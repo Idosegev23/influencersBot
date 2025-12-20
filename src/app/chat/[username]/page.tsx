@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, use } from 'react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
@@ -52,6 +53,7 @@ const typeLabels: Record<InfluencerType, string> = {
 export default function ChatbotPage({ params }: { params: Promise<{ username: string }> }) {
   const resolvedParams = use(params);
   const username = resolvedParams.username;
+  const router = useRouter();
   
   const [influencer, setInfluencer] = useState<Influencer | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -67,9 +69,30 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [tapCount, setTapCount] = useState(0);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const lastTapRef = useRef<number>(0);
+
+  // Triple tap handler for influencer login
+  const handleAvatarTap = () => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 500) {
+      setTapCount(prev => prev + 1);
+    } else {
+      setTapCount(1);
+    }
+    lastTapRef.current = now;
+  };
+
+  // Navigate to influencer dashboard after 3 taps
+  useEffect(() => {
+    if (tapCount >= 3) {
+      setTapCount(0);
+      router.push(`/influencer/${username}`);
+    }
+  }, [tapCount, router, username]);
 
   // Load influencer data
   useEffect(() => {
@@ -211,25 +234,27 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
         <header className="sticky top-0 z-50 glass px-4 py-3">
           <div className="max-w-2xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {influencer.avatar_url ? (
-                <div className="relative w-10 h-10 rounded-xl overflow-hidden">
-                  <Image
-                    src={influencer.avatar_url}
-                    alt={influencer.display_name}
-                    fill
-                    className="object-cover"
-                    sizes="40px"
-                    unoptimized
-                  />
-                </div>
-              ) : (
-                <div 
-                  className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold"
-                  style={{ backgroundColor: 'var(--color-primary)' }}
-                >
-                  {influencer.display_name.charAt(0)}
-                </div>
-              )}
+              <div onClick={handleAvatarTap} className="cursor-pointer select-none">
+                {influencer.avatar_url ? (
+                  <div className="relative w-10 h-10 rounded-xl overflow-hidden">
+                    <Image
+                      src={influencer.avatar_url}
+                      alt={influencer.display_name}
+                      fill
+                      className="object-cover"
+                      sizes="40px"
+                      unoptimized
+                    />
+                  </div>
+                ) : (
+                  <div 
+                    className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold"
+                    style={{ backgroundColor: 'var(--color-primary)' }}
+                  >
+                    {influencer.display_name.charAt(0)}
+                  </div>
+                )}
+              </div>
               <div>
                 <h1 className="font-semibold text-base" style={{ color: 'var(--color-text)' }}>
                   העוזר של {influencer.display_name.split(' ')[0]}
