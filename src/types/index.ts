@@ -55,7 +55,25 @@ export interface Influencer {
   // White label fields
   hide_branding?: boolean;
   custom_logo_url?: string | null;
+  // Scrape settings
+  scrape_settings?: ScrapeSettings;
 }
+
+// Scrape Settings Types
+export interface ScrapeSettings {
+  posts_limit: number;              // 10-100, default 50
+  content_types: PostType[];        // Which types to include
+  include_comments: boolean;        // Whether to fetch comments
+  include_hashtags: boolean;        // Whether to extract hashtags
+}
+
+// Default scrape settings
+export const DEFAULT_SCRAPE_SETTINGS: ScrapeSettings = {
+  posts_limit: 50,
+  content_types: ['image', 'video', 'reel', 'carousel'],
+  include_comments: false,
+  include_hashtags: true,
+};
 
 // Post Types
 export type PostType = 'image' | 'video' | 'reel' | 'carousel';

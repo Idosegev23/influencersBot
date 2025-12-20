@@ -44,8 +44,9 @@ export async function POST(req: NextRequest) {
         tone: 'friendly',
         style: 'casual',
         interests: [],
-        expertise: [],
-        catchphrases: [],
+        signature_phrases: [],
+        emoji_style: 'minimal' as const,
+        language: 'he' as const,
       },
       products.map(p => ({
         name: p.name,
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
       })),
       content.map(c => ({
         title: c.title,
-        type: c.content_type,
+        type: c.type,
       }))
     );
 

@@ -18,6 +18,13 @@ import {
   Type,
   Sun,
   Moon,
+  Database,
+  Image,
+  Video,
+  Film,
+  Layers,
+  Hash,
+  MessageSquare,
 } from 'lucide-react';
 import {
   getInfluencerByUsername,
@@ -25,7 +32,8 @@ import {
   getProductsByInfluencer,
   getContentByInfluencer,
 } from '@/lib/supabase';
-import type { Influencer, InfluencerTheme, Product, ContentItem } from '@/types';
+import type { Influencer, InfluencerTheme, Product, ContentItem, ScrapeSettings, PostType } from '@/types';
+import { DEFAULT_SCRAPE_SETTINGS } from '@/types';
 
 const fontOptions = [
   { value: 'Assistant', label: 'Assistant' },
@@ -72,6 +80,9 @@ export default function SettingsPage({
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
   const [hideBranding, setHideBranding] = useState(false);
   const [customLogoUrl, setCustomLogoUrl] = useState('');
+  
+  // Scrape settings state
+  const [scrapeSettings, setScrapeSettings] = useState<ScrapeSettings>(DEFAULT_SCRAPE_SETTINGS);
 
   // Preview state
   const [showPreview, setShowPreview] = useState(false);
@@ -101,6 +112,7 @@ export default function SettingsPage({
         if (inf.suggested_questions) setSuggestedQuestions(inf.suggested_questions);
         if (inf.hide_branding) setHideBranding(inf.hide_branding);
         if (inf.custom_logo_url) setCustomLogoUrl(inf.custom_logo_url);
+        if (inf.scrape_settings) setScrapeSettings(inf.scrape_settings);
       } catch (error) {
         console.error('Error loading data:', error);
       } finally {
@@ -122,6 +134,7 @@ export default function SettingsPage({
         suggested_questions: suggestedQuestions,
         hide_branding: hideBranding,
         custom_logo_url: customLogoUrl || null,
+        scrape_settings: scrapeSettings,
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -452,11 +465,147 @@ export default function SettingsPage({
               </div>
             </motion.div>
 
-            {/* White Label Settings */}
+            {/* Scrape Settings */}
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
+              className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-6"
+            >
+              <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+                <Database className="w-5 h-5 text-green-400" />
+                הגדרות סריקת אינסטגרם
+              </h2>
+
+              <div className="space-y-6">
+                {/* Posts Limit Slider */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-3">
+                    כמות פוסטים לסריקה: <span className="text-white font-bold">{scrapeSettings.posts_limit}</span>
+                  </label>
+                  <input
+                    type="range"
+                    min="10"
+                    max="100"
+                    step="10"
+                    value={scrapeSettings.posts_limit}
+                    onChange={(e) => setScrapeSettings({ ...scrapeSettings, posts_limit: parseInt(e.target.value) })}
+                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-green-500"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>10</span>
+                    <span>50</span>
+                    <span>100</span>
+                  </div>
+                </div>
+
+                {/* Content Types */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-3">סוגי תוכן לסריקה</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { type: 'image' as PostType, label: 'תמונות', icon: Image },
+                      { type: 'video' as PostType, label: 'סרטונים', icon: Video },
+                      { type: 'reel' as PostType, label: 'Reels', icon: Film },
+                      { type: 'carousel' as PostType, label: 'קרוסלות', icon: Layers },
+                    ].map(({ type, label, icon: Icon }) => {
+                      const isSelected = scrapeSettings.content_types.includes(type);
+                      return (
+                        <button
+                          key={type}
+                          onClick={() => {
+                            if (isSelected) {
+                              // Don't allow removing last type
+                              if (scrapeSettings.content_types.length > 1) {
+                                setScrapeSettings({
+                                  ...scrapeSettings,
+                                  content_types: scrapeSettings.content_types.filter(t => t !== type),
+                                });
+                              }
+                            } else {
+                              setScrapeSettings({
+                                ...scrapeSettings,
+                                content_types: [...scrapeSettings.content_types, type],
+                              });
+                            }
+                          }}
+                          className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                            isSelected
+                              ? 'bg-green-600/20 border-green-500/50 text-white'
+                              : 'bg-gray-700/30 border-gray-600 text-gray-400 hover:border-gray-500'
+                          }`}
+                        >
+                          <Icon className={`w-5 h-5 ${isSelected ? 'text-green-400' : ''}`} />
+                          <span className="text-sm font-medium">{label}</span>
+                          {isSelected && <Check className="w-4 h-4 mr-auto text-green-400" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Additional Options */}
+                <div className="space-y-3">
+                  {/* Include Hashtags */}
+                  <div className="flex items-center justify-between p-4 bg-gray-700/30 rounded-xl">
+                    <div className="flex items-center gap-3">
+                      <Hash className="w-5 h-5 text-blue-400" />
+                      <div>
+                        <h4 className="font-medium text-white">חילוץ האשטגים</h4>
+                        <p className="text-xs text-gray-400">שמירת האשטגים מהפוסטים</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setScrapeSettings({ ...scrapeSettings, include_hashtags: !scrapeSettings.include_hashtags })}
+                      className={`w-12 h-7 rounded-full relative transition-colors ${
+                        scrapeSettings.include_hashtags ? 'bg-green-600' : 'bg-gray-600'
+                      }`}
+                    >
+                      <div
+                        className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all ${
+                          scrapeSettings.include_hashtags ? 'left-1' : 'right-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Include Comments */}
+                  <div className="flex items-center justify-between p-4 bg-gray-700/30 rounded-xl">
+                    <div className="flex items-center gap-3">
+                      <MessageSquare className="w-5 h-5 text-purple-400" />
+                      <div>
+                        <h4 className="font-medium text-white">שליפת תגובות</h4>
+                        <p className="text-xs text-gray-400">יאט את הסריקה אך יספק יותר מידע</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setScrapeSettings({ ...scrapeSettings, include_comments: !scrapeSettings.include_comments })}
+                      className={`w-12 h-7 rounded-full relative transition-colors ${
+                        scrapeSettings.include_comments ? 'bg-purple-600' : 'bg-gray-600'
+                      }`}
+                    >
+                      <div
+                        className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all ${
+                          scrapeSettings.include_comments ? 'left-1' : 'right-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-blue-600/10 border border-blue-500/30 rounded-xl">
+                  <p className="text-sm text-blue-300">
+                    <strong>שימו לב:</strong> Highlights ו-Stories לא נתמכים על ידי הסריקה (דורשים התחברות לאינסטגרם).
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* White Label Settings */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
               className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-6"
             >
               <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">

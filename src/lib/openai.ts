@@ -348,13 +348,18 @@ export async function generateGreetingAndQuestions(
   displayName: string,
   influencerType: InfluencerType,
   persona: InfluencerPersona,
-  products: Array<{ name: string; brand?: string; coupon_code?: string }>
+  products: Array<{ name: string; brand?: string; coupon_code?: string }>,
+  contentItems: Array<{ title: string; type: string }> = []
 ): Promise<{ greeting: string; questions: string[] }> {
   const client = getClient();
   
   const productContext = products.length > 0 
     ? `מוצרים וקופונים: ${products.map(p => `${p.name}${p.brand ? ` (${p.brand})` : ''}${p.coupon_code ? ` - קופון: ${p.coupon_code}` : ''}`).join(', ')}`
     : 'אין מוצרים מוגדרים עדיין';
+  
+  const contentContext = contentItems.length > 0
+    ? `תוכן: ${contentItems.map(c => `${c.title} (${c.type})`).join(', ')}`
+    : '';
 
   try {
     const response = await client.responses.create({
@@ -381,7 +386,8 @@ export async function generateGreetingAndQuestions(
         tone: persona.tone,
         style: persona.style,
         interests: persona.interests,
-        products: productContext
+        products: productContext,
+        content: contentContext
       }),
       text: {
         format: {

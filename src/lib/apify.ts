@@ -1,7 +1,22 @@
-import type { ApifyProfileData, ApifyPostData } from '@/types';
+import type { ApifyProfileData, ApifyPostData, ScrapeSettings, PostType } from '@/types';
+import { DEFAULT_SCRAPE_SETTINGS } from '@/types';
 
 const APIFY_TOKEN = process.env.APIFY_TOKEN;
 const INSTAGRAM_SCRAPER_ACTOR = 'apify/instagram-scraper';
+
+// Map Apify post types to our PostType
+function mapApifyTypeToPostType(apifyType: string): PostType {
+  const typeMap: Record<string, PostType> = {
+    'Image': 'image',
+    'Video': 'video',
+    'Reel': 'reel',
+    'Sidecar': 'carousel',
+    'GraphImage': 'image',
+    'GraphVideo': 'video',
+    'GraphSidecar': 'carousel',
+  };
+  return typeMap[apifyType] || 'image';
+}
 
 interface ApifyRunResult {
   id: string;
@@ -154,7 +169,7 @@ async function getDatasetItems<T>(datasetId: string): Promise<T[]> {
 
 export async function scrapeInstagramProfile(
   username: string,
-  postsLimit: number = 50
+  settings: Partial<ScrapeSettings> = {}
 ): Promise<{
   profile: ApifyProfileData;
   posts: ApifyPostData[];
@@ -163,11 +178,19 @@ export async function scrapeInstagramProfile(
     throw new Error('APIFY_TOKEN not configured');
   }
 
-  // Start the scraper
+  // Merge with defaults
+  const scrapeSettings: ScrapeSettings = {
+    ...DEFAULT_SCRAPE_SETTINGS,
+    ...settings,
+  };
+
+  console.log('Scrape settings:', scrapeSettings);
+
+  // Start the scraper with custom settings
   const run = await runApifyActor(INSTAGRAM_SCRAPER_ACTOR, {
     directUrls: [`https://www.instagram.com/${username}/`],
     resultsType: 'posts',
-    resultsLimit: postsLimit,
+    resultsLimit: scrapeSettings.posts_limit,
     searchType: 'user',
     searchLimit: 1,
     addParentData: true,
@@ -198,9 +221,14 @@ export async function scrapeInstagramProfile(
     isVerified: firstItem.verified || false,
   };
 
-  // Extract posts
+  // Extract posts and filter by content types
   const posts: ApifyPostData[] = items
     .filter((item) => item.shortCode) // Only items that are posts
+    .filter((item) => {
+      // Filter by content type if specified
+      const postType = mapApifyTypeToPostType(item.type || 'Image');
+      return scrapeSettings.content_types.includes(postType);
+    })
     .map((item) => ({
       shortCode: item.shortCode,
       type: item.type || 'Image',
@@ -212,7 +240,20 @@ export async function scrapeInstagramProfile(
       timestamp: item.timestamp || new Date().toISOString(),
     }));
 
+  console.log(`Fetched ${posts.length} posts after filtering`);
+
   return { profile, posts };
+}
+
+// Legacy function for backward compatibility
+export async function scrapeInstagramProfileLegacy(
+  username: string,
+  postsLimit: number = 50
+): Promise<{
+  profile: ApifyProfileData;
+  posts: ApifyPostData[];
+}> {
+  return scrapeInstagramProfile(username, { posts_limit: postsLimit });
 }
 
 // ============================================
