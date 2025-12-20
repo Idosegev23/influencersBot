@@ -21,8 +21,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Scrape profile
-    const result = await scrapeInstagramProfile(parsed.username, 50);
+    // Scrape profile with default settings
+    const result = await scrapeInstagramProfile(parsed.username, { posts_limit: 50 });
 
     return NextResponse.json({
       success: true,

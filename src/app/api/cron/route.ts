@@ -36,10 +36,10 @@ export async function GET(req: NextRequest) {
       try {
         console.log(`Syncing ${influencer.username}...`);
 
-        // Fetch latest posts
+        // Fetch latest posts using influencer's scrape settings
         const { profile, posts } = await scrapeInstagramProfile(
           influencer.username,
-          20 // Only fetch last 20 posts for updates
+          influencer.scrape_settings || { posts_limit: 20 }
         );
 
         // Analyze new posts
@@ -136,8 +136,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Fetch and sync
-    const { profile, posts } = await scrapeInstagramProfile(influencer.username, 30);
+    // Fetch and sync using influencer's scrape settings
+    const { profile, posts } = await scrapeInstagramProfile(
+      influencer.username,
+      influencer.scrape_settings || { posts_limit: 30 }
+    );
     const postAnalysis = await analyzeAllPosts(posts);
 
     const dbPosts: Omit<Post, 'id' | 'created_at'>[] = posts.map((post) => {
