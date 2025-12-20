@@ -1,36 +1,119 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# InfluencerBot - AI Chatbot Platform for Influencers
 
-## Getting Started
+מערכת SaaS ליצירת צ'אטבוטים מותאמים אישית למשפיענים.
 
-First, run the development server:
+## תכונות עיקריות
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Onboarding Wizard** - הזנת URL אינסטגרם ויצירת צ'אטבוט אוטומטית
+- **AI Analysis** - זיהוי סוג משפיען, חילוץ מותגים וקופונים, יצירת פרסונה
+- **Dynamic Theming** - עיצוב מותאם לכל משפיען
+- **Multi-tenant** - כל משפיען מקבל subdomain ייחודי
+- **Admin Panel** - ניהול מוצרים, צפייה בשיחות, אנליטיקס
+- **Auto-sync** - רענון אוטומטי של תוכן מאינסטגרם
+
+## Tech Stack
+
+| Component | Technology |
+|-----------|------------|
+| Framework | Next.js 16 + TypeScript |
+| Styling | Tailwind CSS |
+| Database | Supabase (PostgreSQL) |
+| AI | OpenAI GPT-5.2 / GPT-5-nano (Responses API) |
+| Scraping | Apify Instagram Scraper |
+| Charts | Recharts |
+| Animations | Framer Motion |
+| Hosting | Vercel (wildcard subdomain) |
+
+## הגדרת משתני סביבה
+
+צור קובץ `.env` עם:
+
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+
+# OpenAI
+OPENAI_API_KEY=sk-your-openai-api-key
+
+# Apify
+APIFY_TOKEN=your-apify-token
+
+# App
+NEXT_PUBLIC_ROOT_DOMAIN=influencerbot.com
+ADMIN_PASSWORD=your-admin-password
+
+# Cron Secret
+CRON_SECRET=your-random-secret
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## הרצה מקומית
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+פתח http://localhost:3000
 
-## Learn More
+## מבנה הפרויקט
 
-To learn more about Next.js, take a look at the following resources:
+```
+src/
+├── app/
+│   ├── page.tsx                 # Landing page
+│   ├── admin/
+│   │   ├── page.tsx             # Admin login
+│   │   ├── add/page.tsx         # Onboarding wizard
+│   │   └── dashboard/page.tsx   # Dashboard
+│   ├── [subdomain]/
+│   │   ├── page.tsx             # Client chatbot
+│   │   └── manage/page.tsx      # Influencer admin
+│   └── api/
+│       ├── apify/               # Instagram scraping
+│       ├── analyze/             # AI analysis
+│       ├── chat/                # Chat with GPT-5-nano
+│       ├── cron/                # Auto-sync
+│       └── admin/               # Admin APIs
+├── components/
+│   └── wizard/                  # Onboarding wizard steps
+├── lib/
+│   ├── supabase.ts              # Database client
+│   ├── openai.ts                # AI (Responses API)
+│   ├── apify.ts                 # Instagram scraper
+│   ├── theme.ts                 # Dynamic theming
+│   └── utils.ts                 # Utilities
+└── types/
+    └── index.ts                 # TypeScript types
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Database Schema
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `influencers` - פרטי משפיענים
+- `posts` - פוסטים מאינסטגרם
+- `products` - מוצרים וקופונים
+- `content_items` - מתכונים/לוקים/סקירות
+- `chat_sessions` - סשנים של שיחות
+- `chat_messages` - הודעות
+- `support_requests` - פניות תמיכה
+- `analytics_events` - אירועי אנליטיקס
 
-## Deploy on Vercel
+## מודלי AI
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| שימוש | מודל | הסבר |
+|-------|------|------|
+| צ'אט | `gpt-5-nano` | הכי מהיר וזול |
+| ניתוח | `gpt-5.2` | הכי חכם לניתוח מורכב |
+| Persona | `gpt-5.2` | יצירת פרסונה מדויקת |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Deploy to Vercel
+
+1. Push to GitHub
+2. Connect to Vercel
+3. Add environment variables
+4. Configure wildcard domain (*.influencerbot.com)
+5. Deploy!
+
+## רישיון
+
+MIT
