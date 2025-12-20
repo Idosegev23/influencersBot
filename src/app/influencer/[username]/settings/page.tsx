@@ -70,11 +70,20 @@ export default function SettingsPage({
 
   // Form state
   const [theme, setTheme] = useState<InfluencerTheme>({
-    primaryColor: '#7c3aed',
-    accentColor: '#a855f7',
-    backgroundColor: '#0f0a1a',
-    textColor: '#ffffff',
-    fontFamily: 'Assistant',
+    colors: {
+      primary: '#7c3aed',
+      accent: '#a855f7',
+      background: '#0f0a1a',
+      text: '#ffffff',
+      surface: '#1a1a2e',
+      border: '#2a2a4a',
+    },
+    fonts: {
+      heading: 'Assistant',
+      body: 'Assistant',
+    },
+    style: 'minimal',
+    darkMode: true,
   });
   const [greetingMessage, setGreetingMessage] = useState('');
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
@@ -171,10 +180,14 @@ export default function SettingsPage({
   const applyPreset = (preset: typeof colorPresets[0]) => {
     setTheme({
       ...theme,
-      primaryColor: preset.primary,
-      accentColor: preset.accent,
-      backgroundColor: preset.background,
-      textColor: preset.text,
+      colors: {
+        ...theme.colors,
+        primary: preset.primary,
+        accent: preset.accent,
+        background: preset.background,
+        text: preset.text,
+      },
+      darkMode: preset.background.startsWith('#0') || preset.background.startsWith('#1'),
     });
   };
 
@@ -311,14 +324,14 @@ export default function SettingsPage({
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
-                      value={theme.primaryColor}
-                      onChange={(e) => setTheme({ ...theme, primaryColor: e.target.value })}
+                      value={theme.colors.primary}
+                      onChange={(e) => setTheme({ ...theme, colors: { ...theme.colors, primary: e.target.value } })}
                       className="w-12 h-10 rounded cursor-pointer border-0"
                     />
                     <input
                       type="text"
-                      value={theme.primaryColor}
-                      onChange={(e) => setTheme({ ...theme, primaryColor: e.target.value })}
+                      value={theme.colors.primary}
+                      onChange={(e) => setTheme({ ...theme, colors: { ...theme.colors, primary: e.target.value } })}
                       className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"
                     />
                   </div>
@@ -328,14 +341,14 @@ export default function SettingsPage({
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
-                      value={theme.accentColor}
-                      onChange={(e) => setTheme({ ...theme, accentColor: e.target.value })}
+                      value={theme.colors.accent}
+                      onChange={(e) => setTheme({ ...theme, colors: { ...theme.colors, accent: e.target.value } })}
                       className="w-12 h-10 rounded cursor-pointer border-0"
                     />
                     <input
                       type="text"
-                      value={theme.accentColor}
-                      onChange={(e) => setTheme({ ...theme, accentColor: e.target.value })}
+                      value={theme.colors.accent}
+                      onChange={(e) => setTheme({ ...theme, colors: { ...theme.colors, accent: e.target.value } })}
                       className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"
                     />
                   </div>
@@ -345,14 +358,14 @@ export default function SettingsPage({
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
-                      value={theme.backgroundColor}
-                      onChange={(e) => setTheme({ ...theme, backgroundColor: e.target.value })}
+                      value={theme.colors.background}
+                      onChange={(e) => setTheme({ ...theme, colors: { ...theme.colors, background: e.target.value } })}
                       className="w-12 h-10 rounded cursor-pointer border-0"
                     />
                     <input
                       type="text"
-                      value={theme.backgroundColor}
-                      onChange={(e) => setTheme({ ...theme, backgroundColor: e.target.value })}
+                      value={theme.colors.background}
+                      onChange={(e) => setTheme({ ...theme, colors: { ...theme.colors, background: e.target.value } })}
                       className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"
                     />
                   </div>
@@ -362,14 +375,14 @@ export default function SettingsPage({
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
-                      value={theme.textColor}
-                      onChange={(e) => setTheme({ ...theme, textColor: e.target.value })}
+                      value={theme.colors.text}
+                      onChange={(e) => setTheme({ ...theme, colors: { ...theme.colors, text: e.target.value } })}
                       className="w-12 h-10 rounded cursor-pointer border-0"
                     />
                     <input
                       type="text"
-                      value={theme.textColor}
-                      onChange={(e) => setTheme({ ...theme, textColor: e.target.value })}
+                      value={theme.colors.text}
+                      onChange={(e) => setTheme({ ...theme, colors: { ...theme.colors, text: e.target.value } })}
                       className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"
                     />
                   </div>
@@ -383,8 +396,8 @@ export default function SettingsPage({
                   גופן
                 </label>
                 <select
-                  value={theme.fontFamily}
-                  onChange={(e) => setTheme({ ...theme, fontFamily: e.target.value })}
+                  value={theme.fonts.heading}
+                  onChange={(e) => setTheme({ ...theme, fonts: { heading: e.target.value, body: e.target.value } })}
                   className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   {fontOptions.map((font) => (
@@ -683,8 +696,8 @@ export default function SettingsPage({
                 <div
                   className="p-6 min-h-[400px]"
                   style={{
-                    backgroundColor: theme.backgroundColor,
-                    fontFamily: theme.fontFamily,
+                    backgroundColor: theme.colors.background,
+                    fontFamily: theme.fonts.heading,
                   }}
                 >
                   {/* Avatar */}
@@ -692,13 +705,13 @@ export default function SettingsPage({
                     <div
                       className="w-16 h-16 rounded-full mb-3 flex items-center justify-center text-2xl font-bold"
                       style={{
-                        background: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.accentColor})`,
-                        color: theme.textColor,
+                        background: `linear-gradient(135deg, ${theme.colors.primary}, ${theme.colors.accent})`,
+                        color: theme.colors.text,
                       }}
                     >
                       {influencer.display_name.charAt(0)}
                     </div>
-                    <h3 className="font-semibold" style={{ color: theme.textColor }}>
+                    <h3 className="font-semibold" style={{ color: theme.colors.text }}>
                       {influencer.display_name}
                     </h3>
                   </div>
@@ -707,12 +720,12 @@ export default function SettingsPage({
                   <div
                     className="rounded-2xl rounded-tr-sm p-4 mb-4 max-w-[85%] mr-auto"
                     style={{
-                      backgroundColor: `${theme.primaryColor}20`,
-                      borderColor: `${theme.primaryColor}50`,
+                      backgroundColor: `${theme.colors.primary}20`,
+                      borderColor: `${theme.colors.primary}50`,
                       borderWidth: '1px',
                     }}
                   >
-                    <p className="text-sm" style={{ color: theme.textColor }}>
+                    <p className="text-sm" style={{ color: theme.colors.text }}>
                       {greetingMessage || 'היי! איך אוכל לעזור?'}
                     </p>
                   </div>
@@ -724,8 +737,8 @@ export default function SettingsPage({
                         key={i}
                         className="px-3 py-2 text-xs rounded-lg border"
                         style={{
-                          borderColor: `${theme.primaryColor}50`,
-                          color: theme.textColor,
+                          borderColor: `${theme.colors.primary}50`,
+                          color: theme.colors.text,
                         }}
                       >
                         {q || `שאלה ${i + 1}`}
@@ -737,19 +750,19 @@ export default function SettingsPage({
                   <div
                     className="mt-6 rounded-full px-4 py-3 flex items-center"
                     style={{
-                      backgroundColor: `${theme.textColor}10`,
-                      borderColor: `${theme.primaryColor}30`,
+                      backgroundColor: `${theme.colors.text}10`,
+                      borderColor: `${theme.colors.primary}30`,
                       borderWidth: '1px',
                     }}
                   >
-                    <span className="text-sm opacity-50" style={{ color: theme.textColor }}>
+                    <span className="text-sm opacity-50" style={{ color: theme.colors.text }}>
                       הקלד הודעה...
                     </span>
                     <div
                       className="mr-auto w-8 h-8 rounded-full flex items-center justify-center"
-                      style={{ backgroundColor: theme.primaryColor }}
+                      style={{ backgroundColor: theme.colors.primary }}
                     >
-                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke={theme.textColor}>
+                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke={theme.colors.text}>
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                       </svg>
                     </div>
