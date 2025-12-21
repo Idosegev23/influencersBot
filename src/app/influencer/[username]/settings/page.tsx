@@ -25,6 +25,8 @@ import {
   Layers,
   Hash,
   MessageSquare,
+  Phone,
+  Bell,
 } from 'lucide-react';
 import {
   getInfluencerByUsername,
@@ -90,6 +92,10 @@ export default function SettingsPage({
   const [hideBranding, setHideBranding] = useState(false);
   const [customLogoUrl, setCustomLogoUrl] = useState('');
   
+  // Phone & WhatsApp state
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [whatsappEnabled, setWhatsappEnabled] = useState(false);
+  
   // Scrape settings state
   const [scrapeSettings, setScrapeSettings] = useState<ScrapeSettings>(DEFAULT_SCRAPE_SETTINGS);
 
@@ -122,6 +128,8 @@ export default function SettingsPage({
         if (inf.hide_branding) setHideBranding(inf.hide_branding);
         if (inf.custom_logo_url) setCustomLogoUrl(inf.custom_logo_url);
         if (inf.scrape_settings) setScrapeSettings(inf.scrape_settings);
+        if (inf.phone_number) setPhoneNumber(inf.phone_number);
+        if (inf.whatsapp_enabled) setWhatsappEnabled(inf.whatsapp_enabled);
       } catch (error) {
         console.error('Error loading data:', error);
       } finally {
@@ -144,6 +152,8 @@ export default function SettingsPage({
         hide_branding: hideBranding,
         custom_logo_url: customLogoUrl || null,
         scrape_settings: scrapeSettings,
+        phone_number: phoneNumber || null,
+        whatsapp_enabled: whatsappEnabled,
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -611,6 +621,84 @@ export default function SettingsPage({
                     <strong>שימו לב:</strong> Highlights ו-Stories לא נתמכים על ידי הסריקה (דורשים התחברות לאינסטגרם).
                   </p>
                 </div>
+              </div>
+            </motion.div>
+
+            {/* WhatsApp & Phone Settings */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 }}
+              className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-6"
+            >
+              <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+                <Phone className="w-5 h-5 text-green-400" />
+                טלפון והתראות WhatsApp
+              </h2>
+
+              <div className="space-y-6">
+                {/* Phone Number */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">מספר טלפון</label>
+                  <div className="relative">
+                    <input
+                      type="tel"
+                      value={phoneNumber}
+                      onChange={(e) => {
+                        // Allow only digits
+                        const value = e.target.value.replace(/\D/g, '');
+                        setPhoneNumber(value);
+                      }}
+                      placeholder="0541234567"
+                      dir="ltr"
+                      className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 text-left"
+                    />
+                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">
+                    מספר לקבלת התראות על פניות תמיכה ושאלות מלקוחות
+                  </p>
+                </div>
+
+                {/* WhatsApp Notifications Toggle */}
+                <div className="flex items-center justify-between p-4 bg-gray-700/30 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <Bell className="w-5 h-5 text-green-400" />
+                    <div>
+                      <h4 className="font-medium text-white">התראות WhatsApp</h4>
+                      <p className="text-xs text-gray-400">קבלת התראות בזמן אמת על פניות חדשות</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setWhatsappEnabled(!whatsappEnabled)}
+                    disabled={!phoneNumber}
+                    className={`w-12 h-7 rounded-full relative transition-colors ${
+                      whatsappEnabled && phoneNumber ? 'bg-green-600' : 'bg-gray-600'
+                    } ${!phoneNumber ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <div
+                      className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all ${
+                        whatsappEnabled && phoneNumber ? 'left-1' : 'right-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {!phoneNumber && whatsappEnabled && (
+                  <div className="p-4 bg-yellow-600/10 border border-yellow-500/30 rounded-xl">
+                    <p className="text-sm text-yellow-400">
+                      יש להזין מספר טלפון כדי להפעיל התראות WhatsApp
+                    </p>
+                  </div>
+                )}
+
+                {phoneNumber && whatsappEnabled && (
+                  <div className="p-4 bg-green-600/10 border border-green-500/30 rounded-xl">
+                    <p className="text-sm text-green-300">
+                      התראות WhatsApp פעילות - תקבלו הודעה בכל פנייה חדשה
+                    </p>
+                  </div>
+                )}
               </div>
             </motion.div>
 

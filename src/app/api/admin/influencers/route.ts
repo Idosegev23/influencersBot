@@ -59,6 +59,8 @@ export async function POST(req: NextRequest) {
       persona,
       theme,
       admin_password,
+      phone_number,
+      whatsapp_enabled,
       context,
     } = body;
 
@@ -129,6 +131,8 @@ export async function POST(req: NextRequest) {
       last_synced_at: new Date().toISOString(),
       greeting_message,
       suggested_questions,
+      phone_number: phone_number || null,
+      whatsapp_enabled: whatsapp_enabled || false,
     });
 
     if (!influencer) {

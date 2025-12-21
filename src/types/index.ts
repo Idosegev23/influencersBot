@@ -57,6 +57,10 @@ export interface Influencer {
   custom_logo_url?: string | null;
   // Scrape settings
   scrape_settings?: ScrapeSettings;
+  // Contact info
+  phone_number?: string | null;
+  // WhatsApp settings
+  whatsapp_enabled?: boolean;
 }
 
 // Scrape Settings Types

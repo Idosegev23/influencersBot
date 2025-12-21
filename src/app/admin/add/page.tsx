@@ -162,7 +162,7 @@ export default function AddInfluencerPage() {
   };
 
   // Handle publish
-  const handlePublish = async (subdomain: string, password: string) => {
+  const handlePublish = async (subdomain: string, password: string, phoneNumber?: string) => {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
@@ -195,6 +195,8 @@ export default function AddInfluencerPage() {
           persona: state.persona,
           theme: state.theme,
           admin_password: password,
+          phone_number: phoneNumber,
+          whatsapp_enabled: !!phoneNumber,
           context,
         }),
       });

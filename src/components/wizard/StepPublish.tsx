@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Globe, Lock, Copy, Check, ExternalLink, Loader2, AlertCircle } from 'lucide-react';
+import { Globe, Lock, Copy, Check, ExternalLink, Loader2, AlertCircle, Phone } from 'lucide-react';
 import { isValidSubdomain, slugify } from '@/lib/utils';
 
 interface StepPublishProps {
   suggestedSubdomain: string;
-  onPublish: (subdomain: string, password: string) => Promise<void>;
+  onPublish: (subdomain: string, password: string, phoneNumber?: string) => Promise<void>;
   onBack: () => void;
   isLoading: boolean;
   error: string | null;
@@ -23,6 +23,7 @@ export function StepPublish({
   const [subdomain, setSubdomain] = useState(slugify(suggestedSubdomain));
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [copied, setCopied] = useState(false);
   const [validationError, setValidationError] = useState('');
 
@@ -65,7 +66,13 @@ export function StepPublish({
       return;
     }
 
-    await onPublish(subdomain, password);
+    // Validate phone if provided
+    if (phoneNumber && phoneNumber.length < 9) {
+      setValidationError('מספר הטלפון חייב להכיל לפחות 9 ספרות');
+      return;
+    }
+
+    await onPublish(subdomain, password, phoneNumber || undefined);
   };
 
   return (
@@ -155,6 +162,32 @@ export function StepPublish({
           </div>
           <p className="text-xs text-gray-500 mt-2">
             סיסמה זו תשמש לגישה לפאנל הניהול של המשפיען
+          </p>
+        </div>
+
+        {/* Phone Number Input */}
+        <div className="card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Phone className="w-4 h-4 text-gray-400" />
+            <label className="text-sm font-medium text-gray-700">
+              מספר טלפון להתראות
+            </label>
+            <span className="text-xs text-gray-400">(אופציונלי)</span>
+          </div>
+          <input
+            type="tel"
+            value={phoneNumber}
+            onChange={(e) => {
+              const value = e.target.value.replace(/\D/g, '');
+              setPhoneNumber(value);
+              setValidationError('');
+            }}
+            placeholder="0541234567"
+            dir="ltr"
+            className="input text-left"
+          />
+          <p className="text-xs text-gray-500 mt-2">
+            קבלו התראות WhatsApp על פניות תמיכה ושאלות מלקוחות
           </p>
         </div>
 
