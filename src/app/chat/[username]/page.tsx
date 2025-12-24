@@ -19,6 +19,8 @@ import {
   Heart,
   Dumbbell,
   Sparkles,
+  ArrowRight,
+  Plus,
 } from 'lucide-react';
 import { getInfluencerByUsername, getProductsByInfluencer, getContentByInfluencer } from '@/lib/supabase';
 import { applyTheme, getGoogleFontsUrl } from '@/lib/theme';
@@ -181,6 +183,15 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     }
   };
 
+  // Reset chat and start new conversation
+  const handleNewChat = () => {
+    setMessages([]);
+    setResponseId(null);
+    setSessionId(null);
+    setInputValue('');
+    inputRef.current?.focus();
+  };
+
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code);
     setCopiedCode(code);
@@ -233,7 +244,16 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
         {/* Header */}
         <header className="sticky top-0 z-50 glass px-4 py-3">
           <div className="max-w-2xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            {/* Right side - Back button + Avatar */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => window.history.back()}
+                className="p-2 rounded-lg transition-all hover:bg-black/10"
+                style={{ color: 'var(--color-text)' }}
+                aria-label="חזרה"
+              >
+                <ArrowRight className="w-5 h-5" />
+              </button>
               <div onClick={handleAvatarTap} className="cursor-pointer select-none">
                 {influencer.avatar_url ? (
                   <div className="relative w-10 h-10 rounded-xl overflow-hidden">
@@ -264,25 +284,42 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 </p>
               </div>
             </div>
-            <div className="flex gap-1 p-1 rounded-lg" style={{ backgroundColor: 'var(--color-surface)' }}>
-              <button
-                onClick={() => setActiveTab('chat')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                  activeTab === 'chat' ? 'bg-white shadow-sm' : ''
-                }`}
-                style={{ color: 'var(--color-text)' }}
-              >
-                צ'אט
-              </button>
-              <button
-                onClick={() => setActiveTab('search')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                  activeTab === 'search' ? 'bg-white shadow-sm' : ''
-                }`}
-                style={{ color: 'var(--color-text)' }}
-              >
-                חיפוש
-              </button>
+
+            {/* Left side - Tabs + New Chat */}
+            <div className="flex items-center gap-2">
+              <div className="flex gap-1 p-1 rounded-lg" style={{ backgroundColor: 'var(--color-surface)' }}>
+                <button
+                  onClick={() => setActiveTab('chat')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    activeTab === 'chat' ? 'bg-white shadow-sm' : ''
+                  }`}
+                  style={{ color: 'var(--color-text)' }}
+                >
+                  צ'אט
+                </button>
+                <button
+                  onClick={() => setActiveTab('search')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    activeTab === 'search' ? 'bg-white shadow-sm' : ''
+                  }`}
+                  style={{ color: 'var(--color-text)' }}
+                >
+                  חיפוש
+                </button>
+              </div>
+              
+              {/* New Chat Button - only visible when there are messages */}
+              {messages.length > 0 && (
+                <button
+                  onClick={handleNewChat}
+                  className="p-2 rounded-lg transition-all hover:bg-black/10"
+                  style={{ color: 'var(--color-primary)' }}
+                  aria-label="שיחה חדשה"
+                  title="שיחה חדשה"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+              )}
             </div>
           </div>
         </header>

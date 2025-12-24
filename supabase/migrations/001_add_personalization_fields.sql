@@ -19,3 +19,4 @@ COMMENT ON COLUMN influencers.custom_logo_url IS 'White label: custom logo URL';
 CREATE INDEX IF NOT EXISTS idx_influencers_username ON influencers(username);
 CREATE INDEX IF NOT EXISTS idx_influencers_subdomain ON influencers(subdomain);
 
+
