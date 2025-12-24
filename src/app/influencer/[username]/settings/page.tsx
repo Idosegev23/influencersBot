@@ -69,6 +69,8 @@ export default function SettingsPage({
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
+  const [rescanning, setRescanning] = useState(false);
+  const [rescanResult, setRescanResult] = useState<{ products: number; content: number } | null>(null);
 
   // Form state
   const [theme, setTheme] = useState<InfluencerTheme>({
@@ -184,6 +186,35 @@ export default function SettingsPage({
       console.error('Error regenerating:', error);
     } finally {
       setRegenerating(false);
+    }
+  };
+
+  const handleRescan = async () => {
+    if (!influencer) return;
+
+    setRescanning(true);
+    setRescanResult(null);
+    try {
+      const response = await fetch('/api/influencer/rescan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setRescanResult({
+          products: data.stats.products,
+          content: data.stats.content,
+        });
+        // Reload influencer data
+        const inf = await getInfluencerByUsername(username);
+        if (inf) setInfluencer(inf);
+      }
+    } catch (error) {
+      console.error('Error rescanning:', error);
+    } finally {
+      setRescanning(false);
     }
   };
 
@@ -620,6 +651,34 @@ export default function SettingsPage({
                   <p className="text-sm text-blue-300">
                     <strong>שימו לב:</strong> Highlights ו-Stories לא נתמכים על ידי הסריקה (דורשים התחברות לאינסטגרם).
                   </p>
+                </div>
+
+                {/* Rescan Button */}
+                <div className="pt-4 border-t border-gray-700">
+                  <button
+                    onClick={handleRescan}
+                    disabled={rescanning}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-500 hover:to-teal-500 disabled:opacity-50 text-white font-medium rounded-xl transition-all"
+                  >
+                    {rescanning ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        סורק מחדש...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="w-5 h-5" />
+                        סרוק מחדש מאינסטגרם
+                      </>
+                    )}
+                  </button>
+                  {rescanResult && (
+                    <div className="mt-3 p-3 bg-green-600/20 border border-green-500/30 rounded-xl">
+                      <p className="text-sm text-green-300 text-center">
+                        נמצאו {rescanResult.products} מוצרים ו-{rescanResult.content} פריטי תוכן
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             </motion.div>
