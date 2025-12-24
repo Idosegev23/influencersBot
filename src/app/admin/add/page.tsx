@@ -222,6 +222,20 @@ export default function AddInfluencerPage() {
         }
       }
 
+      // Save content items (recipes, tips, etc.)
+      if (state.extractedContent.length > 0 && data.influencer?.id) {
+        for (const content of state.extractedContent) {
+          await fetch('/api/admin/content', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              influencer_id: data.influencer.id,
+              ...content,
+            }),
+          }).catch(console.error);
+        }
+      }
+
       // Success - redirect to dashboard
       router.push(`/admin/dashboard?created=${subdomain}`);
     } catch (error) {
