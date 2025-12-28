@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, getInfluencerByUsername, getProductsByInfluencer } from '@/lib/supabase';
 import { notifyInfluencerSupport, sendSupportConfirmation } from '@/lib/whatsapp';
-import { sanitizeInput } from '@/lib/sanitize';
+import { sanitizeHtml } from '@/lib/sanitize';
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,8 +24,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Sanitize inputs
-    const sanitizedName = sanitizeInput(customerName);
-    const sanitizedMessage = sanitizeInput(message);
+    const sanitizedName = sanitizeHtml(customerName);
+    const sanitizedMessage = sanitizeHtml(message);
     const sanitizedPhone = customerPhone ? customerPhone.replace(/[^\d+]/g, '') : null;
 
     // Get influencer
@@ -184,7 +184,7 @@ export async function PATCH(req: NextRequest) {
 
     const updateData: Record<string, unknown> = { status };
     if (notes) {
-      updateData.notes = sanitizeInput(notes);
+      updateData.notes = sanitizeHtml(notes);
     }
     if (status === 'resolved' || status === 'closed') {
       updateData.resolved_at = new Date().toISOString();
