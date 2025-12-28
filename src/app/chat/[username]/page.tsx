@@ -21,6 +21,9 @@ import {
   Sparkles,
   ArrowRight,
   Plus,
+  Headphones,
+  X,
+  Loader2,
 } from 'lucide-react';
 import { getInfluencerByUsername, getProductsByInfluencer, getContentByInfluencer } from '@/lib/supabase';
 import { applyTheme, getGoogleFontsUrl } from '@/lib/theme';
@@ -72,6 +75,10 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [tapCount, setTapCount] = useState(0);
+  const [showSupportModal, setShowSupportModal] = useState(false);
+  const [supportForm, setSupportForm] = useState({ name: '', phone: '', message: '' });
+  const [supportLoading, setSupportLoading] = useState(false);
+  const [supportSuccess, setSupportSuccess] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -198,6 +205,38 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
+  const handleSupportSubmit = async () => {
+    if (!supportForm.name || !supportForm.message || !influencer) return;
+    
+    setSupportLoading(true);
+    try {
+      const response = await fetch('/api/support', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username,
+          customerName: supportForm.name,
+          customerPhone: supportForm.phone || null,
+          message: supportForm.message,
+          sessionId,
+        }),
+      });
+
+      if (response.ok) {
+        setSupportSuccess(true);
+        setTimeout(() => {
+          setShowSupportModal(false);
+          setSupportSuccess(false);
+          setSupportForm({ name: '', phone: '', message: '' });
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('Support error:', error);
+    } finally {
+      setSupportLoading(false);
+    }
+  };
+
   const filteredProducts = products.filter((p) =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (p.brand && p.brand.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -307,6 +346,19 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   חיפוש
                 </button>
               </div>
+              
+              {/* Support Button */}
+              {influencer.whatsapp_enabled && (
+                <button
+                  onClick={() => setShowSupportModal(true)}
+                  className="p-2 rounded-lg transition-all hover:bg-black/10"
+                  style={{ color: 'var(--color-accent)' }}
+                  aria-label="פנייה לתמיכה"
+                  title="פנייה לתמיכה"
+                >
+                  <Headphones className="w-5 h-5" />
+                </button>
+              )}
               
               {/* New Chat Button - only visible when there are messages */}
               {messages.length > 0 && (
@@ -589,6 +641,126 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
             )}
           </AnimatePresence>
         </div>
+
+        {/* Support Modal */}
+        <AnimatePresence>
+          {showSupportModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4"
+              style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
+              onClick={() => setShowSupportModal(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="w-full max-w-md rounded-2xl p-6"
+                style={{ backgroundColor: 'var(--color-surface)' }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {supportSuccess ? (
+                  <div className="text-center py-8">
+                    <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ backgroundColor: 'rgba(16,185,129,0.1)' }}>
+                      <Check className="w-8 h-8 text-green-500" />
+                    </div>
+                    <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--color-text)' }}>הפנייה נשלחה בהצלחה!</h3>
+                    <p className="text-sm" style={{ color: 'var(--color-text)', opacity: 0.7 }}>
+                      {influencer.display_name} יחזור/תחזור אליך בהקדם
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text)' }}>
+                        פנייה ל-{influencer.display_name}
+                      </h3>
+                      <button
+                        onClick={() => setShowSupportModal(false)}
+                        className="p-1 rounded-lg hover:bg-black/10"
+                        style={{ color: 'var(--color-text)' }}
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)', opacity: 0.7 }}>
+                          שם *
+                        </label>
+                        <input
+                          type="text"
+                          value={supportForm.name}
+                          onChange={(e) => setSupportForm({ ...supportForm, name: e.target.value })}
+                          placeholder="השם שלך"
+                          className="w-full px-4 py-3 rounded-xl border"
+                          style={{ 
+                            backgroundColor: 'var(--color-background)', 
+                            borderColor: 'var(--color-border)',
+                            color: 'var(--color-text)'
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)', opacity: 0.7 }}>
+                          טלפון (אופציונלי - לקבלת תשובה ב-WhatsApp)
+                        </label>
+                        <input
+                          type="tel"
+                          value={supportForm.phone}
+                          onChange={(e) => setSupportForm({ ...supportForm, phone: e.target.value.replace(/[^\d+]/g, '') })}
+                          placeholder="050-000-0000"
+                          className="w-full px-4 py-3 rounded-xl border"
+                          style={{ 
+                            backgroundColor: 'var(--color-background)', 
+                            borderColor: 'var(--color-border)',
+                            color: 'var(--color-text)'
+                          }}
+                          dir="ltr"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text)', opacity: 0.7 }}>
+                          הודעה *
+                        </label>
+                        <textarea
+                          value={supportForm.message}
+                          onChange={(e) => setSupportForm({ ...supportForm, message: e.target.value })}
+                          placeholder="במה נוכל לעזור?"
+                          rows={4}
+                          className="w-full px-4 py-3 rounded-xl border resize-none"
+                          style={{ 
+                            backgroundColor: 'var(--color-background)', 
+                            borderColor: 'var(--color-border)',
+                            color: 'var(--color-text)'
+                          }}
+                        />
+                      </div>
+
+                      <button
+                        onClick={handleSupportSubmit}
+                        disabled={!supportForm.name || !supportForm.message || supportLoading}
+                        className="w-full py-3 rounded-xl font-medium transition-all disabled:opacity-50"
+                        style={{ backgroundColor: 'var(--color-primary)', color: 'white' }}
+                      >
+                        {supportLoading ? (
+                          <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+                        ) : (
+                          'שלח פנייה'
+                        )}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
     </>
   );

@@ -17,6 +17,7 @@ import {
   BarChart3,
   Loader2,
   FileText,
+  Headphones,
 } from 'lucide-react';
 import { getInfluencerByUsername, getChatSessions, getProductsByInfluencer, getAnalytics } from '@/lib/supabase';
 import { formatNumber, formatRelativeTime } from '@/lib/utils';
@@ -415,6 +416,14 @@ export default function InfluencerDashboardPage({
           >
             <FileText className="w-8 h-8 text-orange-400" />
             <span className="text-white font-medium">תוכן</span>
+          </Link>
+
+          <Link
+            href={`/influencer/${username}/support`}
+            className="flex flex-col items-center gap-3 p-6 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-green-500/50 rounded-2xl transition-all"
+          >
+            <Headphones className="w-8 h-8 text-green-400" />
+            <span className="text-white font-medium">פניות תמיכה</span>
           </Link>
 
           <Link

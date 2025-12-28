@@ -13,3 +13,5 @@ ADD COLUMN IF NOT EXISTS scrape_settings JSONB DEFAULT '{
 COMMENT ON COLUMN influencers.scrape_settings IS 'JSON object containing scrape preferences: posts_limit (10-100), content_types (array), include_comments (bool), include_hashtags (bool)';
 
 
+
+

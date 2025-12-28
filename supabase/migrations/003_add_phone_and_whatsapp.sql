@@ -11,3 +11,5 @@ COMMENT ON COLUMN influencers.phone_number IS 'Influencer phone number for Whats
 COMMENT ON COLUMN influencers.whatsapp_enabled IS 'Whether WhatsApp notifications are enabled for this influencer';
 
 
+
+
