@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { getInfluencerByUsername, getBrandsByInfluencer, supabase } from '@/lib/supabase';
-import { notifyInfluencerSupport } from '@/lib/whatsapp';
+import { notifyBrandSupport, sendSupportConfirmation } from '@/lib/whatsapp';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -10,6 +10,8 @@ const openai = new OpenAI({
 // Types
 interface SupportData {
   brand?: string;
+  brandId?: string;
+  brandPhone?: string;
   customerName?: string;
   orderNumber?: string;
   problemDetails?: string;
@@ -192,6 +194,8 @@ export async function POST(req: NextRequest) {
       
       if (brand) {
         state.data.brand = brand.brand_name;
+        state.data.brandId = brand.id;
+        state.data.brandPhone = brand.whatsapp_phone || '0547667775'; // Default phone
         state.step = 'name';
         const response = generateSupportResponse('name', state.data, influencer.display_name);
         
@@ -272,26 +276,37 @@ export async function POST(req: NextRequest) {
       // Save support request to database
       const supportRequestId = await saveSupportRequest(influencer.id, state.data);
       
-      // Send WhatsApp notification to influencer if enabled
-      let whatsappSent = false;
-      if (influencer.whatsapp_enabled && influencer.phone_number) {
-        const result = await notifyInfluencerSupport({
-          influencerName: influencer.display_name,
-          influencerPhone: influencer.phone_number,
-          customerName: state.data.customerName || '',
-          customerPhone: state.data.customerPhone,
-          message: `בעיה עם ${state.data.brand}: ${state.data.problemDetails}`,
-          productName: state.data.brand,
-        });
-        whatsappSent = result.success;
-        
-        // Update whatsapp_sent status
-        if (supportRequestId && whatsappSent) {
-          await supabase
-            .from('support_requests')
-            .update({ whatsapp_sent: true })
-            .eq('id', supportRequestId);
-        }
+      // Send WhatsApp to BRAND (not influencer)
+      let brandWhatsappSent = false;
+      const brandPhone = state.data.brandPhone || '0547667775';
+      
+      const brandResult = await notifyBrandSupport({
+        brandName: state.data.brand || '',
+        brandPhone: brandPhone,
+        influencerName: influencer.display_name,
+        customerName: state.data.customerName || '',
+        customerPhone: state.data.customerPhone,
+        orderNumber: state.data.orderNumber,
+        problemDetails: state.data.problemDetails || '',
+      });
+      brandWhatsappSent = brandResult.success;
+      
+      // Send confirmation to CUSTOMER
+      let customerWhatsappSent = false;
+      if (state.data.customerPhone) {
+        const customerResult = await sendSupportConfirmation(
+          state.data.customerPhone,
+          state.data.brand || ''
+        );
+        customerWhatsappSent = customerResult.success;
+      }
+      
+      // Update whatsapp_sent status
+      if (supportRequestId && (brandWhatsappSent || customerWhatsappSent)) {
+        await supabase
+          .from('support_requests')
+          .update({ whatsapp_sent: true })
+          .eq('id', supportRequestId);
       }
       
       return NextResponse.json({
@@ -299,7 +314,8 @@ export async function POST(req: NextRequest) {
         supportState: state,
         action: 'complete',
         supportRequestId,
-        whatsappSent,
+        whatsappSent: brandWhatsappSent,
+        customerNotified: customerWhatsappSent,
       });
     }
     

@@ -88,7 +88,40 @@ export async function sendWhatsAppMessage(params: SendMessageParams): Promise<Se
 }
 
 /**
- * Send support request notification to influencer
+ * Send support request notification to brand
+ */
+export async function notifyBrandSupport(params: {
+  brandName: string;
+  brandPhone: string;
+  influencerName: string;
+  customerName: string;
+  customerPhone: string;
+  orderNumber?: string;
+  problemDetails: string;
+}): Promise<SendMessageResult> {
+  const { brandName, brandPhone, influencerName, customerName, customerPhone, orderNumber, problemDetails } = params;
+  
+  let message = `🔔 *פנייה חדשה מהצ'אטבוט של ${influencerName}!*\n\n`;
+  message += `🏷️ *מותג:* ${brandName}\n`;
+  message += `👤 *שם לקוח:* ${customerName}\n`;
+  message += `📱 *טלפון:* ${customerPhone}\n`;
+  
+  if (orderNumber && orderNumber !== 'אין') {
+    message += `📦 *מספר הזמנה:* ${orderNumber}\n`;
+  }
+  
+  message += `\n💬 *פרטי הבעיה:*\n${problemDetails}\n\n`;
+  message += `---\n`;
+  message += `_אנא צרו קשר עם הלקוח בהקדם_`;
+  
+  return sendWhatsAppMessage({
+    phoneNumber: brandPhone,
+    message,
+  });
+}
+
+/**
+ * Send support request notification to influencer (legacy)
  */
 export async function notifyInfluencerSupport(params: SupportRequestParams): Promise<SendMessageResult> {
   const { influencerName, influencerPhone, customerName, customerPhone, message, couponCode, productName } = params;
@@ -153,10 +186,11 @@ export async function sendCouponToCustomer(
  */
 export async function sendSupportConfirmation(
   customerPhone: string,
-  influencerName: string
+  brandName: string
 ): Promise<SendMessageResult> {
   const message = `✅ *הפנייה שלך התקבלה!*\n\n` +
-    `${influencerName} יחזור/תחזור אליך בהקדם.\n\n` +
+    `הפנייה שלך בנושא ${brandName} נשמרה בהצלחה.\n` +
+    `נציג מהמותג יחזור אליך בהקדם.\n\n` +
     `תודה על הסבלנות! 🙏`;
   
   return sendWhatsAppMessage({

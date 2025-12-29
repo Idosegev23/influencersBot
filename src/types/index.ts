@@ -180,6 +180,7 @@ export interface Brand {
   link: string | null;
   short_link: string | null;
   category: string | null;
+  whatsapp_phone: string | null; // Phone number for support notifications
   is_active: boolean;
   created_at: string;
   updated_at: string;
