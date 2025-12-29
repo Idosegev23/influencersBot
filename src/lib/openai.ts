@@ -9,9 +9,9 @@ function getClient() {
 }
 
 // Models configuration
-const CHAT_MODEL = 'gpt-5-nano';      // Fastest, cheapest - for chat
-const ANALYSIS_MODEL = 'gpt-5.2';     // Best for complex analysis
-const COMPLEX_MODEL = 'gpt-5.2';      // Best for persona generation
+const CHAT_MODEL = 'gpt-4o-mini';     // Fastest, cheapest - for chat
+const ANALYSIS_MODEL = 'gpt-4o';      // Best for complex analysis
+const COMPLEX_MODEL = 'gpt-4o';       // Best for persona generation
 
 // ============================================
 // Influencer Type Detection
