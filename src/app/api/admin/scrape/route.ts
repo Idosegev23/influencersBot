@@ -159,7 +159,7 @@ export async function POST(req: NextRequest) {
         const productsList = extractedProducts.map(p => ({
           name: p.name || '',
           brand: p.brand,
-          coupon_code: p.coupon_code,
+          coupon_code: p.coupon_code ?? undefined,
         }));
         
         const greetingData = await generateGreetingAndQuestions(
