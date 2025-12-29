@@ -28,12 +28,35 @@ import {
 import { getInfluencerByUsername, getBrandsByInfluencer, getContentByInfluencer, type Brand } from '@/lib/supabase';
 import { applyTheme, getGoogleFontsUrl } from '@/lib/theme';
 import { getProxiedImageUrl } from '@/lib/image-utils';
+import { BrandCards } from '@/components/chat/BrandCards';
+import { SupportFlowForm } from '@/components/chat/SupportFlowForm';
 import type { Influencer, ContentItem, InfluencerType } from '@/types';
+
+interface SupportState {
+  step: 'detect' | 'brand' | 'name' | 'order' | 'problem' | 'phone' | 'complete';
+  data: {
+    brand?: string;
+    customerName?: string;
+    orderNumber?: string;
+    problemDetails?: string;
+    customerPhone?: string;
+  };
+}
+
+interface BrandInfo {
+  brand_name: string;
+  description: string | null;
+  coupon_code: string | null;
+  category: string | null;
+}
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  action?: 'show_brands' | 'collect_input' | 'complete';
+  brands?: BrandInfo[];
+  inputType?: 'name' | 'order' | 'problem' | 'phone';
 }
 
 const typeIcons: Record<InfluencerType, typeof ChefHat> = {
@@ -84,6 +107,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [supportForm, setSupportForm] = useState({ name: '', phone: '', message: '' });
   const [supportLoading, setSupportLoading] = useState(false);
   const [supportSuccess, setSupportSuccess] = useState(false);
+  const [supportState, setSupportState] = useState<SupportState | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -144,6 +168,61 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Handle support flow input (from form or brand selection)
+  const handleSupportInput = async (value: string) => {
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: value,
+    };
+    setMessages((prev) => [...prev, userMessage]);
+    setIsTyping(true);
+
+    try {
+      const response = await fetch('/api/support-flow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: value,
+          supportState,
+          username,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.supportState) {
+        setSupportState(data.supportState);
+      }
+
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: data.response,
+        action: data.action,
+        brands: data.brands,
+        inputType: data.inputType,
+      };
+
+      setMessages((prev) => [...prev, assistantMessage]);
+
+      // If complete, reset support state
+      if (data.action === 'complete') {
+        setSupportState(null);
+      }
+    } catch (error) {
+      console.error('Support error:', error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: 'אופס! משהו השתבש. נסי שוב בבקשה.',
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isTyping || !influencer) return;
 
@@ -159,6 +238,46 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     setIsTyping(true);
 
     try {
+      // If already in support mode, continue support flow
+      if (supportState && supportState.step !== 'detect') {
+        await handleSupportInput(messageContent);
+        return;
+      }
+
+      // Check for support intent first
+      const supportResponse = await fetch('/api/support-flow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: messageContent,
+          supportState: { step: 'detect', data: {} },
+          username,
+        }),
+      });
+
+      const supportData = await supportResponse.json();
+
+      // If it's a support request, handle it
+      if (supportData.action !== 'use_assistant') {
+        if (supportData.supportState) {
+          setSupportState(supportData.supportState);
+        }
+
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: supportData.response,
+          action: supportData.action,
+          brands: supportData.brands,
+          inputType: supportData.inputType,
+        };
+
+        setMessages((prev) => [...prev, assistantMessage]);
+        setIsTyping(false);
+        return;
+      }
+
+      // Otherwise, use the regular assistant
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -201,6 +320,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     setResponseId(null);
     setSessionId(null);
     setInputValue('');
+    setSupportState(null);
     inputRef.current?.focus();
   };
 
@@ -479,20 +599,42 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                     </div>
                   ) : (
                     <>
-                      {messages.map((msg) => (
-                        <div
-                          key={msg.id}
-                          className={`flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'}`}
-                        >
-                          <div className={`max-w-[85%] px-4 py-3 ${msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-assistant'}`}>
-                            {msg.role === 'user' ? (
-                              <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                            ) : (
-                              <div className="text-sm markdown-content">
-                                <ReactMarkdown>{msg.content}</ReactMarkdown>
-                              </div>
-                            )}
+                      {messages.map((msg, index) => (
+                        <div key={msg.id}>
+                          <div
+                            className={`flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'}`}
+                          >
+                            <div className={`max-w-[85%] px-4 py-3 ${msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-assistant'}`}>
+                              {msg.role === 'user' ? (
+                                <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                              ) : (
+                                <div className="text-sm markdown-content">
+                                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                </div>
+                              )}
+                            </div>
                           </div>
+                          
+                          {/* Show Brand Cards after assistant message with show_brands action */}
+                          {msg.role === 'assistant' && msg.action === 'show_brands' && msg.brands && index === messages.length - 1 && !isTyping && (
+                            <div className="mt-4">
+                              <BrandCards
+                                brands={msg.brands}
+                                onSelect={(brandName) => handleSupportInput(brandName)}
+                              />
+                            </div>
+                          )}
+                          
+                          {/* Show Support Form after assistant message with collect_input action */}
+                          {msg.role === 'assistant' && msg.action === 'collect_input' && msg.inputType && index === messages.length - 1 && !isTyping && (
+                            <div className="mt-4">
+                              <SupportFlowForm
+                                inputType={msg.inputType}
+                                onSubmit={(value) => handleSupportInput(value)}
+                                isLoading={isTyping}
+                              />
+                            </div>
+                          )}
                         </div>
                       ))}
                       {isTyping && (
