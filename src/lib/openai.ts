@@ -8,10 +8,10 @@ function getClient() {
   });
 }
 
-// Models configuration
-const CHAT_MODEL = 'gpt-4o-mini';     // Fastest, cheapest - for chat
-const ANALYSIS_MODEL = 'gpt-4o';      // Best for complex analysis
-const COMPLEX_MODEL = 'gpt-4o';       // Best for persona generation
+// Models configuration - using Responses API
+const CHAT_MODEL = 'gpt-5-nano';      // Fastest, cheapest - for chat
+const ANALYSIS_MODEL = 'gpt-5-nano';  // For analysis  
+const COMPLEX_MODEL = 'gpt-5';        // For persona generation
 
 // ============================================
 // Influencer Type Detection
