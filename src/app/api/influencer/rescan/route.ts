@@ -7,6 +7,7 @@ import {
 } from '@/lib/supabase';
 import { scrapeInstagramProfile } from '@/lib/apify';
 import { analyzeAllPosts, extractRecipeFromPost } from '@/lib/openai';
+import { uploadProfilePicture } from '@/lib/storage';
 import type { ContentItem, Product } from '@/types';
 
 // Check influencer authentication
@@ -144,12 +145,21 @@ export async function POST(req: NextRequest) {
       await supabase.from('content_items').insert(contentToInsert);
     }
 
+    // Upload profile picture to our storage (to avoid Instagram blocking)
+    let avatarUrl = profile.profilePicUrl;
+    if (profile.profilePicUrl) {
+      const uploadedUrl = await uploadProfilePicture(influencer.username, profile.profilePicUrl);
+      if (uploadedUrl) {
+        avatarUrl = uploadedUrl;
+      }
+    }
+
     // Update influencer metadata
     await updateInfluencer(influencer.id, {
       last_synced_at: new Date().toISOString(),
       followers_count: profile.followersCount,
       following_count: profile.followingCount,
-      avatar_url: profile.profilePicUrl,
+      avatar_url: avatarUrl,
       bio: profile.biography,
     });
 
