@@ -105,8 +105,20 @@ export interface Post {
   created_at: string;
 }
 
-// Content Item Types
-export type ContentItemType = 'recipe' | 'look' | 'review' | 'tip' | 'workout' | 'tutorial';
+// Content Item Types - Dynamic based on influencer type
+export type ContentItemType = 
+  // Food
+  | 'recipe' | 'review' | 'recommendation'
+  // Fashion
+  | 'look' | 'outfit' | 'style_tip'
+  // Beauty  
+  | 'tutorial' | 'routine'
+  // Lifestyle
+  | 'tip' | 'moment' | 'story'
+  // Fitness
+  | 'workout' | 'motivation'
+  // General
+  | 'collaboration' | 'event' | 'unboxing' | 'itinerary';
 
 export interface RecipeContent {
   ingredients: string[];

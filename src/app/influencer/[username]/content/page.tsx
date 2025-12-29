@@ -25,12 +25,29 @@ import { getInfluencerByUsername, getContentByInfluencer } from '@/lib/supabase'
 import type { Influencer, ContentItem } from '@/types';
 
 const contentTypeLabels: Record<string, { label: string; icon: typeof ChefHat; color: string }> = {
+  // Food
   recipe: { label: 'מתכון', icon: ChefHat, color: 'text-orange-400' },
+  recommendation: { label: 'המלצה', icon: Star, color: 'text-amber-400' },
+  // Fashion
   look: { label: 'לוק', icon: Shirt, color: 'text-pink-400' },
-  tip: { label: 'טיפ', icon: Lightbulb, color: 'text-yellow-400' },
-  workout: { label: 'אימון', icon: Dumbbell, color: 'text-green-400' },
-  review: { label: 'ביקורת', icon: Star, color: 'text-purple-400' },
+  outfit: { label: 'אאוטפיט', icon: Shirt, color: 'text-fuchsia-400' },
+  style_tip: { label: 'טיפ סטייל', icon: Shirt, color: 'text-rose-400' },
+  // Beauty
   tutorial: { label: 'מדריך', icon: FileText, color: 'text-blue-400' },
+  routine: { label: 'שגרה', icon: FileText, color: 'text-cyan-400' },
+  // Lifestyle
+  tip: { label: 'טיפ', icon: Lightbulb, color: 'text-yellow-400' },
+  moment: { label: 'רגע', icon: Star, color: 'text-indigo-400' },
+  story: { label: 'סיפור', icon: FileText, color: 'text-violet-400' },
+  // Fitness
+  workout: { label: 'אימון', icon: Dumbbell, color: 'text-green-400' },
+  motivation: { label: 'מוטיבציה', icon: Lightbulb, color: 'text-lime-400' },
+  // General
+  review: { label: 'ביקורת', icon: Star, color: 'text-purple-400' },
+  collaboration: { label: 'שיתוף פעולה', icon: Star, color: 'text-teal-400' },
+  event: { label: 'אירוע', icon: Star, color: 'text-red-400' },
+  unboxing: { label: 'אנבוקסינג', icon: FileText, color: 'text-sky-400' },
+  itinerary: { label: 'מסלול', icon: FileText, color: 'text-emerald-400' },
 };
 
 export default function ContentPage({

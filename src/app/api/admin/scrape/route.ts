@@ -88,14 +88,24 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Extract content items from posts (recipes, looks, tips, etc.)
+    // Extract content items from ALL posts - dynamic based on influencer type
     const contentItems: Partial<ContentItem>[] = [];
-    console.log(`Extracting content from posts for ${username}...`);
+    console.log(`Extracting content from ${posts.length} posts for ${username} (type: ${influencer.influencer_type})...`);
 
-    // Process posts for content extraction (limit to 25 posts to avoid rate limits)
-    const postsToProcess = posts.slice(0, 25);
+    // Process ALL posts for content extraction (up to 50)
+    const postsToProcess = posts.slice(0, 50);
+    let successCount = 0;
+    let skipCount = 0;
+    
     for (let i = 0; i < postsToProcess.length; i++) {
       const post = postsToProcess[i];
+      
+      // Skip posts with very short captions
+      if (!post.caption || post.caption.trim().length < 15) {
+        skipCount++;
+        continue;
+      }
+      
       try {
         const extracted = await extractContentFromPost(
           post.caption,
@@ -103,7 +113,7 @@ export async function POST(req: NextRequest) {
           post.displayUrl
         );
         
-        if (extracted) {
+        if (extracted && extracted.title) {
           contentItems.push({
             type: extracted.type as ContentItem['type'],
             title: extracted.title,
@@ -111,19 +121,23 @@ export async function POST(req: NextRequest) {
             content: extracted.content,
             image_url: post.displayUrl,
           });
-          console.log(`  Found ${extracted.type}: ${extracted.title}`);
+          successCount++;
+          console.log(`  [${i+1}/${postsToProcess.length}] ${extracted.type}: ${extracted.title.slice(0, 50)}...`);
+        } else {
+          skipCount++;
         }
         
-        // Small delay between extractions
+        // Smaller delay for faster processing
         if (i < postsToProcess.length - 1) {
-          await new Promise(r => setTimeout(r, 300));
+          await new Promise(r => setTimeout(r, 200));
         }
       } catch (error) {
         console.error(`Error extracting content from post ${i}:`, error);
+        skipCount++;
       }
     }
     
-    console.log(`Extracted ${contentItems.length} content items for ${username}`);
+    console.log(`Content extraction complete: ${successCount} extracted, ${skipCount} skipped`);
 
     // Generate persona from posts
     console.log(`Generating persona for ${username}...`);
@@ -202,7 +216,19 @@ export async function POST(req: NextRequest) {
         image_url: c.image_url || null,
       }));
 
-      await supabase.from('content_items').insert(contentToInsert);
+      console.log(`Inserting ${contentToInsert.length} content items...`);
+      console.log('Sample content item:', JSON.stringify(contentToInsert[0], null, 2));
+      
+      const { data: insertedData, error: contentError } = await supabase
+        .from('content_items')
+        .insert(contentToInsert)
+        .select('id');
+        
+      if (contentError) {
+        console.error('Error inserting content items:', contentError.message, contentError.code, contentError.details);
+      } else {
+        console.log(`Content items inserted successfully: ${insertedData?.length || 0} items`);
+      }
     }
 
     // Upload profile picture to our storage

@@ -264,59 +264,78 @@ export async function extractRecipeFromPost(caption: string): Promise<{
   }
 }
 
-// Extract any type of content from a post
+// Content types based on influencer type
+const CONTENT_TYPES_BY_INFLUENCER: Record<InfluencerType, string[]> = {
+  food: ['recipe', 'review', 'tip', 'recommendation'],
+  fashion: ['look', 'outfit', 'collaboration', 'style_tip', 'event'],
+  beauty: ['tutorial', 'review', 'tip', 'look', 'routine'],
+  lifestyle: ['tip', 'moment', 'review', 'recommendation', 'story'],
+  fitness: ['workout', 'tip', 'routine', 'motivation', 'recipe'],
+  parenting: ['tip', 'story', 'recommendation', 'moment', 'review'],
+  tech: ['review', 'tutorial', 'tip', 'unboxing'],
+  travel: ['review', 'tip', 'recommendation', 'story', 'itinerary'],
+  other: ['tip', 'review', 'story', 'moment', 'recommendation']
+};
+
+// Extract content from ANY post - dynamic based on influencer type
 export async function extractContentFromPost(
   caption: string,
   influencerType: InfluencerType,
   imageUrl?: string
 ): Promise<{
-  type: 'recipe' | 'look' | 'tip' | 'review' | 'workout' | 'tutorial' | null;
+  type: string;
   title: string;
   description: string;
   content: Record<string, unknown>;
 } | null> {
   const client = getClient();
   
-  if (!caption || caption.length < 20) return null;
+  // Skip very short or empty captions
+  if (!caption || caption.trim().length < 10) return null;
+  
+  const contentTypes = CONTENT_TYPES_BY_INFLUENCER[influencerType] || CONTENT_TYPES_BY_INFLUENCER.other;
   
   try {
-    const typeHints: Record<InfluencerType, string> = {
-      food: 'מתכונים, טיפים לבישול, סקירות מסעדות',
-      fashion: 'לוקים, שילובי לבוש, המלצות אופנה',
-      beauty: 'טיפים ליופי, סקירות מוצרים, מדריכי איפור',
-      lifestyle: 'טיפים לחיים, המלצות, סקירות',
-      fitness: 'אימונים, טיפים לכושר, תזונה',
-      parenting: 'טיפים להורות, המלצות לילדים',
-      tech: 'סקירות טכנולוגיה, מדריכים',
-      travel: 'המלצות טיול, סקירות מקומות',
-      other: 'תוכן כללי, טיפים, סקירות'
-    };
-
     const response = await client.responses.create({
       model: ANALYSIS_MODEL,
-      instructions: `נתח את הפוסט וקבע אם הוא מכיל תוכן שימושי מהסוגים הבאים: ${typeHints[influencerType]}.
-אם יש תוכן שימושי, חלץ אותו. אם אין - החזר has_content: false.`,
-      input: caption.slice(0, 2000),
+      instructions: `אתה מנתח תוכן של משפיען/ית מסוג ${influencerType}.
+נתח את הפוסט וחלץ ממנו את התוכן העיקרי.
+
+סוגי תוכן אפשריים: ${contentTypes.join(', ')}
+
+חשוב: 
+- כל פוסט מכיל תוכן כלשהו - אל תחזיר "none" אלא אם הטקסט באמת ריק
+- תן כותרת תמציתית שמתארת את תוכן הפוסט
+- תאר את התוכן בקצרה
+- חלץ נקודות מפתח, מוצרים שהוזכרו, מותגים, טיפים
+
+לדוגמה:
+- לוק אופנה → סוג: look, כותרת: "לוק שחור אלגנטי לערב", נקודות: פריטי הלבוש
+- מתכון → סוג: recipe, כותרת: שם המנה, מרכיבים והוראות
+- רגע משפחתי → סוג: moment/story, כותרת: תיאור הרגע
+- שיתוף פעולה עם מותג → סוג: collaboration, כותרת: המותג והמוצר`,
+      input: caption.slice(0, 2500),
       text: {
         format: {
           type: 'json_schema',
-          name: 'content_extraction',
+          name: 'dynamic_content',
           strict: true,
           schema: {
             type: 'object',
             properties: {
-              has_content: { type: 'boolean' },
-              content_type: { 
-                type: 'string',
-                enum: ['recipe', 'look', 'tip', 'review', 'workout', 'tutorial', 'none']
-              },
+              content_type: { type: 'string' },
               title: { type: 'string' },
               description: { type: 'string' },
               key_points: { type: 'array', items: { type: 'string' } },
+              brands_mentioned: { type: 'array', items: { type: 'string' } },
+              products_mentioned: { type: 'array', items: { type: 'string' } },
+              hashtags: { type: 'array', items: { type: 'string' } },
               ingredients: { type: 'array', items: { type: 'string' } },
-              instructions: { type: 'array', items: { type: 'string' } }
+              instructions: { type: 'array', items: { type: 'string' } },
+              mood: { type: 'string' },
+              is_sponsored: { type: 'boolean' }
             },
-            required: ['has_content', 'content_type', 'title', 'description', 'key_points', 'ingredients', 'instructions'],
+            required: ['content_type', 'title', 'description', 'key_points', 'brands_mentioned', 'products_mentioned', 'hashtags', 'ingredients', 'instructions', 'mood', 'is_sponsored'],
             additionalProperties: false
           }
         }
@@ -325,29 +344,79 @@ export async function extractContentFromPost(
 
     const result = JSON.parse(response.output_text);
     
-    if (!result.has_content || result.content_type === 'none' || !result.title) {
+    if (!result.title || result.title.trim() === '') {
       return null;
     }
 
-    // Build content based on type
-    const content: Record<string, unknown> = {};
+    // Normalize content type to valid enum values
+    const validTypes = [
+      'recipe', 'review', 'recommendation', 'look', 'outfit', 'style_tip',
+      'tutorial', 'routine', 'tip', 'moment', 'story', 'workout', 'motivation',
+      'collaboration', 'event', 'unboxing', 'itinerary'
+    ];
     
-    if (result.content_type === 'recipe') {
-      content.ingredients = result.ingredients || [];
+    let contentType = result.content_type?.toLowerCase().replace(/\s+/g, '_') || 'tip';
+    
+    // Handle combined types like "moment/story" - take the first one
+    if (contentType.includes('/')) {
+      contentType = contentType.split('/')[0];
+    }
+    
+    // Map common variations to valid types
+    const typeMapping: Record<string, string> = {
+      'lifestyle': 'story',
+      'personal': 'moment',
+      'sponsored': 'collaboration',
+      'ad': 'collaboration',
+      'product': 'review',
+      'fashion': 'look',
+      'beauty': 'tutorial',
+      'food': 'recipe',
+      'exercise': 'workout',
+      'travel_tip': 'itinerary',
+      'guide': 'tutorial',
+      'howto': 'tutorial',
+      'how_to': 'tutorial',
+    };
+    
+    if (typeMapping[contentType]) {
+      contentType = typeMapping[contentType];
+    }
+    
+    // If still not valid, default to 'tip'
+    if (!validTypes.includes(contentType)) {
+      contentType = 'tip';
+    }
+
+    // Build rich content object with all extracted data
+    const content: Record<string, unknown> = {
+      key_points: result.key_points || [],
+      brands: result.brands_mentioned || [],
+      products: result.products_mentioned || [],
+      hashtags: result.hashtags || [],
+      mood: result.mood || '',
+      is_sponsored: result.is_sponsored || false
+    };
+    
+    // Add specific fields based on content type
+    if (contentType === 'recipe' && result.ingredients?.length > 0) {
+      content.ingredients = result.ingredients;
       content.instructions = result.instructions || [];
-    } else if (result.content_type === 'look') {
+    }
+    
+    if (contentType === 'look' || contentType === 'outfit') {
       content.items = result.key_points || [];
-    } else if (result.content_type === 'workout') {
+    }
+    
+    if (contentType === 'workout' || contentType === 'routine') {
       content.exercises = result.key_points || [];
       content.instructions = result.instructions || [];
-    } else {
-      content.points = result.key_points || [];
     }
 
     return {
-      type: result.content_type as 'recipe' | 'look' | 'tip' | 'review' | 'workout' | 'tutorial',
+      type: contentType,
       title: result.title,
-      description: result.description || caption.slice(0, 200),
+      description: result.description || caption.slice(0, 300),
       content
     };
   } catch (error) {
