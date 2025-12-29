@@ -132,6 +132,19 @@ export async function generatePersona(
 }
 
 // ============================================
+// Persona Generation from Posts (wrapper)
+// ============================================
+
+export async function generatePersonaFromPosts(
+  posts: ApifyPostData[],
+  profile: { fullName: string; biography: string },
+  influencerType: InfluencerType
+): Promise<InfluencerPersona> {
+  const captions = posts.map(p => p.caption).filter(Boolean);
+  return generatePersona(profile.biography, captions, influencerType);
+}
+
+// ============================================
 // Content Extraction
 // ============================================
 
@@ -179,7 +192,7 @@ export async function extractDataFromPost(caption: string): Promise<ExtractedDat
                     name: { type: 'string' },
                     link: { type: 'string' }
                   },
-                  required: ['name'],
+                  required: ['name', 'link'],
                   additionalProperties: false
                 }
               }

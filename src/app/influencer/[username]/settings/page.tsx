@@ -27,6 +27,13 @@ import {
   MessageSquare,
   Phone,
   Bell,
+  User,
+  Smile,
+  Heart,
+  Zap,
+  Coffee,
+  Star,
+  Globe,
 } from 'lucide-react';
 import {
   getInfluencerByUsername,
@@ -101,6 +108,14 @@ export default function SettingsPage({
   // Scrape settings state
   const [scrapeSettings, setScrapeSettings] = useState<ScrapeSettings>(DEFAULT_SCRAPE_SETTINGS);
 
+  // Persona settings state
+  const [personaTone, setPersonaTone] = useState('');
+  const [personaStyle, setPersonaStyle] = useState('');
+  const [personaInterests, setPersonaInterests] = useState<string[]>([]);
+  const [personaPhrases, setPersonaPhrases] = useState<string[]>([]);
+  const [personaEmojiStyle, setPersonaEmojiStyle] = useState<'none' | 'minimal' | 'frequent'>('minimal');
+  const [personaLanguage, setPersonaLanguage] = useState<'he' | 'en' | 'mixed'>('he');
+
   // Preview state
   const [showPreview, setShowPreview] = useState(false);
 
@@ -132,6 +147,15 @@ export default function SettingsPage({
         if (inf.scrape_settings) setScrapeSettings(inf.scrape_settings);
         if (inf.phone_number) setPhoneNumber(inf.phone_number);
         if (inf.whatsapp_enabled) setWhatsappEnabled(inf.whatsapp_enabled);
+        // Load persona settings
+        if (inf.persona) {
+          setPersonaTone(inf.persona.tone || '');
+          setPersonaStyle(inf.persona.style || '');
+          setPersonaInterests(inf.persona.interests || []);
+          setPersonaPhrases(inf.persona.signature_phrases || []);
+          setPersonaEmojiStyle(inf.persona.emoji_style || 'minimal');
+          setPersonaLanguage(inf.persona.language || 'he');
+        }
       } catch (error) {
         console.error('Error loading data:', error);
       } finally {
@@ -147,6 +171,16 @@ export default function SettingsPage({
 
     setSaving(true);
     try {
+      // Build persona object
+      const updatedPersona = {
+        tone: personaTone,
+        style: personaStyle,
+        interests: personaInterests,
+        signature_phrases: personaPhrases,
+        emoji_style: personaEmojiStyle,
+        language: personaLanguage,
+      };
+
       await updateInfluencer(influencer.id, {
         theme,
         greeting_message: greetingMessage,
@@ -156,6 +190,7 @@ export default function SettingsPage({
         scrape_settings: scrapeSettings,
         phone_number: phoneNumber || null,
         whatsapp_enabled: whatsappEnabled,
+        persona: updatedPersona,
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -516,6 +551,200 @@ export default function SettingsPage({
                     + הוסף שאלה
                   </button>
                 )}
+              </div>
+            </motion.div>
+
+            {/* Persona Settings - NEW */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-6"
+            >
+              <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+                <User className="w-5 h-5 text-purple-400" />
+                פרסונה וטון הצ&apos;אטבוט
+              </h2>
+
+              <div className="space-y-6">
+                {/* Tone */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
+                    <Heart className="w-4 h-4 text-pink-400" />
+                    טון השיחה
+                  </label>
+                  <input
+                    type="text"
+                    value={personaTone}
+                    onChange={(e) => setPersonaTone(e.target.value)}
+                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="לדוגמה: חם, ידידותי ומעודד"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">תאר איך הצ&apos;אטבוט צריך לדבר - האם הוא רשמי, חברותי, הומוריסטי?</p>
+                </div>
+
+                {/* Style */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-yellow-400" />
+                    סגנון תוכן
+                  </label>
+                  <textarea
+                    value={personaStyle}
+                    onChange={(e) => setPersonaStyle(e.target.value)}
+                    rows={2}
+                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                    placeholder="לדוגמה: שיחתי, קליל, עם הרבה הדגשות ודוגמאות"
+                  />
+                </div>
+
+                {/* Language */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-blue-400" />
+                    שפה
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { value: 'he', label: 'עברית', icon: '🇮🇱' },
+                      { value: 'en', label: 'אנגלית', icon: '🇺🇸' },
+                      { value: 'mixed', label: 'מעורב', icon: '🌐' },
+                    ].map((lang) => (
+                      <button
+                        key={lang.value}
+                        type="button"
+                        onClick={() => setPersonaLanguage(lang.value as 'he' | 'en' | 'mixed')}
+                        className={`flex items-center justify-center gap-2 p-3 rounded-xl border transition-all ${
+                          personaLanguage === lang.value
+                            ? 'bg-purple-600/20 border-purple-500/50 text-white'
+                            : 'bg-gray-700/30 border-gray-600 text-gray-400 hover:border-gray-500'
+                        }`}
+                      >
+                        <span>{lang.icon}</span>
+                        <span className="text-sm">{lang.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Emoji Style */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
+                    <Smile className="w-4 h-4 text-yellow-400" />
+                    שימוש באימוג&apos;ים
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { value: 'none', label: 'ללא', example: 'ללא אימוג\'ים' },
+                      { value: 'minimal', label: 'מינימלי', example: 'מעט 👍' },
+                      { value: 'frequent', label: 'הרבה', example: 'הרבה!! 🎉✨💕' },
+                    ].map((style) => (
+                      <button
+                        key={style.value}
+                        type="button"
+                        onClick={() => setPersonaEmojiStyle(style.value as 'none' | 'minimal' | 'frequent')}
+                        className={`flex flex-col items-center gap-1 p-3 rounded-xl border transition-all ${
+                          personaEmojiStyle === style.value
+                            ? 'bg-yellow-600/20 border-yellow-500/50 text-white'
+                            : 'bg-gray-700/30 border-gray-600 text-gray-400 hover:border-gray-500'
+                        }`}
+                      >
+                        <span className="text-sm font-medium">{style.label}</span>
+                        <span className="text-xs opacity-60">{style.example}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Interests */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
+                    <Star className="w-4 h-4 text-amber-400" />
+                    תחומי עניין (נושאים שהצ&apos;אטבוט יודע עליהם)
+                  </label>
+                  <div className="space-y-2">
+                    {personaInterests.map((interest, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={interest}
+                          onChange={(e) => {
+                            const updated = [...personaInterests];
+                            updated[index] = e.target.value;
+                            setPersonaInterests(updated);
+                          }}
+                          className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          placeholder={`תחום עניין ${index + 1}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setPersonaInterests(personaInterests.filter((_, i) => i !== index))}
+                          className="p-2 text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-lg transition-colors"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  {personaInterests.length < 10 && (
+                    <button
+                      type="button"
+                      onClick={() => setPersonaInterests([...personaInterests, ''])}
+                      className="mt-3 text-sm text-purple-400 hover:text-purple-300 transition-colors"
+                    >
+                      + הוסף תחום עניין
+                    </button>
+                  )}
+                </div>
+
+                {/* Signature Phrases */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
+                    <Coffee className="w-4 h-4 text-orange-400" />
+                    ביטויים ייחודיים (משפטי חתימה)
+                  </label>
+                  <div className="space-y-2">
+                    {personaPhrases.map((phrase, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={phrase}
+                          onChange={(e) => {
+                            const updated = [...personaPhrases];
+                            updated[index] = e.target.value;
+                            setPersonaPhrases(updated);
+                          }}
+                          className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          placeholder={`ביטוי ${index + 1}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setPersonaPhrases(personaPhrases.filter((_, i) => i !== index))}
+                          className="p-2 text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-lg transition-colors"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  {personaPhrases.length < 10 && (
+                    <button
+                      type="button"
+                      onClick={() => setPersonaPhrases([...personaPhrases, ''])}
+                      className="mt-3 text-sm text-purple-400 hover:text-purple-300 transition-colors"
+                    >
+                      + הוסף ביטוי
+                    </button>
+                  )}
+                </div>
+
+                {/* Info box */}
+                <div className="p-4 bg-purple-600/10 border border-purple-500/30 rounded-xl">
+                  <p className="text-sm text-purple-300">
+                    <strong>💡 טיפ:</strong> הגדרות אלה משפיעות על איך הצ&apos;אטבוט מדבר עם המבקרים. 
+                    ככל שתתאימו יותר לסגנון האישי שלכם, ככה התגובות יהיו אותנטיות יותר.
+                  </p>
+                </div>
               </div>
             </motion.div>
 
