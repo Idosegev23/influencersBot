@@ -43,6 +43,8 @@ const typeLabels: Record<InfluencerType, string> = {
   lifestyle: 'לייפסטייל',
   fitness: 'כושר',
   beauty: 'יופי וטיפוח',
+  parenting: 'הורות ומשפחה',
+  travel: 'טיולים',
   other: 'אחר',
 };
 

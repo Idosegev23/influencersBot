@@ -21,6 +21,8 @@ import {
   Sparkles,
   ArrowRight,
   Plus,
+  Baby,
+  Plane,
   Headphones,
   X,
   Loader2,
@@ -43,6 +45,8 @@ const typeIcons: Record<InfluencerType, typeof ChefHat> = {
   lifestyle: Heart,
   fitness: Dumbbell,
   beauty: Sparkles,
+  parenting: Baby,
+  travel: Plane,
   other: MessageCircle,
 };
 
@@ -53,6 +57,8 @@ const typeLabels: Record<InfluencerType, string> = {
   lifestyle: 'טיפים והמלצות',
   fitness: 'אימונים ותזונה',
   beauty: 'טיפוח ויופי',
+  parenting: 'הורות ומשפחה',
+  travel: 'טיולים והמלצות',
   other: 'טיפים והמלצות',
 };
 
