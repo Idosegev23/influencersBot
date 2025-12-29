@@ -10,11 +10,22 @@ import { analyzeAllPosts, extractRecipeFromPost } from '@/lib/openai';
 import { uploadProfilePicture } from '@/lib/storage';
 import type { ContentItem, Product } from '@/types';
 
+const COOKIE_PREFIX = 'influencer_session_';
+
 // Check influencer authentication
 async function checkAuth(username: string): Promise<boolean> {
-  const cookieStore = await cookies();
-  const authCookie = cookieStore.get(`influencer_auth_${username}`);
-  return authCookie?.value === 'authenticated';
+  try {
+    const cookieStore = await cookies();
+    const authCookie = cookieStore.get(`${COOKIE_PREFIX}${username}`);
+    
+    // Debug log
+    console.log(`Checking auth for ${username}:`, authCookie?.value);
+    
+    return authCookie?.value === 'authenticated';
+  } catch (error) {
+    console.error('Error checking auth:', error);
+    return false;
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -25,9 +36,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Username required' }, { status: 400 });
     }
 
-    // Check authentication
+    // Check authentication - also check admin session
+    const cookieStore = await cookies();
+    const adminCookie = cookieStore.get('admin_session');
+    const isAdmin = adminCookie?.value === 'authenticated';
+    
     const isAuth = await checkAuth(username);
-    if (!isAuth) {
+    
+    if (!isAuth && !isAdmin) {
+      console.log(`Auth failed for ${username}. isAuth=${isAuth}, isAdmin=${isAdmin}`);
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
