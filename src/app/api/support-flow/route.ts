@@ -285,7 +285,7 @@ export async function POST(req: NextRequest) {
         brandPhone: brandPhone,
         influencerName: influencer.display_name,
         customerName: state.data.customerName || '',
-        customerPhone: state.data.customerPhone,
+        customerPhone: state.data.customerPhone || '',
         orderNumber: state.data.orderNumber,
         problemDetails: state.data.problemDetails || '',
       });
