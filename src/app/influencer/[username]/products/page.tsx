@@ -20,9 +20,6 @@ import {
 import {
   getInfluencerByUsername,
   getProductsByInfluencer,
-  createProduct,
-  updateProduct,
-  deleteProduct,
 } from '@/lib/supabase';
 import type { Influencer, Product } from '@/types';
 
@@ -105,40 +102,52 @@ export default function InfluencerProductsPage({
 
     try {
       if (editingId) {
-        // Update existing product
-        await updateProduct(editingId, {
-          name: formData.name,
-          brand: formData.brand,
-          category: formData.category,
-          link: formData.link,
-          coupon_code: formData.coupon_code || null,
-          image_url: formData.image_url || null,
+        // Update existing product via API
+        const response = await fetch('/api/influencer/products', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username,
+            productId: editingId,
+            name: formData.name,
+            brand: formData.brand,
+            category: formData.category,
+            link: formData.link,
+            coupon_code: formData.coupon_code || null,
+            image_url: formData.image_url || null,
+          }),
         });
 
-        setProducts((prev) =>
-          prev.map((p) =>
-            p.id === editingId
-              ? { ...p, ...formData, coupon_code: formData.coupon_code || null }
-              : p
-          )
-        );
+        if (response.ok) {
+          setProducts((prev) =>
+            prev.map((p) =>
+              p.id === editingId
+                ? { ...p, ...formData, coupon_code: formData.coupon_code || null }
+                : p
+            )
+          );
+        }
       } else {
-        // Create new product
-        const newProduct = await createProduct({
-          influencer_id: influencer.id,
-          name: formData.name,
-          brand: formData.brand,
-          category: formData.category,
-          link: formData.link,
-          short_link: null,
-          coupon_code: formData.coupon_code || null,
-          image_url: formData.image_url || null,
-          source_post_id: null,
-          is_manual: true,
+        // Create new product via API
+        const response = await fetch('/api/influencer/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username,
+            name: formData.name,
+            brand: formData.brand,
+            category: formData.category,
+            link: formData.link,
+            coupon_code: formData.coupon_code || null,
+            image_url: formData.image_url || null,
+          }),
         });
 
-        if (newProduct) {
-          setProducts((prev) => [newProduct, ...prev]);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.product) {
+            setProducts((prev) => [data.product, ...prev]);
+          }
         }
       }
 
@@ -167,8 +176,13 @@ export default function InfluencerProductsPage({
 
   const handleDelete = async (id: string) => {
     try {
-      await deleteProduct(id);
-      setProducts((prev) => prev.filter((p) => p.id !== id));
+      const response = await fetch(`/api/influencer/products?username=${username}&productId=${id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        setProducts((prev) => prev.filter((p) => p.id !== id));
+      }
       setDeleteConfirm(null);
     } catch (error) {
       console.error('Error deleting product:', error);
