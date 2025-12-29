@@ -9,10 +9,8 @@ import {
   Send, 
   Search, 
   MessageCircle, 
-  Package, 
   Copy, 
   Check,
-  ExternalLink,
   ChefHat,
   Shirt,
   Cpu,
@@ -27,10 +25,10 @@ import {
   X,
   Loader2,
 } from 'lucide-react';
-import { getInfluencerByUsername, getProductsByInfluencer, getContentByInfluencer } from '@/lib/supabase';
+import { getInfluencerByUsername, getBrandsByInfluencer, getContentByInfluencer, type Brand } from '@/lib/supabase';
 import { applyTheme, getGoogleFontsUrl } from '@/lib/theme';
 import { getProxiedImageUrl } from '@/lib/image-utils';
-import type { Influencer, Product, ContentItem, InfluencerType } from '@/types';
+import type { Influencer, ContentItem, InfluencerType } from '@/types';
 
 interface Message {
   id: string;
@@ -68,7 +66,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const router = useRouter();
   
   const [influencer, setInfluencer] = useState<Influencer | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
   const [content, setContent] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -123,12 +121,12 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
         setInfluencer(inf);
         applyTheme(inf.theme);
         
-        // Load products and content
-        const [prods, cont] = await Promise.all([
-          getProductsByInfluencer(inf.id),
+        // Load brands and content
+        const [brandsData, cont] = await Promise.all([
+          getBrandsByInfluencer(inf.id),
           getContentByInfluencer(inf.id),
         ]);
-        setProducts(prods);
+        setBrands(brandsData);
         setContent(cont);
       } catch (error) {
         console.error('Error loading influencer:', error);
@@ -244,9 +242,9 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     }
   };
 
-  const filteredProducts = products.filter((p) =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (p.brand && p.brand.toLowerCase().includes(searchQuery.toLowerCase()))
+  const filteredBrands = brands.filter((b) =>
+    b.brand_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (b.category && b.category.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   if (loading) {
@@ -415,7 +413,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         {greetingMessage}
                       </h2>
                       <p className="mb-6 max-w-sm text-sm leading-relaxed" style={{ color: 'var(--color-text)', opacity: 0.7 }}>
-                        אני כאן לעזור עם {typeLabels[influencer.influencer_type].toLowerCase()}, מוצרים וקופונים
+                        אני כאן לעזור עם {typeLabels[influencer.influencer_type].toLowerCase()}, מותגים וקופונים
                       </p>
 
                       {/* Suggestions */}
@@ -439,49 +437,41 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         ))}
                       </div>
 
-                      {/* Products Preview */}
-                      {products.length > 0 && (
+                      {/* Brands Preview */}
+                      {brands.length > 0 && (
                         <div className="w-full mt-6">
                           <p className="text-xs mb-3 text-center" style={{ color: 'var(--color-text)', opacity: 0.5 }}>
-                            מוצרים מומלצים
+                            מותגים וקופונים
                           </p>
                           <div className="flex gap-3 overflow-x-auto pb-3 px-4 scrollbar-hide">
-                            {products.slice(0, 6).map((product) => (
-                              <a
-                                key={product.id}
-                                href={product.link || '#'}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex-shrink-0 w-32 rounded-xl overflow-hidden transition-all hover:shadow-lg"
+                            {brands.slice(0, 6).map((brand) => (
+                              <button
+                                key={brand.id}
+                                onClick={() => brand.coupon_code && handleCopyCode(brand.coupon_code)}
+                                className="flex-shrink-0 w-32 p-3 rounded-xl text-right transition-all hover:shadow-lg"
                                 style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
                               >
-                                {product.image_url && (
-                                  <div className="relative w-full h-20">
-                                    <Image
-                                      src={getProxiedImageUrl(product.image_url)}
-                                      alt={product.name}
-                                      fill
-                                      className="object-cover"
-                                      sizes="128px"
-                                      unoptimized
-                                    />
-                                  </div>
-                                )}
-                                <div className="p-2">
-                                  <p className="text-[9px]" style={{ color: 'var(--color-primary)' }}>{product.brand}</p>
-                                  <p className="font-medium text-[11px] leading-tight line-clamp-2" style={{ color: 'var(--color-text)' }}>
-                                    {product.name}
+                                <p className="font-medium text-sm truncate" style={{ color: 'var(--color-text)' }}>
+                                  {brand.brand_name}
+                                </p>
+                                {brand.category && (
+                                  <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text)', opacity: 0.5 }}>
+                                    {brand.category}
                                   </p>
-                                  {product.coupon_code && (
-                                    <span 
-                                      className="inline-block mt-1 px-1.5 py-0.5 text-[8px] font-semibold rounded"
-                                      style={{ backgroundColor: 'rgba(16,185,129,0.1)', color: '#10b981' }}
-                                    >
-                                      {product.coupon_code}
-                                    </span>
-                                  )}
-                                </div>
-                              </a>
+                                )}
+                                {brand.coupon_code ? (
+                                  <span 
+                                    className="inline-block mt-2 px-2 py-1 text-[10px] font-mono font-semibold rounded"
+                                    style={{ backgroundColor: 'rgba(16,185,129,0.1)', color: '#10b981' }}
+                                  >
+                                    {copiedCode === brand.coupon_code ? 'הועתק!' : brand.coupon_code}
+                                  </span>
+                                ) : (
+                                  <span className="inline-block mt-2 text-[10px]" style={{ color: 'var(--color-text)', opacity: 0.4 }}>
+                                    ללא קופון
+                                  </span>
+                                )}
+                              </button>
                             ))}
                           </div>
                         </div>
@@ -562,83 +552,76 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="חפשו מוצרים, קופונים..."
+                        placeholder="חפשו מותגים, קופונים..."
                         className="input pr-10"
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* Products */}
+                {/* Brands */}
                 <div className="px-4 py-6">
                   <div className="max-w-2xl mx-auto space-y-6">
                     {/* Coupons */}
-                    {products.filter((p) => p.coupon_code).length > 0 && (
+                    {brands.filter((b) => b.coupon_code).length > 0 && (
                       <section>
                         <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text)' }}>קודי קופון</h3>
                         <div className="grid grid-cols-2 gap-3">
-                          {products.filter((p) => p.coupon_code).map((product) => (
+                          {brands.filter((b) => b.coupon_code).map((brand) => (
                             <button
-                              key={product.id}
-                              onClick={() => handleCopyCode(product.coupon_code!)}
+                              key={brand.id}
+                              onClick={() => handleCopyCode(brand.coupon_code!)}
                               className="p-4 rounded-xl text-right transition-all"
                               style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
                             >
                               <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs" style={{ color: 'var(--color-text)', opacity: 0.6 }}>{product.brand}</span>
-                                <span className="text-xs font-medium" style={{ color: copiedCode === product.coupon_code ? '#10b981' : 'var(--color-primary)' }}>
-                                  {copiedCode === product.coupon_code ? 'הועתק!' : 'העתק'}
+                                <span className="text-xs" style={{ color: 'var(--color-text)', opacity: 0.6 }}>{brand.category || 'מותג'}</span>
+                                <span className="text-xs font-medium" style={{ color: copiedCode === brand.coupon_code ? '#10b981' : 'var(--color-primary)' }}>
+                                  {copiedCode === brand.coupon_code ? 'הועתק!' : 'העתק'}
                                 </span>
                               </div>
-                              <p className="font-mono font-bold text-base" style={{ color: 'var(--color-text)' }}>{product.coupon_code}</p>
-                              <p className="text-xs mt-1" style={{ color: 'var(--color-text)', opacity: 0.6 }}>{product.name}</p>
+                              <p className="font-mono font-bold text-base" style={{ color: 'var(--color-text)' }}>{brand.coupon_code}</p>
+                              <p className="text-xs mt-1" style={{ color: 'var(--color-text)', opacity: 0.6 }}>{brand.brand_name}</p>
                             </button>
                           ))}
                         </div>
                       </section>
                     )}
 
-                    {/* All Products */}
+                    {/* All Brands */}
                     <section>
-                      <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text)' }}>מוצרים</h3>
+                      <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text)' }}>מותגים</h3>
                       <div className="grid grid-cols-2 gap-3">
-                        {filteredProducts.map((product) => (
-                          <a
-                            key={product.id}
-                            href={product.link || '#'}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="rounded-xl overflow-hidden transition-all hover:shadow-lg"
+                        {filteredBrands.map((brand) => (
+                          <button
+                            key={brand.id}
+                            onClick={() => brand.coupon_code && handleCopyCode(brand.coupon_code)}
+                            className="p-4 rounded-xl text-right transition-all hover:shadow-lg"
                             style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
                           >
-                            {product.image_url && (
-                              <div className="aspect-square relative">
-                                <Image
-                                  src={getProxiedImageUrl(product.image_url)}
-                                  alt={product.name}
-                                  fill
-                                  className="object-cover"
-                                  sizes="(max-width: 768px) 50vw, 200px"
-                                  unoptimized
-                                />
-                                {product.coupon_code && (
-                                  <span 
-                                    className="absolute top-2 right-2 px-2 py-1 text-xs font-medium rounded-lg"
-                                    style={{ backgroundColor: 'var(--color-primary)', color: 'white' }}
-                                  >
-                                    קופון
-                                  </span>
-                                )}
-                              </div>
+                            <p className="font-semibold text-base" style={{ color: 'var(--color-text)' }}>{brand.brand_name}</p>
+                            {brand.description && (
+                              <p className="text-xs mt-1 line-clamp-2" style={{ color: 'var(--color-text)', opacity: 0.6 }}>{brand.description}</p>
                             )}
-                            <div className="p-3">
-                              <p className="text-xs font-medium" style={{ color: 'var(--color-primary)' }}>{product.brand}</p>
-                              <h4 className="font-medium text-sm line-clamp-2 mt-0.5" style={{ color: 'var(--color-text)' }}>{product.name}</h4>
-                              {product.coupon_code && (
-                                <p className="text-xs font-mono mt-1" style={{ color: 'var(--color-text)', opacity: 0.6 }}>{product.coupon_code}</p>
-                              )}
-                            </div>
-                          </a>
+                            {brand.category && (
+                              <p className="text-xs mt-1" style={{ color: 'var(--color-primary)' }}>{brand.category}</p>
+                            )}
+                            {brand.coupon_code ? (
+                              <div className="mt-2 flex items-center gap-2">
+                                <span 
+                                  className="px-2 py-1 text-xs font-mono font-bold rounded"
+                                  style={{ backgroundColor: 'rgba(16,185,129,0.1)', color: '#10b981' }}
+                                >
+                                  {brand.coupon_code}
+                                </span>
+                                <span className="text-xs" style={{ color: copiedCode === brand.coupon_code ? '#10b981' : 'var(--color-text)', opacity: copiedCode === brand.coupon_code ? 1 : 0.5 }}>
+                                  {copiedCode === brand.coupon_code ? 'הועתק!' : 'לחץ להעתקה'}
+                                </span>
+                              </div>
+                            ) : (
+                              <p className="text-xs mt-2" style={{ color: 'var(--color-text)', opacity: 0.4 }}>ללא קופון כרגע</p>
+                            )}
+                          </button>
                         ))}
                       </div>
                     </section>
