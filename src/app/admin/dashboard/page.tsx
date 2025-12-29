@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import type { Influencer } from '@/types';
 import { formatNumber, formatDateTime } from '@/lib/utils';
+import { getProxiedImageUrl } from '@/lib/image-utils';
 
 function DashboardContent() {
   const router = useRouter();
@@ -210,7 +211,7 @@ function DashboardContent() {
                   {influencer.avatar_url ? (
                     <div className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0">
                       <Image
-                        src={influencer.avatar_url}
+                        src={getProxiedImageUrl(influencer.avatar_url || '')}
                         alt={influencer.display_name}
                         fill
                         className="object-cover"

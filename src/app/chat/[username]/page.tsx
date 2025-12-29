@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { getInfluencerByUsername, getProductsByInfluencer, getContentByInfluencer } from '@/lib/supabase';
 import { applyTheme, getGoogleFontsUrl } from '@/lib/theme';
+import { getProxiedImageUrl } from '@/lib/image-utils';
 import type { Influencer, Product, ContentItem, InfluencerType } from '@/types';
 
 interface Message {
@@ -297,7 +298,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 {influencer.avatar_url ? (
                   <div className="relative w-10 h-10 rounded-xl overflow-hidden">
                     <Image
-                      src={influencer.avatar_url}
+                      src={getProxiedImageUrl(influencer.avatar_url)}
                       alt={influencer.display_name}
                       fill
                       className="object-cover"
@@ -394,7 +395,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                       {influencer.avatar_url && (
                         <div className="relative w-16 h-16 rounded-2xl overflow-hidden mb-5">
                           <Image
-                            src={influencer.avatar_url}
+                            src={getProxiedImageUrl(influencer.avatar_url)}
                             alt={influencer.display_name}
                             fill
                             className="object-cover"
@@ -451,7 +452,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                 {product.image_url && (
                                   <div className="relative w-full h-20">
                                     <Image
-                                      src={product.image_url}
+                                      src={getProxiedImageUrl(product.image_url)}
                                       alt={product.name}
                                       fill
                                       className="object-cover"
@@ -607,7 +608,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             {product.image_url && (
                               <div className="aspect-square relative">
                                 <Image
-                                  src={product.image_url}
+                                  src={getProxiedImageUrl(product.image_url)}
                                   alt={product.name}
                                   fill
                                   className="object-cover"
