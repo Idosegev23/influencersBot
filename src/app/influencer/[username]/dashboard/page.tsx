@@ -18,6 +18,7 @@ import {
   Loader2,
   FileText,
   Headphones,
+  RefreshCw,
 } from 'lucide-react';
 import { getInfluencerByUsername, getChatSessions, getProductsByInfluencer, getAnalytics } from '@/lib/supabase';
 import { formatNumber, formatRelativeTime } from '@/lib/utils';
@@ -39,6 +40,8 @@ export default function InfluencerDashboardPage({
   const [analytics, setAnalytics] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [rescanning, setRescanning] = useState(false);
+  const [rescanResult, setRescanResult] = useState<{ products: number; content: number } | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -96,6 +99,37 @@ export default function InfluencerDashboardPage({
       body: JSON.stringify({ username, action: 'logout' }),
     });
     router.push(`/influencer/${username}`);
+  };
+
+  const handleRescan = async () => {
+    if (!influencer) return;
+
+    setRescanning(true);
+    setRescanResult(null);
+    try {
+      const response = await fetch('/api/influencer/rescan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setRescanResult({
+          products: data.productsCount || 0,
+          content: data.contentCount || 0,
+        });
+        // Reload products after rescan
+        if (influencer) {
+          const prods = await getProductsByInfluencer(influencer.id);
+          setProducts(prods);
+        }
+      }
+    } catch (error) {
+      console.error('Error rescanning:', error);
+    } finally {
+      setRescanning(false);
+    }
   };
 
   const handleCopyLink = () => {
@@ -440,17 +474,49 @@ export default function InfluencerDashboardPage({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.45 }}
-          className="mt-4 flex justify-center"
+          className="mt-4 flex flex-col items-center gap-4"
         >
-          <a
-            href={chatLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl transition-all font-medium"
-          >
-            <ExternalLink className="w-5 h-5" />
-            צפייה בבוט
-          </a>
+          <div className="flex flex-wrap justify-center gap-3">
+            <a
+              href={chatLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl transition-all font-medium"
+            >
+              <ExternalLink className="w-5 h-5" />
+              צפייה בבוט
+            </a>
+            
+            <button
+              onClick={handleRescan}
+              disabled={rescanning}
+              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-500 hover:to-teal-500 disabled:opacity-50 text-white rounded-xl transition-all font-medium"
+            >
+              {rescanning ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  סורק מחדש...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-5 h-5" />
+                  סרוק מחדש מאינסטגרם
+                </>
+              )}
+            </button>
+          </div>
+          
+          {rescanResult && (
+            <motion.div
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="px-4 py-2 bg-green-600/20 border border-green-500/30 rounded-xl"
+            >
+              <p className="text-sm text-green-300">
+                נמצאו {rescanResult.products} מוצרים ו-{rescanResult.content} פריטי תוכן 🎉
+              </p>
+            </motion.div>
+          )}
         </motion.div>
       </main>
     </div>
