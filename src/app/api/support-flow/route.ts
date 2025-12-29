@@ -105,25 +105,22 @@ function generateSupportResponse(
   data: SupportData,
   influencerName: string
 ): string {
-  const firstName = influencerName.split(' ')[0];
-  
   const prompts: Record<string, string> = {
-    brand: `אוי איזה באסה! 😔 אני מצטערת לשמוע שנתקלת בבעיה.
-בואי נטפל בזה ביחד! על איזה מותג מדובר?`,
+    brand: `אוי איזה באסה! 😔 מצטערת לשמוע.
+בואי נטפל בזה - על איזה מותג מדובר?`,
     
-    name: `הבנתי, ${data.brand}. על שם מי ההזמנה?`,
+    name: `הבנתי, ${data.brand}. מה השם שלך?`,
     
-    order: `תודה ${data.customerName}! מה מספר ההזמנה שלך?
-(אם אין לך מספר הזמנה, כתבי "אין")`,
+    order: `תודה ${data.customerName}! מה מספר ההזמנה?
+(אם אין - כתבי "אין")`,
     
-    problem: `אוקי${data.orderNumber && data.orderNumber !== 'אין' ? `, הזמנה מספר ${data.orderNumber}` : ''}. 
-ספרי לי בבקשה מה הבעיה בדיוק?`,
+    problem: `אוקי${data.orderNumber && data.orderNumber !== 'אין' ? `, הזמנה ${data.orderNumber}` : ''}. 
+מה הבעיה בדיוק?`,
     
-    phone: `הבנתי את הבעיה. מה המספר נייד שלך כדי שנוכל לחזור אלייך?`,
+    phone: `הבנתי. מה הטלפון שלך לחזרה?`,
     
-    complete: `תודה רבה! 🙏
-אני מצטערת על החוויה ומעבירה את זה מיידית לטיפול!
-${firstName} תחזור/תחזרי אלייך כמה שיותר מהר! מבטיחה! 💜`
+    complete: `תודה! 🙏 הפנייה נשמרה ונשלחה.
+מישהו מהצוות יחזור אלייך בהקדם! 💜`
   };
 
   return prompts[step] || 'איך אפשר לעזור?';
