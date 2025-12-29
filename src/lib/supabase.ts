@@ -271,6 +271,12 @@ export async function deleteProduct(id: string): Promise<boolean> {
 
 export async function incrementProductClick(id: string): Promise<boolean> {
   const { error } = await supabase.rpc('increment_product_click', { product_id: id });
+  if (error) {
+    console.error('Error incrementing click:', error);
+    return false;
+  }
+  return true;
+}
 
 // ============================================
 // Brands Functions
@@ -340,12 +346,6 @@ export async function deleteBrand(id: string): Promise<boolean> {
 
   if (error) {
     console.error('Error deleting brand:', error);
-    return false;
-  }
-  return true;
-
-  if (error) {
-    console.error('Error incrementing click:', error);
     return false;
   }
   return true;
