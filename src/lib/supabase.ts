@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type {
   Influencer,
   Post,
@@ -23,14 +23,43 @@ if (!supabaseAnonKey) {
   throw new Error('Missing environment variable: NEXT_PUBLIC_SUPABASE_ANON_KEY');
 }
 
+// Singleton pattern to avoid multiple GoTrueClient instances
+let _supabaseClient: SupabaseClient | null = null;
+let _supabaseServer: SupabaseClient | null = null;
+
 // Client for browser-side operations (limited by RLS)
-export const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+export const supabaseClient = (() => {
+  if (!_supabaseClient) {
+    _supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+      },
+    });
+  }
+  return _supabaseClient;
+})();
 
 // Server-side client with service role (bypasses RLS)
 // Only use this in API routes, never expose to client
-export const supabase = supabaseServiceKey 
-  ? createClient(supabaseUrl, supabaseServiceKey)
-  : createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = (() => {
+  if (!_supabaseServer) {
+    _supabaseServer = supabaseServiceKey 
+      ? createClient(supabaseUrl, supabaseServiceKey, {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+          },
+        })
+      : createClient(supabaseUrl, supabaseAnonKey, {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+          },
+        });
+  }
+  return _supabaseServer;
+})();
 
 // ============================================
 // Influencer Functions
