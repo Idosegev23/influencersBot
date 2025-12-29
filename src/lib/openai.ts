@@ -264,6 +264,98 @@ export async function extractRecipeFromPost(caption: string): Promise<{
   }
 }
 
+// Extract any type of content from a post
+export async function extractContentFromPost(
+  caption: string,
+  influencerType: InfluencerType,
+  imageUrl?: string
+): Promise<{
+  type: 'recipe' | 'look' | 'tip' | 'review' | 'workout' | 'tutorial' | null;
+  title: string;
+  description: string;
+  content: Record<string, unknown>;
+} | null> {
+  const client = getClient();
+  
+  if (!caption || caption.length < 20) return null;
+  
+  try {
+    const typeHints: Record<InfluencerType, string> = {
+      food: 'מתכונים, טיפים לבישול, סקירות מסעדות',
+      fashion: 'לוקים, שילובי לבוש, המלצות אופנה',
+      beauty: 'טיפים ליופי, סקירות מוצרים, מדריכי איפור',
+      lifestyle: 'טיפים לחיים, המלצות, סקירות',
+      fitness: 'אימונים, טיפים לכושר, תזונה',
+      parenting: 'טיפים להורות, המלצות לילדים',
+      tech: 'סקירות טכנולוגיה, מדריכים',
+      travel: 'המלצות טיול, סקירות מקומות',
+      other: 'תוכן כללי, טיפים, סקירות'
+    };
+
+    const response = await client.responses.create({
+      model: ANALYSIS_MODEL,
+      instructions: `נתח את הפוסט וקבע אם הוא מכיל תוכן שימושי מהסוגים הבאים: ${typeHints[influencerType]}.
+אם יש תוכן שימושי, חלץ אותו. אם אין - החזר has_content: false.`,
+      input: caption.slice(0, 2000),
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'content_extraction',
+          strict: true,
+          schema: {
+            type: 'object',
+            properties: {
+              has_content: { type: 'boolean' },
+              content_type: { 
+                type: 'string',
+                enum: ['recipe', 'look', 'tip', 'review', 'workout', 'tutorial', 'none']
+              },
+              title: { type: 'string' },
+              description: { type: 'string' },
+              key_points: { type: 'array', items: { type: 'string' } },
+              ingredients: { type: 'array', items: { type: 'string' } },
+              instructions: { type: 'array', items: { type: 'string' } }
+            },
+            required: ['has_content', 'content_type', 'title', 'description', 'key_points', 'ingredients', 'instructions'],
+            additionalProperties: false
+          }
+        }
+      }
+    });
+
+    const result = JSON.parse(response.output_text);
+    
+    if (!result.has_content || result.content_type === 'none' || !result.title) {
+      return null;
+    }
+
+    // Build content based on type
+    const content: Record<string, unknown> = {};
+    
+    if (result.content_type === 'recipe') {
+      content.ingredients = result.ingredients || [];
+      content.instructions = result.instructions || [];
+    } else if (result.content_type === 'look') {
+      content.items = result.key_points || [];
+    } else if (result.content_type === 'workout') {
+      content.exercises = result.key_points || [];
+      content.instructions = result.instructions || [];
+    } else {
+      content.points = result.key_points || [];
+    }
+
+    return {
+      type: result.content_type as 'recipe' | 'look' | 'tip' | 'review' | 'workout' | 'tutorial',
+      title: result.title,
+      description: result.description || caption.slice(0, 200),
+      content
+    };
+  } catch (error) {
+    console.error('Error extracting content:', error);
+    return null;
+  }
+}
+
 // ============================================
 // Batch Processing
 // ============================================

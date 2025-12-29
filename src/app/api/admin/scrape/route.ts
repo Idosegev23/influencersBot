@@ -6,7 +6,7 @@ import {
   supabase 
 } from '@/lib/supabase';
 import { scrapeInstagramProfile } from '@/lib/apify';
-import { analyzeAllPosts, extractRecipeFromPost, generatePersonaFromPosts, generateGreetingAndQuestions } from '@/lib/openai';
+import { analyzeAllPosts, extractContentFromPost, generatePersonaFromPosts, generateGreetingAndQuestions } from '@/lib/openai';
 import { uploadProfilePicture } from '@/lib/storage';
 import type { ContentItem, Product, InfluencerPersona } from '@/types';
 
@@ -88,26 +88,42 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Extract content items
+    // Extract content items from posts (recipes, looks, tips, etc.)
     const contentItems: Partial<ContentItem>[] = [];
+    console.log(`Extracting content from posts for ${username}...`);
 
-    if (influencer.influencer_type === 'food') {
-      for (const post of posts.slice(0, 20)) {
-        const recipe = await extractRecipeFromPost(post.caption);
-        if (recipe) {
+    // Process posts for content extraction (limit to 25 posts to avoid rate limits)
+    const postsToProcess = posts.slice(0, 25);
+    for (let i = 0; i < postsToProcess.length; i++) {
+      const post = postsToProcess[i];
+      try {
+        const extracted = await extractContentFromPost(
+          post.caption,
+          influencer.influencer_type,
+          post.displayUrl
+        );
+        
+        if (extracted) {
           contentItems.push({
-            type: 'recipe',
-            title: recipe.title,
-            description: post.caption.slice(0, 200),
-            content: {
-              ingredients: recipe.ingredients,
-              instructions: recipe.instructions,
-            },
+            type: extracted.type as ContentItem['type'],
+            title: extracted.title,
+            description: extracted.description,
+            content: extracted.content,
             image_url: post.displayUrl,
           });
+          console.log(`  Found ${extracted.type}: ${extracted.title}`);
         }
+        
+        // Small delay between extractions
+        if (i < postsToProcess.length - 1) {
+          await new Promise(r => setTimeout(r, 300));
+        }
+      } catch (error) {
+        console.error(`Error extracting content from post ${i}:`, error);
       }
     }
+    
+    console.log(`Extracted ${contentItems.length} content items for ${username}`);
 
     // Generate persona from posts
     console.log(`Generating persona for ${username}...`);
