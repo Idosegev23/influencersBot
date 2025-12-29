@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
   MessageCircle,
-  Package,
   TrendingUp,
   Users,
   ExternalLink,
@@ -21,9 +20,9 @@ import {
   RefreshCw,
   Tag,
 } from 'lucide-react';
-import { getInfluencerByUsername, getChatSessions, getProductsByInfluencer, getAnalytics } from '@/lib/supabase';
+import { getInfluencerByUsername, getChatSessions, getBrandsByInfluencer, getAnalytics, type Brand } from '@/lib/supabase';
 import { formatNumber, formatRelativeTime } from '@/lib/utils';
-import type { Influencer, Product, ChatSession } from '@/types';
+import type { Influencer, ChatSession } from '@/types';
 import NotificationBell from '@/components/NotificationBell';
 
 export default function InfluencerDashboardPage({
@@ -36,7 +35,7 @@ export default function InfluencerDashboardPage({
   const router = useRouter();
 
   const [influencer, setInfluencer] = useState<Influencer | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [analytics, setAnalytics] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -66,13 +65,13 @@ export default function InfluencerDashboardPage({
         setInfluencer(inf);
 
         // Load related data
-        const [prods, sess, events] = await Promise.all([
-          getProductsByInfluencer(inf.id),
+        const [brandsData, sess, events] = await Promise.all([
+          getBrandsByInfluencer(inf.id),
           getChatSessions(inf.id),
           getAnalytics(inf.id, 30),
         ]);
 
-        setProducts(prods);
+        setBrands(brandsData);
         setSessions(sess);
 
         // Calculate analytics
@@ -120,10 +119,10 @@ export default function InfluencerDashboardPage({
           products: data.productsCount || 0,
           content: data.contentCount || 0,
         });
-        // Reload products after rescan
+        // Reload brands after rescan
         if (influencer) {
-          const prods = await getProductsByInfluencer(influencer.id);
-          setProducts(prods);
+          const brandsData = await getBrandsByInfluencer(influencer.id);
+          setBrands(brandsData);
         }
       }
     } catch (error) {
@@ -285,7 +284,7 @@ export default function InfluencerDashboardPage({
           >
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                <Package className="w-6 h-6 text-purple-400" />
+                <Tag className="w-6 h-6 text-purple-400" />
               </div>
               <div>
                 <p className="text-2xl font-bold text-white">{formatNumber(analytics.couponCopies || 0)}</p>
@@ -314,7 +313,7 @@ export default function InfluencerDashboardPage({
 
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Products Section */}
+          {/* Brands Section */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -323,48 +322,50 @@ export default function InfluencerDashboardPage({
           >
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-white flex items-center gap-2">
-                <Package className="w-5 h-5 text-indigo-400" />
-                מוצרים וקופונים
+                <Tag className="w-5 h-5 text-pink-400" />
+                מותגים וקופונים
               </h3>
               <Link
-                href={`/influencer/${username}/products`}
-                className="text-sm text-indigo-400 hover:text-indigo-300"
+                href={`/influencer/${username}/brands`}
+                className="text-sm text-pink-400 hover:text-pink-300"
               >
                 ניהול מלא
               </Link>
             </div>
 
-            {products.length > 0 ? (
+            {brands.length > 0 ? (
               <div className="space-y-3">
-                {products.slice(0, 4).map((product) => (
+                {brands.slice(0, 4).map((brand) => (
                   <div
-                    key={product.id}
+                    key={brand.id}
                     className="flex items-center justify-between p-3 bg-gray-700/30 rounded-xl"
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">{product.name}</p>
-                      <p className="text-xs text-gray-400">{product.brand}</p>
+                      <p className="text-sm font-medium text-white truncate">{brand.brand_name}</p>
+                      {brand.category && <p className="text-xs text-gray-400">{brand.category}</p>}
                     </div>
-                    {product.coupon_code && (
+                    {brand.coupon_code ? (
                       <span className="px-2 py-1 text-xs bg-green-500/20 text-green-400 rounded-lg font-mono">
-                        {product.coupon_code}
+                        {brand.coupon_code}
                       </span>
+                    ) : (
+                      <span className="text-xs text-gray-500">ללא קוד</span>
                     )}
                   </div>
                 ))}
-                {products.length > 4 && (
-                  <p className="text-sm text-gray-500 text-center">+{products.length - 4} נוספים</p>
+                {brands.length > 4 && (
+                  <p className="text-sm text-gray-500 text-center">+{brands.length - 4} נוספים</p>
                 )}
               </div>
             ) : (
               <div className="text-center py-8">
-                <Package className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                <p className="text-gray-400 mb-3">אין עדיין מוצרים</p>
+                <Tag className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                <p className="text-gray-400 mb-3">אין עדיין מותגים</p>
                 <Link
-                  href={`/influencer/${username}/products`}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-500 transition-colors"
+                  href={`/influencer/${username}/brands`}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-pink-600 text-white text-sm rounded-lg hover:bg-pink-500 transition-colors"
                 >
-                  הוסף מוצר
+                  הוסף מותג
                 </Link>
               </div>
             )}
@@ -443,14 +444,6 @@ export default function InfluencerDashboardPage({
           >
             <Tag className="w-8 h-8 text-pink-400" />
             <span className="text-white font-medium">מותגים וקופונים</span>
-          </Link>
-
-          <Link
-            href={`/influencer/${username}/products`}
-            className="flex flex-col items-center gap-3 p-6 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-indigo-500/50 rounded-2xl transition-all"
-          >
-            <Package className="w-8 h-8 text-purple-400" />
-            <span className="text-white font-medium">מוצרים</span>
           </Link>
 
           <Link
