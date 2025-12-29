@@ -272,6 +272,78 @@ export async function deleteProduct(id: string): Promise<boolean> {
 export async function incrementProductClick(id: string): Promise<boolean> {
   const { error } = await supabase.rpc('increment_product_click', { product_id: id });
 
+// ============================================
+// Brands Functions
+// ============================================
+
+export interface Brand {
+  id: string;
+  influencer_id: string;
+  brand_name: string;
+  description: string | null;
+  coupon_code: string | null;
+  link: string | null;
+  short_link: string | null;
+  category: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getBrandsByInfluencer(influencerId: string): Promise<Brand[]> {
+  const { data, error } = await supabase
+    .from('brands')
+    .select('*')
+    .eq('influencer_id', influencerId)
+    .eq('is_active', true)
+    .order('brand_name', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching brands:', error);
+    return [];
+  }
+  return data || [];
+}
+
+export async function createBrand(brand: Omit<Brand, 'id' | 'created_at' | 'updated_at'>): Promise<Brand | null> {
+  const { data, error } = await supabase
+    .from('brands')
+    .insert(brand)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating brand:', error);
+    return null;
+  }
+  return data;
+}
+
+export async function updateBrand(id: string, updates: Partial<Brand>): Promise<boolean> {
+  const { error } = await supabase
+    .from('brands')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id);
+
+  if (error) {
+    console.error('Error updating brand:', error);
+    return false;
+  }
+  return true;
+}
+
+export async function deleteBrand(id: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('brands')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Error deleting brand:', error);
+    return false;
+  }
+  return true;
+
   if (error) {
     console.error('Error incrementing click:', error);
     return false;

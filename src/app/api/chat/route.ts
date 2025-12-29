@@ -6,6 +6,7 @@ import {
   createChatSession, 
   saveChatMessage,
   getProductsByInfluencer,
+  getBrandsByInfluencer,
   getContentByInfluencer,
   trackEvent,
   supabase,
@@ -65,34 +66,62 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Build context from products and content
+    // Build context from brands, products, and content
     let context = '';
     
-    // Get products
+    // Get brands (main source for coupons)
+    const brands = await getBrandsByInfluencer(influencer.id);
+    if (brands.length > 0) {
+      context += '## מותגים ושיתופי פעולה:\n';
+      context += 'אלו המותגים שאני עובדת איתם ויש לי קופונים עבורם:\n';
+      brands.forEach((b) => {
+        context += `- ${b.brand_name}`;
+        if (b.description) context += `: ${b.description}`;
+        if (b.coupon_code) context += ` | קוד קופון: "${b.coupon_code}"`;
+        else context += ` | ללא קוד קופון כרגע`;
+        if (b.link) context += ` | לינק: ${b.link}`;
+        context += '\n';
+      });
+      context += '\nכשמישהו שואל על קופונים או הנחות, תן להם את הקוד הרלוונטי מהרשימה למעלה.\n';
+    }
+
+    // Get products (for additional context)
     const products = await getProductsByInfluencer(influencer.id);
     if (products.length > 0) {
-      context += '## מוצרים וקופונים:\n';
-      products.forEach((p) => {
+      context += '\n## מוצרים שהזכרתי לאחרונה:\n';
+      products.slice(0, 10).forEach((p) => {
         context += `- ${p.name}`;
         if (p.brand) context += ` (${p.brand})`;
         if (p.coupon_code) context += ` - קופון: ${p.coupon_code}`;
-        if (p.link) context += ` - לינק: ${p.link}`;
         context += '\n';
       });
     }
 
-    // Get content for food influencers
-    if (influencer.influencer_type === 'food') {
-      const content = await getContentByInfluencer(influencer.id);
-      const recipes = content.filter((c) => c.type === 'recipe').slice(0, 10);
-      if (recipes.length > 0) {
-        context += '\n## מתכונים:\n';
-        recipes.forEach((r) => {
-          context += `- ${r.title}`;
-          if (r.description) context += `: ${r.description.slice(0, 100)}`;
-          context += '\n';
-        });
-      }
+    // Get content based on influencer type
+    const content = await getContentByInfluencer(influencer.id);
+    if (content.length > 0) {
+      const contentSlice = content.slice(0, 15);
+      const contentLabels: Record<string, string> = {
+        recipe: 'מתכונים',
+        look: 'לוקים',
+        outfit: 'אאוטפיטים',
+        tip: 'טיפים',
+        workout: 'אימונים',
+        review: 'ביקורות',
+        recommendation: 'המלצות',
+        story: 'סיפורים',
+        moment: 'רגעים',
+        tutorial: 'מדריכים',
+        routine: 'רוטינות',
+      };
+      
+      context += '\n## תכנים שפרסמתי לאחרונה:\n';
+      contentSlice.forEach((c) => {
+        const typeLabel = contentLabels[c.type] || c.type;
+        context += `- [${typeLabel}] ${c.title}`;
+        if (c.description) context += `: ${c.description.slice(0, 80)}...`;
+        context += '\n';
+      });
     }
 
     // Build instructions

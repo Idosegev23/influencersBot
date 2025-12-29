@@ -19,6 +19,7 @@ import {
   FileText,
   Headphones,
   RefreshCw,
+  Tag,
 } from 'lucide-react';
 import { getInfluencerByUsername, getChatSessions, getProductsByInfluencer, getAnalytics } from '@/lib/supabase';
 import { formatNumber, formatRelativeTime } from '@/lib/utils';
@@ -434,6 +435,14 @@ export default function InfluencerDashboardPage({
           >
             <MessageCircle className="w-8 h-8 text-blue-400" />
             <span className="text-white font-medium">שיחות</span>
+          </Link>
+
+          <Link
+            href={`/influencer/${username}/brands`}
+            className="flex flex-col items-center gap-3 p-6 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-pink-500/50 rounded-2xl transition-all"
+          >
+            <Tag className="w-8 h-8 text-pink-400" />
+            <span className="text-white font-medium">מותגים וקופונים</span>
           </Link>
 
           <Link

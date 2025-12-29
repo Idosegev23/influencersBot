@@ -170,6 +170,21 @@ export interface Product {
   created_at: string;
 }
 
+// Brand Partnership Types
+export interface Brand {
+  id: string;
+  influencer_id: string;
+  brand_name: string;
+  description: string | null;
+  coupon_code: string | null;
+  link: string | null;
+  short_link: string | null;
+  category: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 // Chat Types
 export interface ChatSession {
   id: string;
