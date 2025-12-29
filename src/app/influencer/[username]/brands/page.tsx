@@ -15,6 +15,7 @@ import {
   Loader2,
   ExternalLink,
   Search,
+  Phone,
 } from 'lucide-react';
 import { getInfluencerByUsername, getBrandsByInfluencer, createBrand, updateBrand, deleteBrand, type Brand } from '@/lib/supabase';
 import type { Influencer } from '@/types';
@@ -43,6 +44,7 @@ export default function BrandsPage({
     coupon_code: '',
     link: '',
     category: '',
+    whatsapp_phone: '0547667775', // Default phone
   });
   const [saving, setSaving] = useState(false);
 
@@ -94,6 +96,7 @@ export default function BrandsPage({
       coupon_code: brand.coupon_code || '',
       link: brand.link || '',
       category: brand.category || '',
+      whatsapp_phone: brand.whatsapp_phone || '0547667775',
     });
     setShowForm(true);
   };
@@ -112,12 +115,13 @@ export default function BrandsPage({
           coupon_code: formData.coupon_code || null,
           link: formData.link || null,
           category: formData.category || null,
+          whatsapp_phone: formData.whatsapp_phone || '0547667775',
         });
         
         if (success) {
           setBrands(prev => prev.map(b => 
             b.id === editingBrand.id 
-              ? { ...b, ...formData, description: formData.description || null, coupon_code: formData.coupon_code || null, link: formData.link || null, category: formData.category || null }
+              ? { ...b, ...formData, description: formData.description || null, coupon_code: formData.coupon_code || null, link: formData.link || null, category: formData.category || null, whatsapp_phone: formData.whatsapp_phone || '0547667775' }
               : b
           ));
         }
@@ -131,6 +135,7 @@ export default function BrandsPage({
           link: formData.link || null,
           short_link: null,
           category: formData.category || null,
+          whatsapp_phone: formData.whatsapp_phone || '0547667775',
           is_active: true,
         });
         
@@ -142,7 +147,7 @@ export default function BrandsPage({
       // Reset form
       setShowForm(false);
       setEditingBrand(null);
-      setFormData({ brand_name: '', description: '', coupon_code: '', link: '', category: '' });
+      setFormData({ brand_name: '', description: '', coupon_code: '', link: '', category: '', whatsapp_phone: '0547667775' });
     } catch (error) {
       console.error('Error saving brand:', error);
     } finally {
@@ -196,7 +201,7 @@ export default function BrandsPage({
             <button
               onClick={() => {
                 setEditingBrand(null);
-                setFormData({ brand_name: '', description: '', coupon_code: '', link: '', category: '' });
+                setFormData({ brand_name: '', description: '', coupon_code: '', link: '', category: '', whatsapp_phone: '0547667775' });
                 setShowForm(true);
               }}
               className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
@@ -266,7 +271,14 @@ export default function BrandsPage({
                 </div>
 
                 {brand.description && (
-                  <p className="text-sm text-gray-400 mb-3">{brand.description}</p>
+                  <p className="text-sm text-gray-400 mb-2">{brand.description}</p>
+                )}
+
+                {brand.whatsapp_phone && (
+                  <div className="flex items-center gap-1 text-xs text-gray-500 mb-3">
+                    <Phone className="w-3 h-3" />
+                    <span dir="ltr">{brand.whatsapp_phone}</span>
+                  </div>
                 )}
 
                 <div className="flex items-center justify-between">
@@ -400,6 +412,24 @@ export default function BrandsPage({
                     <option value="שירותים">שירותים</option>
                     <option value="אחר">אחר</option>
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">
+                    <Phone className="w-4 h-4 inline ml-1" />
+                    טלפון לפניות שירות (WhatsApp)
+                  </label>
+                  <input
+                    type="tel"
+                    value={formData.whatsapp_phone}
+                    onChange={(e) => setFormData(prev => ({ ...prev, whatsapp_phone: e.target.value }))}
+                    className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                    placeholder="0547667775"
+                    dir="ltr"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    פניות שירות יישלחו למספר זה ב-WhatsApp
+                  </p>
                 </div>
 
                 <div className="flex gap-3 pt-4">
