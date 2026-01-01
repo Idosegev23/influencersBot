@@ -42,9 +42,19 @@ import {
 } from '@/engines/decision';
 import type { EngineContext, AccountContext, SessionContext, UserContext, KnowledgeRefs, LimitsContext, RequestContext } from '@/engines/context';
 
+// Policy Engine
+import { 
+  checkPolicies, 
+  applyPolicyOverrides, 
+  buildSecurityContext,
+  getPolicySummary,
+} from '@/engines/policy';
+import type { SecurityContext, PolicyCheckResult } from '@/engines/policy';
+
 // Feature flags
 const USE_UNDERSTANDING_ENGINE = process.env.USE_UNDERSTANDING_ENGINE !== 'false';
 const USE_DECISION_ENGINE = process.env.USE_DECISION_ENGINE !== 'false';
+const USE_POLICY_ENGINE = process.env.USE_POLICY_ENGINE !== 'false';
 
 // Timing helper
 interface StageTimings {
@@ -56,6 +66,7 @@ interface StageTimings {
   contextLoadMs: number;
   understandingMs: number;
   decisionMs: number;
+  policyMs: number;
   openaiMs: number;
   saveMs: number;
   totalMs: number;
@@ -363,6 +374,159 @@ export async function POST(req: NextRequest) {
       }
     }
     timings.decisionMs = Date.now() - stageStart;
+    stageStart = Date.now();
+
+    // === POLICY ENGINE ===
+    let policyResult: PolicyCheckResult | null = null;
+    let engineContext: EngineContext | null = null;
+    
+    if (USE_POLICY_ENGINE && decision && understanding) {
+      try {
+        // Build engine context (already built above for decision)
+        engineContext = {
+          account: {
+            id: accountId,
+            mode: 'creator',
+            profileId: influencer.id,
+            timezone: 'Asia/Jerusalem',
+            language: 'he',
+            plan: 'pro',
+            allowedChannels: ['chat'],
+            security: {
+              publicChatAllowed: true,
+              requireAuthForSupport: false,
+              allowedOrigins: [],
+            },
+            features: {
+              supportFlowEnabled: true,
+              salesFlowEnabled: false,
+              whatsappEnabled: false,
+              analyticsEnabled: true,
+            },
+          } as AccountContext,
+          session: {
+            id: currentSessionId || '',
+            state: 'Chat.Active',
+            version: 1,
+            lastActiveAt: new Date(),
+            messageCount: 0,
+          } as SessionContext,
+          user: {
+            anonId: `anon_${Date.now()}`,
+            isRepeatVisitor: false,
+          } as UserContext,
+          knowledge: {
+            brandsRef: `brands:${accountId}`,
+            contentIndexRef: `content:${accountId}`,
+          } as KnowledgeRefs,
+          limits: {
+            tokenBudgetRemaining: 100000,
+            tokenBudgetTotal: 100000,
+            costCeiling: 100,
+            costUsed: 0,
+            rateLimitRemaining: 100,
+            rateLimitResetAt: new Date(Date.now() + 60000),
+            periodType: 'month',
+            periodStart: new Date(),
+            periodEnd: new Date(),
+          } as LimitsContext,
+          request: {
+            requestId,
+            traceId,
+            timestamp: new Date(),
+            source: 'chat',
+            messageId: `msg_${Date.now()}`,
+            clientMessageId,
+          } as RequestContext,
+        };
+
+        // Build security context
+        const securityContext: SecurityContext = buildSecurityContext(engineContext);
+        
+        // Run policy checks
+        policyResult = await checkPolicies({
+          ctx: engineContext,
+          understanding,
+          decision,
+          security: securityContext,
+          traceId,
+          requestId,
+        });
+
+        // Emit policy event
+        await emitEvent({
+          type: 'policy_checked',
+          accountId,
+          sessionId: currentSessionId || 'unknown',
+          mode: 'creator',
+          payload: {
+            allowed: policyResult.allowed,
+            blockedReason: policyResult.blockedReason,
+            blockedByRule: policyResult.blockedByRule,
+            policySummary: getPolicySummary(policyResult),
+            warningsCount: policyResult.warnings?.length || 0,
+            hasOverrides: !!policyResult.overrides,
+          },
+          metadata: {
+            source: 'policy',
+            engineVersion: 'v2',
+            traceId,
+            requestId,
+          },
+        });
+
+        // If blocked, return early with policy response
+        if (!policyResult.allowed) {
+          timings.policyMs = Date.now() - stageStart;
+          timings.totalMs = Date.now() - startedAt;
+
+          // Emit blocked event
+          await emitEvent({
+            type: 'policy_blocked',
+            accountId,
+            sessionId: currentSessionId || 'unknown',
+            mode: 'creator',
+            payload: {
+              rule: policyResult.blockedByRule,
+              reason: policyResult.blockedReason,
+              decisionId: decision.decisionId,
+            },
+            metadata: {
+              source: 'policy',
+              engineVersion: 'v2',
+              traceId,
+              requestId,
+              latencyMs: timings.totalMs,
+            },
+          });
+
+          // Complete idempotency with blocked response
+          const blockedResponse = {
+            response: policyResult.blockedReason || 'הפעולה נחסמה',
+            responseId: null,
+            sessionId: currentSessionId,
+          };
+          await completeIdempotencyKey(idempotencyKey, blockedResponse);
+
+          return NextResponse.json({
+            success: false,
+            response: policyResult.blockedReason,
+            blocked: true,
+            blockedBy: policyResult.blockedByRule,
+            sessionId: currentSessionId,
+            traceId,
+          });
+        }
+
+        // Apply policy overrides to decision
+        if (policyResult.overrides) {
+          decision = applyPolicyOverrides(decision, policyResult.overrides);
+        }
+      } catch (err) {
+        console.error('[Policy] Error:', err);
+      }
+    }
+    timings.policyMs = Date.now() - stageStart;
     stageStart = Date.now();
 
     // Build context string
