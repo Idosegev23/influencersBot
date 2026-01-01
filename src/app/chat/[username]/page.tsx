@@ -30,6 +30,7 @@ import { applyTheme, getGoogleFontsUrl } from '@/lib/theme';
 import { getProxiedImageUrl } from '@/lib/image-utils';
 import { BrandCards } from '@/components/chat/BrandCards';
 import { SupportFlowForm } from '@/components/chat/SupportFlowForm';
+import { DirectiveRenderer, type UIDirectives, type BrandCardData } from '@/components/chat';
 import type { Influencer, ContentItem, InfluencerType } from '@/types';
 
 interface SupportState {
@@ -57,6 +58,14 @@ interface Message {
   action?: 'show_brands' | 'collect_input' | 'complete';
   brands?: BrandInfo[];
   inputType?: 'name' | 'order' | 'problem' | 'phone';
+  // Engine v2 fields
+  uiDirectives?: UIDirectives;
+  cardsPayload?: {
+    type: 'brands' | 'products' | 'content';
+    data: BrandCardData[];
+  };
+  state?: string;
+  traceId?: string;
 }
 
 const typeIcons: Record<InfluencerType, typeof ChefHat> = {
@@ -108,10 +117,32 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [supportLoading, setSupportLoading] = useState(false);
   const [supportSuccess, setSupportSuccess] = useState(false);
   const [supportState, setSupportState] = useState<SupportState | null>(null);
+  const [currentTraceId, setCurrentTraceId] = useState<string | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const lastTapRef = useRef<number>(0);
+
+  // Track user interactions for analytics
+  const trackEvent = async (eventType: string, payload: Record<string, unknown> = {}) => {
+    if (!sessionId && !influencer?.id) return;
+    
+    try {
+      await fetch('/api/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventType,
+          accountId: influencer?.id,
+          sessionId,
+          traceId: currentTraceId,
+          payload,
+        }),
+      });
+    } catch (err) {
+      console.error('Track error:', err);
+    }
+  };
 
   // Triple tap handler for influencer login
   const handleAvatarTap = () => {
@@ -298,8 +329,16 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: data.response || 'מצטער, משהו השתבש. נסה שוב!',
+        // Engine v2 fields
+        uiDirectives: data.uiDirectives,
+        cardsPayload: data.cardsPayload,
+        state: data.state,
+        traceId: data.traceId,
       };
 
+      // Store traceId for tracking
+      if (data.traceId) setCurrentTraceId(data.traceId);
+      
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (error) {
       console.error('Chat error:', error);
@@ -615,8 +654,52 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             </div>
                           </div>
                           
-                          {/* Show Brand Cards after assistant message with show_brands action */}
-                          {msg.role === 'assistant' && msg.action === 'show_brands' && msg.brands && index === messages.length - 1 && !isTyping && (
+                          {/* Engine v2: UI Directives Renderer */}
+                          {msg.role === 'assistant' && msg.uiDirectives && index === messages.length - 1 && !isTyping && (
+                            <div className="mt-3 max-w-[95%] mr-auto">
+                              <DirectiveRenderer
+                                directives={msg.uiDirectives}
+                                brands={msg.cardsPayload?.type === 'brands' ? msg.cardsPayload.data : undefined}
+                                onQuickAction={(action, payload) => {
+                                  trackEvent('quick_action_clicked', { action, payload });
+                                  if (action === 'quick_action' && payload?.text) {
+                                    setInputValue(payload.text as string);
+                                    inputRef.current?.focus();
+                                  } else if (action === 'start_support') {
+                                    handleSupportInput('יש לי בעיה עם הזמנה');
+                                  }
+                                }}
+                                onBrandAction={(action, brand) => {
+                                  if (action === 'copy' && brand.coupon_code) {
+                                    trackEvent('coupon_copied', { 
+                                      brandName: brand.brand_name, 
+                                      couponCode: brand.coupon_code,
+                                    });
+                                    handleCopyCode(brand.coupon_code);
+                                  } else if (action === 'open' && brand.link) {
+                                    trackEvent('link_opened', { 
+                                      brandName: brand.brand_name, 
+                                      link: brand.link,
+                                    });
+                                    window.open(brand.link, '_blank');
+                                  } else if (action === 'support') {
+                                    trackEvent('support_started', { 
+                                      brandName: brand.brand_name,
+                                    });
+                                    handleSupportInput(`יש לי בעיה עם הזמנה מ${brand.brand_name}`);
+                                  }
+                                }}
+                                onFormSubmit={(type, value) => {
+                                  trackEvent('form_submitted', { type });
+                                  handleSupportInput(value);
+                                }}
+                                isLoading={isTyping}
+                              />
+                            </div>
+                          )}
+                          
+                          {/* Legacy: Show Brand Cards after assistant message with show_brands action */}
+                          {msg.role === 'assistant' && msg.action === 'show_brands' && msg.brands && !msg.uiDirectives && index === messages.length - 1 && !isTyping && (
                             <div className="mt-4">
                               <BrandCards
                                 brands={msg.brands}
@@ -625,8 +708,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             </div>
                           )}
                           
-                          {/* Show Support Form after assistant message with collect_input action */}
-                          {msg.role === 'assistant' && msg.action === 'collect_input' && msg.inputType && index === messages.length - 1 && !isTyping && (
+                          {/* Legacy: Show Support Form after assistant message with collect_input action */}
+                          {msg.role === 'assistant' && msg.action === 'collect_input' && msg.inputType && !msg.uiDirectives && index === messages.length - 1 && !isTyping && (
                             <div className="mt-4">
                               <SupportFlowForm
                                 inputType={msg.inputType}

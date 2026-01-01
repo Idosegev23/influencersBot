@@ -497,11 +497,38 @@ export async function POST(req: NextRequest) {
       responseId: result.responseId,
       sessionId: currentSessionId,
       traceId,
+      state: decision?.stateTransition?.to || 'Chat.Active',
     };
 
     // Include UI directives for frontend
     if (decision?.uiDirectives) {
       response.uiDirectives = decision.uiDirectives;
+      
+      // Include brands data if showCardList is 'brands'
+      if (decision.uiDirectives.showCardList === 'brands' && brands.length > 0) {
+        response.cardsPayload = {
+          type: 'brands',
+          data: brands.map(b => ({
+            id: b.id,
+            brand_name: b.brand_name,
+            description: b.description,
+            coupon_code: b.coupon_code,
+            category: b.category,
+            link: b.link,
+            discount_percent: b.discount_percent,
+          })),
+        };
+      }
+      
+      // Build suggested actions from decision
+      if (decision.uiDirectives.showQuickActions?.length) {
+        response.suggestedActions = decision.uiDirectives.showQuickActions.map((label, i) => ({
+          id: `quick-${i}`,
+          label,
+          action: 'quick_action',
+          payload: { text: label },
+        }));
+      }
     }
 
     // Debug info in development
