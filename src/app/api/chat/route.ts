@@ -503,6 +503,7 @@ export async function POST(req: NextRequest) {
     // Include UI directives for frontend
     if (decision?.uiDirectives) {
       response.uiDirectives = decision.uiDirectives;
+      response.decisionId = decision.decisionId; // For linking UI actions to decisions
       
       // Include brands data if showCardList is 'brands'
       if (decision.uiDirectives.showCardList === 'brands' && brands.length > 0) {

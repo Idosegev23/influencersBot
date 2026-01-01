@@ -15,6 +15,16 @@ import type {
 } from './types';
 
 /**
+ * Generate a unique decision ID
+ * Format: dec_<timestamp>_<random>
+ */
+export function generateDecisionId(): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 8);
+  return `dec_${timestamp}_${random}`;
+}
+
+/**
  * Build default decision based on understanding
  */
 export function buildDefaultDecision(args: {
@@ -62,6 +72,7 @@ export function buildDefaultDecision(args: {
   };
 
   return {
+    decisionId: generateDecisionId(),
     action,
     handler,
     priority: 5,

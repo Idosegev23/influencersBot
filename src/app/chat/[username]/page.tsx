@@ -66,6 +66,7 @@ interface Message {
   };
   state?: string;
   traceId?: string;
+  decisionId?: string; // For linking UI actions to decisions
 }
 
 const typeIcons: Record<InfluencerType, typeof ChefHat> = {
@@ -118,6 +119,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [supportSuccess, setSupportSuccess] = useState(false);
   const [supportState, setSupportState] = useState<SupportState | null>(null);
   const [currentTraceId, setCurrentTraceId] = useState<string | null>(null);
+  const [currentDecisionId, setCurrentDecisionId] = useState<string | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -136,6 +138,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
           accountId: influencer?.id,
           sessionId,
           traceId: currentTraceId,
+          decisionId: currentDecisionId, // Link UI actions to decision
           payload,
         }),
       });
@@ -334,10 +337,13 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
         cardsPayload: data.cardsPayload,
         state: data.state,
         traceId: data.traceId,
+        decisionId: data.decisionId,
       };
 
       // Store traceId for tracking
       if (data.traceId) setCurrentTraceId(data.traceId);
+      // Store decisionId for linking UI actions
+      if (data.decisionId) setCurrentDecisionId(data.decisionId);
       
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (error) {

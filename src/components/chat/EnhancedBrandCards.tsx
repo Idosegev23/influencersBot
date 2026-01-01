@@ -47,13 +47,33 @@ export function EnhancedBrandCards({
   const displayBrands = showAll ? brands : brands.slice(0, maxDisplay);
   const hasMore = brands.length > maxDisplay;
 
-  const handleCopy = (brand: BrandCardData) => {
+  const handleCopy = (e: React.MouseEvent, brand: BrandCardData) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (brand.coupon_code) {
       navigator.clipboard.writeText(brand.coupon_code);
       setCopiedId(brand.id);
       setTimeout(() => setCopiedId(null), 2000);
       onCopy(brand);
     }
+  };
+
+  const handleOpen = (e: React.MouseEvent, brand: BrandCardData) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onOpen(brand);
+  };
+
+  const handleSupport = (e: React.MouseEvent, brand: BrandCardData) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onSupport(brand);
+  };
+
+  const handleShowAll = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowAll(true);
   };
 
   const getColors = (category: string | null) => {
@@ -123,7 +143,8 @@ export function EnhancedBrandCards({
               <div className="flex gap-2">
                 {brand.coupon_code && (
                   <button
-                    onClick={() => handleCopy(brand)}
+                    type="button"
+                    onClick={(e) => handleCopy(e, brand)}
                     className={`
                       flex-1 flex items-center justify-center gap-1.5 py-2 px-3 
                       rounded-lg font-medium text-sm transition-all
@@ -149,7 +170,8 @@ export function EnhancedBrandCards({
 
                 {brand.link && (
                   <button
-                    onClick={() => onOpen(brand)}
+                    type="button"
+                    onClick={(e) => handleOpen(e, brand)}
                     className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-[var(--color-primary)] text-white font-medium text-sm hover:opacity-90 transition-all"
                   >
                     <ExternalLink className="w-4 h-4" />
@@ -158,7 +180,8 @@ export function EnhancedBrandCards({
                 )}
 
                 <button
-                  onClick={() => onSupport(brand)}
+                  type="button"
+                  onClick={(e) => handleSupport(e, brand)}
                   className="flex items-center justify-center p-2 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-all"
                   title="בעיה עם הזמנה?"
                 >
@@ -173,10 +196,11 @@ export function EnhancedBrandCards({
       {/* Show more button */}
       {hasMore && !showAll && (
         <motion.button
+          type="button"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
-          onClick={() => setShowAll(true)}
+          onClick={handleShowAll}
           className="w-full mt-3 py-2 text-sm text-[var(--color-primary)] hover:bg-[var(--color-primary)]/5 rounded-lg transition-all"
         >
           הצג עוד {brands.length - maxDisplay} מותגים

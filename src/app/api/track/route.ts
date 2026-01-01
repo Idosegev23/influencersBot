@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
       accountId,
       sessionId,
       traceId,
+      decisionId,
       payload = {},
     } = body;
 
@@ -52,12 +53,14 @@ export async function POST(req: NextRequest) {
       payload: {
         ...payload,
         clientEventType: eventType,
+        decisionId: decisionId || undefined, // Link to the decision that led to this action
       },
       metadata: {
         source: 'frontend',
         engineVersion: 'v2',
         traceId: traceId || undefined,
         requestId: generateRequestId(),
+        decisionId: decisionId || undefined,
       },
     });
 

@@ -139,6 +139,9 @@ export interface CostEstimate {
 
 // Full Decision Result
 export interface DecisionResult {
+  // Identity (for linking UI actions to decisions)
+  decisionId: string;
+  
   // Core
   action: ActionType;
   handler: HandlerType;
