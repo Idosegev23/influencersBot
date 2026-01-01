@@ -362,10 +362,10 @@ export async function POST(req: NextRequest) {
         }
 
         const instructions = buildInfluencerInstructions(
-          influencer,
-          brands,
-          contextStr,
-          { tone: decision.uiDirectives.tone, responseLength: decision.uiDirectives.responseLength }
+          influencer.display_name,
+          influencer.persona,
+          influencer.influencer_type,
+          contextStr
         );
 
         // Stream from OpenAI
