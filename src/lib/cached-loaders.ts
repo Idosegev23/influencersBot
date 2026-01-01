@@ -1,7 +1,11 @@
 /**
  * ============================================
- * Cached Data Loaders
+ * Cached Data Loaders (L1 + L2)
  * ============================================
+ * 
+ * Two-layer caching:
+ * - L1: In-memory LRU (fast, per-instance)
+ * - L2: Redis (shared across instances)
  * 
  * Wraps database queries with caching for:
  * - Username resolution
@@ -20,6 +24,15 @@ import {
   type CacheMetrics,
   createCacheMetrics,
 } from './cache';
+import {
+  l2CacheWrap,
+  L2_KEYS,
+  L2_TTL,
+  invalidateBrandsCache as invalidateBrandsCacheL2,
+  invalidateContentCache as invalidateContentCacheL2,
+  type L2Metrics,
+} from './cache-l2';
+import { isRedisAvailable } from './redis';
 import {
   getInfluencerByUsername,
   getBrandsByInfluencer,
@@ -281,17 +294,23 @@ export interface CombinedLoadResult {
     contentHit: boolean;
     totalMs: number;
     cacheHitRate: number;
+    // L2 metrics
+    redisAvailable: boolean;
+    l1Hits: number;
+    l2Hits: number;
+    dbHits: number;
   };
 }
 
 /**
  * Load all data needed for a chat request with caching
- * Uses parallel loading where possible
+ * Uses L1 (in-memory) + L2 (Redis) with parallel loading
  */
 export async function loadChatContextCached(
   username: string
 ): Promise<CombinedLoadResult> {
   const startMs = Date.now();
+  const redisAvailable = isRedisAvailable();
   
   // Step 1: Resolve username (must be first)
   const usernameResult = await resolveUsernameToAccountId(username);
@@ -313,26 +332,35 @@ export async function loadChatContextCached(
         contentHit: false,
         totalMs: Date.now() - startMs,
         cacheHitRate: usernameResult.metrics.hit ? 1 : 0,
+        redisAvailable,
+        l1Hits: usernameResult.metrics.hit ? 1 : 0,
+        l2Hits: 0,
+        dbHits: usernameResult.metrics.hit ? 0 : 1,
       },
     };
   }
 
   const { influencerId, accountId } = usernameResult.data;
 
-  // Step 2: Load remaining data in parallel
+  // Step 2: Load remaining data in parallel (with L2)
   const [influencerResult, brandsResult, contentResult] = await Promise.all([
     loadInfluencerProfileCached(influencerId),
-    loadBrandsCached(influencerId, accountId),
-    loadContentIndexCached(influencerId, accountId),
+    loadBrandsWithL2(influencerId, accountId),
+    loadContentWithL2(influencerId, accountId),
   ]);
 
   // Calculate cache hit rate
-  const hits = [
-    usernameResult.metrics.hit,
-    influencerResult.metrics.hit,
-    brandsResult.metrics.hit,
-    contentResult.metrics.hit,
-  ].filter(Boolean).length;
+  const allResults = [
+    usernameResult.metrics,
+    influencerResult.metrics,
+    brandsResult.metrics,
+    contentResult.metrics,
+  ];
+  
+  const l1Hits = allResults.filter(m => m.hit).length;
+  const l2Hits = [brandsResult.l2Metrics, contentResult.l2Metrics]
+    .filter(m => m && m.l2Hit).length;
+  const dbHits = allResults.filter(m => !m.hit).length - l2Hits;
 
   return {
     influencer: influencerResult.data,
@@ -345,12 +373,86 @@ export async function loadChatContextCached(
       influencerMs: influencerResult.metrics.loadTimeMs,
       influencerHit: influencerResult.metrics.hit,
       brandsMs: brandsResult.metrics.loadTimeMs,
-      brandsHit: brandsResult.metrics.hit,
+      brandsHit: brandsResult.metrics.hit || (brandsResult.l2Metrics?.l2Hit ?? false),
       contentMs: contentResult.metrics.loadTimeMs,
-      contentHit: contentResult.metrics.hit,
+      contentHit: contentResult.metrics.hit || (contentResult.l2Metrics?.l2Hit ?? false),
       totalMs: Date.now() - startMs,
-      cacheHitRate: hits / 4,
+      cacheHitRate: (l1Hits + l2Hits) / 4,
+      redisAvailable,
+      l1Hits,
+      l2Hits,
+      dbHits: Math.max(0, dbHits),
     },
+  };
+}
+
+/**
+ * Load brands with L2 (Redis) support
+ */
+async function loadBrandsWithL2(
+  influencerId: string,
+  accountId: string
+): Promise<LoadResult<Brand[]> & { l2Metrics?: L2Metrics }> {
+  // Try L2 first if Redis is available
+  if (isRedisAvailable()) {
+    const l2Result = await l2CacheWrap<Brand[]>(
+      L2_KEYS.accountBrands(accountId),
+      async () => getBrandsByInfluencer(influencerId),
+      { ttlMs: L2_TTL.accountBrands * 1000, tags: [`account:${accountId}`] }
+    );
+    
+    return {
+      data: l2Result.value || [],
+      metrics: createCacheMetrics('brands', { 
+        value: l2Result.value, 
+        hit: l2Result.metrics.l1Hit,
+        stale: false,
+      }),
+      l2Metrics: l2Result.metrics,
+    };
+  }
+  
+  // Fallback to L1 only
+  return {
+    ...(await loadBrandsCached(influencerId, accountId)),
+    l2Metrics: undefined,
+  };
+}
+
+/**
+ * Load content with L2 (Redis) support
+ */
+async function loadContentWithL2(
+  influencerId: string,
+  accountId: string,
+  limit = 10
+): Promise<LoadResult<ContentItem[]> & { l2Metrics?: L2Metrics }> {
+  // Try L2 first if Redis is available
+  if (isRedisAvailable()) {
+    const l2Result = await l2CacheWrap<ContentItem[]>(
+      L2_KEYS.accountContent(accountId),
+      async () => {
+        const content = await getContentByInfluencer(influencerId);
+        return content.slice(0, limit);
+      },
+      { ttlMs: L2_TTL.accountContent * 1000, tags: [`account:${accountId}`] }
+    );
+    
+    return {
+      data: l2Result.value || [],
+      metrics: createCacheMetrics('contentIndex', { 
+        value: l2Result.value, 
+        hit: l2Result.metrics.l1Hit,
+        stale: false,
+      }),
+      l2Metrics: l2Result.metrics,
+    };
+  }
+  
+  // Fallback to L1 only
+  return {
+    ...(await loadContentIndexCached(influencerId, accountId, limit)),
+    l2Metrics: undefined,
   };
 }
 
@@ -359,39 +461,63 @@ export async function loadChatContextCached(
 // ============================================
 
 import { cacheInvalidateTag, cacheInvalidateAccount } from './cache';
+import { 
+  invalidateAccountCache as invalidateAccountCacheL2,
+  invalidateRulesCache as invalidateRulesCacheL2,
+  invalidateExperimentsCache as invalidateExperimentsCacheL2,
+} from './cache-l2';
 
 /**
- * Invalidate cache after brand update
+ * Invalidate cache after brand update (L1 + L2)
  */
-export function invalidateBrandsCache(accountId: string): void {
+export async function invalidateBrandsCache(accountId: string): Promise<void> {
   cacheInvalidateTag(CacheTags.accountBrands(accountId));
+  await invalidateBrandsCacheL2(accountId);
 }
 
 /**
- * Invalidate cache after persona update
+ * Invalidate cache after persona update (L1 + L2)
  */
-export function invalidatePersonaCache(accountId: string): void {
+export async function invalidatePersonaCache(accountId: string): Promise<void> {
   cacheInvalidateTag(CacheTags.accountPersona(accountId));
+  // L2 invalidation is handled via accountStable
 }
 
 /**
- * Invalidate cache after theme update
+ * Invalidate cache after theme update (L1 + L2)
  */
-export function invalidateThemeCache(accountId: string): void {
+export async function invalidateThemeCache(accountId: string): Promise<void> {
   cacheInvalidateTag(CacheTags.accountTheme(accountId));
+  // L2 invalidation is handled via accountStable
 }
 
 /**
- * Invalidate cache after content update
+ * Invalidate cache after content update (L1 + L2)
  */
-export function invalidateContentCache(accountId: string): void {
+export async function invalidateContentCache(accountId: string): Promise<void> {
   cacheInvalidateTag(CacheTags.accountContent(accountId));
+  await invalidateContentCacheL2(accountId);
 }
 
 /**
- * Invalidate all cache for an account
+ * Invalidate cache after rules update (L1 + L2)
  */
-export function invalidateAllAccountCache(accountId: string): void {
+export async function invalidateRulesCache(accountId: string): Promise<void> {
+  await invalidateRulesCacheL2(accountId);
+}
+
+/**
+ * Invalidate cache after experiments update (L1 + L2)
+ */
+export async function invalidateExperimentsCache(accountId: string): Promise<void> {
+  await invalidateExperimentsCacheL2(accountId);
+}
+
+/**
+ * Invalidate all cache for an account (L1 + L2)
+ */
+export async function invalidateAllAccountCache(accountId: string): Promise<void> {
   cacheInvalidateAccount(accountId);
+  await invalidateAccountCacheL2(accountId);
 }
 

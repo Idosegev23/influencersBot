@@ -244,7 +244,7 @@ export async function POST(req: NextRequest) {
         // === LOCK ===
         await acquireLock(currentSessionId, requestId);
 
-        // Emit stream started with cache metrics
+        // Emit stream started with cache metrics (L1 + L2)
         await emitEvent({
           type: 'message_received',
           accountId,
@@ -260,6 +260,11 @@ export async function POST(req: NextRequest) {
               influencerHit: cachedData.metrics.influencerHit,
               brandsHit: cachedData.metrics.brandsHit,
               contentHit: cachedData.metrics.contentHit,
+              // L2 metrics
+              redisAvailable: cachedData.metrics.redisAvailable,
+              l1Hits: cachedData.metrics.l1Hits,
+              l2Hits: cachedData.metrics.l2Hits,
+              dbHits: cachedData.metrics.dbHits,
             },
           },
           metadata: { source: 'chat', engineVersion: 'v2', traceId, requestId },

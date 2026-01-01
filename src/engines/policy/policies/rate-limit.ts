@@ -1,52 +1,39 @@
 /**
  * ============================================
- * Policy: Rate Limiting
+ * Policy: Rate Limiting (Redis + Fallback)
  * ============================================
  * 
- * Prevents spam and billing runaway by limiting:
- * - Messages per session/minute
- * - Actions per account/minute  
- * - Total cost per period
+ * Uses Redis for distributed rate limiting across instances.
+ * Falls back to in-memory when Redis unavailable.
+ * 
+ * Scopes:
+ * - per accountId (system-level)
+ * - per anonId within accountId (user-level)
+ * - per sessionId (session-level)
  */
 
-import type { PolicyInput, PolicyCheckResult, AppliedPolicy, RateLimitConfig, RateLimitResult } from '../types';
-import { supabase } from '@/lib/supabase';
+import type { PolicyInput, PolicyCheckResult, AppliedPolicy, RateLimitResult as PolicyRateLimitResult } from '../types';
+import { 
+  checkAllRateLimits, 
+  checkRateLimit as checkRedisRateLimit,
+  type RateLimitContext,
+  type RateLimitResult,
+  type RateLimitBucket,
+  type RateLimitScope,
+} from '@/lib/rate-limit';
+import { emitEvent } from '@/engines/events-emitter';
 
 const POLICY_ID = 'rate_limit';
 const POLICY_NAME = 'Rate Limiting';
 
-// Rate limit configurations
-const RATE_LIMITS = {
-  // Per session: 10 messages per minute
-  sessionMessages: {
-    windowSeconds: 60,
-    maxRequests: 10,
-  },
-  // Per account: 100 messages per 5 minutes
-  accountMessages: {
-    windowSeconds: 300,
-    maxRequests: 100,
-  },
-  // Per anon user (IP hash): 20 actions per 5 minutes
-  anonActions: {
-    windowSeconds: 300,
-    maxRequests: 20,
-  },
-  // Actions (clicks, copies) per session: 30 per minute
-  sessionActions: {
-    windowSeconds: 60,
-    maxRequests: 30,
-  },
-} as const;
-
-// In-memory cache for rate limits (simple sliding window)
+// In-memory fallback cache
 const rateLimitCache = new Map<string, { count: number; resetAt: number }>();
 
 /**
- * Check rate limit policy
+ * Check rate limit policy using Redis with in-memory fallback
  */
 export async function checkRateLimit(input: PolicyInput): Promise<PolicyCheckResult> {
-  const { ctx, security, decision } = input;
+  const { ctx, traceId, requestId } = input;
   
   const applied: AppliedPolicy = {
     id: POLICY_ID,
@@ -56,59 +43,67 @@ export async function checkRateLimit(input: PolicyInput): Promise<PolicyCheckRes
     appliedAt: new Date().toISOString(),
   };
 
-  // Check session rate limit
-  const sessionKey = `session:${ctx.session.id}`;
-  const sessionLimit = checkMemoryRateLimit(sessionKey, RATE_LIMITS.sessionMessages);
-  
-  if (!sessionLimit.allowed) {
+  // Build context for rate limiter
+  const rateLimitCtx: RateLimitContext = {
+    accountId: ctx.account.id,
+    anonId: ctx.user.anonId,
+    sessionId: ctx.session.id,
+  };
+
+  // Check all scopes using Redis-based rate limiter
+  const { allowed, results, mostRestrictive } = await checkAllRateLimits('chat', rateLimitCtx);
+
+  if (!allowed && mostRestrictive) {
+    const retryAfterSeconds = Math.ceil(mostRestrictive.retryAfterMs / 1000);
+    
+    // Emit rate limit hit event
+    await emitEvent({
+      type: 'policy_checked',
+      accountId: ctx.account.id,
+      sessionId: ctx.session.id,
+      mode: ctx.account.mode,
+      payload: {
+        policy: POLICY_ID,
+        result: 'block',
+        scope: mostRestrictive.scope,
+        bucket: mostRestrictive.bucket,
+        retryAfterMs: mostRestrictive.retryAfterMs,
+        usedRedis: mostRestrictive.usedRedis,
+      },
+      metadata: {
+        source: 'policy',
+        engineVersion: 'v2',
+        traceId,
+        requestId,
+      },
+    });
+
+    // Return blocked response based on scope
+    const messageMap: Record<RateLimitScope, string> = {
+      session: `רגע, אתה שולח יותר מדי הודעות. נסה שוב בעוד ${retryAfterSeconds} שניות`,
+      anon: 'יותר מדי פעולות. נסה שוב בעוד כמה דקות',
+      account: 'הגעת למגבלת ההודעות. נסה שוב בעוד כמה דקות',
+    };
+
     return {
       allowed: false,
-      blockedReason: `רגע, אתה שולח יותר מדי הודעות. נסה שוב בעוד ${sessionLimit.retryAfterSeconds} שניות`,
+      blockedReason: messageMap[mostRestrictive.scope],
       blockedByRule: POLICY_ID,
       overrides: {
-        handler: 'chat',
+        handler: mostRestrictive.scope === 'account' ? 'notification_only' : 'chat',
         forceResponseTemplate: 'rate_limit_exceeded',
         uiDirectives: {
           responseLength: 'short',
-          showQuickActions: ['נסה שוב בעוד דקה'],
+          showQuickActions: retryAfterSeconds < 60 
+            ? [`נסה שוב בעוד ${retryAfterSeconds} שניות`]
+            : ['נסה שוב בעוד כמה דקות'],
         },
       },
       appliedPolicies: [{ ...applied, result: 'block' }],
     };
   }
 
-  // Check account rate limit
-  const accountKey = `account:${ctx.account.id}`;
-  const accountLimit = checkMemoryRateLimit(accountKey, RATE_LIMITS.accountMessages);
-  
-  if (!accountLimit.allowed) {
-    return {
-      allowed: false,
-      blockedReason: 'הגעת למגבלת ההודעות. נסה שוב בעוד כמה דקות',
-      blockedByRule: POLICY_ID,
-      overrides: {
-        handler: 'notification_only',
-        forceResponseTemplate: 'account_rate_limit',
-      },
-      appliedPolicies: [{ ...applied, result: 'block' }],
-    };
-  }
-
-  // Check anon user rate limit (based on anonId/IP)
-  const anonKey = `anon:${ctx.user.anonId}`;
-  const anonLimit = checkMemoryRateLimit(anonKey, RATE_LIMITS.anonActions);
-  
-  if (!anonLimit.allowed) {
-    return {
-      allowed: false,
-      blockedReason: 'יותר מדי פעולות. נסה שוב בעוד כמה דקות',
-      blockedByRule: POLICY_ID,
-      appliedPolicies: [{ ...applied, result: 'block' }],
-    };
-  }
-
   // Check cost budget (if near limit, warn and downgrade model)
-  const costRemaining = ctx.limits.costCeiling - ctx.limits.costUsed;
   const costRatio = ctx.limits.costUsed / ctx.limits.costCeiling;
   
   if (costRatio > 0.9) {
@@ -142,10 +137,14 @@ export async function checkRateLimit(input: PolicyInput): Promise<PolicyCheckRes
     };
   }
 
-  // Increment counters
-  incrementRateLimit(sessionKey, RATE_LIMITS.sessionMessages);
-  incrementRateLimit(accountKey, RATE_LIMITS.accountMessages);
-  incrementRateLimit(anonKey, RATE_LIMITS.anonActions);
+  // Add rate limit metrics to applied policy
+  applied.metadata = {
+    scopes: results.map(r => ({
+      scope: r.scope,
+      remaining: r.remaining,
+      usedRedis: r.usedRedis,
+    })),
+  };
 
   return {
     allowed: true,
@@ -154,91 +153,41 @@ export async function checkRateLimit(input: PolicyInput): Promise<PolicyCheckRes
 }
 
 /**
- * Check in-memory rate limit (sliding window)
+ * Check action rate limit (for tracking clicks, copies, etc.)
  */
-function checkMemoryRateLimit(
-  key: string, 
-  config: { windowSeconds: number; maxRequests: number }
-): RateLimitResult {
-  const now = Date.now();
-  const windowMs = config.windowSeconds * 1000;
-  const entry = rateLimitCache.get(key);
+export async function checkActionRateLimit(
+  accountId: string,
+  sessionId: string,
+  anonId: string,
+  actionType: string
+): Promise<PolicyRateLimitResult> {
+  const ctx: RateLimitContext = { accountId, anonId, sessionId };
+  const result = await checkRedisRateLimit('session', 'track', ctx);
   
-  // If no entry or window expired, allow
-  if (!entry || entry.resetAt < now) {
-    return {
-      allowed: true,
-      remaining: config.maxRequests - 1,
-      resetAt: new Date(now + windowMs),
-    };
-  }
-  
-  // Check if over limit
-  if (entry.count >= config.maxRequests) {
-    const retryAfterSeconds = Math.ceil((entry.resetAt - now) / 1000);
-    return {
-      allowed: false,
-      remaining: 0,
-      resetAt: new Date(entry.resetAt),
-      retryAfterSeconds,
-    };
-  }
-  
-  // Under limit
   return {
-    allowed: true,
-    remaining: config.maxRequests - entry.count - 1,
-    resetAt: new Date(entry.resetAt),
+    allowed: result.allowed,
+    remaining: result.remaining,
+    resetAt: new Date(result.resetAt),
+    retryAfterSeconds: Math.ceil(result.retryAfterMs / 1000),
   };
 }
 
 /**
- * Increment rate limit counter
+ * Increment action rate limit (for compatibility)
+ * Note: Redis rate limiter auto-increments on check
  */
-function incrementRateLimit(
-  key: string, 
-  config: { windowSeconds: number; maxRequests: number }
-): void {
-  const now = Date.now();
-  const windowMs = config.windowSeconds * 1000;
-  const entry = rateLimitCache.get(key);
-  
-  if (!entry || entry.resetAt < now) {
-    // Start new window
-    rateLimitCache.set(key, {
-      count: 1,
-      resetAt: now + windowMs,
-    });
-  } else {
-    // Increment existing
-    entry.count++;
-  }
-}
-
-/**
- * Check action rate limit (for tracking clicks, copies, etc.)
- */
-export function checkActionRateLimit(
+export async function incrementActionRateLimit(
+  accountId: string,
   sessionId: string,
+  anonId: string,
   actionType: string
-): RateLimitResult {
-  const key = `action:${sessionId}:${actionType}`;
-  return checkMemoryRateLimit(key, RATE_LIMITS.sessionActions);
+): Promise<void> {
+  // Redis rate limiter auto-increments, so this is a no-op
+  // Keeping for API compatibility
 }
 
 /**
- * Increment action rate limit
- */
-export function incrementActionRateLimit(
-  sessionId: string,
-  actionType: string
-): void {
-  const key = `action:${sessionId}:${actionType}`;
-  incrementRateLimit(key, RATE_LIMITS.sessionActions);
-}
-
-/**
- * Cleanup old rate limit entries (call periodically)
+ * Cleanup old rate limit entries (for in-memory fallback)
  */
 export function cleanupRateLimits(): number {
   const now = Date.now();
@@ -256,4 +205,3 @@ export function cleanupRateLimits(): number {
 
 // Auto-cleanup every 5 minutes
 setInterval(cleanupRateLimits, 5 * 60 * 1000);
-
