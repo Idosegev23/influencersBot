@@ -16,11 +16,8 @@
 import { NextRequest } from 'next/server';
 import { streamChat, buildInfluencerInstructions } from '@/lib/openai';
 import { 
-  getInfluencerByUsername, 
   createChatSession, 
   saveChatMessage,
-  getBrandsByInfluencer,
-  getContentByInfluencer,
   supabase,
 } from '@/lib/supabase';
 import {
@@ -28,6 +25,10 @@ import {
   sanitizeUsername,
   isValidSessionId,
 } from '@/lib/sanitize';
+import { 
+  loadChatContextCached,
+  type CombinedLoadResult,
+} from '@/lib/cached-loaders';
 
 // Engine imports
 import { 
@@ -159,9 +160,12 @@ export async function POST(req: NextRequest) {
           return;
         }
 
-        // === LOAD INFLUENCER ===
-        const influencer = await getInfluencerByUsername(username);
-        if (!influencer) {
+        // === LOAD DATA WITH CACHING ===
+        const cacheStartMs = Date.now();
+        const cachedData = await loadChatContextCached(username);
+        const cacheLoadMs = Date.now() - cacheStartMs;
+        
+        if (!cachedData.influencer) {
           controller.enqueue(encodeEvent({
             type: 'error',
             message: 'המשפיען לא נמצא',
@@ -171,9 +175,10 @@ export async function POST(req: NextRequest) {
           return;
         }
 
-        // Get account
-        const account = await getAccountByInfluencerUsername(username);
-        accountId = account?.id || influencer.id;
+        const influencer = cachedData.influencer;
+        const brands = cachedData.brands;
+        const content = cachedData.content;
+        accountId = cachedData.accountId || influencer.id;
 
         // === SESSION ===
         let currentSessionId = rawSessionId;
@@ -225,21 +230,26 @@ export async function POST(req: NextRequest) {
         // === LOCK ===
         await acquireLock(currentSessionId, requestId);
 
-        // Emit stream started
+        // Emit stream started with cache metrics
         await emitEvent({
           type: 'message_received',
           accountId,
           sessionId: currentSessionId,
           mode: 'creator',
-          payload: { messageLength: message.length, streaming: true },
+          payload: { 
+            messageLength: message.length, 
+            streaming: true,
+            cacheMetrics: {
+              loadMs: cacheLoadMs,
+              hitRate: cachedData.metrics.cacheHitRate,
+              usernameHit: cachedData.metrics.usernameHit,
+              influencerHit: cachedData.metrics.influencerHit,
+              brandsHit: cachedData.metrics.brandsHit,
+              contentHit: cachedData.metrics.contentHit,
+            },
+          },
           metadata: { source: 'chat', engineVersion: 'v2', traceId, requestId },
         });
-
-        // === LOAD DATA (parallel) ===
-        const [brands, content] = await Promise.all([
-          getBrandsByInfluencer(influencer.id),
-          getContentByInfluencer(influencer.id),
-        ]);
 
         // === UNDERSTANDING ===
         const understanding = await understandMessage({

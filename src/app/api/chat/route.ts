@@ -6,8 +6,6 @@ import {
   createChatSession, 
   saveChatMessage,
   getProductsByInfluencer,
-  getBrandsByInfluencer,
-  getContentByInfluencer,
   trackEvent,
   supabase,
 } from '@/lib/supabase';
@@ -17,6 +15,11 @@ import {
   isValidSessionId,
   isValidResponseId,
 } from '@/lib/sanitize';
+import {
+  loadChatContextCached,
+  loadBrandsCached,
+  loadContentIndexCached,
+} from '@/lib/cached-loaders';
 
 // Engine v2 imports
 import { 
@@ -189,13 +192,21 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Build context from brands, products, and content (parallel)
-    const [brands, products, content] = await Promise.all([
-      getBrandsByInfluencer(influencer.id),
-      getProductsByInfluencer(influencer.id),
-      getContentByInfluencer(influencer.id),
+    // Build context from brands, products, and content (parallel with caching)
+    const [brandsResult, contentResult, products] = await Promise.all([
+      loadBrandsCached(influencer.id, accountId),
+      loadContentIndexCached(influencer.id, accountId),
+      getProductsByInfluencer(influencer.id), // Products not cached yet
     ]);
+    const brands = brandsResult.data;
+    const content = contentResult.data;
     timings.contextLoadMs = Date.now() - stageStart;
+    timings.cacheMetrics = {
+      brandsHit: brandsResult.metrics.hit,
+      brandsMs: brandsResult.metrics.loadTimeMs,
+      contentHit: contentResult.metrics.hit,
+      contentMs: contentResult.metrics.loadTimeMs,
+    };
     stageStart = Date.now();
 
     // === UNDERSTANDING ENGINE ===
