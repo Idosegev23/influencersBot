@@ -15,3 +15,5 @@ COMMENT ON COLUMN influencers.scrape_settings IS 'JSON object containing scrape 
 
 
 
+
+
