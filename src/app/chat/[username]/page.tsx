@@ -130,6 +130,12 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const lastTapRef = useRef<number>(0);
+  const streamingMessageIdRef = useRef<string | null>(null);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    streamingMessageIdRef.current = streamingMessageId;
+  }, [streamingMessageId]);
 
   // Streaming hook
   const { 
@@ -147,15 +153,28 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     },
     onDone: (done) => {
       if (done.responseId) setResponseId(done.responseId);
-      // Update the streaming message with final content
-      if (streamingMessageId) {
+      // Update the streaming message with final content (using ref to get current value)
+      const msgId = streamingMessageIdRef.current;
+      if (msgId && done.fullText) {
         setMessages(prev => prev.map(m => 
-          m.id === streamingMessageId 
+          m.id === msgId 
             ? { ...m, content: done.fullText }
             : m
         ));
-        setStreamingMessageId(null);
       }
+      setStreamingMessageId(null);
+    },
+    onError: (error) => {
+      // Show error in the streaming message
+      const msgId = streamingMessageIdRef.current;
+      if (msgId) {
+        setMessages(prev => prev.map(m =>
+          m.id === msgId
+            ? { ...m, content: error.message || 'שגיאה בעיבוד הבקשה' }
+            : m
+        ));
+      }
+      setStreamingMessageId(null);
     },
   });
 
