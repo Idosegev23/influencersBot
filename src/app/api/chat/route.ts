@@ -34,8 +34,17 @@ import {
 // Understanding Engine
 import { understandMessage } from '@/engines/understanding';
 
-// Feature flag for full engine mode
+// Decision Engine
+import { 
+  decide, 
+  getUIDirectivesSummary, 
+  getModelStrategySummary,
+} from '@/engines/decision';
+import type { EngineContext, AccountContext, SessionContext, UserContext, KnowledgeRefs, LimitsContext, RequestContext } from '@/engines/context';
+
+// Feature flags
 const USE_UNDERSTANDING_ENGINE = process.env.USE_UNDERSTANDING_ENGINE !== 'false';
+const USE_DECISION_ENGINE = process.env.USE_DECISION_ENGINE !== 'false';
 
 // Timing helper
 interface StageTimings {
@@ -46,6 +55,7 @@ interface StageTimings {
   lockMs: number;
   contextLoadMs: number;
   understandingMs: number;
+  decisionMs: number;
   openaiMs: number;
   saveMs: number;
   totalMs: number;
@@ -162,7 +172,7 @@ export async function POST(req: NextRequest) {
       },
       metadata: {
         source: 'chat',
-        engineVersion: 'v2-hybrid',
+        engineVersion: 'v2',
         traceId,
         requestId,
       },
@@ -253,10 +263,106 @@ export async function POST(req: NextRequest) {
         }
       } catch (err) {
         console.error('[Understanding] Error:', err);
-        // Continue without understanding - fallback to basic chat
       }
     }
     timings.understandingMs = Date.now() - stageStart;
+    stageStart = Date.now();
+
+    // === DECISION ENGINE ===
+    let decision = null;
+    if (USE_DECISION_ENGINE && understanding) {
+      try {
+        // Build minimal EngineContext for decision
+        const engineContext: EngineContext = {
+          account: {
+            id: accountId,
+            mode: 'creator',
+            profileId: influencer.id,
+            timezone: 'Asia/Jerusalem',
+            language: 'he',
+            plan: 'pro',
+            allowedChannels: ['chat'],
+            security: {
+              publicChatAllowed: true,
+              requireAuthForSupport: false,
+              allowedOrigins: [],
+            },
+            features: {
+              supportFlowEnabled: true,
+              salesFlowEnabled: false,
+              whatsappEnabled: false,
+              analyticsEnabled: true,
+            },
+          } as AccountContext,
+          session: {
+            id: currentSessionId || '',
+            state: 'Chat.Active',
+            version: 1,
+            lastActiveAt: new Date(),
+            messageCount: 0,
+          } as SessionContext,
+          user: {
+            anonId: `anon_${Date.now()}`,
+            isRepeatVisitor: false,
+          } as UserContext,
+          knowledge: {
+            brandsRef: `brands:${accountId}`,
+            contentIndexRef: `content:${accountId}`,
+          } as KnowledgeRefs,
+          limits: {
+            tokenBudgetRemaining: 100000,
+            tokenBudgetTotal: 100000,
+            costCeiling: 100,
+            costUsed: 0,
+            rateLimitRemaining: 100,
+            rateLimitResetAt: new Date(Date.now() + 60000),
+            periodType: 'month',
+            periodStart: new Date(),
+            periodEnd: new Date(),
+          } as LimitsContext,
+          request: {
+            requestId,
+            traceId,
+            timestamp: new Date(),
+            source: 'chat',
+            messageId: `msg_${Date.now()}`,
+            clientMessageId,
+          } as RequestContext,
+        };
+
+        decision = await decide({
+          ctx: engineContext,
+          understanding,
+          traceId,
+          requestId,
+        });
+
+        // Emit decision event
+        await emitEvent({
+          type: 'decision_made',
+          accountId,
+          sessionId: currentSessionId || 'unknown',
+          mode: 'creator',
+          payload: {
+            action: decision.action,
+            handler: decision.handler,
+            uiDirectives: getUIDirectivesSummary(decision),
+            modelStrategy: getModelStrategySummary(decision),
+            rulesApplied: decision.rulesApplied.length,
+            ruleNames: decision.rulesApplied.map(r => r.name),
+          },
+          metadata: {
+            source: 'decision',
+            engineVersion: 'v2',
+            traceId,
+            requestId,
+          },
+        });
+      } catch (err) {
+        console.error('[Decision] Error:', err);
+      }
+    }
+    timings.decisionMs = Date.now() - stageStart;
     stageStart = Date.now();
 
     // Build context string
@@ -311,7 +417,10 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Build instructions
+    // Build instructions with decision-based tone
+    const tone = decision?.uiDirectives?.tone || 'casual';
+    const responseLength = decision?.uiDirectives?.responseLength || 'standard';
+    
     const instructions = buildInfluencerInstructions(
       influencer.display_name,
       influencer.persona,
@@ -334,10 +443,10 @@ export async function POST(req: NextRequest) {
         saveChatMessage(currentSessionId, 'user', message),
         saveChatMessage(currentSessionId, 'assistant', result.response),
         supabase
-          .from('chat_sessions')
+        .from('chat_sessions')
           .update({ 
             thread_id: result.responseId,
-            state: 'Chat.Active',
+            state: decision?.stateTransition?.to || 'Chat.Active',
             updated_at: new Date().toISOString(),
           })
           .eq('id', currentSessionId),
@@ -347,7 +456,7 @@ export async function POST(req: NextRequest) {
     timings.saveMs = Date.now() - stageStart;
     timings.totalMs = Date.now() - startedAt;
 
-    // === ENGINE V2: Emit response_sent event with timings ===
+    // === ENGINE V2: Emit response_sent event with full details ===
     await emitEvent({
       type: 'response_sent',
       accountId,
@@ -355,14 +464,16 @@ export async function POST(req: NextRequest) {
       mode: 'creator',
       payload: {
         responseLength: result.response.length,
-        handler: 'chat',
+        handler: decision?.handler || 'chat',
         hasResponseId: !!result.responseId,
         intent: understanding?.intent,
         confidence: understanding?.confidence,
+        action: decision?.action,
+        rulesApplied: decision?.rulesApplied?.length || 0,
       },
       metadata: {
         source: 'chat',
-        engineVersion: 'v2-hybrid',
+        engineVersion: 'v2',
         traceId,
         requestId,
         latencyMs: timings.totalMs,
@@ -379,22 +490,41 @@ export async function POST(req: NextRequest) {
     };
     await completeIdempotencyKey(idempotencyKey, responseData);
 
-    return NextResponse.json({
+    // Build response with UI directives
+    const response: Record<string, unknown> = {
       success: true,
       response: result.response,
       responseId: result.responseId,
       sessionId: currentSessionId,
       traceId,
-      // Debug info (remove in production)
-      ...(process.env.NODE_ENV === 'development' && { 
+    };
+
+    // Include UI directives for frontend
+    if (decision?.uiDirectives) {
+      response.uiDirectives = decision.uiDirectives;
+    }
+
+    // Debug info in development
+    if (process.env.NODE_ENV === 'development') {
+      response.debug = {
         understanding: understanding ? {
           intent: understanding.intent,
           confidence: understanding.confidence,
           topic: understanding.topic,
+          entities: understanding.entities,
+        } : null,
+        decision: decision ? {
+          action: decision.action,
+          handler: decision.handler,
+          rulesApplied: decision.rulesApplied.map(r => r.name),
+          uiDirectives: decision.uiDirectives,
+          modelStrategy: decision.modelStrategy,
         } : null,
         timings,
-      }),
-    });
+      };
+    }
+
+    return NextResponse.json(response);
   } catch (error) {
     timings.totalMs = Date.now() - startedAt;
     console.error('Chat API error:', error);
@@ -411,7 +541,7 @@ export async function POST(req: NextRequest) {
         },
         metadata: {
           source: 'chat',
-          engineVersion: 'v2-hybrid',
+          engineVersion: 'v2',
           traceId,
           requestId,
           latencyMs: timings.totalMs,
