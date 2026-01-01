@@ -31,7 +31,11 @@ import { getProxiedImageUrl } from '@/lib/image-utils';
 import { BrandCards } from '@/components/chat/BrandCards';
 import { SupportFlowForm } from '@/components/chat/SupportFlowForm';
 import { DirectiveRenderer, type UIDirectives, type BrandCardData } from '@/components/chat';
+import { useStreamChat, type StreamMeta, type StreamCards, type StreamDone } from '@/hooks/useStreamChat';
 import type { Influencer, ContentItem, InfluencerType } from '@/types';
+
+// Feature flag for streaming
+const USE_STREAMING = process.env.NEXT_PUBLIC_USE_STREAMING !== 'false';
 
 interface SupportState {
   step: 'detect' | 'brand' | 'name' | 'order' | 'problem' | 'phone' | 'complete';
@@ -120,10 +124,40 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [supportState, setSupportState] = useState<SupportState | null>(null);
   const [currentTraceId, setCurrentTraceId] = useState<string | null>(null);
   const [currentDecisionId, setCurrentDecisionId] = useState<string | null>(null);
+  const [useStreaming, setUseStreaming] = useState(USE_STREAMING);
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const lastTapRef = useRef<number>(0);
+
+  // Streaming hook
+  const { 
+    isStreaming: isStreamActive,
+    meta: streamMeta,
+    cards: streamCards,
+    text: streamText,
+    sendMessage: sendStreamMessage,
+    cancel: cancelStream,
+  } = useStreamChat({
+    onMeta: (meta) => {
+      setCurrentTraceId(meta.traceId);
+      setCurrentDecisionId(meta.decisionId);
+      if (meta.sessionId) setSessionId(meta.sessionId);
+    },
+    onDone: (done) => {
+      if (done.responseId) setResponseId(done.responseId);
+      // Update the streaming message with final content
+      if (streamingMessageId) {
+        setMessages(prev => prev.map(m => 
+          m.id === streamingMessageId 
+            ? { ...m, content: done.fullText }
+            : m
+        ));
+        setStreamingMessageId(null);
+      }
+    },
+  });
 
   // Track user interactions for analytics
   const trackEvent = async (eventType: string, payload: Record<string, unknown> = {}) => {
@@ -258,7 +292,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   };
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim() || isTyping || !influencer) return;
+    if (!inputValue.trim() || isTyping || isStreamActive || !influencer) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -278,40 +312,68 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
         return;
       }
 
-      // Check for support intent first
-      const supportResponse = await fetch('/api/support-flow', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: messageContent,
-          supportState: { step: 'detect', data: {} },
-          username,
-        }),
-      });
+      // Check for support intent first (skip for streaming for now)
+      if (!useStreaming) {
+        const supportResponse = await fetch('/api/support-flow', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: messageContent,
+            supportState: { step: 'detect', data: {} },
+            username,
+          }),
+        });
 
-      const supportData = await supportResponse.json();
+        const supportData = await supportResponse.json();
 
-      // If it's a support request, handle it
-      if (supportData.action !== 'use_assistant') {
-        if (supportData.supportState) {
-          setSupportState(supportData.supportState);
+        // If it's a support request, handle it
+        if (supportData.action !== 'use_assistant') {
+          if (supportData.supportState) {
+            setSupportState(supportData.supportState);
+          }
+
+          const assistantMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            content: supportData.response,
+            action: supportData.action,
+            brands: supportData.brands,
+            inputType: supportData.inputType,
+          };
+
+          setMessages((prev) => [...prev, assistantMessage]);
+          setIsTyping(false);
+          return;
         }
+      }
 
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
+      // === STREAMING MODE ===
+      if (useStreaming) {
+        const assistantMessageId = (Date.now() + 1).toString();
+        setStreamingMessageId(assistantMessageId);
+        
+        // Add placeholder message that will be updated
+        const streamingMessage: Message = {
+          id: assistantMessageId,
           role: 'assistant',
-          content: supportData.response,
-          action: supportData.action,
-          brands: supportData.brands,
-          inputType: supportData.inputType,
+          content: '',
         };
+        setMessages((prev) => [...prev, streamingMessage]);
+        setIsTyping(false); // Let streaming indicator take over
 
-        setMessages((prev) => [...prev, assistantMessage]);
-        setIsTyping(false);
+        // Start streaming
+        await sendStreamMessage({
+          message: messageContent,
+          username,
+          sessionId: sessionId || undefined,
+          previousResponseId: responseId || undefined,
+          clientMessageId: assistantMessageId,
+        });
+
         return;
       }
 
-      // Otherwise, use the regular assistant
+      // === NON-STREAMING MODE ===
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -644,28 +706,52 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                     </div>
                   ) : (
                     <>
-                      {messages.map((msg, index) => (
+                      {messages.map((msg, index) => {
+                        // For streaming messages, use the live text
+                        const isStreamingThis = streamingMessageId === msg.id && isStreamActive;
+                        const displayContent = isStreamingThis ? streamText : msg.content;
+                        // For streaming, use meta directives until done
+                        const displayDirectives = isStreamingThis && streamMeta?.uiDirectives 
+                          ? streamMeta.uiDirectives as UIDirectives 
+                          : msg.uiDirectives;
+                        // For streaming, use cards from stream
+                        const displayCards = isStreamingThis && streamCards?.items 
+                          ? { type: streamCards.cardsType, data: streamCards.items as BrandCardData[] }
+                          : msg.cardsPayload;
+                        
+                        return (
                         <div key={msg.id}>
                           <div
                             className={`flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'}`}
                           >
                             <div className={`max-w-[85%] px-4 py-3 ${msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-assistant'}`}>
                               {msg.role === 'user' ? (
-                                <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                                <p className="text-sm whitespace-pre-wrap">{displayContent}</p>
                               ) : (
                                 <div className="text-sm markdown-content">
-                                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                  {/* Show typing indicator when streaming starts but no text yet */}
+                                  {isStreamingThis && !displayContent && (
+                                    <div className="flex items-center gap-1 text-gray-400">
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                      <span>מקליד...</span>
+                                    </div>
+                                  )}
+                                  {displayContent && <ReactMarkdown>{displayContent}</ReactMarkdown>}
+                                  {/* Show cursor while streaming */}
+                                  {isStreamingThis && displayContent && (
+                                    <span className="inline-block w-2 h-4 bg-current opacity-60 animate-pulse" />
+                                  )}
                                 </div>
                               )}
                             </div>
                           </div>
                           
-                          {/* Engine v2: UI Directives Renderer */}
-                          {msg.role === 'assistant' && msg.uiDirectives && index === messages.length - 1 && !isTyping && (
+                          {/* Engine v2: UI Directives Renderer (including streaming) */}
+                          {msg.role === 'assistant' && displayDirectives && index === messages.length - 1 && (!isTyping || isStreamingThis) && (
                             <div className="mt-3 max-w-[95%] mr-auto">
                               <DirectiveRenderer
-                                directives={msg.uiDirectives}
-                                brands={msg.cardsPayload?.type === 'brands' ? msg.cardsPayload.data : undefined}
+                                directives={displayDirectives}
+                                brands={displayCards?.type === 'brands' ? displayCards.data : undefined}
                                 onQuickAction={(action, payload) => {
                                   trackEvent('quick_action_clicked', { action, payload });
                                   if (action === 'quick_action' && payload?.text) {
@@ -725,7 +811,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             </div>
                           )}
                         </div>
-                      ))}
+                        );
+                      })}
                       {isTyping && (
                         <div className="flex justify-end">
                           <div className="chat-bubble-assistant px-4 py-3 flex gap-1">

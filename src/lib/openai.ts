@@ -484,6 +484,62 @@ export async function chat(
 }
 
 // ============================================
+// Streaming Chat - Using Responses API with streaming
+// ============================================
+
+interface StreamChatParams {
+  message: string;
+  instructions: string;
+  previousResponseId?: string;
+  onDelta: (delta: string) => void;
+}
+
+interface StreamChatResult {
+  responseId: string | null;
+  tokens?: { input: number; output: number };
+}
+
+export async function streamChat(params: StreamChatParams): Promise<StreamChatResult> {
+  const { message, instructions, previousResponseId, onDelta } = params;
+  const client = getClient();
+  
+  try {
+    const response = await client.responses.create({
+      model: CHAT_MODEL,
+      instructions,
+      input: message,
+      ...(previousResponseId && { previous_response_id: previousResponseId }),
+      store: true,
+      stream: true,
+    });
+
+    let responseId: string | null = null;
+    let tokens = { input: 0, output: 0 };
+
+    // Process stream events
+    for await (const event of response) {
+      if (event.type === 'response.output_text.delta') {
+        onDelta(event.delta || '');
+      } else if (event.type === 'response.completed') {
+        responseId = event.response?.id || null;
+        // Extract token usage if available
+        if (event.response?.usage) {
+          tokens = {
+            input: event.response.usage.input_tokens || 0,
+            output: event.response.usage.output_tokens || 0,
+          };
+        }
+      }
+    }
+
+    return { responseId, tokens };
+  } catch (error) {
+    console.error('Error in streamChat:', error);
+    throw error;
+  }
+}
+
+// ============================================
 // Chat with Web Search (for real-time info)
 // ============================================
 

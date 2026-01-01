@@ -1,0 +1,486 @@
+/**
+ * ============================================
+ * Streaming Chat API
+ * ============================================
+ * 
+ * NDJSON streaming endpoint for real-time chat responses.
+ * 
+ * Stream events:
+ * - meta: Initial response with traceId, decisionId, uiDirectives
+ * - cards: Brand/product cards data
+ * - delta: Text chunks from OpenAI
+ * - done: Final response with latency, tokens, cost
+ * - error: Error information if something fails
+ */
+
+import { NextRequest } from 'next/server';
+import { streamChat, buildInfluencerInstructions } from '@/lib/openai';
+import { 
+  getInfluencerByUsername, 
+  createChatSession, 
+  saveChatMessage,
+  getBrandsByInfluencer,
+  getContentByInfluencer,
+  supabase,
+} from '@/lib/supabase';
+import {
+  sanitizeChatMessage,
+  sanitizeUsername,
+  isValidSessionId,
+} from '@/lib/sanitize';
+
+// Engine imports
+import { 
+  getAccountByInfluencerUsername,
+  emitEvent,
+  generateTraceId,
+  generateRequestId,
+  acquireLock,
+  releaseLock,
+  claimIdempotencyKey,
+  completeIdempotencyKey,
+  hashMessage,
+} from '@/engines';
+
+import { understandMessage } from '@/engines/understanding';
+import { 
+  decide, 
+  getUIDirectivesSummary, 
+  getModelStrategySummary,
+} from '@/engines/decision';
+import { 
+  checkPolicies, 
+  applyPolicyOverrides, 
+  buildSecurityContext,
+  getPolicySummary,
+} from '@/engines/policy';
+import type { EngineContext, AccountContext, SessionContext, UserContext, KnowledgeRefs, LimitsContext, RequestContext } from '@/engines/context';
+
+// ============================================
+// Stream Event Types
+// ============================================
+
+interface StreamMeta {
+  type: 'meta';
+  traceId: string;
+  requestId: string;
+  decisionId: string;
+  sessionId: string;
+  uiDirectives: Record<string, unknown>;
+  stateTransition?: { from: string; to: string };
+  suggestedActions?: Array<{ id: string; label: string; action: string }>;
+}
+
+interface StreamCards {
+  type: 'cards';
+  cardsType: 'brands' | 'products' | 'content';
+  items: unknown[];
+}
+
+interface StreamDelta {
+  type: 'delta';
+  text: string;
+}
+
+interface StreamDone {
+  type: 'done';
+  responseId: string | null;
+  latencyMs: number;
+  tokens?: { input: number; output: number };
+  fullText: string;
+}
+
+interface StreamError {
+  type: 'error';
+  message: string;
+  code?: string;
+}
+
+type StreamEvent = StreamMeta | StreamCards | StreamDelta | StreamDone | StreamError;
+
+// ============================================
+// Helper: Encode NDJSON
+// ============================================
+
+function encodeEvent(event: StreamEvent): Uint8Array {
+  const encoder = new TextEncoder();
+  return encoder.encode(JSON.stringify(event) + '\n');
+}
+
+// ============================================
+// POST Handler
+// ============================================
+
+export async function POST(req: NextRequest) {
+  const startedAt = Date.now();
+  const traceId = generateTraceId();
+  const requestId = generateRequestId();
+  
+  // State for cleanup
+  let sessionIdForLock: string | null = null;
+  let idempotencyKey: string | null = null;
+  let accountId: string | null = null;
+
+  // Create readable stream
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        // === PARSE REQUEST ===
+        const body = await req.json();
+        const {
+          message: rawMessage,
+          username: rawUsername,
+          sessionId: rawSessionId,
+          previousResponseId,
+          clientMessageId,
+        } = body;
+
+        // Validate & sanitize
+        const message = sanitizeChatMessage(rawMessage);
+        const username = sanitizeUsername(rawUsername);
+        
+        if (!message || message.length < 1) {
+          controller.enqueue(encodeEvent({
+            type: 'error',
+            message: 'הודעה ריקה',
+            code: 'EMPTY_MESSAGE',
+          }));
+          controller.close();
+          return;
+        }
+
+        if (!username) {
+          controller.enqueue(encodeEvent({
+            type: 'error',
+            message: 'שם משתמש לא תקין',
+            code: 'INVALID_USERNAME',
+          }));
+          controller.close();
+          return;
+        }
+
+        // === LOAD INFLUENCER ===
+        const influencer = await getInfluencerByUsername(username);
+        if (!influencer) {
+          controller.enqueue(encodeEvent({
+            type: 'error',
+            message: 'המשפיען לא נמצא',
+            code: 'INFLUENCER_NOT_FOUND',
+          }));
+          controller.close();
+          return;
+        }
+
+        // Get account
+        const account = await getAccountByInfluencerUsername(username);
+        accountId = account?.id || influencer.id;
+
+        // === SESSION ===
+        let currentSessionId = rawSessionId;
+        if (!currentSessionId || !isValidSessionId(currentSessionId)) {
+          const session = await createChatSession(influencer.id);
+          currentSessionId = session?.id;
+        }
+        sessionIdForLock = currentSessionId;
+
+        // === IDEMPOTENCY ===
+        idempotencyKey = `${accountId}:${currentSessionId}:chat:${hashMessage(message)}:${clientMessageId || 'na'}`;
+        const idempotencyResult = await claimIdempotencyKey(idempotencyKey);
+        
+        if (!idempotencyResult.allowed) {
+          if (idempotencyResult.cachedResult) {
+            // Return cached response
+            const cached = idempotencyResult.cachedResult as { response: string };
+            controller.enqueue(encodeEvent({
+              type: 'meta',
+              traceId,
+              requestId,
+              decisionId: 'cached',
+              sessionId: currentSessionId,
+              uiDirectives: {},
+            }));
+            controller.enqueue(encodeEvent({
+              type: 'delta',
+              text: cached.response,
+            }));
+            controller.enqueue(encodeEvent({
+              type: 'done',
+              responseId: null,
+              latencyMs: Date.now() - startedAt,
+              fullText: cached.response,
+            }));
+            controller.close();
+            return;
+          }
+          // Still processing
+          controller.enqueue(encodeEvent({
+            type: 'error',
+            message: 'הבקשה בעיבוד, נסה שוב בעוד רגע',
+            code: 'PENDING',
+          }));
+          controller.close();
+          return;
+        }
+
+        // === LOCK ===
+        await acquireLock(currentSessionId, requestId);
+
+        // Emit stream started
+        await emitEvent({
+          type: 'message_received',
+          accountId,
+          sessionId: currentSessionId,
+          mode: 'creator',
+          payload: { messageLength: message.length, streaming: true },
+          metadata: { source: 'chat', engineVersion: 'v2', traceId, requestId },
+        });
+
+        // === LOAD DATA (parallel) ===
+        const [brands, content] = await Promise.all([
+          getBrandsByInfluencer(influencer.id),
+          getContentByInfluencer(influencer.id),
+        ]);
+
+        // === UNDERSTANDING ===
+        const understanding = await understandMessage({
+          message,
+          accountId,
+          sessionId: currentSessionId,
+          context: { brandsRef: brands.map(b => b.brand_name) },
+          traceId,
+          requestId,
+        });
+
+        // === DECISION ===
+        const engineContext: EngineContext = {
+          account: {
+            id: accountId,
+            mode: 'creator',
+            profileId: influencer.id,
+            timezone: 'Asia/Jerusalem',
+            language: 'he',
+            plan: 'pro',
+            allowedChannels: ['chat'],
+            security: { publicChatAllowed: true, requireAuthForSupport: false, allowedOrigins: [] },
+            features: { supportFlowEnabled: true, salesFlowEnabled: false, whatsappEnabled: false, analyticsEnabled: true },
+          } as AccountContext,
+          session: { id: currentSessionId, state: 'Chat.Active', version: 1, lastActiveAt: new Date(), messageCount: 0 } as SessionContext,
+          user: { anonId: `anon_${Date.now()}`, isRepeatVisitor: false } as UserContext,
+          knowledge: { brandsRef: `brands:${accountId}`, contentIndexRef: `content:${accountId}` } as KnowledgeRefs,
+          limits: { tokenBudgetRemaining: 100000, tokenBudgetTotal: 100000, costCeiling: 100, costUsed: 0, rateLimitRemaining: 100, rateLimitResetAt: new Date(Date.now() + 60000), periodType: 'month', periodStart: new Date(), periodEnd: new Date() } as LimitsContext,
+          request: { requestId, traceId, timestamp: new Date(), source: 'chat', messageId: `msg_${Date.now()}`, clientMessageId } as RequestContext,
+        };
+
+        let decision = await decide({
+          ctx: engineContext,
+          understanding,
+          traceId,
+          requestId,
+        });
+
+        // === POLICY ===
+        const securityContext = buildSecurityContext(engineContext);
+        const policyResult = await checkPolicies({
+          ctx: engineContext,
+          understanding,
+          decision,
+          security: securityContext,
+          traceId,
+          requestId,
+        });
+
+        if (!policyResult.allowed) {
+          controller.enqueue(encodeEvent({
+            type: 'error',
+            message: policyResult.blockedReason || 'הפעולה נחסמה',
+            code: 'POLICY_BLOCKED',
+          }));
+          await releaseLock(currentSessionId, requestId);
+          await completeIdempotencyKey(idempotencyKey, { response: policyResult.blockedReason, blocked: true });
+          controller.close();
+          return;
+        }
+
+        if (policyResult.overrides) {
+          decision = applyPolicyOverrides(decision, policyResult.overrides);
+        }
+
+        // === SEND META (fast!) ===
+        const metaEvent: StreamMeta = {
+          type: 'meta',
+          traceId,
+          requestId,
+          decisionId: decision.decisionId,
+          sessionId: currentSessionId,
+          uiDirectives: decision.uiDirectives,
+          stateTransition: decision.stateTransition,
+          suggestedActions: decision.uiDirectives.showQuickActions?.map((label, i) => ({
+            id: `quick-${i}`,
+            label,
+            action: 'quick_action',
+          })),
+        };
+        controller.enqueue(encodeEvent(metaEvent));
+
+        // === SEND CARDS (if needed) ===
+        if (decision.uiDirectives.showCardList === 'brands' && brands.length > 0) {
+          const cardsEvent: StreamCards = {
+            type: 'cards',
+            cardsType: 'brands',
+            items: brands.map(b => ({
+              id: b.id,
+              brand_name: b.brand_name,
+              description: b.description,
+              coupon_code: b.coupon_code,
+              category: b.category,
+              link: b.link,
+              discount_percent: b.discount_percent,
+            })),
+          };
+          controller.enqueue(encodeEvent(cardsEvent));
+        }
+
+        // === BUILD CONTEXT & STREAM OPENAI ===
+        let contextStr = '';
+        if (brands.length > 0) {
+          contextStr += '## מותגים ושיתופי פעולה:\n';
+          brands.forEach((b) => {
+            contextStr += `- ${b.brand_name}`;
+            if (b.description) contextStr += `: ${b.description}`;
+            if (b.coupon_code) contextStr += ` | קוד קופון: "${b.coupon_code}"`;
+            else contextStr += ` | ללא קוד קופון כרגע`;
+            contextStr += '\n';
+          });
+        }
+
+        if (content.length > 0) {
+          const contentSlice = content.slice(0, 10);
+          contextStr += '\n## תוכן אחרון:\n';
+          contentSlice.forEach((c) => {
+            contextStr += `- ${c.content_type}: ${c.extracted_data?.title || c.extracted_data?.description || ''}\n`;
+          });
+        }
+
+        const instructions = buildInfluencerInstructions(
+          influencer,
+          brands,
+          contextStr,
+          { tone: decision.uiDirectives.tone, responseLength: decision.uiDirectives.responseLength }
+        );
+
+        // Stream from OpenAI
+        let fullText = '';
+        let responseId: string | null = null;
+        let tokenInfo = { input: 0, output: 0 };
+
+        try {
+          const streamResult = await streamChat({
+            message,
+            instructions,
+            previousResponseId: previousResponseId || undefined,
+            onDelta: (delta) => {
+              fullText += delta;
+              controller.enqueue(encodeEvent({ type: 'delta', text: delta }));
+            },
+          });
+
+          responseId = streamResult.responseId;
+          tokenInfo = streamResult.tokens || { input: 0, output: 0 };
+        } catch (openaiError: any) {
+          console.error('[Stream] OpenAI error:', openaiError);
+          // Fallback response
+          fullText = 'מצטער, משהו השתבש. נסה שוב!';
+          controller.enqueue(encodeEvent({ type: 'delta', text: fullText }));
+        }
+
+        // === DONE ===
+        const latencyMs = Date.now() - startedAt;
+        controller.enqueue(encodeEvent({
+          type: 'done',
+          responseId,
+          latencyMs,
+          tokens: tokenInfo,
+          fullText,
+        }));
+
+        // === SAVE & EVENTS ===
+        await Promise.all([
+          saveChatMessage(currentSessionId, 'user', message),
+          saveChatMessage(currentSessionId, 'assistant', fullText),
+          emitEvent({
+            type: 'response_sent',
+            accountId,
+            sessionId: currentSessionId,
+            mode: 'creator',
+            payload: {
+              responseLength: fullText.length,
+              handler: decision.handler,
+              intent: understanding.intent,
+              streaming: true,
+              decisionId: decision.decisionId,
+            },
+            metadata: {
+              source: 'chat',
+              engineVersion: 'v2',
+              traceId,
+              requestId,
+              latencyMs,
+              tokens: tokenInfo,
+            },
+          }),
+        ]);
+
+        // Complete idempotency
+        await completeIdempotencyKey(idempotencyKey, { response: fullText, responseId });
+
+        // Release lock
+        await releaseLock(currentSessionId, requestId);
+
+        controller.close();
+
+      } catch (error: any) {
+        console.error('[Stream] Error:', error);
+        
+        // Send error event
+        controller.enqueue(encodeEvent({
+          type: 'error',
+          message: 'שגיאה בעיבוד הבקשה',
+          code: 'INTERNAL_ERROR',
+        }));
+
+        // Cleanup
+        if (sessionIdForLock) {
+          await releaseLock(sessionIdForLock, requestId).catch(() => {});
+        }
+        if (idempotencyKey) {
+          await completeIdempotencyKey(idempotencyKey, { error: error.message }).catch(() => {});
+        }
+
+        // Log error event
+        if (accountId && sessionIdForLock) {
+          await emitEvent({
+            type: 'response_sent',
+            accountId,
+            sessionId: sessionIdForLock,
+            mode: 'creator',
+            payload: { error: error.message, streaming: true },
+            metadata: { source: 'chat', engineVersion: 'v2', traceId, requestId, latencyMs: Date.now() - startedAt },
+          }).catch(() => {});
+        }
+
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'application/x-ndjson',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'X-Trace-Id': traceId,
+      'X-Request-Id': requestId,
+    },
+  });
+}
+
