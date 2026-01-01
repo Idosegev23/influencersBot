@@ -124,6 +124,12 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [supportState, setSupportState] = useState<SupportState | null>(null);
   const [currentTraceId, setCurrentTraceId] = useState<string | null>(null);
   const [currentDecisionId, setCurrentDecisionId] = useState<string | null>(null);
+  const [currentAnonId, setCurrentAnonId] = useState<string | null>(null);
+  const [currentExperiments, setCurrentExperiments] = useState<Array<{
+    experimentKey: string;
+    variantId: string;
+    variantName: string;
+  }> | null>(null);
   const [useStreaming, setUseStreaming] = useState(USE_STREAMING);
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   
@@ -154,6 +160,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       streamMetaRef.current = meta;
       setCurrentTraceId(meta.traceId);
       setCurrentDecisionId(meta.decisionId);
+      if (meta.anonId) setCurrentAnonId(meta.anonId);
+      if (meta.experiments) setCurrentExperiments(meta.experiments);
       if (meta.sessionId) setSessionId(meta.sessionId);
     },
     onCards: (cards) => {
@@ -202,11 +210,14 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     },
   });
 
-  // Track user interactions for analytics
+  // Track user interactions for analytics with full attribution
   const trackEvent = async (eventType: string, payload: Record<string, unknown> = {}) => {
     if (!sessionId && !influencer?.id) return;
     
     try {
+      // Generate unique client event ID for dedup
+      const clientEventId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      
       await fetch('/api/track', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -214,9 +225,16 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
           eventType,
           accountId: influencer?.id,
           sessionId,
+          anonId: currentAnonId,
           traceId: currentTraceId,
-          decisionId: currentDecisionId, // Link UI actions to decision
+          decisionId: currentDecisionId,
+          // Pass first experiment for simple attribution
+          experimentKey: currentExperiments?.[0]?.experimentKey,
+          variantId: currentExperiments?.[0]?.variantId,
+          clientEventId, // For dedup
+          elementId: payload.elementId || payload.brandId || payload.actionId,
           payload,
+          mode: 'creator',
         }),
       });
     } catch (err) {

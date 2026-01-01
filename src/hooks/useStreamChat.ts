@@ -12,9 +12,15 @@ interface StreamMeta {
   requestId: string;
   decisionId: string;
   sessionId: string;
+  anonId: string;
   uiDirectives: Record<string, unknown>;
   stateTransition?: { from: string; to: string };
   suggestedActions?: Array<{ id: string; label: string; action: string }>;
+  experiments?: Array<{
+    experimentKey: string;
+    variantId: string;
+    variantName: string;
+  }>;
 }
 
 interface StreamCards {

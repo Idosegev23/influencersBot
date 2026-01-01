@@ -49,12 +49,18 @@ import {
   getUIDirectivesSummary, 
   getModelStrategySummary,
 } from '@/engines/decision';
-import { 
+import {
   checkPolicies, 
   applyPolicyOverrides, 
   buildSecurityContext,
   getPolicySummary,
 } from '@/engines/policy';
+import {
+  applyExperiments,
+  trackExperimentExposure,
+  type ExperimentContext,
+  type ExperimentAssignment,
+} from '@/engines/experiments';
 import type { EngineContext, AccountContext, SessionContext, UserContext, KnowledgeRefs, LimitsContext, RequestContext } from '@/engines/context';
 
 // ============================================
@@ -67,9 +73,16 @@ interface StreamMeta {
   requestId: string;
   decisionId: string;
   sessionId: string;
+  anonId: string; // For experiment tracking
   uiDirectives: Record<string, unknown>;
   stateTransition?: { from: string; to: string };
   suggestedActions?: Array<{ id: string; label: string; action: string }>;
+  // Experiments for attribution
+  experiments?: Array<{
+    experimentKey: string;
+    variantId: string;
+    variantName: string;
+  }>;
 }
 
 interface StreamCards {
@@ -202,6 +215,7 @@ export async function POST(req: NextRequest) {
               requestId,
               decisionId: 'cached',
               sessionId: currentSessionId,
+              anonId: `anon_${currentSessionId.slice(0, 8)}`,
               uiDirectives: {},
             }));
             controller.enqueue(encodeEvent({
@@ -315,6 +329,35 @@ export async function POST(req: NextRequest) {
           decision = applyPolicyOverrides(decision, policyResult.overrides);
         }
 
+        // === EXPERIMENTS ===
+        // Generate consistent anonId (from client or session-based)
+        const anonId = `anon_${currentSessionId.slice(0, 8)}`;
+        
+        const expContext: ExperimentContext = {
+          anonId,
+          sessionId: currentSessionId,
+          accountId,
+          mode: 'creator',
+          intent: understanding?.intent,
+        };
+
+        // Apply experiment overrides to UI directives
+        const { directives: experimentDirectives, experiments } = await applyExperiments(
+          expContext,
+          decision.uiDirectives
+        );
+        
+        // Update decision with experiment overrides
+        decision = {
+          ...decision,
+          uiDirectives: experimentDirectives,
+        };
+
+        // Track experiment exposures
+        for (const exp of experiments) {
+          await trackExperimentExposure(expContext, exp, decision.decisionId);
+        }
+
         // === SEND META (fast!) ===
         const metaEvent: StreamMeta = {
           type: 'meta',
@@ -322,12 +365,19 @@ export async function POST(req: NextRequest) {
           requestId,
           decisionId: decision.decisionId,
           sessionId: currentSessionId,
+          anonId, // For client-side experiment tracking
           uiDirectives: decision.uiDirectives,
           stateTransition: decision.stateTransition,
           suggestedActions: decision.uiDirectives.showQuickActions?.map((label, i) => ({
             id: `quick-${i}`,
             label,
             action: 'quick_action',
+          })),
+          // Pass experiments to client for attribution
+          experiments: experiments.map(e => ({
+            experimentKey: e.experimentKey,
+            variantId: e.variantId,
+            variantName: e.variantName,
           })),
         };
         controller.enqueue(encodeEvent(metaEvent));

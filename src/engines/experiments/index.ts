@@ -146,18 +146,22 @@ function hashString(s: string): number {
 
 /**
  * Check if user is in experiment allocation
+ * IMPORTANT: Scoped to accountId to prevent cross-account leakage
  */
-function isUserInExperiment(anonId: string, experimentKey: string, allocation: number): boolean {
-  const hash = hashString(`${anonId}:${experimentKey}:allocation`);
+function isUserInExperiment(accountId: string, anonId: string, experimentKey: string, allocation: number): boolean {
+  // accountId + anonId + experimentKey ensures isolation between accounts
+  const hash = hashString(`${accountId}:${anonId}:${experimentKey}:allocation`);
   return (hash % 100) < allocation;
 }
 
 /**
  * Select variant based on weights
+ * IMPORTANT: Scoped to accountId to prevent cross-account leakage
  */
-function selectVariant(anonId: string, experimentKey: string, variants: ExperimentVariant[]): ExperimentVariant {
+function selectVariant(accountId: string, anonId: string, experimentKey: string, variants: ExperimentVariant[]): ExperimentVariant {
   const totalWeight = variants.reduce((sum, v) => sum + v.weight, 0);
-  const hash = hashString(`${anonId}:${experimentKey}:variant`);
+  // accountId + anonId + experimentKey ensures user gets same variant within same account
+  const hash = hashString(`${accountId}:${anonId}:${experimentKey}:variant`);
   const bucket = hash % totalWeight;
   
   let cumulative = 0;
@@ -196,6 +200,7 @@ function experimentApplies(experiment: Experiment, ctx: ExperimentContext): bool
 
 /**
  * Get all experiment assignments for a user
+ * Assignment is scoped to accountId + anonId to prevent cross-account leakage
  */
 export async function getExperimentAssignments(
   ctx: ExperimentContext
@@ -209,13 +214,13 @@ export async function getExperimentAssignments(
       continue;
     }
 
-    // Check if user is in experiment allocation
-    if (!isUserInExperiment(ctx.anonId, experiment.key, experiment.allocation)) {
+    // Check if user is in experiment allocation (scoped to accountId)
+    if (!isUserInExperiment(ctx.accountId, ctx.anonId, experiment.key, experiment.allocation)) {
       continue;
     }
 
-    // Assign variant
-    const variant = selectVariant(ctx.anonId, experiment.key, experiment.variants);
+    // Assign variant (scoped to accountId)
+    const variant = selectVariant(ctx.accountId, ctx.anonId, experiment.key, experiment.variants);
     
     assignments.push({
       experimentKey: experiment.key,
