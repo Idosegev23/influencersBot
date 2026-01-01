@@ -78,9 +78,10 @@ export const USER_PROMPT = (message: string) => `נתח את ההודעה הבא
 
 "${message}"`;
 
-// JSON Schema for structured output
+// JSON Schema for structured output (with additionalProperties: false for OpenAI strict mode)
 export const OUTPUT_SCHEMA = {
   type: 'object',
+  additionalProperties: false,
   properties: {
     intent: {
       type: 'string',
@@ -88,14 +89,13 @@ export const OUTPUT_SCHEMA = {
     },
     confidence: {
       type: 'number',
-      minimum: 0,
-      maximum: 1,
     },
     topic: {
       type: 'string',
     },
     entities: {
       type: 'object',
+      additionalProperties: false,
       properties: {
         brands: { type: 'array', items: { type: 'string' } },
         coupons: { type: 'array', items: { type: 'string' } },
@@ -127,6 +127,7 @@ export const OUTPUT_SCHEMA = {
     },
     risk: {
       type: 'object',
+      additionalProperties: false,
       properties: {
         privacy: { type: 'boolean' },
         legal: { type: 'boolean' },
@@ -141,6 +142,7 @@ export const OUTPUT_SCHEMA = {
     },
     routeHints: {
       type: 'object',
+      additionalProperties: false,
       properties: {
         suggestedHandler: {
           type: 'string',
@@ -148,14 +150,16 @@ export const OUTPUT_SCHEMA = {
         },
         suggestedUi: {
           type: 'object',
+          additionalProperties: false,
           properties: {
-            showForm: { type: ['string', 'null'] },
-            showCardList: { type: ['string', 'null'] },
+            showForm: { type: 'string' },
+            showCardList: { type: 'string' },
             showQuickActions: { type: 'array', items: { type: 'string' } },
           },
+          required: ['showForm', 'showCardList', 'showQuickActions'],
         },
       },
-      required: ['suggestedHandler'],
+      required: ['suggestedHandler', 'suggestedUi'],
     },
     piiDetectedPaths: {
       type: 'array',
