@@ -137,6 +137,10 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     streamingMessageIdRef.current = streamingMessageId;
   }, [streamingMessageId]);
 
+  // Refs to store streaming data for final message
+  const streamMetaRef = useRef<StreamMeta | null>(null);
+  const streamCardsRef = useRef<StreamCards | null>(null);
+
   // Streaming hook
   const { 
     isStreaming: isStreamActive,
@@ -147,25 +151,43 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     cancel: cancelStream,
   } = useStreamChat({
     onMeta: (meta) => {
+      streamMetaRef.current = meta;
       setCurrentTraceId(meta.traceId);
       setCurrentDecisionId(meta.decisionId);
       if (meta.sessionId) setSessionId(meta.sessionId);
     },
+    onCards: (cards) => {
+      streamCardsRef.current = cards;
+    },
     onDone: (done) => {
       if (done.responseId) setResponseId(done.responseId);
-      // Update the streaming message with final content (using ref to get current value)
       const msgId = streamingMessageIdRef.current;
+      const meta = streamMetaRef.current;
+      const cards = streamCardsRef.current;
+      
       if (msgId && done.fullText) {
-        setMessages(prev => prev.map(m => 
-          m.id === msgId 
-            ? { ...m, content: done.fullText }
-            : m
-        ));
+        setMessages(prev => prev.map(m => {
+          if (m.id !== msgId) return m;
+          return { 
+            ...m, 
+            content: done.fullText,
+            traceId: meta?.traceId,
+            decisionId: meta?.decisionId,
+            state: meta?.stateTransition?.to,
+            uiDirectives: meta?.uiDirectives as UIDirectives,
+            cardsPayload: cards ? { 
+              type: cards.cardsType, 
+              data: cards.items as BrandCardData[] 
+            } : undefined,
+          };
+        }));
       }
+      // Reset refs
+      streamMetaRef.current = null;
+      streamCardsRef.current = null;
       setStreamingMessageId(null);
     },
     onError: (error) => {
-      // Show error in the streaming message
       const msgId = streamingMessageIdRef.current;
       if (msgId) {
         setMessages(prev => prev.map(m =>
@@ -174,6 +196,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
             : m
         ));
       }
+      streamMetaRef.current = null;
+      streamCardsRef.current = null;
       setStreamingMessageId(null);
     },
   });
