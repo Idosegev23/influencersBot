@@ -332,9 +332,12 @@ export interface Rule {
   enabled: boolean;
   
   // Versioning
-  version: number;
-  publishedAt: Date;
+  version?: number;
+  publishedAt?: Date;
   updatedBy?: string;
+  
+  // Source tracking
+  source?: 'code' | 'db';       // Where this rule came from
 }
 
 // ============================================
