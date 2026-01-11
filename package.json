@@ -7,13 +7,19 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "type-check": "tsc --noEmit",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "backup:db": "./scripts/backup-database.sh",
+    "backup:migrations": "./scripts/backup-migrations.sh",
+    "backup:all": "./scripts/backup-all.sh",
+    "precommit": "./scripts/build-and-check.sh"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.89.0",
     "@upstash/redis": "^1.36.0",
     "clsx": "^2.1.1",
