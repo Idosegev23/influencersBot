@@ -15,3 +15,5 @@ COMMENT ON COLUMN influencers.whatsapp_enabled IS 'Whether WhatsApp notification
 
 
 
+
+

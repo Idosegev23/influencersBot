@@ -231,3 +231,5 @@ export function getRulesByCategory(category: string): Rule[] {
   return allRules.filter(r => r.category === category);
 }
 
+
+

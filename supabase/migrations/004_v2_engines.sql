@@ -428,3 +428,5 @@ COMMENT ON FUNCTION release_session_lock IS 'Releases session lock if owned by c
 COMMENT ON FUNCTION claim_idempotency_key IS 'Claims idempotency key for processing';
 COMMENT ON FUNCTION increment_cost IS 'Atomically increments cost and returns budget status';
 
+
+

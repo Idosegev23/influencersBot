@@ -19,6 +19,12 @@ import {
   Headphones,
   RefreshCw,
   Tag,
+  Briefcase,
+  CheckCircle2,
+  Calendar,
+  FileCheck,
+  DollarSign,
+  AlertCircle,
 } from 'lucide-react';
 import { getInfluencerByUsername, getChatSessions, getBrandsByInfluencer, getAnalytics, type Brand } from '@/lib/supabase';
 import { formatNumber, formatRelativeTime } from '@/lib/utils';
@@ -38,6 +44,9 @@ export default function InfluencerDashboardPage({
   const [brands, setBrands] = useState<Brand[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [analytics, setAnalytics] = useState<Record<string, number>>({});
+  const [audienceAnalytics, setAudienceAnalytics] = useState<any>(null);
+  const [taskSummary, setTaskSummary] = useState<any>(null);
+  const [partnerships, setPartnerships] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [rescanning, setRescanning] = useState(false);
@@ -82,6 +91,32 @@ export default function InfluencerDashboardPage({
           productClicks: events.filter((e) => e.event_type === 'product_clicked').length,
         };
         setAnalytics(stats);
+
+        // Load new Influencer OS data
+        try {
+          // Load audience analytics
+          const audienceRes = await fetch(`/api/influencer/analytics/audience?username=${username}`);
+          if (audienceRes.ok) {
+            const audienceData = await audienceRes.json();
+            setAudienceAnalytics(audienceData);
+          }
+
+          // Load task summary
+          const tasksRes = await fetch(`/api/influencer/tasks/summary?username=${username}&days=7`);
+          if (tasksRes.ok) {
+            const tasksData = await tasksRes.json();
+            setTaskSummary(tasksData);
+          }
+
+          // Load partnerships
+          const partnershipsRes = await fetch(`/api/influencer/partnerships?username=${username}&limit=5`);
+          if (partnershipsRes.ok) {
+            const partnershipsData = await partnershipsRes.json();
+            setPartnerships(partnershipsData.partnerships || []);
+          }
+        } catch (err) {
+          console.error('Error loading new data:', err);
+        }
       } catch (error) {
         console.error('Error loading data:', error);
       } finally {
@@ -160,7 +195,7 @@ export default function InfluencerDashboardPage({
 
       {/* Header */}
       <header className="relative z-10 sticky top-0 bg-slate-900/80 backdrop-blur-xl border-b border-gray-800">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {influencer.avatar_url ? (
@@ -203,7 +238,7 @@ export default function InfluencerDashboardPage({
         </div>
       </header>
 
-      <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-8">
+      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-8">
         {/* Share Link */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -240,8 +275,8 @@ export default function InfluencerDashboardPage({
           </div>
         </motion.div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {/* Primary KPIs */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -253,7 +288,7 @@ export default function InfluencerDashboardPage({
                 <MessageCircle className="w-6 h-6 text-blue-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-white">{formatNumber(analytics.totalChats || 0)}</p>
+                <p className="text-2xl font-bold text-white">{formatNumber(audienceAnalytics?.overview?.totalConversations || analytics.totalChats || 0)}</p>
                 <p className="text-sm text-gray-400">שיחות</p>
               </div>
             </div>
@@ -267,11 +302,11 @@ export default function InfluencerDashboardPage({
           >
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-green-400" />
+                <Tag className="w-6 h-6 text-green-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-white">{formatNumber(analytics.totalMessages || 0)}</p>
-                <p className="text-sm text-gray-400">הודעות</p>
+                <p className="text-2xl font-bold text-white">{formatNumber(audienceAnalytics?.overview?.couponCopiedCount || analytics.couponCopies || 0)}</p>
+                <p className="text-sm text-gray-400">קופונים</p>
               </div>
             </div>
           </motion.div>
@@ -284,11 +319,11 @@ export default function InfluencerDashboardPage({
           >
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                <Tag className="w-6 h-6 text-purple-400" />
+                <Briefcase className="w-6 h-6 text-purple-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-white">{formatNumber(analytics.couponCopies || 0)}</p>
-                <p className="text-sm text-gray-400">קופונים הועתקו</p>
+                <p className="text-2xl font-bold text-white">{partnerships.length || 0}</p>
+                <p className="text-sm text-gray-400">שת"פים</p>
               </div>
             </div>
           </motion.div>
@@ -301,23 +336,156 @@ export default function InfluencerDashboardPage({
           >
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-orange-500/20 flex items-center justify-center">
-                <BarChart3 className="w-6 h-6 text-orange-400" />
+                <CheckCircle2 className="w-6 h-6 text-orange-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-white">{formatNumber(analytics.productClicks || 0)}</p>
-                <p className="text-sm text-gray-400">קליקים על מוצרים</p>
+                <p className="text-2xl font-bold text-white">{taskSummary?.summary?.statusCounts?.pending || 0}</p>
+                <p className="text-sm text-gray-400">משימות</p>
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-5"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                <TrendingUp className="w-6 h-6 text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-white">{audienceAnalytics?.overview?.conversionRate?.toFixed(1) || '0.0'}%</p>
+                <p className="text-sm text-gray-400">המרה</p>
               </div>
             </div>
           </motion.div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Main Dashboard Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Upcoming Tasks */}
+          {taskSummary && (taskSummary.upcoming?.length > 0 || taskSummary.overdue?.length > 0) && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.35 }}
+              className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-6"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-white flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-orange-400" />
+                  משימות קרובות
+                </h3>
+                <Link
+                  href={`/influencer/${username}/tasks`}
+                  className="text-sm text-orange-400 hover:text-orange-300"
+                >
+                  כל המשימות
+                </Link>
+              </div>
+
+              <div className="space-y-3">
+                {taskSummary.overdue?.slice(0, 2).map((task: any) => (
+                  <div
+                    key={task.id}
+                    className="flex items-start gap-3 p-3 bg-red-500/10 border border-red-500/30 rounded-xl"
+                  >
+                    <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white truncate">{task.title}</p>
+                      <p className="text-xs text-red-400">באיחור - {new Date(task.due_date).toLocaleDateString('he-IL')}</p>
+                      {task.partnership && (
+                        <p className="text-xs text-gray-400">{task.partnership.brand_name}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {taskSummary.upcoming?.slice(0, 3).map((task: any) => (
+                  <div
+                    key={task.id}
+                    className="flex items-start gap-3 p-3 bg-gray-700/30 rounded-xl"
+                  >
+                    <CheckCircle2 className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white truncate">{task.title}</p>
+                      <p className="text-xs text-gray-400">{new Date(task.due_date).toLocaleDateString('he-IL')}</p>
+                      {task.partnership_name && (
+                        <p className="text-xs text-gray-500">{task.partnership_name}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* Active Partnerships */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-6"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-white flex items-center gap-2">
+                <Briefcase className="w-5 h-5 text-purple-400" />
+                שת"פים פעילים
+              </h3>
+              <Link
+                href={`/influencer/${username}/partnerships`}
+                className="text-sm text-purple-400 hover:text-purple-300"
+              >
+                ניהול מלא
+              </Link>
+            </div>
+
+            {partnerships.length > 0 ? (
+              <div className="space-y-3">
+                {partnerships.slice(0, 4).map((partnership) => (
+                  <Link
+                    key={partnership.id}
+                    href={`/influencer/${username}/partnerships/${partnership.id}`}
+                    className="flex items-center justify-between p-3 bg-gray-700/30 hover:bg-gray-700/50 rounded-xl transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white truncate">{partnership.brand_name}</p>
+                      <p className="text-xs text-gray-400">
+                        {partnership.status === 'active' && '✓ פעיל'}
+                        {partnership.status === 'proposal' && '📋 הצעה'}
+                        {partnership.status === 'contract' && '📝 חוזה'}
+                        {partnership.status === 'negotiation' && '💬 משא ומתן'}
+                      </p>
+                    </div>
+                    {partnership.contract_amount && (
+                      <span className="text-sm font-bold text-green-400">
+                        ₪{formatNumber(partnership.contract_amount)}
+                      </span>
+                    )}
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Briefcase className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                <p className="text-gray-400 mb-3">אין עדיין שת"פים</p>
+                <Link
+                  href={`/influencer/${username}/partnerships`}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-500 transition-colors"
+                >
+                  הוסף שת"פ
+                </Link>
+              </div>
+            )}
+          </motion.div>
+
           {/* Brands Section */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
+            transition={{ delay: 0.45 }}
             className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-6"
           >
             <div className="flex items-center justify-between mb-4">
@@ -375,7 +543,7 @@ export default function InfluencerDashboardPage({
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35 }}
+            transition={{ delay: 0.5 }}
             className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-6"
           >
             <div className="flex items-center justify-between mb-4">
@@ -383,7 +551,12 @@ export default function InfluencerDashboardPage({
                 <MessageCircle className="w-5 h-5 text-indigo-400" />
                 שיחות אחרונות
               </h3>
-              <span className="text-sm text-gray-500">30 ימים אחרונים</span>
+              <Link
+                href={`/influencer/${username}/conversations`}
+                className="text-sm text-indigo-400 hover:text-indigo-300"
+              >
+                כל השיחות
+              </Link>
             </div>
 
             {sessions.length > 0 ? (
@@ -419,9 +592,25 @@ export default function InfluencerDashboardPage({
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-4"
+          transition={{ delay: 0.55 }}
+          className="grid grid-cols-2 sm:grid-cols-4 gap-4"
         >
+          <Link
+            href={`/influencer/${username}/partnerships`}
+            className="flex flex-col items-center gap-3 p-6 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-purple-500/50 rounded-2xl transition-all"
+          >
+            <Briefcase className="w-8 h-8 text-purple-400" />
+            <span className="text-white font-medium">שת"פים</span>
+          </Link>
+
+          <Link
+            href={`/influencer/${username}/tasks`}
+            className="flex flex-col items-center gap-3 p-6 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-orange-500/50 rounded-2xl transition-all"
+          >
+            <CheckCircle2 className="w-8 h-8 text-orange-400" />
+            <span className="text-white font-medium">משימות</span>
+          </Link>
+
           <Link
             href={`/influencer/${username}/analytics`}
             className="flex flex-col items-center gap-3 p-6 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-indigo-500/50 rounded-2xl transition-all"
@@ -431,19 +620,19 @@ export default function InfluencerDashboardPage({
           </Link>
 
           <Link
-            href={`/influencer/${username}/conversations`}
-            className="flex flex-col items-center gap-3 p-6 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-indigo-500/50 rounded-2xl transition-all"
-          >
-            <MessageCircle className="w-8 h-8 text-blue-400" />
-            <span className="text-white font-medium">שיחות</span>
-          </Link>
-
-          <Link
             href={`/influencer/${username}/brands`}
             className="flex flex-col items-center gap-3 p-6 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-pink-500/50 rounded-2xl transition-all"
           >
             <Tag className="w-8 h-8 text-pink-400" />
-            <span className="text-white font-medium">מותגים וקופונים</span>
+            <span className="text-white font-medium">מותגים</span>
+          </Link>
+
+          <Link
+            href={`/influencer/${username}/conversations`}
+            className="flex flex-col items-center gap-3 p-6 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-blue-500/50 rounded-2xl transition-all"
+          >
+            <MessageCircle className="w-8 h-8 text-blue-400" />
+            <span className="text-white font-medium">שיחות</span>
           </Link>
 
           <Link
@@ -459,7 +648,7 @@ export default function InfluencerDashboardPage({
             className="flex flex-col items-center gap-3 p-6 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-green-500/50 rounded-2xl transition-all"
           >
             <Headphones className="w-8 h-8 text-green-400" />
-            <span className="text-white font-medium">פניות תמיכה</span>
+            <span className="text-white font-medium">תמיכה</span>
           </Link>
 
           <Link
@@ -475,8 +664,8 @@ export default function InfluencerDashboardPage({
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.45 }}
-          className="mt-4 flex flex-col items-center gap-4"
+          transition={{ delay: 0.6 }}
+          className="mt-8 flex flex-col items-center gap-4"
         >
           <div className="flex flex-wrap justify-center gap-3">
             <a
@@ -524,4 +713,3 @@ export default function InfluencerDashboardPage({
     </div>
   );
 }
-

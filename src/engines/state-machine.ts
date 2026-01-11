@@ -538,3 +538,5 @@ export function canReceiveInput(state: ConversationState): boolean {
   return STATE_METADATA[state]?.allowsInput ?? false;
 }
 
+
+
