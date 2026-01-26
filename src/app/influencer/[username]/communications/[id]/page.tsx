@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { CommunicationThread } from '@/components/communications/CommunicationThread';
+import CommunicationThread from '@/components/communications/CommunicationThread';
 
 interface Communication {
   id: string;

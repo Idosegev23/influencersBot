@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { SubTasksList } from '@/components/tasks/SubTasksList';
+import SubTasksList from '@/components/tasks/SubTasksList';
 
 interface Task {
   id: string;

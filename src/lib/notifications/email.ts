@@ -7,6 +7,12 @@ interface EmailParams {
   text?: string;
 }
 
+// Helper function for backwards compatibility
+export async function sendEmail(params: EmailParams): Promise<boolean> {
+  const channel = new EmailChannel();
+  return await channel.send(params);
+}
+
 export class EmailChannel {
   private apiKey: string;
   private fromEmail: string;

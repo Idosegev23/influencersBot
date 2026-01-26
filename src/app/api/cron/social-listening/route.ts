@@ -6,7 +6,7 @@ import { trackInstagramMentions, getBrandedHashtags } from '@/lib/social-listeni
  * Cron Job: Social Listening
  * Runs every 6 hours to track Instagram mentions
  * 
- * Schedule: 0 */6 * * * (every 6 hours)
+ * Schedule: 0 star-slash-6 star star star (every 6 hours)
  */
 export async function GET(req: NextRequest) {
   console.log('🔍 Social Listening Cron Job started');

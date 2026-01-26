@@ -5,6 +5,12 @@ interface WhatsAppParams {
   message: string;
 }
 
+// Helper function for backwards compatibility
+export async function sendWhatsAppMessage(params: WhatsAppParams): Promise<boolean> {
+  const channel = new WhatsAppChannel();
+  return await channel.send(params);
+}
+
 export class WhatsAppChannel {
   private instanceId: string;
   private token: string;

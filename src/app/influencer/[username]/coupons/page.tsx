@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { CouponPerformanceTable } from '@/components/analytics/CouponPerformanceTable';
-import { TopProducts } from '@/components/analytics/TopProducts';
+import CouponPerformanceTable from '@/components/analytics/CouponPerformanceTable';
+import TopProducts from '@/components/analytics/TopProducts';
 
 interface CouponData {
   coupons: Array<{
