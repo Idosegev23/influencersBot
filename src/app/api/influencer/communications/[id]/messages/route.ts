@@ -2,24 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase';
 import { requireAuth } from '@/lib/auth/api-helpers';
 
-type RouteParams = {
-  params: {
-    id: string;
-  };
-};
-
 /**
  * POST /api/influencer/communications/[id]/messages
  * שליחת הודעה חדשה בשיחה
  */
-export async function POST(request: NextRequest, { params }: RouteParams) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   const authCheck = await requireAuth(request);
   if (authCheck.error) {
     return authCheck.error;
   }
 
   const supabase = createClient();
-  const { id: communicationId } = params;
+  const { id: communicationId } = await params;
   const body = await request.json();
 
   const { message_text, attachments } = body;
