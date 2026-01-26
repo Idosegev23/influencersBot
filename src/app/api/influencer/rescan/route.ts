@@ -421,12 +421,22 @@ ${JSON.stringify(contentData, null, 2)}
     });
 
     const text = response.text || '';
+    console.log('📝 Gemini response preview:', text.substring(0, 200));
+    
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
+      console.warn('⚠️ No JSON found in Gemini response');
       throw new Error('No JSON found in response');
     }
 
-    const parsed = JSON.parse(jsonMatch[0]);
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonMatch[0]);
+    } catch (parseError) {
+      console.error('❌ JSON parse error:', parseError);
+      console.error('📄 Attempted to parse:', jsonMatch[0].substring(0, 200));
+      throw new Error(`Failed to parse JSON: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`);
+    }
 
     // Convert to legacy format (Map with shortcode keys)
     const result = new Map<string, any>();
@@ -438,9 +448,16 @@ ${JSON.stringify(contentData, null, 2)}
       products: parsed.products || [],
     });
 
+    console.log('✅ Gemini analysis successful:', {
+      brands: parsed.brands?.length || 0,
+      coupons: parsed.coupons?.length || 0,
+      products: parsed.products?.length || 0
+    });
+
     return result;
   } catch (error) {
-    console.error('Gemini 3 Pro analysis failed:', error);
+    console.error('❌ Gemini 3 Pro analysis failed:', error);
+    console.error('Stack:', error instanceof Error ? error.stack : 'No stack');
     // Fallback to empty analysis
     return new Map<string, any>();
   }
