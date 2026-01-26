@@ -9,6 +9,7 @@ import {
   trackEvent,
   supabase,
 } from '@/lib/supabase';
+import { buildInstructionsWithPersona } from '@/lib/chatbot/instructions-builder';
 import {
   sanitizeChatMessage,
   sanitizeUsername,
@@ -592,16 +593,47 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // === LOAD PERSONA + KNOWLEDGE BASE ===
+    let persona = null;
+    let knowledge: any[] = [];
+    
+    try {
+      // Load chatbot persona
+      const { data: personaData } = await supabase
+        .from('chatbot_persona')
+        .select('*')
+        .eq('account_id', accountId)
+        .single();
+      
+      persona = personaData;
+
+      // Load knowledge base (top 10 by priority)
+      const { data: knowledgeData } = await supabase
+        .from('chatbot_knowledge_base')
+        .select('*')
+        .eq('account_id', accountId)
+        .eq('is_active', true)
+        .order('priority', { ascending: false })
+        .limit(10);
+      
+      knowledge = knowledgeData || [];
+    } catch (error) {
+      console.log('Persona/knowledge not available, using fallback');
+    }
+
     // Build instructions with decision-based tone
     const tone = decision?.uiDirectives?.tone || 'casual';
     const responseLength = decision?.uiDirectives?.responseLength || 'standard';
     
-    const instructions = buildInfluencerInstructions(
-      influencer.display_name,
-      influencer.persona,
-      influencer.influencer_type,
-      contextStr
-    );
+    // Use enhanced instructions if persona available, otherwise fallback
+    const instructions = persona
+      ? buildInstructionsWithPersona(influencer, persona, knowledge)
+      : buildInfluencerInstructions(
+          influencer.display_name,
+          influencer.persona,
+          influencer.influencer_type,
+          contextStr
+        );
 
     // Use Responses API with previous_response_id for multi-turn
     const result = await chat(

@@ -1,33 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase, getInfluencerByUsername } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
+import { requireInfluencerAuth } from '@/lib/auth/influencer-auth';
 
 // GET - Get audience analytics
 export async function GET(req: NextRequest) {
   try {
+    // Auth check with cookie-based auth (no RLS loop)
+    const auth = await requireInfluencerAuth(req);
+    if (!auth.authorized) {
+      return auth.response!;
+    }
+
     const { searchParams } = new URL(req.url);
-    const username = searchParams.get('username');
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    if (!username) {
-      return NextResponse.json({ error: 'Username required' }, { status: 400 });
-    }
-
-    const influencer = await getInfluencerByUsername(username);
-    if (!influencer) {
-      return NextResponse.json({ error: 'Influencer not found' }, { status: 404 });
-    }
-
-    // Get account_id
-    const { data: account } = await supabase
-      .from('accounts')
-      .select('id')
-      .eq('legacy_influencer_id', influencer.id)
-      .single();
-
-    if (!account) {
-      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
-    }
+    // Use account_id from auth (for legacy influencers, account_id = influencer_id)
+    const accountId = auth.accountId;
 
     // Build date filter
     const dateFilter: Record<string, string> = {};
@@ -38,7 +27,7 @@ export async function GET(req: NextRequest) {
     const { data: sessions, error: sessionsError } = await supabase
       .from('events')
       .select('session_id', { count: 'exact' })
-      .eq('account_id', account.id)
+      .eq('account_id', accountId)
       .eq('type', 'message_received');
 
     if (sessionsError) {
@@ -52,7 +41,7 @@ export async function GET(req: NextRequest) {
     const { count: totalMessages, error: messagesError } = await supabase
       .from('events')
       .select('*', { count: 'exact', head: true })
-      .eq('account_id', account.id)
+      .eq('account_id', accountId)
       .eq('type', 'message_received');
 
     if (messagesError) {
@@ -63,7 +52,7 @@ export async function GET(req: NextRequest) {
     const { data: couponEvents, error: couponError } = await supabase
       .from('events')
       .select('payload, session_id')
-      .eq('account_id', account.id)
+      .eq('account_id', accountId)
       .eq('type', 'coupon_copied');
 
     if (couponError) {
@@ -77,7 +66,7 @@ export async function GET(req: NextRequest) {
     const { count: supportCount, error: supportError } = await supabase
       .from('events')
       .select('*', { count: 'exact', head: true })
-      .eq('account_id', account.id)
+      .eq('account_id', accountId)
       .eq('type', 'support_started');
 
     if (supportError) {
@@ -88,7 +77,7 @@ export async function GET(req: NextRequest) {
     const { data: satisfactionEvents, error: satisfactionError } = await supabase
       .from('events')
       .select('payload')
-      .eq('account_id', account.id)
+      .eq('account_id', accountId)
       .eq('type', 'user_satisfied')
       .or('type.eq.user_unsatisfied');
 
@@ -108,7 +97,7 @@ export async function GET(req: NextRequest) {
     const { data: dailyActivity, error: activityError } = await supabase
       .from('events')
       .select('created_at, session_id')
-      .eq('account_id', account.id)
+      .eq('account_id', accountId)
       .eq('type', 'message_received')
       .gte('created_at', thirtyDaysAgo.toISOString());
 

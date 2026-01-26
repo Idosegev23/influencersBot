@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { getInfluencerByUsername } from '@/lib/supabase';
 import type { Influencer } from '@/types';
+import TaskTimeline from '@/components/tasks/TaskTimeline';
+import TaskProgress from '@/components/tasks/TaskProgress';
 
 interface Task {
   id: string;
@@ -266,11 +268,34 @@ export default function TasksPage({
           </motion.div>
         </div>
 
-        {/* Filters */}
+        {/* Task Progress */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.25 }}
+          className="mb-6"
+        >
+          <TaskProgress tasks={filteredTasks} />
+        </motion.div>
+
+        {/* Task Timeline */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="mb-6"
+        >
+          <TaskTimeline 
+            tasks={filteredTasks} 
+            onTaskClick={(task) => router.push(`/influencer/${username}/tasks/${task.id}`)}
+          />
+        </motion.div>
+
+        {/* Filters */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35 }}
           className="mb-6 flex flex-col sm:flex-row gap-4"
         >
           <div className="flex-1 relative">

@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { supabase, getInfluencerByUsername } from '@/lib/supabase';
 import { sanitizeHtml } from '@/lib/sanitize';
+import { getCurrentUser, checkPermission, getAgentInfluencerAccounts } from '@/lib/auth/middleware';
 
 // Check influencer authentication
 async function checkAuth(username: string): Promise<boolean> {
   const cookieStore = await cookies();
-  const authCookie = cookieStore.get(`influencer_auth_${username}`);
+  const authCookie = cookieStore.get(`influencer_session_${username}`); // FIX: Match /api/influencer/auth cookie name
   return authCookie?.value === 'authenticated';
 }
 
@@ -31,21 +32,50 @@ export async function GET(req: NextRequest) {
     }
 
     // Get account_id for this influencer
-    const { data: account } = await supabase
-      .from('accounts')
-      .select('id')
-      .eq('legacy_influencer_id', influencer.id)
-      .single();
+    // For legacy influencers, account_id = influencer_id
+    const accountId = influencer.id;
 
-    if (!account) {
-      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
+    // Auth check: Support both cookie-based (influencer) and Supabase Auth (admin/agent)
+    const cookieAuth = await checkAuth(username);
+    
+    // If cookie auth passed, allow access (no need to check Supabase Auth)
+    if (!cookieAuth) {
+      // No cookie auth - try Supabase Auth (for admin/agent)
+      const user = await getCurrentUser(req);
+      
+      if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // Permission check for Supabase Auth users
+      const canRead = await checkPermission(user, {
+        resource: 'partnerships',
+        action: 'read',
+      });
+
+      if (!canRead) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+
+      // Additional permission checks
+      if (user.role === 'influencer') {
+        if (user.accountId !== accountId) {
+          return NextResponse.json({ error: 'Forbidden - not your account' }, { status: 403 });
+        }
+      } else if (user.role === 'agent') {
+        const agentAccounts = await getAgentInfluencerAccounts(user.id);
+        if (!agentAccounts.includes(accountId)) {
+          return NextResponse.json({ error: 'Forbidden - not your influencer' }, { status: 403 });
+        }
+      }
     }
+    // Cookie auth users can only see their own data (verified by checkAuth)
 
     // Build query
     let query = supabase
       .from('partnerships')
       .select('*', { count: 'exact' })
-      .eq('account_id', account.id);
+      .eq('account_id', accountId);
 
     // Apply filters
     if (status) {
@@ -108,33 +138,56 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Username and brand name are required' }, { status: 400 });
     }
 
-    // Check authentication
-    const isAuth = await checkAuth(username);
-    if (!isAuth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const influencer = await getInfluencerByUsername(username);
     if (!influencer) {
       return NextResponse.json({ error: 'Influencer not found' }, { status: 404 });
     }
 
     // Get account_id for this influencer
-    const { data: account } = await supabase
-      .from('accounts')
-      .select('id')
-      .eq('legacy_influencer_id', influencer.id)
-      .single();
+    // For legacy influencers, account_id = influencer_id
+    const accountId = influencer.id;
 
-    if (!account) {
-      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
+    // Auth check: Support both cookie-based (influencer) and Supabase Auth (admin/agent)
+    const cookieAuth = await checkAuth(username);
+    
+    // If cookie auth passed, allow access (no need to check Supabase Auth)
+    if (!cookieAuth) {
+      // No cookie auth - try Supabase Auth (for admin/agent)
+      const user = await getCurrentUser(req);
+      
+      if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // Permission check for Supabase Auth users
+      const canCreate = await checkPermission(user, {
+        resource: 'partnerships',
+        action: 'create',
+      });
+
+      if (!canCreate) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+
+      // Additional permission checks
+      if (user.role === 'influencer') {
+        if (user.accountId !== accountId) {
+          return NextResponse.json({ error: 'Forbidden - not your account' }, { status: 403 });
+        }
+      } else if (user.role === 'agent') {
+        const agentAccounts = await getAgentInfluencerAccounts(user.id);
+        if (!agentAccounts.includes(accountId)) {
+          return NextResponse.json({ error: 'Forbidden - not your influencer' }, { status: 403 });
+        }
+      }
     }
+    // Cookie auth users can only manage their own data (verified by checkAuth)
 
     // Create partnership
     const { data: partnership, error } = await supabase
       .from('partnerships')
       .insert({
-        account_id: account.id,
+        account_id: accountId,
         brand_name: sanitizeHtml(brand_name),
         brand_contact_name: brand_contact_name ? sanitizeHtml(brand_contact_name) : null,
         brand_contact_email: brand_contact_email || null,

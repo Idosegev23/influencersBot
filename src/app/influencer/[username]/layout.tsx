@@ -1,16 +1,24 @@
-import type { Metadata } from 'next';
+'use client';
 
-export const metadata: Metadata = {
-  title: 'פאנל ניהול | InfluencerBot',
-  description: 'ניהול המוצרים, הקופונים והסטטיסטיקות שלך',
-};
+import { usePathname } from 'next/navigation';
+import { NavigationMenu } from '@/components/NavigationMenu';
 
 export default function InfluencerLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  const pathname = usePathname();
+  
+  // Don't show navigation on login page
+  const showNav = !pathname.endsWith('/login');
+
+  return (
+    <>
+      {showNav && <NavigationMenu />}
+      {children}
+    </>
+  );
 }
 
 

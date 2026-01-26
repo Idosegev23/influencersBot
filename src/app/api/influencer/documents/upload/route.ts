@@ -1,7 +1,16 @@
 // Upload documents to Supabase Storage
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { cookies } from 'next/headers';
+import { supabase, getInfluencerByUsername } from '@/lib/supabase';
+import { getCurrentUser, checkPermission, isAccountOwner } from '@/lib/auth/middleware';
+
+// Check influencer authentication
+async function checkAuth(username: string): Promise<boolean> {
+  const cookieStore = await cookies();
+  const authCookie = cookieStore.get(`influencer_session_${username}`);
+  return authCookie?.value === 'authenticated';
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,6 +18,8 @@ export async function POST(request: NextRequest) {
     const files = formData.getAll('files') as File[];
     const accountId = formData.get('accountId') as string;
     const partnershipId = formData.get('partnershipId') as string | null;
+    const username = formData.get('username') as string | null;
+    const documentType = formData.get('documentType') as string || 'other';
 
     if (!accountId) {
       return NextResponse.json(
@@ -17,14 +28,54 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Auth check: Support both cookie-based (influencer) and Supabase Auth (admin/agent)
+    let isAuthenticated = false;
+
+    if (username) {
+      // Try cookie auth first
+      isAuthenticated = await checkAuth(username);
+    }
+
+    if (!isAuthenticated) {
+      // Try Supabase Auth (for admin/agent)
+      const user = await getCurrentUser(request);
+      if (!user) {
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 401 }
+        );
+      }
+
+      // Check document upload permission
+      const canUpload = await checkPermission(user, {
+        resource: 'documents',
+        action: 'create',
+      });
+
+      if (!canUpload) {
+        return NextResponse.json(
+          { error: 'Forbidden - insufficient permissions' },
+          { status: 403 }
+        );
+      }
+
+      // Verify user owns this account
+      const isOwner = await isAccountOwner(user, accountId);
+      if (!isOwner) {
+        return NextResponse.json(
+          { error: 'Forbidden - not account owner' },
+          { status: 403 }
+        );
+      }
+    }
+    // Cookie auth users can only upload to their own account (verified by cookie)
+
     if (files.length === 0) {
       return NextResponse.json(
         { error: 'No files provided' },
         { status: 400 }
       );
     }
-
-    const supabase = await createClient();
 
     const uploadedFiles = [];
 
@@ -57,7 +108,9 @@ export async function POST(request: NextRequest) {
           file_size: file.size,
           mime_type: file.type,
           storage_path: storagePath,
+          document_type: documentType,
           parsing_status: 'pending',
+          uploaded_at: new Date().toISOString(),
         })
         .select()
         .single();
@@ -74,12 +127,22 @@ export async function POST(request: NextRequest) {
         type: file.type,
         storagePath: storagePath,
       });
+
+      // Trigger AI parsing asynchronously (don't await - let it run in background)
+      fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'}/api/influencer/documents/parse`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documentId: document.id,
+          documentType: documentType,
+        }),
+      }).catch(err => console.error('[Upload] Failed to trigger parsing:', err));
     }
 
     return NextResponse.json({
       success: true,
       files: uploadedFiles,
-      message: `${uploadedFiles.length} קבצים הועלו בהצלחה`,
+      message: `${uploadedFiles.length} קבצים הועלו בהצלחה. ה-AI מתחיל לנתח...`,
     });
 
   } catch (error: any) {

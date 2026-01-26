@@ -1,30 +1,30 @@
 // Parse uploaded documents with AI
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { supabase } from '@/lib/supabase';
 import { parseDocument, mergeDocuments } from '@/lib/ai-parser';
 import type { DocumentType, ParseResult } from '@/lib/ai-parser/types';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { documentIds, accountId } = body;
+    const { documentId, documentIds, documentType } = body;
 
-    if (!accountId || !documentIds || documentIds.length === 0) {
+    // Support both single document and multiple documents
+    const idsToProcess = documentId ? [documentId] : documentIds;
+
+    if (!idsToProcess || idsToProcess.length === 0) {
       return NextResponse.json(
-        { error: 'accountId and documentIds are required' },
+        { error: 'documentId or documentIds required' },
         { status: 400 }
       );
     }
-
-    const supabase = await createClient();
 
     // Fetch documents from database
     const { data: documents, error: fetchError } = await supabase
       .from('partnership_documents')
       .select('*')
-      .in('id', documentIds)
-      .eq('account_id', accountId);
+      .in('id', idsToProcess);
 
     if (fetchError) {
       throw fetchError;

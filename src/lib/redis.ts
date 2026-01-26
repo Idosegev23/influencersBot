@@ -287,5 +287,20 @@ export function isRedisAvailable(): boolean {
   return redisAvailable && !!getClient();
 }
 
+// ============================================
+// Export redis object for compatibility
+// ============================================
 
+export const redis = {
+  get: redisGet,
+  set: redisSet,
+  setex: async (key: string, ttl: number, value: unknown) => redisSet(key, value, { ttl }),
+  del: redisDel,
+  exists: redisExists,
+  ttl: redisTtl,
+  expire: redisExpire,
+  incr: redisIncr,
+  incrby: redisIncrBy,
+  isAvailable: isRedisAvailable,
+};
 

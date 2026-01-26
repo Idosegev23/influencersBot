@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { supabase, getInfluencerByUsername } from '@/lib/supabase';
 import { sanitizeHtml } from '@/lib/sanitize';
+import { requireAuth, requireAccountAccess, checkPermission } from '@/lib/auth/api-helpers';
 
 // Check influencer authentication
 async function checkAuth(username: string): Promise<boolean> {
@@ -16,6 +17,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Auth check
+    const auth = await requireAuth(req, 'tasks', 'read');
+    if (!auth.authorized) {
+      return auth.response!;
+    }
+
     const { id } = await params;
     const { searchParams } = new URL(req.url);
     const username = searchParams.get('username');
@@ -38,6 +45,12 @@ export async function GET(
 
     if (!account) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
+    }
+
+    // Verify access to this account
+    const accessCheck = await requireAccountAccess(auth.user!, account.id);
+    if (accessCheck) {
+      return accessCheck;
     }
 
     // Get task with partnership info

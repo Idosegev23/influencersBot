@@ -7,16 +7,23 @@ import {
   updateInfluencer,
 } from '@/lib/supabase';
 import { generateGreetingAndQuestions } from '@/lib/openai';
+import { requireAuth } from '@/lib/auth/api-helpers';
 
 export async function POST(req: NextRequest) {
   try {
+    // Auth check (new RBAC)
+    const auth = await requireAuth(req, 'partnerships', 'update');
+    if (!auth.authorized) {
+      return auth.response!;
+    }
+
     const { username } = await req.json();
 
     if (!username) {
       return NextResponse.json({ error: 'Username required' }, { status: 400 });
     }
 
-    // Check authentication
+    // Check authentication (legacy)
     const cookieStore = await cookies();
     const authCookie = cookieStore.get(`influencer_auth_${username}`);
 

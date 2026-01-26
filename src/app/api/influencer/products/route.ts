@@ -1,34 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { supabase, getInfluencerByUsername } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { sanitizeHtml, sanitizeUrl } from '@/lib/sanitize';
-
-// Check influencer authentication
-async function checkAuth(username: string): Promise<boolean> {
-  const cookieStore = await cookies();
-  const authCookie = cookieStore.get(`influencer_auth_${username}`);
-  return authCookie?.value === 'authenticated';
-}
+import { requireInfluencerAuth } from '@/lib/auth/influencer-auth';
 
 // GET - List products for an influencer
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const username = searchParams.get('username');
-
-    if (!username) {
-      return NextResponse.json({ error: 'Username required' }, { status: 400 });
-    }
-
-    const influencer = await getInfluencerByUsername(username);
-    if (!influencer) {
-      return NextResponse.json({ error: 'Influencer not found' }, { status: 404 });
+    // Auth check with cookie-based auth (no RLS loop)
+    const auth = await requireInfluencerAuth(req);
+    if (!auth.authorized) {
+      return auth.response!;
     }
 
     const { data: products, error } = await supabase
       .from('products')
       .select('*')
-      .eq('influencer_id', influencer.id)
+      .eq('influencer_id', auth.influencer.id)
       .order('created_at', { ascending: false });
 
     if (error) {

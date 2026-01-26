@@ -1,37 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase, getInfluencerByUsername } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
+import { requireInfluencerAuth } from '@/lib/auth/influencer-auth';
 
 // GET - Get daily task summary
 export async function GET(req: NextRequest) {
   try {
+    // Auth check with cookie-based auth (no RLS loop)
+    const auth = await requireInfluencerAuth(req);
+    if (!auth.authorized) {
+      return auth.response!;
+    }
+
     const { searchParams } = new URL(req.url);
-    const username = searchParams.get('username');
     const days = searchParams.get('days') ? parseInt(searchParams.get('days')!) : 7;
 
-    if (!username) {
-      return NextResponse.json({ error: 'Username required' }, { status: 400 });
-    }
-
-    const influencer = await getInfluencerByUsername(username);
-    if (!influencer) {
-      return NextResponse.json({ error: 'Influencer not found' }, { status: 404 });
-    }
-
-    // Get account_id
-    const { data: account } = await supabase
-      .from('accounts')
-      .select('id')
-      .eq('legacy_influencer_id', influencer.id)
-      .single();
-
-    if (!account) {
-      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
-    }
+    const accountId = auth.accountId;
 
     // Get upcoming tasks (using the helper function from migration)
     const { data: upcomingTasks, error: upcomingError } = await supabase
       .rpc('get_upcoming_tasks', {
-        p_account_id: account.id,
+        p_account_id: accountId,
         p_days: days
       });
 

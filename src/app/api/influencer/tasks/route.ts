@@ -1,20 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { supabase, getInfluencerByUsername } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { sanitizeHtml } from '@/lib/sanitize';
-
-// Check influencer authentication
-async function checkAuth(username: string): Promise<boolean> {
-  const cookieStore = await cookies();
-  const authCookie = cookieStore.get(`influencer_auth_${username}`);
-  return authCookie?.value === 'authenticated';
-}
+import { requireInfluencerAuth } from '@/lib/auth/influencer-auth';
 
 // GET - List tasks for an influencer with filters
 export async function GET(req: NextRequest) {
   try {
+    // Auth check with cookie-based auth (no RLS loop)
+    const auth = await requireInfluencerAuth(req);
+    if (!auth.authorized) {
+      return auth.response!;
+    }
+
     const { searchParams } = new URL(req.url);
-    const username = searchParams.get('username');
     const partnershipId = searchParams.get('partnershipId');
     const status = searchParams.get('status');
     const priority = searchParams.get('priority');
@@ -24,24 +22,18 @@ export async function GET(req: NextRequest) {
     const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 50;
     const offset = searchParams.get('offset') ? parseInt(searchParams.get('offset')!) : 0;
 
-    if (!username) {
-      return NextResponse.json({ error: 'Username required' }, { status: 400 });
-    }
+    const accountId = auth.accountId;
 
-    const influencer = await getInfluencerByUsername(username);
-    if (!influencer) {
-      return NextResponse.json({ error: 'Influencer not found' }, { status: 404 });
-    }
-
-    // Get account_id
-    const { data: account } = await supabase
-      .from('accounts')
-      .select('id')
-      .eq('legacy_influencer_id', influencer.id)
-      .single();
-
-    if (!account) {
-      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
+    // Permission check
+    if (user.role === 'influencer') {
+      if (user.accountId !== account.id) {
+        return NextResponse.json({ error: 'Forbidden - not your account' }, { status: 403 });
+      }
+    } else if (user.role === 'agent') {
+      const agentAccounts = await getAgentInfluencerAccounts(user.id);
+      if (!agentAccounts.includes(account.id)) {
+        return NextResponse.json({ error: 'Forbidden - not your influencer' }, { status: 403 });
+      }
     }
 
     // Build query with partnership join for better display
@@ -99,6 +91,22 @@ export async function GET(req: NextRequest) {
 // POST - Create a new task
 export async function POST(req: NextRequest) {
   try {
+    // Auth check
+    const user = await getCurrentUser(req);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check create permission
+    const canCreate = await checkPermission(user, {
+      resource: 'tasks',
+      action: 'create',
+    });
+
+    if (!canCreate) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const body = await req.json();
     const {
       username,
@@ -119,7 +127,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Username and title are required' }, { status: 400 });
     }
 
-    // Check authentication
+    // Check authentication (legacy)
     const isAuth = await checkAuth(username);
     if (!isAuth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -139,6 +147,18 @@ export async function POST(req: NextRequest) {
 
     if (!account) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
+    }
+
+    // Permission check
+    if (user.role === 'influencer') {
+      if (user.accountId !== account.id) {
+        return NextResponse.json({ error: 'Forbidden - not your account' }, { status: 403 });
+      }
+    } else if (user.role === 'agent') {
+      const agentAccounts = await getAgentInfluencerAccounts(user.id);
+      if (!agentAccounts.includes(account.id)) {
+        return NextResponse.json({ error: 'Forbidden - not your influencer' }, { status: 403 });
+      }
     }
 
     // If partnership_id provided, verify it belongs to this account

@@ -17,7 +17,8 @@ const rateLimitStore = new Map<string, RateLimitEntry>();
 const RATE_LIMITS = {
   chat: { windowMs: 60 * 1000, maxRequests: 100 },
   admin: { windowMs: 60 * 1000, maxRequests: 20 },
-  auth: { windowMs: 15 * 60 * 1000, maxRequests: 5 },
+  auth: { windowMs: 60 * 1000, maxRequests: 50 },
+  influencer: { windowMs: 60 * 1000, maxRequests: 200 }, // High limit for dashboard
 };
 
 function getClientIP(request: NextRequest): string {
@@ -86,6 +87,9 @@ export function middleware(request: NextRequest) {
     } else if (pathname.includes('/auth')) {
       config = RATE_LIMITS.auth;
       prefix = 'auth';
+    } else if (pathname.startsWith('/api/influencer/')) {
+      config = RATE_LIMITS.influencer;
+      prefix = 'influencer';
     }
     
     const key = `${prefix}:${ip}`;

@@ -1,39 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase, getInfluencerByUsername } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
+import { requireInfluencerAuth } from '@/lib/auth/influencer-auth';
 
 // GET - Get conversation analytics
 export async function GET(req: NextRequest) {
   try {
+    // Auth check with cookie-based auth (no RLS loop)
+    const auth = await requireInfluencerAuth(req);
+    if (!auth.authorized) {
+      return auth.response!;
+    }
+
     const { searchParams } = new URL(req.url);
-    const username = searchParams.get('username');
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    if (!username) {
-      return NextResponse.json({ error: 'Username required' }, { status: 400 });
-    }
-
-    const influencer = await getInfluencerByUsername(username);
-    if (!influencer) {
-      return NextResponse.json({ error: 'Influencer not found' }, { status: 404 });
-    }
-
-    // Get account_id
-    const { data: account } = await supabase
-      .from('accounts')
-      .select('id')
-      .eq('legacy_influencer_id', influencer.id)
-      .single();
-
-    if (!account) {
-      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
-    }
+    const accountId = auth.accountId;
 
     // Build date filter
     let eventsQuery = supabase
       .from('events')
       .select('*')
-      .eq('account_id', account.id);
+      .eq('account_id', accountId);
 
     if (startDate) {
       eventsQuery = eventsQuery.gte('created_at', startDate);

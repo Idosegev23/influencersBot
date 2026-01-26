@@ -1,45 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase, getInfluencerByUsername } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
+import { requireInfluencerAuth } from '@/lib/auth/influencer-auth';
 
 // GET - Get coupon performance analytics
 export async function GET(req: NextRequest) {
   try {
+    // Auth check with cookie-based auth (no RLS loop)
+    const auth = await requireInfluencerAuth(req);
+    if (!auth.authorized) {
+      return auth.response!;
+    }
+
     const { searchParams } = new URL(req.url);
-    const username = searchParams.get('username');
     const partnershipId = searchParams.get('partnershipId');
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    if (!username) {
-      return NextResponse.json({ error: 'Username required' }, { status: 400 });
-    }
+    const accountId = auth.accountId;
 
-    const influencer = await getInfluencerByUsername(username);
-    if (!influencer) {
-      return NextResponse.json({ error: 'Influencer not found' }, { status: 404 });
-    }
-
-    // Get account_id
-    const { data: account } = await supabase
-      .from('accounts')
-      .select('id')
-      .eq('legacy_influencer_id', influencer.id)
-      .single();
-
-    if (!account) {
-      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
-    }
-
-    // Get all brands for this influencer
+    // Get all partnerships (brands) for this influencer
     const { data: brands, error: brandsError } = await supabase
-      .from('brands')
+      .from('partnerships')
       .select('*')
-      .eq('influencer_id', influencer.id)
+      .eq('account_id', accountId)
       .eq('is_active', true);
 
     if (brandsError) {
-      console.error('Brands error:', brandsError);
-      return NextResponse.json({ error: 'Failed to fetch brands' }, { status: 500 });
+      console.error('Partnerships error:', brandsError);
+      return NextResponse.json({ error: 'Failed to fetch partnerships' }, { status: 500 });
     }
 
     // Build date filter for events

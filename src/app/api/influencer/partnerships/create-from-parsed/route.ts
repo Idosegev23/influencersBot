@@ -2,9 +2,19 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getCurrentUser, checkPermission, isAccountOwner } from '@/lib/auth/middleware';
 
 export async function POST(request: NextRequest) {
   try {
+    // Auth check
+    const user = await getCurrentUser(request);
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const { accountId, parsedData, documentIds } = body;
 
@@ -12,6 +22,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'accountId and parsedData are required' },
         { status: 400 }
+      );
+    }
+
+    // Verify user owns this account
+    const isOwner = await isAccountOwner(user, accountId);
+    if (!isOwner) {
+      return NextResponse.json(
+        { error: 'Forbidden - not account owner' },
+        { status: 403 }
+      );
+    }
+
+    // Check partnership creation permission
+    const canCreate = await checkPermission(user, {
+      resource: 'partnerships',
+      action: 'create',
+    });
+
+    if (!canCreate) {
+      return NextResponse.json(
+        { error: 'Forbidden - insufficient permissions' },
+        { status: 403 }
       );
     }
 

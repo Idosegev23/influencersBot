@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { supabase, getInfluencerByUsername } from '@/lib/supabase';
 import { sanitizeHtml } from '@/lib/sanitize';
+import { requireAuth, requireAccountAccess } from '@/lib/auth/api-helpers';
 
 // Check influencer authentication
 async function checkAuth(username: string): Promise<boolean> {
   const cookieStore = await cookies();
-  const authCookie = cookieStore.get(`influencer_auth_${username}`);
+  const authCookie = cookieStore.get(`influencer_session_${username}`); // FIX: Match /api/influencer/auth cookie name
   return authCookie?.value === 'authenticated';
 }
 
@@ -29,15 +30,15 @@ export async function GET(
       return NextResponse.json({ error: 'Influencer not found' }, { status: 404 });
     }
 
-    // Get account_id
-    const { data: account } = await supabase
-      .from('accounts')
-      .select('id')
-      .eq('legacy_influencer_id', influencer.id)
-      .single();
+    // Get account_id - for legacy influencers, account_id = influencer_id
+    const accountId = influencer.id;
 
-    if (!account) {
-      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
+    // Check cookie auth first (for influencers)
+    const isAuth = await checkAuth(username);
+    if (!isAuth) {
+      // No cookie auth - would need Supabase Auth, but that causes RLS loop
+      // For now, require cookie auth only
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Get partnership
@@ -45,7 +46,7 @@ export async function GET(
       .from('partnerships')
       .select('*')
       .eq('id', id)
-      .eq('account_id', account.id)
+      .eq('account_id', accountId)
       .single();
 
     if (error || !partnership) {
@@ -84,16 +85,8 @@ export async function PATCH(
       return NextResponse.json({ error: 'Influencer not found' }, { status: 404 });
     }
 
-    // Get account_id
-    const { data: account } = await supabase
-      .from('accounts')
-      .select('id')
-      .eq('legacy_influencer_id', influencer.id)
-      .single();
-
-    if (!account) {
-      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
-    }
+    // Get account_id - for legacy influencers, account_id = influencer_id
+    const accountId = influencer.id;
 
     // Verify partnership belongs to this account
     const { data: existing } = await supabase
@@ -102,7 +95,7 @@ export async function PATCH(
       .eq('id', id)
       .single();
 
-    if (!existing || existing.account_id !== account.id) {
+    if (!existing || existing.account_id !== accountId) {
       return NextResponse.json({ error: 'Partnership not found' }, { status: 404 });
     }
 
@@ -203,16 +196,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Influencer not found' }, { status: 404 });
     }
 
-    // Get account_id
-    const { data: account } = await supabase
-      .from('accounts')
-      .select('id')
-      .eq('legacy_influencer_id', influencer.id)
-      .single();
-
-    if (!account) {
-      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
-    }
+    // Get account_id - for legacy influencers, account_id = influencer_id
+    const accountId = influencer.id;
 
     // Verify partnership belongs to this account
     const { data: existing } = await supabase
@@ -221,7 +206,7 @@ export async function DELETE(
       .eq('id', id)
       .single();
 
-    if (!existing || existing.account_id !== account.id) {
+    if (!existing || existing.account_id !== accountId) {
       return NextResponse.json({ error: 'Partnership not found' }, { status: 404 });
     }
 
