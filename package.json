@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "type-check": "tsc --noEmit",
+    "check:env": "npx tsx scripts/check-env.ts",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
@@ -19,10 +20,14 @@
     "precommit": "./scripts/build-and-check.sh"
   },
   "dependencies": {
+    "@google/genai": "^1.38.0",
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.89.0",
     "@upstash/redis": "^1.36.0",
+    "apify-client": "^2.21.0",
     "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "dotenv": "^17.2.3",
     "framer-motion": "^12.23.26",
     "lucide-react": "^0.562.0",
     "next": "16.1.0",

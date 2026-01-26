@@ -9,6 +9,8 @@ import { scrapeInstagramProfile } from '@/lib/apify';
 import { analyzeAllPosts, extractContentFromPost, generatePersonaFromPosts, generateGreetingAndQuestions } from '@/lib/openai';
 import { uploadProfilePicture } from '@/lib/storage';
 import type { ContentItem, Product, InfluencerPersona } from '@/types';
+import { ApifyClient } from 'apify-client';
+import { GoogleGenAI } from '@google/genai';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
@@ -39,34 +41,108 @@ export async function POST(req: NextRequest) {
 
     console.log(`Starting full scrape for ${username}...`);
 
-    // Scrape Instagram profile
-    const { profile, posts } = await scrapeInstagramProfile(
-      influencer.username,
-      influencer.scrape_settings || { posts_limit: 50 }
-    );
+    // Initialize Apify client
+    const apify = new ApifyClient({
+      token: process.env.APIFY_TOKEN || process.env.APIFY_API_TOKEN!,
+    });
 
-    console.log(`Scraped ${posts.length} posts for ${username}`);
+    // 1. Scrape posts
+    const postsLimit = influencer.scrape_settings?.posts_limit || 50;
+    const postsInput = {
+      directUrls: [`https://www.instagram.com/${influencer.username}/`],
+      resultsType: 'posts',
+      resultsLimit: postsLimit,
+      searchType: 'user',
+      searchLimit: 1,
+      addParentData: true,
+    };
 
-    // Analyze posts
-    const postAnalysis = await analyzeAllPosts(posts);
+    console.log(`📸 Scraping ${postsLimit} posts...`);
+    const postsRun = await apify.actor('apify/instagram-scraper').call(postsInput);
+    const { items: postsItems } = await apify.dataset(postsRun.defaultDatasetId).listItems();
+    const posts = postsItems.filter((item: any) => item.shortCode && item.caption);
+    
+    console.log(`✅ Found ${posts.length} posts with text`);
 
-    // Extract products
+    // 2. Scrape reels
+    let reels: any[] = [];
+    try {
+      console.log(`🎬 Scraping reels...`);
+      const reelsInput = {
+        username: [influencer.username],
+        resultsLimit: 30,
+      };
+      const reelsRun = await apify.actor('apify/instagram-reel-scraper').call(reelsInput);
+      const { items: reelsItems } = await apify.dataset(reelsRun.defaultDatasetId).listItems();
+      reels = reelsItems.filter((item: any) => item.caption || item.videoTranscript);
+      console.log(`✅ Found ${reels.length} reels with text`);
+    } catch (error) {
+      console.warn('⚠️ Reels scraping failed:', error);
+    }
+
+    // 3. Combine content
+    const allContent = [
+      ...posts.map((p: any) => ({ ...p, contentType: 'post' })),
+      ...reels.map((r: any) => ({ ...r, contentType: 'reel' })),
+    ];
+
+    // Get profile info from first post's parent data
+    const profile = postsItems[0]?.ownerUsername ? {
+      username: postsItems[0].ownerUsername,
+      followersCount: postsItems[0].ownerFollowersCount || influencer.followers_count,
+      followingCount: postsItems[0].ownerFollowingCount || influencer.following_count,
+      profilePicUrl: postsItems[0].ownerProfilePicUrl || influencer.avatar_url,
+      biography: postsItems[0].ownerFullName || influencer.bio,
+      fullName: postsItems[0].ownerFullName || influencer.display_name,
+    } : {
+      username: influencer.username,
+      followersCount: influencer.followers_count,
+      followingCount: influencer.following_count,
+      profilePicUrl: influencer.avatar_url,
+      biography: influencer.bio,
+      fullName: influencer.display_name,
+    };
+
+    console.log(`Scraped ${posts.length} posts + ${reels.length} reels for ${username}`);
+
+    // 4. Analyze with Gemini 3 Pro (or fallback to OpenAI)
+    console.log(`🤖 Analyzing content...`);
+    let postAnalysis;
+    
+    if (process.env.GOOGLE_AI_API_KEY) {
+      // Use Gemini 3 Pro
+      postAnalysis = await analyzeWithGemini3Pro(allContent, influencer.display_name);
+    } else {
+      // Fallback to OpenAI (legacy)
+      postAnalysis = await analyzeAllPosts(posts);
+    }
+
+    // Extract products, brands, and coupons
     const extractedProducts: Partial<Product>[] = [];
     const brandSet = new Set<string>();
-    const couponSet = new Map<string, { code: string; brand: string }>();
+    const couponSet = new Map<string, { code: string; brand: string; discount?: string }>();
 
     for (const [shortcode, data] of postAnalysis) {
-      data.brands.forEach((brand) => brandSet.add(brand));
+      // Handle both legacy format and new format
+      const brands = data.brands || [];
+      const coupons = data.coupons || [];
+      const products = data.products || [];
+
+      brands.forEach((brand: string) => brandSet.add(brand));
       
-      data.coupons.forEach((coupon) => {
-        couponSet.set(coupon.code, coupon);
+      coupons.forEach((coupon: any) => {
+        couponSet.set(coupon.code, { 
+          code: coupon.code, 
+          brand: coupon.brand,
+          discount: coupon.discount 
+        });
       });
 
-      const post = posts.find((p) => p.shortCode === shortcode);
-      data.products.forEach((product) => {
+      const post = posts.find((p: any) => p.shortCode === shortcode);
+      products.forEach((product: any) => {
         extractedProducts.push({
           name: product.name,
-          brand: data.brands[0] || '',
+          brand: brands[0] || product.brand || '',
           link: product.link,
           image_url: post?.displayUrl,
           coupon_code: undefined,
@@ -86,6 +162,84 @@ export async function POST(req: NextRequest) {
           is_manual: false,
         });
       }
+    }
+
+    // Save to partnerships and coupons tables
+    console.log(`💾 Saving ${brandSet.size} partnerships and ${couponSet.size} coupons...`);
+    
+    // Save partnerships
+    const partnershipIds = new Map<string, string>();
+    for (const brandName of brandSet) {
+      const { data: existing } = await supabase
+        .from('partnerships')
+        .select('id')
+        .eq('account_id', influencer.id)
+        .eq('brand_name', brandName)
+        .single();
+
+      if (existing) {
+        partnershipIds.set(brandName, existing.id);
+      } else {
+        const { data: newPartnership } = await supabase
+          .from('partnerships')
+          .insert({
+            account_id: influencer.id,
+            brand_name: brandName,
+            category: 'Auto',
+            brief: 'זוהה אוטומטית מאינסטגרם',
+            is_active: true,
+          })
+          .select('id')
+          .single();
+
+        if (newPartnership) {
+          partnershipIds.set(brandName, newPartnership.id);
+        }
+      }
+    }
+
+    // Save coupons
+    for (const [code, coupon] of couponSet) {
+      const partnershipId = partnershipIds.get(coupon.brand);
+      if (!partnershipId) continue;
+
+      await supabase
+        .from('coupons')
+        .upsert({
+          partnership_id: partnershipId,
+          account_id: influencer.id,
+          code: coupon.code,
+          discount_type: 'percentage',
+          discount_value: parseFloat(coupon.discount || '0') || null,
+          description: `קופון ${coupon.brand}${coupon.discount ? ` - ${coupon.discount}` : ''}`,
+          is_active: true,
+        }, {
+          onConflict: 'account_id,code',
+        });
+    }
+
+    // Create/update chatbot persona
+    await supabase.from('chatbot_persona').upsert({
+      account_id: influencer.id,
+      name: `העוזר של ${influencer.display_name}`,
+      tone: 'friendly',
+      language: 'he',
+      greeting_message: `היי! 👋 אני העוזרת של ${influencer.display_name}. איך אפשר לעזור לך היום?`,
+      faq: [
+        { question: 'איך אפשר ליצור קשר?', answer: `תוכל/י ליצור קשר דרך האינסטגרם של ${influencer.display_name}` }
+      ],
+    }, { onConflict: 'account_id' });
+
+    // Create knowledge base items for coupons
+    for (const [code, coupon] of couponSet) {
+      await supabase.from('chatbot_knowledge_base').upsert({
+        account_id: influencer.id,
+        knowledge_type: 'coupon',
+        title: `קופון ${coupon.brand}`,
+        content: `מותג: ${coupon.brand}\nקוד: ${code}${coupon.discount ? `\nהנחה: ${coupon.discount}` : ''}`,
+        keywords: ['קופון', coupon.brand, code],
+        priority: 90,
+      }, { onConflict: 'account_id,title' });
     }
 
     // Extract content items from ALL posts - dynamic based on influencer type
@@ -270,8 +424,11 @@ export async function POST(req: NextRequest) {
       success: true,
       stats: {
         products: extractedProducts.length,
+        partnerships: brandSet.size,
+        coupons: couponSet.size,
         content: contentItems.length,
         posts: posts.length,
+        reels: reels.length,
         profile: {
           name: profile.fullName,
           followers: profile.followersCount,
@@ -287,6 +444,90 @@ export async function POST(req: NextRequest) {
       { error: error instanceof Error ? error.message : 'Scrape failed' },
       { status: 500 }
     );
+  }
+}
+
+// ============================================
+// Gemini 3 Pro Analysis
+// ============================================
+
+async function analyzeWithGemini3Pro(content: any[], influencerName: string) {
+  const genAI = new GoogleGenAI({
+    apiKey: process.env.GOOGLE_AI_API_KEY!,
+  });
+
+  const contentData = content.map((item) => ({
+    type: item.contentType || 'post',
+    caption: item.caption || '',
+    transcript: item.videoTranscript || '',
+    likes: item.likesCount || 0,
+    comments: item.commentsCount || 0,
+    views: item.videoViewCount || 0,
+  }));
+
+  const prompt = `אני ${influencerName}, משפיענ/ית ישראלי/ת. 
+
+להלן ${content.length} פריטי תוכן (פוסטים + ריילס) האחרונים שלי מאינסטגרם:
+
+${JSON.stringify(contentData, null, 2)}
+
+בבקשה נתח את התוכן ותחלץ:
+
+1. **מותגים (brands)**: רשימת כל המותגים
+   - name: שם המותג (בעברית אם אפשר)
+   - mentions: כמה פעמים מוזכר
+   
+2. **קופונים (coupons)**: רשימת קודי קופון
+   - code: קוד הקופון (אותיות גדולות)
+   - brand: המותג
+   - discount: הנחה (אם מצוין)
+
+3. **מוצרים (products)**: רשימת מוצרים ספציפיים
+   - name: שם המוצר
+   - brand: המותג
+
+החזר JSON בפורמט:
+{
+  "brands": [{ "name": "...", "mentions": 1 }],
+  "coupons": [{ "code": "...", "brand": "...", "discount": "..." }],
+  "products": [{ "name": "...", "brand": "..." }]
+}`;
+
+  try {
+    const response = await genAI.models.generateContent({
+      model: 'gemini-3-pro-preview',
+      contents: prompt,
+      config: {
+        thinkingConfig: {
+          thinkingLevel: 'high',
+        },
+        temperature: 1.0,
+      },
+    });
+
+    const text = response.text || '';
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('No JSON found in response');
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+
+    // Convert to legacy format (Map with shortcode keys)
+    const result = new Map<string, any>();
+    
+    // Create a single analysis entry
+    result.set('summary', {
+      brands: parsed.brands?.map((b: any) => b.name) || [],
+      coupons: parsed.coupons || [],
+      products: parsed.products || [],
+    });
+
+    return result;
+  } catch (error) {
+    console.error('Gemini 3 Pro analysis failed:', error);
+    // Fallback to empty analysis
+    return new Map<string, any>();
   }
 }
 

@@ -1,4 +1,4 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient as createSupabaseClient, SupabaseClient } from '@supabase/supabase-js';
 import type {
   Influencer,
   Post,
@@ -13,7 +13,7 @@ import type {
 // Environment variables validation
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
 
 if (!supabaseUrl) {
   throw new Error('Missing environment variable: NEXT_PUBLIC_SUPABASE_URL');
@@ -30,7 +30,7 @@ let _supabaseServer: SupabaseClient | null = null;
 // Client for browser-side operations (limited by RLS)
 export const supabaseClient = (() => {
   if (!_supabaseClient) {
-    _supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+    _supabaseClient = createSupabaseClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
@@ -40,18 +40,23 @@ export const supabaseClient = (() => {
   return _supabaseClient;
 })();
 
+// Helper: create client-side Supabase client (for use in React components)
+export function createClientSupabaseClient() {
+  return supabaseClient;
+}
+
 // Server-side client with service role (bypasses RLS)
 // Only use this in API routes, never expose to client
 export const supabase = (() => {
   if (!_supabaseServer) {
     _supabaseServer = supabaseServiceKey 
-      ? createClient(supabaseUrl, supabaseServiceKey, {
+      ? createSupabaseClient(supabaseUrl, supabaseServiceKey, {
           auth: {
             persistSession: false,
             autoRefreshToken: false,
           },
         })
-      : createClient(supabaseUrl, supabaseAnonKey, {
+      : createSupabaseClient(supabaseUrl, supabaseAnonKey, {
           auth: {
             persistSession: true,
             autoRefreshToken: true,
@@ -60,6 +65,16 @@ export const supabase = (() => {
   }
   return _supabaseServer;
 })();
+
+// Helper: create server-side Supabase client (for use in API routes)
+export function createServerSupabaseClient() {
+  return supabase;
+}
+
+// Alias for backward compatibility - returns the server-side client
+export function createClient() {
+  return supabase;
+}
 
 // ============================================
 // Influencer Functions
@@ -279,9 +294,13 @@ export async function incrementProductClick(id: string): Promise<boolean> {
 }
 
 // ============================================
-// Brands Functions
+// Brands Functions (DEPRECATED - use Partnerships)
 // ============================================
 
+/**
+ * @deprecated Use Partnership interface instead
+ * Kept for backward compatibility
+ */
 export interface Brand {
   id: string;
   influencer_id: string;
@@ -297,56 +316,166 @@ export interface Brand {
   updated_at: string;
 }
 
+/**
+ * @deprecated Use getPartnershipsByInfluencer instead
+ * Kept for backward compatibility
+ */
 export async function getBrandsByInfluencer(influencerId: string): Promise<Brand[]> {
+  // Map partnerships to old Brand format
+  const partnerships = await getPartnershipsByInfluencer(influencerId);
+  return partnerships.map(p => ({
+    id: p.id,
+    influencer_id: influencerId,
+    brand_name: p.brand_name,
+    description: p.brief,
+    coupon_code: p.coupon_code,
+    link: p.link,
+    short_link: p.short_link,
+    category: p.category,
+    whatsapp_phone: p.whatsapp_phone,
+    is_active: p.is_active || false,
+    created_at: p.created_at,
+    updated_at: p.updated_at,
+  }));
+}
+
+/**
+ * @deprecated Use createPartnership instead
+ */
+export async function createBrand(brand: Omit<Brand, 'id' | 'created_at' | 'updated_at'>): Promise<Brand | null> {
+  console.warn('createBrand is deprecated. Use createPartnership instead.');
+  return null;
+}
+
+/**
+ * @deprecated Use updatePartnership instead
+ */
+export async function updateBrand(id: string, updates: Partial<Brand>): Promise<boolean> {
+  console.warn('updateBrand is deprecated. Use updatePartnership instead.');
+  return false;
+}
+
+/**
+ * @deprecated Use deletePartnership instead
+ */
+export async function deleteBrand(id: string): Promise<boolean> {
+  console.warn('deleteBrand is deprecated. Use deletePartnership instead.');
+  return false;
+}
+
+// ============================================
+// Partnerships Functions (NEW - replaces Brands)
+// ============================================
+
+export interface Partnership {
+  id: string;
+  account_id: string;
+  brand_name: string;
+  brand_contact_name: string | null;
+  brand_contact_email: string | null;
+  brand_contact_phone: string | null;
+  status: 'proposal' | 'negotiation' | 'contract' | 'active' | 'completed' | 'cancelled';
+  proposal_amount: number | null;
+  contract_amount: number | null;
+  currency: string;
+  brief: string | null;
+  deliverables: any; // JSON
+  proposal_date: string | null;
+  contract_signed_date: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  notes: string | null;
+  tags: any; // JSON
+  // New fields from brands
+  coupon_code: string | null;
+  link: string | null;
+  short_link: string | null;
+  category: string | null;
+  is_active: boolean;
+  whatsapp_phone: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getPartnershipsByInfluencer(influencerId: string): Promise<Partnership[]> {
   const { data, error } = await supabase
-    .from('brands')
-    .select('*')
-    .eq('influencer_id', influencerId)
-    .eq('is_active', true)
+    .from('partnerships')
+    .select(`
+      *,
+      coupons:coupons!partnership_id(
+        id,
+        code,
+        discount_type,
+        discount_value,
+        description,
+        is_active
+      )
+    `)
+    .eq('account_id', influencerId)
     .order('brand_name', { ascending: true });
 
   if (error) {
-    console.error('Error fetching brands:', error);
+    console.error('Error fetching partnerships:', error);
     return [];
   }
-  return data || [];
+  
+  // Map partnerships with coupons to include coupon_code
+  return (data || []).map(p => ({
+    ...p,
+    coupon_code: p.coupons?.find((c: any) => c.is_active)?.code || null,
+    coupons: undefined, // Remove nested array from final result
+  }));
 }
 
-export async function createBrand(brand: Omit<Brand, 'id' | 'created_at' | 'updated_at'>): Promise<Brand | null> {
+export async function getPartnershipById(id: string): Promise<Partnership | null> {
   const { data, error } = await supabase
-    .from('brands')
-    .insert(brand)
-    .select()
+    .from('partnerships')
+    .select('*')
+    .eq('id', id)
     .single();
 
   if (error) {
-    console.error('Error creating brand:', error);
+    console.error('Error fetching partnership:', error);
     return null;
   }
   return data;
 }
 
-export async function updateBrand(id: string, updates: Partial<Brand>): Promise<boolean> {
+export async function createPartnership(partnership: Omit<Partnership, 'id' | 'created_at' | 'updated_at'>): Promise<Partnership | null> {
+  const { data, error } = await supabase
+    .from('partnerships')
+    .insert(partnership)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating partnership:', error);
+    return null;
+  }
+  return data;
+}
+
+export async function updatePartnership(id: string, updates: Partial<Partnership>): Promise<boolean> {
   const { error } = await supabase
-    .from('brands')
+    .from('partnerships')
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', id);
 
   if (error) {
-    console.error('Error updating brand:', error);
+    console.error('Error updating partnership:', error);
     return false;
   }
   return true;
 }
 
-export async function deleteBrand(id: string): Promise<boolean> {
+export async function deletePartnership(id: string): Promise<boolean> {
   const { error } = await supabase
-    .from('brands')
+    .from('partnerships')
     .delete()
     .eq('id', id);
 
   if (error) {
-    console.error('Error deleting brand:', error);
+    console.error('Error deleting partnership:', error);
     return false;
   }
   return true;

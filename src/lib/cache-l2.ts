@@ -10,7 +10,7 @@
  * Fallback chain: L1 -> L2 -> DB
  */
 
-import { cacheGet, cacheSet, cacheDel, type CacheOptions } from './cache';
+import { cacheGet, cacheSet, cacheDelete, type CacheOptions } from './cache';
 import { redisGet, redisSet, redisDel, redisDelByPattern, isRedisAvailable } from './redis';
 
 // ============================================
@@ -179,7 +179,7 @@ export async function l2CacheSet<T>(
  * Delete from both L1 and L2
  */
 export async function l2CacheDel(key: string): Promise<void> {
-  cacheDel(key);
+  cacheDelete(key);
   
   if (isRedisAvailable()) {
     await redisDel(key);

@@ -26,7 +26,7 @@ import {
   DollarSign,
   AlertCircle,
 } from 'lucide-react';
-import { getInfluencerByUsername, getChatSessions, getBrandsByInfluencer, getAnalytics, type Brand } from '@/lib/supabase';
+import { getInfluencerByUsername, getChatSessions, getAnalytics, type Partnership } from '@/lib/supabase';
 import { formatNumber, formatRelativeTime } from '@/lib/utils';
 import type { Influencer, ChatSession } from '@/types';
 import NotificationBell from '@/components/NotificationBell';
@@ -41,7 +41,7 @@ export default function InfluencerDashboardPage({
   const router = useRouter();
 
   const [influencer, setInfluencer] = useState<Influencer | null>(null);
-  const [brands, setBrands] = useState<Brand[]>([]);
+  const [brandsLegacy, setBrandsLegacy] = useState<Partnership[]>([]); // Renamed from brands
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [analytics, setAnalytics] = useState<Record<string, number>>({});
   const [audienceAnalytics, setAudienceAnalytics] = useState<any>(null);
@@ -74,13 +74,23 @@ export default function InfluencerDashboardPage({
         setInfluencer(inf);
 
         // Load related data
-        const [brandsData, sess, events] = await Promise.all([
-          getBrandsByInfluencer(inf.id),
+        const [sess, events] = await Promise.all([
           getChatSessions(inf.id),
           getAnalytics(inf.id, 30),
         ]);
 
-        setBrands(brandsData);
+        // Load partnerships via API (handles auth correctly)
+        try {
+          const partnershipsRes = await fetch(`/api/influencer/partnerships?username=${username}&limit=100`);
+          if (partnershipsRes.ok) {
+            const partnershipsData = await partnershipsRes.json();
+            setBrandsLegacy(partnershipsData.partnerships || []);
+          }
+        } catch (err) {
+          console.error('Error loading partnerships:', err);
+          setBrandsLegacy([]);
+        }
+
         setSessions(sess);
 
         // Calculate analytics
@@ -154,10 +164,17 @@ export default function InfluencerDashboardPage({
           products: data.productsCount || 0,
           content: data.contentCount || 0,
         });
-        // Reload brands after rescan
+        // Reload partnerships after rescan
         if (influencer) {
-          const brandsData = await getBrandsByInfluencer(influencer.id);
-          setBrands(brandsData);
+          try {
+            const partnershipsRes = await fetch(`/api/influencer/partnerships?username=${username}&limit=100`);
+            if (partnershipsRes.ok) {
+              const partnershipsData = await partnershipsRes.json();
+              setBrandsLegacy(partnershipsData.partnerships || []);
+            }
+          } catch (err) {
+            console.error('Error reloading partnerships:', err);
+          }
         }
       }
     } catch (error) {
@@ -481,7 +498,7 @@ export default function InfluencerDashboardPage({
             )}
           </motion.div>
 
-          {/* Brands Section */}
+          {/* Brands/Coupons Section (from partnerships) */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -494,35 +511,36 @@ export default function InfluencerDashboardPage({
                 מותגים וקופונים
               </h3>
               <Link
-                href={`/influencer/${username}/brands`}
+                href={`/influencer/${username}/partnerships`}
                 className="text-sm text-pink-400 hover:text-pink-300"
               >
                 ניהול מלא
               </Link>
             </div>
 
-            {brands.length > 0 ? (
+            {brandsLegacy.length > 0 ? (
               <div className="space-y-3">
-                {brands.slice(0, 4).map((brand) => (
-                  <div
-                    key={brand.id}
-                    className="flex items-center justify-between p-3 bg-gray-700/30 rounded-xl"
+                {brandsLegacy.slice(0, 4).map((partnership) => (
+                  <Link
+                    key={partnership.id}
+                    href={`/influencer/${username}/partnerships/${partnership.id}`}
+                    className="flex items-center justify-between p-3 bg-gray-700/30 hover:bg-gray-700/50 rounded-xl transition-colors"
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">{brand.brand_name}</p>
-                      {brand.category && <p className="text-xs text-gray-400">{brand.category}</p>}
+                      <p className="text-sm font-medium text-white truncate">{partnership.brand_name}</p>
+                      {partnership.category && <p className="text-xs text-gray-400">{partnership.category}</p>}
                     </div>
-                    {brand.coupon_code ? (
+                    {partnership.coupon_code ? (
                       <span className="px-2 py-1 text-xs bg-green-500/20 text-green-400 rounded-lg font-mono">
-                        {brand.coupon_code}
+                        {partnership.coupon_code}
                       </span>
                     ) : (
                       <span className="text-xs text-gray-500">ללא קוד</span>
                     )}
-                  </div>
+                  </Link>
                 ))}
-                {brands.length > 4 && (
-                  <p className="text-sm text-gray-500 text-center">+{brands.length - 4} נוספים</p>
+                {brandsLegacy.length > 4 && (
+                  <p className="text-sm text-gray-500 text-center">+{brandsLegacy.length - 4} נוספים</p>
                 )}
               </div>
             ) : (
@@ -530,10 +548,10 @@ export default function InfluencerDashboardPage({
                 <Tag className="w-12 h-12 text-gray-600 mx-auto mb-3" />
                 <p className="text-gray-400 mb-3">אין עדיין מותגים</p>
                 <Link
-                  href={`/influencer/${username}/brands`}
+                  href={`/influencer/${username}/partnerships`}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-pink-600 text-white text-sm rounded-lg hover:bg-pink-500 transition-colors"
                 >
-                  הוסף מותג
+                  הוסף שת"פ
                 </Link>
               </div>
             )}
@@ -620,11 +638,11 @@ export default function InfluencerDashboardPage({
           </Link>
 
           <Link
-            href={`/influencer/${username}/brands`}
+            href={`/influencer/${username}/partnerships`}
             className="flex flex-col items-center gap-3 p-6 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-pink-500/50 rounded-2xl transition-all"
           >
             <Tag className="w-8 h-8 text-pink-400" />
-            <span className="text-white font-medium">מותגים</span>
+            <span className="text-white font-medium">מותגים וקופונים</span>
           </Link>
 
           <Link
