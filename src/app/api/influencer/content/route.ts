@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabase, getInfluencerByUsername } from '@/lib/supabase';
 import { requireInfluencerAuth } from '@/lib/auth/influencer-auth';
 
 // GET content items
@@ -36,14 +36,20 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Username and ID required' }, { status: 400 });
     }
 
-    const isAuth = await checkAuth(username);
-    if (!isAuth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Auth check
+    const authCheck = await requireInfluencerAuth(req);
+    if (!authCheck.authorized) {
+      return authCheck.response!;
     }
 
     const influencer = await getInfluencerByUsername(username);
     if (!influencer) {
       return NextResponse.json({ error: 'Influencer not found' }, { status: 404 });
+    }
+    
+    // Verify access to this influencer
+    if (authCheck.accountId !== influencer.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { error } = await supabase
@@ -75,15 +81,21 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Username and ID required' }, { status: 400 });
   }
 
-  const isAuth = await checkAuth(username);
-  if (!isAuth) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // Auth check
+  const authCheck = await requireInfluencerAuth(req);
+  if (!authCheck.authorized) {
+    return authCheck.response!;
   }
 
   try {
     const influencer = await getInfluencerByUsername(username);
     if (!influencer) {
       return NextResponse.json({ error: 'Influencer not found' }, { status: 404 });
+    }
+    
+    // Verify access
+    if (authCheck.accountId !== influencer.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { error } = await supabase

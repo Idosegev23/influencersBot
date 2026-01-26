@@ -8,8 +8,8 @@ import { requireAuth } from '@/lib/auth/api-helpers';
  */
 export async function GET(request: NextRequest) {
   const authCheck = await requireAuth(request);
-  if (authCheck.error) {
-    return authCheck.error;
+  if (!authCheck.authorized) {
+    return authCheck.response!;
   }
 
   const supabase = createClient();
@@ -79,8 +79,8 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   const authCheck = await requireAuth(request);
-  if (authCheck.error) {
-    return authCheck.error;
+  if (!authCheck.authorized) {
+    return authCheck.response!;
   }
 
   const supabase = createClient();
@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
         related_invoice_id,
         related_document_id,
         related_task_id,
-        created_by: authCheck.user.id,
+        created_by: authCheck.user!.id,
       })
       .select()
       .single();
@@ -145,10 +145,10 @@ export async function POST(request: NextRequest) {
       .insert({
         communication_id: communication.id,
         sender_type: 'influencer',
-        sender_name: authCheck.user.name || 'Influencer',
-        sender_email: authCheck.user.email,
+        sender_name: authCheck.user!.fullName || 'Influencer',
+        sender_email: authCheck.user!.email,
         message_text: initial_message,
-        created_by: authCheck.user.id,
+        created_by: authCheck.user!.id,
       });
 
     if (msgError) throw msgError;

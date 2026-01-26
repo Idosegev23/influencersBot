@@ -8,8 +8,8 @@ import { createClient } from '@/lib/supabase';
  */
 export async function POST(request: NextRequest) {
   const authCheck = await requireAuth(request);
-  if (authCheck.error) {
-    return authCheck.error;
+  if (!authCheck.authorized) {
+    return authCheck.response!;
   }
 
   const supabase = createClient();
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     const { error } = await supabase
       .from('calendar_connections')
       .delete()
-      .eq('user_id', authCheck.user.id);
+      .eq('user_id', authCheck.user!.id);
 
     if (error) throw error;
 

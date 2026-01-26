@@ -35,7 +35,7 @@ export async function GET(
     }
 
     // Check access
-    if (account.owner_user_id !== authResult.user.id) {
+    if (!authResult.user || account.owner_user_id !== authResult.user.id) {
       return NextResponse.json(
         { error: 'אין הרשאה לצפות בנתונים' },
         { status: 403 }

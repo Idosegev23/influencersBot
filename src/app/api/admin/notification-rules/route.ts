@@ -5,15 +5,19 @@ import { requireAuth } from '@/lib/auth/api-helpers';
 // Get all notification rules (for admin panel)
 export async function GET(request: NextRequest) {
   try {
-    const authResult = await requireAuth(request);
-    if (!authResult.success) {
-      return NextResponse.json(
-        { error: authResult.error },
-        { status: authResult.status }
-      );
+    const authResult = await requireAuth(request, 'notifications', 'read');
+    if (!authResult.authorized) {
+      return authResult.response!;
     }
 
     const { user } = authResult;
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const supabase = await createClient();
 
     // Check if user is admin
@@ -68,6 +72,13 @@ export async function POST(request: NextRequest) {
     }
 
     const { user } = authResult;
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const supabase = await createClient();
 
     // Check if user is admin

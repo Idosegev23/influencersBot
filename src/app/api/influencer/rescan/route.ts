@@ -11,7 +11,7 @@ import { uploadProfilePicture } from '@/lib/storage';
 import type { ContentItem, Product } from '@/types';
 import { requireAuth } from '@/lib/auth/api-helpers';
 import { ApifyClient } from 'apify-client';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 
 const COOKIE_PREFIX = 'influencer_session_';
 
@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
       postAnalysis = await analyzeWithGemini3Pro(allContent, influencer.display_name);
     } else {
       // Fallback to OpenAI (legacy)
-      postAnalysis = await analyzeAllPosts(posts);
+      postAnalysis = await analyzeAllPosts(posts as any);
     }
 
     // Extract brands and coupons from analysis
@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
           name: product.name,
           brand: brands[0] || product.brand || '',
           link: product.link,
-          image_url: post?.displayUrl,
+          image_url: (post?.displayUrl as string) || undefined,
           is_manual: false,
         });
       });
@@ -414,7 +414,7 @@ ${JSON.stringify(contentData, null, 2)}
       contents: prompt,
       config: {
         thinkingConfig: {
-          thinkingLevel: 'high',
+          thinkingLevel: ThinkingLevel.HIGH,
         },
         temperature: 1.0,
       },

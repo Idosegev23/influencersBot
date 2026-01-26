@@ -61,7 +61,7 @@ export async function POST(
         code: coupon?.code,
         copy_count: coupon?.copy_count || 0,
         usage_count: coupon?.usage_count || 0,
-        conversion_rate: coupon?.copy_count > 0 
+        conversion_rate: coupon?.copy_count && coupon.usage_count
           ? ((coupon.usage_count / coupon.copy_count) * 100).toFixed(1)
           : '0',
       },

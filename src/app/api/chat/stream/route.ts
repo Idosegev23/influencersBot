@@ -275,9 +275,7 @@ export async function POST(req: NextRequest) {
           message,
           accountId,
           sessionId: currentSessionId,
-          context: { brandsRef: brands.map(b => b.brand_name) },
-          traceId,
-          requestId,
+          mode: 'creator',
         });
 
         // === DECISION ===
@@ -371,8 +369,8 @@ export async function POST(req: NextRequest) {
           decisionId: decision.decisionId,
           sessionId: currentSessionId,
           anonId, // For client-side experiment tracking
-          uiDirectives: decision.uiDirectives,
-          stateTransition: decision.stateTransition,
+          uiDirectives: decision.uiDirectives as any,
+          stateTransition: decision.stateTransition as any,
           suggestedActions: decision.uiDirectives.showQuickActions?.map((label, i) => ({
             id: `quick-${i}`,
             label,
@@ -399,7 +397,6 @@ export async function POST(req: NextRequest) {
               coupon_code: b.coupon_code,
               category: b.category,
               link: b.link,
-              discount_percent: b.discount_percent,
             })),
           };
           controller.enqueue(encodeEvent(cardsEvent));
@@ -422,13 +419,13 @@ export async function POST(req: NextRequest) {
           const contentSlice = content.slice(0, 10);
           contextStr += '\n## תוכן אחרון:\n';
           contentSlice.forEach((c) => {
-            contextStr += `- ${c.content_type}: ${c.extracted_data?.title || c.extracted_data?.description || ''}\n`;
+            contextStr += `- ${c.type}: ${c.title || c.description || ''}\n`;
           });
         }
 
         const instructions = buildInfluencerInstructions(
           influencer.display_name,
-          influencer.persona,
+          influencer.persona || {} as any,
           influencer.influencer_type,
           contextStr
         );

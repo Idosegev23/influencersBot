@@ -68,6 +68,12 @@ interface StageTimings {
   sessionMs: number;
   lockMs: number;
   contextLoadMs: number;
+  cacheMetrics?: {
+    brandsHit: boolean;
+    brandsMs: number;
+    contentHit: boolean;
+    contentMs: number;
+  };
   understandingMs: number;
   decisionMs: number;
   policyMs: number;
@@ -211,7 +217,7 @@ export async function POST(req: NextRequest) {
     stageStart = Date.now();
 
     // === UNDERSTANDING ENGINE ===
-    let understanding = null;
+    let understanding: any = null;
     if (USE_UNDERSTANDING_ENGINE) {
       try {
         understanding = await understandMessage({
@@ -515,7 +521,7 @@ export async function POST(req: NextRequest) {
           // Complete idempotency with blocked response
           const blockedResponse = {
             response: policyResult.blockedReason || 'הפעולה נחסמה',
-            responseId: null,
+            responseId: null as string | null,
             sessionId: currentSessionId,
           };
           await completeIdempotencyKey(idempotencyKey, blockedResponse);
@@ -723,7 +729,6 @@ export async function POST(req: NextRequest) {
             coupon_code: b.coupon_code,
             category: b.category,
             link: b.link,
-            discount_percent: b.discount_percent,
           })),
         };
       }

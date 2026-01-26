@@ -9,8 +9,8 @@ import { syncAllToCalendar } from '@/lib/integrations/google-calendar';
  */
 export async function POST(request: NextRequest) {
   const authCheck = await requireAuth(request);
-  if (authCheck.error) {
-    return authCheck.error;
+  if (!authCheck.authorized) {
+    return authCheck.response!;
   }
 
   const supabase = createClient();
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     const { data: connection, error: connError } = await supabase
       .from('calendar_connections')
       .select('id, account_id, sync_enabled')
-      .eq('user_id', authCheck.user.id)
+      .eq('user_id', authCheck.user!.id)
       .single();
 
     if (connError || !connection) {
@@ -118,8 +118,8 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   const authCheck = await requireAuth(request);
-  if (authCheck.error) {
-    return authCheck.error;
+  if (!authCheck.authorized) {
+    return authCheck.response!;
   }
 
   const supabase = createClient();
@@ -129,7 +129,7 @@ export async function GET(request: NextRequest) {
     const { data: connection } = await supabase
       .from('calendar_connections')
       .select('*')
-      .eq('user_id', authCheck.user.id)
+      .eq('user_id', authCheck.user!.id)
       .single();
 
     if (!connection) {

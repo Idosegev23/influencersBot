@@ -8,12 +8,12 @@ import { getAuthorizationUrl } from '@/lib/integrations/google-calendar';
  */
 export async function GET(request: NextRequest) {
   const authCheck = await requireAuth(request);
-  if (authCheck.error) {
-    return authCheck.error;
+  if (!authCheck.authorized) {
+    return authCheck.response!;
   }
 
   try {
-    const authUrl = getAuthorizationUrl(authCheck.user.id);
+    const authUrl = getAuthorizationUrl(authCheck.user!.id);
     
     return NextResponse.json({
       authUrl,

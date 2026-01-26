@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
             const whatsappMessage = generateWhatsAppMessage(digest);
 
             await sendWhatsAppMessage({
-              to: user.phone,
+              phoneNumber: user.phone,
               message: whatsappMessage,
             });
 

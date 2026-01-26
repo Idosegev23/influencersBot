@@ -2,24 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase';
 import { requireAuth } from '@/lib/auth/api-helpers';
 
-type RouteParams = {
-  params: {
-    id: string;
-  };
-};
-
 /**
  * GET /api/influencer/communications/[id]
  * שליפת שיחה ספציפית + כל ההודעות
  */
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   const authCheck = await requireAuth(request);
-  if (authCheck.error) {
-    return authCheck.error;
+  if (!authCheck.authorized) {
+    return authCheck.response!;
   }
 
   const supabase = createClient();
-  const { id } = params;
+  const { id } = await params;
 
   try {
     // Get communication
@@ -75,14 +72,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  * PATCH /api/influencer/communications/[id]
  * עדכון שיחה (status, priority, due_date, etc.)
  */
-export async function PATCH(request: NextRequest, { params }: RouteParams) {
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   const authCheck = await requireAuth(request);
-  if (authCheck.error) {
-    return authCheck.error;
+  if (!authCheck.authorized) {
+    return authCheck.response!;
   }
 
   const supabase = createClient();
-  const { id } = params;
+  const { id } = await params;
   const body = await request.json();
 
   const {
@@ -137,14 +137,17 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
  * DELETE /api/influencer/communications/[id]
  * מחיקת שיחה (soft delete - סגירה)
  */
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   const authCheck = await requireAuth(request);
-  if (authCheck.error) {
-    return authCheck.error;
+  if (!authCheck.authorized) {
+    return authCheck.response!;
   }
 
   const supabase = createClient();
-  const { id } = params;
+  const { id } = await params;
 
   try {
     // Soft delete - mark as closed

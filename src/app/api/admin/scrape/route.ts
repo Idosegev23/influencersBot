@@ -10,7 +10,7 @@ import { analyzeAllPosts, extractContentFromPost, generatePersonaFromPosts, gene
 import { uploadProfilePicture } from '@/lib/storage';
 import type { ContentItem, Product, InfluencerPersona } from '@/types';
 import { ApifyClient } from 'apify-client';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
       postAnalysis = await analyzeWithGemini3Pro(allContent, influencer.display_name);
     } else {
       // Fallback to OpenAI (legacy)
-      postAnalysis = await analyzeAllPosts(posts);
+      postAnalysis = await analyzeAllPosts(posts as any);
     }
 
     // Extract products, brands, and coupons
@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
           name: product.name,
           brand: brands[0] || product.brand || '',
           link: product.link,
-          image_url: post?.displayUrl,
+          image_url: (post?.displayUrl as string) || undefined,
           coupon_code: undefined,
           is_manual: false,
         });
@@ -252,19 +252,20 @@ export async function POST(req: NextRequest) {
     let skipCount = 0;
     
     for (let i = 0; i < postsToProcess.length; i++) {
-      const post = postsToProcess[i];
+      const post = postsToProcess[i] as any;
       
       // Skip posts with very short captions
-      if (!post.caption || post.caption.trim().length < 15) {
+      const caption = (post.caption || '') as string;
+      if (!caption || caption.trim().length < 15) {
         skipCount++;
         continue;
       }
       
       try {
         const extracted = await extractContentFromPost(
-          post.caption,
+          caption,
           influencer.influencer_type,
-          post.displayUrl
+          post.displayUrl as string
         );
         
         if (extracted && extracted.title) {
@@ -297,7 +298,7 @@ export async function POST(req: NextRequest) {
     console.log(`Generating persona for ${username}...`);
     let persona: InfluencerPersona | null = null;
     try {
-      persona = await generatePersonaFromPosts(posts, profile, influencer.influencer_type);
+      persona = await generatePersonaFromPosts(posts as any, profile as any, influencer.influencer_type);
     } catch (error) {
       console.error('Error generating persona:', error);
     }
@@ -317,7 +318,7 @@ export async function POST(req: NextRequest) {
         }));
         
         const greetingData = await generateGreetingAndQuestions(
-          profile.fullName || influencer.display_name,
+          (profile.fullName as string) || influencer.display_name,
           influencer.influencer_type,
           persona,
           productsList,
@@ -386,9 +387,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Upload profile picture to our storage
-    let avatarUrl = profile.profilePicUrl;
+    let avatarUrl = profile.profilePicUrl as any;
     if (profile.profilePicUrl) {
-      const uploadedUrl = await uploadProfilePicture(influencer.username, profile.profilePicUrl);
+      const uploadedUrl = await uploadProfilePicture(influencer.username, profile.profilePicUrl as string);
       if (uploadedUrl) {
         avatarUrl = uploadedUrl;
       }
@@ -397,10 +398,10 @@ export async function POST(req: NextRequest) {
     // Update influencer with all new data
     const updateData: Record<string, unknown> = {
       last_synced_at: new Date().toISOString(),
-      followers_count: profile.followersCount,
-      following_count: profile.followingCount,
+      followers_count: profile.followersCount as number,
+      following_count: profile.followingCount as number,
       avatar_url: avatarUrl,
-      bio: profile.biography,
+      bio: profile.biography as string,
       display_name: profile.fullName || influencer.display_name,
     };
 
@@ -499,7 +500,7 @@ ${JSON.stringify(contentData, null, 2)}
       contents: prompt,
       config: {
         thinkingConfig: {
-          thinkingLevel: 'high',
+          thinkingLevel: ThinkingLevel.HIGH,
         },
         temperature: 1.0,
       },

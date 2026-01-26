@@ -11,8 +11,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const authCheck = await requireAuth(request);
-  if (authCheck.error) {
-    return authCheck.error;
+  if (!authCheck.authorized) {
+    return authCheck.response!;
   }
 
   const supabase = createClient();
@@ -48,11 +48,11 @@ export async function POST(
       .insert({
         communication_id: communicationId,
         sender_type: 'influencer',
-        sender_name: authCheck.user.name || 'Influencer',
-        sender_email: authCheck.user.email,
+        sender_name: authCheck.user!.fullName || 'Influencer',
+        sender_email: authCheck.user!.email,
         message_text,
         attachments: attachments || [],
-        created_by: authCheck.user.id,
+        created_by: authCheck.user!.id,
       })
       .select()
       .single();

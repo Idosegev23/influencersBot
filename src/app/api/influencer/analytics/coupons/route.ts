@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
     let eventsQuery = supabase
       .from('events')
       .select('*')
-      .eq('account_id', account.id)
+      .eq('account_id', accountId)
       .eq('type', 'coupon_copied');
 
     if (startDate) {
@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
     const { data: linkClicks, error: clicksError } = await supabase
       .from('events')
       .select('payload, session_id')
-      .eq('account_id', account.id)
+      .eq('account_id', accountId)
       .eq('type', 'link_clicked');
 
     if (clicksError) {
@@ -113,7 +113,7 @@ export async function GET(req: NextRequest) {
     const { data: timeSeriesData, error: timeSeriesError } = await supabase
       .from('events')
       .select('created_at, payload')
-      .eq('account_id', account.id)
+      .eq('account_id', accountId)
       .eq('type', 'coupon_copied')
       .gte('created_at', thirtyDaysAgo.toISOString());
 

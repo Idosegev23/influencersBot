@@ -10,16 +10,20 @@ export interface AuthCheckResult {
   authorized: boolean;
   user: AuthUser | null;
   response?: NextResponse;
+  error?: string; // For backwards compatibility
+  success?: boolean; // For backwards compatibility
+  status?: number; // For backwards compatibility
 }
 
 /**
  * בדיקת authentication + authorization בסיסית
  * שימוש: const auth = await requireAuth(req, 'analytics', 'read');
+ * או: const auth = await requireAuth(req); // בדיקת authentication בלבד
  */
 export async function requireAuth(
   req: NextRequest,
-  resource: string,
-  action: 'create' | 'read' | 'update' | 'delete'
+  resource?: string,
+  action?: 'create' | 'read' | 'update' | 'delete'
 ): Promise<AuthCheckResult> {
   // Get user
   const user = await getCurrentUser(req);
@@ -28,6 +32,9 @@ export async function requireAuth(
     return {
       authorized: false,
       user: null,
+      success: false,
+      error: 'Unauthorized - please login',
+      status: 401,
       response: NextResponse.json(
         { error: 'Unauthorized - please login' },
         { status: 401 }
@@ -35,23 +42,29 @@ export async function requireAuth(
     };
   }
 
-  // Check permission
-  const canAccess = await checkPermission(user, { resource, action });
+  // If resource and action provided, check permission
+  if (resource && action) {
+    const canAccess = await checkPermission(user, { resource, action });
 
-  if (!canAccess) {
-    return {
-      authorized: false,
-      user,
-      response: NextResponse.json(
-        { error: 'Forbidden - insufficient permissions' },
-        { status: 403 }
-      ),
-    };
+    if (!canAccess) {
+      return {
+        authorized: false,
+        user,
+        success: false,
+        error: 'Forbidden - insufficient permissions',
+        status: 403,
+        response: NextResponse.json(
+          { error: 'Forbidden - insufficient permissions' },
+          { status: 403 }
+        ),
+      };
+    }
   }
 
   return {
     authorized: true,
     user,
+    success: true,
   };
 }
 

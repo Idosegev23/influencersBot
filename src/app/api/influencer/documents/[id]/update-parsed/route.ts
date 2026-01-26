@@ -37,15 +37,11 @@ export async function PATCH(
 
     // Check access to account
     const accessResult = await requireAccountAccess(
-      user.id,
-      document.account_id,
-      'update'
+      user,
+      document.account_id
     );
-    if (!accessResult.success) {
-      return NextResponse.json(
-        { error: accessResult.error },
-        { status: accessResult.status }
-      );
+    if (accessResult) {
+      return accessResult;
     }
 
     // Parse request body
