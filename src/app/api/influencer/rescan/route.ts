@@ -380,32 +380,39 @@ async function analyzeWithGemini3Pro(content: any[], influencerName: string) {
     views: item.videoViewCount || 0,
   }));
 
-  const prompt = `אני ${influencerName}, משפיענ/ית ישראלי/ת. 
+  const prompt = `IMPORTANT: You MUST respond with ONLY valid JSON. No text before or after the JSON. No explanations. No markdown.
 
-להלן ${content.length} פריטי תוכן (פוסטים + ריילס) האחרונים שלי מאינסטגרם:
+Analyze Instagram content for influencer: ${influencerName}
 
+Content data (${content.length} posts + reels):
 ${JSON.stringify(contentData, null, 2)}
 
-בבקשה נתח את התוכן ותחלץ:
+Extract and return ONLY this JSON structure:
 
-1. **מותגים (brands)**: רשימת כל המותגים
-   - name: שם המותג (בעברית אם אפשר)
-   - mentions: כמה פעמים מוזכר
-   
-2. **קופונים (coupons)**: רשימת קודי קופון
-   - code: קוד הקופון (אותיות גדולות)
-   - brand: המותג
-   - discount: הנחה (אם מצוין)
-
-3. **מוצרים (products)**: רשימת מוצרים ספציפיים
-   - name: שם המוצר
-   - brand: המותג
-
-החזר JSON בפורמט:
 {
-  "brands": [{ "name": "...", "mentions": 1 }],
-  "coupons": [{ "code": "...", "brand": "...", "discount": "..." }],
-  "products": [{ "name": "...", "brand": "..." }]
+  "brands": [
+    { "name": "Brand Name", "mentions": 1 }
+  ],
+  "coupons": [
+    { "code": "SAVE20", "brand": "Nike", "discount": "20%" }
+  ],
+  "products": [
+    { "name": "Product Name", "brand": "Brand Name" }
+  ]
+}
+
+Rules:
+- brands: List ALL mentioned brands (Hebrew names preferred)
+- coupons: Extract coupon codes (UPPERCASE letters/numbers)
+- products: Specific product names mentioned
+- If nothing found, return empty arrays []
+- MUST be valid JSON only
+
+Example response:
+{
+  "brands": [{"name": "Nike", "mentions": 3}],
+  "coupons": [{"code": "NIKE20", "brand": "Nike", "discount": "20%"}],
+  "products": [{"name": "Air Max", "brand": "Nike"}]
 }`;
 
   try {
@@ -416,26 +423,54 @@ ${JSON.stringify(contentData, null, 2)}
         thinkingConfig: {
           thinkingLevel: ThinkingLevel.HIGH,
         },
-        temperature: 1.0,
+        temperature: 0.7, // Lower temperature for more consistent JSON
+        responseMimeType: 'application/json', // Force JSON response
       },
     });
 
     const text = response.text || '';
-    console.log('📝 Gemini response preview:', text.substring(0, 200));
+    console.log('📝 Gemini raw response:', text.substring(0, 300));
     
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    // Strict validation - must start with { and end with }
+    const trimmed = text.trim();
+    if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) {
+      console.warn('⚠️ Response is not JSON format (missing braces)');
+      console.warn('📄 Response preview:', trimmed.substring(0, 100));
+      throw new Error('Invalid JSON format - missing braces');
+    }
+    
+    // Try to extract JSON (handle markdown code blocks if present)
+    const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      console.warn('⚠️ No JSON found in Gemini response');
+      console.warn('⚠️ No JSON structure found in response');
       throw new Error('No JSON found in response');
     }
 
     let parsed;
     try {
       parsed = JSON.parse(jsonMatch[0]);
+      
+      // Validate structure
+      if (!parsed.brands || !parsed.coupons || !parsed.products) {
+        console.warn('⚠️ JSON missing required fields');
+        throw new Error('Invalid JSON structure - missing required fields');
+      }
+      
+      // Ensure arrays
+      if (!Array.isArray(parsed.brands)) parsed.brands = [];
+      if (!Array.isArray(parsed.coupons)) parsed.coupons = [];
+      if (!Array.isArray(parsed.products)) parsed.products = [];
+      
+      console.log('✅ Valid JSON parsed:', {
+        brands: parsed.brands.length,
+        coupons: parsed.coupons.length,
+        products: parsed.products.length
+      });
+      
     } catch (parseError) {
       console.error('❌ JSON parse error:', parseError);
-      console.error('📄 Attempted to parse:', jsonMatch[0].substring(0, 200));
-      throw new Error(`Failed to parse JSON: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`);
+      console.error('📄 Failed text:', jsonMatch[0].substring(0, 300));
+      throw new Error(`JSON parsing failed: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`);
     }
 
     // Convert to legacy format (Map with shortcode keys)
