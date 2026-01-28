@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { getInfluencerByUsername } from '@/lib/supabase';
 import { runBackgroundScrape } from '@/lib/background-scraper';
+import { getProgress } from '@/lib/scraping-progress';
 
 const COOKIE_PREFIX = 'influencer_session_';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
@@ -24,8 +25,8 @@ async function checkAuth(username: string): Promise<boolean> {
 }
 
 /**
- * Influencer rescan endpoint - ULTRA-FAST rescanning with Gemini Flash
- * Optimized to complete in 30-90 seconds
+ * Influencer rescan endpoint - returns immediately, runs in background
+ * Returns 202 Accepted status with progress URL
  */
 export async function POST(req: NextRequest) {
   try {
@@ -52,22 +53,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Influencer not found' }, { status: 404 });
     }
 
-    console.log(`🔄 Starting ULTRA-FAST rescan for ${username}...`);
-
-    // Run synchronously (fire-and-forget doesn't work in Vercel!)
-    const result = await runBackgroundScrape(username, true);
-
-    if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 500 });
+    // Check if already scraping
+    const existingProgress = await getProgress(username);
+    if (existingProgress && existingProgress.status !== 'completed' && existingProgress.status !== 'failed') {
+      return NextResponse.json({ 
+        error: 'Rescan already in progress',
+        progress: existingProgress
+      }, { status: 409 });
     }
 
-    // Return success with stats
+    console.log(`🔄 Starting background rescan for ${username}...`);
+
+    // Start background scrape (isRescan=true)
+    runBackgroundScrape(username, true).catch(error => {
+      console.error('Background rescan error:', error);
+    });
+
+    // Return immediately with 202 Accepted
     return NextResponse.json({
-      message: 'Rescan completed',
+      message: 'Rescan started',
       username,
-      status: 'completed',
-      stats: result.stats,
-    }, { status: 200 });
+      status: 'processing',
+      progressUrl: `/api/admin/scrape-progress/${username}`,
+    }, { status: 202 });
 
   } catch (error) {
     console.error('Rescan error:', error);

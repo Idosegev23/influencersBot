@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { getInfluencerByUsername } from '@/lib/supabase';
 import { runBackgroundScrape } from '@/lib/background-scraper';
+import { getProgress } from '@/lib/scraping-progress';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
@@ -9,8 +10,8 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 export const maxDuration = 480; // 8 minutes
 
 /**
- * Admin scrape endpoint - ULTRA-FAST scraping with Gemini Flash
- * Optimized to complete in 30-90 seconds
+ * Admin scrape endpoint - returns immediately, runs in background
+ * Returns 202 Accepted status with progress URL
  */
 export async function POST(req: NextRequest) {
   try {
@@ -36,22 +37,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Influencer not found' }, { status: 404 });
     }
 
-    console.log(`🚀 Starting ULTRA-FAST scrape for ${username}...`);
-
-    // Run synchronously (fire-and-forget doesn't work in Vercel!)
-    const result = await runBackgroundScrape(username, false);
-
-    if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 500 });
+    // Check if already scraping
+    const existingProgress = await getProgress(username);
+    if (existingProgress && existingProgress.status !== 'completed' && existingProgress.status !== 'failed') {
+      return NextResponse.json({ 
+        error: 'Scrape already in progress',
+        progress: existingProgress
+      }, { status: 409 });
     }
 
-    // Return success with stats
+    console.log(`🚀 Starting background scrape for ${username}...`);
+
+    // Start background scrape (don't await - fire and forget)
+    runBackgroundScrape(username, false).catch(error => {
+      console.error('Background scrape error:', error);
+    });
+
+    // Return immediately with 202 Accepted
     return NextResponse.json({
-      message: 'Scrape completed',
+      message: 'Scrape started',
       username,
-      status: 'completed',
-      stats: result.stats,
-    }, { status: 200 });
+      status: 'processing',
+      progressUrl: `/api/admin/scrape-progress/${username}`,
+    }, { status: 202 });
 
   } catch (error) {
     console.error('Admin scrape error:', error);
