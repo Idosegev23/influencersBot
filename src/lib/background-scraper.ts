@@ -47,17 +47,24 @@ export async function runBackgroundScrape(
   username: string,
   isRescan: boolean = false
 ): Promise<ScrapeResult> {
+  const overallStartTime = Date.now();
+  
   try {
-    console.log(`🚀 [Background] Starting ${isRescan ? 'rescan' : 'scrape'} for ${username}...`);
+    console.log(`\n${'='.repeat(60)}`);
+    console.log(`🚀 [${username}] Starting ${isRescan ? 'RESCAN' : 'SCRAPE'}`);
+    console.log(`${'='.repeat(60)}\n`);
 
     // Initialize progress
+    console.log(`⏱️ [${username}] Step 0: Initializing progress...`);
     await initProgress(username);
 
     // Get influencer
+    console.log(`⏱️ [${username}] Step 1: Fetching influencer from DB...`);
     const influencer = await getInfluencerByUsername(username);
     if (!influencer) {
       throw new Error('Influencer not found');
     }
+    console.log(`✅ [${username}] Influencer found: ${influencer.full_name || username}`);
 
     // Initialize Apify client
     const apify = new ApifyClient({
@@ -67,6 +74,7 @@ export async function runBackgroundScrape(
     // 1. Scrape posts
     const postsLimit = influencer.scrape_settings?.posts_limit || 50;
     
+    console.log(`\n📸 [${username}] STAGE 1/5: Scraping ${postsLimit} posts...`);
     await updateProgress(username, {
       status: 'scraping_posts',
       progress: 10,
@@ -83,14 +91,17 @@ export async function runBackgroundScrape(
       addParentData: true,
     };
 
-    console.log('📸 Scraping posts with Apify...');
+    const postsStartTime = Date.now();
     const postsRun = await apify.actor('apify/instagram-scraper').call(postsInput);
     const { items: postsData } = await apify.dataset(postsRun.defaultDatasetId).listItems();
     const posts = postsData || [];
+    const postsElapsed = ((Date.now() - postsStartTime) / 1000).toFixed(2);
+    console.log(`✅ [${username}] Posts scraped: ${posts.length} in ${postsElapsed}s`);
 
     // 2. Scrape reels
     const reelsLimit = influencer.scrape_settings?.reels_limit || 30;
     
+    console.log(`\n🎬 [${username}] STAGE 2/5: Scraping ${reelsLimit} reels...`);
     await updateProgress(username, {
       status: 'scraping_reels',
       progress: 30,
@@ -104,14 +115,17 @@ export async function runBackgroundScrape(
       resultsLimit: reelsLimit,
     };
 
-    console.log('🎬 Scraping reels with Apify...');
+    const reelsStartTime = Date.now();
     const reelsRun = await apify.actor('apify/instagram-reel-scraper').call(reelsInput);
     const { items: reelsData } = await apify.dataset(reelsRun.defaultDatasetId).listItems();
     const reels = reelsData || [];
+    const reelsElapsed = ((Date.now() - reelsStartTime) / 1000).toFixed(2);
+    console.log(`✅ [${username}] Reels scraped: ${reels.length} in ${reelsElapsed}s`);
 
-    console.log(`📊 Scraped ${posts.length} posts + ${reels.length} reels`);
+    console.log(`\n📊 [${username}] Total content: ${posts.length} posts + ${reels.length} reels`);
 
     // 3. Analyze with Gemini 3 Pro
+    console.log(`\n🤖 [${username}] STAGE 3/5: AI Analysis...`);
     await updateProgress(username, {
       status: 'analyzing',
       progress: 40,
@@ -123,14 +137,18 @@ export async function runBackgroundScrape(
       estimatedTimeRemaining: 60,
     });
 
-    console.log('🤖 Analyzing with Gemini 3 Pro...');
+    const analysisStartTime = Date.now();
+    console.log(`📊 [${username}] Content size: ${posts.length} posts + ${reels.length} reels`);
     
-    // Prepare content for analysis
+    // Prepare content for analysis (limit to 20,000 chars for speed)
     const allContent = [...posts, ...reels];
     const captions = allContent
       .map((item: any) => item.caption || item.text || '')
       .filter(Boolean)
-      .join('\n---\n');
+      .join('\n---\n')
+      .substring(0, 20000); // Reduced from 50k
+    
+    console.log(`📝 [${username}] Prompt length: ${captions.length} characters`);
 
     // Analyze with Gemini
     const genAI = new GoogleGenAI(process.env.GOOGLE_GEMINI_API_KEY!);
@@ -143,7 +161,7 @@ Analyze this Instagram content and extract:
 - products: Specific product names (ONLY concrete products mentioned by name)
 
 Content:
-${captions.substring(0, 50000)}
+${captions}
 
 Rules:
 - brands: List ALL mentioned brands (Hebrew names preferred)
@@ -158,20 +176,27 @@ Example response:
     let parsed: any = { brands: [], coupons: [], products: [] };
 
     try {
+      console.log(`⏱️ [${username}] Starting Gemini API call...`);
+      const startTime = Date.now();
+      
       const response = await genAI.models.generateContent({
         model: 'gemini-3-pro-preview',
         contents: prompt,
         config: {
           thinkingConfig: {
-            thinkingLevel: ThinkingLevel.HIGH,
+            thinkingLevel: ThinkingLevel.MEDIUM, // Changed from HIGH to MEDIUM
           },
-          temperature: 0.7,
+          temperature: 0.5, // Lower for faster, more consistent responses
           responseMimeType: 'application/json',
         },
       });
 
+      const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(2);
+      console.log(`✅ [${username}] Gemini API responded in ${elapsedTime}s`);
+
       const text = response.text || '';
-      console.log('📝 Gemini response preview:', text.substring(0, 300));
+      console.log(`📝 [${username}] Response length: ${text.length} characters`);
+      console.log(`📝 [${username}] Response preview:`, text.substring(0, 200));
 
       // Validate JSON
       const trimmed = text.trim();
@@ -203,15 +228,22 @@ Example response:
       });
 
     } catch (error) {
-      console.error('❌ Gemini analysis failed:', error);
+      const analysisElapsed = ((Date.now() - analysisStartTime) / 1000).toFixed(2);
+      console.error(`❌ [${username}] Gemini analysis failed after ${analysisElapsed}s:`, error);
       // Continue with empty data
     }
+
+    const analysisElapsed = ((Date.now() - analysisStartTime) / 1000).toFixed(2);
+    console.log(`✅ [${username}] Analysis completed in ${analysisElapsed}s`);
 
     // 4. Save to database
     const brandSet = new Set<string>(parsed.brands || []);
     const couponSet = new Set<string>(parsed.coupons || []);
     const productSet = new Set<string>(parsed.products || []);
 
+    console.log(`\n💾 [${username}] STAGE 4/5: Saving to database...`);
+    console.log(`📊 [${username}] Found: ${brandSet.size} brands, ${couponSet.size} coupons, ${productSet.size} products`);
+    
     await updateProgress(username, {
       status: 'saving',
       progress: 70,
@@ -225,7 +257,7 @@ Example response:
       estimatedTimeRemaining: 30,
     });
 
-    console.log('💾 Saving to database...');
+    const dbStartTime = Date.now();
 
     // Save partnerships
     const partnershipIds = new Map<string, string>();
@@ -285,11 +317,15 @@ Example response:
       });
     }
 
+    const dbElapsed = ((Date.now() - dbStartTime) / 1000).toFixed(2);
+    console.log(`✅ [${username}] Database save completed in ${dbElapsed}s`);
+
     // 5. Generate persona (if not rescan)
     let persona = null;
     let greeting = null;
 
     if (!isRescan) {
+      console.log(`\n🎭 [${username}] STAGE 5/5: Generating persona...`);
       await updateProgress(username, {
         status: 'saving',
         progress: 90,
@@ -297,7 +333,7 @@ Example response:
         estimatedTimeRemaining: 10,
       });
 
-      console.log('🎭 Generating persona...');
+      const personaStartTime = Date.now();
       persona = await generatePersonaFromPosts(posts as any);
 
       if (persona) {
@@ -313,7 +349,7 @@ Example response:
         );
       }
 
-      console.log('👋 Generating greeting...');
+      console.log(`⏱️ [${username}] Generating greeting...`);
       greeting = await generateGreetingAndQuestions(influencer.username, posts as any);
 
       if (greeting) {
@@ -322,9 +358,15 @@ Example response:
           initial_questions: greeting.questions,
         }).eq('influencer_id', influencer.id);
       }
+      
+      const personaElapsed = ((Date.now() - personaStartTime) / 1000).toFixed(2);
+      console.log(`✅ [${username}] Persona generated in ${personaElapsed}s`);
+    } else {
+      console.log(`⏭️ [${username}] Skipping persona (rescan mode)`);
     }
 
     // 6. Update influencer record
+    console.log(`\n🔄 [${username}] Updating influencer record...`);
     const profile = (posts[0] as any)?.ownerFullName ? posts[0] : reels[0];
     let avatarUrl = null;
 
@@ -346,7 +388,11 @@ Example response:
       last_scraped_at: new Date().toISOString(),
     });
 
-    console.log(`✅ Scrape completed for ${username}`);
+    const overallElapsed = ((Date.now() - overallStartTime) / 1000).toFixed(2);
+    
+    console.log(`\n${'='.repeat(60)}`);
+    console.log(`✅ [${username}] SCRAPE COMPLETED in ${overallElapsed}s`);
+    console.log(`${'='.repeat(60)}\n`);
 
     // Mark as completed
     await completeProgress(username, {
@@ -377,7 +423,12 @@ Example response:
     };
 
   } catch (error) {
-    console.error('❌ Background scrape error:', error);
+    const overallElapsed = ((Date.now() - overallStartTime) / 1000).toFixed(2);
+    
+    console.log(`\n${'='.repeat(60)}`);
+    console.error(`❌ [${username}] SCRAPE FAILED after ${overallElapsed}s`);
+    console.error(`❌ [${username}] Error:`, error);
+    console.log(`${'='.repeat(60)}\n`);
     
     const errorMessage = error instanceof Error ? error.message : 'Scrape failed';
     await failProgress(username, errorMessage);

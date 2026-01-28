@@ -6,8 +6,8 @@ import { getProgress } from '@/lib/scraping-progress';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
-// Increase timeout to 5 minutes (Vercel Pro: 300s, Hobby: 10s)
-export const maxDuration = 300;
+// Increase timeout to 8 minutes (Vercel Pro max: 900s)
+export const maxDuration = 480; // 8 minutes
 
 /**
  * Admin scrape endpoint - returns immediately, runs in background
