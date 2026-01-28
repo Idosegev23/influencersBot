@@ -23,6 +23,11 @@ if (!supabaseAnonKey) {
   throw new Error('Missing environment variable: NEXT_PUBLIC_SUPABASE_ANON_KEY');
 }
 
+// Debug: Check if service key is available (server-side only)
+if (typeof window === 'undefined' && !supabaseServiceKey) {
+  console.warn('⚠️ SUPABASE_SECRET_KEY not found - using anon key (RLS will apply)');
+}
+
 // Singleton pattern to avoid multiple GoTrueClient instances
 let _supabaseClient: SupabaseClient | null = null;
 let _supabaseServer: SupabaseClient | null = null;
