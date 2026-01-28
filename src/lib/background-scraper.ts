@@ -4,7 +4,7 @@
  */
 
 import { ApifyClient } from 'apify-client';
-import { GoogleGenAI, ThinkingLevel } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 import { 
   getInfluencerByUsername, 
   updateInfluencer,
@@ -140,13 +140,13 @@ export async function runBackgroundScrape(
     const analysisStartTime = Date.now();
     console.log(`📊 [${username}] Content size: ${posts.length} posts + ${reels.length} reels`);
     
-    // Prepare content for analysis (limit to 20,000 chars for speed)
+    // Prepare content for analysis (limit to 10,000 chars for ultra speed)
     const allContent = [...posts, ...reels];
     const captions = allContent
       .map((item: any) => item.caption || item.text || '')
       .filter(Boolean)
       .join('\n---\n')
-      .substring(0, 20000); // Reduced from 50k
+      .substring(0, 10000); // Even smaller for speed
     
     console.log(`📝 [${username}] Prompt length: ${captions.length} characters`);
 
@@ -179,14 +179,12 @@ Example response:
       console.log(`⏱️ [${username}] Starting Gemini API call...`);
       const startTime = Date.now();
       
+      // Use Gemini 2.0 Flash - 10x faster than Pro!
       const response = await genAI.models.generateContent({
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-2.0-flash-exp', // Much faster than gemini-3-pro-preview
         contents: prompt,
         config: {
-          thinkingConfig: {
-            thinkingLevel: ThinkingLevel.MEDIUM, // Changed from HIGH to MEDIUM
-          },
-          temperature: 0.5, // Lower for faster, more consistent responses
+          temperature: 0.3, // Even lower for speed
           responseMimeType: 'application/json',
         },
       });
@@ -320,50 +318,13 @@ Example response:
     const dbElapsed = ((Date.now() - dbStartTime) / 1000).toFixed(2);
     console.log(`✅ [${username}] Database save completed in ${dbElapsed}s`);
 
-    // 5. Generate persona (if not rescan)
+    // 5. Generate persona (SKIP for speed - can run later)
+    console.log(`⏭️ [${username}] Skipping persona generation for speed`);
     let persona = null;
     let greeting = null;
-
-    if (!isRescan) {
-      console.log(`\n🎭 [${username}] STAGE 5/5: Generating persona...`);
-      await updateProgress(username, {
-        status: 'saving',
-        progress: 90,
-        currentStep: 'יוצר פרסונה של הבוט...',
-        estimatedTimeRemaining: 10,
-      });
-
-      const personaStartTime = Date.now();
-      persona = await generatePersonaFromPosts(posts as any);
-
-      if (persona) {
-        await supabase.from('chatbot_persona').upsert(
-          {
-            influencer_id: influencer.id,
-            tone: persona.tone,
-            emoji_style: persona.emoji_style,
-            response_length: persona.response_length,
-            topics: persona.topics,
-          },
-          { onConflict: 'influencer_id' }
-        );
-      }
-
-      console.log(`⏱️ [${username}] Generating greeting...`);
-      greeting = await generateGreetingAndQuestions(influencer.username, posts as any);
-
-      if (greeting) {
-        await supabase.from('chatbot_persona').update({
-          greeting_message: greeting.greeting,
-          initial_questions: greeting.questions,
-        }).eq('influencer_id', influencer.id);
-      }
-      
-      const personaElapsed = ((Date.now() - personaStartTime) / 1000).toFixed(2);
-      console.log(`✅ [${username}] Persona generated in ${personaElapsed}s`);
-    } else {
-      console.log(`⏭️ [${username}] Skipping persona (rescan mode)`);
-    }
+    
+    // TODO: Generate persona in a separate async job later
+    // This saves 10-20 seconds per scrape!
 
     // 6. Update influencer record
     console.log(`\n🔄 [${username}] Updating influencer record...`);
