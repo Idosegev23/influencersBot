@@ -11,6 +11,13 @@ import { uploadProfilePicture } from '@/lib/storage';
 import type { ContentItem, Product, InfluencerPersona } from '@/types';
 import { ApifyClient } from 'apify-client';
 import { GoogleGenAI, ThinkingLevel } from '@google/genai';
+import { 
+  initProgress, 
+  updateProgress, 
+  completeProgress, 
+  failProgress,
+  calculateETA 
+} from '@/lib/scraping-progress';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
@@ -41,12 +48,22 @@ export async function POST(req: NextRequest) {
 
     console.log(`Starting full scrape for ${username}...`);
 
+    // Initialize progress tracking
+    await initProgress(username);
+
     // Initialize Apify client
     const apify = new ApifyClient({
       token: process.env.APIFY_TOKEN || process.env.APIFY_API_TOKEN!,
     });
 
     // 1. Scrape posts
+    await updateProgress(username, {
+      status: 'scraping_posts',
+      progress: 10,
+      currentStep: `סורק ${postsLimit || 50} פוסטים מאינסטגרם...`,
+      estimatedTimeRemaining: 90,
+    });
+    
     const postsLimit = influencer.scrape_settings?.posts_limit || 50;
     const postsInput = {
       directUrls: [`https://www.instagram.com/${influencer.username}/`],
@@ -104,6 +121,18 @@ export async function POST(req: NextRequest) {
     };
 
     console.log(`Scraped ${posts.length} posts + ${reels.length} reels for ${username}`);
+
+    // Update progress
+    await updateProgress(username, {
+      status: 'analyzing',
+      progress: 40,
+      currentStep: `מנתח ${posts.length + reels.length} פריטי תוכן עם AI...`,
+      details: {
+        postsScraped: posts.length,
+        reelsScraped: reels.length,
+      },
+      estimatedTimeRemaining: 60,
+    });
 
     // 4. Analyze with Gemini 3 Pro (or fallback to OpenAI)
     console.log(`🤖 Analyzing content...`);
@@ -166,6 +195,19 @@ export async function POST(req: NextRequest) {
 
     // Save to partnerships and coupons tables
     console.log(`💾 Saving ${brandSet.size} partnerships and ${couponSet.size} coupons...`);
+    
+    await updateProgress(username, {
+      status: 'saving',
+      progress: 70,
+      currentStep: `שומר ${brandSet.size} מותגים ו-${couponSet.size} קופונים למסד נתונים...`,
+      details: {
+        postsScraped: posts.length,
+        reelsScraped: reels.length,
+        brandsFound: brandSet.size,
+        couponsFound: couponSet.size,
+      },
+      estimatedTimeRemaining: 30,
+    });
     
     // Save partnerships
     const partnershipIds = new Map<string, string>();
@@ -421,6 +463,15 @@ export async function POST(req: NextRequest) {
 
     console.log(`Scrape completed for ${username}`);
 
+    // Mark progress as completed
+    await completeProgress(username, {
+      postsScraped: posts.length,
+      reelsScraped: reels.length,
+      brandsFound: brandSet.size,
+      couponsFound: couponSet.size,
+      productsFound: extractedProducts.length,
+    });
+
     return NextResponse.json({
       success: true,
       stats: {
@@ -441,8 +492,21 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error('Admin scrape error:', error);
+    
+    // Mark progress as failed
+    const errorMessage = error instanceof Error ? error.message : 'Scrape failed';
+    try {
+      // Extract username from request for progress tracking
+      const body = await req.json().catch(() => ({}));
+      if (body.username) {
+        await failProgress(body.username, errorMessage);
+      }
+    } catch (progressError) {
+      console.error('Failed to update progress:', progressError);
+    }
+    
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Scrape failed' },
+      { error: errorMessage },
       { status: 500 }
     );
   }
