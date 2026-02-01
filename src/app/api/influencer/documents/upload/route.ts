@@ -5,6 +5,9 @@ import { cookies } from 'next/headers';
 import { supabase, getInfluencerByUsername } from '@/lib/supabase';
 import { getCurrentUser, checkPermission, isAccountOwner } from '@/lib/auth/middleware';
 
+// Allow longer execution for large files (max 5 minutes on Pro plan)
+export const maxDuration = 300;
+
 // Check influencer authentication
 async function checkAuth(username: string): Promise<boolean> {
   const cookieStore = await cookies();

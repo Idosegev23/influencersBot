@@ -54,37 +54,37 @@ export default function NewPartnershipPage() {
       const result = await response.json();
       const partnershipId = result.partnership.id;
 
-      // Upload documents if any
+      // Upload documents if any - using existing upload API
       if (uploadedFiles.length > 0) {
-        const uploadPromises = uploadedFiles.map(async (file) => {
-          // Check file size (max 10MB)
-          const MAX_SIZE = 10 * 1024 * 1024;
-          if (file.size > MAX_SIZE) {
-            console.error(`File ${file.name} is too large (${(file.size / 1024 / 1024).toFixed(2)}MB). Max size is 10MB.`);
-            return;
+        try {
+          const uploadFormData = new FormData();
+          
+          // Add all files
+          uploadedFiles.forEach(file => {
+            uploadFormData.append('files', file);
+          });
+          
+          // Add metadata
+          uploadFormData.append('accountId', result.partnership.account_id);
+          uploadFormData.append('partnershipId', partnershipId);
+          uploadFormData.append('username', username);
+          uploadFormData.append('documentType', 'contract');
+
+          const uploadRes = await fetch(`/api/influencer/documents/upload`, {
+            method: 'POST',
+            body: uploadFormData,
+          });
+
+          if (!uploadRes.ok) {
+            const errorData = await uploadRes.json();
+            console.error('Failed to upload documents:', errorData);
+          } else {
+            const data = await uploadRes.json();
+            console.log(`✓ ${data.message}`);
           }
-
-          const docFormData = new FormData();
-          docFormData.append('file', file);
-          docFormData.append('partnership_id', partnershipId);
-          docFormData.append('username', username);
-          docFormData.append('account_id', result.partnership.account_id);
-
-          try {
-            const uploadRes = await fetch(`/api/influencer/partnerships/${partnershipId}/documents`, {
-              method: 'POST',
-              body: docFormData,
-            });
-
-            if (!uploadRes.ok) {
-              console.error(`Failed to upload ${file.name}:`, await uploadRes.text());
-            }
-          } catch (err) {
-            console.error(`Error uploading ${file.name}:`, err);
-          }
-        });
-
-        await Promise.all(uploadPromises);
+        } catch (err) {
+          console.error('Error uploading documents:', err);
+        }
       }
 
       router.push(`/influencer/${username}/partnerships/${partnershipId}`);
