@@ -164,9 +164,9 @@ function buildSystemInstructions(persona: any): string {
     instructions.push(`\n😊 ${emojiMap[persona.emoji_usage]}`);
   }
 
-  // Directives (most important!)
+  // Directives (most important! - these are BEHAVIORAL GUIDELINES, not scripted responses)
   if (persona.directives?.length) {
-    instructions.push(`\n\n🎯 חוקים חשובים (תמיד עקוב!):`);
+    instructions.push(`\n\n🎯 הנחיות והתנהגות (אלה הן הנחיות כלליות - לא סקריפטים מוכנים!):`);
     persona.directives.forEach((directive: string) => {
       instructions.push(`- ${directive}`);
     });
@@ -181,14 +181,6 @@ function buildSystemInstructions(persona: any): string {
   if (persona.dontsList?.length) {
     instructions.push(`\n\n❌ לעולם לא:`);
     persona.dontsList.forEach((item: string) => instructions.push(`- ${item}`));
-  }
-
-  // Custom responses
-  if (persona.custom_responses && Object.keys(persona.custom_responses).length > 0) {
-    instructions.push(`\n\n📝 תשובות מוכנות לנושאים ספציפיים:`);
-    Object.entries(persona.custom_responses).forEach(([topic, response]) => {
-      instructions.push(`- כש${topic}: ${response}`);
-    });
   }
 
   // Personal info
@@ -207,11 +199,19 @@ function buildSystemInstructions(persona: any): string {
 
   // Final rules
   instructions.push(`\n\n⚡ כללים כלליים:
-- דבר/י תמיד בגוף ראשון כאילו אתה ${persona.name}
+- **חשוב מאוד (דרישה חוקית):** תמיד גלה בהתחלה שאתה הבוט/עוזר הדיגיטלי של ${persona.name || 'המשפיען'}, אבל תעשה את זה בצורה חמה ונעימה בשפה שלו/ה
+- דבר/י תמיד בגוף ראשון כאילו אתה נציג/ה של ${persona.name}
 - אם שואלים על דברים אישיים שלא ציינת - תהיה/י מעורפל/ת בנימוס
-- אל תגיד "אני בוט" או "אני AI" - אתה ${persona.name}!
 - אם יש מידע בהקשר (מוצרים, שת"פים, קופונים) - השתמש בו!
-- תהיה/י עוזר/ת ושימושי/ת, לא רק small talk`);
+- תהיה/י עוזר/ת ושימושי/ת, לא רק small talk
+
+דוגמאות לגילוי שאתה בוט בצורה נעימה:
+✅ "היי! אני הבוט של ${persona.name || 'המשפיען'} 😊 אני כאן כדי לעזור לך..."
+✅ "שלום! אני העוזר הדיגיטלי של ${persona.name || 'המשפיען'}, איך אפשר לעזור?"
+✅ "ברוכים הבאים! ${persona.name || 'המשפיען'} יצרה אותי כדי לעזור לך עם..."
+
+❌ לא: "אני מערכת AI" (קר מדי)
+❌ לא: "אני רובוט אוטומטי" (לא נעים)`);
 
   return instructions.join('\n');
 }

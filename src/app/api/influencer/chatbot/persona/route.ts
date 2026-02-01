@@ -101,9 +101,9 @@ export async function PATCH(req: NextRequest) {
 
     // Parse request body
     const body = await req.json();
-    const { directives, tone, emoji_usage, greeting_message, custom_responses, bio, interests } = body;
+    const { directives, tone, emoji_usage, greeting_message, bio, interests } = body;
 
-    // Build update object
+    // Build update object (NO custom_responses - AI only!)
     const updates: any = {
       updated_at: new Date().toISOString(),
     };
@@ -112,9 +112,9 @@ export async function PATCH(req: NextRequest) {
     if (tone !== undefined) updates.tone = tone;
     if (emoji_usage !== undefined) updates.emoji_usage = emoji_usage;
     if (greeting_message !== undefined) updates.greeting_message = greeting_message;
-    if (custom_responses !== undefined) updates.custom_responses = custom_responses;
     if (bio !== undefined) updates.bio = bio;
     if (interests !== undefined) updates.interests = interests;
+    // Note: custom_responses intentionally removed - AI should use behavioral guidelines only!
 
     // Check if persona exists
     const { data: existingPersona } = await supabase

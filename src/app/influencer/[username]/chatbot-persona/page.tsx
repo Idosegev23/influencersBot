@@ -22,17 +22,20 @@ export default function ChatbotPersonaPage({
     name: '',
     tone: 'friendly',
     emoji_usage: 'moderate',
-    greeting_message: '',
-    directives: [] as string[],
-    custom_responses: {} as Record<string, string>,
+    greeting_message: 'היי! אני הבוט שלי 😊 אני כאן כדי לעזור לך עם כל השאלות על המוצרים והשת"פים שלי. במה אפשר לעזור?',
+    directives: [
+      'תמיד דבר בגוף ראשון כנציג שלי',
+      'היה ידידותי ומועיל',
+      'גלה בהתחלה שאתה הבוט שלי, אבל בצורה חמה',
+      'כששואלים על דברים אישיים שלא ציינתי בביו - תענה בעדינות שזה פרטי',
+      'כששואלים על מקומות/חוויות - השתמש במה שכתוב בביו והתחומי עניין'
+    ] as string[],
     bio: '',
     interests: [] as string[],
   });
 
   const [newDirective, setNewDirective] = useState('');
   const [newInterest, setNewInterest] = useState('');
-  const [newResponseKey, setNewResponseKey] = useState('');
-  const [newResponseValue, setNewResponseValue] = useState('');
 
   useEffect(() => {
     loadPersona();
@@ -56,7 +59,6 @@ export default function ChatbotPersonaPage({
           emoji_usage: data.persona.emoji_usage || 'moderate',
           greeting_message: data.persona.greeting_message || '',
           directives: data.persona.directives || [],
-          custom_responses: data.persona.custom_responses || {},
           bio: data.persona.bio || '',
           interests: data.persona.interests || [],
         });
@@ -132,29 +134,6 @@ export default function ChatbotPersonaPage({
     });
   };
 
-  const addCustomResponse = () => {
-    if (newResponseKey.trim() && newResponseValue.trim()) {
-      setPersona({
-        ...persona,
-        custom_responses: {
-          ...persona.custom_responses,
-          [newResponseKey.trim()]: newResponseValue.trim(),
-        },
-      });
-      setNewResponseKey('');
-      setNewResponseValue('');
-    }
-  };
-
-  const removeCustomResponse = (key: string) => {
-    const newResponses = { ...persona.custom_responses };
-    delete newResponses[key];
-    setPersona({
-      ...persona,
-      custom_responses: newResponses,
-    });
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
@@ -195,6 +174,35 @@ export default function ChatbotPersonaPage({
         )}
 
         <div className="space-y-6">
+          {/* Legal Notice */}
+          <div className="bg-blue-500/10 border border-blue-500/50 rounded-xl p-6">
+            <div className="flex items-start gap-3">
+              <div className="text-3xl">⚖️</div>
+              <div className="flex-1 text-right">
+                <h3 className="text-xl font-bold text-blue-300 mb-2">דרישה חוקית חשובה</h3>
+                <p className="text-gray-300 leading-relaxed">
+                  על פי החוק (כמו קליפורניה AB 2655 ואירופה AI Act), הבוט <strong>חייב לגלות</strong> שהוא בוט בהתחלת השיחה.
+                  <br />
+                  <strong>אבל!</strong> אפשר (ומומלץ!) לעשות את זה בצורה חמה ונעימה בשפה שלך:
+                </p>
+                <div className="mt-3 space-y-2 text-sm">
+                  <div className="flex items-center gap-2 text-green-400">
+                    <span>✅</span>
+                    <span>"היי! אני הבוט של ירדן 😊 אני כאן כדי לעזור לך..."</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-green-400">
+                    <span>✅</span>
+                    <span>"שלום! אני העוזר הדיגיטלי של ירדן, במה אפשר לעזור?"</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-red-400">
+                    <span>❌</span>
+                    <span>"אני מערכת AI אוטומטית" (קר מדי)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Basic Info */}
           <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
             <h2 className="text-2xl font-bold text-white mb-4 text-right">מידע בסיסי</h2>
@@ -247,6 +255,10 @@ export default function ChatbotPersonaPage({
                   placeholder="היי! אני הבוט של ירדן, פה לעזור לך עם כל שאלה 😊"
                   className="w-full px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none text-right"
                 />
+                <p className="mt-2 text-xs text-yellow-400 text-right flex items-center gap-2 justify-end">
+                  <span>⚠️</span>
+                  <span>זכור לציין שזה בוט (דרישה חוקית), אבל עשה את זה בצורה חמה!</span>
+                </p>
               </div>
 
               {/* Bio */}
@@ -309,10 +321,29 @@ export default function ChatbotPersonaPage({
 
           {/* Directives */}
           <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
-            <h2 className="text-2xl font-bold text-white mb-4 text-right">הנחיות והתנהגות</h2>
+            <h2 className="text-2xl font-bold text-white mb-4 text-right">הנחיות והתנהגות 🎯</h2>
             <p className="text-gray-400 mb-4 text-right text-sm">
-              תגיד לבוט מה תמיד לעשות ומה לעולם לא לעשות
+              תגיד ל-AI איך להתנהג ולענות - <strong>לא סקריפטים מוכנים, רק כללים!</strong>
             </p>
+            
+            <div className="mb-4 space-y-2">
+              <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-right">
+                <p className="text-xs text-blue-300">
+                  💡 <strong>טיפ:</strong> הבוט כבר מוגדר לגלות שהוא בוט (דרישה חוקית), אבל בצורה חמה ונעימה בשפה שלך
+                </p>
+              </div>
+              
+              <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg text-right space-y-1">
+                <p className="text-xs font-semibold text-green-300">דוגמאות להנחיות טובות:</p>
+                <div className="text-xs text-gray-300 space-y-1 pr-2">
+                  <p>✅ "כששואלים על דברים אישיים שלא ציינתי - תענה בעדינות שזה פרטי"</p>
+                  <p>✅ "כששואלים על מקומות - השתמש במה שכתוב בביו ובתחומי העניין"</p>
+                  <p>✅ "תמיד הצע מוצרים או שת\"פים רלוונטיים כשמתאים"</p>
+                  <p>✅ "אם לא יודע משהו - תגיד שתעביר את השאלה אליי"</p>
+                  <p>❌ לא: "כששואלים על בן זוג תגיד X" (זה סקריפט מוכן!)</p>
+                </div>
+              </div>
+            </div>
 
             <div className="flex gap-2 mb-4">
               <input
@@ -320,7 +351,7 @@ export default function ChatbotPersonaPage({
                 value={newDirective}
                 onChange={(e) => setNewDirective(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && addDirective()}
-                placeholder='לדוגמה: "תמיד דבר/י בגוף ראשון כאילו אני ירדן"'
+                placeholder='לדוגמה: "כששואלים על נושאים אישיים - תענה בעדינות שזה פרטי"'
                 className="flex-1 px-4 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none text-right"
               />
               <button
@@ -344,54 +375,6 @@ export default function ChatbotPersonaPage({
                   >
                     ×
                   </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Custom Responses */}
-          <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
-            <h2 className="text-2xl font-bold text-white mb-4 text-right">תשובות מותאמות אישית</h2>
-            <p className="text-gray-400 mb-4 text-right text-sm">
-              הגדר תשובות ספציפיות לשאלות נפוצות
-            </p>
-
-            <div className="space-y-2 mb-4">
-              <input
-                type="text"
-                value={newResponseKey}
-                onChange={(e) => setNewResponseKey(e.target.value)}
-                placeholder="נושא/שאלה (לדוגמה: בן זוג, מקום אהוב)"
-                className="w-full px-4 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none text-right"
-              />
-              <textarea
-                value={newResponseValue}
-                onChange={(e) => setNewResponseValue(e.target.value)}
-                rows={2}
-                placeholder="התשובה המדויקת שאת/ה רוצה שהבוט יגיד"
-                className="w-full px-4 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none text-right"
-              />
-              <button
-                onClick={addCustomResponse}
-                className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-500 transition-colors"
-              >
-                הוסף תשובה
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {Object.entries(persona.custom_responses).map(([key, value]) => (
-                <div key={key} className="p-4 bg-gray-900/50 rounded-lg">
-                  <div className="flex items-start justify-between mb-2">
-                    <span className="font-semibold text-purple-300 text-right">{key}</span>
-                    <button
-                      onClick={() => removeCustomResponse(key)}
-                      className="text-red-400 hover:text-red-300 px-2"
-                    >
-                      ×
-                    </button>
-                  </div>
-                  <p className="text-white text-right text-sm">{value}</p>
                 </div>
               ))}
             </div>
