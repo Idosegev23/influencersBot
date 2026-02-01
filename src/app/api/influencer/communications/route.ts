@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/server';
 import { requireInfluencerAuth } from '@/lib/auth/influencer-auth';
 
 /**
@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
     return auth.response!;
   }
 
+  const supabase = await createClient();
   const { searchParams } = new URL(request.url);
   
   // Filters
@@ -28,10 +29,7 @@ export async function GET(request: NextRequest) {
   try {
     let query = supabase
       .from('brand_communications')
-      .select(`
-        *,
-        partnership:partnerships(id, brand_name, status)
-      `, { count: 'exact' })
+      .select('*', { count: 'exact' })
       .eq('account_id', accountId) // Always filter by current account
       .order('last_message_at', { ascending: false })
       .range(offset, offset + limit - 1);
@@ -83,6 +81,7 @@ export async function POST(request: NextRequest) {
     return auth.response!;
   }
 
+  const supabase = await createClient();
   const body = await request.json();
   const accountId = auth.accountId;
 
