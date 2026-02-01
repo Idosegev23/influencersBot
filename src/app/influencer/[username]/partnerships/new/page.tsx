@@ -395,11 +395,11 @@ export default function NewPartnershipPage() {
             {isParsing && (
               <div className="text-center py-12">
                 <Loader2 className="h-12 w-12 text-blue-600 animate-spin mx-auto mb-4" />
-                <p className="text-lg font-medium text-gray-900">🤖 Gemini 3 Pro מנתח את החוזה...</p>
+                <p className="text-lg font-medium text-gray-900">מנתח את החוזה...</p>
                 <p className="text-sm text-gray-600 mt-2">זה עשוי לקחת 30 שניות - 8 דקות</p>
                 <div className="mt-6 max-w-md mx-auto text-right">
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <p className="text-xs font-medium text-blue-900 mb-2">מה ה-AI מחפש:</p>
+                    <p className="text-xs font-medium text-blue-900 mb-2">מחלץ מהמסמך:</p>
                     <ul className="text-xs text-blue-700 space-y-1">
                       <li>✓ שמות הצדדים (מותג, משפיען, סוכן)</li>
                       <li>✓ תאריכים (תחילה, סיום, שנתי)</li>
@@ -427,7 +427,7 @@ export default function NewPartnershipPage() {
               </div>
               <div>
                 <h3 className="text-xl font-bold text-gray-900">✅ החוזה נותח בהצלחה!</h3>
-                <p className="text-sm text-gray-600">Gemini 3 Pro זיהה את הפרטים הבאים:</p>
+                <p className="text-sm text-gray-600">המערכת זיהתה את הפרטים הבאים:</p>
               </div>
             </div>
 
@@ -486,21 +486,7 @@ export default function NewPartnershipPage() {
               </div>
             )}
 
-            {/* Confidence */}
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-              <p className="text-xs text-gray-600 mb-1">רמת ביטחון של AI:</p>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-blue-600 h-2 rounded-full transition-all"
-                    style={{ width: `${(parsedRawData.confidence || 0.79) * 100}%` }}
-                  />
-                </div>
-                <span className="text-sm font-bold text-gray-700">
-                  {((parsedRawData.confidence || 0.79) * 100).toFixed(0)}%
-                </span>
-              </div>
-            </div>
+            {/* Confidence - Removed as per user request */}
           </div>
 
           {/* Actions */}
