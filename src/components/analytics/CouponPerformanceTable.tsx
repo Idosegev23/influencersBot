@@ -68,9 +68,15 @@ export default function CouponPerformanceTable({ coupons }: CouponPerformanceTab
                         {coupon.brand_name}
                       </span>
                     )}
-                    <span className="font-mono font-bold text-blue-600 text-xs">
-                      {coupon.code}
-                    </span>
+                    {coupon.code ? (
+                      <span className="font-mono font-bold text-blue-600 text-xs">
+                        {coupon.code}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-400 italic">
+                        (קוד לא הוגדר)
+                      </span>
+                    )}
                   </div>
                 </td>
                 <td className="px-4 py-3 text-center whitespace-nowrap">
