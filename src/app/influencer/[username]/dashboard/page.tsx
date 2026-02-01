@@ -47,6 +47,7 @@ export default function InfluencerDashboardPage({
   const [audienceAnalytics, setAudienceAnalytics] = useState<any>(null);
   const [taskSummary, setTaskSummary] = useState<any>(null);
   const [partnerships, setPartnerships] = useState<any[]>([]);
+  const [partnershipCoupons, setPartnershipCoupons] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [rescanning, setRescanning] = useState(false);
@@ -86,7 +87,28 @@ export default function InfluencerDashboardPage({
           const partnershipsRes = await fetch(`/api/influencer/partnerships?username=${username}&limit=100`);
           if (partnershipsRes.ok) {
             const partnershipsData = await partnershipsRes.json();
-            setBrandsLegacy(partnershipsData.partnerships || []);
+            const loadedPartnerships = partnershipsData.partnerships || [];
+            setBrandsLegacy(loadedPartnerships);
+            
+            // Load coupons for each partnership
+            const couponsMap: Record<string, any[]> = {};
+            await Promise.all(
+              loadedPartnerships.map(async (p: any) => {
+                try {
+                  const couponsRes = await fetch(
+                    `/api/influencer/partnerships/${p.id}/coupons?username=${username}`
+                  );
+                  if (couponsRes.ok) {
+                    const couponsData = await couponsRes.json();
+                    couponsMap[p.id] = couponsData.coupons || [];
+                  }
+                } catch (err) {
+                  console.error('Error loading coupons for partnership:', p.id, err);
+                  couponsMap[p.id] = [];
+                }
+              })
+            );
+            setPartnershipCoupons(couponsMap);
           }
         } catch (err) {
           console.error('Error loading partnerships:', err);
@@ -568,13 +590,22 @@ export default function InfluencerDashboardPage({
                       <p className="text-sm font-medium text-white truncate">{partnership.brand_name}</p>
                       {partnership.category && <p className="text-xs text-gray-400">{partnership.category}</p>}
                     </div>
-                    {partnership.coupon_code ? (
-                      <span className="px-2 py-1 text-xs bg-green-500/20 text-green-400 rounded-lg font-mono">
-                        {partnership.coupon_code}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-gray-500">ללא קוד</span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {partnershipCoupons[partnership.id]?.length > 0 ? (
+                        <>
+                          <span className="px-2 py-1 text-xs bg-green-500/20 text-green-400 rounded-lg font-mono">
+                            {partnershipCoupons[partnership.id][0].code}
+                          </span>
+                          {partnershipCoupons[partnership.id].length > 1 && (
+                            <span className="text-xs text-gray-400">
+                              +{partnershipCoupons[partnership.id].length - 1}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-xs text-gray-500">ללא קופונים</span>
+                      )}
+                    </div>
                   </Link>
                 ))}
                 {brandsLegacy.length > 4 && (
