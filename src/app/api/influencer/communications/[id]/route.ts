@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase';
-import { requireAuth } from '@/lib/auth/api-helpers';
+import { supabase } from '@/lib/supabase';
+import { requireInfluencerAuth } from '@/lib/auth/influencer-auth';
 
 /**
  * GET /api/influencer/communications/[id]
@@ -10,16 +10,19 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authCheck = await requireAuth(request);
-  if (!authCheck.authorized) {
-    return authCheck.response!;
+  const auth = await requireInfluencerAuth(request);
+  if (!auth.authorized) {
+    console.error(`[Communications GET] Unauthorized access attempt`);
+    return auth.response!;
   }
 
-  const supabase = createClient();
   const { id } = await params;
+  const accountId = auth.accountId;
+  
+  console.log(`[Communications GET] Fetching communication ${id} for account ${accountId}`);
 
   try {
-    // Get communication
+    // Get communication and verify it belongs to this account
     const { data: communication, error: commError } = await supabase
       .from('brand_communications')
       .select(`
@@ -31,11 +34,17 @@ export async function GET(
         related_task:tasks(id, title, status)
       `)
       .eq('id', id)
+      .eq('account_id', accountId)
       .single();
 
-    if (commError) throw commError;
+    if (commError) {
+      console.error(`[Communications GET] Database error:`, commError);
+      throw commError;
+    }
+    
     if (!communication) {
-      return NextResponse.json({ error: 'Communication not found' }, { status: 404 });
+      console.error(`[Communications GET] Communication ${id} not found or unauthorized`);
+      return NextResponse.json({ error: 'התקשורת לא נמצאה' }, { status: 404 });
     }
 
     // Get all messages
@@ -45,7 +54,10 @@ export async function GET(
       .eq('communication_id', id)
       .order('created_at', { ascending: true });
 
-    if (msgError) throw msgError;
+    if (msgError) {
+      console.error(`[Communications GET] Messages error:`, msgError);
+      throw msgError;
+    }
 
     // Mark unread messages as read
     await supabase
@@ -55,14 +67,16 @@ export async function GET(
       .eq('is_read', false)
       .neq('sender_type', 'influencer'); // Don't mark own messages
 
+    console.log(`[Communications GET] Successfully fetched communication ${id} with ${messages?.length || 0} messages`);
+
     return NextResponse.json({
       communication,
       messages: messages || [],
     });
   } catch (error: any) {
-    console.error('Error fetching communication:', error);
+    console.error('[Communications GET] Error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch communication', details: error.message },
+      { error: 'שגיאה בטעינת התקשורת', details: error.message },
       { status: 500 }
     );
   }
@@ -76,14 +90,17 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authCheck = await requireAuth(request);
-  if (!authCheck.authorized) {
-    return authCheck.response!;
+  const auth = await requireInfluencerAuth(request);
+  if (!auth.authorized) {
+    console.error(`[Communications PATCH] Unauthorized access attempt`);
+    return auth.response!;
   }
 
-  const supabase = createClient();
   const { id } = await params;
+  const accountId = auth.accountId;
   const body = await request.json();
+  
+  console.log(`[Communications PATCH] Updating communication ${id} for account ${accountId}`);
 
   const {
     status,
@@ -118,16 +135,21 @@ export async function PATCH(
       .from('brand_communications')
       .update(updateData)
       .eq('id', id)
+      .eq('account_id', accountId)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error(`[Communications PATCH] Database error:`, error);
+      throw error;
+    }
 
+    console.log(`[Communications PATCH] Successfully updated communication ${id}`);
     return NextResponse.json({ communication: data });
   } catch (error: any) {
-    console.error('Error updating communication:', error);
+    console.error('[Communications PATCH] Error:', error);
     return NextResponse.json(
-      { error: 'Failed to update communication', details: error.message },
+      { error: 'שגיאה בעדכון התקשורת', details: error.message },
       { status: 500 }
     );
   }
@@ -141,13 +163,16 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authCheck = await requireAuth(request);
-  if (!authCheck.authorized) {
-    return authCheck.response!;
+  const auth = await requireInfluencerAuth(request);
+  if (!auth.authorized) {
+    console.error(`[Communications DELETE] Unauthorized access attempt`);
+    return auth.response!;
   }
 
-  const supabase = createClient();
   const { id } = await params;
+  const accountId = auth.accountId;
+  
+  console.log(`[Communications DELETE] Deleting communication ${id} for account ${accountId}`);
 
   try {
     // Soft delete - mark as closed
@@ -159,16 +184,21 @@ export async function DELETE(
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
+      .eq('account_id', accountId)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error(`[Communications DELETE] Database error:`, error);
+      throw error;
+    }
 
+    console.log(`[Communications DELETE] Successfully deleted communication ${id}`);
     return NextResponse.json({ communication: data });
   } catch (error: any) {
-    console.error('Error deleting communication:', error);
+    console.error('[Communications DELETE] Error:', error);
     return NextResponse.json(
-      { error: 'Failed to delete communication', details: error.message },
+      { error: 'שגיאה במחיקת התקשורת', details: error.message },
       { status: 500 }
     );
   }
