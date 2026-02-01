@@ -116,23 +116,21 @@ export default function CouponsAnalyticsPage() {
           },
         },
         coupons: (apiResult?.brandPerformance || []).map(brand => ({
-          id: brand?.brandId || '',
+          coupon_id: brand?.brandId || '',
           code: brand?.couponCode || '',
-          partnership: {
-            id: brand?.brandId || '',
-            brand_name: brand?.brandName || 'Unknown',
-          },
-          times_copied: brand?.copyCount || 0,
-          times_used: brand?.linkClicks || 0,
+          copy_count: brand?.copyCount || 0,
+          usage_count: brand?.linkClicks || 0,
           conversion_rate: brand?.clickThroughRate || 0,
           total_revenue: 0, // Not available
-          avg_order_value: 0, // Not available
-          created_at: new Date().toISOString(), // Not available
+          total_discount: 0, // Not available
+          profit_per_coupon: 0, // Not available
+          average_basket: 0, // Not available
         })),
         top_products: (apiResult?.topCoupons || []).slice(0, 10).map(coupon => ({
           product_name: coupon?.brandName || 'Unknown',
-          times_ordered: coupon?.copyCount || 0,
-          revenue: 0, // Not available
+          total_sold: coupon?.copyCount || 0,
+          total_revenue: 0, // Not available
+          average_price: 0, // Not available
         })),
       };
       
