@@ -179,7 +179,7 @@ export default function CommunicationsList({
         return (
           <Link
             key={comm.id}
-            href={`/influencer/[username]/communications/${comm.id}`}
+            href={`/influencer/${username}/communications/${comm.id}`}
             className="block bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md hover:border-blue-300 transition-all"
           >
             <div className="flex items-start justify-between">
