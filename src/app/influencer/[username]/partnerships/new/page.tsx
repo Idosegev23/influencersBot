@@ -46,7 +46,9 @@ export default function NewPartnershipPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create partnership');
+        const errorData = await response.json();
+        console.error('Partnership creation failed:', errorData);
+        throw new Error(errorData.details || errorData.error || 'Failed to create partnership');
       }
 
       const result = await response.json();

@@ -209,8 +209,18 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) {
-      console.error('Database error:', error);
-      return NextResponse.json({ error: 'Failed to create partnership' }, { status: 500 });
+      console.error('Database error creating partnership:', {
+        error,
+        errorCode: error.code,
+        errorMessage: error.message,
+        errorDetails: error.details,
+        accountId,
+        brand_name,
+      });
+      return NextResponse.json({ 
+        error: 'Failed to create partnership',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      }, { status: 500 });
     }
 
     return NextResponse.json({ partnership }, { status: 201 });
