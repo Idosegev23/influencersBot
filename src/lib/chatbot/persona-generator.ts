@@ -227,6 +227,172 @@ function calculateEngagementRate(posts: ApifyPostData[], followersCount: number)
 }
 
 /**
+ * Analyze content style from posts
+ */
+function analyzeContentStyle(posts: ApifyPostData[]) {
+  const captions = posts.map(p => p.caption || '').filter(Boolean);
+  
+  // Average caption length
+  const avgCaptionLength = captions.length > 0
+    ? Math.round(captions.reduce((sum, c) => sum + c.length, 0) / captions.length)
+    : 0;
+  
+  // Emoji density (emojis per 100 characters)
+  const emojiRegex = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu;
+  const totalEmojis = captions.join('').match(emojiRegex)?.length || 0;
+  const totalChars = captions.join('').length;
+  const emojiDensity = totalChars > 0 ? Math.round((totalEmojis / totalChars) * 100 * 10) / 10 : 0;
+  
+  // Question usage (indicates engagement style)
+  const questionsCount = captions.filter(c => c.includes('?')).length;
+  const questionFrequency = captions.length > 0 ? Math.round((questionsCount / captions.length) * 100) : 0;
+  
+  // Content type distribution
+  const contentTypes = posts.reduce((acc, post) => {
+    const type = post.type || 'Image';
+    acc[type] = (acc[type] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  
+  // Writing style indicators
+  const avgWordsPerPost = captions.length > 0
+    ? Math.round(captions.reduce((sum, c) => sum + c.split(/\s+/).length, 0) / captions.length)
+    : 0;
+  
+  return {
+    avgCaptionLength,
+    avgWordsPerPost,
+    emojiDensity,
+    questionFrequency,
+    contentTypeDistribution: contentTypes,
+    writingStyle: avgCaptionLength > 500 ? 'מפורט' : avgCaptionLength > 200 ? 'בינוני' : 'תמציתי',
+  };
+}
+
+/**
+ * Analyze engagement patterns
+ */
+function analyzeEngagementPatterns(posts: ApifyPostData[]) {
+  if (posts.length === 0) return {
+    avgLikes: 0,
+    avgComments: 0,
+    avgEngagementRate: 0,
+    mostEngagingType: 'Image',
+    engagementTrend: 'stable' as const,
+  };
+  
+  const avgLikes = Math.round(posts.reduce((sum, p) => sum + (p.likesCount || 0), 0) / posts.length);
+  const avgComments = Math.round(posts.reduce((sum, p) => sum + (p.commentsCount || 0), 0) / posts.length);
+  const avgEngagementRate = 0; // Will be calculated with followers
+  
+  // Most engaging content type
+  const typeEngagement: Record<string, { total: number; count: number }> = {};
+  posts.forEach(post => {
+    const type = post.type || 'Image';
+    if (!typeEngagement[type]) {
+      typeEngagement[type] = { total: 0, count: 0 };
+    }
+    typeEngagement[type].total += (post.likesCount || 0) + (post.commentsCount || 0);
+    typeEngagement[type].count += 1;
+  });
+  
+  const mostEngagingType = Object.entries(typeEngagement)
+    .sort((a, b) => (b[1].total / b[1].count) - (a[1].total / a[1].count))[0]?.[0] || 'Image';
+  
+  // Engagement trend (recent vs older posts)
+  const recentPosts = posts.slice(0, Math.floor(posts.length / 3));
+  const olderPosts = posts.slice(-Math.floor(posts.length / 3));
+  
+  const recentAvg = recentPosts.reduce((sum, p) => sum + (p.likesCount || 0) + (p.commentsCount || 0), 0) / recentPosts.length;
+  const olderAvg = olderPosts.reduce((sum, p) => sum + (p.likesCount || 0) + (p.commentsCount || 0), 0) / olderPosts.length;
+  
+  const engagementTrend = recentAvg > olderAvg * 1.1 ? 'עולה' : recentAvg < olderAvg * 0.9 ? 'יורד' : 'יציב';
+  
+  return {
+    avgLikes,
+    avgComments,
+    avgEngagementRate,
+    mostEngagingType,
+    engagementTrend,
+  };
+}
+
+/**
+ * Analyze posting behavior
+ */
+function analyzePostingBehavior(posts: ApifyPostData[]) {
+  if (posts.length === 0) return {
+    mostActiveHours: [],
+    mostActiveDays: [],
+    postingFrequency: 'נמוך',
+  };
+  
+  const dates = posts.map(p => new Date(p.timestamp));
+  
+  // Most active hours
+  const hourCounts: Record<number, number> = {};
+  dates.forEach(date => {
+    const hour = date.getHours();
+    hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+  });
+  
+  const mostActiveHours = Object.entries(hourCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([hour]) => `${hour}:00`);
+  
+  // Most active days
+  const dayNames = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+  const dayCounts: Record<number, number> = {};
+  dates.forEach(date => {
+    const day = date.getDay();
+    dayCounts[day] = (dayCounts[day] || 0) + 1;
+  });
+  
+  const mostActiveDays = Object.entries(dayCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([day]) => dayNames[parseInt(day)]);
+  
+  // Posting frequency
+  if (dates.length > 1) {
+    const oldestDate = dates[dates.length - 1];
+    const newestDate = dates[0];
+    const daysDiff = (newestDate.getTime() - oldestDate.getTime()) / (1000 * 60 * 60 * 24);
+    const postsPerWeek = (posts.length / daysDiff) * 7;
+    
+    const postingFrequency = postsPerWeek > 7 ? 'יומי' : postsPerWeek > 3 ? 'תכוף' : postsPerWeek > 1 ? 'בינוני' : 'נמוך';
+    
+    return {
+      mostActiveHours,
+      mostActiveDays,
+      postingFrequency,
+      postsPerWeek: Math.round(postsPerWeek * 10) / 10,
+    };
+  }
+  
+  return {
+    mostActiveHours,
+    mostActiveDays,
+    postingFrequency: 'לא ידוע',
+  };
+}
+
+/**
+ * Identify top performing posts
+ */
+function identifyTopPosts(posts: ApifyPostData[], count: number = 5) {
+  return posts
+    .slice()
+    .sort((a, b) => {
+      const engagementA = (a.likesCount || 0) + (a.commentsCount || 0);
+      const engagementB = (b.likesCount || 0) + (b.commentsCount || 0);
+      return engagementB - engagementA;
+    })
+    .slice(0, count);
+}
+
+/**
  * Extract hashtags from posts
  */
 function extractHashtags(posts: ApifyPostData[]): string[] {
@@ -321,8 +487,39 @@ export async function syncInstagramAndRegeneratePersona(accountId: string, usern
       hashtags_count: top_hashtags.length,
     });
 
-    // Extract recent post captions for AI analysis
-    const recentPosts = posts.slice(0, 20).map(post => post.caption || '').filter(Boolean);
+    // === RICH DATA ANALYSIS FOR GEMINI PRO ===
+    
+    // 1. Content analysis
+    const contentAnalysis = analyzeContentStyle(posts);
+    
+    // 2. Engagement patterns
+    const engagementPatterns = analyzeEngagementPatterns(posts);
+    
+    // 3. Posting behavior
+    const postingBehavior = analyzePostingBehavior(posts);
+    
+    // 4. Top performing posts (viral content)
+    const topPosts = identifyTopPosts(posts, 5);
+    
+    // 5. Prepare rich data for Gemini Pro
+    const enrichedPosts = posts.slice(0, 30).map(post => ({
+      caption: post.caption || '',
+      type: post.type,
+      engagement: {
+        likes: post.likesCount,
+        comments: post.commentsCount,
+        rate: post.likesCount > 0 ? ((post.likesCount + post.commentsCount) / profile.followersCount * 100).toFixed(2) : '0',
+      },
+      timestamp: post.timestamp,
+    }));
+
+    console.log('📊 Rich analysis completed:', {
+      avg_caption_length: contentAnalysis.avgCaptionLength,
+      emoji_density: contentAnalysis.emojiDensity,
+      avg_engagement_rate: engagementPatterns.avgEngagementRate + '%',
+      most_active_hours: postingBehavior.mostActiveHours,
+      content_types: contentAnalysis.contentTypeDistribution,
+    });
 
     console.log('🤖 Building deep persona with Gemini Pro...');
 
@@ -331,7 +528,16 @@ export async function syncInstagramAndRegeneratePersona(accountId: string, usern
       username: profile.username,
       bio: profile.biography || '',
       interests: top_topics,
-      recentPosts,
+      enrichedPosts,
+      analytics: {
+        contentAnalysis,
+        engagementPatterns,
+        postingBehavior,
+        topPerformingPosts: topPosts.map(p => ({
+          caption: p.caption?.substring(0, 200) || '',
+          engagement_rate: ((p.likesCount + p.commentsCount) / profile.followersCount * 100).toFixed(2) + '%',
+        })),
+      },
       customDirectives: [
         'תמיד דבר בגוף ראשון כנציג של המשפיען',
         'גלה בהתחלה שאתה הבוט של המשפיען, אבל בצורה חמה ונעימה',

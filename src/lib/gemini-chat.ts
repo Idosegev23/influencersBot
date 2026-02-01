@@ -18,7 +18,18 @@ export async function buildPersonaWithGemini(input: {
   username: string;
   bio: string;
   interests: string[];
-  recentPosts: string[];
+  enrichedPosts?: Array<{
+    caption: string;
+    type: string;
+    engagement: any;
+    timestamp: string;
+  }>;
+  analytics?: {
+    contentAnalysis: any;
+    engagementPatterns: any;
+    postingBehavior: any;
+    topPerformingPosts: any[];
+  };
   customDirectives?: string[];
 }) {
   const model = genAI.getGenerativeModel({ model: GEMINI_MODELS.PERSONA_BUILDER });
@@ -27,33 +38,75 @@ export async function buildPersonaWithGemini(input: {
 
 תפקידך: ליצור פרסונה עמוקה ואותנטית עבור ${input.username} שתשמש את הצ'אטבוט שלה/שלו.
 
-📊 נתונים:
+📊 נתוני פרופיל:
 Bio: ${input.bio}
-תחומי עניין: ${input.interests.join(', ')}
+תחומי עניין מזוהים: ${input.interests.join(', ')}
 
-תוכן אחרון:
-${input.recentPosts.slice(0, 10).join('\n---\n')}
+${input.analytics ? `
+🎯 ניתוח מעמיק של התוכן:
+- סגנון כתיבה: ${input.analytics.contentAnalysis.writingStyle}
+- אורך ממוצע: ${input.analytics.contentAnalysis.avgCaptionLength} תווים (${input.analytics.contentAnalysis.avgWordsPerPost} מילים)
+- צפיפות אימוג'ים: ${input.analytics.contentAnalysis.emojiDensity}%
+- שימוש בשאלות: ${input.analytics.contentAnalysis.questionFrequency}% מהפוסטים
+- סוגי תוכן: ${JSON.stringify(input.analytics.contentAnalysis.contentTypeDistribution)}
+
+📈 דפוסי אנגייג'מנט:
+- ממוצע לייקים: ${input.analytics.engagementPatterns.avgLikes}
+- ממוצע תגובות: ${input.analytics.engagementPatterns.avgComments}
+- סוג תוכן מעניין ביותר: ${input.analytics.engagementPatterns.mostEngagingType}
+- טרנד אנגייג'מנט: ${input.analytics.engagementPatterns.engagementTrend}
+
+⏰ התנהגות פרסום:
+- שעות פעילות: ${input.analytics.postingBehavior.mostActiveHours?.join(', ')}
+- ימים פעילים: ${input.analytics.postingBehavior.mostActiveDays?.join(', ')}
+- תדירות: ${input.analytics.postingBehavior.postingFrequency}
+
+🔥 פוסטים ויראליים (TOP 5):
+${input.analytics.topPerformingPosts?.map((p, i) => `${i + 1}. [${p.engagement_rate} engagement] ${p.caption.substring(0, 150)}...`).join('\n')}
+` : ''}
+
+📝 פוסטים לדוגמה (${input.enrichedPosts?.length || 0} אחרונים):
+${input.enrichedPosts?.slice(0, 10).map((post, i) => `
+${i + 1}. [${post.type}] [Engagement: ${post.engagement.rate}%]
+${post.caption.substring(0, 300)}${post.caption.length > 300 ? '...' : ''}
+`).join('\n---\n') || 'אין פוסטים זמינים'}
 
 ${input.customDirectives?.length ? `\n🎯 הנחיות מיוחדות מהמשפיען:\n${input.customDirectives.join('\n')}` : ''}
 
 בנה פרסונה מפורטת בפורמט JSON עם השדות הבאים:
 
 {
-  "voiceAndTone": "איך המשפיען/ית מדבר/ת (גוף ראשון, סגנון, אישיות)",
-  "knowledgeAreas": ["תחום 1", "תחום 2", "..."],
-  "conversationStyle": "תיאור של איך לנהל שיחה (חם/פורמלי/הומוריסטי וכו')",
-  "dosList": ["תמיד עשה X", "תמיד דבר בגוף ראשון", "..."],
-  "dontsList": ["אל תעמיד פנים שאתה AI", "אל תדבר על נושאים אישיים שלא צוינו", "..."],
+  "voiceAndTone": "איך המשפיען/ית מדבר/ת (גוף ראשון, סגנון, אישיות, התבסס על הפוסטים)",
+  "knowledgeAreas": ["תחום 1 שהמשפיען מומחה בו", "תחום 2", "..."],
+  "conversationStyle": "תיאור מפורט של איך לנהל שיחה (חם/פורמלי/הומוריסטי, התבסס על הדאטה)",
+  "contentPreferences": {
+    "preferredFormats": ["סוג התוכן שהמשפיען מעדיף - Image/Video/Reel"],
+    "writingStyle": "תמציתי/בינוני/מפורט - כמו שזוהה בניתוח",
+    "emojiUsage": "heavy/moderate/minimal/none - לפי הצפיפות",
+    "postingTimes": ["שעות מועדפות לפרסום"]
+  },
+  "dosList": [
+    "תמיד דבר בגוף ראשון כנציג של המשפיען",
+    "השתמש בסגנון הכתיבה המזוהה (תמציתי/מפורט/אימוג'ים)",
+    "...עוד הנחיות מבוססות דאטה"
+  ],
+  "dontsList": [
+    "אל תדבר בסגנון שונה מהמשפיען",
+    "אל תדבר על נושאים שלא הוזכרו בתוכן",
+    "..."
+  ],
   "personalInfo": {
-    "location": "מיקום אם צוין",
-    "hobbies": ["תחביב 1", "..."],
+    "location": "מיקום אם צוין בביו או פוסטים",
+    "hobbies": ["תחביב 1 מזוהה מהפוסטים", "..."],
     "favorites": {
-      "places": ["..."],
-      "activities": ["..."]
+      "places": ["מקומות שהוזכרו בפוסטים"],
+      "activities": ["פעילויות מזוהות"],
+      "topics": ["נושאים שהמשפיען מדבר עליהם הכי הרבה"]
     }
   },
+  "viralContentInsights": "תובנות מהפוסטים הויראליים - מה עובד טוב",
   "responseExamples": {
-    "greeting": "דוגמה לברכה",
+    "greeting": "דוגמה לברכה בסגנון המשפיען",
     "productQuestion": "דוגמה לשאלה על מוצר",
     "personalQuestion": "דוגמה לשאלה אישית"
   }
