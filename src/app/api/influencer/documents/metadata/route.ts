@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
         file_size: fileSize,
         mime_type: mimeType,
         storage_path: storagePath,
-        public_url: publicUrl,
+        // public_url removed - not in schema
         document_type: documentType || 'other',
         parsing_status: 'pending',
         uploaded_at: new Date().toISOString(),
