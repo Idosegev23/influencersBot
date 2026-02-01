@@ -70,12 +70,7 @@ export default function NewPartnershipPage() {
 
       if (uploadError) throw uploadError;
 
-      // 2. Get public URL
-      const { data: urlData } = supabaseClient.storage
-        .from('partnership-documents')
-        .getPublicUrl(storagePath);
-
-      // 3. Save metadata to DB
+      // 2. Save metadata to DB (storage_path is enough to access file)
       const metadataResponse = await fetch('/api/influencer/documents/metadata', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -87,7 +82,6 @@ export default function NewPartnershipPage() {
           fileSize: file.size,
           mimeType: file.type,
           storagePath,
-          publicUrl: urlData.publicUrl,
           documentType: 'contract',
         }),
       });
@@ -193,12 +187,7 @@ export default function NewPartnershipPage() {
               continue;
             }
 
-            // 2. Get public URL
-            const { data: urlData } = supabaseClient.storage
-              .from('partnership-documents')
-              .getPublicUrl(storagePath);
-
-            // 3. Save metadata to DB via lightweight API (only JSON, no file payload)
+            // 2. Save metadata to DB via lightweight API (only JSON, no file payload)
             await fetch('/api/influencer/documents/metadata', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -210,7 +199,6 @@ export default function NewPartnershipPage() {
                 fileSize: file.size,
                 mimeType: file.type,
                 storagePath,
-                publicUrl: urlData.publicUrl,
                 documentType: 'contract',
               }),
             });

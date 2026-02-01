@@ -182,12 +182,7 @@ export function FileUploader({
           continue;
         }
 
-        // 2. Get public URL
-        const { data: urlData } = supabaseClient.storage
-          .from('partnership-documents')
-          .getPublicUrl(storagePath);
-
-        // 3. Save metadata to DB via lightweight API (only JSON, no file payload)
+        // 2. Save metadata to DB via lightweight API (only JSON, no file payload)
         const metadataResponse = await fetch('/api/influencer/documents/metadata', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -199,7 +194,6 @@ export function FileUploader({
             fileSize: file.size,
             mimeType: file.type,
             storagePath,
-            publicUrl: urlData.publicUrl,
             documentType: 'other', // Can be customized
           }),
         });
