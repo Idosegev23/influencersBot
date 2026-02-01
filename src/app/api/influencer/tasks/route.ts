@@ -79,25 +79,14 @@ export async function GET(req: NextRequest) {
 // POST - Create a new task
 export async function POST(req: NextRequest) {
   try {
-    // Auth check
-    const user = await getCurrentUser(req);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check create permission
-    const canCreate = await checkPermission(user, {
-      resource: 'tasks',
-      action: 'create',
-    });
-
-    if (!canCreate) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    // Auth check with cookie-based auth (no RLS loop)
+    const auth = await requireInfluencerAuth(req);
+    if (!auth.authorized) {
+      return auth.response!;
     }
 
     const body = await req.json();
     const {
-      username,
       partnership_id,
       title,
       description,
@@ -111,43 +100,11 @@ export async function POST(req: NextRequest) {
       attachments,
     } = body;
 
-    if (!username || !title) {
-      return NextResponse.json({ error: 'Username and title are required' }, { status: 400 });
+    if (!title) {
+      return NextResponse.json({ error: 'Title is required' }, { status: 400 });
     }
 
-    // Check authentication (legacy)
-    const isAuth = await checkAuth(username);
-    if (!isAuth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const influencer = await getInfluencerByUsername(username);
-    if (!influencer) {
-      return NextResponse.json({ error: 'Influencer not found' }, { status: 404 });
-    }
-
-    // Get account_id
-    const { data: account } = await supabase
-      .from('accounts')
-      .select('id')
-      .eq('legacy_influencer_id', influencer.id)
-      .single();
-
-    if (!account) {
-      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
-    }
-
-    // Permission check
-    if (user.role === 'influencer') {
-      if (user.accountId !== account.id) {
-        return NextResponse.json({ error: 'Forbidden - not your account' }, { status: 403 });
-      }
-    } else if (user.role === 'agent') {
-      const agentAccounts = await getAgentInfluencerAccounts(user.id);
-      if (!agentAccounts.includes(account.id)) {
-        return NextResponse.json({ error: 'Forbidden - not your influencer' }, { status: 403 });
-      }
-    }
+    const accountId = auth.accountId;
 
     // If partnership_id provided, verify it belongs to this account
     if (partnership_id) {
@@ -157,7 +114,7 @@ export async function POST(req: NextRequest) {
         .eq('id', partnership_id)
         .single();
 
-      if (!partnership || partnership.account_id !== account.id) {
+      if (!partnership || partnership.account_id !== accountId) {
         return NextResponse.json({ error: 'Partnership not found' }, { status: 404 });
       }
     }
@@ -166,7 +123,7 @@ export async function POST(req: NextRequest) {
     const { data: task, error } = await supabase
       .from('tasks')
       .insert({
-        account_id: account.id,
+        account_id: accountId,
         partnership_id: partnership_id || null,
         title: sanitizeHtml(title),
         description: description ? sanitizeHtml(description) : null,
