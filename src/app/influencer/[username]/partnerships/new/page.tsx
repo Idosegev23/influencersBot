@@ -55,65 +55,9 @@ export default function NewPartnershipPage() {
       const result = await response.json();
       const partnershipId = result.partnership.id;
 
-      // Upload documents if any - DIRECT to Supabase Storage (bypasses Vercel 4.5MB limit)
-      if (uploadedFiles.length > 0) {
-        const accountId = result.partnership.account_id;
-        
-        for (const file of uploadedFiles) {
-          try {
-            // Check file size (max 10MB)
-            const MAX_SIZE = 10 * 1024 * 1024;
-            if (file.size > MAX_SIZE) {
-              alert(`${file.name} גדול מדי (${(file.size / 1024 / 1024).toFixed(2)}MB). מקסימום 10MB.`);
-              continue;
-            }
-
-            // 1. Upload directly to Supabase Storage (client-side, no API route)
-            const timestamp = Date.now();
-            const cleanFilename = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-            const storagePath = `${accountId}/partnerships/${partnershipId}/${timestamp}_${cleanFilename}`;
-
-            const { data: uploadData, error: uploadError } = await supabaseClient.storage
-              .from('partnership-documents')
-              .upload(storagePath, file, {
-                contentType: file.type,
-                upsert: false,
-              });
-
-            if (uploadError) {
-              console.error(`Failed to upload ${file.name}:`, uploadError);
-              continue;
-            }
-
-            // 2. Get public URL
-            const { data: urlData } = supabaseClient.storage
-              .from('partnership-documents')
-              .getPublicUrl(storagePath);
-
-            // 3. Save metadata to DB via lightweight API (only JSON, no file payload)
-            await fetch('/api/influencer/documents/metadata', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                username,
-                accountId,
-                partnershipId,
-                filename: file.name,
-                fileSize: file.size,
-                mimeType: file.type,
-                storagePath,
-                publicUrl: urlData.publicUrl,
-                documentType: 'contract',
-              }),
-            });
-
-            console.log(`✓ Uploaded ${file.name}`);
-          } catch (err) {
-            console.error(`Error uploading ${file.name}:`, err);
-          }
-        }
-      }
-
+      // Documents upload temporarily disabled during creation
+      // Can upload later from partnership detail page
+      
       router.push(`/influencer/${username}/partnerships/${partnershipId}`);
     } catch (err) {
       console.error('Error creating partnership:', err);
@@ -270,23 +214,16 @@ export default function NewPartnershipPage() {
           />
         </div>
 
-        {/* Document Upload */}
+        {/* Document Upload - Temporarily disabled during creation */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
-            העלה מסמכים (חוזה, ברייף, וכו')
+            העלאת מסמכים
           </label>
-          <input
-            type="file"
-            multiple
-            accept=".pdf,.doc,.docx,.txt"
-            onChange={handleFileChange}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-          {uploadedFiles.length > 0 && (
-            <div className="mt-2 text-sm text-gray-600">
-              {uploadedFiles.length} קובץ/ים נבחרו: {uploadedFiles.map(f => f.name).join(', ')}
-            </div>
-          )}
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-700 text-right">
+              💡 ניתן להעלות מסמכים לאחר יצירת השת"פ מעמוד פרטי השת"פ
+            </p>
+          </div>
         </div>
 
         {/* Actions */}
