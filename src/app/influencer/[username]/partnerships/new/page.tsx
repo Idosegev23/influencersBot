@@ -135,6 +135,7 @@ export default function NewPartnershipPage() {
       console.log('✅ parsedRawData saved');
       
       // Map to form fields - SIMPLE AND DIRECT
+      // Keep deliverables as text for form display
       const deliverablesText = Array.isArray(data.deliverables)
         ? data.deliverables
             .map((d: any) => {
@@ -154,8 +155,14 @@ export default function NewPartnershipPage() {
         start_date: data.effectiveDate || '',
         end_date: data.expiryDate || '',
         contract_amount: data.paymentTerms?.totalAmount?.toString() || '',
-        deliverables: deliverablesText,
+        deliverables: deliverablesText, // Text for editing
         notes: '',
+      });
+      
+      console.log('[Partnership Creation] ✅ Form data set:', {
+        brand_name: data.parties?.brand,
+        amount: data.paymentTerms?.totalAmount,
+        deliverables_count: data.deliverables?.length,
       });
 
       setIsParsing(false);
