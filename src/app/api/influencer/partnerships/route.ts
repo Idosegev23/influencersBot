@@ -132,6 +132,16 @@ export async function POST(req: NextRequest) {
       end_date,
       notes,
       tags,
+      // New parsed contract fields
+      payment_schedule,
+      exclusivity,
+      termination_clauses,
+      liability_clauses,
+      confidentiality,
+      key_dates,
+      contract_scope,
+      auto_renewal,
+      parsed_contract_data,
     } = body;
 
     if (!username || !brand_name) {
@@ -204,6 +214,16 @@ export async function POST(req: NextRequest) {
         end_date: end_date || null,
         notes: notes ? sanitizeHtml(notes) : null,
         tags: tags || [],
+        // Full parsed contract data (from AI)
+        payment_schedule: payment_schedule || [],
+        exclusivity: exclusivity || null,
+        termination_clauses: termination_clauses || [],
+        liability_clauses: liability_clauses || [],
+        confidentiality: confidentiality || null,
+        key_dates: key_dates || [],
+        contract_scope: contract_scope ? sanitizeHtml(contract_scope) : null,
+        auto_renewal: auto_renewal || false,
+        parsed_contract_data: parsed_contract_data || null,
       })
       .select()
       .single();
