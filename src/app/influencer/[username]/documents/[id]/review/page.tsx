@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { BriefView } from '@/components/documents/BriefView';
 
 interface Document {
   id: string;
@@ -194,7 +195,12 @@ export default function DocumentReviewPage() {
         </h2>
 
         {document.parsing_status === 'completed' && editedData ? (
-          <div className="space-y-6">
+          <>
+            {/* Brief View - Special Display */}
+            {document.document_type === 'brief' ? (
+              <BriefView data={editedData} />
+            ) : (
+              <div className="space-y-6">
             {/* Brand Name */}
             {editedData.brandName !== undefined && (
               <div>
@@ -329,7 +335,21 @@ export default function DocumentReviewPage() {
                 {JSON.stringify(editedData, null, 2)}
               </pre>
             </details>
-          </div>
+              </div>
+            )}
+
+            {/* Raw JSON always available */}
+            {document.document_type === 'brief' && (
+              <details className="mt-6">
+                <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-900">
+                  הצג JSON מלא
+                </summary>
+                <pre className="mt-2 p-4 bg-gray-50 rounded-lg text-xs overflow-auto max-h-64 text-left">
+                  {JSON.stringify(editedData, null, 2)}
+                </pre>
+              </details>
+            )}
+          </>
         ) : (
           <p className="text-gray-500 text-center py-8">
             אין נתונים לתצוגה. אנא מלא את הפרטים ידנית.
