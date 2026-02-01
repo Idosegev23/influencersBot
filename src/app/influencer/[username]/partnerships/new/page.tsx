@@ -391,8 +391,20 @@ export default function NewPartnershipPage() {
             {isParsing && (
               <div className="text-center py-12">
                 <Loader2 className="h-12 w-12 text-blue-600 animate-spin mx-auto mb-4" />
-                <p className="text-lg font-medium text-gray-900">AI מנתח את המסמך...</p>
-                <p className="text-sm text-gray-600 mt-2">זה עשוי לקחת 10-30 שניות</p>
+                <p className="text-lg font-medium text-gray-900">🤖 Gemini 3 Pro מנתח את החוזה...</p>
+                <p className="text-sm text-gray-600 mt-2">זה עשוי לקחת 30 שניות - 8 דקות</p>
+                <div className="mt-6 max-w-md mx-auto text-right">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-xs font-medium text-blue-900 mb-2">מה ה-AI מחפש:</p>
+                    <ul className="text-xs text-blue-700 space-y-1">
+                      <li>✓ שמות הצדדים (מותג, משפיען, סוכן)</li>
+                      <li>✓ תאריכים (תחילה, סיום, שנתי)</li>
+                      <li>✓ סכום החוזה (בטבלאות ורשימות)</li>
+                      <li>✓ דליברבלס (פוסטים, סרטונים, סטוריז)</li>
+                      <li>✓ תנאי תשלום ומועדים</li>
+                    </ul>
+                  </div>
+                </div>
               </div>
             )}
           </div>
