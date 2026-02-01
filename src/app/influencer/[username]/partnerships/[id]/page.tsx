@@ -392,6 +392,36 @@ export default function PartnershipDetailPage() {
             פרטי השת"פ
           </button>
           <button
+            onClick={() => setActiveTab('payments')}
+            className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 ${
+              activeTab === 'payments'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            💰 מועדי תשלום
+          </button>
+          <button
+            onClick={() => setActiveTab('deliverables')}
+            className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 ${
+              activeTab === 'deliverables'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            📋 משימות
+          </button>
+          <button
+            onClick={() => setActiveTab('terms')}
+            className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 ${
+              activeTab === 'terms'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            ⚖️ תנאים
+          </button>
+          <button
             onClick={() => setActiveTab('documents')}
             className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 ${
               activeTab === 'documents'
@@ -399,7 +429,7 @@ export default function PartnershipDetailPage() {
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            מסמכים ({documents.length})
+            📄 מסמכים ({documents.length})
           </button>
         </div>
       </div>
@@ -554,6 +584,291 @@ export default function PartnershipDetailPage() {
           <p>נוצר: {new Date(partnership.created_at).toLocaleString('he-IL')}</p>
           <p>עודכן: {new Date(partnership.updated_at).toLocaleString('he-IL')}</p>
         </div>
+        </div>
+      )}
+
+      {/* Payments Tab */}
+      {activeTab === 'payments' && (
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6 text-right">💰 מועדי תשלום</h2>
+          
+          {partnership?.payment_schedule && partnership.payment_schedule.length > 0 ? (
+            <div className="space-y-4">
+              {/* Total Amount Summary */}
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-6 mb-6">
+                <div className="flex items-center justify-between">
+                  <div className="text-right">
+                    <p className="text-sm text-green-700 mb-1">סכום כולל</p>
+                    <p className="text-4xl font-bold text-green-900">
+                      ₪{partnership.contract_amount?.toLocaleString() || '—'}
+                    </p>
+                    <p className="text-xs text-green-600 mt-1">
+                      {partnership.payment_schedule.length} תשלומים מתוכננים
+                    </p>
+                  </div>
+                  <div className="h-16 w-16 rounded-full bg-green-200 flex items-center justify-center">
+                    <svg className="h-8 w-8 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Timeline */}
+              <div className="relative">
+                {partnership.payment_schedule.map((milestone, index) => (
+                  <div key={index} className="flex gap-4 mb-6 last:mb-0">
+                    {/* Timeline Line */}
+                    <div className="flex flex-col items-center">
+                      <div className="h-10 w-10 rounded-full bg-blue-100 border-2 border-blue-600 flex items-center justify-center font-bold text-blue-600">
+                        {index + 1}
+                      </div>
+                      {index < partnership.payment_schedule.length - 1 && (
+                        <div className="w-0.5 h-full bg-blue-200 mt-2" style={{ minHeight: '60px' }} />
+                      )}
+                    </div>
+
+                    {/* Payment Card */}
+                    <div className="flex-1 bg-white border-2 border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="text-right flex-1">
+                          <p className="text-lg font-bold text-gray-900">
+                            ₪{milestone.amount.toLocaleString()}
+                          </p>
+                          <p className="text-sm text-gray-600">{milestone.percentage}% מהסכום</p>
+                        </div>
+                        {milestone.dueDate && (
+                          <div className="bg-blue-50 px-3 py-1 rounded-full">
+                            <p className="text-xs font-medium text-blue-700">
+                              📅 {new Date(milestone.dueDate).toLocaleDateString('he-IL')}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <p className="text-sm text-gray-700 mb-3 text-right">
+                        <strong>תנאי:</strong> {milestone.trigger}
+                      </p>
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={() => {
+                            // TODO: Add to Google Calendar
+                            alert('הוספה ליומן - בקרוב!');
+                          }}
+                          className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          📅 הוסף ליומן
+                        </button>
+                        <button
+                          onClick={() => {
+                            // TODO: Set reminder
+                            alert('תזכורת - בקרוב!');
+                          }}
+                          className="px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors"
+                        >
+                          🔔 תזכורת
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-12 text-gray-500">
+              <svg className="h-16 w-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-lg mb-2">אין מועדי תשלום</p>
+              <p className="text-sm">העלה חוזה עם פירוט תשלומים או הוסף ידנית</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Deliverables Tab */}
+      {activeTab === 'deliverables' && (
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6 text-right">📋 דליברבלס ומשימות</h2>
+          
+          {partnership?.deliverables && Array.isArray(partnership.deliverables) && partnership.deliverables.length > 0 ? (
+            <div className="space-y-3">
+              {partnership.deliverables.map((item, index) => (
+                <div key={index} className="border-2 border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
+                  <div className="flex items-start gap-4">
+                    <input
+                      type="checkbox"
+                      checked={item.completed || false}
+                      onChange={() => {
+                        // TODO: Toggle completion
+                        alert('סימון השלמה - בקרוב!');
+                      }}
+                      className="mt-1 h-5 w-5 text-blue-600 rounded"
+                    />
+                    
+                    <div className="flex-1 text-right">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                          <h3 className="text-lg font-bold text-gray-900">
+                            {item.quantity && `${item.quantity}x `}
+                            {item.type}
+                          </h3>
+                          <p className="text-sm text-gray-600 mt-1">{item.description}</p>
+                        </div>
+                        {item.platform && (
+                          <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs font-medium">
+                            {item.platform}
+                          </span>
+                        )}
+                      </div>
+
+                      {item.dueDate && (
+                        <p className="text-sm text-gray-500 mb-3">
+                          📅 מועד: {new Date(item.dueDate).toLocaleDateString('he-IL')}
+                        </p>
+                      )}
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={() => {
+                            // TODO: Create task
+                            alert('יצירת משימה - בקרוב!');
+                          }}
+                          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+                        >
+                          ➕ צור משימה
+                        </button>
+                        <button
+                          onClick={() => {
+                            // TODO: Add to calendar
+                            alert('הוספה ליומן - בקרוב!');
+                          }}
+                          className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded hover:bg-gray-50 transition-colors"
+                        >
+                          📅 ליומן
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 text-gray-500">
+              <svg className="h-16 w-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              <p className="text-lg mb-2">אין דליברבלס</p>
+              <p className="text-sm">העלה חוזה או הוסף דליברבלס ידנית</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Terms Tab */}
+      {activeTab === 'terms' && (
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6 text-right">⚖️ תנאי החוזה</h2>
+          
+          <div className="space-y-6">
+            {/* Scope */}
+            {partnership?.contract_scope && (
+              <div className="border-l-4 border-blue-500 bg-blue-50 p-4">
+                <h3 className="font-bold text-gray-900 mb-2 text-right">📌 תחום החוזה</h3>
+                <p className="text-sm text-gray-700 text-right">{partnership.contract_scope}</p>
+              </div>
+            )}
+
+            {/* Exclusivity */}
+            {partnership?.exclusivity?.isExclusive && (
+              <div className="border-l-4 border-purple-500 bg-purple-50 p-4">
+                <h3 className="font-bold text-gray-900 mb-2 text-right">🔒 אקסקלוסיביות</h3>
+                <p className="text-sm text-purple-700 mb-2 text-right font-medium">חוזה אקסקלוסיבי</p>
+                {partnership.exclusivity.categories && partnership.exclusivity.categories.length > 0 && (
+                  <ul className="text-sm text-gray-700 space-y-1">
+                    {partnership.exclusivity.categories.map((cat, i) => (
+                      <li key={i} className="text-right">• {cat}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {/* Termination Clauses */}
+            {partnership?.termination_clauses && partnership.termination_clauses.length > 0 && (
+              <div className="border-l-4 border-orange-500 bg-orange-50 p-4">
+                <h3 className="font-bold text-gray-900 mb-3 text-right">⚠️ תנאי ביטול</h3>
+                <ul className="text-sm text-gray-700 space-y-2">
+                  {partnership.termination_clauses.map((clause, i) => (
+                    <li key={i} className="text-right border-b border-orange-200 pb-2 last:border-0">• {clause}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Liability Clauses */}
+            {partnership?.liability_clauses && partnership.liability_clauses.length > 0 && (
+              <div className="border-l-4 border-red-500 bg-red-50 p-4">
+                <h3 className="font-bold text-gray-900 mb-3 text-right">⚡ אחריות ונזיקין</h3>
+                <ul className="text-sm text-gray-700 space-y-2">
+                  {partnership.liability_clauses.map((clause, i) => (
+                    <li key={i} className="text-right border-b border-red-200 pb-2 last:border-0">• {clause}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Confidentiality */}
+            {partnership?.confidentiality && (
+              <div className="border-l-4 border-gray-500 bg-gray-50 p-4">
+                <h3 className="font-bold text-gray-900 mb-2 text-right">🔐 סודיות</h3>
+                <p className="text-sm text-gray-700 text-right">{partnership.confidentiality}</p>
+              </div>
+            )}
+
+            {/* Auto Renewal */}
+            {partnership?.auto_renewal && (
+              <div className="border-l-4 border-green-500 bg-green-50 p-4">
+                <h3 className="font-bold text-gray-900 mb-2 text-right">🔄 חידוש אוטומטי</h3>
+                <p className="text-sm text-green-700 text-right">החוזה מתחדש אוטומטית בתום התקופה</p>
+              </div>
+            )}
+
+            {/* Key Dates */}
+            {partnership?.key_dates && partnership.key_dates.length > 0 && (
+              <div className="border-l-4 border-indigo-500 bg-indigo-50 p-4">
+                <h3 className="font-bold text-gray-900 mb-3 text-right">📆 תאריכים חשובים</h3>
+                <ul className="text-sm text-gray-700 space-y-2">
+                  {partnership.key_dates.map((kd, i) => (
+                    <li key={i} className="flex items-center justify-between text-right border-b border-indigo-200 pb-2 last:border-0">
+                      <span>{kd.event}</span>
+                      <span className="font-medium text-indigo-700">
+                        {new Date(kd.date).toLocaleDateString('he-IL')}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          {/* Empty State */}
+          {!partnership?.payment_schedule?.length &&
+           !partnership?.exclusivity &&
+           !partnership?.termination_clauses?.length &&
+           !partnership?.liability_clauses?.length &&
+           !partnership?.confidentiality && (
+            <div className="text-center py-12 text-gray-500">
+              <svg className="h-16 w-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <p className="text-lg mb-2">אין תנאי חוזה</p>
+              <p className="text-sm">העלה חוזה עם תנאים מפורטים</p>
+            </div>
+          )}
         </div>
       )}
 
