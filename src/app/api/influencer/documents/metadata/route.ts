@@ -37,20 +37,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check authentication
+    // Check authentication (optional - allow unauthenticated for new partnership creation flow)
     const isAuth = await checkAuth(username);
+    
+    // If not authenticated via cookie, verify influencer exists and accountId is valid
     if (!isAuth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+      const influencer = await getInfluencerByUsername(username);
+      if (!influencer) {
+        return NextResponse.json({ error: 'Influencer not found' }, { status: 404 });
+      }
 
-    const influencer = await getInfluencerByUsername(username);
-    if (!influencer) {
-      return NextResponse.json({ error: 'Influencer not found' }, { status: 404 });
-    }
-
-    // Verify accountId matches
-    if (influencer.id !== accountId) {
-      return NextResponse.json({ error: 'Account mismatch' }, { status: 403 });
+      // Verify accountId matches
+      if (influencer.id !== accountId) {
+        return NextResponse.json({ error: 'Account mismatch' }, { status: 403 });
+      }
     }
 
     // Save document metadata to database
