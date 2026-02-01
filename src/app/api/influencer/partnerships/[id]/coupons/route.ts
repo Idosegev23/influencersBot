@@ -40,6 +40,7 @@ export async function GET(
     }
 
     // Get coupons
+    console.log('🎟️ Fetching coupons for partnership:', partnershipId, 'account:', accountId);
     const { data, error } = await supabase
       .from('coupons')
       .select('*, coupon_usages(count)')
@@ -47,12 +48,15 @@ export async function GET(
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching coupons:', error);
+      console.error('❌ Error fetching coupons:', error);
       return NextResponse.json(
         { error: 'שגיאה בטעינת קופונים' },
         { status: 500 }
       );
     }
+
+    console.log('✅ Found coupons:', data?.length || 0);
+    console.log('📦 Coupons data:', JSON.stringify(data, null, 2));
 
     return NextResponse.json({
       success: true,
@@ -106,6 +110,7 @@ export async function POST(
     }
 
     // Create coupon
+    console.log('➕ Creating coupon:', body.code, 'for partnership:', partnershipId);
     const { data, error } = await supabase
       .from('coupons')
       .insert({
@@ -128,12 +133,14 @@ export async function POST(
       .single();
 
     if (error) {
-      console.error('Error creating coupon:', error);
+      console.error('❌ Error creating coupon:', error);
       return NextResponse.json(
-        { error: 'שגיאה ביצירת קופון' },
+        { error: 'שגיאה ביצירת קופון', details: error.message },
         { status: 500 }
       );
     }
+
+    console.log('✅ Coupon created successfully:', data.id, data.code);
 
     return NextResponse.json({
       success: true,

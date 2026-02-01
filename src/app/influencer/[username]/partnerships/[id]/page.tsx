@@ -169,15 +169,20 @@ export default function PartnershipDetailPage() {
   const loadCoupons = async () => {
     setIsLoadingCoupons(true);
     try {
+      console.log('🎟️ Loading coupons for partnership:', partnershipId);
       const response = await fetch(
         `/api/influencer/partnerships/${partnershipId}/coupons?username=${username}`
       );
 
       if (!response.ok) {
+        const errorData = await response.json();
+        console.error('❌ Failed to load coupons:', response.status, errorData);
         throw new Error('Failed to load coupons');
       }
 
       const result = await response.json();
+      console.log('✅ Loaded coupons:', result.coupons);
+      console.log('📊 Coupons count:', result.coupons?.length || 0);
       setCoupons(result.coupons || []);
     } catch (err) {
       console.error('Error loading coupons:', err);
@@ -206,6 +211,7 @@ export default function PartnershipDetailPage() {
       }
 
       const result = await response.json();
+      console.log('✅ Coupon created:', result.coupon);
       
       // Reset form and reload coupons
       setNewCoupon({
@@ -221,6 +227,8 @@ export default function PartnershipDetailPage() {
         tracking_url: '',
       });
       setShowCouponForm(false);
+      
+      console.log('🔄 Reloading coupons after creation...');
       await loadCoupons();
       
       alert('✅ הקופון נוצר בהצלחה!');
