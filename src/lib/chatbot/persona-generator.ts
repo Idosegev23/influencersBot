@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase';
 import { scrapeInstagramProfile } from '@/lib/apify';
+import { buildPersonaWithGemini } from '@/lib/gemini-chat';
 import type { ApifyPostData } from '@/types';
 
 type InstagramData = {
@@ -280,14 +281,18 @@ function extractTopics(posts: ApifyPostData[]): string[] {
 }
 
 /**
- * Sync Instagram data and regenerate persona
+ * Sync Instagram data and regenerate persona WITH GEMINI PRO
  */
 export async function syncInstagramAndRegeneratePersona(accountId: string, username: string) {
   try {
+    console.log(`🔍 Starting Instagram sync for @${username}`);
+    
     // Fetch real data from Instagram via Apify
     const { profile, posts } = await scrapeInstagramProfile(username, { 
       posts_limit: 50,
     });
+
+    console.log(`✅ Scraped ${posts.length} posts from @${username}`);
 
     // Calculate engagement rate
     const engagement_rate = calculateEngagementRate(posts, profile.followersCount);
@@ -308,19 +313,98 @@ export async function syncInstagramAndRegeneratePersona(accountId: string, usern
       top_topics,
     };
 
-    console.log('Instagram data synced:', {
+    console.log('📊 Instagram data analyzed:', {
       username: instagramData.username,
       followers: instagramData.followers,
       engagement_rate: instagramData.engagement_rate,
       topics: instagramData.top_topics,
+      hashtags_count: top_hashtags.length,
     });
 
-    // Generate persona
-    return await generatePersona(accountId, instagramData);
+    // Extract recent post captions for AI analysis
+    const recentPosts = posts.slice(0, 20).map(post => post.caption || '').filter(Boolean);
+
+    console.log('🤖 Building deep persona with Gemini Pro...');
+
+    // Use Gemini Pro to build a DEEP, intelligent persona
+    const aiPersona = await buildPersonaWithGemini({
+      username: profile.username,
+      bio: profile.biography || '',
+      interests: top_topics,
+      recentPosts,
+      customDirectives: [
+        'תמיד דבר בגוף ראשון כנציג של המשפיען',
+        'גלה בהתחלה שאתה הבוט של המשפיען, אבל בצורה חמה ונעימה',
+        'כששואלים על דברים אישיים שלא ציינתי - תענה בעדינות שזה פרטי',
+      ],
+    });
+
+    console.log('✨ Gemini Pro persona built successfully!');
+
+    // Merge AI persona with Instagram data and save
+    const supabase = createClient();
+    
+    const { data, error } = await supabase
+      .from('chatbot_persona')
+      .upsert({
+        account_id: accountId,
+        name: profile.username,
+        
+        // AI-generated fields (from Gemini Pro)
+        tone: determineTone(aiPersona.conversationStyle),
+        bio: profile.biography || '',
+        interests: top_topics,
+        directives: aiPersona.dosList || [
+          'תמיד דבר בגוף ראשון כנציג של המשפיען',
+          'גלה בהתחלה שאתה הבוט של המשפיען',
+        ],
+        greeting_message: aiPersona.responseExamples?.greeting || `היי! אני הבוט של ${profile.username} 😊`,
+        
+        // Instagram analytics
+        instagram_username: profile.username,
+        instagram_followers: profile.followersCount,
+        instagram_following: profile.followingCount,
+        instagram_posts_count: profile.postsCount,
+        instagram_engagement_rate: engagement_rate,
+        instagram_data: instagramData as any,
+        instagram_last_synced: new Date().toISOString(),
+        
+        // AI persona data (for reference)
+        ai_persona_data: aiPersona as any,
+        
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'account_id',
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ Failed to save persona:', error);
+      throw error;
+    }
+
+    console.log('💾 Persona saved to DB!');
+    return data;
   } catch (error) {
-    console.error('Failed to sync Instagram data:', error);
+    console.error('❌ Failed to sync Instagram data:', error);
     throw new Error('Failed to sync Instagram profile. Please try again.');
   }
+}
+
+/**
+ * Map AI conversation style to our tone options
+ */
+function determineTone(conversationStyle: string): 'friendly' | 'professional' | 'casual' | 'enthusiastic' | 'formal' {
+  const style = conversationStyle.toLowerCase();
+  
+  if (style.includes('חם') || style.includes('ידידות')) return 'friendly';
+  if (style.includes('מקצוע')) return 'professional';
+  if (style.includes('סלנג') || style.includes('חופשי')) return 'casual';
+  if (style.includes('נלהב') || style.includes('אנרגט')) return 'enthusiastic';
+  if (style.includes('פורמל')) return 'formal';
+  
+  return 'friendly'; // default
 }
 
 /**

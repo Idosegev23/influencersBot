@@ -216,24 +216,4 @@ function buildSystemInstructions(persona: any): string {
   return instructions.join('\n');
 }
 
-/**
- * Export for backward compatibility
- */
-export async function chat(
-  messages: Array<{ role: string; content: string }>,
-  options?: { model?: string; temperature?: number }
-) {
-  // This is the old OpenAI function - we'll keep it for now
-  const client = getClient();
-  
-  const completion = await client.chat.completions.create({
-    model: options?.model || CHAT_MODEL,
-    messages: messages as any,
-    temperature: options?.temperature || 0.7,
-    max_tokens: 500,
-  });
-
-  return completion.choices[0]?.message?.content || 'מצטער, לא הצלחתי להבין';
-}
-
-export { buildInfluencerInstructions } from './chatbot/instructions-builder';
+// Note: Gemini-only functions here. For OpenAI fallback, see src/lib/openai.ts

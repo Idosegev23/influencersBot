@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Save, Sparkles } from 'lucide-react';
+import { ArrowRight, Save, Sparkles, Instagram } from 'lucide-react';
 
 export default function ChatbotPersonaPage({
   params,
@@ -15,6 +15,7 @@ export default function ChatbotPersonaPage({
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
@@ -132,6 +133,39 @@ export default function ChatbotPersonaPage({
       ...persona,
       interests: persona.interests.filter((_, i) => i !== index),
     });
+  };
+
+  const syncFromInstagram = async () => {
+    try {
+      setSyncing(true);
+      setError(null);
+      setSuccess(false);
+
+      const response = await fetch(
+        `/api/influencer/chatbot/persona?username=${username}`,
+        {
+          method: 'POST',
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to sync from Instagram');
+      }
+
+      const data = await response.json();
+      
+      // Reload persona after sync
+      await loadPersona();
+      
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 5000);
+    } catch (err) {
+      console.error('Error syncing from Instagram:', err);
+      setError(err instanceof Error ? err.message : 'שגיאה בסנכרון מאינסטגרם');
+    } finally {
+      setSyncing(false);
+    }
   };
 
   if (loading) {
@@ -380,11 +414,31 @@ export default function ChatbotPersonaPage({
             </div>
           </div>
 
-          {/* Save Button */}
+          {/* Action Buttons */}
           <div className="flex gap-4">
+            {/* Sync from Instagram */}
+            <button
+              onClick={syncFromInstagram}
+              disabled={syncing || saving}
+              className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {syncing ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  סורק אינסטגרם עם Gemini Pro...
+                </>
+              ) : (
+                <>
+                  <Instagram className="w-5 h-5" />
+                  🤖 סנכרן מאינסטגרם (AI)
+                </>
+              )}
+            </button>
+
+            {/* Save Changes */}
             <button
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || syncing}
               className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? (
@@ -399,6 +453,19 @@ export default function ChatbotPersonaPage({
                 </>
               )}
             </button>
+          </div>
+
+          {/* Info about sync */}
+          <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg text-right">
+            <p className="text-sm text-blue-300">
+              💡 <strong>מה קורה בסנכרון מאינסטגרם?</strong>
+            </p>
+            <ol className="text-xs text-gray-300 space-y-1 mt-2 pr-4">
+              <li>1️⃣ סורקים 50 פוסטים אחרונים מהאינסטגרם שלך (Apify)</li>
+              <li>2️⃣ מנתחים את התוכן, הטון, תחומי עניין, hashtags</li>
+              <li>3️⃣ <strong>Gemini 3 Pro</strong> בונה פרסונה מעמיקה מכל התוכן</li>
+              <li>4️⃣ הפרסונה נשמרת אוטומטית ומוכנה לשימוש!</li>
+            </ol>
           </div>
         </div>
       </div>
