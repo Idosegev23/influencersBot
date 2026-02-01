@@ -550,15 +550,37 @@ export default function PartnershipDetailPage() {
           </label>
           {isEditing ? (
             <textarea
-              value={editData.deliverables ?? partnership.deliverables ?? ''}
+              value={
+                typeof editData.deliverables === 'string' 
+                  ? editData.deliverables 
+                  : typeof partnership.deliverables === 'string'
+                  ? partnership.deliverables
+                  : Array.isArray(partnership.deliverables)
+                  ? partnership.deliverables.map(d => `${d.quantity || ''}x ${d.type} - ${d.description}`).join('\n')
+                  : ''
+              }
               onChange={(e) => setEditData({ ...editData, deliverables: e.target.value })}
               rows={3}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
             />
           ) : (
-            <p className="text-gray-900 whitespace-pre-wrap">
-              {partnership.deliverables || '—'}
-            </p>
+            <div className="text-gray-900">
+              {typeof partnership.deliverables === 'string' ? (
+                <p className="whitespace-pre-wrap">{partnership.deliverables}</p>
+              ) : Array.isArray(partnership.deliverables) && partnership.deliverables.length > 0 ? (
+                <div className="space-y-2">
+                  {partnership.deliverables.map((d, i) => (
+                    <div key={i} className="text-sm bg-gray-50 p-2 rounded">
+                      {d.quantity && <strong>{d.quantity}x </strong>}
+                      {d.type}
+                      {d.description && <> - {d.description}</>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p>—</p>
+              )}
+            </div>
           )}
         </div>
 
