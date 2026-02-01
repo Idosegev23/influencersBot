@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { syncInstagramAndRegeneratePersona } from '@/lib/chatbot/persona-generator';
+import { supabase } from '@/lib/supabase';
+import { requireInfluencerAuth } from '@/lib/auth/influencer-auth';
 
 /**
  * GET /api/influencer/chatbot/persona
@@ -8,30 +8,18 @@ import { syncInstagramAndRegeneratePersona } from '@/lib/chatbot/persona-generat
  */
 export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireInfluencerAuth(req);
+    if (!auth.authorized) {
+      return auth.response!;
     }
 
-    // Get account
-    const { data: account, error: accountError } = await supabase
-      .from('accounts')
-      .select('id')
-      .eq('owner_user_id', user.id)
-      .single();
-
-    if (accountError || !account) {
-      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
-    }
+    const accountId = auth.accountId;
 
     // Get persona
     const { data: persona, error: personaError } = await supabase
       .from('chatbot_persona')
       .select('*')
-      .eq('account_id', account.id)
+      .eq('account_id', accountId)
       .single();
 
     if (personaError && personaError.code !== 'PGRST116') {
@@ -104,28 +92,16 @@ export async function POST(req: NextRequest) {
  */
 export async function PATCH(req: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireInfluencerAuth(req);
+    if (!auth.authorized) {
+      return auth.response!;
     }
 
-    // Get account
-    const { data: account, error: accountError } = await supabase
-      .from('accounts')
-      .select('id')
-      .eq('owner_user_id', user.id)
-      .single();
-
-    if (accountError || !account) {
-      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
-    }
+    const accountId = auth.accountId;
 
     // Parse request body
     const body = await req.json();
-    const { directives, tone, emoji_usage, greeting_message, custom_responses } = body;
+    const { directives, tone, emoji_usage, greeting_message, custom_responses, bio, interests } = body;
 
     // Build update object
     const updates: any = {
@@ -137,18 +113,48 @@ export async function PATCH(req: NextRequest) {
     if (emoji_usage !== undefined) updates.emoji_usage = emoji_usage;
     if (greeting_message !== undefined) updates.greeting_message = greeting_message;
     if (custom_responses !== undefined) updates.custom_responses = custom_responses;
+    if (bio !== undefined) updates.bio = bio;
+    if (interests !== undefined) updates.interests = interests;
 
-    // Update persona
-    const { data: persona, error: updateError } = await supabase
+    // Check if persona exists
+    const { data: existingPersona } = await supabase
       .from('chatbot_persona')
-      .update(updates)
-      .eq('account_id', account.id)
-      .select()
+      .select('id')
+      .eq('account_id', accountId)
       .single();
 
-    if (updateError) {
-      console.error('Failed to update persona:', updateError);
-      return NextResponse.json({ error: 'Failed to update persona' }, { status: 500 });
+    let persona;
+    if (existingPersona) {
+      // Update existing
+      const { data, error: updateError } = await supabase
+        .from('chatbot_persona')
+        .update(updates)
+        .eq('account_id', accountId)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('Failed to update persona:', updateError);
+        return NextResponse.json({ error: 'Failed to update persona' }, { status: 500 });
+      }
+      persona = data;
+    } else {
+      // Create new
+      const { data, error: insertError } = await supabase
+        .from('chatbot_persona')
+        .insert({
+          account_id: accountId,
+          name: auth.username || 'Influencer',
+          ...updates,
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('Failed to create persona:', insertError);
+        return NextResponse.json({ error: 'Failed to create persona' }, { status: 500 });
+      }
+      persona = data;
     }
 
     return NextResponse.json({ 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { chat, buildInfluencerInstructions } from '@/lib/openai';
+import { chatWithGemini } from '@/lib/gemini-chat';
 import { 
   getInfluencerBySubdomain,
   getInfluencerByUsername, 
@@ -631,22 +632,52 @@ export async function POST(req: NextRequest) {
     const tone = decision?.uiDirectives?.tone || 'casual';
     const responseLength = decision?.uiDirectives?.responseLength || 'standard';
     
-    // Use enhanced instructions if persona available, otherwise fallback
-    const instructions = persona
-      ? buildInstructionsWithPersona(influencer, persona, knowledge)
-      : buildInfluencerInstructions(
-          influencer.display_name,
-          influencer.persona,
-          influencer.influencer_type,
-          contextStr
-        );
+    // Get conversation history for context
+    const { data: recentMessages } = await supabase
+      .from('chat_messages')
+      .select('role, message')
+      .eq('session_id', currentSessionId)
+      .order('created_at', { ascending: false })
+      .limit(10);
 
-    // Use Responses API with previous_response_id for multi-turn
-    const result = await chat(
-      instructions,
-      message,
-      responseId || undefined
-    );
+    const conversationHistory = (recentMessages || [])
+      .reverse()
+      .map(msg => ({
+        role: msg.role === 'user' ? 'user' as const : 'model' as const,
+        text: msg.message,
+      }));
+
+    // Use Gemini 3 Flash for fast responses
+    let result: any;
+    if (persona) {
+      // Use Gemini with persona
+      const geminiResult = await chatWithGemini({
+        message,
+        persona,
+        context: contextStr,
+        conversationHistory,
+      });
+      
+      result = {
+        response: geminiResult.text,
+        responseId: null, // Gemini doesn't use response IDs
+        usage: geminiResult.usage,
+      };
+    } else {
+      // Fallback to OpenAI if no persona
+      const instructions = buildInfluencerInstructions(
+        influencer.display_name,
+        influencer.persona,
+        influencer.influencer_type,
+        contextStr
+      );
+      result = await chat(
+        instructions,
+        message,
+        responseId || undefined
+      );
+    }
+    
     timings.openaiMs = Date.now() - stageStart;
     stageStart = Date.now();
 

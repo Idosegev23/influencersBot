@@ -44,6 +44,11 @@ export function NavigationMenu() {
       href: `/influencer/${username}/documents`,
       icon: '📄',
     },
+    {
+      label: 'הבוט שלי',
+      href: `/influencer/${username}/chatbot-persona`,
+      icon: '🤖',
+    },
   ];
 
   return (
