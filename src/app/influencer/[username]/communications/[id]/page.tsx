@@ -34,19 +34,18 @@ export default function CommunicationThreadPage() {
 
     try {
       const response = await fetch(
-        `/api/influencer/communications/${communicationId}`
+        `/api/influencer/communications/${communicationId}?username=${username}`
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to load communication');
+        throw new Error('Failed to load communication');
       }
 
       const result = await response.json();
       setCommunication(result.communication);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error loading communication:', err);
-      setError(err.message || 'שגיאה בטעינת התקשורת');
+      setError('שגיאה בטעינת התקשורת');
     } finally {
       setIsLoading(false);
     }

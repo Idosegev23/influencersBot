@@ -42,18 +42,19 @@ export default function CommunicationsPage() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/influencer/communications`);
+      const response = await fetch(
+        `/api/influencer/communications?username=${username}`
+      );
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to load communications');
+        throw new Error('Failed to load communications');
       }
 
       const result = await response.json();
       setCommunications(result.communications || []);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error loading communications:', err);
-      setError(err.message || 'שגיאה בטעינת התקשורת');
+      setError('שגיאה בטעינת התקשורת');
     } finally {
       setIsLoading(false);
     }
