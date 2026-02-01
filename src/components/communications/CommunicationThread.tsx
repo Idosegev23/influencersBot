@@ -86,6 +86,11 @@ export default function CommunicationThread({ communicationId, username, onUpdat
       const data = await res.json();
       setMessages([...messages, data.message]);
       setNewMessage('');
+      
+      // Notify parent component to refresh if callback provided
+      if (onUpdate) {
+        onUpdate();
+      }
     } catch (err: any) {
       console.error('Error sending message:', err);
       alert('שגיאה בשליחת הודעה: ' + err.message);
