@@ -194,8 +194,10 @@ export default function NewPartnershipPage() {
         contract_amount: formData.contract_amount ? parseFloat(formData.contract_amount) : null,
       };
 
-      // Add full parsed contract data if available
+      // Add full parsed contract data if available (from AI parsing)
       if (parsedRawData) {
+        console.log('[Partnership Creation] 💾 Saving full parsed data to partnership');
+        
         partnershipData.payment_schedule = parsedRawData.paymentTerms?.schedule || [];
         partnershipData.exclusivity = parsedRawData.exclusivity || null;
         partnershipData.termination_clauses = parsedRawData.terminationClauses || [];
@@ -206,10 +208,13 @@ export default function NewPartnershipPage() {
         partnershipData.auto_renewal = parsedRawData.autoRenewal || false;
         partnershipData.parsed_contract_data = parsedRawData; // Full backup
         
-        // Also save deliverables as structured JSONB
-        if (parsedRawData.deliverables) {
+        // Save deliverables as structured JSONB array (not text!)
+        if (Array.isArray(parsedRawData.deliverables)) {
           partnershipData.deliverables = parsedRawData.deliverables;
+          console.log(`[Partnership Creation] 📋 Saving ${parsedRawData.deliverables.length} deliverables as JSONB`);
         }
+      } else {
+        console.log('[Partnership Creation] ℹ️ No parsed data - manual creation');
       }
 
       // Create partnership
