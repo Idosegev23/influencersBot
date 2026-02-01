@@ -9,10 +9,10 @@ export async function PATCH(
   try {
     const { id: documentId } = await context.params;
     const body = await request.json();
-    const { partnership_id } = body;
+    const { field, value, partnership_id } = body;
 
     // Simple update for linking document to partnership (no auth required during creation flow)
-    if (partnership_id !== undefined) {
+    if (partnership_id !== undefined && !field) {
       const { createClient } = await import('@/lib/supabase');
       const supabase = await createClient();
       
@@ -32,7 +32,7 @@ export async function PATCH(
       return NextResponse.json({ success: true });
     }
 
-    // For other updates, require auth
+    // For other updates (field edits), require auth
     const authResult = await requireAuth(request);
     if (!authResult.success) {
       return NextResponse.json(
@@ -66,10 +66,6 @@ export async function PATCH(
     if (accessResult) {
       return accessResult;
     }
-
-    // Parse request body
-    const body = await request.json();
-    const { field, value, partnership_id } = body;
 
     // Prepare update object
     const updates: any = {
