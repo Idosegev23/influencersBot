@@ -18,10 +18,11 @@ type Communication = {
 };
 
 type CommunicationsListProps = {
-  username: string;
+  username?: string;
   accountId?: string;
   category?: string;
   status?: string;
+  communications?: Communication[]; // Optional - if provided, use instead of fetching
 };
 
 export default function CommunicationsList({
@@ -29,16 +30,25 @@ export default function CommunicationsList({
   accountId,
   category,
   status,
+  communications: providedCommunications,
 }: CommunicationsListProps) {
   const [communications, setCommunications] = useState<Communication[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // If communications are provided as props, use them directly
   useEffect(() => {
+    if (providedCommunications) {
+      setCommunications(providedCommunications);
+      setLoading(false);
+      return;
+    }
+
+    // Otherwise, fetch them
     if (username) {
       fetchCommunications();
     }
-  }, [username, accountId, category, status]);
+  }, [username, accountId, category, status, providedCommunications]);
 
   const fetchCommunications = async () => {
     setLoading(true);
