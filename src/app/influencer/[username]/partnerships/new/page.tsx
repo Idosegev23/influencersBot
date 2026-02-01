@@ -180,15 +180,36 @@ export default function NewPartnershipPage() {
     setError(null);
 
     try {
-      // Create partnership first
+      // Prepare partnership data
+      const partnershipData: any = {
+        username,
+        ...formData,
+        contract_amount: formData.contract_amount ? parseFloat(formData.contract_amount) : null,
+      };
+
+      // Add full parsed contract data if available
+      if (parsedRawData) {
+        partnershipData.payment_schedule = parsedRawData.paymentTerms?.schedule || [];
+        partnershipData.exclusivity = parsedRawData.exclusivity || null;
+        partnershipData.termination_clauses = parsedRawData.terminationClauses || [];
+        partnershipData.liability_clauses = parsedRawData.liabilityClauses || [];
+        partnershipData.confidentiality = parsedRawData.confidentiality || null;
+        partnershipData.key_dates = parsedRawData.keyDates || [];
+        partnershipData.contract_scope = parsedRawData.scope || null;
+        partnershipData.auto_renewal = parsedRawData.autoRenewal || false;
+        partnershipData.parsed_contract_data = parsedRawData; // Full backup
+        
+        // Also save deliverables as structured JSONB
+        if (parsedRawData.deliverables) {
+          partnershipData.deliverables = parsedRawData.deliverables;
+        }
+      }
+
+      // Create partnership
       const response = await fetch(`/api/influencer/partnerships`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username,
-          ...formData,
-          contract_amount: formData.contract_amount ? parseFloat(formData.contract_amount) : null,
-        }),
+        body: JSON.stringify(partnershipData),
       });
 
       if (!response.ok) {
