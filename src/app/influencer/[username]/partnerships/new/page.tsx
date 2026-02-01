@@ -106,13 +106,30 @@ export default function NewPartnershipPage() {
       if (!parseResponse.ok) throw new Error('AI parsing failed');
 
       const parseResult = await parseResponse.json();
-      console.log('[Partnership Creation] Parse result:', JSON.stringify(parseResult, null, 2));
+      console.log('[Partnership Creation] 📦 Full parse result:', JSON.stringify(parseResult, null, 2));
+      console.log('[Partnership Creation] 🔍 Keys:', Object.keys(parseResult));
       
       // 5. Fill form with parsed data
-      // Map Gemini response structure to form fields
-      if (parseResult.mergedData || parseResult.results?.[0]?.data) {
-        const data = parseResult.mergedData || parseResult.results[0].data;
-        console.log('[Partnership Creation] Extracted data:', JSON.stringify(data, null, 2));
+      // Try multiple possible response structures
+      let data = null;
+      
+      if (parseResult.mergedData) {
+        data = parseResult.mergedData;
+        console.log('[Partnership Creation] ✅ Using mergedData');
+      } else if (parseResult.results?.[0]?.data) {
+        data = parseResult.results[0].data;
+        console.log('[Partnership Creation] ✅ Using results[0].data');
+      } else if (parseResult.data) {
+        data = parseResult.data;
+        console.log('[Partnership Creation] ✅ Using data');
+      } else if (parseResult.results?.[0]) {
+        // Maybe results[0] is the data itself
+        data = parseResult.results[0];
+        console.log('[Partnership Creation] ✅ Using results[0]');
+      }
+      
+      if (data) {
+        console.log('[Partnership Creation] 📊 Extracted data:', JSON.stringify(data, null, 2));
         
         // Map contract structure to form fields
         const brandName = data.parties?.brand || data.brandName || '';
@@ -147,9 +164,12 @@ export default function NewPartnershipPage() {
           start_date: startDate,
           end_date: endDate,
           amount,
+          deliverables: deliverablesText.substring(0, 100),
         });
       } else {
-        console.warn('[Partnership Creation] ⚠️ No parsed data found:', parseResult);
+        console.error('[Partnership Creation] ❌ No data found in parseResult!');
+        console.error('[Partnership Creation] parseResult structure:', parseResult);
+        throw new Error('לא נמצאו נתונים מנותחים. נסה שוב או מלא ידנית.');
       }
 
       setIsParsing(false);
