@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase';
-import { requireAuth, requireAccountAccess } from '@/lib/auth/api-helpers';
+import { supabase } from '@/lib/supabase';
+import { requireInfluencerAuth } from '@/lib/auth/influencer-auth';
 
 // GET coupons for a partnership
 export async function GET(
@@ -10,15 +10,34 @@ export async function GET(
   try {
     const { id: partnershipId } = await context.params;
 
-    const authResult = await requireAuth(request);
-    if (!authResult.success) {
+    // Auth check with cookie-based auth (no RLS loop)
+    const auth = await requireInfluencerAuth(request);
+    if (!auth.authorized) {
+      return auth.response!;
+    }
+
+    const accountId = auth.accountId;
+
+    // Verify partnership belongs to this account
+    const { data: partnership } = await supabase
+      .from('partnerships')
+      .select('account_id')
+      .eq('id', partnershipId)
+      .single();
+
+    if (!partnership) {
       return NextResponse.json(
-        { error: authResult.error },
-        { status: authResult.status }
+        { error: 'שת"פ לא נמצא' },
+        { status: 404 }
       );
     }
 
-    const supabase = await createClient();
+    if (partnership.account_id !== accountId) {
+      return NextResponse.json(
+        { error: 'אין הרשאה לגשת לשת"פ זה' },
+        { status: 403 }
+      );
+    }
 
     // Get coupons
     const { data, error } = await supabase
@@ -56,15 +75,13 @@ export async function POST(
   try {
     const { id: partnershipId } = await context.params;
 
-    const authResult = await requireAuth(request);
-    if (!authResult.success) {
-      return NextResponse.json(
-        { error: authResult.error },
-        { status: authResult.status }
-      );
+    // Auth check with cookie-based auth (no RLS loop)
+    const auth = await requireInfluencerAuth(request);
+    if (!auth.authorized) {
+      return auth.response!;
     }
 
-    const supabase = await createClient();
+    const accountId = auth.accountId;
     const body = await request.json();
 
     // Get partnership to verify access
@@ -81,17 +98,10 @@ export async function POST(
       );
     }
 
-    // Check access
-    const accessResult = await requireAccountAccess(
-      authResult.user.id,
-      partnership.account_id,
-      'update'
-    );
-
-    if (!accessResult.success) {
+    if (partnership.account_id !== accountId) {
       return NextResponse.json(
-        { error: accessResult.error },
-        { status: accessResult.status }
+        { error: 'אין הרשאה לגשת לשת"פ זה' },
+        { status: 403 }
       );
     }
 
@@ -100,7 +110,7 @@ export async function POST(
       .from('coupons')
       .insert({
         partnership_id: partnershipId,
-        account_id: partnership.account_id,
+        account_id: accountId,
         code: body.code,
         description: body.description,
         discount_type: body.discount_type,
