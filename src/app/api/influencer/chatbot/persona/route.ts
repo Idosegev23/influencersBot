@@ -37,23 +37,24 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/influencer/chatbot/persona
- * Trigger manual sync from Instagram
+ * Trigger manual sync from Instagram (starts background job)
  */
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireInfluencerAuth(req);
+    if (!auth.authorized) {
+      return auth.response!;
     }
 
+    const accountId = auth.accountId;
+    const username = auth.username;
+
     // Get account with Instagram username
+    const supabase = await createClient();
     const { data: account, error: accountError } = await supabase
       .from('accounts')
       .select('id, instagram_username')
-      .eq('owner_user_id', user.id)
+      .eq('id', accountId)
       .single();
 
     if (accountError || !account) {
@@ -67,21 +68,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Sync Instagram and regenerate persona
-    const persona = await syncInstagramAndRegeneratePersona(
+    // Start sync in background (don't await it!)
+    syncInstagramAndRegeneratePersona(
       account.id,
       account.instagram_username
-    );
+    ).catch((error) => {
+      console.error('Background sync error:', error);
+    });
 
+    // Return immediately so UI can start polling for progress
     return NextResponse.json({ 
       success: true,
-      persona,
-      message: 'Persona synced successfully from Instagram',
+      message: 'Sync started in background. Check progress for status.',
+      username: account.instagram_username,
     });
   } catch (error) {
     console.error('POST /api/influencer/chatbot/persona error:', error);
     
-    const errorMessage = error instanceof Error ? error.message : 'Failed to sync persona';
+    const errorMessage = error instanceof Error ? error.message : 'Failed to start sync';
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
