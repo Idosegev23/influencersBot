@@ -4,20 +4,22 @@ import { SUPPORTED_MIME_TYPES, MAX_FILE_SIZE } from './types';
 import type { DocumentType } from './types';
 
 /**
- * Convert File to base64
+ * Convert File/Blob to base64 (Node.js compatible)
  */
-export async function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => {
-      const result = reader.result as string;
-      // Remove data:image/png;base64, prefix
-      const base64 = result.split(',')[1];
-      resolve(base64);
-    };
-    reader.onerror = error => reject(error);
-  });
+export async function fileToBase64(file: File | Blob): Promise<string> {
+  try {
+    // Convert blob to array buffer
+    const arrayBuffer = await file.arrayBuffer();
+    
+    // Convert array buffer to base64
+    const buffer = Buffer.from(arrayBuffer);
+    const base64 = buffer.toString('base64');
+    
+    return base64;
+  } catch (error) {
+    console.error('[fileToBase64] Error:', error);
+    throw new Error('Failed to convert file to base64');
+  }
 }
 
 /**
