@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase';
-import { requireAuth } from '@/lib/auth/api-helpers';
+import { supabase } from '@/lib/supabase';
+import { requireInfluencerAuth } from '@/lib/auth/influencer-auth';
 
 /**
  * POST /api/influencer/communications/[id]/messages
@@ -10,14 +10,17 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authCheck = await requireAuth(request);
-  if (!authCheck.authorized) {
-    return authCheck.response!;
+  const auth = await requireInfluencerAuth(request);
+  if (!auth.authorized) {
+    console.error(`[Communication Messages POST] Unauthorized access attempt`);
+    return auth.response!;
   }
 
-  const supabase = createClient();
   const { id: communicationId } = await params;
+  const accountId = auth.accountId;
   const body = await request.json();
+  
+  console.log(`[Communication Messages POST] Sending message to communication ${communicationId}`);
 
   const { message_text, attachments } = body;
 
@@ -35,11 +38,17 @@ export async function POST(
       .from('brand_communications')
       .select('id, status, account_id')
       .eq('id', communicationId)
+      .eq('account_id', accountId)
       .single();
 
-    if (commError) throw commError;
+    if (commError) {
+      console.error(`[Communication Messages POST] Database error:`, commError);
+      throw commError;
+    }
+    
     if (!communication) {
-      return NextResponse.json({ error: 'Communication not found' }, { status: 404 });
+      console.error(`[Communication Messages POST] Communication ${communicationId} not found or unauthorized`);
+      return NextResponse.json({ error: 'התקשורת לא נמצאה' }, { status: 404 });
     }
 
     // Insert message
@@ -48,33 +57,41 @@ export async function POST(
       .insert({
         communication_id: communicationId,
         sender_type: 'influencer',
-        sender_name: authCheck.user!.fullName || 'Influencer',
-        sender_email: authCheck.user!.email,
+        sender_name: auth.influencer?.full_name || auth.username || 'Influencer',
         message_text,
         attachments: attachments || [],
-        created_by: authCheck.user!.id,
+        is_read: true, // Sender's own message is marked as read
       })
       .select()
       .single();
 
-    if (msgError) throw msgError;
-
-    // Update communication status if closed
-    if (communication.status === 'closed') {
-      await supabase
-        .from('brand_communications')
-        .update({
-          status: 'open',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', communicationId);
+    if (msgError) {
+      console.error(`[Communication Messages POST] Error creating message:`, msgError);
+      throw msgError;
     }
 
+    // Update communication last_message_at and reopen if closed
+    const updateData: any = {
+      last_message_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    
+    if (communication.status === 'closed') {
+      updateData.status = 'open';
+      console.log(`[Communication Messages POST] Reopening closed communication ${communicationId}`);
+    }
+    
+    await supabase
+      .from('brand_communications')
+      .update(updateData)
+      .eq('id', communicationId);
+
+    console.log(`[Communication Messages POST] Successfully sent message to ${communicationId}`);
     return NextResponse.json({ message }, { status: 201 });
   } catch (error: any) {
-    console.error('Error sending message:', error);
+    console.error('[Communication Messages POST] Error:', error);
     return NextResponse.json(
-      { error: 'Failed to send message', details: error.message },
+      { error: 'שגיאה בשליחת ההודעה', details: error.message },
       { status: 500 }
     );
   }
