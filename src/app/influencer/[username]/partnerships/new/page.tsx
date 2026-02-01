@@ -115,16 +115,24 @@ export default function NewPartnershipPage() {
       }
 
       const parseResult = await parseResponse.json();
+      console.log('🔍 parseResult keys:', Object.keys(parseResult));
+      console.log('🔍 parseResult.results:', parseResult.results);
+      console.log('🔍 parseResult.results[0]:', parseResult.results?.[0]);
       
       // 5. Get parsed data from API response
       const data = parseResult.results?.[0]?.data;
+      console.log('🔍 data extracted:', data);
+      console.log('🔍 data.parties:', data?.parties);
+      console.log('🔍 data.parties.brand:', data?.parties?.brand);
       
       if (!data) {
         throw new Error('לא נמצאו נתונים מנותחים');
       }
       
       // Save raw data for review screen
+      console.log('💾 Saving to parsedRawData:', JSON.stringify(data, null, 2));
       setParsedRawData(data);
+      console.log('✅ parsedRawData saved');
       
       // Map to form fields - SIMPLE AND DIRECT
       const deliverablesText = Array.isArray(data.deliverables)
