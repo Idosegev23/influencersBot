@@ -149,14 +149,20 @@ export default function NewPartnershipPage() {
         const endDate = data.expiryDate || data.endDate || data.timeline?.endDate || '';
         const amount = data.totalAmount || data.paymentTerms?.totalAmount || null;
         
-        // Convert deliverables array to string
+        // Convert deliverables array to formatted string
         let deliverablesText = '';
         if (Array.isArray(data.deliverables)) {
           deliverablesText = data.deliverables
             .map((d: any, index: number) => {
-              const desc = typeof d === 'string' ? d : d.description || d.title || '';
-              const qty = d.quantity ? `${d.quantity}x ` : '';
-              return `${qty}${desc}`;
+              if (typeof d === 'string') return d;
+              
+              const parts = [];
+              if (d.quantity) parts.push(`${d.quantity}x`);
+              if (d.type) parts.push(d.type);
+              if (d.description) parts.push(`- ${d.description}`);
+              if (d.platform && d.platform !== 'instagram') parts.push(`(${d.platform})`);
+              
+              return parts.join(' ');
             })
             .filter(Boolean)
             .join('\n');
