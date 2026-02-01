@@ -7,20 +7,23 @@
  * - Drag & drop zone
  * - Multiple file selection
  * - File type validation
- * - Size validation (max 50MB)
+ * - Size validation (max 10MB) - Direct to Supabase Storage
  * - Preview thumbnails
  * - Auto-upload on select
+ * - Direct client-side upload (bypasses Vercel 4.5MB limit)
  * 
  * Usage:
  * <FileUploader 
  *   accountId="account-id"
  *   partnershipId="partnership-id" (optional)
+ *   username="username" (required for auth)
  *   onUploadComplete={(files) => console.log(files)}
  * />
  */
 
 import { useState, useRef, useCallback } from 'react';
 import { Upload, X, FileText, Image, AlertCircle } from 'lucide-react';
+import { supabaseClient } from '@/lib/supabase-client';
 
 export interface UploadedFile {
   id: string;
@@ -32,11 +35,12 @@ export interface UploadedFile {
 
 export interface FileUploaderProps {
   accountId: string;
+  username: string; // Required for auth
   partnershipId?: string;
   onUploadComplete: (files: UploadedFile[]) => void;
   onError?: (error: string) => void;
   acceptedTypes?: string[];
-  maxSize?: number; // in MB
+  maxSize?: number; // in MB (max 10MB for direct upload)
   multiple?: boolean;
 }
 
@@ -60,7 +64,7 @@ const DEFAULT_ACCEPTED_TYPES = [
   'image/gif',
 ];
 
-const DEFAULT_MAX_SIZE = 50; // MB
+const DEFAULT_MAX_SIZE = 10; // MB (Vercel limit bypass via client-side upload)
 
 const ACCEPTED_EXTENSIONS = [
   '.pdf',
@@ -79,6 +83,7 @@ const ACCEPTED_EXTENSIONS = [
 
 export function FileUploader({
   accountId,
+  username,
   partnershipId,
   onUploadComplete,
   onError,
@@ -149,36 +154,80 @@ export function FileUploader({
     [multiple, maxSize, acceptedTypes]
   );
 
-  // Upload files to API
+  // Upload files directly to Supabase Storage (bypasses Vercel 4.5MB limit)
   const uploadFiles = async (filesToUpload: File[]) => {
     setIsUploading(true);
 
     try {
-      const formData = new FormData();
-      
-      filesToUpload.forEach((file) => {
-        formData.append('files', file);
-      });
-      
-      formData.append('accountId', accountId);
-      if (partnershipId) {
-        formData.append('partnershipId', partnershipId);
+      const uploadedFiles: UploadedFile[] = [];
+
+      for (const file of filesToUpload) {
+        // 1. Upload directly to Supabase Storage (client-side)
+        const timestamp = Date.now();
+        const cleanFilename = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const storagePath = partnershipId
+          ? `${accountId}/partnerships/${partnershipId}/${timestamp}_${cleanFilename}`
+          : `${accountId}/documents/${timestamp}_${cleanFilename}`;
+
+        const { data: uploadData, error: uploadError } = await supabaseClient.storage
+          .from('partnership-documents')
+          .upload(storagePath, file, {
+            contentType: file.type,
+            upsert: false,
+          });
+
+        if (uploadError) {
+          console.error(`[FileUploader] Failed to upload ${file.name}:`, uploadError);
+          onError?.(`העלאת ${file.name} נכשלה: ${uploadError.message}`);
+          continue;
+        }
+
+        // 2. Get public URL
+        const { data: urlData } = supabaseClient.storage
+          .from('partnership-documents')
+          .getPublicUrl(storagePath);
+
+        // 3. Save metadata to DB via lightweight API (only JSON, no file payload)
+        const metadataResponse = await fetch('/api/influencer/documents/metadata', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username,
+            accountId,
+            partnershipId: partnershipId || null,
+            filename: file.name,
+            fileSize: file.size,
+            mimeType: file.type,
+            storagePath,
+            publicUrl: urlData.publicUrl,
+            documentType: 'other', // Can be customized
+          }),
+        });
+
+        if (!metadataResponse.ok) {
+          const error = await metadataResponse.json();
+          console.error(`[FileUploader] Failed to save metadata for ${file.name}:`, error);
+          onError?.(`שמירת ${file.name} נכשלה`);
+          continue;
+        }
+
+        const metadata = await metadataResponse.json();
+
+        uploadedFiles.push({
+          id: metadata.document.id,
+          filename: file.name,
+          size: file.size,
+          type: file.type,
+          storagePath: storagePath,
+        });
+
+        console.log(`✓ Uploaded ${file.name}`);
       }
-
-      const response = await fetch('/api/influencer/documents/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Upload failed');
-      }
-
-      const result = await response.json();
 
       // Call success callback
-      onUploadComplete(result.files);
+      if (uploadedFiles.length > 0) {
+        onUploadComplete(uploadedFiles);
+      }
 
       // Clear uploaded files from preview
       setFiles((prev) =>

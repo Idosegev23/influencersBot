@@ -228,7 +228,8 @@ export default function DocumentUploadPage({
           </div>
 
           <FileUploader
-            accountId="temp-account-id" // TODO: Replace with actual accountId
+            accountId="temp-account-id" // TODO: Replace with actual accountId from auth
+            username={username}
             onUploadComplete={handleUploadComplete}
             onError={handleUploadError}
             multiple={true}
