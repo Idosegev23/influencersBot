@@ -115,85 +115,40 @@ export default function NewPartnershipPage() {
       }
 
       const parseResult = await parseResponse.json();
-      console.log('[Partnership Creation] 📦 Full parse result:', JSON.stringify(parseResult, null, 2));
-      console.log('[Partnership Creation] 🔍 Keys:', Object.keys(parseResult));
       
-      // 5. Fill form with parsed data
-      // Try multiple possible response structures
-      let data = null;
+      // 5. Get parsed data from API response
+      const data = parseResult.results?.[0]?.data;
       
-      if (parseResult.mergedData) {
-        data = parseResult.mergedData;
-        console.log('[Partnership Creation] ✅ Using mergedData');
-      } else if (parseResult.results?.[0]?.data) {
-        data = parseResult.results[0].data;
-        console.log('[Partnership Creation] ✅ Using results[0].data');
-      } else if (parseResult.data) {
-        data = parseResult.data;
-        console.log('[Partnership Creation] ✅ Using data');
-      } else if (parseResult.results?.[0]) {
-        // Maybe results[0] is the data itself
-        data = parseResult.results[0];
-        console.log('[Partnership Creation] ✅ Using results[0]');
+      if (!data) {
+        throw new Error('לא נמצאו נתונים מנותחים');
       }
       
-      if (data) {
-        console.log('[Partnership Creation] 📊 Extracted data:', JSON.stringify(data, null, 2));
-        
-        // Save raw data for review screen
-        setParsedRawData(data);
-        
-        // Map contract structure to form fields
-        const brandName = data.parties?.brand || data.brandName || '';
-        const startDate = data.effectiveDate || data.startDate || data.timeline?.startDate || '';
-        const endDate = data.expiryDate || data.endDate || data.timeline?.endDate || '';
-        const amount = data.totalAmount || data.paymentTerms?.totalAmount || null;
-        
-        // Convert deliverables array to formatted string
-        let deliverablesText = '';
-        if (Array.isArray(data.deliverables)) {
-          deliverablesText = data.deliverables
-            .map((d: any, index: number) => {
-              if (typeof d === 'string') return d;
-              
+      // Save raw data for review screen
+      setParsedRawData(data);
+      
+      // Map to form fields - SIMPLE AND DIRECT
+      const deliverablesText = Array.isArray(data.deliverables)
+        ? data.deliverables
+            .map((d: any) => {
               const parts = [];
               if (d.quantity) parts.push(`${d.quantity}x`);
               if (d.type) parts.push(d.type);
               if (d.description) parts.push(`- ${d.description}`);
-              if (d.platform && d.platform !== 'instagram') parts.push(`(${d.platform})`);
-              
               return parts.join(' ');
             })
-            .filter(Boolean)
-            .join('\n');
-        } else if (typeof data.deliverables === 'string') {
-          deliverablesText = data.deliverables;
-        }
-        
-        setFormData({
-          brand_name: brandName,
-          campaign_name: data.campaignName || data.campaignGoal || data.scope || '',
-          status: 'active', // Default for signed contracts
-          start_date: startDate,
-          end_date: endDate,
-          contract_amount: amount?.toString() || '',
-          deliverables: deliverablesText,
-          notes: data.notes || '',
-        });
-        
-        console.log('[Partnership Creation] ✅ Form filled with:', {
-          brand_name: brandName,
-          campaign_name: data.campaignName || data.scope,
-          start_date: startDate,
-          end_date: endDate,
-          amount,
-          deliverables: deliverablesText.substring(0, 100),
-        });
-      } else {
-        console.error('[Partnership Creation] ❌ No data found in parseResult!');
-        console.error('[Partnership Creation] parseResult structure:', parseResult);
-        throw new Error('לא נמצאו נתונים מנותחים. נסה שוב או מלא ידנית.');
-      }
+            .join('\n')
+        : '';
+      
+      setFormData({
+        brand_name: data.parties?.brand || '',
+        campaign_name: data.scope || '',
+        status: 'active',
+        start_date: data.effectiveDate || '',
+        end_date: data.expiryDate || '',
+        contract_amount: data.paymentTerms?.totalAmount?.toString() || '',
+        deliverables: deliverablesText,
+        notes: '',
+      });
 
       setIsParsing(false);
       console.log('[Partnership Creation] ✅ Switching to review mode');
