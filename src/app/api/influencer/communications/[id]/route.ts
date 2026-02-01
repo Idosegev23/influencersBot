@@ -29,9 +29,9 @@ export async function GET(
       .select(`
         *,
         partnership:partnerships(id, brand_name, category, status),
-        account:accounts(id, name),
+        account:accounts(id, type, plan),
         related_invoice:invoices(id, invoice_number, amount, status),
-        related_document:partnership_documents(id, file_name, document_type),
+        related_document:partnership_documents(id, filename, document_type),
         related_task:tasks(id, title, status)
       `)
       .eq('id', id)
