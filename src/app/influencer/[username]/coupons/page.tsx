@@ -100,38 +100,38 @@ export default function CouponsAnalyticsPage() {
 
       const apiResult: ApiCouponData = await response.json();
       
-      // Transform API format to frontend format
+      // Transform API format to frontend format with null safety
       const transformedData: CouponData = {
         overview: {
-          total_coupons: apiResult.totals.totalBrands,
-          total_copied: apiResult.totals.totalCopies,
+          total_coupons: apiResult?.totals?.totalBrands || 0,
+          total_copied: apiResult?.totals?.totalCopies || 0,
           total_used: 0, // Not available from current API
           total_revenue: 0, // Not available from current API
-          avg_conversion_rate: apiResult.totals.totalCopies > 0 
-            ? (apiResult.totals.totalLinkClicks / apiResult.totals.totalCopies) * 100 
+          avg_conversion_rate: (apiResult?.totals?.totalCopies || 0) > 0 
+            ? ((apiResult?.totals?.totalLinkClicks || 0) / (apiResult?.totals?.totalCopies || 1)) * 100 
             : 0,
           followers_vs_non: {
             followers: 0, // Not available from current API
-            non_followers: apiResult.totals.totalUniqueCopiers,
+            non_followers: apiResult?.totals?.totalUniqueCopiers || 0,
           },
         },
-        coupons: apiResult.brandPerformance.map(brand => ({
-          id: brand.brandId,
-          code: brand.couponCode,
+        coupons: (apiResult?.brandPerformance || []).map(brand => ({
+          id: brand?.brandId || '',
+          code: brand?.couponCode || '',
           partnership: {
-            id: brand.brandId,
-            brand_name: brand.brandName,
+            id: brand?.brandId || '',
+            brand_name: brand?.brandName || 'Unknown',
           },
-          times_copied: brand.copyCount,
-          times_used: brand.linkClicks,
-          conversion_rate: brand.clickThroughRate,
+          times_copied: brand?.copyCount || 0,
+          times_used: brand?.linkClicks || 0,
+          conversion_rate: brand?.clickThroughRate || 0,
           total_revenue: 0, // Not available
           avg_order_value: 0, // Not available
           created_at: new Date().toISOString(), // Not available
         })),
-        top_products: apiResult.topCoupons.slice(0, 10).map(coupon => ({
-          product_name: coupon.brandName,
-          times_ordered: coupon.copyCount,
+        top_products: (apiResult?.topCoupons || []).slice(0, 10).map(coupon => ({
+          product_name: coupon?.brandName || 'Unknown',
+          times_ordered: coupon?.copyCount || 0,
           revenue: 0, // Not available
         })),
       };
@@ -193,52 +193,52 @@ export default function CouponsAnalyticsPage() {
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="text-sm text-gray-600 mb-1">סה"כ קופונים</div>
           <div className="text-2xl font-bold text-gray-900">
-            {data.overview.total_coupons}
+            {data?.overview?.total_coupons || 0}
           </div>
         </div>
 
         <div className="bg-white border border-blue-200 rounded-lg p-4">
           <div className="text-sm text-gray-600 mb-1">הועתקו</div>
           <div className="text-2xl font-bold text-blue-600">
-            {data.overview.total_copied}
+            {data?.overview?.total_copied || 0}
           </div>
         </div>
 
         <div className="bg-white border border-green-200 rounded-lg p-4">
           <div className="text-sm text-gray-600 mb-1">נוצלו</div>
           <div className="text-2xl font-bold text-green-600">
-            {data.overview.total_used}
+            {data?.overview?.total_used || 0}
           </div>
         </div>
 
         <div className="bg-white border border-purple-200 rounded-lg p-4">
           <div className="text-sm text-gray-600 mb-1">הכנסות</div>
           <div className="text-2xl font-bold text-purple-600">
-            ₪{data.overview.total_revenue.toLocaleString('he-IL')}
+            ₪{(data?.overview?.total_revenue || 0).toLocaleString('he-IL')}
           </div>
         </div>
 
         <div className="bg-white border border-orange-200 rounded-lg p-4">
           <div className="text-sm text-gray-600 mb-1">אחוז המרה</div>
           <div className="text-2xl font-bold text-orange-600">
-            {data.overview.avg_conversion_rate.toFixed(1)}%
+            {(data?.overview?.avg_conversion_rate || 0).toFixed(1)}%
           </div>
         </div>
 
         <div className="bg-white border border-emerald-200 rounded-lg p-4">
           <div className="text-sm text-gray-600 mb-1">עוקבים / לא</div>
           <div className="text-lg font-bold text-emerald-600">
-            {data.overview.followers_vs_non.followers} /{' '}
-            {data.overview.followers_vs_non.non_followers}
+            {data?.overview?.followers_vs_non?.followers || 0} /{' '}
+            {data?.overview?.followers_vs_non?.non_followers || 0}
           </div>
         </div>
       </div>
 
       {/* Coupons Table */}
-      <CouponPerformanceTable coupons={data.coupons} />
+      <CouponPerformanceTable coupons={data?.coupons || []} />
 
       {/* Top Products */}
-      <TopProducts products={data.top_products} />
+      <TopProducts products={data?.top_products || []} />
     </div>
   );
 }
