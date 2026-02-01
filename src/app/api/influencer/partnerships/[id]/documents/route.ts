@@ -164,9 +164,5 @@ export async function POST(
   }
 }
 
-// Configure body size limit for file uploads
-export const config = {
-  api: {
-    bodyParser: false, // Disable default body parser to handle files
-  },
-};
+// Note: bodyParser config is deprecated in Next.js 16 App Router
+// File handling is done via FormData in the route handler directly
