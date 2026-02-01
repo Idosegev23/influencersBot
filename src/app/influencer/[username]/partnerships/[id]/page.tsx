@@ -170,7 +170,7 @@ export default function PartnershipDetailPage() {
     setIsLoadingCoupons(true);
     try {
       const response = await fetch(
-        `/api/influencer/partnerships/${partnershipId}/coupons`
+        `/api/influencer/partnerships/${partnershipId}/coupons?username=${username}`
       );
 
       if (!response.ok) {
@@ -193,7 +193,7 @@ export default function PartnershipDetailPage() {
 
     try {
       const response = await fetch(
-        `/api/influencer/partnerships/${partnershipId}/coupons`,
+        `/api/influencer/partnerships/${partnershipId}/coupons?username=${username}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
