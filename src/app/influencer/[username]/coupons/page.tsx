@@ -100,6 +100,13 @@ export default function CouponsAnalyticsPage() {
 
       const apiResult: ApiCouponData = await response.json();
       
+      // Debug: Check what API returns
+      console.log('🔍 API Result:', apiResult);
+      console.log('🔍 Brand Performance:', apiResult?.brandPerformance);
+      if (apiResult?.brandPerformance?.[0]) {
+        console.log('🔍 First Coupon:', apiResult.brandPerformance[0]);
+      }
+      
       // Transform API format to frontend format with null safety
       const transformedData: CouponData = {
         overview: {
