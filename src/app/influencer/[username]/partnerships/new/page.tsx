@@ -10,6 +10,7 @@ export default function NewPartnershipPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [formData, setFormData] = useState({
     brand_name: '',
     campaign_name: '',
@@ -21,12 +22,19 @@ export default function NewPartnershipPage() {
     notes: '',
   });
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setUploadedFiles(Array.from(e.target.files));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setError(null);
 
     try {
+      // Create partnership first
       const response = await fetch(`/api/influencer/partnerships`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -42,7 +50,24 @@ export default function NewPartnershipPage() {
       }
 
       const result = await response.json();
-      router.push(`/influencer/${username}/partnerships/${result.partnership.id}`);
+      const partnershipId = result.partnership.id;
+
+      // Upload documents if any
+      if (uploadedFiles.length > 0) {
+        for (const file of uploadedFiles) {
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('partnership_id', partnershipId);
+          formData.append('username', username);
+
+          await fetch(`/api/influencer/partnerships/${partnershipId}/documents`, {
+            method: 'POST',
+            body: formData,
+          });
+        }
+      }
+
+      router.push(`/influencer/${username}/partnerships/${partnershipId}`);
     } catch (err) {
       console.error('Error creating partnership:', err);
       setError('שגיאה ביצירת השת"פ. נסה שוב.');
@@ -196,6 +221,25 @@ export default function NewPartnershipPage() {
             className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="הערות נוספות..."
           />
+        </div>
+
+        {/* Document Upload */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+            העלה מסמכים (חוזה, ברייף, וכו')
+          </label>
+          <input
+            type="file"
+            multiple
+            accept=".pdf,.doc,.docx,.txt"
+            onChange={handleFileChange}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          {uploadedFiles.length > 0 && (
+            <div className="mt-2 text-sm text-gray-600">
+              {uploadedFiles.length} קובץ/ים נבחרו: {uploadedFiles.map(f => f.name).join(', ')}
+            </div>
+          )}
         </div>
 
         {/* Actions */}

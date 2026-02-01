@@ -51,6 +51,8 @@ export default function InfluencerDashboardPage({
   const [copied, setCopied] = useState(false);
   const [rescanning, setRescanning] = useState(false);
   const [rescanResult, setRescanResult] = useState<{ products: number; content: number } | null>(null);
+  const [calendarConnected, setCalendarConnected] = useState(false);
+  const [connectingCalendar, setConnectingCalendar] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -190,6 +192,42 @@ export default function InfluencerDashboardPage({
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const handleConnectCalendar = async () => {
+    setConnectingCalendar(true);
+    try {
+      const response = await fetch(`/api/integrations/google-calendar/connect?username=${username}`);
+      const data = await response.json();
+      
+      if (data.authUrl) {
+        window.location.href = data.authUrl;
+      }
+    } catch (error) {
+      console.error('Error connecting calendar:', error);
+      alert('שגיאה בחיבור ליומן. נסה שוב.');
+    } finally {
+      setConnectingCalendar(false);
+    }
+  };
+
+  useEffect(() => {
+    // Check if calendar is connected
+    const checkCalendarStatus = async () => {
+      try {
+        const response = await fetch(`/api/integrations/google-calendar/status?username=${username}`);
+        if (response.ok) {
+          const data = await response.json();
+          setCalendarConnected(data.connected);
+        }
+      } catch (error) {
+        console.error('Error checking calendar status:', error);
+      }
+    };
+    
+    if (influencer) {
+      checkCalendarStatus();
+    }
+  }, [influencer, username]);
 
   if (loading) {
     return (
@@ -710,6 +748,33 @@ export default function InfluencerDashboardPage({
                 <>
                   <RefreshCw className="w-5 h-5" />
                   סרוק מחדש מאינסטגרם
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={handleConnectCalendar}
+              disabled={connectingCalendar || calendarConnected}
+              className={`flex items-center gap-2 px-6 py-3 rounded-xl transition-all font-medium ${
+                calendarConnected
+                  ? 'bg-green-600/20 border border-green-500/30 text-green-300 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white'
+              } disabled:opacity-50`}
+            >
+              {connectingCalendar ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  מתחבר...
+                </>
+              ) : calendarConnected ? (
+                <>
+                  <Check className="w-5 h-5" />
+                  יומן מחובר
+                </>
+              ) : (
+                <>
+                  <Calendar className="w-5 h-5" />
+                  חבר יומן גוגל
                 </>
               )}
             </button>

@@ -24,18 +24,6 @@ export async function GET(req: NextRequest) {
 
     const accountId = auth.accountId;
 
-    // Permission check
-    if (user.role === 'influencer') {
-      if (user.accountId !== account.id) {
-        return NextResponse.json({ error: 'Forbidden - not your account' }, { status: 403 });
-      }
-    } else if (user.role === 'agent') {
-      const agentAccounts = await getAgentInfluencerAccounts(user.id);
-      if (!agentAccounts.includes(account.id)) {
-        return NextResponse.json({ error: 'Forbidden - not your influencer' }, { status: 403 });
-      }
-    }
-
     // Build query with partnership join for better display
     let query = supabase
       .from('tasks')
@@ -43,7 +31,7 @@ export async function GET(req: NextRequest) {
         *,
         partnership:partnerships(id, brand_name, status)
       `, { count: 'exact' })
-      .eq('account_id', account.id);
+      .eq('account_id', accountId);
 
     // Apply filters
     if (partnershipId) {
