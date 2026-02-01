@@ -26,9 +26,11 @@ type Communication = {
 
 type CommunicationThreadProps = {
   communicationId: string;
+  username?: string;
+  onUpdate?: () => void;
 };
 
-export default function CommunicationThread({ communicationId }: CommunicationThreadProps) {
+export default function CommunicationThread({ communicationId, username, onUpdate }: CommunicationThreadProps) {
   const [communication, setCommunication] = useState<Communication | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
