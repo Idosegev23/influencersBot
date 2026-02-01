@@ -79,7 +79,25 @@ export default function PartnershipDetailPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<Partnership>>({});
-  const [activeTab, setActiveTab] = useState<'details' | 'payments' | 'deliverables' | 'terms' | 'documents'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'payments' | 'deliverables' | 'terms' | 'documents' | 'coupons'>('details');
+  
+  // Coupons state
+  const [coupons, setCoupons] = useState<any[]>([]);
+  const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
+  const [showCouponForm, setShowCouponForm] = useState(false);
+  const [isCreatingCoupon, setIsCreatingCoupon] = useState(false);
+  const [newCoupon, setNewCoupon] = useState({
+    code: '',
+    description: '',
+    discount_type: 'percentage',
+    discount_value: 0,
+    min_purchase_amount: null as number | null,
+    max_discount_amount: null as number | null,
+    usage_limit: null as number | null,
+    start_date: '',
+    end_date: '',
+    tracking_url: '',
+  });
 
   useEffect(() => {
     loadInfluencerAndData();
@@ -145,6 +163,81 @@ export default function PartnershipDetailPage() {
     } catch (err) {
       console.error('Error loading documents:', err);
       setDocuments([]);
+    }
+  };
+
+  const loadCoupons = async () => {
+    setIsLoadingCoupons(true);
+    try {
+      const response = await fetch(
+        `/api/influencer/partnerships/${partnershipId}/coupons`
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to load coupons');
+      }
+
+      const result = await response.json();
+      setCoupons(result.coupons || []);
+    } catch (err) {
+      console.error('Error loading coupons:', err);
+      setCoupons([]);
+    } finally {
+      setIsLoadingCoupons(false);
+    }
+  };
+
+  const handleCreateCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsCreatingCoupon(true);
+
+    try {
+      const response = await fetch(
+        `/api/influencer/partnerships/${partnershipId}/coupons`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newCoupon),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to create coupon');
+      }
+
+      const result = await response.json();
+      
+      // Reset form and reload coupons
+      setNewCoupon({
+        code: '',
+        description: '',
+        discount_type: 'percentage',
+        discount_value: 0,
+        min_purchase_amount: null,
+        max_discount_amount: null,
+        usage_limit: null,
+        start_date: '',
+        end_date: '',
+        tracking_url: '',
+      });
+      setShowCouponForm(false);
+      await loadCoupons();
+      
+      alert('✅ הקופון נוצר בהצלחה!');
+    } catch (err) {
+      console.error('Error creating coupon:', err);
+      alert('שגיאה ביצירת הקופון');
+    } finally {
+      setIsCreatingCoupon(false);
+    }
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      alert('✓ הועתק ללוח!');
+    } catch (err) {
+      console.error('Failed to copy:', err);
     }
   };
 
@@ -430,6 +523,19 @@ export default function PartnershipDetailPage() {
             }`}
           >
             📄 מסמכים ({documents.length})
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('coupons');
+              loadCoupons();
+            }}
+            className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 ${
+              activeTab === 'coupons'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            🎟️ קופונים ({coupons.length})
           </button>
         </div>
       </div>
@@ -1037,6 +1143,320 @@ export default function PartnershipDetailPage() {
                         הורד
                       </button>
                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Coupons Tab */}
+      {activeTab === 'coupons' && (
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="mb-6 flex justify-between items-center">
+            <h2 className="text-2xl font-bold text-gray-900 text-right">🎟️ קופונים ומעקב ROI</h2>
+            <button
+              onClick={() => setShowCouponForm(!showCouponForm)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              {showCouponForm ? 'ביטול' : '+ קופון חדש'}
+            </button>
+          </div>
+
+          {/* Create Coupon Form */}
+          {showCouponForm && (
+            <form onSubmit={handleCreateCoupon} className="mb-8 p-6 bg-gray-50 rounded-lg border border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 text-right">צור קופון חדש</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Coupon Code */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                    קוד קופון *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newCoupon.code}
+                    onChange={(e) => setNewCoupon({ ...newCoupon, code: e.target.value.toUpperCase() })}
+                    placeholder="SUMMER2026"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+                  />
+                </div>
+
+                {/* Discount Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                    סוג הנחה *
+                  </label>
+                  <select
+                    value={newCoupon.discount_type}
+                    onChange={(e) => setNewCoupon({ ...newCoupon, discount_type: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+                  >
+                    <option value="percentage">אחוז (%)</option>
+                    <option value="fixed">סכום קבוע (₪)</option>
+                    <option value="free_shipping">משלוח חינם</option>
+                  </select>
+                </div>
+
+                {/* Discount Value */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                    ערך ההנחה *
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    step="0.01"
+                    value={newCoupon.discount_value}
+                    onChange={(e) => setNewCoupon({ ...newCoupon, discount_value: parseFloat(e.target.value) })}
+                    placeholder={newCoupon.discount_type === 'percentage' ? '10' : '50'}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+                  />
+                </div>
+
+                {/* Usage Limit */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                    מגבלת שימושים
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={newCoupon.usage_limit || ''}
+                    onChange={(e) => setNewCoupon({ ...newCoupon, usage_limit: e.target.value ? parseInt(e.target.value) : null })}
+                    placeholder="100 (או השאר ריק ללא הגבלה)"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+                  />
+                </div>
+
+                {/* Start Date */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                    תאריך התחלה
+                  </label>
+                  <input
+                    type="date"
+                    value={newCoupon.start_date}
+                    onChange={(e) => setNewCoupon({ ...newCoupon, start_date: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+                  />
+                </div>
+
+                {/* End Date */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                    תאריך סיום
+                  </label>
+                  <input
+                    type="date"
+                    value={newCoupon.end_date}
+                    onChange={(e) => setNewCoupon({ ...newCoupon, end_date: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+                  />
+                </div>
+
+                {/* Min Purchase */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                    סכום קנייה מינימלי (₪)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={newCoupon.min_purchase_amount || ''}
+                    onChange={(e) => setNewCoupon({ ...newCoupon, min_purchase_amount: e.target.value ? parseFloat(e.target.value) : null })}
+                    placeholder="0"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+                  />
+                </div>
+
+                {/* Max Discount */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                    הנחה מקסימלית (₪)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={newCoupon.max_discount_amount || ''}
+                    onChange={(e) => setNewCoupon({ ...newCoupon, max_discount_amount: e.target.value ? parseFloat(e.target.value) : null })}
+                    placeholder="לא מוגבל"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+                  />
+                </div>
+              </div>
+
+              {/* Description */}
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                  תיאור
+                </label>
+                <textarea
+                  value={newCoupon.description}
+                  onChange={(e) => setNewCoupon({ ...newCoupon, description: e.target.value })}
+                  rows={2}
+                  placeholder="קופון מיוחד למשפיעני Summer 2026"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+                />
+              </div>
+
+              {/* Tracking URL */}
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                  URL מעקב (עם UTM)
+                </label>
+                <input
+                  type="url"
+                  value={newCoupon.tracking_url}
+                  onChange={(e) => setNewCoupon({ ...newCoupon, tracking_url: e.target.value })}
+                  placeholder="https://example.com?utm_source=instagram&utm_campaign=summer"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+                />
+              </div>
+
+              {/* Submit Button */}
+              <div className="mt-6 flex gap-3">
+                <button
+                  type="submit"
+                  disabled={isCreatingCoupon}
+                  className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                >
+                  {isCreatingCoupon ? 'יוצר קופון...' : '✓ צור קופון'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCouponForm(false)}
+                  className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                >
+                  ביטול
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Coupons List */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 text-right">
+              קופונים קיימים
+            </h3>
+
+            {isLoadingCoupons ? (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="mt-4 text-gray-600">טוען קופונים...</p>
+              </div>
+            ) : coupons.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+                </svg>
+                <p className="text-lg mb-2">אין קופונים עדיין</p>
+                <p className="text-sm">צור קופון ראשון למעקב אחר ROI</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {coupons.map((coupon) => (
+                  <div
+                    key={coupon.id}
+                    className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1 text-right">
+                        <div className="flex items-center gap-3 justify-end mb-2">
+                          <h4 className="text-xl font-bold text-gray-900 font-mono">
+                            {coupon.code}
+                          </h4>
+                          {coupon.is_active ? (
+                            <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
+                              פעיל
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">
+                              לא פעיל
+                            </span>
+                          )}
+                        </div>
+                        {coupon.description && (
+                          <p className="text-gray-600 text-sm">{coupon.description}</p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => copyToClipboard(coupon.code)}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                      >
+                        📋 העתק
+                      </button>
+                    </div>
+
+                    {/* Coupon Details */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                      <div className="text-right">
+                        <div className="text-sm text-gray-500">הנחה</div>
+                        <div className="text-lg font-semibold text-gray-900">
+                          {coupon.discount_type === 'percentage' 
+                            ? `${coupon.discount_value}%`
+                            : coupon.discount_type === 'fixed'
+                            ? `₪${coupon.discount_value}`
+                            : 'משלוח חינם'}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm text-gray-500">שימושים</div>
+                        <div className="text-lg font-semibold text-gray-900">
+                          {coupon.usage_count || 0}
+                          {coupon.usage_limit && ` / ${coupon.usage_limit}`}
+                        </div>
+                      </div>
+                      {coupon.start_date && (
+                        <div className="text-right">
+                          <div className="text-sm text-gray-500">תחילה</div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {new Date(coupon.start_date).toLocaleDateString('he-IL')}
+                          </div>
+                        </div>
+                      )}
+                      {coupon.end_date && (
+                        <div className="text-right">
+                          <div className="text-sm text-gray-500">סיום</div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {new Date(coupon.end_date).toLocaleDateString('he-IL')}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Additional Info */}
+                    {(coupon.min_purchase_amount || coupon.max_discount_amount) && (
+                      <div className="text-sm text-gray-600 space-y-1 text-right">
+                        {coupon.min_purchase_amount && (
+                          <div>✓ קנייה מינימלית: ₪{coupon.min_purchase_amount}</div>
+                        )}
+                        {coupon.max_discount_amount && (
+                          <div>✓ הנחה מקסימלית: ₪{coupon.max_discount_amount}</div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Tracking URL */}
+                    {coupon.tracking_url && (
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <div className="text-sm text-gray-500 mb-1 text-right">קישור מעקב:</div>
+                        <a
+                          href={coupon.tracking_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 hover:text-blue-700 truncate block text-right"
+                        >
+                          {coupon.tracking_url}
+                        </a>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
