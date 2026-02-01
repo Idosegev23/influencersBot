@@ -26,14 +26,7 @@ export async function GET(
     // Get communication and verify it belongs to this account
     const { data: communication, error: commError } = await supabase
       .from('brand_communications')
-      .select(`
-        *,
-        partnership:partnerships(id, brand_name, category, status),
-        account:accounts(id, type, plan),
-        related_invoice:invoices(id, invoice_number, amount, status),
-        related_document:partnership_documents(id, filename, document_type),
-        related_task:tasks(id, title, status)
-      `)
+      .select('*')
       .eq('id', id)
       .eq('account_id', accountId)
       .single();
