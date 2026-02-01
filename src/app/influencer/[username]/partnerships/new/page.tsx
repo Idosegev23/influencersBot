@@ -94,6 +94,8 @@ export default function NewPartnershipPage() {
 
       // 4. Parse document with AI
       setIsParsing(true);
+      console.log('[Partnership Creation] 🔄 Calling parse API for document:', document.id);
+      
       const parseResponse = await fetch('/api/influencer/documents/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -103,7 +105,13 @@ export default function NewPartnershipPage() {
         }),
       });
 
-      if (!parseResponse.ok) throw new Error('AI parsing failed');
+      console.log('[Partnership Creation] 📡 Parse response status:', parseResponse.status);
+
+      if (!parseResponse.ok) {
+        const errorText = await parseResponse.text();
+        console.error('[Partnership Creation] ❌ Parse API failed:', errorText);
+        throw new Error('AI parsing failed');
+      }
 
       const parseResult = await parseResponse.json();
       console.log('[Partnership Creation] 📦 Full parse result:', JSON.stringify(parseResult, null, 2));
@@ -173,9 +181,15 @@ export default function NewPartnershipPage() {
       }
 
       setIsParsing(false);
+      console.log('[Partnership Creation] ✅ Switching to manual mode to show form');
       setCreationMode('manual'); // Show form for editing
     } catch (err: any) {
-      console.error('Error uploading/parsing document:', err);
+      console.error('[Partnership Creation] ❌ Error uploading/parsing document:', err);
+      console.error('[Partnership Creation] Error details:', {
+        message: err.message,
+        stack: err.stack,
+        name: err.name,
+      });
       setError(err.message || 'שגיאה בהעלאה/ניתוח המסמך');
       setIsUploading(false);
       setIsParsing(false);
