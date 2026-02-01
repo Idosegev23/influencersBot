@@ -25,9 +25,9 @@ export async function parseWithGemini(options: ParseOptions): Promise<ParseResul
     // Get prompt
     const prompt = getPrompt(documentType, language);
 
-    // Initialize model
+    // Initialize model (Gemini 3 Pro - most powerful, takes longer but best results)
     const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-pro',
+      model: 'gemini-3-pro-preview',
       generationConfig: {
         temperature: 0.1, // Low temperature for accuracy
         topP: 0.95,

@@ -5,6 +5,9 @@ import { supabase } from '@/lib/supabase';
 import { parseDocument, mergeDocuments } from '@/lib/ai-parser';
 import type { DocumentType, ParseResult } from '@/lib/ai-parser/types';
 
+// Gemini 3 Pro is powerful but slow - allow 8 minutes for parsing
+export const maxDuration = 480; // 8 minutes
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
