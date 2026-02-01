@@ -17,6 +17,8 @@ async function checkAuth(username: string): Promise<boolean> {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    console.log('[Metadata API] Request body:', JSON.stringify(body, null, 2));
+    
     const {
       username,
       accountId,
@@ -31,6 +33,7 @@ export async function POST(req: NextRequest) {
 
     // Validate required fields
     if (!username || !accountId || !filename || !storagePath) {
+      console.error('[Metadata API] Missing required fields:', { username, accountId, filename, storagePath });
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -54,6 +57,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Save document metadata to database
+    console.log('[Metadata API] Inserting document:', {
+      account_id: accountId,
+      partnership_id: partnershipId || null,
+      filename,
+      file_size: fileSize,
+      document_type: documentType || 'other',
+    });
+
     const { data: document, error: dbError } = await supabase
       .from('partnership_documents')
       .insert({
@@ -72,12 +83,23 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (dbError) {
-      console.error('Database error saving document metadata:', dbError);
+      console.error('[Metadata API] Database error:', {
+        code: dbError.code,
+        message: dbError.message,
+        details: dbError.details,
+        hint: dbError.hint,
+      });
       return NextResponse.json(
-        { error: 'Failed to save document metadata' },
+        { 
+          error: 'Failed to save document metadata',
+          details: dbError.message,
+          code: dbError.code,
+        },
         { status: 500 }
       );
     }
+
+    console.log('[Metadata API] ✅ Document saved:', document.id);
 
     // Trigger AI parsing asynchronously (optional)
     if (process.env.NEXT_PUBLIC_APP_URL) {
@@ -96,10 +118,17 @@ export async function POST(req: NextRequest) {
       document,
       message: 'מסמך נשמר בהצלחה',
     });
-  } catch (error) {
-    console.error('Error saving document metadata:', error);
+  } catch (error: any) {
+    console.error('[Metadata API] Unexpected error:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+    });
     return NextResponse.json(
-      { error: 'Failed to save document metadata' },
+      { 
+        error: 'Failed to save document metadata',
+        details: error.message,
+      },
       { status: 500 }
     );
   }
