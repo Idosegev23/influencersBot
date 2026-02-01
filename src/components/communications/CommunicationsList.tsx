@@ -18,12 +18,14 @@ type Communication = {
 };
 
 type CommunicationsListProps = {
+  username: string;
   accountId?: string;
   category?: string;
   status?: string;
 };
 
 export default function CommunicationsList({
+  username,
   accountId,
   category,
   status,
@@ -33,8 +35,10 @@ export default function CommunicationsList({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchCommunications();
-  }, [accountId, category, status]);
+    if (username) {
+      fetchCommunications();
+    }
+  }, [username, accountId, category, status]);
 
   const fetchCommunications = async () => {
     setLoading(true);
@@ -42,6 +46,7 @@ export default function CommunicationsList({
 
     try {
       const params = new URLSearchParams();
+      params.set('username', username); // Always add username
       if (accountId) params.set('account_id', accountId);
       if (category) params.set('category', category);
       if (status) params.set('status', status);
