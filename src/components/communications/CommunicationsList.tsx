@@ -56,13 +56,19 @@ export default function CommunicationsList({
 
     try {
       const params = new URLSearchParams();
-      params.set('username', username); // Always add username
-      if (accountId) params.set('account_id', accountId);
       if (category) params.set('category', category);
       if (status) params.set('status', status);
 
-      const res = await fetch(`/api/influencer/communications?${params}`);
-      if (!res.ok) throw new Error('Failed to fetch communications');
+      const queryString = params.toString();
+      const url = queryString 
+        ? `/api/influencer/communications?${queryString}`
+        : `/api/influencer/communications`;
+        
+      const res = await fetch(url);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to fetch communications');
+      }
 
       const data = await res.json();
       setCommunications(data.communications || []);
