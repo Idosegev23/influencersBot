@@ -49,10 +49,14 @@ export async function GET(request: NextRequest) {
 
     const { data, error, count } = await query;
 
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase query error:', error);
+      throw error;
+    }
 
+    // Return empty array if no data (not an error)
     return NextResponse.json({
-      communications: data,
+      communications: data || [],
       pagination: {
         page,
         limit,
@@ -113,25 +117,33 @@ export async function POST(request: NextRequest) {
       .from('brand_communications')
       .insert({
         account_id: accountId,
-        partnership_id,
+        partnership_id: partnership_id || null,
         subject,
         category,
         priority: priority || 'normal',
         brand_name,
-        brand_contact_name,
-        brand_contact_email,
-        brand_contact_phone,
+        brand_contact_name: brand_contact_name || null,
+        brand_contact_email: brand_contact_email || null,
+        brand_contact_phone: brand_contact_phone || null,
         status: 'open',
-        due_date,
+        due_date: due_date || null,
         tags: tags || [],
-        related_invoice_id,
-        related_document_id,
-        related_task_id,
+        related_invoice_id: related_invoice_id || null,
+        related_document_id: related_document_id || null,
+        related_task_id: related_task_id || null,
+        last_message_at: new Date().toISOString(),
       })
       .select()
       .single();
 
-    if (commError) throw commError;
+    if (commError) {
+      console.error('Error creating communication:', commError);
+      throw commError;
+    }
+
+    if (!communication) {
+      throw new Error('Communication created but not returned from database');
+    }
 
     // Add initial message
     const { error: msgError } = await supabase
@@ -139,17 +151,22 @@ export async function POST(request: NextRequest) {
       .insert({
         communication_id: communication.id,
         sender_type: 'influencer',
-        sender_name: auth.influencer?.full_name || auth.username,
+        sender_name: auth.influencer?.full_name || auth.username || 'Influencer',
         message_text: initial_message,
+        is_read: true, // Mark as read since sender is influencer
       });
 
-    if (msgError) throw msgError;
+    if (msgError) {
+      console.error('Error creating initial message:', msgError);
+      // Don't throw - communication was created successfully
+      // Just log the error
+    }
 
     return NextResponse.json({ communication }, { status: 201 });
   } catch (error: any) {
     console.error('Error creating communication:', error);
     return NextResponse.json(
-      { error: 'Failed to create communication', details: error.message },
+      { error: 'שגיאה ביצירת התקשורת', details: error.message },
       { status: 500 }
     );
   }

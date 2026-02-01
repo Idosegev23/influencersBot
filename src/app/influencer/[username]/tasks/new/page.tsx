@@ -254,6 +254,9 @@ export default function NewTaskPage({
                 placeholder="2.5"
                 className="w-full px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:border-orange-500 focus:outline-none text-right"
               />
+              <p className="mt-2 text-xs text-gray-400 text-right">
+                💡 כמה שעות לדעתך תיקח המשימה? (לדוגמה: 2.5 שעות ליצירת סרטון, 0.5 שעה לפוסט)
+              </p>
             </div>
 
             {/* Submit Buttons */}

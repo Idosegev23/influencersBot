@@ -88,22 +88,84 @@ export async function POST(request: NextRequest) {
     // 3. Create Tasks from deliverables
     const tasks: any[] = [];
 
+    // 3.1. Add kickoff meeting task if required
+    if (parsedData.kickoffMeeting?.required) {
+      const kickoffTask = {
+        account_id: accountId,
+        partnership_id: partnership.id,
+        title: 'פגישת קיקאוף - היכרות ובחינת מוצר',
+        description: parsedData.kickoffMeeting.purpose || 'פגישה מקדימה לבחינת מוצר תבואות באתר הסחר והכרת הצוות',
+        due_date: parsedData.startDate || null, // Schedule before start date
+        status: 'pending',
+        priority: 'high',
+        task_type: 'meeting',
+      };
+      tasks.push(kickoffTask);
+      console.log(`[Create Partnership] Added kickoff meeting task`);
+    }
+
+    // 3.2. Add tasks from deliverables with approval deadlines
     if (parsedData.deliverables && Array.isArray(parsedData.deliverables)) {
       for (const deliverable of parsedData.deliverables) {
-        tasks.push({
+        // Main deliverable task
+        const deliverableTask = {
           account_id: accountId,
           partnership_id: partnership.id,
-          title: `${deliverable.quantity || 1} ${deliverable.type || 'deliverable'} ב-${deliverable.platform || ''}`,
+          title: `${deliverable.quantity || 1} ${deliverable.type || 'deliverable'} ב-${deliverable.platform || 'אינסטגרם'}`,
           description: deliverable.description || '',
           due_date: deliverable.dueDate || null,
           status: 'pending',
           priority: 'medium',
           task_type: 'content_creation',
-        });
+        };
+        tasks.push(deliverableTask);
+
+        // If approval deadline exists, create approval task
+        if (deliverable.approvalDeadline && deliverable.dueDate) {
+          const approvalTask = {
+            account_id: accountId,
+            partnership_id: partnership.id,
+            title: `אישור תוצר: ${deliverable.type}`,
+            description: `העברת תוצר לאישור המותג - ${deliverable.approvalDeadline}`,
+            due_date: deliverable.dueDate, // Should be adjusted to be before dueDate
+            status: 'pending',
+            priority: 'high',
+            task_type: 'reporting',
+          };
+          tasks.push(approvalTask);
+        }
       }
     }
 
-    // Add tasks from brief
+    // 3.3. Add general approval task if approval process required
+    if (parsedData.approvalProcess?.required && !parsedData.approvalProcess?.timeframe) {
+      tasks.push({
+        account_id: accountId,
+        partnership_id: partnership.id,
+        title: 'אישור תוצרים מהמותג',
+        description: `תיאום אישור תוצרים עם ${parsedData.approvalProcess.contactForApproval || 'המותג'} - ${parsedData.approvalProcess.timeframe || '48 שעות לפני פרסום'}`,
+        due_date: parsedData.startDate || null,
+        status: 'pending',
+        priority: 'high',
+        task_type: 'general',
+      });
+    }
+
+    // 3.4. Add tracking setup task if encoded links required
+    if (parsedData.trackingAndMonitoring?.useEncodedLinks) {
+      tasks.push({
+        account_id: accountId,
+        partnership_id: partnership.id,
+        title: 'הגדרת לינקים מקודדים וניטור',
+        description: `הגדרת מערכת מעקב ${parsedData.trackingAndMonitoring.trackingSystem || 'imai'} ולינקים מקודדים לניטור נתונים`,
+        due_date: parsedData.startDate || null,
+        status: 'pending',
+        priority: 'high',
+        task_type: 'general',
+      });
+    }
+
+    // 3.5. Add tasks from brief
     if (parsedData.tasks && Array.isArray(parsedData.tasks)) {
       for (const task of parsedData.tasks) {
         tasks.push({
@@ -120,15 +182,19 @@ export async function POST(request: NextRequest) {
     }
 
     if (tasks.length > 0) {
+      console.log(`[Create Partnership] Creating ${tasks.length} tasks...`);
       const { error: tasksError } = await supabase
         .from('tasks')
         .insert(tasks);
 
       if (tasksError) {
         console.error('[Create Partnership] Tasks error:', tasksError);
+        // Don't fail the whole operation if tasks fail
       } else {
-        console.log(`[Create Partnership] Created ${tasks.length} tasks`);
+        console.log(`[Create Partnership] ✅ Created ${tasks.length} tasks successfully`);
       }
+    } else {
+      console.log('[Create Partnership] No tasks to create');
     }
 
     // 4. Create Invoices from payment milestones
@@ -209,15 +275,20 @@ export async function POST(request: NextRequest) {
     // 6. TODO: Create notifications/follow-ups
     // This will be implemented with the notification engine
 
+    const summary = {
+      tasks: tasks.length,
+      invoices: invoices.length,
+      calendarEvents: calendarEvents.length,
+    };
+
+    console.log(`[Create Partnership] ✅ Partnership created successfully with ${summary.tasks} tasks, ${summary.invoices} invoices, ${summary.calendarEvents} events`);
+
     return NextResponse.json({
       success: true,
+      partnership_id: partnership.id,
       partnership,
-      summary: {
-        tasks: tasks.length,
-        invoices: invoices.length,
-        calendarEvents: calendarEvents.length,
-      },
-      message: 'שת"פ נוצר בהצלחה! 🎉',
+      summary,
+      message: `שת"פ נוצר בהצלחה! נוצרו ${summary.tasks} משימות, ${summary.invoices} חשבוניות, ו-${summary.calendarEvents} אירועים.`,
     });
 
   } catch (error: any) {

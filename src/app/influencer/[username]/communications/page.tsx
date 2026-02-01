@@ -181,11 +181,45 @@ export default function CommunicationsPage() {
         </div>
       </div>
 
+      {/* Error State */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <button
+            onClick={loadData}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+          >
+            נסה שוב
+          </button>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!error && communications.length === 0 && (
+        <div className="bg-white border border-gray-200 rounded-lg p-12 text-center">
+          <div className="text-6xl mb-4">💬</div>
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+            אין תקשורת עם מותגים עדיין
+          </h3>
+          <p className="text-gray-600 mb-6">
+            התחל לתקשר עם מותגים כדי לנהל את כל השיחות במקום אחד
+          </p>
+          <button
+            onClick={() => router.push(`/influencer/${username}/communications/new`)}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            צור תקשורת ראשונה
+          </button>
+        </div>
+      )}
+
       {/* Communications List */}
-      <CommunicationsList
-        communications={filteredCommunications}
-        username={username}
-      />
+      {!error && communications.length > 0 && (
+        <CommunicationsList
+          communications={filteredCommunications}
+          username={username}
+        />
+      )}
     </div>
   );
 }

@@ -97,6 +97,9 @@ const PROMPTS_BY_LANGUAGE: Record<string, Record<DocumentType, string>> = {
   "paymentTerms": {
     "totalAmount": סכום כולל ללא מע"מ - חפש ב'סכ\"ה התמורה', 'סכום כולל', 'תמורה', בטבלאות (number),
     "currency": "ILS (ברירת מחדל) או USD/EUR אם מפורש",
+    "paymentType": "סוג תשלום - שוטף/חד פעמי/לפי מייל-סטון (string או null)",
+    "paymentMethod": "אופן תשלום - העברה בנקאית/צ'ק/אשראי (string או null)",
+    "invoiceRequirements": "דרישות חשבונית - חפש 'חשבונית', 'קבלה', 'מסמכי תשלום' (string או null)",
     "schedule": [
       {
         "percentage": אחוז מהסכום (number),
@@ -112,9 +115,30 @@ const PROMPTS_BY_LANGUAGE: Record<string, Record<DocumentType, string>> = {
       "quantity": כמות - 6 סרטונים = 6 (number),
       "platform": "פלטפורמה - אינסטגרם/טיקטוק/יוטיוב/פייסבוק (string, אם לא מפורש: 'instagram')",
       "dueDate": "YYYY-MM-DD (string או null)",
-      "description": "תיאור מלא של הדליברבל כולל פרטים טכניים (string)"
+      "description": "תיאור מלא של הדליברבל כולל פרטים טכניים (string)",
+      "approvalDeadline": "מועד אישור/בקרה - חפש '48 שעות לפני', 'אישור מוקדם' (string או null)"
     }
   ],
+  "approvalProcess": {
+    "required": האם נדרש אישור תוצרים לפני פרסום - חפש 'אישור', 'בקרה', 'העברה לאישור' (boolean),
+    "timeframe": "זמן אישור - למשל '48 שעות לפני פרסום', '3 ימי עסקים' (string או null)",
+    "contactForApproval": "איש קשר לאישורים (string או null)"
+  },
+  "sanctions": {
+    "latePenalty": "קנס על איחור - חפש 'קנס', 'פיצוי', 'הפחתה', 'עמידה בלוז' (string או null)",
+    "qualityRequirements": "דרישות איכות - חפש 'סטנדרט', 'איכות', 'רמה מקצועית' (string או null)",
+    "breachConsequences": "תוצאות הפרת הסכם - חפש 'הפרה', 'אי עמידה' (string או null)"
+  },
+  "trackingAndMonitoring": {
+    "useEncodedLinks": האם נדרש שימוש בלינקים מקודדים - חפש 'לינק מקודד', 'UTM', 'tracking link' (boolean),
+    "trackingSystem": "מערכת מעקב - חפש 'imai', 'tracking system', 'מערכת ניטור' (string או null)",
+    "reportingRequirements": "דרישות דיווח - חפש 'דיווח', 'ריפורטים', 'נתונים' (string או null)"
+  },
+  "kickoffMeeting": {
+    "required": האם נדרשת פגישה מקדימה - חפש 'פגישת קיקאוף', 'פגישה מקדימה', 'ברייפינג' (boolean),
+    "purpose": "מטרת הפגישה - חפש 'בחינת מוצר', 'הכרות', 'תיאום ציפיות' (string או null)",
+    "participants": "משתתפים נדרשים (string או null)"
+  },
   "terminationClauses": ["סעיפי ביטול/הפסקת הסכם - חפש 'ביטול', 'הפסקה', 'סיום מוקדם'"],
   "liabilityClauses": ["סעיפי אחריות/נזיקין - חפש 'אחריות', 'נזק', 'פיצוי'"],
   "confidentiality": "תקופת סודיות/חיסיון - כמה זמן (string או null)",
@@ -143,8 +167,17 @@ const PROMPTS_BY_LANGUAGE: Record<string, Record<DocumentType, string>> = {
    - "6 סרטוני תוכן" → type: "סרטון תוכן", quantity: 6
    - "סטוריז באינסטגרם" → type: "סטורי", platform: "instagram"
    - רשימות עם מספרים (1., 2., 3.) או נקודות (•)
-5. **אם שדה לא קיים במסמך** - החזר null (אל תנחש!)
-6. **דיוק מקסימלי** - העתק טקסט מדויק מהמסמך
+5. **תנאי תשלום מיוחדים:** חפש:
+   - "שוטף" / "חודשי" / "רבעוני" → paymentType: "שוטף"
+   - "חד פעמי" → paymentType: "חד פעמי"
+   - "העברה בנקאית" / "צ'ק" → paymentMethod
+6. **סנקציות ובקרה:** חפש:
+   - "48 שעות לפני" / "אישור מוקדם" → approvalProcess
+   - "קנס" / "הפחתה" / "עמידה בלוז" → sanctions
+   - "לינק מקודד" / "imai" / "tracking" → trackingAndMonitoring
+   - "פגישה מקדימה" / "קיקאוף" / "בחינת מוצר" → kickoffMeeting
+7. **אם שדה לא קיים במסמך** - החזר null (אל תנחש!)
+8. **דיוק מקסימלי** - העתק טקסט מדויק מהמסמך
 
 החזר רק JSON תקין, ללא טקסט נוסף לפני או אחרי.`,
 

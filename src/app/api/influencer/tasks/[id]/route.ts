@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { supabase, getInfluencerByUsername } from '@/lib/supabase';
 import { sanitizeHtml } from '@/lib/sanitize';
-import { requireAuth, requireAccountAccess, checkPermission } from '@/lib/auth/api-helpers';
+import { requireInfluencerAuth } from '@/lib/auth/influencer-auth';
 
 // Check influencer authentication
 async function checkAuth(username: string): Promise<boolean> {
@@ -17,41 +17,17 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Auth check
-    const auth = await requireAuth(req, 'tasks', 'read');
+    const { id } = await params;
+    
+    // Auth check with requireInfluencerAuth
+    const auth = await requireInfluencerAuth(req);
     if (!auth.authorized) {
+      console.error(`[Tasks GET] Unauthorized access attempt for task ${id}`);
       return auth.response!;
     }
 
-    const { id } = await params;
-    const { searchParams } = new URL(req.url);
-    const username = searchParams.get('username');
-
-    if (!username) {
-      return NextResponse.json({ error: 'Username required' }, { status: 400 });
-    }
-
-    const influencer = await getInfluencerByUsername(username);
-    if (!influencer) {
-      return NextResponse.json({ error: 'Influencer not found' }, { status: 404 });
-    }
-
-    // Get account_id
-    const { data: account } = await supabase
-      .from('accounts')
-      .select('id')
-      .eq('legacy_influencer_id', influencer.id)
-      .single();
-
-    if (!account) {
-      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
-    }
-
-    // Verify access to this account
-    const accessCheck = await requireAccountAccess(auth.user!, account.id);
-    if (accessCheck) {
-      return accessCheck;
-    }
+    const accountId = auth.accountId;
+    console.log(`[Tasks GET] Fetching task ${id} for account ${accountId}`);
 
     // Get task with partnership info
     const { data: task, error } = await supabase
@@ -61,17 +37,30 @@ export async function GET(
         partnership:partnerships(id, brand_name, status)
       `)
       .eq('id', id)
-      .eq('account_id', account.id)
+      .eq('account_id', accountId)
       .single();
 
-    if (error || !task) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    if (error) {
+      console.error(`[Tasks GET] Database error for task ${id}:`, error);
+      return NextResponse.json(
+        { error: 'שגיאה בטעינת המשימה', details: error.message },
+        { status: 500 }
+      );
     }
 
+    if (!task) {
+      console.error(`[Tasks GET] Task ${id} not found for account ${accountId}`);
+      return NextResponse.json({ error: 'המשימה לא נמצאה' }, { status: 404 });
+    }
+
+    console.log(`[Tasks GET] Successfully fetched task ${id}`);
     return NextResponse.json({ task });
   } catch (error) {
-    console.error('Get task error:', error);
-    return NextResponse.json({ error: 'Failed to fetch task' }, { status: 500 });
+    console.error('[Tasks GET] Unexpected error:', error);
+    return NextResponse.json(
+      { error: 'שגיאה בטעינת המשימה', details: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
   }
 }
 
@@ -83,33 +72,17 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await req.json();
-    const { username, ...updates } = body;
+    const { ...updates } = body;
 
-    if (!username) {
-      return NextResponse.json({ error: 'Username required' }, { status: 400 });
+    // Auth check with requireInfluencerAuth
+    const auth = await requireInfluencerAuth(req);
+    if (!auth.authorized) {
+      console.error(`[Tasks PATCH] Unauthorized access attempt for task ${id}`);
+      return auth.response!;
     }
 
-    // Check authentication
-    const isAuth = await checkAuth(username);
-    if (!isAuth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const influencer = await getInfluencerByUsername(username);
-    if (!influencer) {
-      return NextResponse.json({ error: 'Influencer not found' }, { status: 404 });
-    }
-
-    // Get account_id
-    const { data: account } = await supabase
-      .from('accounts')
-      .select('id')
-      .eq('legacy_influencer_id', influencer.id)
-      .single();
-
-    if (!account) {
-      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
-    }
+    const accountId = auth.accountId;
+    console.log(`[Tasks PATCH] Updating task ${id} for account ${accountId}`);
 
     // Verify task belongs to this account
     const { data: existing } = await supabase
@@ -118,8 +91,9 @@ export async function PATCH(
       .eq('id', id)
       .single();
 
-    if (!existing || existing.account_id !== account.id) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    if (!existing || existing.account_id !== accountId) {
+      console.error(`[Tasks PATCH] Task ${id} not found or unauthorized for account ${accountId}`);
+      return NextResponse.json({ error: 'המשימה לא נמצאה' }, { status: 404 });
     }
 
     // Build sanitized updates
@@ -191,14 +165,21 @@ export async function PATCH(
       .single();
 
     if (error) {
-      console.error('Database error:', error);
-      return NextResponse.json({ error: 'Failed to update task' }, { status: 500 });
+      console.error(`[Tasks PATCH] Database error for task ${id}:`, error);
+      return NextResponse.json(
+        { error: 'שגיאה בעדכון המשימה', details: error.message },
+        { status: 500 }
+      );
     }
 
+    console.log(`[Tasks PATCH] Successfully updated task ${id}`);
     return NextResponse.json({ task });
   } catch (error) {
-    console.error('Update task error:', error);
-    return NextResponse.json({ error: 'Failed to update task' }, { status: 500 });
+    console.error('[Tasks PATCH] Unexpected error:', error);
+    return NextResponse.json(
+      { error: 'שגיאה בעדכון המשימה', details: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
   }
 }
 
@@ -209,34 +190,16 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const { searchParams } = new URL(req.url);
-    const username = searchParams.get('username');
 
-    if (!username) {
-      return NextResponse.json({ error: 'Username required' }, { status: 400 });
+    // Auth check with requireInfluencerAuth
+    const auth = await requireInfluencerAuth(req);
+    if (!auth.authorized) {
+      console.error(`[Tasks DELETE] Unauthorized access attempt for task ${id}`);
+      return auth.response!;
     }
 
-    // Check authentication
-    const isAuth = await checkAuth(username);
-    if (!isAuth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const influencer = await getInfluencerByUsername(username);
-    if (!influencer) {
-      return NextResponse.json({ error: 'Influencer not found' }, { status: 404 });
-    }
-
-    // Get account_id
-    const { data: account } = await supabase
-      .from('accounts')
-      .select('id')
-      .eq('legacy_influencer_id', influencer.id)
-      .single();
-
-    if (!account) {
-      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
-    }
+    const accountId = auth.accountId;
+    console.log(`[Tasks DELETE] Deleting task ${id} for account ${accountId}`);
 
     // Verify task belongs to this account
     const { data: existing } = await supabase
@@ -245,8 +208,9 @@ export async function DELETE(
       .eq('id', id)
       .single();
 
-    if (!existing || existing.account_id !== account.id) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    if (!existing || existing.account_id !== accountId) {
+      console.error(`[Tasks DELETE] Task ${id} not found or unauthorized for account ${accountId}`);
+      return NextResponse.json({ error: 'המשימה לא נמצאה' }, { status: 404 });
     }
 
     // Delete task
@@ -256,14 +220,21 @@ export async function DELETE(
       .eq('id', id);
 
     if (error) {
-      console.error('Database error:', error);
-      return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 });
+      console.error(`[Tasks DELETE] Database error for task ${id}:`, error);
+      return NextResponse.json(
+        { error: 'שגיאה במחיקת המשימה', details: error.message },
+        { status: 500 }
+      );
     }
 
+    console.log(`[Tasks DELETE] Successfully deleted task ${id}`);
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Delete task error:', error);
-    return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 });
+    console.error('[Tasks DELETE] Unexpected error:', error);
+    return NextResponse.json(
+      { error: 'שגיאה במחיקת המשימה', details: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
   }
 }
 

@@ -5,6 +5,39 @@ import { useParams, useRouter } from 'next/navigation';
 import CouponPerformanceTable from '@/components/analytics/CouponPerformanceTable';
 import TopProducts from '@/components/analytics/TopProducts';
 
+// API response format
+interface ApiCouponData {
+  totals: {
+    totalCopies: number;
+    totalUniqueCopiers: number;
+    totalBrands: number;
+    activeBrands: number;
+    totalLinkClicks: number;
+  };
+  brandPerformance: Array<{
+    brandId: string;
+    brandName: string;
+    couponCode: string;
+    category: string;
+    copyCount: number;
+    uniqueUsers: number;
+    link: string;
+    shortLink: string;
+    linkClicks: number;
+    clickThroughRate: number;
+  }>;
+  topCoupons: Array<{
+    brandId: string;
+    brandName: string;
+    couponCode: string;
+    copyCount: number;
+    uniqueUsers: number;
+    linkClicks: number;
+    clickThroughRate: number;
+  }>;
+}
+
+// Frontend display format
 interface CouponData {
   coupons: Array<{
     id: string;
@@ -65,8 +98,45 @@ export default function CouponsAnalyticsPage() {
         throw new Error('Failed to load coupon analytics');
       }
 
-      const result = await response.json();
-      setData(result);
+      const apiResult: ApiCouponData = await response.json();
+      
+      // Transform API format to frontend format
+      const transformedData: CouponData = {
+        overview: {
+          total_coupons: apiResult.totals.totalBrands,
+          total_copied: apiResult.totals.totalCopies,
+          total_used: 0, // Not available from current API
+          total_revenue: 0, // Not available from current API
+          avg_conversion_rate: apiResult.totals.totalCopies > 0 
+            ? (apiResult.totals.totalLinkClicks / apiResult.totals.totalCopies) * 100 
+            : 0,
+          followers_vs_non: {
+            followers: 0, // Not available from current API
+            non_followers: apiResult.totals.totalUniqueCopiers,
+          },
+        },
+        coupons: apiResult.brandPerformance.map(brand => ({
+          id: brand.brandId,
+          code: brand.couponCode,
+          partnership: {
+            id: brand.brandId,
+            brand_name: brand.brandName,
+          },
+          times_copied: brand.copyCount,
+          times_used: brand.linkClicks,
+          conversion_rate: brand.clickThroughRate,
+          total_revenue: 0, // Not available
+          avg_order_value: 0, // Not available
+          created_at: new Date().toISOString(), // Not available
+        })),
+        top_products: apiResult.topCoupons.slice(0, 10).map(coupon => ({
+          product_name: coupon.brandName,
+          times_ordered: coupon.copyCount,
+          revenue: 0, // Not available
+        })),
+      };
+      
+      setData(transformedData);
     } catch (err) {
       console.error('Error loading coupon analytics:', err);
       setError('שגיאה בטעינת נתוני קופונים');
