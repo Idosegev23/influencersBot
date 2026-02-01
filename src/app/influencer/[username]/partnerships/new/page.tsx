@@ -106,19 +106,50 @@ export default function NewPartnershipPage() {
       if (!parseResponse.ok) throw new Error('AI parsing failed');
 
       const parseResult = await parseResponse.json();
+      console.log('[Partnership Creation] Parse result:', JSON.stringify(parseResult, null, 2));
       
       // 5. Fill form with parsed data
-      if (parseResult.parsedData) {
+      // Map Gemini response structure to form fields
+      if (parseResult.mergedData || parseResult.results?.[0]?.data) {
+        const data = parseResult.mergedData || parseResult.results[0].data;
+        console.log('[Partnership Creation] Extracted data:', JSON.stringify(data, null, 2));
+        
+        // Map contract structure to form fields
+        const brandName = data.parties?.brand || data.brandName || '';
+        const startDate = data.effectiveDate || data.startDate || data.timeline?.startDate || '';
+        const endDate = data.expiryDate || data.endDate || data.timeline?.endDate || '';
+        const amount = data.totalAmount || data.paymentTerms?.totalAmount || null;
+        
+        // Convert deliverables array to string
+        let deliverablesText = '';
+        if (Array.isArray(data.deliverables)) {
+          deliverablesText = data.deliverables
+            .map((d: any) => typeof d === 'string' ? d : d.description || d.title || '')
+            .filter(Boolean)
+            .join('\n');
+        } else if (typeof data.deliverables === 'string') {
+          deliverablesText = data.deliverables;
+        }
+        
         setFormData({
-          brand_name: parseResult.parsedData.brand_name || '',
-          campaign_name: parseResult.parsedData.campaign_name || '',
-          status: parseResult.parsedData.status || 'lead',
-          start_date: parseResult.parsedData.start_date || '',
-          end_date: parseResult.parsedData.end_date || '',
-          contract_amount: parseResult.parsedData.contract_amount?.toString() || '',
-          deliverables: parseResult.parsedData.deliverables || '',
-          notes: parseResult.parsedData.notes || '',
+          brand_name: brandName,
+          campaign_name: data.campaignName || data.campaignGoal || '',
+          status: 'active', // Default for signed contracts
+          start_date: startDate,
+          end_date: endDate,
+          contract_amount: amount?.toString() || '',
+          deliverables: deliverablesText,
+          notes: data.notes || '',
         });
+        
+        console.log('[Partnership Creation] ✅ Form filled with:', {
+          brand_name: brandName,
+          start_date: startDate,
+          end_date: endDate,
+          amount,
+        });
+      } else {
+        console.warn('[Partnership Creation] ⚠️ No parsed data found:', parseResult);
       }
 
       setIsParsing(false);
