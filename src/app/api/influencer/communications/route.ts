@@ -1,25 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase';
-import { requireAuth } from '@/lib/auth/api-helpers';
+import { supabase } from '@/lib/supabase';
+import { requireInfluencerAuth } from '@/lib/auth/influencer-auth';
 
 /**
  * GET /api/influencer/communications
  * שליפת כל השיחות עם מותגים
  */
 export async function GET(request: NextRequest) {
-  const authCheck = await requireAuth(request);
-  if (!authCheck.authorized) {
-    return authCheck.response!;
+  const auth = await requireInfluencerAuth(request);
+  if (!auth.authorized) {
+    return auth.response!;
   }
 
-  const supabase = createClient();
   const { searchParams } = new URL(request.url);
   
   // Filters
   const category = searchParams.get('category'); // financial, legal, issues, general
   const status = searchParams.get('status'); // open, waiting_response, etc.
   const partnershipId = searchParams.get('partnership_id');
-  const accountId = searchParams.get('account_id');
+  const accountId = auth.accountId; // Use accountId from auth
   
   // Pagination
   const page = parseInt(searchParams.get('page') || '1');
@@ -34,10 +33,11 @@ export async function GET(request: NextRequest) {
         partnership:partnerships(id, brand_name, campaign_name),
         account:accounts(id, name)
       `, { count: 'exact' })
+      .eq('account_id', accountId) // Always filter by current account
       .order('last_message_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
-    // Apply filters
+    // Apply additional filters
     if (category) {
       query = query.eq('category', category);
     }
@@ -46,9 +46,6 @@ export async function GET(request: NextRequest) {
     }
     if (partnershipId) {
       query = query.eq('partnership_id', partnershipId);
-    }
-    if (accountId) {
-      query = query.eq('account_id', accountId);
     }
 
     const { data, error, count } = await query;
@@ -78,16 +75,15 @@ export async function GET(request: NextRequest) {
  * יצירת שיחה חדשה עם מותג
  */
 export async function POST(request: NextRequest) {
-  const authCheck = await requireAuth(request);
-  if (!authCheck.authorized) {
-    return authCheck.response!;
+  const auth = await requireInfluencerAuth(request);
+  if (!auth.authorized) {
+    return auth.response!;
   }
 
-  const supabase = createClient();
   const body = await request.json();
+  const accountId = auth.accountId;
 
   const {
-    account_id,
     partnership_id,
     subject,
     category,
@@ -105,9 +101,9 @@ export async function POST(request: NextRequest) {
   } = body;
 
   // Validation
-  if (!account_id || !subject || !category || !brand_name || !initial_message) {
+  if (!subject || !category || !brand_name || !initial_message) {
     return NextResponse.json(
-      { error: 'Missing required fields: account_id, subject, category, brand_name, initial_message' },
+      { error: 'Missing required fields: subject, category, brand_name, initial_message' },
       { status: 400 }
     );
   }
@@ -117,7 +113,7 @@ export async function POST(request: NextRequest) {
     const { data: communication, error: commError } = await supabase
       .from('brand_communications')
       .insert({
-        account_id,
+        account_id: accountId,
         partnership_id,
         subject,
         category,
@@ -132,7 +128,6 @@ export async function POST(request: NextRequest) {
         related_invoice_id,
         related_document_id,
         related_task_id,
-        created_by: authCheck.user!.id,
       })
       .select()
       .single();
@@ -145,10 +140,8 @@ export async function POST(request: NextRequest) {
       .insert({
         communication_id: communication.id,
         sender_type: 'influencer',
-        sender_name: authCheck.user!.fullName || 'Influencer',
-        sender_email: authCheck.user!.email,
+        sender_name: auth.influencer?.full_name || auth.username,
         message_text: initial_message,
-        created_by: authCheck.user!.id,
       });
 
     if (msgError) throw msgError;
