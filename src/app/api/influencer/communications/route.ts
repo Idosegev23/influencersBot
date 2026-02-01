@@ -30,8 +30,7 @@ export async function GET(request: NextRequest) {
       .from('brand_communications')
       .select(`
         *,
-        partnership:partnerships(id, brand_name, campaign_name),
-        account:accounts(id, name)
+        partnership:partnerships(id, brand_name, status)
       `, { count: 'exact' })
       .eq('account_id', accountId) // Always filter by current account
       .order('last_message_at', { ascending: false })
