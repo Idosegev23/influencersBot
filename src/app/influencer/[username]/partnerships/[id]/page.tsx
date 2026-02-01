@@ -4,6 +4,22 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabaseClient } from '@/lib/supabase-client';
 
+interface PaymentMilestone {
+  percentage: number;
+  amount: number;
+  trigger: string;
+  dueDate: string | null;
+}
+
+interface Deliverable {
+  type: string;
+  quantity: number;
+  platform: string;
+  dueDate: string | null;
+  description: string;
+  completed?: boolean;
+}
+
 interface Partnership {
   id: string;
   brand_name: string;
@@ -12,10 +28,20 @@ interface Partnership {
   start_date: string | null;
   end_date: string | null;
   contract_amount: number | null;
-  deliverables: string | null;
+  deliverables: Deliverable[] | string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
+  // Full parsed contract data
+  payment_schedule?: PaymentMilestone[];
+  exclusivity?: { isExclusive: boolean; categories: string[] } | null;
+  termination_clauses?: string[];
+  liability_clauses?: string[];
+  confidentiality?: string | null;
+  key_dates?: Array<{ event: string; date: string }>;
+  contract_scope?: string | null;
+  auto_renewal?: boolean;
+  parsed_contract_data?: any;
 }
 
 interface Document {
@@ -53,7 +79,7 @@ export default function PartnershipDetailPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<Partnership>>({});
-  const [activeTab, setActiveTab] = useState<'details' | 'documents'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'payments' | 'deliverables' | 'terms' | 'documents'>('details');
 
   useEffect(() => {
     loadInfluencerAndData();
