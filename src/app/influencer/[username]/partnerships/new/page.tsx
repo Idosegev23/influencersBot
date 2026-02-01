@@ -54,17 +54,35 @@ export default function NewPartnershipPage() {
 
       // Upload documents if any
       if (uploadedFiles.length > 0) {
-        for (const file of uploadedFiles) {
-          const formData = new FormData();
-          formData.append('file', file);
-          formData.append('partnership_id', partnershipId);
-          formData.append('username', username);
+        const uploadPromises = uploadedFiles.map(async (file) => {
+          // Check file size (max 10MB)
+          const MAX_SIZE = 10 * 1024 * 1024;
+          if (file.size > MAX_SIZE) {
+            console.error(`File ${file.name} is too large (${(file.size / 1024 / 1024).toFixed(2)}MB). Max size is 10MB.`);
+            return;
+          }
 
-          await fetch(`/api/influencer/partnerships/${partnershipId}/documents`, {
-            method: 'POST',
-            body: formData,
-          });
-        }
+          const docFormData = new FormData();
+          docFormData.append('file', file);
+          docFormData.append('partnership_id', partnershipId);
+          docFormData.append('username', username);
+          docFormData.append('account_id', result.partnership.account_id);
+
+          try {
+            const uploadRes = await fetch(`/api/influencer/partnerships/${partnershipId}/documents`, {
+              method: 'POST',
+              body: docFormData,
+            });
+
+            if (!uploadRes.ok) {
+              console.error(`Failed to upload ${file.name}:`, await uploadRes.text());
+            }
+          } catch (err) {
+            console.error(`Error uploading ${file.name}:`, err);
+          }
+        });
+
+        await Promise.all(uploadPromises);
       }
 
       router.push(`/influencer/${username}/partnerships/${partnershipId}`);
