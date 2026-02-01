@@ -695,8 +695,18 @@ export default function PartnershipDetailPage() {
           
           {partnership?.deliverables && Array.isArray(partnership.deliverables) && partnership.deliverables.length > 0 ? (
             <div className="space-y-3">
-              {partnership.deliverables.map((item, index) => (
-                <div key={index} className="border-2 border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
+              {partnership.deliverables.map((item, index) => {
+                // Handle both string and object deliverables
+                if (typeof item === 'string') {
+                  return (
+                    <div key={`del-${index}`} className="border-2 border-gray-200 rounded-lg p-4">
+                      <p className="text-sm text-gray-700 text-right">{item}</p>
+                    </div>
+                  );
+                }
+                
+                return (
+                <div key={`del-${index}-${item.type}`} className="border-2 border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
                   <div className="flex items-start gap-4">
                     <input
                       type="checkbox"
@@ -754,7 +764,7 @@ export default function PartnershipDetailPage() {
                     </div>
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
           ) : (
             <div className="text-center py-12 text-gray-500">

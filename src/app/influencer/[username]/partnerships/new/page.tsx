@@ -515,25 +515,77 @@ export default function NewPartnershipPage() {
               </div>
             </div>
 
+            {/* Payment Schedule */}
+            {parsedRawData.paymentTerms?.schedule?.length > 0 && (
+              <div className="mb-6">
+                <p className="text-sm font-medium text-gray-700 mb-3 text-right">💰 מועדי תשלום שזוהו:</p>
+                <div className="space-y-2">
+                  {parsedRawData.paymentTerms.schedule.map((payment: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3">
+                      <div className="text-right flex-1">
+                        <p className="font-bold text-green-900">
+                          ₪{payment.amount?.toLocaleString()} ({payment.percentage}%)
+                        </p>
+                        <p className="text-xs text-green-700">{payment.trigger}</p>
+                      </div>
+                      {payment.dueDate && (
+                        <span className="text-sm font-medium text-green-700">
+                          📅 {new Date(payment.dueDate).toLocaleDateString('he-IL')}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Deliverables Details */}
             {parsedRawData.deliverables?.length > 0 && (
               <div className="mb-6">
-                <p className="text-sm font-medium text-gray-700 mb-2">דליברבלס שזוהו:</p>
+                <p className="text-sm font-medium text-gray-700 mb-3 text-right">📋 דליברבלס שזוהו:</p>
                 <ul className="space-y-2">
                   {parsedRawData.deliverables.map((d: any, i: number) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-gray-600 bg-gray-50 rounded p-2">
+                    <li key={i} className="flex items-start gap-2 text-sm text-gray-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
                       <span className="font-bold text-blue-600">{i + 1}.</span>
-                      <span>
+                      <span className="flex-1 text-right">
                         {d.quantity && <strong>{d.quantity}x </strong>}
                         {d.type && <span className="font-medium">{d.type}</span>}
                         {d.description && <> - {d.description}</>}
                         {d.platform && <span className="text-xs text-gray-500"> ({d.platform})</span>}
+                        {d.dueDate && (
+                          <span className="block text-xs text-blue-600 mt-1">
+                            📅 {new Date(d.dueDate).toLocaleDateString('he-IL')}
+                          </span>
+                        )}
                       </span>
                     </li>
                   ))}
                 </ul>
               </div>
             )}
+
+            {/* Important Terms Preview */}
+            <div className="mb-6">
+              <p className="text-sm font-medium text-gray-700 mb-3 text-right">⚖️ תנאים חשובים:</p>
+              <div className="space-y-2">
+                {parsedRawData.exclusivity?.isExclusive && (
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-right">
+                    <p className="text-sm font-bold text-purple-900">🔒 חוזה אקסקלוסיבי</p>
+                    {parsedRawData.exclusivity.categories?.length > 0 && (
+                      <p className="text-xs text-purple-700 mt-1">
+                        {parsedRawData.exclusivity.categories.join(', ')}
+                      </p>
+                    )}
+                  </div>
+                )}
+                
+                {parsedRawData.terminationClauses?.[0] && (
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-right">
+                    <p className="text-xs text-orange-700">{parsedRawData.terminationClauses[0]}</p>
+                  </div>
+                )}
+              </div>
+            </div>
 
             {/* Confidence - Removed as per user request */}
           </div>

@@ -8,8 +8,31 @@ export async function PATCH(
 ) {
   try {
     const { id: documentId } = await context.params;
+    const body = await request.json();
+    const { partnership_id } = body;
 
-    // Check authentication
+    // Simple update for linking document to partnership (no auth required during creation flow)
+    if (partnership_id !== undefined) {
+      const { createClient } = await import('@/lib/supabase');
+      const supabase = await createClient();
+      
+      const { error: updateError } = await supabase
+        .from('partnership_documents')
+        .update({ partnership_id })
+        .eq('id', documentId);
+
+      if (updateError) {
+        console.error('Error linking document to partnership:', updateError);
+        return NextResponse.json(
+          { error: 'שגיאה בעדכון המסמך' },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({ success: true });
+    }
+
+    // For other updates, require auth
     const authResult = await requireAuth(request);
     if (!authResult.success) {
       return NextResponse.json(
