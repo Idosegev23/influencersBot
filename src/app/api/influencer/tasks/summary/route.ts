@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
         *,
         partnership:partnerships(id, brand_name, status)
       `)
-      .eq('account_id', account.id)
+      .eq('account_id', accountId)
       .neq('status', 'completed')
       .neq('status', 'cancelled')
       .lt('due_date', now)
@@ -79,7 +79,7 @@ export async function GET(req: NextRequest) {
     const { data: completedToday, error: completedError } = await supabase
       .from('tasks')
       .select('id')
-      .eq('account_id', account.id)
+      .eq('account_id', accountId)
       .eq('status', 'completed')
       .gte('completed_at', todayStart.toISOString());
 
@@ -94,7 +94,7 @@ export async function GET(req: NextRequest) {
         *,
         partnership:partnerships(id, brand_name, status)
       `)
-      .eq('account_id', account.id)
+      .eq('account_id', accountId)
       .in('status', ['pending', 'in_progress'])
       .in('priority', ['high', 'urgent'])
       .order('priority', { ascending: false })
