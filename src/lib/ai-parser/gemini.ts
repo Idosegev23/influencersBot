@@ -53,29 +53,40 @@ export async function parseWithGemini(options: ParseOptions): Promise<ParseResul
     const response = result.response;
     const text = response.text();
 
-    console.log('[Gemini] Raw response:', text.substring(0, 200) + '...');
+    console.log('[Gemini] Raw response (first 500 chars):', text.substring(0, 500));
 
     // Parse JSON
     let parsed: any;
     try {
       parsed = JSON.parse(text);
+      console.log('[Gemini] ✅ Parsed JSON successfully');
     } catch (parseError) {
       console.error('[Gemini] JSON parse error:', parseError);
       // Try to extract JSON from text
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         parsed = JSON.parse(jsonMatch[0]);
+        console.log('[Gemini] ✅ Extracted and parsed JSON from response');
       } else {
         throw new Error('Failed to parse JSON from response');
       }
     }
+
+    // Log full parsed data for debugging
+    console.log('[Gemini] 📊 Full parsed data:', JSON.stringify(parsed, null, 2));
 
     // Calculate confidence
     const confidence = calculateConfidence(parsed, documentType);
 
     const duration = Date.now() - startTime;
 
-    console.log(`[Gemini] ✅ Success! Confidence: ${confidence.toFixed(2)}, Duration: ${duration}ms`);
+    console.log(`[Gemini] ✅ Success! Confidence: ${(confidence * 100).toFixed(1)}%, Duration: ${duration}ms`);
+    console.log(`[Gemini] 🎯 Key fields extracted:`, {
+      brand: parsed.parties?.brand,
+      amount: parsed.paymentTerms?.totalAmount,
+      deliverables: parsed.deliverables?.length,
+      dates: { effective: parsed.effectiveDate, expiry: parsed.expiryDate }
+    });
 
     return {
       success: true,
