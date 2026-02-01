@@ -221,6 +221,26 @@ export default function NewPartnershipPage() {
       const result = await response.json();
       const partnershipId = result.partnership.id;
 
+      // Update uploaded document with partnership_id (if was uploaded during creation)
+      if (uploadedDocumentId) {
+        try {
+          console.log('[Partnership Creation] 🔗 Linking document to partnership:', uploadedDocumentId, '→', partnershipId);
+          
+          await fetch(`/api/influencer/documents/${uploadedDocumentId}/update-parsed`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              partnership_id: partnershipId,
+            }),
+          });
+          
+          console.log('[Partnership Creation] ✅ Document linked to partnership');
+        } catch (linkError) {
+          console.error('[Partnership Creation] ⚠️ Failed to link document:', linkError);
+          // Don't fail the whole creation - just log it
+        }
+      }
+
       // Upload documents if any - DIRECT to Supabase Storage (bypasses Vercel 4.5MB limit)
       if (uploadedFiles.length > 0) {
         const accountId = result.partnership.account_id;

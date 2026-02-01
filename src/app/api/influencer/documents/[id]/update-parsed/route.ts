@@ -45,29 +45,34 @@ export async function PATCH(
     }
 
     // Parse request body
-    const { field, value } = await request.json();
+    const body = await request.json();
+    const { field, value, partnership_id } = body;
 
-    if (!field) {
-      return NextResponse.json(
-        { error: 'שדה חובה חסר' },
-        { status: 400 }
-      );
+    // Prepare update object
+    const updates: any = {
+      updated_at: new Date().toISOString(),
+    };
+
+    // Update partnership_id if provided
+    if (partnership_id !== undefined) {
+      updates.partnership_id = partnership_id;
+      console.log(`[Update Document] Linking document ${documentId} to partnership ${partnership_id}`);
     }
 
-    // Update parsed_data
-    const currentParsedData = document.parsed_data || {};
-    const updatedParsedData = {
-      ...currentParsedData,
-      [field]: value,
-    };
+    // Update parsed_data field if provided
+    if (field) {
+      const currentParsedData = document.parsed_data || {};
+      updates.parsed_data = {
+        ...currentParsedData,
+        [field]: value,
+      };
+      console.log(`[Update Document] Updating parsed_data field: ${field}`);
+    }
 
     // Update in database
     const { error: updateError } = await supabase
       .from('partnership_documents')
-      .update({
-        parsed_data: updatedParsedData,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updates)
       .eq('id', documentId);
 
     if (updateError) {
@@ -80,7 +85,7 @@ export async function PATCH(
 
     return NextResponse.json({
       success: true,
-      parsed_data: updatedParsedData,
+      updates,
     });
   } catch (error) {
     console.error('Error in PATCH /api/influencer/documents/[id]/update-parsed:', error);
