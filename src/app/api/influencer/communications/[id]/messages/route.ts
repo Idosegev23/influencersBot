@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/server';
 import { requireInfluencerAuth } from '@/lib/auth/influencer-auth';
 
 /**
@@ -18,6 +18,7 @@ export async function POST(
 
   const { id: communicationId } = await params;
   const accountId = auth.accountId;
+  const supabase = await createClient();
   const body = await request.json();
   
   console.log(`[Communication Messages POST] Sending message to communication ${communicationId}`);

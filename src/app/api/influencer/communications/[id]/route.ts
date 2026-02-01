@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/server';
 import { requireInfluencerAuth } from '@/lib/auth/influencer-auth';
 
 /**
@@ -18,6 +18,7 @@ export async function GET(
 
   const { id } = await params;
   const accountId = auth.accountId;
+  const supabase = await createClient();
   
   console.log(`[Communications GET] Fetching communication ${id} for account ${accountId}`);
 
@@ -98,6 +99,7 @@ export async function PATCH(
 
   const { id } = await params;
   const accountId = auth.accountId;
+  const supabase = await createClient();
   const body = await request.json();
   
   console.log(`[Communications PATCH] Updating communication ${id} for account ${accountId}`);
@@ -171,6 +173,7 @@ export async function DELETE(
 
   const { id } = await params;
   const accountId = auth.accountId;
+  const supabase = await createClient();
   
   console.log(`[Communications DELETE] Deleting communication ${id} for account ${accountId}`);
 
