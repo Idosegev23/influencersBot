@@ -28,7 +28,7 @@ export async function GET(
       .from('brand_communications')
       .select(`
         *,
-        partnership:partnerships(id, brand_name, campaign_name),
+        partnership:partnerships(id, brand_name, category, status),
         account:accounts(id, name),
         related_invoice:invoices(id, invoice_number, amount, status),
         related_document:partnership_documents(id, file_name, document_type),
