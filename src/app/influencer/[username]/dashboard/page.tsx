@@ -48,6 +48,7 @@ export default function InfluencerDashboardPage({
   const [taskSummary, setTaskSummary] = useState<any>(null);
   const [partnerships, setPartnerships] = useState<any[]>([]);
   const [partnershipCoupons, setPartnershipCoupons] = useState<Record<string, any[]>>({});
+  const [totalCouponsCount, setTotalCouponsCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [rescanning, setRescanning] = useState(false);
@@ -92,6 +93,7 @@ export default function InfluencerDashboardPage({
             
             // Load coupons for each partnership
             const couponsMap: Record<string, any[]> = {};
+            let totalCoupons = 0;
             await Promise.all(
               loadedPartnerships.map(async (p: any) => {
                 try {
@@ -101,6 +103,7 @@ export default function InfluencerDashboardPage({
                   if (couponsRes.ok) {
                     const couponsData = await couponsRes.json();
                     couponsMap[p.id] = couponsData.coupons || [];
+                    totalCoupons += (couponsData.coupons || []).length;
                   }
                 } catch (err) {
                   console.error('Error loading coupons for partnership:', p.id, err);
@@ -109,6 +112,7 @@ export default function InfluencerDashboardPage({
               })
             );
             setPartnershipCoupons(couponsMap);
+            setTotalCouponsCount(totalCoupons);
           }
         } catch (err) {
           console.error('Error loading partnerships:', err);
@@ -382,8 +386,8 @@ export default function InfluencerDashboardPage({
                 <Tag className="w-6 h-6 text-green-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-white">{formatNumber(audienceAnalytics?.overview?.couponCopiedCount || analytics.couponCopies || 0)}</p>
-                <p className="text-sm text-gray-400">קופונים</p>
+                <p className="text-2xl font-bold text-white">{formatNumber(totalCouponsCount)}</p>
+                <p className="text-sm text-gray-400">קופונים פעילים</p>
               </div>
             </div>
           </motion.div>
