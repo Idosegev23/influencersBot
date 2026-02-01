@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { supabaseClient } from '@/lib/supabase-client';
 import { Upload, FileText, Loader2 } from 'lucide-react';
 
-type CreationMode = 'select' | 'upload' | 'manual';
+type CreationMode = 'select' | 'upload' | 'review' | 'manual';
 
 export default function NewPartnershipPage() {
   const params = useParams();
@@ -17,6 +17,7 @@ export default function NewPartnershipPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [uploadedDocumentId, setUploadedDocumentId] = useState<string | null>(null);
+  const [parsedRawData, setParsedRawData] = useState<any>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -139,6 +140,9 @@ export default function NewPartnershipPage() {
       if (data) {
         console.log('[Partnership Creation] 📊 Extracted data:', JSON.stringify(data, null, 2));
         
+        // Save raw data for review screen
+        setParsedRawData(data);
+        
         // Map contract structure to form fields
         const brandName = data.parties?.brand || data.brandName || '';
         const startDate = data.effectiveDate || data.startDate || data.timeline?.startDate || '';
@@ -149,7 +153,11 @@ export default function NewPartnershipPage() {
         let deliverablesText = '';
         if (Array.isArray(data.deliverables)) {
           deliverablesText = data.deliverables
-            .map((d: any) => typeof d === 'string' ? d : d.description || d.title || '')
+            .map((d: any, index: number) => {
+              const desc = typeof d === 'string' ? d : d.description || d.title || '';
+              const qty = d.quantity ? `${d.quantity}x ` : '';
+              return `${qty}${desc}`;
+            })
             .filter(Boolean)
             .join('\n');
         } else if (typeof data.deliverables === 'string') {
@@ -158,7 +166,7 @@ export default function NewPartnershipPage() {
         
         setFormData({
           brand_name: brandName,
-          campaign_name: data.campaignName || data.campaignGoal || '',
+          campaign_name: data.campaignName || data.campaignGoal || data.scope || '',
           status: 'active', // Default for signed contracts
           start_date: startDate,
           end_date: endDate,
@@ -169,6 +177,7 @@ export default function NewPartnershipPage() {
         
         console.log('[Partnership Creation] ✅ Form filled with:', {
           brand_name: brandName,
+          campaign_name: data.campaignName || data.scope,
           start_date: startDate,
           end_date: endDate,
           amount,
@@ -181,8 +190,8 @@ export default function NewPartnershipPage() {
       }
 
       setIsParsing(false);
-      console.log('[Partnership Creation] ✅ Switching to manual mode to show form');
-      setCreationMode('manual'); // Show form for editing
+      console.log('[Partnership Creation] ✅ Switching to review mode');
+      setCreationMode('review'); // Show review screen first
     } catch (err: any) {
       console.error('[Partnership Creation] ❌ Error uploading/parsing document:', err);
       console.error('[Partnership Creation] Error details:', {
@@ -445,22 +454,131 @@ export default function NewPartnershipPage() {
         </div>
       )}
 
+      {/* REVIEW MODE - Show what AI found */}
+      {creationMode === 'review' && parsedRawData && (
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="mb-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
+                <svg className="h-6 w-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">✅ החוזה נותח בהצלחה!</h3>
+                <p className="text-sm text-gray-600">Gemini 3 Pro זיהה את הפרטים הבאים:</p>
+              </div>
+            </div>
+
+            {/* Extracted Data Summary */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              {/* Brand */}
+              <div className="bg-blue-50 rounded-lg p-4">
+                <p className="text-xs font-medium text-blue-900 mb-1">מותג</p>
+                <p className="text-lg font-bold text-blue-700">{parsedRawData.parties?.brand || '—'}</p>
+              </div>
+
+              {/* Amount */}
+              <div className="bg-green-50 rounded-lg p-4">
+                <p className="text-xs font-medium text-green-900 mb-1">סכום</p>
+                <p className="text-lg font-bold text-green-700">
+                  {parsedRawData.paymentTerms?.totalAmount 
+                    ? `₪${parsedRawData.paymentTerms.totalAmount.toLocaleString()}`
+                    : '—'}
+                </p>
+              </div>
+
+              {/* Dates */}
+              <div className="bg-purple-50 rounded-lg p-4">
+                <p className="text-xs font-medium text-purple-900 mb-1">תאריכים</p>
+                <p className="text-sm font-bold text-purple-700">
+                  {parsedRawData.effectiveDate || '—'} → {parsedRawData.expiryDate || '—'}
+                </p>
+              </div>
+
+              {/* Deliverables */}
+              <div className="bg-orange-50 rounded-lg p-4">
+                <p className="text-xs font-medium text-orange-900 mb-1">דליברבלס</p>
+                <p className="text-lg font-bold text-orange-700">
+                  {parsedRawData.deliverables?.length || 0} פריטים
+                </p>
+              </div>
+            </div>
+
+            {/* Deliverables Details */}
+            {parsedRawData.deliverables?.length > 0 && (
+              <div className="mb-6">
+                <p className="text-sm font-medium text-gray-700 mb-2">דליברבלס שזוהו:</p>
+                <ul className="space-y-2">
+                  {parsedRawData.deliverables.map((d: any, i: number) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-gray-600 bg-gray-50 rounded p-2">
+                      <span className="font-bold text-blue-600">{i + 1}.</span>
+                      <span>
+                        {d.quantity && <strong>{d.quantity}x </strong>}
+                        {d.type && <span className="font-medium">{d.type}</span>}
+                        {d.description && <> - {d.description}</>}
+                        {d.platform && <span className="text-xs text-gray-500"> ({d.platform})</span>}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Confidence */}
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+              <p className="text-xs text-gray-600 mb-1">רמת ביטחון של AI:</p>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-blue-600 h-2 rounded-full transition-all"
+                    style={{ width: `${(parsedRawData.confidence || 0.79) * 100}%` }}
+                  />
+                </div>
+                <span className="text-sm font-bold text-gray-700">
+                  {((parsedRawData.confidence || 0.79) * 100).toFixed(0)}%
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3">
+            <button
+              onClick={() => setCreationMode('select')}
+              className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              התחל מחדש
+            </button>
+            <button
+              onClick={() => {
+                console.log('[Partnership Creation] 🎯 Moving to form edit mode');
+                setCreationMode('manual');
+              }}
+              className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              המשך לעריכה ←
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* FORM (shown in manual mode or after parsing) */}
       {creationMode === 'manual' && (
         <>
           {/* AI Parsing Success Notice */}
           {uploadedDocumentId && (
-            <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-start gap-3">
-                <svg className="h-5 w-5 text-green-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="h-5 w-5 text-blue-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-green-900">
-                    ✅ המסמך נותח בהצלחה!
+                  <p className="text-sm font-medium text-blue-900">
+                    💡 הטופס מולא אוטומטית מהחוזה
                   </p>
-                  <p className="text-sm text-green-700 mt-1">
-                    הפרטים מולאו אוטומטית. ערוך והשלם את החסר.
+                  <p className="text-sm text-blue-700 mt-1">
+                    בדוק את הפרטים, ערוך והשלם את החסר לפי הצורך.
                   </p>
                 </div>
               </div>
