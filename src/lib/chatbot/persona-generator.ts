@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase';
 import { scrapeInstagramProfile } from '@/lib/apify';
 import { buildPersonaWithGemini } from '@/lib/gemini-chat';
+import { initProgress, updateProgress, completeProgress, failProgress } from '@/lib/scraping-progress';
 import type { ApifyPostData } from '@/types';
 
 type InstagramData = {
@@ -451,7 +452,17 @@ function extractTopics(posts: ApifyPostData[]): string[] {
  */
 export async function syncInstagramAndRegeneratePersona(accountId: string, username: string) {
   try {
+    // Initialize progress tracking
+    await initProgress(username);
+    
     console.log(`🔍 Starting Instagram sync for @${username}`);
+    
+    // Update progress: Starting
+    await updateProgress(username, {
+      status: 'starting',
+      progress: 5,
+      currentStep: '🔍 מתחבר לאינסטגרם...',
+    });
     
     // Fetch real data from Instagram via Apify
     const { profile, posts } = await scrapeInstagramProfile(username, { 
@@ -459,6 +470,16 @@ export async function syncInstagramAndRegeneratePersona(accountId: string, usern
     });
 
     console.log(`✅ Scraped ${posts.length} posts from @${username}`);
+    
+    // Update progress: Scraped posts
+    await updateProgress(username, {
+      status: 'scraping_posts',
+      progress: 30,
+      currentStep: `✅ נסרקו ${posts.length} פוסטים!`,
+      details: {
+        postsScraped: posts.length,
+      },
+    });
 
     // Calculate engagement rate
     const engagement_rate = calculateEngagementRate(posts, profile.followersCount);
@@ -521,7 +542,20 @@ export async function syncInstagramAndRegeneratePersona(accountId: string, usern
       content_types: contentAnalysis.contentTypeDistribution,
     });
 
+    // Update progress: Analyzing
+    await updateProgress(username, {
+      status: 'analyzing',
+      progress: 50,
+      currentStep: '📊 מנתח תוכן ודפוסים...',
+    });
+
     console.log('🤖 Building deep persona with Gemini Pro...');
+    
+    // Update progress: Building persona
+    await updateProgress(username, {
+      progress: 60,
+      currentStep: '🤖 בונה פרסונה עם Gemini Pro...',
+    });
 
     // Use Gemini Pro to build a DEEP, intelligent persona
     const aiPersona = await buildPersonaWithGemini({
@@ -546,6 +580,12 @@ export async function syncInstagramAndRegeneratePersona(accountId: string, usern
     });
 
     console.log('✨ Gemini Pro persona built successfully!');
+    
+    // Update progress: Persona built
+    await updateProgress(username, {
+      progress: 80,
+      currentStep: '✨ פרסונה נבנתה! שומר...',
+    });
 
     // Merge AI persona with Instagram data and save
     const supabase = createClient();
@@ -591,9 +631,25 @@ export async function syncInstagramAndRegeneratePersona(accountId: string, usern
     }
 
     console.log('💾 Persona saved to DB!');
+    
+    // Update progress: Complete!
+    await completeProgress(username, {
+      postsScraped: posts.length,
+      brandsFound: 0, // Can be updated later
+      couponsFound: 0,
+      productsFound: 0,
+    });
+    
     return data;
   } catch (error) {
     console.error('❌ Failed to sync Instagram data:', error);
+    
+    // Mark as failed
+    await failProgress(
+      username,
+      error instanceof Error ? error.message : 'הסריקה נכשלה'
+    );
+    
     throw new Error('Failed to sync Instagram profile. Please try again.');
   }
 }

@@ -38,7 +38,7 @@ export default function ScrapeProgressModal({ username, isOpen, onComplete }: Pr
 
     const fetchProgress = async () => {
       try {
-        const res = await fetch(`/api/admin/scrape-progress/${username}`);
+        const res = await fetch(`/api/influencer/scrape-progress/${username}`);
         
         if (res.status === 404) {
           // No progress found yet - still initializing

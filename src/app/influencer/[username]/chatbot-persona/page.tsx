@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Save, Sparkles, Instagram } from 'lucide-react';
+import ScrapeProgressModal from '@/components/ScrapeProgressModal';
 
 export default function ChatbotPersonaPage({
   params,
@@ -16,6 +17,7 @@ export default function ChatbotPersonaPage({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [showProgressModal, setShowProgressModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
@@ -140,7 +142,11 @@ export default function ChatbotPersonaPage({
       setSyncing(true);
       setError(null);
       setSuccess(false);
+      
+      // Show progress modal
+      setShowProgressModal(true);
 
+      // Start the sync in the background
       const response = await fetch(
         `/api/influencer/chatbot/persona?username=${username}`,
         {
@@ -153,18 +159,26 @@ export default function ChatbotPersonaPage({
         throw new Error(data.error || 'Failed to sync from Instagram');
       }
 
-      const data = await response.json();
-      
-      // Reload persona after sync
-      await loadPersona();
-      
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 5000);
+      // Note: Progress modal will handle the completion via polling
     } catch (err) {
       console.error('Error syncing from Instagram:', err);
       setError(err instanceof Error ? err.message : 'שגיאה בסנכרון מאינסטגרם');
-    } finally {
+      setShowProgressModal(false);
       setSyncing(false);
+    }
+  };
+
+  const handleSyncComplete = async (success: boolean) => {
+    setShowProgressModal(false);
+    setSyncing(false);
+    
+    if (success) {
+      // Reload persona after successful sync
+      await loadPersona();
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 5000);
+    } else {
+      setError('הסריקה נכשלה. נסה שוב.');
     }
   };
 
@@ -469,6 +483,13 @@ export default function ChatbotPersonaPage({
           </div>
         </div>
       </div>
+
+      {/* Progress Modal */}
+      <ScrapeProgressModal
+        username={username}
+        isOpen={showProgressModal}
+        onComplete={handleSyncComplete}
+      />
     </div>
   );
 }
