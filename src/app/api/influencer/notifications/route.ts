@@ -1,31 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase';
-import { requireAuth } from '@/lib/auth/api-helpers';
+import { supabase } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
   try {
-    const authResult = await requireAuth(request);
-    if (!authResult.success) {
-      return NextResponse.json(
-        { error: authResult.error },
-        { status: authResult.status }
-      );
-    }
-
-    const { user } = authResult;
-    const supabase = await createClient();
-
     // Get query params
     const { searchParams } = new URL(request.url);
+    const accountId = searchParams.get('account_id');
     const limit = parseInt(searchParams.get('limit') || '20');
     const offset = parseInt(searchParams.get('offset') || '0');
     const unreadOnly = searchParams.get('unread_only') === 'true';
 
-    // Build query
+    if (!accountId) {
+      return NextResponse.json(
+        { error: 'account_id required' },
+        { status: 400 }
+      );
+    }
+
+    // Build query - using account_id instead of user_id
     let query = supabase
       .from('in_app_notifications')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('account_id', accountId)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase';
-import { requireAuth } from '@/lib/auth/api-helpers';
+import { supabase } from '@/lib/supabase';
 
 export async function PATCH(
   request: NextRequest,
@@ -8,17 +7,15 @@ export async function PATCH(
 ) {
   try {
     const { id: notificationId } = await context.params;
+    const { searchParams } = new URL(request.url);
+    const accountId = searchParams.get('account_id');
 
-    const authResult = await requireAuth(request);
-    if (!authResult.success) {
+    if (!accountId) {
       return NextResponse.json(
-        { error: authResult.error },
-        { status: authResult.status }
+        { error: 'account_id required' },
+        { status: 400 }
       );
     }
-
-    const { user } = authResult;
-    const supabase = await createClient();
 
     const { error } = await supabase
       .from('in_app_notifications')
@@ -27,7 +24,7 @@ export async function PATCH(
         read_at: new Date().toISOString(),
       })
       .eq('id', notificationId)
-      .eq('user_id', user.id); // Ensure user owns the notification
+      .eq('account_id', accountId); // Ensure account owns the notification
 
     if (error) {
       console.error('Error marking notification as read:', error);

@@ -1,19 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase';
-import { requireAuth } from '@/lib/auth/api-helpers';
+import { supabase } from '@/lib/supabase';
 
 export async function PATCH(request: NextRequest) {
   try {
-    const authResult = await requireAuth(request);
-    if (!authResult.success) {
+    const { searchParams } = new URL(request.url);
+    const accountId = searchParams.get('account_id');
+
+    if (!accountId) {
       return NextResponse.json(
-        { error: authResult.error },
-        { status: authResult.status }
+        { error: 'account_id required' },
+        { status: 400 }
       );
     }
-
-    const { user } = authResult;
-    const supabase = await createClient();
 
     const { error } = await supabase
       .from('in_app_notifications')
@@ -21,7 +19,7 @@ export async function PATCH(request: NextRequest) {
         is_read: true,
         read_at: new Date().toISOString(),
       })
-      .eq('user_id', user.id)
+      .eq('account_id', accountId)
       .eq('is_read', false);
 
     if (error) {

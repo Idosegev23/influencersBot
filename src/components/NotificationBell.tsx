@@ -15,7 +15,7 @@ interface Notification {
   created_at: string;
 }
 
-export function NotificationBell({ className }: { className?: string }) {
+export function NotificationBell({ className, username, accountId }: { className?: string; username?: string; accountId?: string }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -24,21 +24,25 @@ export function NotificationBell({ className }: { className?: string }) {
 
   // Load notifications
   useEffect(() => {
-    loadNotifications();
-    loadUnreadCount();
-
-    // Poll for new notifications every 30 seconds
-    const interval = setInterval(() => {
+    if (accountId) {
+      loadNotifications();
       loadUnreadCount();
-    }, 30000);
 
-    return () => clearInterval(interval);
-  }, []);
+      // Poll for new notifications every 30 seconds
+      const interval = setInterval(() => {
+        loadUnreadCount();
+      }, 30000);
+
+      return () => clearInterval(interval);
+    }
+  }, [accountId]);
 
   const loadNotifications = async () => {
+    if (!accountId) return;
+    
     setIsLoading(true);
     try {
-      const response = await fetch('/api/influencer/notifications');
+      const response = await fetch(`/api/influencer/notifications?account_id=${accountId}`);
       if (response.ok) {
         const data = await response.json();
         setNotifications(data.notifications || []);
@@ -51,8 +55,10 @@ export function NotificationBell({ className }: { className?: string }) {
   };
 
   const loadUnreadCount = async () => {
+    if (!accountId) return;
+    
     try {
-      const response = await fetch('/api/influencer/notifications/unread-count');
+      const response = await fetch(`/api/influencer/notifications/unread-count?account_id=${accountId}`);
       if (response.ok) {
         const data = await response.json();
         setUnreadCount(data.count || 0);
@@ -63,8 +69,10 @@ export function NotificationBell({ className }: { className?: string }) {
   };
 
   const markAsRead = async (notificationId: string) => {
+    if (!accountId) return;
+    
     try {
-      await fetch(`/api/influencer/notifications/${notificationId}/read`, {
+      await fetch(`/api/influencer/notifications/${notificationId}/read?account_id=${accountId}`, {
         method: 'PATCH',
       });
 
@@ -82,8 +90,10 @@ export function NotificationBell({ className }: { className?: string }) {
   };
 
   const markAllAsRead = async () => {
+    if (!accountId) return;
+    
     try {
-      await fetch('/api/influencer/notifications/mark-all-read', {
+      await fetch(`/api/influencer/notifications/mark-all-read?account_id=${accountId}`, {
         method: 'PATCH',
       });
 

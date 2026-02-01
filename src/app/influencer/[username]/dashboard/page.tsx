@@ -271,7 +271,7 @@ export default function InfluencerDashboardPage({
             </div>
 
             <div className="flex items-center gap-2">
-              <NotificationBell influencerId={influencer.id} />
+              <NotificationBell username={username} accountId={influencer.id} />
               <a
                 href={chatLink}
                 target="_blank"
