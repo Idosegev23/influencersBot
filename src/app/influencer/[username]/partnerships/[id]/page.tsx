@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { supabaseClient } from '@/lib/supabase-client';
 
 interface Partnership {
   id: string;
@@ -134,25 +135,68 @@ export default function PartnershipDetailPage() {
     setError(null);
 
     try {
-      const formData = new FormData();
-      for (let i = 0; i < files.length; i++) {
-        formData.append('files', files[i]);
-      }
-      formData.append('accountId', accountId);
-      formData.append('partnershipId', partnershipId);
-      formData.append('username', username);
+      // Upload files directly to Supabase Storage (bypasses Vercel 4.5MB limit)
+      for (const file of Array.from(files)) {
+        // Check file size (max 10MB)
+        const MAX_SIZE = 10 * 1024 * 1024;
+        if (file.size > MAX_SIZE) {
+          setError(`${file.name} גדול מדי (${(file.size / 1024 / 1024).toFixed(2)}MB). מקסימום 10MB.`);
+          continue;
+        }
 
-      const response = await fetch('/api/influencer/documents/upload', {
-        method: 'POST',
-        body: formData,
-      });
+        // 1. Upload directly to Supabase Storage (client-side)
+        const timestamp = Date.now();
+        const cleanFilename = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const storagePath = `${accountId}/partnerships/${partnershipId}/${timestamp}_${cleanFilename}`;
 
-      if (!response.ok) {
-        throw new Error('Failed to upload documents');
+        const { data: uploadData, error: uploadError } = await supabaseClient.storage
+          .from('partnership-documents')
+          .upload(storagePath, file, {
+            contentType: file.type,
+            upsert: false,
+          });
+
+        if (uploadError) {
+          console.error(`Failed to upload ${file.name}:`, uploadError);
+          setError(`העלאת ${file.name} נכשלה`);
+          continue;
+        }
+
+        // 2. Get public URL
+        const { data: urlData } = supabaseClient.storage
+          .from('partnership-documents')
+          .getPublicUrl(storagePath);
+
+        // 3. Save metadata to DB via lightweight API (only JSON, no file payload)
+        const metadataResponse = await fetch('/api/influencer/documents/metadata', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username,
+            accountId,
+            partnershipId,
+            filename: file.name,
+            fileSize: file.size,
+            mimeType: file.type,
+            storagePath,
+            publicUrl: urlData.publicUrl,
+            documentType: 'contract',
+          }),
+        });
+
+        if (!metadataResponse.ok) {
+          const error = await metadataResponse.json();
+          console.error(`Failed to save metadata for ${file.name}:`, error);
+          setError(`שמירת ${file.name} נכשלה`);
+          continue;
+        }
+
+        console.log(`✓ Uploaded ${file.name}`);
       }
 
       // Reload documents
       await loadDocuments();
+      setError(null); // Clear any errors on success
     } catch (err) {
       console.error('Error uploading documents:', err);
       setError('שגיאה בהעלאת המסמכים');
