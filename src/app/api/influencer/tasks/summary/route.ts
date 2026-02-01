@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     const { data: taskCounts, error: countsError } = await supabase
       .from('tasks')
       .select('status')
-      .eq('account_id', account.id)
+      .eq('account_id', accountId)
       .neq('status', 'cancelled');
 
     if (countsError) {
