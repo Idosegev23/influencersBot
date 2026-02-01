@@ -81,6 +81,9 @@ export default function PartnershipDetailPage() {
   const [editData, setEditData] = useState<Partial<Partnership>>({});
   const [activeTab, setActiveTab] = useState<'details' | 'payments' | 'deliverables' | 'terms' | 'documents' | 'coupons'>('details');
   
+  // Document upload state
+  const [selectedDocumentType, setSelectedDocumentType] = useState<'contract' | 'quote' | 'brief' | 'invoice' | 'receipt' | 'other'>('contract');
+  
   // Coupons state
   const [coupons, setCoupons] = useState<any[]>([]);
   const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
@@ -261,6 +264,8 @@ export default function PartnershipDetailPage() {
     setIsUploading(true);
     setError(null);
 
+    const uploadedDocumentIds: string[] = [];
+
     try {
       // Upload files directly to Supabase Storage (bypasses Vercel 4.5MB limit)
       for (const file of Array.from(files)) {
@@ -301,7 +306,7 @@ export default function PartnershipDetailPage() {
             fileSize: file.size,
             mimeType: file.type,
             storagePath,
-            documentType: 'contract',
+            documentType: selectedDocumentType,
           }),
         });
 
@@ -312,7 +317,37 @@ export default function PartnershipDetailPage() {
           continue;
         }
 
+        const metadataResult = await metadataResponse.json();
+        uploadedDocumentIds.push(metadataResult.document.id);
+
         console.log(`✓ Uploaded ${file.name}`);
+      }
+
+      // 3. Auto-parse uploaded documents
+      if (uploadedDocumentIds.length > 0) {
+        console.log(`📄 מנתח ${uploadedDocumentIds.length} מסמכים...`);
+        
+        try {
+          const parseResponse = await fetch('/api/influencer/documents/parse', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              documentIds: uploadedDocumentIds,
+              documentType: selectedDocumentType,
+            }),
+          });
+
+          if (parseResponse.ok) {
+            console.log('✅ ניתוח הושלם בהצלחה');
+          } else {
+            const parseError = await parseResponse.json();
+            console.warn('⚠️ ניתוח נכשל:', parseError.error);
+            // Don't show error to user - document is uploaded, parsing is optional
+          }
+        } catch (parseErr) {
+          console.warn('⚠️ שגיאה בניתוח:', parseErr);
+          // Continue - document is uploaded
+        }
       }
 
       // Reload documents
@@ -1026,6 +1061,27 @@ export default function PartnershipDetailPage() {
             <h3 className="text-lg font-semibold text-gray-900 mb-4 text-right">
               העלאת מסמכים
             </h3>
+            
+            {/* Document Type Selector */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                סוג המסמך
+              </label>
+              <select
+                value={selectedDocumentType}
+                onChange={(e) => setSelectedDocumentType(e.target.value as any)}
+                disabled={isUploading}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="contract">📄 חוזה שת"פ - הסכם שיתוף פעולה עם מותג</option>
+                <option value="brief">📋 בריף קמפיין - דרישות תוכן והנחיות</option>
+                <option value="quote">💰 הצעת מחיר - הצעה מסחרית או הצעת שת"פ</option>
+                <option value="invoice">🧾 חשבונית - חשבונית, קבלה או דרישת תשלום</option>
+                <option value="receipt">🧾 קבלה - אישור תשלום</option>
+                <option value="other">📁 אחר - AI ינחש את סוג המסמך</option>
+              </select>
+            </div>
+
             <div className="flex items-center gap-4">
               <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer transition-colors">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1051,7 +1107,7 @@ export default function PartnershipDetailPage() {
               </p>
             </div>
             <p className="text-sm text-gray-600 mt-2 text-right">
-              💡 ה-AI ינתח אוטומטית את המסמך ויחלץ פרטים רלוונטיים
+              💡 ה-AI ינתח אוטומטית את המסמך בהתאם לסוג שבחרת ויחלץ פרטים רלוונטיים
             </p>
           </div>
 
