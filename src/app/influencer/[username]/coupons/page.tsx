@@ -118,6 +118,7 @@ export default function CouponsAnalyticsPage() {
         coupons: (apiResult?.brandPerformance || []).map(brand => ({
           coupon_id: brand?.brandId || '',
           code: brand?.couponCode || '',
+          brand_name: brand?.brandName || '',
           copy_count: brand?.copyCount || 0,
           usage_count: brand?.linkClicks || 0,
           conversion_rate: brand?.clickThroughRate || 0,

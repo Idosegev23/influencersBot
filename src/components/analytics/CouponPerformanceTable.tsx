@@ -3,6 +3,7 @@
 type CouponPerformance = {
   coupon_id: string;
   code: string;
+  brand_name?: string;
   usage_count: number;
   copy_count: number;
   total_revenue: number;
@@ -35,7 +36,7 @@ export default function CouponPerformanceTable({ coupons }: CouponPerformanceTab
           <thead className="bg-gray-50">
             <tr>
               <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                קוד קופון
+                מותג / קוד
               </th>
               <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
                 העתקות
@@ -60,10 +61,17 @@ export default function CouponPerformanceTable({ coupons }: CouponPerformanceTab
           <tbody className="bg-white divide-y divide-gray-200">
             {coupons.map((coupon) => (
               <tr key={coupon.coupon_id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 whitespace-nowrap">
-                  <span className="font-mono font-bold text-blue-600">
-                    {coupon.code}
-                  </span>
+                <td className="px-4 py-3">
+                  <div className="flex flex-col">
+                    {coupon.brand_name && (
+                      <span className="text-sm font-semibold text-gray-900 mb-1">
+                        {coupon.brand_name}
+                      </span>
+                    )}
+                    <span className="font-mono font-bold text-blue-600 text-xs">
+                      {coupon.code}
+                    </span>
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-center whitespace-nowrap">
                   <span className="text-gray-900">
