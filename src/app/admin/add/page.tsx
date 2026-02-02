@@ -56,6 +56,23 @@ export default function AddInfluencerPage() {
       .catch(() => router.push('/admin'));
   }, [router]);
 
+  // Prevent accidental page close during scraping
+  useEffect(() => {
+    if (state.step !== 'scraping' || !state.jobId) return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = 'תהליך הסריקה עדיין רץ. האם אתה בטוח שברצונך לעזוב?';
+      return e.returnValue;
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [state.step, state.jobId]);
+
   // Poll job status when in scraping step
   useEffect(() => {
     if (state.step !== 'scraping' || !state.jobId) return;
@@ -91,6 +108,53 @@ export default function AddInfluencerPage() {
 
     return () => clearInterval(interval);
   }, [state.step, state.jobId]);
+
+  // Handle cancel scraping
+  const handleCancelScraping = async () => {
+    const confirmed = window.confirm(
+      'האם אתה בטוח שברצונך לבטל את תהליך הסריקה?\n\n' +
+      'פעולה זו תמחק את כל הנתונים שנאספו עד כה ולא ניתן יהיה לשחזר אותם.'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      // Delete the job and all associated data
+      if (state.jobId) {
+        await fetch(`/api/scraping/cancel?jobId=${state.jobId}`, {
+          method: 'DELETE',
+        });
+      }
+
+      // Delete the account
+      if (state.accountId) {
+        await fetch(`/api/admin/accounts/${state.accountId}`, {
+          method: 'DELETE',
+        });
+      }
+
+      // Reset to initial state
+      setState({
+        step: 'username',
+        username: '',
+        jobId: null,
+        accountId: null,
+        scrapingComplete: false,
+        subdomain: '',
+        password: '',
+        phoneNumber: '',
+        whatsappEnabled: false,
+        error: null,
+        isLoading: false,
+      });
+    } catch (error) {
+      console.error('Error canceling scraping:', error);
+      setState((prev) => ({
+        ...prev,
+        error: 'שגיאה בביטול הריצה',
+      }));
+    }
+  };
 
   // Step 1: Handle username submission
   const handleUsernameSubmit = async (e: React.FormEvent) => {
@@ -394,9 +458,15 @@ export default function AddInfluencerPage() {
               <h2 className="text-2xl font-bold text-white mb-2">
                 סורק ומנתח את הפרופיל
               </h2>
-              <p className="text-gray-400">
-                תהליך זה עשוי לקחת 20-30 דקות
+              <p className="text-gray-400 mb-4">
+                תהליך זה עשוי לקחת 15-20 דקות
               </p>
+              <button
+                onClick={handleCancelScraping}
+                className="text-red-400 hover:text-red-300 text-sm underline transition-colors"
+              >
+                בטל ריצה ומחק נתונים
+              </button>
             </div>
 
             {jobStatus && (

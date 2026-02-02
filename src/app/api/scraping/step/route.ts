@@ -429,8 +429,14 @@ async function runStep4_Hashtags(supabase: any, accountId: string, username: str
 
   console.log(`[Step 4] Scraped ${hashtagsData.length} hashtags, saving to database...`);
 
-  // Save to database
-  const hashtagsToInsert = hashtagsData.map(data => ({
+  // Save to database - remove duplicates first
+  const uniqueHashtagsData = hashtagsData.filter((data, index, self) =>
+    index === self.findIndex((t) => t.hashtag === data.hashtag)
+  );
+
+  console.log(`[Step 4] After removing duplicates: ${uniqueHashtagsData.length} unique hashtags`);
+
+  const hashtagsToInsert = uniqueHashtagsData.map(data => ({
     account_id: accountId,
     hashtag: data.hashtag,
     frequency: allHashtags.filter(h => h === data.hashtag).length,
