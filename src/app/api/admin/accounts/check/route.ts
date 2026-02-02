@@ -42,15 +42,18 @@ export async function GET(request: Request) {
     console.log(`[Admin Check] Looking for account with username: ${username}`);
 
     // Check if account exists
-    // Try to find by username in config JSONB field
-    const { data: account, error: accountError } = await supabase
+    // Get the most recent account with this username (there might be duplicates)
+    const { data: accounts, error: accountError } = await supabase
       .from('accounts')
       .select('id, type, status, config, created_at')
       .eq('type', 'creator')
       .eq('config->>username', username)
-      .maybeSingle(); // Use maybeSingle instead of single to avoid error if not found
+      .order('created_at', { ascending: false })
+      .limit(1);
 
-    console.log(`[Admin Check] Account query result:`, { account, error: accountError });
+    console.log(`[Admin Check] Found ${accounts?.length || 0} accounts`);
+
+    const account = accounts && accounts.length > 0 ? accounts[0] : null;
 
     if (accountError) {
       console.error('[Admin Check] Database error:', accountError);
