@@ -68,6 +68,14 @@ export async function POST(request: Request) {
     }
 
     const username = job.accounts?.config?.username || job.accounts?.username;
+    const accountId = job.account_id;
+
+    if (!accountId) {
+      return NextResponse.json(
+        { error: 'Account ID not found in job' },
+        { status: 400 }
+      );
+    }
 
     // Update step status to 'running'
     await updateStepStatus(supabase, jobId, step, 'running', null, null);
