@@ -588,6 +588,9 @@ async function runStep7_GeminiPersona(supabase: any, accountId: string) {
     identityWho: persona.identity.who,
     boundariesDiscussed: persona.boundaries.discussed.length,
     boundariesNotDiscussed: persona.boundaries.notDiscussed.length,
+    productsIdentified: persona.products?.length || 0,
+    couponsIdentified: persona.coupons?.length || 0,
+    brandsIdentified: persona.brands?.length || 0,
   };
 }
 
