@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getAccountByUsername } from '@/lib/supabase';
 
 export async function GET(request: Request) {
   try {
@@ -18,14 +19,8 @@ export async function GET(request: Request) {
       );
     }
 
-    const supabase = await createClient();
-
-    // Get account
-    const { data: account } = await supabase
-      .from('accounts')
-      .select('id, username, display_name')
-      .eq('username', username)
-      .single();
+    // Get account using the helper function
+    const account = await getAccountByUsername(username);
 
     if (!account) {
       return NextResponse.json(
@@ -34,6 +29,8 @@ export async function GET(request: Request) {
       );
     }
 
+    const supabase = await createClient();
+
     // Load persona
     const { data: persona } = await supabase
       .from('chatbot_persona')
@@ -41,8 +38,11 @@ export async function GET(request: Request) {
       .eq('account_id', account.id)
       .single();
 
+    // Extract display name from config
+    const displayName = (account.config as any)?.display_name || username;
+
     // Build greeting message
-    let greeting = `שלום! אני הבוט של ${persona?.name || account.display_name || username} 😊`;
+    let greeting = `שלום! אני הבוט של ${persona?.name || displayName} 😊`;
     
     if (persona?.voice_rules?.tone) {
       // Use voice_rules to craft a better greeting
@@ -65,7 +65,7 @@ export async function GET(request: Request) {
       greeting,
       quickReplies,
       accountId: account.id,
-      displayName: account.display_name,
+      displayName,
     });
 
   } catch (error: any) {
