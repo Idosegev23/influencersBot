@@ -441,3 +441,51 @@ export async function getAgentInfluencerAccounts(
 
   return data?.map((d) => d.influencer_account_id) || [];
 }
+
+/**
+ * Helper function for influencer authentication in API routes
+ * Returns either the authenticated account data or a NextResponse error
+ */
+export async function requireInfluencerAuth(
+  request: Request
+): Promise<
+  | { accountId: string; userId: string }
+  | import('next/server').NextResponse
+> {
+  const { NextResponse } = await import('next/server');
+  const { createClient } = await import('@/lib/supabase/server');
+  const supabase = await createClient();
+
+  // Get authenticated user
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    );
+  }
+
+  // Get the influencer account for this user
+  const { data: account, error: accountError } = await supabase
+    .from('accounts')
+    .select('id')
+    .eq('owner_user_id', user.id)
+    .eq('type', 'influencer')
+    .single();
+
+  if (accountError || !account) {
+    return NextResponse.json(
+      { error: 'Influencer account not found' },
+      { status: 404 }
+    );
+  }
+
+  return {
+    accountId: account.id,
+    userId: user.id,
+  };
+}
