@@ -97,12 +97,6 @@ export default function DocumentReviewPage() {
     setError(null);
 
     try {
-      // Get account ID from influencer
-      const accountResponse = await fetch(`/api/influencer/${username}`);
-      if (!accountResponse.ok) throw new Error('Failed to get account');
-      const { influencer } = await accountResponse.json();
-      const accountId = influencer.id;
-
       // Create tasks from brief
       const tasks = editedData.tasks || [];
       
@@ -118,13 +112,12 @@ export default function DocumentReviewPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            username,
-            accountId,
             title: task.title,
             description: task.description || '',
-            dueDate: task.dueDate || null,
+            due_date: task.dueDate || null,
             priority: task.priority || 'medium',
             status: 'pending',
+            type: 'brief_task',
           }),
         });
 
