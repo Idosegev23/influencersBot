@@ -6,7 +6,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { PreprocessedData } from '../scraping/preprocessing';
 
-const GEMINI_API_KEY = process.env.GOOGLE_GEMINI_API_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
 
 // ============================================
 // Type Definitions
@@ -142,7 +142,7 @@ export async function buildPersonaWithGemini(
   console.log('[Gemini Persona Builder] Starting persona generation...');
 
   if (!GEMINI_API_KEY) {
-    throw new Error('GOOGLE_GEMINI_API_KEY is not configured');
+    throw new Error('GEMINI_API_KEY or GOOGLE_GEMINI_API_KEY is not configured');
   }
 
   // Initialize Gemini
