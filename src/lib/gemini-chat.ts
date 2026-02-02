@@ -170,29 +170,88 @@ export async function chatWithGemini(input: {
 
 /**
  * Build system instructions from persona
+ * Enhanced to use new structure: voice_rules, knowledge_map, boundaries, response_policy
  */
 function buildSystemInstructions(persona: any): string {
   const instructions = [];
 
-  // Base identity
-  instructions.push(`אתה ${persona.name || 'המשפיען/ית'}.`);
+  // Base identity - use new structure if available
+  if (persona.voice_rules?.identity?.who) {
+    instructions.push(`אתה ${persona.voice_rules.identity.who}`);
+  } else {
+    instructions.push(`אתה ${persona.name || 'המשפיען/ית'}.`);
+  }
   
-  // Voice and tone
-  if (persona.voice_and_tone || persona.voiceAndTone) {
+  // Enhanced voice and tone from voice_rules
+  if (persona.voice_rules) {
+    instructions.push(`\n🎭 סגנון דיבור ותשובה:`);
+    instructions.push(`- טון: ${persona.voice_rules.tone}`);
+    instructions.push(`- מבנה תשובה: ${persona.voice_rules.responseStructure}`);
+    instructions.push(`- אורך ממוצע: ${persona.voice_rules.avgLength}`);
+    
+    if (persona.voice_rules.recurringPhrases?.length > 0) {
+      instructions.push(`- ביטויים מאפיינים: ${persona.voice_rules.recurringPhrases.slice(0, 5).join(', ')}`);
+    }
+    
+    if (persona.voice_rules.avoidedWords?.length > 0) {
+      instructions.push(`- מילים להימנע מהן: ${persona.voice_rules.avoidedWords.slice(0, 5).join(', ')}`);
+    }
+  } else if (persona.voice_and_tone || persona.voiceAndTone) {
     instructions.push(`\n🎭 סגנון דיבור:\n${persona.voice_and_tone || persona.voiceAndTone}`);
   }
 
-  // Bio
+  // Bio - keep for backward compatibility
   if (persona.bio) {
     instructions.push(`\n👤 עליך:\n${persona.bio}`);
   }
 
-  // Interests
-  if (persona.interests?.length) {
+  // Knowledge Map - NEW!
+  if (persona.knowledge_map?.coreTopics?.length > 0) {
+    instructions.push(`\n📚 מפת הידע שלך (מבוסס על תוכן אמיתי):`);
+    persona.knowledge_map.coreTopics.forEach((topic: any) => {
+      instructions.push(`\n- ${topic.name}:`);
+      if (topic.keyPoints?.length > 0) {
+        topic.keyPoints.slice(0, 3).forEach((point: string) => {
+          instructions.push(`  * ${point}`);
+        });
+      }
+    });
+  } else if (persona.interests?.length) {
     instructions.push(`\n❤️ תחומי עניין: ${persona.interests.join(', ')}`);
   }
 
-  // Tone setting
+  // Boundaries - NEW!
+  if (persona.boundaries) {
+    instructions.push(`\n🚧 גבולות הידע:`);
+    
+    if (persona.boundaries.discussed?.length > 0) {
+      instructions.push(`- נושאים שדיברת עליהם: ${persona.boundaries.discussed.slice(0, 10).join(', ')}`);
+    }
+    
+    if (persona.boundaries.notDiscussed?.length > 0) {
+      instructions.push(`- נושאים שלא דיברת עליהם: ${persona.boundaries.notDiscussed.slice(0, 5).join(', ')}`);
+      instructions.push(`  ⚠️ אם נשאלת על אחד מהם, תגיד בנימוס שאין לך מספיק מידע על זה`);
+    }
+  }
+
+  // Response Policy - NEW!
+  if (persona.response_policy) {
+    instructions.push(`\n🎯 מדיניות תשובה:`);
+    
+    if (persona.response_policy.highConfidence?.length > 0) {
+      instructions.push(`- ענה בביטחון על: ${persona.response_policy.highConfidence.slice(0, 3).join(', ')}`);
+    }
+    
+    if (persona.response_policy.cautious?.length > 0) {
+      instructions.push(`- ענה בזהירות על: ${persona.response_policy.cautious.slice(0, 3).join(', ')}`);
+    }
+    
+    if (persona.response_policy.refuse?.length > 0) {
+      instructions.push(`- סרב לענות על: ${persona.response_policy.refuse.slice(0, 3).join(', ')}`);
+    }
+  }
+
+  // Tone setting - keep for backward compatibility
   const toneMap: Record<string, string> = {
     friendly: 'דבר/י בצורה חמה וידידותית',
     professional: 'שמור/י על טון מקצועי אבל נגיש',
@@ -205,7 +264,7 @@ function buildSystemInstructions(persona: any): string {
     instructions.push(`\n🗣️ ${toneMap[persona.tone]}`);
   }
 
-  // Emoji usage
+  // Emoji usage - keep for backward compatibility
   const emojiMap: Record<string, string> = {
     none: 'אל תשתמש באימוג\'ים בכלל',
     minimal: 'השתמש באימוג\'י אחד לפעמים',
