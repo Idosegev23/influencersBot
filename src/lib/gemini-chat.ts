@@ -5,9 +5,9 @@ const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY || '');
 
 // Models configuration
 export const GEMINI_MODELS = {
-  PERSONA_BUILDER: 'gemini-3-pro-preview',      // For building persona (quality, depth)
-  CHAT_RESPONSES: 'gemini-3-flash-preview',     // For real-time chat (speed, cost)
-  ANALYSIS: 'gemini-3-flash-preview',           // For quick analysis
+  PERSONA_BUILDER: 'gemini-3-pro-preview-20251117',      // For building persona (quality, depth)
+  CHAT_RESPONSES: 'gemini-3-flash-preview-20251117',     // For real-time chat (speed, cost)
+  ANALYSIS: 'gemini-3-flash-preview-20251117',           // For quick analysis
 } as const;
 
 /**

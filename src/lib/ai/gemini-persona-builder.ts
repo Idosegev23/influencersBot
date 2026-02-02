@@ -148,7 +148,7 @@ export async function buildPersonaWithGemini(
   // Initialize Gemini
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
   const model = genAI.getGenerativeModel({ 
-    model: 'gemini-3-pro-preview', // Updated to Gemini 3 Pro for better analysis
+    model: 'gemini-3-pro-preview-20251117', // Gemini 3 Pro with version date
     generationConfig: {
       temperature: 0.3, // Lower temperature for more consistent output
       topK: 40,
@@ -213,8 +213,43 @@ ${JSON.stringify(inputData, null, 2)}
   console.log('[Gemini] Sending request to Gemini Pro...');
   console.log(`[Gemini] Input data size: ${JSON.stringify(inputData).length} characters`);
 
-  // Call Gemini
-  const result = await model.generateContent(fullPrompt);
+  // Call Gemini with retry mechanism
+  let result;
+  let retries = 3;
+  let lastError: any;
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      console.log(`[Gemini] Attempt ${attempt}/${retries}...`);
+      
+      // Set a timeout of 2 minutes for Gemini call
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Gemini request timeout (120s)')), 120000);
+      });
+
+      const geminiPromise = model.generateContent(fullPrompt);
+      
+      result = await Promise.race([geminiPromise, timeoutPromise]);
+      
+      console.log('[Gemini] Request succeeded');
+      break; // Success, exit retry loop
+      
+    } catch (error: any) {
+      lastError = error;
+      console.error(`[Gemini] Attempt ${attempt} failed:`, error.message);
+      
+      if (attempt < retries) {
+        const delay = attempt * 2000; // 2s, 4s
+        console.log(`[Gemini] Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  if (!result) {
+    throw new Error(`Gemini failed after ${retries} attempts: ${lastError?.message}`);
+  }
+
   const response = result.response;
   const text = response.text();
 
