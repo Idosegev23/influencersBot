@@ -277,11 +277,11 @@ async function runStep2_Comments(supabase: any, accountId: string, username: str
     throw new Error('No posts found. Please run step 1 first.');
   }
 
-  // Select top 150 posts (100 top + 50 random)
+  // Select top 50 posts (30 top + 20 random)
   const selectedUrls = selectTopPostsForComments(
     posts.map(p => ({ ...p, post_url: p.post_url })),
-    100,
-    50
+    30,
+    20
   );
 
   console.log(`[Step 2] Selected ${selectedUrls.length} posts for comment scraping`);

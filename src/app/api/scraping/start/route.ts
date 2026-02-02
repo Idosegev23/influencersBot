@@ -67,7 +67,7 @@ export async function POST(request: Request) {
     // Initialize step statuses
     const stepStatuses = [
       { step: 1, name: 'Instagram Posts', nameHe: 'סריקת פוסטים', description: '100 פוסטים אחרונים', status: 'pending' },
-      { step: 2, name: 'Comments', nameHe: 'סריקת תגובות', description: '150 פוסטים × 50 תגובות', status: 'pending' },
+      { step: 2, name: 'Comments', nameHe: 'סריקת תגובות', description: '50 פוסטים × 50 תגובות', status: 'pending' },
       { step: 3, name: 'Profile', nameHe: 'פרופיל', description: 'bio, followers, category', status: 'pending' },
       { step: 4, name: 'Hashtags', nameHe: 'האשטגים', description: '20 hashtags × 30 posts', status: 'pending' },
       { step: 5, name: 'Search', nameHe: 'חיפוש', description: 'מיקום בשוק', status: 'pending' },
