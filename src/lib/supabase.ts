@@ -143,6 +143,7 @@ export async function getAllInfluencers(): Promise<Influencer[]> {
 }
 
 export async function createInfluencer(influencer: Omit<Influencer, 'id' | 'created_at' | 'updated_at'>): Promise<Influencer | null> {
+  // Step 1: Create legacy influencer record
   const { data, error } = await supabase
     .from('influencers')
     .insert(influencer)
@@ -153,6 +154,77 @@ export async function createInfluencer(influencer: Omit<Influencer, 'id' | 'crea
     console.error('Error creating influencer:', error);
     return null;
   }
+
+  // Step 2: Create corresponding account record
+  if (data) {
+    const { data: accountData, error: accountError } = await supabase
+      .from('accounts')
+      .insert({
+        type: 'influencer',
+        legacy_influencer_id: data.id,
+        owner_user_id: null, // Will be set when user registers
+        config: {
+          username: influencer.username,
+          display_name: influencer.display_name,
+          subdomain: influencer.subdomain,
+        },
+        plan: 'free',
+        status: influencer.is_active ? 'active' : 'inactive',
+        timezone: 'Asia/Jerusalem',
+        language: 'he',
+        allowed_channels: {
+          whatsapp: influencer.whatsapp_enabled || false,
+          web: true,
+        },
+        features: {
+          chatbot: true,
+          analytics: true,
+        },
+      })
+      .select()
+      .single();
+
+    if (accountError) {
+      console.error('Error creating account:', accountError);
+      // Don't fail the whole operation, just log the error
+    } else if (accountData) {
+      // Step 3: Create initial chatbot persona
+      const { error: personaError } = await supabase
+        .from('chatbot_persona')
+        .insert({
+          account_id: accountData.id,
+          name: influencer.display_name,
+          tone: influencer.persona?.tone || 'ידידותי ומקצועי',
+          language: 'he',
+          bio: influencer.bio || '',
+          description: influencer.persona?.description || '',
+          interests: influencer.persona?.interests || [],
+          topics: influencer.persona?.topics || [],
+          response_style: influencer.persona?.response_style || 'מפורט אך תמציתי',
+          emoji_usage: influencer.persona?.emoji_usage || 'moderate',
+          greeting_message: influencer.greeting_message || 'שלום! איך אפשר לעזור?',
+          instagram_username: influencer.username,
+          instagram_followers: influencer.followers_count || 0,
+          instagram_following: influencer.following_count || 0,
+          instagram_data: {
+            avatar_url: influencer.avatar_url,
+            influencer_type: influencer.influencer_type,
+          },
+          directives: [
+            'ענה בעברית בלבד',
+            'היה ידידותי ומועיל',
+            'התבסס על המידע שיש לך',
+            'אם אין לך מידע, אמור זאת בכנות',
+          ],
+        });
+
+      if (personaError) {
+        console.error('Error creating chatbot persona:', personaError);
+        // Don't fail the whole operation
+      }
+    }
+  }
+
   return data;
 }
 
@@ -166,7 +238,72 @@ export async function updateInfluencer(id: string, updates: Partial<Influencer>)
     console.error('Error updating influencer:', error);
     return false;
   }
+
+  // Also update the corresponding account if relevant fields changed
+  const accountUpdates: any = {};
+  if (updates.is_active !== undefined) {
+    accountUpdates.status = updates.is_active ? 'active' : 'inactive';
+  }
+  if (updates.username || updates.display_name || updates.subdomain) {
+    accountUpdates.config = {};
+    if (updates.username) accountUpdates.config.username = updates.username;
+    if (updates.display_name) accountUpdates.config.display_name = updates.display_name;
+    if (updates.subdomain) accountUpdates.config.subdomain = updates.subdomain;
+  }
+
+  if (Object.keys(accountUpdates).length > 0) {
+    const { error: accountError } = await supabase
+      .from('accounts')
+      .update(accountUpdates)
+      .eq('legacy_influencer_id', id);
+
+    if (accountError) {
+      console.error('Error updating account:', accountError);
+      // Don't fail the whole operation
+    }
+  }
+
   return true;
+}
+
+/**
+ * Get account by legacy influencer ID
+ */
+export async function getAccountByInfluencerId(influencerId: string) {
+  const { data, error } = await supabase
+    .from('accounts')
+    .select('*')
+    .eq('legacy_influencer_id', influencerId)
+    .single();
+
+  if (error) {
+    console.error('Error fetching account:', error);
+    return null;
+  }
+  return data;
+}
+
+/**
+ * Get account by username (from config)
+ */
+export async function getAccountByUsername(username: string) {
+  const { data, error } = await supabase
+    .from('accounts')
+    .select('*')
+    .eq('type', 'influencer')
+    .eq('config->>username', username)
+    .single();
+
+  if (error) {
+    // Try also from legacy influencer table
+    const influencer = await getInfluencerByUsername(username);
+    if (influencer) {
+      return getAccountByInfluencerId(influencer.id);
+    }
+    console.error('Error fetching account by username:', error);
+    return null;
+  }
+  return data;
 }
 
 // ============================================
