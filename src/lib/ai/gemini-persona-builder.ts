@@ -519,108 +519,32 @@ export async function savePersonaToDatabase(
 
   console.log('[Gemini] Persona saved successfully');
 
-  // Save products if identified
-  if (persona.products && persona.products.length > 0) {
-    console.log(`[Gemini] Saving ${persona.products.length} products...`);
+  // Store products/coupons/brands in persona metadata for now
+  // (They will be manually added to proper tables later or via separate process)
+  if (persona.products || persona.coupons || persona.brands) {
+    console.log('[Gemini] Storing commerce data in persona metadata...');
     
-    const productsToInsert = persona.products.map(product => ({
-      account_id: accountId,
-      name: product.name,
-      brand: product.brand || null,
-      category: product.category || null,
-      description: product.description || null,
-      price: null,
-      currency: 'ILS',
-      link: null,
-      image_url: null,
-      is_active: true,
-      metadata: {
-        sentiment: product.sentiment,
-        mentionedInPosts: product.mentionedInPosts,
-        keyPoints: product.keyPoints,
-        discoveredBy: 'gemini_persona_builder',
-        discoveredAt: new Date().toISOString(),
-      },
-    }));
+    const commerceData = {
+      products: persona.products || [],
+      coupons: persona.coupons || [],
+      brands: persona.brands || [],
+      extractedAt: new Date().toISOString(),
+    };
 
-    const { error: productsError } = await supabase
-      .from('products')
-      .upsert(productsToInsert, { 
-        onConflict: 'account_id,name',
-        ignoreDuplicates: false,
-      });
+    const { error: commerceError } = await supabase
+      .from('chatbot_persona')
+      .update({
+        metadata: commerceData,
+      })
+      .eq('account_id', accountId);
 
-    if (productsError) {
-      console.error('[Gemini] Error saving products:', productsError);
+    if (commerceError) {
+      console.error('[Gemini] Error saving commerce data:', commerceError);
     } else {
-      console.log('[Gemini] Products saved successfully');
-    }
-  }
-
-  // Save coupons if identified
-  if (persona.coupons && persona.coupons.length > 0) {
-    console.log(`[Gemini] Saving ${persona.coupons.length} coupons...`);
-    
-    const couponsToInsert = persona.coupons.map(coupon => ({
-      account_id: accountId,
-      code: coupon.code,
-      brand_name: coupon.brand,
-      description: coupon.description || null,
-      discount_amount: coupon.discount || null,
-      expires_at: coupon.expiresAt ? new Date(coupon.expiresAt).toISOString() : null,
-      status: 'active',
-      source: 'instagram_scan',
-      metadata: {
-        mentionedInPosts: coupon.mentionedInPosts,
-        discoveredBy: 'gemini_persona_builder',
-        discoveredAt: new Date().toISOString(),
-      },
-    }));
-
-    const { error: couponsError } = await supabase
-      .from('coupons')
-      .upsert(couponsToInsert, {
-        onConflict: 'account_id,code',
-        ignoreDuplicates: false,
-      });
-
-    if (couponsError) {
-      console.error('[Gemini] Error saving coupons:', couponsError);
-    } else {
-      console.log('[Gemini] Coupons saved successfully');
-    }
-  }
-
-  // Save brands if identified (to partnerships table)
-  if (persona.brands && persona.brands.length > 0) {
-    console.log(`[Gemini] Saving ${persona.brands.length} brands/partnerships...`);
-    
-    const brandsToInsert = persona.brands.map(brand => ({
-      account_id: accountId,
-      brand_name: brand.name,
-      campaign_name: `זוהה מאינסטגרם - ${brand.relationship}`,
-      status: brand.relationship === 'partnership' || brand.relationship === 'sponsored' ? 'active' : 'potential',
-      category: brand.category || null,
-      metadata: {
-        relationship: brand.relationship,
-        mentionCount: brand.mentionCount,
-        firstMentioned: brand.firstMentioned,
-        discoveredBy: 'gemini_persona_builder',
-        discoveredAt: new Date().toISOString(),
-      },
-    }));
-
-    const { error: brandsError } = await supabase
-      .from('partnerships')
-      .upsert(brandsToInsert, {
-        onConflict: 'account_id,brand_name',
-        ignoreDuplicates: false,
-      });
-
-    if (brandsError) {
-      console.error('[Gemini] Error saving brands/partnerships:', brandsError);
-    } else {
-      console.log('[Gemini] Brands/partnerships saved successfully');
+      console.log('[Gemini] Commerce data stored successfully');
+      console.log(`[Gemini] - ${persona.products?.length || 0} products`);
+      console.log(`[Gemini] - ${persona.coupons?.length || 0} coupons`);
+      console.log(`[Gemini] - ${persona.brands?.length || 0} brands`);
     }
   }
 
