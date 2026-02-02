@@ -39,63 +39,92 @@ export async function GET(request: Request) {
 
     const supabase = await createClient();
 
-    console.log(`[Admin Check] Looking for account with username: ${username}`);
+    console.log(`[Admin Check] Looking for jobs with username: ${username}`);
 
-    // Check if account exists
-    // Get the most recent account with this username (there might be duplicates)
-    const { data: accounts, error: accountError } = await supabase
-      .from('accounts')
-      .select('id, type, status, config, created_at')
-      .eq('type', 'creator')
-      .eq('config->>username', username)
+    // Strategy: Find the most recent job for this username (across ALL accounts)
+    // This is better than finding account first, because there might be multiple accounts
+    const { data: jobsWithAccounts, error: jobsError } = await supabase
+      .from('scraping_jobs')
+      .select(`
+        *,
+        accounts!inner(id, type, status, config, created_at)
+      `)
+      .eq('accounts.type', 'creator')
+      .eq('accounts.config->>username', username)
       .order('created_at', { ascending: false })
       .limit(1);
 
-    console.log(`[Admin Check] Found ${accounts?.length || 0} accounts`);
+    console.log(`[Admin Check] Found ${jobsWithAccounts?.length || 0} jobs for username ${username}`);
 
-    const account = accounts && accounts.length > 0 ? accounts[0] : null;
-
-    if (accountError) {
-      console.error('[Admin Check] Database error:', accountError);
+    if (jobsError) {
+      console.error('[Admin Check] Database error:', jobsError);
     }
 
-    if (!account) {
-      console.log(`[Admin Check] No account found for username: ${username}`);
+    // If no jobs found, check if there's at least an account
+    if (!jobsWithAccounts || jobsWithAccounts.length === 0) {
+      console.log(`[Admin Check] No jobs found, checking for account only...`);
+      
+      const { data: accounts } = await supabase
+        .from('accounts')
+        .select('id, type, status, config, created_at')
+        .eq('type', 'creator')
+        .eq('config->>username', username)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      const account = accounts && accounts.length > 0 ? accounts[0] : null;
+
+      if (!account) {
+        console.log(`[Admin Check] No account found for username: ${username}`);
+        return NextResponse.json({
+          exists: false,
+          account: null,
+          job: null,
+        });
+      }
+
+      console.log(`[Admin Check] Found account without jobs:`, account.id);
+      
       return NextResponse.json({
-        exists: false,
-        account: null,
+        exists: true,
+        account: {
+          id: account.id,
+          username,
+          status: account.status,
+          createdAt: account.created_at,
+        },
         job: null,
       });
     }
 
-    console.log(`[Admin Check] Found account:`, account.id);
+    // Found job - extract account and job data
+    const jobData = jobsWithAccounts[0];
+    const accountData = jobData.accounts;
 
-    // Check if there's an active or failed job
-    const { data: job, error: jobError } = await supabase
-      .from('scraping_jobs')
-      .select('*')
-      .eq('account_id', account.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(); // Use maybeSingle to avoid error if no jobs found
-
-    console.log(`[Admin Check] Job query result:`, { job, error: jobError });
-
-    if (job) {
-      console.log(`[Admin Check] Found job:`, job.id, `Status: ${job.status}, Step: ${job.current_step}`);
-    } else {
-      console.log(`[Admin Check] No jobs found for account`);
-    }
+    console.log(`[Admin Check] Found job:`, jobData.id, `Status: ${jobData.status}, Step: ${jobData.current_step}`);
+    console.log(`[Admin Check] Associated account:`, accountData.id);
 
     return NextResponse.json({
       exists: true,
       account: {
-        id: account.id,
+        id: accountData.id,
         username,
-        status: account.status,
-        createdAt: account.created_at,
+        status: accountData.status,
+        createdAt: accountData.created_at,
       },
-      job: job || null,
+      job: {
+        id: jobData.id,
+        status: jobData.status,
+        current_step: jobData.current_step,
+        total_steps: jobData.total_steps,
+        error_step: jobData.error_step,
+        error_message: jobData.error_message,
+        started_at: jobData.started_at,
+        completed_at: jobData.completed_at,
+        total_posts_scraped: jobData.total_posts_scraped,
+        total_comments_scraped: jobData.total_comments_scraped,
+        total_hashtags_tracked: jobData.total_hashtags_tracked,
+      },
     });
 
   } catch (error: any) {
