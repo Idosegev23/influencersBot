@@ -197,14 +197,14 @@ export async function POST(request: Request) {
 }
 
 // ============================================
-// Step 1: Scrape Posts (500)
+// Step 1: Scrape Posts (100)
 // ============================================
 
 async function runStep1_Posts(supabase: any, accountId: string, username: string) {
   console.log('[Step 1] Starting posts scrape...');
 
   const manager = new InstagramActorManager(username);
-  const posts = await manager.scrapePosts(500);
+  const posts = await manager.scrapePosts(100);
 
   console.log(`[Step 1] Scraped ${posts.length} posts, saving to database...`);
 
