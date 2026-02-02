@@ -189,8 +189,8 @@ export async function POST(req: NextRequest) {
         }
 
         const influencer = cachedData.influencer;
-        const brands = cachedData.brands;
-        const content = cachedData.content;
+        const brands = cachedData.brands || [];
+        const content = cachedData.content || [];
         accountId = cachedData.accountId || influencer.id;
 
         // === SESSION ===
