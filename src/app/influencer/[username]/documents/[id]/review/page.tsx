@@ -27,6 +27,8 @@ export default function DocumentReviewPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editedData, setEditedData] = useState<any>({});
+  const [showTasksModal, setShowTasksModal] = useState(false);
+  const [isCreatingTasks, setIsCreatingTasks] = useState(false);
 
   useEffect(() => {
     loadDocument();
@@ -87,6 +89,59 @@ export default function DocumentReviewPage() {
       setError('שגיאה ביצירת השת"פ');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleCreateTasks = async () => {
+    setIsCreatingTasks(true);
+    setError(null);
+
+    try {
+      // Get account ID from influencer
+      const accountResponse = await fetch(`/api/influencer/${username}`);
+      if (!accountResponse.ok) throw new Error('Failed to get account');
+      const { influencer } = await accountResponse.json();
+      const accountId = influencer.id;
+
+      // Create tasks from brief
+      const tasks = editedData.tasks || [];
+      
+      if (tasks.length === 0) {
+        setError('אין משימות בבריף');
+        setIsCreatingTasks(false);
+        return;
+      }
+
+      const createdTasks = [];
+      for (const task of tasks) {
+        const response = await fetch('/api/influencer/tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username,
+            accountId,
+            title: task.title,
+            description: task.description || '',
+            dueDate: task.dueDate || null,
+            priority: task.priority || 'medium',
+            status: 'pending',
+          }),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          createdTasks.push(result);
+        }
+      }
+
+      setShowTasksModal(false);
+      // Show success and redirect
+      router.push(`/influencer/${username}/tasks`);
+    } catch (err) {
+      console.error('Error creating tasks:', err);
+      setError('שגיאה ביצירת המשימות');
+    } finally {
+      setIsCreatingTasks(false);
     }
   };
 
@@ -501,20 +556,13 @@ export default function DocumentReviewPage() {
         
         {/* Different actions based on document type */}
         {document.document_type === 'brief' ? (
-          <div className="flex gap-3">
-            <button
-              onClick={() => router.push(`/influencer/${username}/partnerships`)}
-              className="px-6 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
-            >
-              הוסף לשת"פ קיים
-            </button>
-            <button
-              onClick={() => router.push(`/influencer/${username}/tasks/new`)}
-              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            >
-              צור משימות מהבריף
-            </button>
-          </div>
+          <button
+            onClick={() => setShowTasksModal(true)}
+            disabled={!editedData.tasks || editedData.tasks.length === 0}
+            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            צור {editedData.tasks?.length || 0} משימות מהבריף
+          </button>
         ) : (
           <button
             onClick={handleCreatePartnership}
@@ -525,6 +573,66 @@ export default function DocumentReviewPage() {
           </button>
         )}
       </div>
+
+      {/* Tasks Confirmation Modal */}
+      {showTasksModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full p-6 max-h-[80vh] overflow-y-auto">
+            <h3 className="text-2xl font-bold text-gray-900 mb-4 text-right">
+              אישור יצירת משימות
+            </h3>
+            
+            <p className="text-gray-600 mb-6 text-right">
+              האם ליצור {editedData.tasks?.length || 0} משימות מהבריף?
+            </p>
+
+            {/* Tasks Preview */}
+            <div className="space-y-3 mb-6 max-h-96 overflow-y-auto">
+              {editedData.tasks?.map((task: any, i: number) => (
+                <div key={i} className="bg-gray-50 rounded-lg p-4 text-right border border-gray-200">
+                  <div className="flex items-start justify-between mb-2">
+                    <h4 className="font-semibold text-gray-900">{task.title}</h4>
+                    <span className={`text-xs px-2 py-1 rounded-full ${
+                      task.priority === 'high' ? 'bg-red-100 text-red-800' :
+                      task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-green-100 text-green-800'
+                    }`}>
+                      {task.priority === 'high' ? 'גבוה' : 
+                       task.priority === 'medium' ? 'בינוני' : 'נמוך'}
+                    </span>
+                  </div>
+                  {task.description && (
+                    <p className="text-sm text-gray-600 mb-2">{task.description}</p>
+                  )}
+                  {task.dueDate && (
+                    <p className="text-xs text-gray-500">
+                      📅 {new Date(task.dueDate).toLocaleDateString('he-IL')}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowTasksModal(false)}
+                disabled={isCreatingTasks}
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                ביטול
+              </button>
+              <button
+                onClick={handleCreateTasks}
+                disabled={isCreatingTasks}
+                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+              >
+                {isCreatingTasks ? 'יוצר משימות...' : `אשר ויצור ${editedData.tasks?.length || 0} משימות`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

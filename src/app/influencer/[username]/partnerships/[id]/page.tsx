@@ -1057,42 +1057,64 @@ export default function PartnershipDetailPage() {
       {activeTab === 'documents' && (
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           {/* Upload Section */}
-          <div className="mb-6 pb-6 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 text-right">
-              העלאת מסמכים
+          <div className="mb-8">
+            <h3 className="text-xl font-bold text-gray-900 mb-6 text-right">
+              📤 העלאת מסמכים
             </h3>
             
-            {/* Document Type Selector */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
-                סוג המסמך
+            {/* Document Type Selector - Bigger and Clearer */}
+            <div className="mb-6 bg-gray-50 rounded-lg p-4 border border-gray-200">
+              <label className="block text-sm font-semibold text-gray-900 mb-3 text-right">
+                1️⃣ בחר סוג מסמך
               </label>
               <select
                 value={selectedDocumentType}
                 onChange={(e) => setSelectedDocumentType(e.target.value as any)}
                 disabled={isUploading}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-4 py-3 text-base border-2 border-gray-300 rounded-lg text-right focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed bg-white"
               >
-                <option value="contract">📄 חוזה שת"פ - הסכם שיתוף פעולה עם מותג</option>
-                <option value="brief">📋 בריף קמפיין - דרישות תוכן והנחיות</option>
-                <option value="quote">💰 הצעת מחיר - הצעה מסחרית או הצעת שת"פ</option>
-                <option value="invoice">🧾 חשבונית - חשבונית, קבלה או דרישת תשלום</option>
-                <option value="receipt">🧾 קבלה - אישור תשלום</option>
-                <option value="other">📁 אחר - AI ינחש את סוג המסמך</option>
+                <option value="contract">📄 חוזה שת"פ</option>
+                <option value="brief">📋 בריף קמפיין</option>
+                <option value="quote">💰 הצעת מחיר</option>
+                <option value="invoice">🧾 חשבונית</option>
+                <option value="receipt">🧾 קבלה</option>
+                <option value="other">📁 אחר</option>
               </select>
+              <p className="text-xs text-gray-600 mt-2 text-right">
+                {selectedDocumentType === 'contract' && 'הסכם שיתוף פעולה עם מותג'}
+                {selectedDocumentType === 'brief' && 'דרישות תוכן והנחיות לקמפיין'}
+                {selectedDocumentType === 'quote' && 'הצעה מסחרית או הצעת שת"פ'}
+                {selectedDocumentType === 'invoice' && 'חשבונית או דרישת תשלום'}
+                {selectedDocumentType === 'receipt' && 'אישור תשלום'}
+                {selectedDocumentType === 'other' && 'AI ינחש את סוג המסמך אוטומטית'}
+              </p>
             </div>
 
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer transition-colors">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                  />
-                </svg>
-                <span>{isUploading ? 'מעלה...' : 'העלה מסמך'}</span>
+            {/* Upload Area - Drag & Drop Style */}
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-8 border-2 border-dashed border-blue-300">
+              <label className="flex flex-col items-center cursor-pointer group">
+                <div className="mb-4 h-20 w-20 rounded-full bg-blue-100 flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+                  <svg className="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                    />
+                  </svg>
+                </div>
+                <p className="text-lg font-semibold text-gray-900 mb-2">
+                  {isUploading ? '⏳ מעלה ומנתח...' : '2️⃣ לחץ להעלאת קבצים או גרור לכאן'}
+                </p>
+                <p className="text-sm text-gray-600 mb-4">
+                  PDF, Word, תמונות • עד 10MB לקובץ
+                </p>
+                <div className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium group-hover:bg-blue-700 transition-colors">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  <span>{isUploading ? 'מעלה...' : 'בחר קבצים'}</span>
+                </div>
                 <input
                   type="file"
                   multiple
@@ -1102,14 +1124,29 @@ export default function PartnershipDetailPage() {
                   className="hidden"
                 />
               </label>
-              <p className="text-sm text-gray-500">
-                PDF, Word, תמונות (עד 50MB)
-              </p>
             </div>
-            <p className="text-sm text-gray-600 mt-2 text-right">
-              💡 ה-AI ינתח אוטומטית את המסמך בהתאם לסוג שבחרת ויחלץ פרטים רלוונטיים
-            </p>
+
+            {/* AI Processing Info */}
+            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 h-6 w-6 rounded-full bg-blue-100 flex items-center justify-center">
+                  <svg className="h-4 w-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="text-right flex-1">
+                  <p className="text-sm font-medium text-blue-900 mb-1">
+                    🤖 ה-AI ינתח את המסמך אוטומטית
+                  </p>
+                  <p className="text-xs text-blue-700">
+                    המערכת תחלץ: שמות, תאריכים, סכומים, דליברבלס, תנאים ועוד. התהליך לוקח 30 שניות - 8 דקות.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
+
+          <div className="border-t border-gray-200 pt-6"></div>
 
           {/* Documents List */}
           <div>
