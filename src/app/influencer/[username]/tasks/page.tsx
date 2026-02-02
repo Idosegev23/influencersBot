@@ -51,6 +51,7 @@ export default function TasksPage({
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [dateRangeFilter, setDateRangeFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
@@ -124,6 +125,35 @@ export default function TasksPage({
     if (statusFilter !== 'all' && t.status !== statusFilter) return false;
     if (priorityFilter !== 'all' && t.priority !== priorityFilter) return false;
     if (searchQuery && !t.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    
+    // Date range filter
+    if (dateRangeFilter !== 'all' && t.due_date) {
+      const dueDate = new Date(t.due_date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      switch (dateRangeFilter) {
+        case 'week':
+          const weekFromNow = new Date(today);
+          weekFromNow.setDate(weekFromNow.getDate() + 7);
+          if (dueDate > weekFromNow) return false;
+          break;
+        case 'two_weeks':
+          const twoWeeksFromNow = new Date(today);
+          twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
+          if (dueDate > twoWeeksFromNow) return false;
+          break;
+        case 'month':
+          const monthFromNow = new Date(today);
+          monthFromNow.setMonth(monthFromNow.getMonth() + 1);
+          if (dueDate > monthFromNow) return false;
+          break;
+        case 'overdue':
+          if (dueDate >= today || t.status === 'completed') return false;
+          break;
+      }
+    }
+    
     return true;
   });
 
@@ -309,7 +339,7 @@ export default function TasksPage({
             />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Filter className="w-5 h-5 text-gray-400" />
             <select
               value={statusFilter}
@@ -333,6 +363,18 @@ export default function TasksPage({
               <option value="high">גבוה</option>
               <option value="medium">בינוני</option>
               <option value="low">נמוך</option>
+            </select>
+
+            <select
+              value={dateRangeFilter}
+              onChange={(e) => setDateRangeFilter(e.target.value)}
+              className="px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+            >
+              <option value="all">כל התאריכים</option>
+              <option value="overdue">באיחור</option>
+              <option value="week">שבוע הקרוב</option>
+              <option value="two_weeks">שבועיים הקרובים</option>
+              <option value="month">חודש הקרוב</option>
             </select>
           </div>
         </motion.div>

@@ -137,6 +137,20 @@ export function buildInstructionsWithPersona(
     parts.push(`- הודעת פתיחה שלך: "${persona.greeting_message}"`);
   }
 
+  // === HANDLING SPECIFIC PRODUCT QUESTIONS ===
+  parts.push(`\n\n## טיפול בשאלות אישיות וספציפיות:`);
+  parts.push(`- אם מישהו שואל על מוצר/מותג ספציפי שאינו ברשימת המידע שלך - אל תמציא ואל תנחש!`);
+  parts.push(`- במקום זאת, תן תשובה כנה וידידותית:`);
+  if (persona?.instagram_username) {
+    parts.push(`  "אני לא יכול/ה להיות בטוח/ה לגבי המוצר הספציפי הזה. אשמח אם תפנה ישירות ל-@${persona.instagram_username} או תבדוק בפוסטים האחרונים באינסטגרם 📱"`);
+  } else {
+    parts.push(`  "אני לא יכול/ה להיות בטוח/ה לגבי המוצר הספציפי הזה. מוזמנ/ת לפנות ישירות או לבדוק בפוסטים האחרונים 📱"`);
+  }
+  parts.push(`- אם יש מוצרים/מותגים דומים ברשימה שלך - הצע אותם כאלטרנטיבה`);
+  parts.push(`- הפנה תמיד לאינסטגרם או לערוצי התקשורת הישירים לפרטים מדויקים`);
+  parts.push(`- היה שקוף - הסבר שאתה בוט ושיש מגבלה למידע שאתה יכול לספק`);
+  parts.push(`- שמור על טון חיובי וידידותי גם כשאתה לא יכול לעזור ישירות`);
+
   return parts.join('\n');
 }
 

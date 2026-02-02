@@ -40,18 +40,16 @@ interface ApiCouponData {
 // Frontend display format
 interface CouponData {
   coupons: Array<{
-    id: string;
+    coupon_id: string;
     code: string;
-    partnership: {
-      id: string;
-      brand_name: string;
-    };
-    times_copied: number;
-    times_used: number;
-    conversion_rate: number;
+    brand_name?: string;
+    usage_count: number;
+    copy_count: number;
     total_revenue: number;
-    avg_order_value: number;
-    created_at: string;
+    total_discount: number;
+    profit_per_coupon: number;
+    average_basket: number;
+    conversion_rate: number;
   }>;
   overview: {
     total_coupons: number;
@@ -66,8 +64,9 @@ interface CouponData {
   };
   top_products: Array<{
     product_name: string;
-    times_ordered: number;
-    revenue: number;
+    total_sold: number;
+    total_revenue: number;
+    average_price: number;
   }>;
 }
 
@@ -95,7 +94,8 @@ export default function CouponsAnalyticsPage() {
       );
 
       if (!response.ok) {
-        throw new Error('Failed to load coupon analytics');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to load coupon analytics');
       }
 
       const apiResult: ApiCouponData = await response.json();
@@ -241,10 +241,24 @@ export default function CouponsAnalyticsPage() {
       </div>
 
       {/* Coupons Table */}
-      <CouponPerformanceTable coupons={data?.coupons || []} />
+      {data?.coupons && data.coupons.length > 0 ? (
+        <CouponPerformanceTable coupons={data.coupons} />
+      ) : (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold mb-4">ביצועי קופונים מפורטים</h3>
+          <p className="text-gray-500 text-center py-8">אין עדיין נתוני קופונים</p>
+        </div>
+      )}
 
       {/* Top Products */}
-      <TopProducts products={data?.top_products || []} />
+      {data?.top_products && data.top_products.length > 0 ? (
+        <TopProducts products={data.top_products} />
+      ) : (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold mb-4">מוצרים פופולריים</h3>
+          <p className="text-gray-500 text-center py-8">אין עדיין נתוני מוצרים</p>
+        </div>
+      )}
     </div>
   );
 }

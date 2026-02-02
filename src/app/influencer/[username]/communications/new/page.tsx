@@ -89,12 +89,15 @@ export default function NewCommunicationPage({
 
       const { communication } = await response.json();
       
+      if (!communication || !communication.id) {
+        throw new Error('התקשורת נוצרה אך לא התקבל מזהה');
+      }
+      
       // Redirect to the new communication
       router.push(`/influencer/${username}/communications/${communication.id}`);
     } catch (err: any) {
       console.error('Error creating communication:', err);
       setError(err.message || 'שגיאה ביצירת התקשורת');
-    } finally {
       setCreating(false);
     }
   };
@@ -284,6 +287,18 @@ export default function NewCommunicationPage({
                 className="w-full px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg text-white focus:border-orange-500 focus:outline-none text-right"
               />
             </div>
+
+            {/* Validation Message */}
+            {(!formData.brand_name || !formData.subject || !formData.initial_message) && (
+              <div className="p-4 bg-yellow-500/20 border border-yellow-500/50 rounded-lg text-yellow-300 text-sm text-right">
+                <p className="font-medium mb-1">שדות חובה חסרים:</p>
+                <ul className="list-disc list-inside mr-4">
+                  {!formData.brand_name && <li>שם המותג</li>}
+                  {!formData.subject && <li>נושא השיחה</li>}
+                  {!formData.initial_message && <li>הודעה ראשונית</li>}
+                </ul>
+              </div>
+            )}
 
             {/* Submit Buttons */}
             <div className="flex gap-4 pt-4">

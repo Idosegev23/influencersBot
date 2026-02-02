@@ -242,20 +242,51 @@ export default function NewTaskPage({
 
             {/* Estimated Hours */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2 text-right">
-                זמן משוער (שעות)
+              <label className="flex items-center gap-2 justify-end text-sm font-medium text-gray-300 mb-2">
+                <div className="group relative">
+                  <svg 
+                    className="w-4 h-4 text-gray-400 cursor-help hover:text-gray-200 transition-colors" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      strokeWidth={2} 
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" 
+                    />
+                  </svg>
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-64 z-10">
+                    <div className="bg-gray-900 text-gray-100 text-xs rounded-lg p-3 shadow-xl border border-gray-700">
+                      <p className="font-semibold mb-1">מה זה "זמן משוער"?</p>
+                      <p className="text-gray-300">
+                        ימים/שעות צפויים עד לסיום המשימה. לדוגמה:
+                      </p>
+                      <ul className="mt-2 space-y-1 text-gray-400">
+                        <li>• סרטון: 2-3 ימים (16-24 שעות)</li>
+                        <li>• פוסט: 0.5 יום (4 שעות)</li>
+                        <li>• סטורי: 0.25 יום (2 שעות)</li>
+                      </ul>
+                      <div className="mt-2 pt-2 border-t border-gray-700 text-gray-400">
+                        💡 עוזר לתכנון ומעקב אחר עומס עבודה
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <span>זמן משוער (ימים)</span>
               </label>
               <input
                 type="number"
-                step="0.5"
+                step="0.25"
                 min="0"
                 value={formData.estimated_hours}
                 onChange={(e) => setFormData({ ...formData, estimated_hours: e.target.value })}
-                placeholder="2.5"
+                placeholder="2"
                 className="w-full px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:border-orange-500 focus:outline-none text-right"
               />
               <p className="mt-2 text-xs text-gray-400 text-right">
-                💡 כמה שעות לדעתך תיקח המשימה? (לדוגמה: 2.5 שעות ליצירת סרטון, 0.5 שעה לפוסט)
+                💡 כמה ימים צפוי שייקח לסיים? (לדוגמה: 2 ימים ליצירת סרטון, 0.5 יום לפוסט)
               </p>
             </div>
 

@@ -1,15 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { supabase, getInfluencerByUsername } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/server';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { requireInfluencerAuth } from '@/lib/auth/influencer-auth';
-
-// Check influencer authentication
-async function checkAuth(username: string): Promise<boolean> {
-  const cookieStore = await cookies();
-  const authCookie = cookieStore.get(`influencer_auth_${username}`);
-  return authCookie?.value === 'authenticated';
-}
 
 // GET - Get a single task by ID
 export async function GET(
@@ -28,6 +20,8 @@ export async function GET(
 
     const accountId = auth.accountId;
     console.log(`[Tasks GET] Fetching task ${id} for account ${accountId}`);
+
+    const supabase = await createClient();
 
     // Get task with partnership info
     const { data: task, error } = await supabase
@@ -84,6 +78,8 @@ export async function PATCH(
     const accountId = auth.accountId;
     console.log(`[Tasks PATCH] Updating task ${id} for account ${accountId}`);
 
+    const supabase = await createClient();
+
     // Verify task belongs to this account
     const { data: existing } = await supabase
       .from('tasks')
@@ -108,7 +104,7 @@ export async function PATCH(
           .eq('id', updates.partnership_id)
           .single();
 
-        if (!partnership || partnership.account_id !== account.id) {
+        if (!partnership || partnership.account_id !== accountId) {
           return NextResponse.json({ error: 'Partnership not found' }, { status: 404 });
         }
       }
@@ -200,6 +196,8 @@ export async function DELETE(
 
     const accountId = auth.accountId;
     console.log(`[Tasks DELETE] Deleting task ${id} for account ${accountId}`);
+
+    const supabase = await createClient();
 
     // Verify task belongs to this account
     const { data: existing } = await supabase

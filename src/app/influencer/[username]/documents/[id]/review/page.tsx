@@ -556,6 +556,24 @@ export default function DocumentReviewPage() {
           >
             צור {editedData.tasks?.length || 0} משימות מהבריף
           </button>
+        ) : document.document_type === 'contract' ? (
+          <div className="flex gap-3">
+            <button
+              onClick={handleCreatePartnership}
+              disabled={isSaving || !editedData.parties?.brand}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSaving ? 'יוצר שת"פ...' : 'צור שת"פ מההסכם'}
+            </button>
+            {editedData.tasks && editedData.tasks.length > 0 && (
+              <button
+                onClick={() => setShowTasksModal(true)}
+                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                צור {editedData.tasks?.length || 0} משימות מההסכם
+              </button>
+            )}
+          </div>
         ) : (
           <button
             onClick={handleCreatePartnership}
@@ -576,7 +594,7 @@ export default function DocumentReviewPage() {
             </h3>
             
             <p className="text-gray-600 mb-6 text-right">
-              האם ליצור {editedData.tasks?.length || 0} משימות מהבריף?
+              האם ליצור {editedData.tasks?.length || 0} משימות מה{document.document_type === 'brief' ? 'בריף' : 'הסכם'}?
             </p>
 
             {/* Tasks Preview */}
