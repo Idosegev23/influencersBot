@@ -39,21 +39,33 @@ export async function GET(request: Request) {
 
     const supabase = await createClient();
 
+    console.log(`[Admin Check] Looking for account with username: ${username}`);
+
     // Check if account exists
+    // Try to find by username in config JSONB field
     const { data: account, error: accountError } = await supabase
       .from('accounts')
       .select('id, type, status, config, created_at')
       .eq('type', 'creator')
       .eq('config->>username', username)
-      .single();
+      .maybeSingle(); // Use maybeSingle instead of single to avoid error if not found
 
-    if (accountError || !account) {
+    console.log(`[Admin Check] Account query result:`, { account, error: accountError });
+
+    if (accountError) {
+      console.error('[Admin Check] Database error:', accountError);
+    }
+
+    if (!account) {
+      console.log(`[Admin Check] No account found for username: ${username}`);
       return NextResponse.json({
         exists: false,
         account: null,
         job: null,
       });
     }
+
+    console.log(`[Admin Check] Found account:`, account.id);
 
     // Check if there's an active or failed job
     const { data: job, error: jobError } = await supabase
@@ -62,7 +74,15 @@ export async function GET(request: Request) {
       .eq('account_id', account.id)
       .order('created_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle(); // Use maybeSingle to avoid error if no jobs found
+
+    console.log(`[Admin Check] Job query result:`, { job, error: jobError });
+
+    if (job) {
+      console.log(`[Admin Check] Found job:`, job.id, `Status: ${job.status}, Step: ${job.current_step}`);
+    } else {
+      console.log(`[Admin Check] No jobs found for account`);
+    }
 
     return NextResponse.json({
       exists: true,
