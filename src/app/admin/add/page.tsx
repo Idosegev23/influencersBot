@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { ArrowRight, Zap, Instagram, User, Lock, Phone } from 'lucide-react';
 
-type WizardStep = 'username' | 'scraping' | 'settings' | 'complete';
+type WizardStep = 'username' | 'scraping' | 'settings' | 'complete' | 'resume-choice';
 
 interface WizardState {
   step: WizardStep;
@@ -20,6 +20,9 @@ interface WizardState {
   whatsappEnabled: boolean;
   error: string | null;
   isLoading: boolean;
+  // For resume functionality
+  existingAccount?: any;
+  existingJob?: any;
 }
 
 export default function AddInfluencerPage() {
@@ -109,6 +112,122 @@ export default function AddInfluencerPage() {
     return () => clearInterval(interval);
   }, [state.step, state.jobId]);
 
+  // Handle resume from existing account
+  const handleResumeExisting = async () => {
+    const { existingAccount, existingJob } = state;
+    
+    if (!existingAccount) return;
+
+    setState((prev) => ({ ...prev, isLoading: true }));
+
+    try {
+      const hasActiveJob = existingJob && (existingJob.status === 'running' || existingJob.status === 'pending' || existingJob.status === 'failed');
+
+      if (hasActiveJob) {
+        // Resume from existing job
+        const nextStep = existingJob.status === 'failed' 
+          ? (existingJob.error_step || existingJob.current_step) // Retry failed step
+          : existingJob.current_step + 1; // Continue from next step
+        
+        console.log(`[Resume] Continuing job ${existingJob.id} from step ${nextStep}`);
+        
+        setState((prev) => ({
+          ...prev,
+          accountId: existingAccount.id,
+          jobId: existingJob.id,
+          step: 'scraping',
+          isLoading: false,
+        }));
+        
+        // Resume from the appropriate step
+        if (nextStep <= 7) {
+          executeNextStep(existingJob.id, nextStep);
+        }
+      } else {
+        // No active job - start new one with existing account
+        console.log(`[Resume] Starting new job for existing account ${existingAccount.id}`);
+        
+        const scrapingRes = await fetch('/api/scraping/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: state.username,
+            accountId: existingAccount.id,
+          }),
+        });
+
+        if (!scrapingRes.ok) {
+          const error = await scrapingRes.json();
+          throw new Error(error.error || 'Failed to start scraping');
+        }
+
+        const { jobId } = await scrapingRes.json();
+
+        setState((prev) => ({
+          ...prev,
+          accountId: existingAccount.id,
+          jobId,
+          step: 'scraping',
+          isLoading: false,
+        }));
+        
+        executeNextStep(jobId, 1);
+      }
+    } catch (error: any) {
+      setState((prev) => ({
+        ...prev,
+        error: error.message,
+        isLoading: false,
+        step: 'username',
+      }));
+    }
+  };
+
+  // Handle delete and restart
+  const handleDeleteAndRestart = async () => {
+    const { existingAccount, existingJob } = state;
+    
+    if (!existingAccount) return;
+
+    setState((prev) => ({ ...prev, isLoading: true }));
+
+    try {
+      // Delete job if exists
+      if (existingJob) {
+        await fetch(`/api/scraping/cancel?jobId=${existingJob.id}`, { method: 'DELETE' });
+      }
+      
+      // Delete account
+      await fetch(`/api/admin/accounts/${existingAccount.id}`, { method: 'DELETE' });
+      
+      console.log(`[Delete] Deleted account and job, restarting...`);
+      
+      // Reset and restart
+      setState((prev) => ({
+        ...prev,
+        isLoading: false,
+        step: 'username',
+        existingAccount: undefined,
+        existingJob: undefined,
+      }));
+      
+      // Auto-submit after deletion
+      setTimeout(() => {
+        const form = document.querySelector('form');
+        if (form) {
+          form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+        }
+      }, 500);
+    } catch (error: any) {
+      setState((prev) => ({
+        ...prev,
+        error: 'שגיאה במחיקת החשבון',
+        isLoading: false,
+        step: 'username',
+      }));
+    }
+  };
+
   // Handle cancel scraping
   const handleCancelScraping = async () => {
     const confirmed = window.confirm(
@@ -181,107 +300,14 @@ export default function AddInfluencerPage() {
         const { exists, account, job } = await checkRes.json();
         
         if (exists && account) {
-          // Account exists - ask user what to do
-          const hasActiveJob = job && (job.status === 'running' || job.status === 'pending' || job.status === 'failed');
-          
-          let message = `חשבון @${username} כבר קיים במערכת.\n\n`;
-          
-          if (hasActiveJob) {
-            const statusText = job.status === 'failed' 
-              ? `נכשל בשלב ${job.error_step || job.current_step}`
-              : job.status === 'running'
-              ? `רץ כעת - שלב ${job.current_step} מתוך 7`
-              : `ממתין - שלב ${job.current_step} מתוך 7`;
-            
-            message += `📊 סטטוס: ${statusText}\n\n`;
-            message += '✅ לחץ OK להמשיך מהשלב הנוכחי (חוסך זמן ועלויות)\n';
-            message += '❌ לחץ ביטול כדי למחוק הכל ולהתחיל מאפס';
-          } else {
-            message += 'יש נתונים קיימים אבל אין ריצה פעילה.\n\n';
-            message += '✅ לחץ OK להתחיל ריצה חדשה (ישתמש בנתונים קיימים)\n';
-            message += '❌ לחץ ביטול כדי למחוק הכל ולהתחיל מאפס';
-          }
-          
-          const shouldResume = window.confirm(message);
-          
-          if (!shouldResume) {
-            // User chose to start fresh - delete everything
-            const confirmDelete = window.confirm(
-              '⚠️ אזהרה: פעולה זו תמחק לצמיתות:\n' +
-              '• כל הפוסטים שנסרקו\n' +
-              '• כל התגובות\n' +
-              '• את הפרסונה שנוצרה\n' +
-              '• את ה-job\n\n' +
-              'האם להמשיך במחיקה?'
-            );
-            
-            if (!confirmDelete) {
-              setState((prev) => ({ ...prev, isLoading: false }));
-              return;
-            }
-            
-            if (job) {
-              await fetch(`/api/scraping/cancel?jobId=${job.id}`, { method: 'DELETE' });
-            }
-            await fetch(`/api/admin/accounts/${account.id}`, { method: 'DELETE' });
-            
-            setState((prev) => ({ ...prev, isLoading: false }));
-            
-            // Wait a bit and try again
-            setTimeout(() => {
-              handleUsernameSubmit(e);
-            }, 500);
-            return;
-          }
-          
-          // User chose to resume
-          if (hasActiveJob) {
-            // Continue from existing job
-            const nextStep = job.status === 'failed' 
-              ? (job.error_step || job.current_step) // Retry failed step
-              : job.current_step + 1; // Continue from next step
-            
-            setState((prev) => ({
-              ...prev,
-              accountId: account.id,
-              jobId: job.id,
-              step: 'scraping',
-              isLoading: false,
-            }));
-            
-            // Resume from the appropriate step
-            if (nextStep <= 7) {
-              executeNextStep(job.id, nextStep);
-            }
-            return;
-          }
-          
-          // No active job - start new one with existing account
-          const scrapingRes = await fetch('/api/scraping/start', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              username,
-              accountId: account.id,
-            }),
-          });
-
-          if (!scrapingRes.ok) {
-            const error = await scrapingRes.json();
-            throw new Error(error.error || 'Failed to start scraping');
-          }
-
-          const { jobId } = await scrapingRes.json();
-
+          // Account exists - show resume choice screen
           setState((prev) => ({
             ...prev,
-            accountId: account.id,
-            jobId,
-            step: 'scraping',
+            step: 'resume-choice',
+            existingAccount: account,
+            existingJob: job,
             isLoading: false,
           }));
-          
-          executeNextStep(jobId, 1);
           return;
         }
       }
@@ -555,6 +581,107 @@ export default function AddInfluencerPage() {
                 )}
               </button>
             </form>
+          </motion.div>
+        )}
+
+        {/* Resume Choice Screen */}
+        {state.step === 'resume-choice' && state.existingAccount && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-2xl p-8"
+          >
+            <div className="text-center mb-8">
+              <Instagram className="w-16 h-16 text-indigo-500 mx-auto mb-4" />
+              <h2 className="text-2xl font-bold text-white mb-2">
+                חשבון קיים נמצא
+              </h2>
+              <p className="text-gray-400">
+                @{state.username} כבר קיים במערכת
+              </p>
+            </div>
+
+            {/* Account Info */}
+            <div className="bg-gray-800/50 rounded-xl p-6 mb-6">
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">חשבון:</span>
+                  <span className="text-white font-medium">@{state.username}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">סטטוס:</span>
+                  <span className="text-green-400">{state.existingAccount.status}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">נוצר:</span>
+                  <span className="text-white">
+                    {new Date(state.existingAccount.createdAt).toLocaleString('he-IL')}
+                  </span>
+                </div>
+                {state.existingJob && (
+                  <>
+                    <div className="border-t border-gray-700 my-3"></div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">ריצה:</span>
+                      <span className={`font-medium ${
+                        state.existingJob.status === 'completed' ? 'text-green-400' :
+                        state.existingJob.status === 'failed' ? 'text-red-400' :
+                        'text-yellow-400'
+                      }`}>
+                        {state.existingJob.status === 'completed' ? '✅ הושלם' :
+                         state.existingJob.status === 'failed' ? `❌ נכשל בשלב ${state.existingJob.error_step || state.existingJob.current_step}` :
+                         `🔄 שלב ${state.existingJob.current_step} מתוך 7`}
+                      </span>
+                    </div>
+                    {state.existingJob.error_message && (
+                      <div className="text-xs text-red-400 mt-2">
+                        שגיאה: {state.existingJob.error_message}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="space-y-4">
+              <button
+                onClick={handleResumeExisting}
+                disabled={state.isLoading}
+                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white px-8 py-4 rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {state.isLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    מעבד...
+                  </>
+                ) : (
+                  <>
+                    <ArrowRight className="w-5 h-5" />
+                    {state.existingJob ? 
+                      `המשך מ${state.existingJob.status === 'failed' ? 'שלב שנכשל' : `שלב ${state.existingJob.current_step + 1}`}` :
+                      'התחל ריצה חדשה עם הנתונים הקיימים'
+                    }
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleDeleteAndRestart}
+                disabled={state.isLoading}
+                className="w-full bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-600/50 px-8 py-4 rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                🗑️ מחק הכל והתחל מאפס
+              </button>
+
+              <button
+                onClick={() => setState((prev) => ({ ...prev, step: 'username', username: '' }))}
+                disabled={state.isLoading}
+                className="w-full text-gray-400 hover:text-white transition-colors py-2"
+              >
+                ← חזור
+              </button>
+            </div>
           </motion.div>
         )}
 
