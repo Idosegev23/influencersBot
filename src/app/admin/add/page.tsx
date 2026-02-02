@@ -4,49 +4,44 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { ArrowRight, Zap } from 'lucide-react';
-import {
-  WizardSteps,
-  StepUrl,
-  StepFetching,
-  StepReview,
-  StepTheme,
-  StepPublish,
-} from '@/components/wizard';
-import { themePresets } from '@/lib/theme';
-import type {
-  WizardStep,
-  WizardState,
-  ApifyProfileData,
-  ApifyPostData,
-  InfluencerType,
-  InfluencerTheme,
-  InfluencerPersona,
-  Product,
-  ContentItem,
-} from '@/types';
+import { ArrowRight, Zap, Instagram, User, Lock, Phone } from 'lucide-react';
+
+type WizardStep = 'username' | 'scraping' | 'settings' | 'complete';
+
+interface WizardState {
+  step: WizardStep;
+  username: string;
+  jobId: string | null;
+  accountId: string | null;
+  scrapingComplete: boolean;
+  subdomain: string;
+  password: string;
+  phoneNumber: string;
+  whatsappEnabled: boolean;
+  error: string | null;
+  isLoading: boolean;
+}
 
 export default function AddInfluencerPage() {
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
 
   const [state, setState] = useState<WizardState>({
-    step: 'url',
-    url: '',
-    profileData: null,
-    posts: [],
-    influencerType: null,
-    extractedProducts: [],
-    extractedContent: [],
-    persona: null,
-    theme: themePresets.other,
+    step: 'username',
+    username: '',
+    jobId: null,
+    accountId: null,
+    scrapingComplete: false,
     subdomain: '',
+    password: '',
+    phoneNumber: '',
+    whatsappEnabled: false,
     error: null,
     isLoading: false,
   });
 
-  const [fetchProgress, setFetchProgress] = useState(0);
-  const [fetchStatus, setFetchStatus] = useState('');
+  // Polling for scraping progress
+  const [jobStatus, setJobStatus] = useState<any>(null);
 
   useEffect(() => {
     fetch('/api/admin')
@@ -61,187 +56,178 @@ export default function AddInfluencerPage() {
       .catch(() => router.push('/admin'));
   }, [router]);
 
-  // Step 1: Handle URL submission
-  const handleUrlSubmit = async (url: string) => {
-    setState((prev) => ({ ...prev, url, isLoading: true, error: null }));
-    setFetchProgress(0);
-    setFetchStatus('מתחבר לאינסטגרם...');
+  // Poll job status when in scraping step
+  useEffect(() => {
+    if (state.step !== 'scraping' || !state.jobId) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/scraping/status?jobId=${state.jobId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setJobStatus(data);
+
+          if (data.status === 'completed') {
+            setState((prev) => ({
+              ...prev,
+              scrapingComplete: true,
+              step: 'settings',
+            }));
+            clearInterval(interval);
+          } else if (data.status === 'failed') {
+            setState((prev) => ({
+              ...prev,
+              error: data.error || 'Scraping failed',
+              step: 'username',
+              isLoading: false,
+            }));
+            clearInterval(interval);
+          }
+        }
+      } catch (error) {
+        console.error('Error polling status:', error);
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [state.step, state.jobId]);
+
+  // Step 1: Handle username submission
+  const handleUsernameSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const username = state.username.trim().replace('@', '');
+    if (!username) {
+      setState((prev) => ({ ...prev, error: 'נא להזין שם משתמש' }));
+      return;
+    }
+
+    setState((prev) => ({ 
+      ...prev, 
+      isLoading: true, 
+      error: null,
+      subdomain: username.toLowerCase().replace(/[^a-z0-9]/g, ''),
+    }));
 
     try {
-      // Start fetching phase
-      setState((prev) => ({ ...prev, step: 'fetching' }));
-
-      // Simulate progress while fetching
-      const progressInterval = setInterval(() => {
-        setFetchProgress((prev) => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return prev;
-          }
-          return prev + Math.random() * 15;
-        });
-      }, 500);
-
-      setFetchProgress(10);
-      setFetchStatus('שולף פרופיל...');
-
-      // Fetch from Apify
-      const apifyRes = await fetch('/api/apify', {
+      // Create account first
+      const accountRes = await fetch('/api/admin/accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({
+          username,
+          type: 'influencer',
+        }),
       });
 
-      if (!apifyRes.ok) {
-        const error = await apifyRes.json();
-        throw new Error(error.error || 'Failed to fetch profile');
+      if (!accountRes.ok) {
+        const error = await accountRes.json();
+        throw new Error(error.error || 'Failed to create account');
       }
 
-      const apifyData = await apifyRes.json();
-      const { profile, posts }: { profile: ApifyProfileData; posts: ApifyPostData[] } = apifyData;
+      const { accountId } = await accountRes.json();
 
-      setFetchProgress(60);
-      setFetchStatus('מנתח תוכן...');
-      setState((prev) => ({ ...prev, step: 'analysis' }));
-
-      // Analyze with AI
-      const analyzeRes = await fetch('/api/analyze', {
+      // Start scraping job
+      const scrapingRes = await fetch('/api/scraping/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profile, posts }),
+        body: JSON.stringify({
+          username,
+          accountId,
+        }),
       });
 
-      if (!analyzeRes.ok) {
-        const error = await analyzeRes.json();
-        throw new Error(error.error || 'Analysis failed');
+      if (!scrapingRes.ok) {
+        const error = await scrapingRes.json();
+        throw new Error(error.error || 'Failed to start scraping');
       }
 
-      const analysisData = await analyzeRes.json();
+      const { jobId } = await scrapingRes.json();
 
-      clearInterval(progressInterval);
-      setFetchProgress(100);
-      setFetchStatus('הושלם!');
-
-      // Update state with all data
       setState((prev) => ({
         ...prev,
-        step: 'review',
-        profileData: profile,
-        posts,
-        influencerType: analysisData.influencerType,
-        persona: analysisData.persona,
-        theme: analysisData.theme || themePresets[analysisData.influencerType as InfluencerType],
-        extractedProducts: analysisData.products,
-        extractedContent: analysisData.contentItems,
-        subdomain: profile.username.toLowerCase().replace(/[^a-z0-9]/g, ''),
+        jobId,
+        accountId,
+        step: 'scraping',
         isLoading: false,
       }));
+
+      // Start executing steps automatically
+      executeNextStep(jobId, 1);
     } catch (error) {
       setState((prev) => ({
         ...prev,
-        step: 'url',
-        error: error instanceof Error ? error.message : 'An error occurred',
+        error: error instanceof Error ? error.message : 'אירעה שגיאה',
         isLoading: false,
       }));
     }
   };
 
-  // Handle products update
-  const handleUpdateProducts = (products: Partial<Product>[]) => {
-    setState((prev) => ({ ...prev, extractedProducts: products }));
-  };
+  // Execute scraping steps
+  const executeNextStep = async (jobId: string, step: number) => {
+    if (step > 7) return;
 
-  // Handle content update
-  const handleUpdateContent = (content: Partial<ContentItem>[]) => {
-    setState((prev) => ({ ...prev, extractedContent: content }));
-  };
+    try {
+      const res = await fetch('/api/scraping/step', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId, step }),
+      });
 
-  // Handle theme change
-  const handleThemeChange = (theme: InfluencerTheme) => {
-    setState((prev) => ({ ...prev, theme }));
+      if (!res.ok) {
+        console.error(`Step ${step} failed`);
+        return;
+      }
+
+      const data = await res.json();
+      
+      if (data.nextStep && data.nextStep <= 7) {
+        // Continue to next step
+        setTimeout(() => executeNextStep(jobId, data.nextStep), 1000);
+      }
+    } catch (error) {
+      console.error(`Error executing step ${step}:`, error);
+    }
   };
 
   // Handle publish
-  const handlePublish = async (subdomain: string, password: string, phoneNumber?: string) => {
+  const handlePublish = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!state.password || state.password.length < 6) {
+      setState((prev) => ({ 
+        ...prev, 
+        error: 'סיסמה חייבת להכיל לפחות 6 תווים' 
+      }));
+      return;
+    }
+
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      // Build context for assistant
-      let context = '';
-      if (state.extractedProducts.length > 0) {
-        context += '## מוצרים וקופונים:\n';
-        state.extractedProducts.forEach((p) => {
-          context += `- ${p.name}`;
-          if (p.brand) context += ` (${p.brand})`;
-          if (p.coupon_code) context += ` - קופון: ${p.coupon_code}`;
-          if (p.link) context += ` - לינק: ${p.link}`;
-          context += '\n';
-        });
-      }
-
-      // Create influencer
-      const res = await fetch('/api/admin/influencers', {
+      const res = await fetch('/api/admin/influencers/finalize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          username: state.profileData?.username,
-          subdomain,
-          display_name: state.profileData?.fullName || state.profileData?.username,
-          bio: state.profileData?.biography,
-          avatar_url: state.profileData?.profilePicUrl,
-          followers_count: state.profileData?.followersCount,
-          following_count: state.profileData?.followingCount,
-          influencer_type: state.influencerType,
-          persona: state.persona,
-          theme: state.theme,
-          admin_password: password,
-          phone_number: phoneNumber,
-          whatsapp_enabled: !!phoneNumber,
-          context,
+          accountId: state.accountId,
+          username: state.username,
+          subdomain: state.subdomain,
+          password: state.password,
+          phoneNumber: state.phoneNumber || null,
+          whatsappEnabled: state.whatsappEnabled,
         }),
       });
 
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.error || 'Failed to create influencer');
+        throw new Error(error.error || 'Failed to finalize');
       }
 
-      const data = await res.json();
-
-      // Save products
-      if (state.extractedProducts.length > 0 && data.influencer?.id) {
-        for (const product of state.extractedProducts) {
-          await fetch('/api/admin/products', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              influencer_id: data.influencer.id,
-              ...product,
-            }),
-          }).catch(console.error);
-        }
-      }
-
-      // Save content items (recipes, tips, etc.)
-      if (state.extractedContent.length > 0 && data.influencer?.id) {
-        for (const content of state.extractedContent) {
-          await fetch('/api/admin/content', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              influencer_id: data.influencer.id,
-              ...content,
-            }),
-          }).catch(console.error);
-        }
-      }
-
-      // Success - redirect to dashboard
-      router.push(`/admin/dashboard?created=${subdomain}`);
+      setState((prev) => ({ ...prev, step: 'complete', isLoading: false }));
     } catch (error) {
       setState((prev) => ({
         ...prev,
-        error: error instanceof Error ? error.message : 'Failed to publish',
+        error: error instanceof Error ? error.message : 'אירעה שגיאה',
         isLoading: false,
       }));
     }
@@ -254,6 +240,51 @@ export default function AddInfluencerPage() {
       </div>
     );
   }
+
+  const renderStepIndicator = () => {
+    const steps = [
+      { id: 'username', label: 'שם משתמש', icon: Instagram },
+      { id: 'scraping', label: 'סריקה ובניית פרסונה', icon: Zap },
+      { id: 'settings', label: 'הגדרות', icon: User },
+      { id: 'complete', label: 'סיום', icon: Lock },
+    ];
+
+    const currentIndex = steps.findIndex(s => s.id === state.step);
+
+    return (
+      <div className="flex items-center justify-center gap-2 mb-8">
+        {steps.map((step, index) => {
+          const Icon = step.icon;
+          const isActive = index === currentIndex;
+          const isCompleted = index < currentIndex;
+
+          return (
+            <div key={step.id} className="flex items-center">
+              <div
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                  isActive
+                    ? 'bg-indigo-500 text-white'
+                    : isCompleted
+                    ? 'bg-green-500/20 text-green-400'
+                    : 'bg-gray-800 text-gray-500'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                <span className="text-sm font-medium hidden sm:inline">{step.label}</span>
+              </div>
+              {index < steps.length - 1 && (
+                <div
+                  className={`w-8 h-0.5 mx-2 ${
+                    isCompleted ? 'bg-green-500' : 'bg-gray-700'
+                  }`}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen admin-panel" dir="rtl">
@@ -272,22 +303,17 @@ export default function AddInfluencerPage() {
           </Link>
           <div className="flex items-center gap-2">
             <Zap className="w-5 h-5 text-indigo-500" />
-            <span className="font-semibold text-white">הוספת משפיען</span>
+            <span className="font-semibold text-white">הוספת משפיען חדש</span>
           </div>
         </div>
       </header>
 
-      {/* Wizard Steps Indicator */}
-      <div className="relative z-10 py-6 border-b border-gray-800">
-        <div className="max-w-4xl mx-auto px-6">
-          <WizardSteps currentStep={state.step} isLoading={state.isLoading} />
-        </div>
-      </div>
-
       {/* Main Content */}
       <main className="relative z-10 max-w-4xl mx-auto px-6 py-12">
+        {renderStepIndicator()}
+
         {/* Error Display */}
-        {state.error && state.step === 'url' && (
+        {state.error && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -297,52 +323,297 @@ export default function AddInfluencerPage() {
           </motion.div>
         )}
 
-        {/* Step Content */}
-        {state.step === 'url' && (
-          <StepUrl onSubmit={handleUrlSubmit} isLoading={state.isLoading} />
+        {/* Step 1: Username Input */}
+        {state.step === 'username' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-2xl p-8"
+          >
+            <div className="text-center mb-8">
+              <Instagram className="w-16 h-16 text-indigo-500 mx-auto mb-4" />
+              <h2 className="text-2xl font-bold text-white mb-2">
+                הזן שם משתמש אינסטגרם
+              </h2>
+              <p className="text-gray-400">
+                המערכת תסרוק את הפרופיל ותבנה פרסונה מלאה
+              </p>
+            </div>
+
+            <form onSubmit={handleUsernameSubmit} className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  שם משתמש
+                </label>
+                <div className="relative">
+                  <Instagram className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                  <input
+                    type="text"
+                    value={state.username}
+                    onChange={(e) => setState(prev => ({ ...prev, username: e.target.value }))}
+                    placeholder="username"
+                    className="w-full pr-12 pl-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    disabled={state.isLoading}
+                  />
+                </div>
+                <p className="mt-2 text-sm text-gray-500">
+                  אפשר להזין עם או בלי @
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={state.isLoading || !state.username.trim()}
+                className="w-full py-3 bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                {state.isLoading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    יוצר חשבון...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-5 h-5" />
+                    התחל סריקה
+                  </>
+                )}
+              </button>
+            </form>
+          </motion.div>
         )}
 
-        {(state.step === 'fetching' || state.step === 'analysis') && (
-          <StepFetching progress={fetchProgress} status={fetchStatus} />
+        {/* Step 2: Scraping Progress */}
+        {state.step === 'scraping' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-2xl p-8"
+          >
+            <div className="text-center mb-8">
+              <Zap className="w-16 h-16 text-indigo-500 mx-auto mb-4 animate-pulse" />
+              <h2 className="text-2xl font-bold text-white mb-2">
+                סורק ומנתח את הפרופיל
+              </h2>
+              <p className="text-gray-400">
+                תהליך זה עשוי לקחת 20-30 דקות
+              </p>
+            </div>
+
+            {jobStatus && (
+              <div className="space-y-6">
+                {/* Progress Bar */}
+                <div className="w-full bg-gray-800 rounded-full h-3 overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${jobStatus.progress || 0}%` }}
+                    transition={{ duration: 0.5 }}
+                    className="h-full bg-gradient-to-r from-indigo-500 to-purple-500"
+                  />
+                </div>
+
+                {/* Current Step */}
+                <div className="text-center">
+                  <p className="text-lg font-medium text-white mb-1">
+                    {jobStatus.currentStep ? `שלב ${jobStatus.currentStep} מתוך 7` : 'מתכונן...'}
+                  </p>
+                  <p className="text-sm text-gray-400">
+                    {Math.round(jobStatus.progress || 0)}% הושלם
+                  </p>
+                </div>
+
+                {/* Step Details */}
+                {jobStatus.stepStatuses && (
+                  <div className="space-y-3">
+                    {jobStatus.stepStatuses.map((step: any, index: number) => (
+                      <div
+                        key={index}
+                        className={`flex items-center gap-3 p-3 rounded-lg ${
+                          step.status === 'completed'
+                            ? 'bg-green-500/10 border border-green-500/20'
+                            : step.status === 'running'
+                            ? 'bg-indigo-500/10 border border-indigo-500/20'
+                            : step.status === 'failed'
+                            ? 'bg-red-500/10 border border-red-500/20'
+                            : 'bg-gray-800'
+                        }`}
+                      >
+                        <div
+                          className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                            step.status === 'completed'
+                              ? 'bg-green-500 text-white'
+                              : step.status === 'running'
+                              ? 'bg-indigo-500 text-white'
+                              : step.status === 'failed'
+                              ? 'bg-red-500 text-white'
+                              : 'bg-gray-700 text-gray-400'
+                          }`}
+                        >
+                          {step.step}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-white font-medium">{step.name}</p>
+                          {step.duration && (
+                            <p className="text-sm text-gray-400">
+                              {Math.round(step.duration)}s
+                            </p>
+                          )}
+                        </div>
+                        {step.status === 'running' && (
+                          <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </motion.div>
         )}
 
-        {state.step === 'review' && state.profileData && state.influencerType && state.persona && (
-          <StepReview
-            profile={state.profileData}
-            influencerType={state.influencerType}
-            persona={state.persona}
-            products={state.extractedProducts}
-            contentItems={state.extractedContent}
-            onUpdateProducts={handleUpdateProducts}
-            onUpdateContent={handleUpdateContent}
-            onContinue={() => setState((prev) => ({ ...prev, step: 'theme' }))}
-            onBack={() => setState((prev) => ({ ...prev, step: 'url' }))}
-          />
+        {/* Step 3: Settings */}
+        {state.step === 'settings' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-2xl p-8"
+          >
+            <div className="text-center mb-8">
+              <User className="w-16 h-16 text-indigo-500 mx-auto mb-4" />
+              <h2 className="text-2xl font-bold text-white mb-2">
+                הגדרות חשבון
+              </h2>
+              <p className="text-gray-400">
+                הפרסונה נבנתה בהצלחה! כעת נשאר להגדיר את פרטי הגישה
+              </p>
+            </div>
+
+            <form onSubmit={handlePublish} className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  תת-דומיין *
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={state.subdomain}
+                    onChange={(e) => setState(prev => ({ ...prev, subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '') }))}
+                    className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="username"
+                    required
+                  />
+                  <span className="text-gray-400 whitespace-nowrap">
+                    .influencer.bot
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  סיסמת ניהול *
+                </label>
+                <div className="relative">
+                  <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                  <input
+                    type="password"
+                    value={state.password}
+                    onChange={(e) => setState(prev => ({ ...prev, password: e.target.value }))}
+                    className="w-full pr-12 pl-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="••••••"
+                    minLength={6}
+                    required
+                  />
+                </div>
+                <p className="mt-2 text-sm text-gray-500">
+                  לפחות 6 תווים
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  מספר טלפון (אופציונלי)
+                </label>
+                <div className="relative">
+                  <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                  <input
+                    type="tel"
+                    value={state.phoneNumber}
+                    onChange={(e) => setState(prev => ({ ...prev, phoneNumber: e.target.value }))}
+                    className="w-full pr-12 pl-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="050-1234567"
+                  />
+                </div>
+              </div>
+
+              {state.phoneNumber && (
+                <div className="flex items-center gap-3 p-4 bg-gray-800 rounded-lg">
+                  <input
+                    type="checkbox"
+                    id="whatsapp"
+                    checked={state.whatsappEnabled}
+                    onChange={(e) => setState(prev => ({ ...prev, whatsappEnabled: e.target.checked }))}
+                    className="w-5 h-5 rounded border-gray-600 text-indigo-500 focus:ring-indigo-500"
+                  />
+                  <label htmlFor="whatsapp" className="text-white cursor-pointer">
+                    הפעל התראות WhatsApp
+                  </label>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={state.isLoading}
+                className="w-full py-3 bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                {state.isLoading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    שומר...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-5 h-5" />
+                    פרסם משפיען
+                  </>
+                )}
+              </button>
+            </form>
+          </motion.div>
         )}
 
-        {state.step === 'theme' && state.influencerType && state.profileData && (
-          <StepTheme
-            initialTheme={state.theme}
-            influencerType={state.influencerType}
-            profileName={state.profileData.fullName || state.profileData.username}
-            onThemeChange={handleThemeChange}
-            onContinue={() => setState((prev) => ({ ...prev, step: 'publish' }))}
-            onBack={() => setState((prev) => ({ ...prev, step: 'review' }))}
-          />
-        )}
+        {/* Step 4: Complete */}
+        {state.step === 'complete' && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-2xl p-8 text-center"
+          >
+            <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Zap className="w-10 h-10 text-green-500" />
+            </div>
+            <h2 className="text-3xl font-bold text-white mb-4">
+              🎉 המשפיען נוסף בהצלחה!
+            </h2>
+            <p className="text-gray-400 mb-8">
+              הפרסונה נבנתה והחשבון מוכן לשימוש
+            </p>
 
-        {state.step === 'publish' && state.profileData && (
-          <StepPublish
-            suggestedSubdomain={state.subdomain || state.profileData.username}
-            onPublish={handlePublish}
-            onBack={() => setState((prev) => ({ ...prev, step: 'theme' }))}
-            isLoading={state.isLoading}
-            error={state.error}
-          />
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link
+                href={`/influencer/${state.username}/dashboard`}
+                className="px-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-medium rounded-lg transition-colors"
+              >
+                לדשבורד המשפיען
+              </Link>
+              <Link
+                href="/admin/dashboard"
+                className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-lg transition-colors"
+              >
+                חזרה לניהול
+              </Link>
+            </div>
+          </motion.div>
         )}
       </main>
     </div>
   );
 }
-
-

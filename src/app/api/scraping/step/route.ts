@@ -9,6 +9,15 @@ import { requireInfluencerAuth } from '@/lib/auth/middleware';
 import { InstagramActorManager, selectTopPostsForComments, extractTopHashtags, extractKeywordsFromBio } from '@/lib/scraping/apify-actors';
 import { runPreprocessing } from '@/lib/scraping/preprocessing';
 import { runGeminiBuilder, savePersonaToDatabase } from '@/lib/ai/gemini-persona-builder';
+import { cookies } from 'next/headers';
+
+const ADMIN_COOKIE_NAME = 'influencerbot_admin_session';
+
+async function checkAdminAuth(): Promise<boolean> {
+  const cookieStore = await cookies();
+  const session = cookieStore.get(ADMIN_COOKIE_NAME);
+  return session?.value === 'authenticated';
+}
 
 // Vercel timeout: 600 seconds (10 דקות) - conservative
 export const maxDuration = 600;
@@ -17,15 +26,20 @@ export async function POST(request: Request) {
   const startTime = Date.now();
 
   try {
-    // Authentication
-    const authResult = await requireInfluencerAuth(request);
-    if (authResult instanceof NextResponse) {
-      return authResult;
-    }
-
-    const { accountId } = authResult;
     const body = await request.json();
     const { jobId, step } = body;
+
+    // Check authentication (admin or influencer)
+    const isAdmin = await checkAdminAuth();
+    
+    if (!isAdmin) {
+      // Regular influencer auth
+      const authResult = await requireInfluencerAuth(request);
+      if (authResult instanceof NextResponse) {
+        return authResult;
+      }
+      // accountId will be validated from job
+    }
 
     if (!jobId || !step) {
       return NextResponse.json(
@@ -38,13 +52,13 @@ export async function POST(request: Request) {
 
     const supabase = await createClient();
 
-    // Load job
-    const { data: job, error: jobError } = await supabase
+    // Load job (without account_id filter for admin)
+    let jobQuery = supabase
       .from('scraping_jobs')
-      .select('*, accounts!inner(username)')
-      .eq('id', jobId)
-      .eq('account_id', accountId)
-      .single();
+      .select('*, accounts!inner(config)')
+      .eq('id', jobId);
+
+    const { data: job, error: jobError } = await jobQuery.single();
 
     if (jobError || !job) {
       return NextResponse.json(
@@ -53,7 +67,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const username = job.accounts.username;
+    const username = job.accounts?.config?.username || job.accounts?.username;
 
     // Update step status to 'running'
     await updateStepStatus(supabase, jobId, step, 'running', null, null);

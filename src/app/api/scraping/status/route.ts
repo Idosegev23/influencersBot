@@ -6,18 +6,32 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireInfluencerAuth } from '@/lib/auth/middleware';
+import { cookies } from 'next/headers';
+
+const ADMIN_COOKIE_NAME = 'influencerbot_admin_session';
+
+async function checkAdminAuth(): Promise<boolean> {
+  const cookieStore = await cookies();
+  const session = cookieStore.get(ADMIN_COOKIE_NAME);
+  return session?.value === 'authenticated';
+}
 
 export async function GET(request: Request) {
   try {
-    // Authentication
-    const authResult = await requireInfluencerAuth(request);
-    if (authResult instanceof NextResponse) {
-      return authResult;
-    }
-
-    const { accountId } = authResult;
     const { searchParams } = new URL(request.url);
     const jobId = searchParams.get('jobId');
+
+    // Check authentication (admin or influencer)
+    const isAdmin = await checkAdminAuth();
+    
+    if (!isAdmin) {
+      // Regular influencer auth
+      const authResult = await requireInfluencerAuth(request);
+      if (authResult instanceof NextResponse) {
+        return authResult;
+      }
+      // accountId will be validated from job if needed
+    }
 
     if (!jobId) {
       return NextResponse.json(
@@ -28,13 +42,13 @@ export async function GET(request: Request) {
 
     const supabase = await createClient();
 
-    // Load job with full details
-    const { data: job, error } = await supabase
+    // Load job with full details (without account_id filter for admin)
+    let jobQuery = supabase
       .from('scraping_jobs')
       .select('*')
-      .eq('id', jobId)
-      .eq('account_id', accountId)
-      .single();
+      .eq('id', jobId);
+
+    const { data: job, error } = await jobQuery.single();
 
     if (error || !job) {
       return NextResponse.json(

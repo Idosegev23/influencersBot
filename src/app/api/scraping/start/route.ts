@@ -6,18 +6,35 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireInfluencerAuth } from '@/lib/auth/middleware';
+import { cookies } from 'next/headers';
+
+const ADMIN_COOKIE_NAME = 'influencerbot_admin_session';
+
+async function checkAdminAuth(): Promise<boolean> {
+  const cookieStore = await cookies();
+  const session = cookieStore.get(ADMIN_COOKIE_NAME);
+  return session?.value === 'authenticated';
+}
 
 export async function POST(request: Request) {
   try {
-    // Authentication
-    const authResult = await requireInfluencerAuth(request);
-    if (authResult instanceof NextResponse) {
-      return authResult;
-    }
-
-    const { accountId } = authResult;
     const body = await request.json();
-    const { username, jobType = 'full_rebuild' } = body;
+    const { username, jobType = 'full_rebuild', accountId: providedAccountId } = body;
+
+    let accountId: string;
+
+    // Check if admin is calling with accountId
+    const isAdmin = await checkAdminAuth();
+    if (isAdmin && providedAccountId) {
+      accountId = providedAccountId;
+    } else {
+      // Regular influencer auth
+      const authResult = await requireInfluencerAuth(request);
+      if (authResult instanceof NextResponse) {
+        return authResult;
+      }
+      accountId = authResult.accountId;
+    }
 
     if (!username) {
       return NextResponse.json(
