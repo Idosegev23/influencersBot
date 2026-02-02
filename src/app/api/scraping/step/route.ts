@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     // Load job
     const { data: job, error: jobError } = await supabase
       .from('scraping_jobs')
-      .select('*, influencer_accounts!inner(username)')
+      .select('*, accounts!inner(username)')
       .eq('id', jobId)
       .eq('account_id', accountId)
       .single();
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const username = job.influencer_accounts.username;
+    const username = job.accounts.username;
 
     // Update step status to 'running'
     await updateStepStatus(supabase, jobId, step, 'running', null, null);

@@ -32,7 +32,7 @@ export async function GET(request: Request) {
 
     // 2. מציאת accounts שצריכים עדכון (לא עודכנו ב-24 שעות)
     const { data: accounts, error: accountsError } = await supabase
-      .from('influencer_accounts')
+      .from('accounts')
       .select('id, username, instagram_username')
       .not('instagram_username', 'is', null);
 

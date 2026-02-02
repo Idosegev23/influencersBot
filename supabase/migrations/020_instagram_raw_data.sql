@@ -6,7 +6,7 @@
 -- ============================================
 CREATE TABLE IF NOT EXISTS instagram_posts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  account_id UUID REFERENCES influencer_accounts(id) ON DELETE CASCADE NOT NULL,
+  account_id UUID REFERENCES accounts(id) ON DELETE CASCADE NOT NULL,
   
   -- Instagram identifiers
   shortcode TEXT NOT NULL,
@@ -58,7 +58,7 @@ CREATE INDEX idx_instagram_posts_scraped_at ON instagram_posts(scraped_at DESC);
 CREATE TABLE IF NOT EXISTS instagram_comments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   post_id UUID REFERENCES instagram_posts(id) ON DELETE CASCADE NOT NULL,
-  account_id UUID REFERENCES influencer_accounts(id) ON DELETE CASCADE NOT NULL,
+  account_id UUID REFERENCES accounts(id) ON DELETE CASCADE NOT NULL,
   
   -- Comment data
   comment_id TEXT,
@@ -95,7 +95,7 @@ CREATE INDEX idx_instagram_comments_author ON instagram_comments(author_username
 -- ============================================
 CREATE TABLE IF NOT EXISTS instagram_hashtags (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  account_id UUID REFERENCES influencer_accounts(id) ON DELETE CASCADE NOT NULL,
+  account_id UUID REFERENCES accounts(id) ON DELETE CASCADE NOT NULL,
   
   -- Hashtag data
   hashtag TEXT NOT NULL,
@@ -128,7 +128,7 @@ CREATE INDEX idx_instagram_hashtags_hashtag ON instagram_hashtags(hashtag);
 -- ============================================
 CREATE TABLE IF NOT EXISTS instagram_profile_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  account_id UUID REFERENCES influencer_accounts(id) ON DELETE CASCADE NOT NULL,
+  account_id UUID REFERENCES accounts(id) ON DELETE CASCADE NOT NULL,
   
   -- Profile data snapshot
   username TEXT NOT NULL,
@@ -222,25 +222,25 @@ ALTER TABLE instagram_profile_history ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Influencers can view their own Instagram posts"
   ON instagram_posts FOR SELECT
   USING (account_id IN (
-    SELECT id FROM influencer_accounts WHERE user_id = auth.uid()
+    SELECT id FROM accounts WHERE owner_user_id = auth.uid()
   ));
 
 CREATE POLICY "Influencers can view their own Instagram comments"
   ON instagram_comments FOR SELECT
   USING (account_id IN (
-    SELECT id FROM influencer_accounts WHERE user_id = auth.uid()
+    SELECT id FROM accounts WHERE owner_user_id = auth.uid()
   ));
 
 CREATE POLICY "Influencers can view their own Instagram hashtags"
   ON instagram_hashtags FOR SELECT
   USING (account_id IN (
-    SELECT id FROM influencer_accounts WHERE user_id = auth.uid()
+    SELECT id FROM accounts WHERE owner_user_id = auth.uid()
   ));
 
 CREATE POLICY "Influencers can view their own Instagram profile history"
   ON instagram_profile_history FOR SELECT
   USING (account_id IN (
-    SELECT id FROM influencer_accounts WHERE user_id = auth.uid()
+    SELECT id FROM accounts WHERE owner_user_id = auth.uid()
   ));
 
 -- Service role can do everything (for backend scraping)

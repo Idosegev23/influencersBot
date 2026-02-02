@@ -7,7 +7,7 @@
 
 CREATE TABLE IF NOT EXISTS scraping_jobs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  account_id UUID REFERENCES influencer_accounts(id) ON DELETE CASCADE NOT NULL,
+  account_id UUID REFERENCES accounts(id) ON DELETE CASCADE NOT NULL,
   
   -- Job status
   status TEXT NOT NULL CHECK (status IN ('pending', 'running', 'completed', 'failed', 'cancelled')),
@@ -316,7 +316,7 @@ ALTER TABLE scraping_jobs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Influencers can view their own scraping jobs"
   ON scraping_jobs FOR SELECT
   USING (account_id IN (
-    SELECT id FROM influencer_accounts WHERE user_id = auth.uid()
+    SELECT id FROM accounts WHERE owner_user_id = auth.uid()
   ));
 
 -- Service role can do everything

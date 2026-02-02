@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 
     // Get account
     const { data: account } = await supabase
-      .from('influencer_accounts')
+      .from('accounts')
       .select('id, username, display_name')
       .eq('username', username)
       .single();
