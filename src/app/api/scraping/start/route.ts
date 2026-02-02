@@ -72,7 +72,7 @@ export async function POST(request: Request) {
       { step: 4, name: 'Hashtags', nameHe: 'האשטגים', description: '20 hashtags × 30 posts', status: 'pending' },
       { step: 5, name: 'Search', nameHe: 'חיפוש', description: 'מיקום בשוק', status: 'pending' },
       { step: 6, name: 'Preprocessing', nameHe: 'עיבוד מידע', description: 'ניתוח, clustering, timeline', status: 'pending' },
-      { step: 7, name: 'Gemini Persona', nameHe: 'בניית פרסונה', description: 'Gemini Pro - קול, ידע, גבולות', status: 'pending' },
+      { step: 7, name: 'Gemini Persona', nameHe: 'בניית פרסונה', description: 'Gemini Pro - קול, ידע, מוצרים, קופונים', status: 'pending' },
     ];
 
     // Create the job using SQL function
