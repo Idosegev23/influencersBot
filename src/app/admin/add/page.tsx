@@ -174,7 +174,119 @@ export default function AddInfluencerPage() {
     }));
 
     try {
-      // Create account first
+      // Check if account already exists
+      const checkRes = await fetch(`/api/admin/accounts/check?username=${username}`);
+      
+      if (checkRes.ok) {
+        const { exists, account, job } = await checkRes.json();
+        
+        if (exists && account) {
+          // Account exists - ask user what to do
+          const hasActiveJob = job && (job.status === 'running' || job.status === 'pending' || job.status === 'failed');
+          
+          let message = `חשבון @${username} כבר קיים במערכת.\n\n`;
+          
+          if (hasActiveJob) {
+            const statusText = job.status === 'failed' 
+              ? `נכשל בשלב ${job.error_step || job.current_step}`
+              : job.status === 'running'
+              ? `רץ כעת - שלב ${job.current_step} מתוך 7`
+              : `ממתין - שלב ${job.current_step} מתוך 7`;
+            
+            message += `📊 סטטוס: ${statusText}\n\n`;
+            message += '✅ לחץ OK להמשיך מהשלב הנוכחי (חוסך זמן ועלויות)\n';
+            message += '❌ לחץ ביטול כדי למחוק הכל ולהתחיל מאפס';
+          } else {
+            message += 'יש נתונים קיימים אבל אין ריצה פעילה.\n\n';
+            message += '✅ לחץ OK להתחיל ריצה חדשה (ישתמש בנתונים קיימים)\n';
+            message += '❌ לחץ ביטול כדי למחוק הכל ולהתחיל מאפס';
+          }
+          
+          const shouldResume = window.confirm(message);
+          
+          if (!shouldResume) {
+            // User chose to start fresh - delete everything
+            const confirmDelete = window.confirm(
+              '⚠️ אזהרה: פעולה זו תמחק לצמיתות:\n' +
+              '• כל הפוסטים שנסרקו\n' +
+              '• כל התגובות\n' +
+              '• את הפרסונה שנוצרה\n' +
+              '• את ה-job\n\n' +
+              'האם להמשיך במחיקה?'
+            );
+            
+            if (!confirmDelete) {
+              setState((prev) => ({ ...prev, isLoading: false }));
+              return;
+            }
+            
+            if (job) {
+              await fetch(`/api/scraping/cancel?jobId=${job.id}`, { method: 'DELETE' });
+            }
+            await fetch(`/api/admin/accounts/${account.id}`, { method: 'DELETE' });
+            
+            setState((prev) => ({ ...prev, isLoading: false }));
+            
+            // Wait a bit and try again
+            setTimeout(() => {
+              handleUsernameSubmit(e);
+            }, 500);
+            return;
+          }
+          
+          // User chose to resume
+          if (hasActiveJob) {
+            // Continue from existing job
+            const nextStep = job.status === 'failed' 
+              ? (job.error_step || job.current_step) // Retry failed step
+              : job.current_step + 1; // Continue from next step
+            
+            setState((prev) => ({
+              ...prev,
+              accountId: account.id,
+              jobId: job.id,
+              step: 'scraping',
+              isLoading: false,
+            }));
+            
+            // Resume from the appropriate step
+            if (nextStep <= 7) {
+              executeNextStep(job.id, nextStep);
+            }
+            return;
+          }
+          
+          // No active job - start new one with existing account
+          const scrapingRes = await fetch('/api/scraping/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username,
+              accountId: account.id,
+            }),
+          });
+
+          if (!scrapingRes.ok) {
+            const error = await scrapingRes.json();
+            throw new Error(error.error || 'Failed to start scraping');
+          }
+
+          const { jobId } = await scrapingRes.json();
+
+          setState((prev) => ({
+            ...prev,
+            accountId: account.id,
+            jobId,
+            step: 'scraping',
+            isLoading: false,
+          }));
+          
+          executeNextStep(jobId, 1);
+          return;
+        }
+      }
+      
+      // Account doesn't exist - create new one
       const accountRes = await fetch('/api/admin/accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
