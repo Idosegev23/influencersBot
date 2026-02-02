@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { BriefView } from '@/components/documents/BriefView';
+import { QuoteView } from '@/components/documents/QuoteView';
 
 interface Document {
   id: string;
@@ -323,6 +324,13 @@ export default function DocumentReviewPage() {
                     </div>
                   </div>
                 </div>
+              </>
+            ) : document.document_type === 'quote' ? (
+              <>
+                <h2 className="text-xl font-semibold text-gray-900 mb-6 text-right">
+                  סקירת הצעת מחיר
+                </h2>
+                <QuoteView data={editedData} />
               </>
             ) : (
               <div className="space-y-6">
