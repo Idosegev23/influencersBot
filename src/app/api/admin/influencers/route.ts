@@ -224,7 +224,38 @@ export async function DELETE(req: NextRequest) {
     // Import supabase client directly for delete
     const { supabase } = await import('@/lib/supabase');
 
-    // Delete related data first (products, sessions, etc.)
+    console.log(`[Admin Delete] Deleting influencer ${id}`);
+
+    // Get associated account_id
+    const { data: account } = await supabase
+      .from('accounts')
+      .select('id')
+      .eq('legacy_influencer_id', id)
+      .single();
+
+    // Delete NEW data structures (if account exists)
+    if (account) {
+      console.log(`[Admin Delete] Found account ${account.id}, deleting new data...`);
+      
+      // Delete Instagram data (CASCADE should handle this, but we'll be explicit)
+      await supabase.from('instagram_comments').delete().eq('account_id', account.id);
+      await supabase.from('instagram_posts').delete().eq('account_id', account.id);
+      await supabase.from('instagram_hashtags').delete().eq('account_id', account.id);
+      await supabase.from('instagram_profile_history').delete().eq('account_id', account.id);
+      
+      // Delete scraping jobs
+      await supabase.from('scraping_jobs').delete().eq('account_id', account.id);
+      
+      // Delete persona
+      await supabase.from('chatbot_persona').delete().eq('account_id', account.id);
+      
+      // Delete the account itself
+      await supabase.from('accounts').delete().eq('id', account.id);
+      
+      console.log(`[Admin Delete] Deleted account and related data`);
+    }
+
+    // Delete LEGACY data structures
     await supabase.from('products').delete().eq('influencer_id', id);
     await supabase.from('content_items').delete().eq('influencer_id', id);
     await supabase.from('posts').delete().eq('influencer_id', id);
