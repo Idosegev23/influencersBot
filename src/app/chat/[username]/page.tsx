@@ -16,13 +16,13 @@ interface Message {
 }
 
 interface PageProps {
-  params: {
+  params: Promise<{
     username: string;
-  };
+  }>;
 }
 
-export default function PublicChatPage({ params }: PageProps) {
-  const username = params.username;
+export default async function PublicChatPage({ params }: PageProps) {
+  const { username } = await params;
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
