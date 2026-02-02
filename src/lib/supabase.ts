@@ -139,7 +139,40 @@ export async function getAllInfluencers(): Promise<Influencer[]> {
     console.error('Error fetching influencers:', error);
     return [];
   }
-  return data || [];
+  
+  // Enrich with Instagram profile data if available
+  const enriched = await Promise.all((data || []).map(async (influencer) => {
+    // Get account ID
+    const { data: account } = await supabase
+      .from('accounts')
+      .select('id')
+      .eq('legacy_influencer_id', influencer.id)
+      .single();
+    
+    if (!account) return influencer;
+    
+    // Get latest Instagram profile
+    const { data: profile } = await supabase
+      .from('instagram_profile_history')
+      .select('profile_pic_url, bio, followers_count, following_count, posts_count')
+      .eq('account_id', account.id)
+      .order('snapshot_date', { ascending: false })
+      .limit(1)
+      .single();
+    
+    if (!profile) return influencer;
+    
+    // Merge Instagram data with influencer data
+    return {
+      ...influencer,
+      avatar_url: profile.profile_pic_url || influencer.avatar_url,
+      bio: profile.bio || influencer.bio,
+      followers_count: profile.followers_count || influencer.followers_count,
+      following_count: profile.following_count || influencer.following_count,
+    };
+  }));
+  
+  return enriched;
 }
 
 export async function createInfluencer(influencer: Omit<Influencer, 'id' | 'created_at' | 'updated_at'>): Promise<Influencer | null> {
