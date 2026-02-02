@@ -326,15 +326,28 @@ export class InstagramActorManager {
 
     for (const hashtag of hashtags) {
       try {
+        // Clean hashtag: remove #, spaces, special chars, keep only alphanumeric and underscore
+        const cleanHashtag = hashtag
+          .replace(/^#/, '') // Remove leading #
+          .replace(/[^a-zA-Z0-9_\u0590-\u05FF]/g, '') // Keep only alphanumeric, underscore, and Hebrew
+          .trim();
+        
+        if (!cleanHashtag) {
+          console.warn(`[Actor 4] Skipping invalid hashtag: ${hashtag}`);
+          continue;
+        }
+
+        console.log(`[Actor 4] Scraping hashtag: ${hashtag} → ${cleanHashtag}`);
+
         const run = await runApifyActor(ACTORS.INSTAGRAM_HASHTAG_SCRAPER, {
-          hashtags: [hashtag],
+          hashtags: [cleanHashtag],
           resultsLimit: postsPerHashtag,
         });
 
         const items = await getDatasetItems<any>(run.defaultDatasetId);
 
         results.push({
-          hashtag: hashtag,
+          hashtag: cleanHashtag, // Use cleaned hashtag
           total_posts_in_hashtag: items[0]?.hashtagPostCount,
           sample_posts: items.slice(0, postsPerHashtag).map((item: any) => ({
             shortcode: item.shortCode || '',
@@ -344,9 +357,9 @@ export class InstagramActorManager {
           })),
         });
 
-        console.log(`[Actor 4] Fetched ${items.length} posts for #${hashtag}`);
+        console.log(`[Actor 4] Fetched ${items.length} posts for #${cleanHashtag}`);
       } catch (error) {
-        console.error(`[Actor 4] Failed to scrape #${hashtag}:`, error);
+        console.error(`[Actor 4] Failed to scrape hashtag ${hashtag}:`, error);
       }
     }
 
