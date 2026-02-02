@@ -377,15 +377,28 @@ export class InstagramActorManager {
 
     for (const query of queries) {
       try {
+        // Clean query: remove special chars that Apify doesn't allow
+        // Allowed: letters, numbers, spaces (will be converted to commas by Apify)
+        const cleanQuery = query
+          .replace(/[!?.,:;\-+=*&%$#@/\\~^|<>()[\]{}\"'`]/g, '') // Remove special chars
+          .trim();
+        
+        if (!cleanQuery || cleanQuery.length < 2) {
+          console.warn(`[Actor 5] Skipping invalid query: ${query}`);
+          continue;
+        }
+
+        console.log(`[Actor 5] Searching: ${query} → ${cleanQuery}`);
+
         const run = await runApifyActor(ACTORS.INSTAGRAM_SEARCH_SCRAPER, {
-          search: query,
+          search: cleanQuery,
           searchLimit: 20,
         });
 
         const items = await getDatasetItems<any>(run.defaultDatasetId);
 
         results.push({
-          query: query,
+          query: cleanQuery, // Use cleaned query
           results: items.map((item: any) => ({
             type: item.type || 'user',
             name: item.username || item.title || '',

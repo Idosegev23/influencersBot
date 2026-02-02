@@ -358,6 +358,11 @@ export async function savePersonaToDatabase(
     .upsert({
       account_id: accountId,
       
+      // Required fields
+      name: persona.identity.who || 'משפיען',
+      tone: persona.voice.tone || 'ידידותי',
+      language: 'he',
+      
       // New enhanced fields
       voice_rules: persona.voice,
       knowledge_map: persona.knowledgeMap,
