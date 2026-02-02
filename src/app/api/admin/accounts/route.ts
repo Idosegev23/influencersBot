@@ -35,17 +35,20 @@ export async function POST(request: Request) {
     const supabase = await createClient();
 
     // Create account
+    // Note: type must be 'creator' or 'brand' per DB constraint
+    const accountType = type === 'influencer' ? 'creator' : type;
+    
     const { data: account, error: accountError } = await supabase
       .from('accounts')
       .insert({
-        type,
+        type: accountType,
         config: {
           username,
           display_name: username,
           subdomain: username.toLowerCase().replace(/[^a-z0-9]/g, ''),
         },
         plan: 'free',
-        status: 'pending', // Will be activated after setup
+        status: 'active',
         timezone: 'Asia/Jerusalem',
         language: 'he',
         allowed_channels: {

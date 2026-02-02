@@ -160,7 +160,7 @@ export async function createInfluencer(influencer: Omit<Influencer, 'id' | 'crea
     const { data: accountData, error: accountError } = await supabase
       .from('accounts')
       .insert({
-        type: 'influencer',
+        type: 'creator', // Must be 'creator' or 'brand' per DB constraint
         legacy_influencer_id: data.id,
         owner_user_id: null, // Will be set when user registers
         config: {
@@ -169,7 +169,7 @@ export async function createInfluencer(influencer: Omit<Influencer, 'id' | 'crea
           subdomain: influencer.subdomain,
         },
         plan: 'free',
-        status: influencer.is_active ? 'active' : 'inactive',
+        status: influencer.is_active ? 'active' : 'suspended', // Must be 'active', 'suspended', or 'deleted'
         timezone: 'Asia/Jerusalem',
         language: 'he',
         allowed_channels: {
@@ -290,7 +290,7 @@ export async function getAccountByUsername(username: string) {
   const { data, error } = await supabase
     .from('accounts')
     .select('*')
-    .eq('type', 'influencer')
+    .eq('type', 'creator')
     .eq('config->>username', username)
     .single();
 

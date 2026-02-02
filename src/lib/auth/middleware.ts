@@ -474,7 +474,7 @@ export async function requireInfluencerAuth(
     .from('accounts')
     .select('id')
     .eq('owner_user_id', user.id)
-    .eq('type', 'influencer')
+    .eq('type', 'creator')
     .single();
 
   if (accountError || !account) {
