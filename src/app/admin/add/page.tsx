@@ -87,7 +87,7 @@ export default function AddInfluencerPage() {
       } catch (error) {
         console.error('Error polling status:', error);
       }
-    }, 2000);
+    }, 5000); // Poll every 5 seconds (reduced from 2s to avoid rate limiting)
 
     return () => clearInterval(interval);
   }, [state.step, state.jobId]);

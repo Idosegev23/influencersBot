@@ -75,6 +75,8 @@ export const config = {
     '/api/chat/:path*',
     '/api/admin/:path*',
     '/api/influencer/:path*',
+    // Note: /api/scraping/* is intentionally excluded from rate limiting
+    // to allow frequent polling during long-running scraping jobs
   ],
 };
 
