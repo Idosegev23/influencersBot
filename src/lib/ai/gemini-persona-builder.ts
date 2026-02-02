@@ -56,6 +56,34 @@ export interface GeminiPersonaOutput {
     cautious: string[];
     refuse: string[];
   };
+
+  // Commerce & Products
+  products?: Array<{
+    name: string;
+    brand?: string;
+    category?: string;
+    description: string;
+    mentionedInPosts: number;
+    sentiment: 'positive' | 'neutral' | 'negative';
+    keyPoints: string[];
+  }>;
+
+  coupons?: Array<{
+    code: string;
+    brand: string;
+    description?: string;
+    discount?: string;
+    expiresAt?: string;
+    mentionedInPosts: string[];
+  }>;
+
+  brands?: Array<{
+    name: string;
+    relationship: 'partnership' | 'sponsored' | 'organic' | 'affiliate';
+    category?: string;
+    mentionCount: number;
+    firstMentioned?: string;
+  }>;
 }
 
 // ============================================
@@ -121,8 +149,36 @@ const PERSONA_BUILDER_PROMPT = `
 - מתי יש לענות בזהירות
 - מתי יש לסרב לענות
 
+ז. זיהוי מוצרים, קופונים ומותגים
+חשוב! זהה מהתוכן:
+
+**מוצרים**: מוצרים ספציפיים שהמשפיען ממליץ עליהם
+- רק מוצרים שהוזכרו במפורש ונבדקו/נוסו
+- כלול: שם, מותג, קטגוריה, תיאור, רגש (positive/negative)
+- נקודות מפתח על המוצר
+- כמה פעמים הוזכר
+
+**קופונים**: קודי הנחה שהמשפיען חולק
+- קוד מדויק (לדוגמה: DEKEL20)
+- למי הקוד (מותג/אתר)
+- תיאור ההנחה (20%, משלוח חינם וכו')
+- תוקף אם צוין
+- רשימת פוסטים שהזכירו
+
+**מותגים**: מותגים שהמשפיען עובד איתם
+- שם המותג
+- סוג הקשר: partnership, sponsored, organic, affiliate
+- קטגוריה
+- כמה פעמים הוזכר
+- מתי הוזכר לראשונה
+
+הערות חשובות:
+- זהה רק מה שמופיע בפועל בתוכן
+- הבחן בין שת"פ ממומן (#ad) להמלצה אורגנית
+- אל תמציא מוצרים או קופונים
+
 פלט:
-החזר JSON מובנה הכולל את כל הסעיפים לעיל, מוכן להזנה למערכת תשובות.
+החזר JSON מובנה הכולל את כל הסעיפים לעיל (כולל products, coupons, brands), מוכן להזנה למערכת תשובות.
 
 חשוב מאוד:
 - אל תמציא מידע שלא קיים בנתונים
@@ -207,7 +263,37 @@ ${JSON.stringify(inputData, null, 2)}
     "highConfidence": ["מצב 1", "מצב 2"],
     "cautious": ["מצב 1", "מצב 2"],
     "refuse": ["מצב 1", "מצב 2"]
-  }
+  },
+  "products": [
+    {
+      "name": "שם מוצר",
+      "brand": "מותג",
+      "category": "קטגוריה",
+      "description": "תיאור",
+      "mentionedInPosts": 5,
+      "sentiment": "positive",
+      "keyPoints": ["נקודה 1", "נקודה 2"]
+    }
+  ],
+  "coupons": [
+    {
+      "code": "CODE123",
+      "brand": "מותג",
+      "description": "תיאור ההנחה",
+      "discount": "20%",
+      "expiresAt": "2026-03-01",
+      "mentionedInPosts": ["post_url_1", "post_url_2"]
+    }
+  ],
+  "brands": [
+    {
+      "name": "מותג",
+      "relationship": "partnership",
+      "category": "קטגוריה",
+      "mentionCount": 10,
+      "firstMentioned": "2025-01-15"
+    }
+  ]
 }`;
 
   console.log('[Gemini] Sending request to Gemini Pro...');
