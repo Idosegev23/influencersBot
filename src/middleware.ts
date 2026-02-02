@@ -7,6 +7,11 @@ export function middleware(request: NextRequest) {
              request.headers.get('x-real-ip') || 
              '127.0.0.1';
 
+  // Skip rate limiting for scraping endpoints (they have long-running jobs with frequent polling)
+  if (request.nextUrl.pathname.startsWith('/api/scraping/')) {
+    return NextResponse.next();
+  }
+
   // Rate limit chat API
   if (request.nextUrl.pathname.startsWith('/api/chat')) {
     const key = getRateLimitKey(ip, 'chat');
