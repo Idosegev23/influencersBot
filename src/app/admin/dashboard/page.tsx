@@ -15,6 +15,7 @@ import {
   BarChart3,
   LogOut,
   Check,
+  Trash2,
 } from 'lucide-react';
 import type { Influencer } from '@/types';
 import { formatNumber, formatDateTime } from '@/lib/utils';
@@ -74,6 +75,40 @@ function DashboardContent() {
       body: JSON.stringify({ action: 'logout' }),
     });
     router.push('/admin');
+  };
+
+  const handleDelete = async (influencer: Influencer) => {
+    const confirmed = window.confirm(
+      `האם אתה בטוח שברצונך למחוק את @${influencer.username}?\n\n` +
+      'פעולה זו תמחק:\n' +
+      '• את כל נתוני הסריקה (פוסטים, תגובות, האשטגים)\n' +
+      '• את הפרסונה\n' +
+      '• את כל המוצרים והקופונים\n' +
+      '• את כל השיחות\n\n' +
+      'המחיקה היא לצמיתות ולא ניתן לשחזר!'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setLoading(true);
+      const res = await fetch(`/api/admin/influencers?id=${influencer.id}`, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        // Refresh list
+        await fetchInfluencers();
+      } else {
+        const error = await res.json();
+        alert(`שגיאה במחיקה: ${error.error || 'לא ידוע'}`);
+      }
+    } catch (error) {
+      console.error('Error deleting:', error);
+      alert('שגיאה במחיקה');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading) {
@@ -261,6 +296,13 @@ function DashboardContent() {
                     <Settings className="w-4 h-4" />
                     ניהול
                   </Link>
+                  <button
+                    onClick={() => handleDelete(influencer)}
+                    className="flex items-center justify-center gap-1 px-3 py-2 text-sm text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition-colors"
+                    title="מחק משפיען"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               </motion.div>
             ))}
