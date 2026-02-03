@@ -118,31 +118,59 @@ async function waitForRun(runId: string): Promise<ApifyRunResult> {
   const maxWaitTime = 5 * 60 * 1000; // 5 minutes
   const pollInterval = 3000; // 3 seconds
   const startTime = Date.now();
+  const maxRetries = 3;
 
   console.log('Waiting for run:', runId);
 
   while (Date.now() - startTime < maxWaitTime) {
-    const response = await fetch(
-      `https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_TOKEN}`
-    );
+    let lastError: Error | null = null;
+    
+    // Retry logic for temporary errors
+    for (let retry = 0; retry < maxRetries; retry++) {
+      try {
+        const response = await fetch(
+          `https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_TOKEN}`,
+          { signal: AbortSignal.timeout(15000) }
+        );
 
-    if (!response.ok) {
-      const errorBody = await response.text();
-      console.error('Wait for run error:', errorBody);
-      throw new Error(`Failed to check run status: ${response.status} ${response.statusText}`);
-    }
+        if (!response.ok) {
+          // Retry on 502/503 (Bad Gateway / Service Unavailable)
+          if (response.status === 502 || response.status === 503) {
+            throw new Error(`Apify API temporarily unavailable (${response.status})`);
+          }
+          
+          const errorBody = await response.text();
+          console.error('Wait for run error:', errorBody);
+          throw new Error(`Failed to check run status: ${response.status} ${response.statusText}`);
+        }
 
-    const result: ApifyRunResponse = await response.json();
-    const run = result.data;
+        const result: ApifyRunResponse = await response.json();
+        const run = result.data;
 
-    console.log('Run status:', run.status);
+        console.log('Run status:', run.status);
 
-    if (run.status === 'SUCCEEDED') {
-      return run;
-    }
+        if (run.status === 'SUCCEEDED') {
+          return run;
+        }
 
-    if (run.status === 'FAILED' || run.status === 'ABORTED') {
-      throw new Error(`Apify run ${run.status}`);
+        if (run.status === 'FAILED' || run.status === 'ABORTED') {
+          throw new Error(`Apify run ${run.status}`);
+        }
+
+        // Success - break retry loop
+        break;
+      } catch (error: any) {
+        lastError = error;
+        
+        if (retry === maxRetries - 1) {
+          console.error(`Failed after ${maxRetries} retries:`, error.message);
+          throw error;
+        }
+        
+        const retryWait = 2000 * (retry + 1);
+        console.warn(`Retry ${retry + 1}/${maxRetries} after ${retryWait}ms:`, error.message);
+        await new Promise((r) => setTimeout(r, retryWait));
+      }
     }
 
     await new Promise((r) => setTimeout(r, pollInterval));

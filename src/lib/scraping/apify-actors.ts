@@ -102,61 +102,117 @@ async function runApifyActor(
 
   const encodedActorId = actorId.replace('/', '~');
   const url = `https://api.apify.com/v2/acts/${encodedActorId}/runs?token=${APIFY_TOKEN}`;
+  const maxRetries = 3;
 
   console.log(`[Apify] Starting actor: ${actorId}`);
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
-  });
+  // Retry logic for starting the actor
+  for (let retry = 0; retry < maxRetries; retry++) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+        signal: AbortSignal.timeout(30000), // 30s timeout
+      });
 
-  if (!response.ok) {
-    const errorBody = await response.text();
-    console.error('[Apify] Error:', errorBody);
-    throw new Error(`Apify API error: ${response.status} ${response.statusText}`);
+      if (!response.ok) {
+        const errorBody = await response.text();
+        
+        // Retry on 502/503
+        if (response.status === 502 || response.status === 503) {
+          throw new Error(`Apify API temporarily unavailable (${response.status})`);
+        }
+        
+        console.error('[Apify] Error:', errorBody);
+        throw new Error(`Apify API error: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      const runId = result.data.id;
+
+      console.log(`[Apify] Run started: ${runId}`);
+
+      if (waitForFinish) {
+        return await waitForRun(runId);
+      }
+
+      return result.data;
+    } catch (error: any) {
+      if (retry === maxRetries - 1) {
+        console.error(`[Apify] Failed to start actor after ${maxRetries} retries:`, error.message);
+        throw error;
+      }
+      
+      const retryWait = 3000 * (retry + 1);
+      console.warn(`[Apify] Retry ${retry + 1}/${maxRetries} after ${retryWait}ms:`, error.message);
+      await new Promise((resolve) => setTimeout(resolve, retryWait));
+    }
   }
 
-  const result = await response.json();
-  const runId = result.data.id;
-
-  console.log(`[Apify] Run started: ${runId}`);
-
-  if (waitForFinish) {
-    return await waitForRun(runId);
-  }
-
-  return result.data;
+  throw new Error('Failed to start actor after retries');
 }
 
 async function waitForRun(runId: string, maxWaitTime: number = 10 * 60 * 1000): Promise<any> {
   const pollInterval = 5000; // 5 seconds
   const startTime = Date.now();
+  const maxRetries = 3;
 
   console.log(`[Apify] Waiting for run: ${runId} (max ${maxWaitTime/1000}s)`);
 
   while (Date.now() - startTime < maxWaitTime) {
-    const response = await fetch(
-      `https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_TOKEN}`
-    );
+    let lastError: Error | null = null;
+    
+    // Retry logic for temporary network errors
+    for (let retry = 0; retry < maxRetries; retry++) {
+      try {
+        const response = await fetch(
+          `https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_TOKEN}`,
+          { 
+            signal: AbortSignal.timeout(15000) // 15s timeout per request
+          }
+        );
 
-    if (!response.ok) {
-      throw new Error(`Failed to check run status: ${response.statusText}`);
-    }
+        if (!response.ok) {
+          // If it's a 502/503 (temporary), retry
+          if (response.status === 502 || response.status === 503) {
+            throw new Error(`Apify API temporarily unavailable (${response.status})`);
+          }
+          // Other errors - fail immediately
+          throw new Error(`Failed to check run status: ${response.status} ${response.statusText}`);
+        }
 
-    const result = await response.json();
-    const run = result.data;
-    const elapsed = Math.round((Date.now() - startTime) / 1000);
+        const result = await response.json();
+        const run = result.data;
+        const elapsed = Math.round((Date.now() - startTime) / 1000);
 
-    console.log(`[Apify] Status: ${run.status} (${elapsed}s elapsed)`);
+        console.log(`[Apify] Status: ${run.status} (${elapsed}s elapsed)`);
 
-    if (run.status === 'SUCCEEDED') {
-      console.log(`[Apify] Run completed successfully in ${elapsed}s`);
-      return run;
-    }
+        if (run.status === 'SUCCEEDED') {
+          console.log(`[Apify] Run completed successfully in ${elapsed}s`);
+          return run;
+        }
 
-    if (run.status === 'FAILED' || run.status === 'ABORTED') {
-      throw new Error(`Apify run ${run.status}`);
+        if (run.status === 'FAILED' || run.status === 'ABORTED') {
+          throw new Error(`Apify run ${run.status}`);
+        }
+
+        // Success - break out of retry loop
+        break;
+      } catch (error: any) {
+        lastError = error;
+        
+        // If it's the last retry, throw
+        if (retry === maxRetries - 1) {
+          console.error(`[Apify] Failed after ${maxRetries} retries:`, error.message);
+          throw error;
+        }
+        
+        // Otherwise, wait and retry
+        const retryWait = 2000 * (retry + 1); // 2s, 4s, 6s
+        console.warn(`[Apify] Retry ${retry + 1}/${maxRetries} after ${retryWait}ms:`, error.message);
+        await new Promise((resolve) => setTimeout(resolve, retryWait));
+      }
     }
 
     await new Promise((resolve) => setTimeout(resolve, pollInterval));
@@ -172,13 +228,37 @@ async function getDatasetItems<T>(datasetId: string, limit?: number): Promise<T[
     url += `&limit=${limit}`;
   }
 
-  const response = await fetch(url);
+  const maxRetries = 3;
 
-  if (!response.ok) {
-    throw new Error(`Failed to get dataset: ${response.statusText}`);
+  // Retry logic for fetching dataset
+  for (let retry = 0; retry < maxRetries; retry++) {
+    try {
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(30000), // 30s timeout
+      });
+
+      if (!response.ok) {
+        // Retry on 502/503
+        if (response.status === 502 || response.status === 503) {
+          throw new Error(`Apify API temporarily unavailable (${response.status})`);
+        }
+        throw new Error(`Failed to get dataset: ${response.status} ${response.statusText}`);
+      }
+
+      return response.json();
+    } catch (error: any) {
+      if (retry === maxRetries - 1) {
+        console.error(`[Apify] Failed to get dataset after ${maxRetries} retries:`, error.message);
+        throw error;
+      }
+      
+      const retryWait = 2000 * (retry + 1);
+      console.warn(`[Apify] Retry ${retry + 1}/${maxRetries} for dataset after ${retryWait}ms:`, error.message);
+      await new Promise((resolve) => setTimeout(resolve, retryWait));
+    }
   }
 
-  return response.json();
+  throw new Error('Failed to get dataset after retries');
 }
 
 function extractHashtags(text: string): string[] {
