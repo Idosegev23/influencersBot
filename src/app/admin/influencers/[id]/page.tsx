@@ -48,6 +48,8 @@ export default function AdminInfluencerEditPage({
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => {
     async function checkAuthAndLoad() {
@@ -128,16 +130,31 @@ export default function AdminInfluencerEditPage({
   const handleDelete = async () => {
     if (!influencer || deleteConfirmText !== influencer.username) return;
 
+    setDeleting(true);
+    setDeleteError('');
+
     try {
+      console.log('[Delete] Deleting influencer:', influencer.id);
+      
       const res = await fetch(`/api/admin/influencers?id=${influencer.id}`, {
         method: 'DELETE',
       });
 
+      console.log('[Delete] Response status:', res.status);
+
       if (res.ok) {
+        console.log('[Delete] Success! Redirecting...');
         router.push('/admin/dashboard?deleted=true');
+      } else {
+        const errorData = await res.json();
+        console.error('[Delete] Error response:', errorData);
+        setDeleteError(errorData.error || 'שגיאה במחיקה');
+        setDeleting(false);
       }
     } catch (error) {
-      console.error('Error deleting:', error);
+      console.error('[Delete] Exception:', error);
+      setDeleteError('שגיאת רשת - ודא שהשרת רץ');
+      setDeleting(false);
     }
   };
 
@@ -401,21 +418,37 @@ export default function AdminInfluencerEditPage({
                 placeholder={influencer.username}
                 className="w-full px-4 py-3 bg-gray-700/50 border border-red-500/50 rounded-xl text-white focus:border-red-500 outline-none"
               />
+              {deleteError && (
+                <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+                  {deleteError}
+                </div>
+              )}
               <div className="flex gap-3">
                 <button
                   onClick={handleDelete}
-                  disabled={deleteConfirmText !== influencer.username}
+                  disabled={deleteConfirmText !== influencer.username || deleting}
                   className="flex-1 py-3 bg-red-500 hover:bg-red-400 text-white font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  <Trash2 className="w-5 h-5" />
-                  מחיקה סופית
+                  {deleting ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      מוחק...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-5 h-5" />
+                      מחיקה סופית
+                    </>
+                  )}
                 </button>
                 <button
                   onClick={() => {
                     setShowDeleteConfirm(false);
                     setDeleteConfirmText('');
+                    setDeleteError('');
                   }}
-                  className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-xl transition-colors"
+                  disabled={deleting}
+                  className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-xl transition-colors disabled:opacity-50"
                 >
                   ביטול
                 </button>
