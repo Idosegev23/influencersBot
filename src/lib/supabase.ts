@@ -529,9 +529,22 @@ export interface Brand {
  * Kept for backward compatibility
  */
 export async function getBrandsByInfluencer(influencerId: string): Promise<Brand[]> {
-  // Map partnerships to old Brand format
+  // Get account_id(s) for this influencer
+  const { data: accounts, error: accountError } = await supabase
+    .from('accounts')
+    .select('id')
+    .eq('legacy_influencer_id', influencerId);
+
+  if (accountError || !accounts || accounts.length === 0) {
+    console.error('Error fetching accounts for influencer:', accountError);
+    return [];
+  }
+
+  const accountIds = accounts.map(a => a.id);
+
+  // 1. Get partnerships-based brands
   const partnerships = await getPartnershipsByInfluencer(influencerId);
-  return partnerships.map(p => ({
+  const partnershipBrands = partnerships.map(p => ({
     id: p.id,
     influencer_id: influencerId,
     brand_name: p.brand_name,
@@ -545,6 +558,38 @@ export async function getBrandsByInfluencer(influencerId: string): Promise<Brand
     created_at: p.created_at,
     updated_at: p.updated_at,
   }));
+
+  // 2. Get standalone coupons (without partnership)
+  const { data: standaloneCoupons, error: couponsError } = await supabase
+    .from('coupons')
+    .select('*')
+    .in('account_id', accountIds)
+    .is('partnership_id', null)
+    .eq('is_active', true)
+    .order('created_at', { ascending: false });
+
+  if (couponsError) {
+    console.error('Error fetching standalone coupons:', couponsError);
+  }
+
+  // 3. Map standalone coupons to Brand format
+  const standaloneBrands: Brand[] = (standaloneCoupons || []).map(c => ({
+    id: c.id,
+    influencer_id: influencerId,
+    brand_name: c.brand_name || 'מותג',
+    description: c.description,
+    coupon_code: c.code,
+    link: c.brand_link || c.tracking_url,
+    short_link: null,
+    category: c.brand_category,
+    whatsapp_phone: null,
+    is_active: c.is_active || false,
+    created_at: c.created_at,
+    updated_at: c.updated_at,
+  }));
+
+  // 4. Combine and return
+  return [...partnershipBrands, ...standaloneBrands];
 }
 
 /**
