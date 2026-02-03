@@ -147,10 +147,13 @@ export async function chatWithGemini(input: {
     parts: [{ text: msg.text }],
   })) || [];
 
-  // Start chat
+  // Start chat with properly formatted system instruction
   const chat = model.startChat({
     history,
-    systemInstruction: systemInstructions,
+    systemInstruction: {
+      role: 'system',
+      parts: [{ text: systemInstructions }],
+    },
   });
 
   // Send message with context
@@ -190,10 +193,13 @@ export async function streamChatWithGemini(input: {
     parts: [{ text: msg.text }],
   })) || [];
 
-  // Start chat
+  // Start chat with properly formatted system instruction
   const chat = model.startChat({
     history,
-    systemInstruction: systemInstructions,
+    systemInstruction: {
+      role: 'system',
+      parts: [{ text: systemInstructions }],
+    },
   });
 
   // Send message with context
@@ -365,9 +371,11 @@ function buildSystemInstructions(persona: any): string {
   }
 
   // Final rules
+  const personaName = persona.name || 'המשפיען';
+  
   instructions.push(`\n\n⚡ כללים כלליים:
-- **חשוב מאוד (דרישה חוקית):** תמיד גלה בהתחלה שאתה הבוט/עוזר הדיגיטלי של ${persona.name || 'המשפיען'}, אבל תעשה את זה בצורה חמה ונעימה בשפה שלו/ה
-- דבר/י תמיד בגוף ראשון כאילו אתה נציג/ה של ${persona.name}
+- **חשוב מאוד (דרישה חוקית):** תמיד גלה בהתחלה שאתה הבוט/עוזר הדיגיטלי של ${personaName}, אבל תעשה את זה בצורה חמה ונעימה בשפה שלו/ה
+- דבר/י תמיד בגוף ראשון כאילו אתה נציג/ה של ${personaName}
 - אם יש מידע בהקשר (מוצרים, שת"פים, קופונים) - השתמש בו!
 - תהיה/י עוזר/ת ושימושי/ת, לא רק small talk
 
@@ -383,9 +391,9 @@ function buildSystemInstructions(persona: any): string {
 - אם השאלה על מקום/חוויה שהוזכר בביו - אז כן תשתמש בזה! אבל אל תוסיף פרטים שלא נאמרו
 
 דוגמאות לגילוי שאתה בוט בצורה נעימה:
-✅ "היי! אני הבוט של ${persona.name || 'המשפיען'} 😊 אני כאן כדי לעזור לך..."
-✅ "שלום! אני העוזר הדיגיטלי של ${persona.name || 'המשפיען'}, איך אפשר לעזור?"
-✅ "ברוכים הבאים! ${persona.name || 'המשפיען'} יצרה אותי כדי לעזור לך עם..."
+✅ "היי! אני הבוט של ${personaName} 😊 אני כאן כדי לעזור לך..."
+✅ "שלום! אני העוזר הדיגיטלי של ${personaName}, איך אפשר לעזור?"
+✅ "ברוכים הבאים! ${personaName} יצרה אותי כדי לעזור לך עם..."
 
 ❌ לא: "אני מערכת AI" (קר מדי)
 ❌ לא: "אני רובוט אוטומטי" (לא נעים)
