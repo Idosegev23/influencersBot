@@ -24,10 +24,15 @@ export const maxDuration = 600;
 
 export async function POST(request: Request) {
   const startTime = Date.now();
+  
+  // Parse body once and keep variables in scope for catch block
+  let jobId: string | undefined;
+  let step: number | undefined;
 
   try {
     const body = await request.json();
-    const { jobId, step } = body;
+    jobId = body.jobId;
+    step = body.step;
 
     // Check authentication (admin or influencer)
     const isAdmin = await checkAdminAuth();
@@ -163,11 +168,8 @@ export async function POST(request: Request) {
     const duration = Math.round((Date.now() - startTime) / 1000);
     console.error('[Scraping Step] Error:', error);
 
-    // Try to update job with error
+    // Try to update job with error (using variables from outer scope)
     try {
-      const body = await request.json();
-      const { jobId, step } = body;
-      
       if (jobId && step) {
         const supabase = await createClient();
         await updateStepStatus(supabase, jobId, step, 'failed', null, error.message);
@@ -319,23 +321,17 @@ async function runStep2_Comments(supabase: any, accountId: string, username: str
 
   const validComments = commentsToInsert.filter(c => c !== null);
 
-  // Delete old comments and insert new ones
-  const { error: deleteError } = await supabase
+  // Upsert comments (update if exists, insert if new)
+  const { error: upsertError } = await supabase
     .from('instagram_comments')
-    .delete()
-    .eq('account_id', accountId);
+    .upsert(validComments, {
+      onConflict: 'post_id,comment_id',
+      ignoreDuplicates: false // Update existing records
+    });
 
-  if (deleteError) {
-    console.error('[Step 2] Error deleting old comments:', deleteError);
-  }
-
-  const { error: insertError } = await supabase
-    .from('instagram_comments')
-    .insert(validComments);
-
-  if (insertError) {
-    console.error('[Step 2] Error inserting comments:', insertError);
-    throw new Error(`Failed to save comments: ${insertError.message}`);
+  if (upsertError) {
+    console.error('[Step 2] Error upserting comments:', upsertError);
+    throw new Error(`Failed to save comments: ${upsertError.message}`);
   }
 
   console.log(`[Step 2] Saved ${validComments.length} comments successfully`);
