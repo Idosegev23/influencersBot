@@ -321,10 +321,20 @@ async function runStep2_Comments(supabase: any, accountId: string, username: str
 
   const validComments = commentsToInsert.filter(c => c !== null);
 
+  // Remove duplicates within the batch (same post_id + comment_id)
+  // This prevents "ON CONFLICT DO UPDATE command cannot affect row a second time" error
+  const uniqueComments = Array.from(
+    new Map(
+      validComments.map(c => [`${c.post_id}_${c.comment_id}`, c])
+    ).values()
+  );
+
+  console.log(`[Step 2] Filtered ${validComments.length} comments to ${uniqueComments.length} unique comments`);
+
   // Upsert comments (update if exists, insert if new)
   const { error: upsertError } = await supabase
     .from('instagram_comments')
-    .upsert(validComments, {
+    .upsert(uniqueComments, {
       onConflict: 'post_id,comment_id',
       ignoreDuplicates: false // Update existing records
     });
@@ -334,15 +344,15 @@ async function runStep2_Comments(supabase: any, accountId: string, username: str
     throw new Error(`Failed to save comments: ${upsertError.message}`);
   }
 
-  console.log(`[Step 2] Saved ${validComments.length} comments successfully`);
+  console.log(`[Step 2] Saved ${uniqueComments.length} comments successfully`);
 
-  const ownerReplies = validComments.filter(c => c?.is_owner_reply).length;
+  const ownerReplies = uniqueComments.filter(c => c?.is_owner_reply).length;
 
   return {
-    commentsCount: validComments.length,
+    commentsCount: uniqueComments.length,
     postsWithComments: selectedUrls.length,
     ownerReplies,
-    ownerReplyRatio: Math.round((ownerReplies / validComments.length) * 100),
+    ownerReplyRatio: uniqueComments.length > 0 ? Math.round((ownerReplies / uniqueComments.length) * 100) : 0,
   };
 }
 
