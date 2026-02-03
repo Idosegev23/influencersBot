@@ -14,7 +14,7 @@
  */
 
 import { NextRequest } from 'next/server';
-import { streamChat, buildInfluencerInstructions } from '@/lib/openai';
+import { streamChatWithGemini } from '@/lib/gemini-chat';
 import { 
   createChatSession, 
   saveChatMessage,
@@ -402,9 +402,9 @@ export async function POST(req: NextRequest) {
           controller.enqueue(encodeEvent(cardsEvent));
         }
 
-        // === BUILD CONTEXT & STREAM OPENAI ===
+        // === BUILD CONTEXT & STREAM WITH GEMINI ===
         let contextStr = '';
-        if (brands.length > 0) {
+        if (brands && brands.length > 0) {
           contextStr += '## מותגים ושיתופי פעולה:\n';
           brands.forEach((b) => {
             contextStr += `- ${b.brand_name}`;
@@ -415,7 +415,7 @@ export async function POST(req: NextRequest) {
           });
         }
 
-        if (content.length > 0) {
+        if (content && content.length > 0) {
           const contentSlice = content.slice(0, 10);
           contextStr += '\n## תוכן אחרון:\n';
           contentSlice.forEach((c) => {
@@ -423,33 +423,34 @@ export async function POST(req: NextRequest) {
           });
         }
 
-        const instructions = buildInfluencerInstructions(
-          influencer.display_name,
-          influencer.persona || {} as any,
-          influencer.influencer_type,
-          contextStr
-        );
+        // Build persona object safely
+        const persona = influencer.persona || {
+          name: influencer.display_name,
+          voiceAndTone: 'חמה וידידותית',
+          interests: [],
+          directives: [],
+        };
 
-        // Stream from OpenAI
+        // Stream from Gemini Flash Preview
         let fullText = '';
         let responseId: string | null = null;
         let tokenInfo = { input: 0, output: 0 };
 
         try {
-          const streamResult = await streamChat({
+          const streamResult = await streamChatWithGemini({
             message,
-            instructions,
-            previousResponseId: previousResponseId || undefined,
+            persona,
+            context: contextStr,
+            conversationHistory: [], // TODO: Load from DB if needed
             onDelta: (delta) => {
               fullText += delta;
               controller.enqueue(encodeEvent({ type: 'delta', text: delta }));
             },
           });
 
-          responseId = streamResult.responseId;
-          tokenInfo = streamResult.tokens || { input: 0, output: 0 };
-        } catch (openaiError: any) {
-          console.error('[Stream] OpenAI error:', openaiError);
+          tokenInfo = streamResult.usage || { input: 0, output: 0 };
+        } catch (geminiError: any) {
+          console.error('[Stream] Gemini error:', geminiError);
           // Fallback response
           fullText = 'מצטער, משהו השתבש. נסה שוב!';
           controller.enqueue(encodeEvent({ type: 'delta', text: fullText }));

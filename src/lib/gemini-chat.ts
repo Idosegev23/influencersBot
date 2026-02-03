@@ -169,6 +169,60 @@ export async function chatWithGemini(input: {
 }
 
 /**
+ * Stream chat with Gemini 3 Flash (for real-time responses)
+ */
+export async function streamChatWithGemini(input: {
+  message: string;
+  persona: any;
+  context: string;
+  conversationHistory?: Array<{ role: 'user' | 'model'; text: string }>;
+  onDelta: (text: string) => void;
+}) {
+  const model = genAI.getGenerativeModel({ model: GEMINI_MODELS.CHAT_RESPONSES });
+
+  // Build system instructions from persona
+  const systemInstructions = buildSystemInstructions(input.persona);
+
+  // Build chat history
+  const history = input.conversationHistory?.map(msg => ({
+    role: msg.role,
+    parts: [{ text: msg.text }],
+  })) || [];
+
+  // Start chat
+  const chat = model.startChat({
+    history,
+    systemInstruction: systemInstructions,
+  });
+
+  // Send message with context
+  const fullMessage = `${input.context ? `\n\n[הקשר זמין:\n${input.context}\n]\n\n` : ''}${input.message}`;
+  
+  const result = await chat.sendMessageStream(fullMessage);
+  
+  let fullText = '';
+  
+  // Stream response
+  for await (const chunk of result.stream) {
+    const chunkText = chunk.text();
+    fullText += chunkText;
+    input.onDelta(chunkText);
+  }
+  
+  // Get final usage stats
+  const finalResponse = await result.response;
+  
+  return {
+    text: fullText,
+    usage: {
+      promptTokens: finalResponse.usageMetadata?.promptTokenCount || 0,
+      completionTokens: finalResponse.usageMetadata?.candidatesTokenCount || 0,
+      totalTokens: finalResponse.usageMetadata?.totalTokenCount || 0,
+    },
+  };
+}
+
+/**
  * Build system instructions from persona
  * Enhanced to use new structure: voice_rules, knowledge_map, boundaries, response_policy
  */

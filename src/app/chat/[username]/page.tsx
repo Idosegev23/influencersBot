@@ -609,10 +609,10 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
               </div>
               <div>
                 <h1 className="font-semibold text-base" style={{ color: 'var(--color-text)' }}>
-                  העוזר של {influencer.display_name.split(' ')[0]}
+                  {influencer.display_name}
                 </h1>
                 <p className="text-xs" style={{ color: 'var(--color-text)', opacity: 0.6 }}>
-                  {typeLabels[influencer.influencer_type]}
+                  💬 הבוט האישי | {typeLabels[influencer.influencer_type]}
                 </p>
               </div>
             </div>
