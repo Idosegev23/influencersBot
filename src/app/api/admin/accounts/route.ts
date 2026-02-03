@@ -34,7 +34,23 @@ export async function POST(request: Request) {
 
     const supabase = await createClient();
 
-    // Create account
+    // First, check if account with this username already exists
+    const { data: existingAccount } = await supabase
+      .from('accounts')
+      .select('id, config')
+      .eq('config->>username', username)
+      .maybeSingle();
+
+    if (existingAccount) {
+      console.log(`[Accounts] Account with username @${username} already exists, returning existing ID`);
+      return NextResponse.json({
+        success: true,
+        accountId: existingAccount.id,
+        existed: true,
+      });
+    }
+
+    // Create account only if it doesn't exist
     // Note: type must be 'creator' or 'brand' per DB constraint
     const accountType = type === 'influencer' ? 'creator' : type;
     
@@ -66,10 +82,12 @@ export async function POST(request: Request) {
     if (accountError || !account) {
       console.error('Error creating account:', accountError);
       return NextResponse.json(
-        { error: 'Failed to create account' },
+        { error: 'Failed to create account', details: accountError?.message },
         { status: 500 }
       );
     }
+
+    console.log(`[Accounts] Created new account for @${username}, ID: ${account.id}`);
 
     return NextResponse.json({
       success: true,

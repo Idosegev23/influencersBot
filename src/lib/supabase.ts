@@ -176,6 +176,18 @@ export async function getAllInfluencers(): Promise<Influencer[]> {
 }
 
 export async function createInfluencer(influencer: Omit<Influencer, 'id' | 'created_at' | 'updated_at'>): Promise<Influencer | null> {
+  // Check if influencer with this username already exists
+  const { data: existingInfluencer } = await supabase
+    .from('influencers')
+    .select('id')
+    .eq('username', influencer.username)
+    .maybeSingle();
+
+  if (existingInfluencer) {
+    console.log(`[createInfluencer] Influencer @${influencer.username} already exists, returning existing`);
+    return await getInfluencerByUsername(influencer.username);
+  }
+
   // Step 1: Create legacy influencer record
   const { data, error } = await supabase
     .from('influencers')
@@ -188,9 +200,18 @@ export async function createInfluencer(influencer: Omit<Influencer, 'id' | 'crea
     return null;
   }
 
-  // Step 2: Create corresponding account record
-  if (data) {
-    const { data: accountData, error: accountError } = await supabase
+  // Step 2: Check if account already exists for this username
+  const { data: existingAccount } = await supabase
+    .from('accounts')
+    .select('id')
+    .eq('config->>username', influencer.username)
+    .maybeSingle();
+
+  let accountData = existingAccount;
+
+  // Step 3: Create account only if doesn't exist
+  if (!existingAccount && data) {
+    const { data: newAccount, error: accountError } = await supabase
       .from('accounts')
       .insert({
         type: 'creator', // Must be 'creator' or 'brand' per DB constraint
@@ -220,7 +241,20 @@ export async function createInfluencer(influencer: Omit<Influencer, 'id' | 'crea
     if (accountError) {
       console.error('Error creating account:', accountError);
       // Don't fail the whole operation, just log the error
-    } else if (accountData) {
+    } else {
+      accountData = newAccount;
+      console.log(`[createInfluencer] Created new account for @${influencer.username}, ID: ${newAccount.id}`);
+    }
+  } else if (existingAccount) {
+    console.log(`[createInfluencer] Using existing account for @${influencer.username}, ID: ${existingAccount.id}`);
+    // Update the legacy_influencer_id if needed
+    await supabase
+      .from('accounts')
+      .update({ legacy_influencer_id: data.id })
+      .eq('id', existingAccount.id);
+  }
+
+  if (accountData) {
       // Step 3: Create initial chatbot persona
       const { error: personaError } = await supabase
         .from('chatbot_persona')
@@ -255,7 +289,6 @@ export async function createInfluencer(influencer: Omit<Influencer, 'id' | 'crea
         console.error('Error creating chatbot persona:', personaError);
         // Don't fail the whole operation
       }
-    }
   }
 
   return data;
