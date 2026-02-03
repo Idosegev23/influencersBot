@@ -277,17 +277,17 @@ async function runStep2_Comments(supabase: any, accountId: string, username: str
     throw new Error('No posts found. Please run step 1 first.');
   }
 
-  // Select top 50 posts (30 top + 20 random)
+  // Select top 30 posts (20 top + 10 random)
   const selectedUrls = selectTopPostsForComments(
     posts.map(p => ({ ...p, post_url: p.post_url })),
-    30,
-    20
+    20,
+    10
   );
 
   console.log(`[Step 2] Selected ${selectedUrls.length} posts for comment scraping`);
 
   const manager = new InstagramActorManager(username);
-  const comments = await manager.scrapeComments(selectedUrls, 50);
+  const comments = await manager.scrapeComments(selectedUrls, 20);
 
   console.log(`[Step 2] Scraped ${comments.length} comments, saving to database...`);
 

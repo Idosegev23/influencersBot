@@ -327,7 +327,7 @@ export class InstagramActorManager {
    * Actor 2: Instagram Comments Scraper
    * שולף תגובות מפוסטים מסוימים (עד 50 למעלה לכל פוסט)
    */
-  async scrapeComments(postUrls: string[], commentsPerPost: number = 50): Promise<CommentData[]> {
+  async scrapeComments(postUrls: string[], commentsPerPost: number = 20): Promise<CommentData[]> {
     console.log(`[Actor 2] Starting comments scrape for ${postUrls.length} posts (${commentsPerPost} per post)`);
 
     const run = await runApifyActor(ACTORS.INSTAGRAM_COMMENT_SCRAPER, {
