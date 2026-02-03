@@ -573,6 +573,19 @@ export interface Partnership {
 }
 
 export async function getPartnershipsByInfluencer(influencerId: string): Promise<Partnership[]> {
+  // First, get the account_id(s) for this influencer
+  const { data: accounts, error: accountError } = await supabase
+    .from('accounts')
+    .select('id')
+    .eq('legacy_influencer_id', influencerId);
+
+  if (accountError || !accounts || accounts.length === 0) {
+    console.error('Error fetching accounts for influencer:', accountError);
+    return [];
+  }
+
+  const accountIds = accounts.map(a => a.id);
+
   const { data, error } = await supabase
     .from('partnerships')
     .select(`
@@ -586,7 +599,7 @@ export async function getPartnershipsByInfluencer(influencerId: string): Promise
         is_active
       )
     `)
-    .eq('account_id', influencerId)
+    .in('account_id', accountIds)
     .order('brand_name', { ascending: true });
 
   if (error) {
