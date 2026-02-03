@@ -192,6 +192,8 @@ export default function AddInfluencerPage() {
     setState((prev) => ({ ...prev, isLoading: true }));
 
     try {
+      const username = state.username;
+
       // Delete job if exists
       if (existingJob) {
         await fetch(`/api/scraping/cancel?jobId=${existingJob.id}`, { method: 'DELETE' });
@@ -200,30 +202,65 @@ export default function AddInfluencerPage() {
       // Delete account
       await fetch(`/api/admin/accounts/${existingAccount.id}`, { method: 'DELETE' });
       
-      console.log(`[Delete] Deleted account and job, restarting...`);
+      console.log(`[Delete] Deleted account and job, starting fresh...`);
       
-      // Reset and restart
+      // Wait a bit for deletion to complete
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Create new account
+      const accountRes = await fetch('/api/admin/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username,
+          type: 'influencer',
+        }),
+      });
+
+      if (!accountRes.ok) {
+        const error = await accountRes.json();
+        throw new Error(error.error || 'Failed to create account');
+      }
+
+      const { accountId } = await accountRes.json();
+
+      // Start scraping job
+      const scrapingRes = await fetch('/api/scraping/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username,
+          accountId,
+        }),
+      });
+
+      if (!scrapingRes.ok) {
+        const error = await scrapingRes.json();
+        throw new Error(error.error || 'Failed to start scraping');
+      }
+
+      const { jobId } = await scrapingRes.json();
+
       setState((prev) => ({
         ...prev,
+        jobId,
+        accountId,
+        step: 'scraping',
+        isLoading: false,
+        existingAccount: undefined,
+        existingJob: undefined,
+      }));
+
+      // Start executing steps automatically
+      executeNextStep(jobId, 1);
+    } catch (error: any) {
+      setState((prev) => ({
+        ...prev,
+        error: error.message || 'שגיאה במחיקת החשבון',
         isLoading: false,
         step: 'username',
         existingAccount: undefined,
         existingJob: undefined,
-      }));
-      
-      // Auto-submit after deletion
-      setTimeout(() => {
-        const form = document.querySelector('form');
-        if (form) {
-          form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
-        }
-      }, 500);
-    } catch (error: any) {
-      setState((prev) => ({
-        ...prev,
-        error: 'שגיאה במחיקת החשבון',
-        isLoading: false,
-        step: 'username',
       }));
     }
   };
