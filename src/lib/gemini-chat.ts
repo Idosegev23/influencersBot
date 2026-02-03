@@ -1,7 +1,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Initialize Gemini
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY || '');
+// Initialize Gemini - support both env var names
+const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY || '';
+const genAI = new GoogleGenerativeAI(GEMINI_KEY);
 
 // Models configuration
 export const GEMINI_MODELS = {

@@ -150,8 +150,12 @@ export async function runBackgroundScrape(
     
     console.log(`📝 [${username}] Prompt length: ${captions.length} characters`);
 
-    // Analyze with Gemini
-    const genAI = new GoogleGenAI(process.env.GOOGLE_GEMINI_API_KEY!);
+    // Analyze with Gemini - support both env var names
+    const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
+    if (!GEMINI_KEY) {
+      throw new Error('GEMINI_API_KEY or GOOGLE_GEMINI_API_KEY is required');
+    }
+    const genAI = new GoogleGenAI(GEMINI_KEY);
     
     const prompt = `IMPORTANT: You MUST respond with ONLY valid JSON. No text before or after the JSON. No explanations. No markdown.
 
