@@ -69,8 +69,8 @@ export interface WrappedResponse {
 export const DEFAULT_PERSONALITY: PersonalityConfig = {
   narrativePerspective: 'sidekick-professional',
   sassLevel: 5,
-  lifeContextInjection: true,
-  storytellingMode: 'balanced',
+  lifeContextInjection: false, // ⚡ Disabled to avoid fluff
+  storytellingMode: 'concise', // ⚡ Changed to concise
   slangMap: {
     'amazing': 'מדהים',
     'love': 'אוהבת',
@@ -78,7 +78,7 @@ export const DEFAULT_PERSONALITY: PersonalityConfig = {
     'favorite': 'האהובה',
     'always': 'תמיד',
   },
-  emojiUsage: 'moderate',
+  emojiUsage: 'minimal', // ⚡ Changed to minimal
   emojiTypes: ['✨', '💕', '🌟', '👌', '💪', '🔥'],
   messageStructure: 'whatsapp',
   commonPhrases: [
