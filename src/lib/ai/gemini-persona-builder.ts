@@ -207,7 +207,7 @@ export async function buildPersonaWithGemini(
   // Initialize Gemini
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
   const model = genAI.getGenerativeModel({ 
-    model: 'gemini-3-pro-preview, // Gemini 3 Pro (no version date needed)
+    model: 'gemini-3-pro-preview', // Gemini 3 Pro (no version date needed)
     generationConfig: {
       temperature: 0.3, // Lower temperature for more consistent output
       topK: 40,

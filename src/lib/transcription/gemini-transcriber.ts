@@ -158,7 +158,7 @@ export async function transcribeVideo(
     
     // Call Gemini with video
     const response = await genAI.models.generateContent({
-      model: 'gemini-3-flash-preview, // ⚡ Gemini 3 Flash Preview (1M context, cheap!)
+      model: 'gemini-3-flash-preview', // ⚡ Gemini 3 Flash Preview (1M context, cheap!)
       contents: [
         {
           parts: [
@@ -260,7 +260,7 @@ export async function saveTranscription(
         video_duration: input.video_duration,
         processing_status: 'failed',
         error_message: output.error,
-        gemini_model_used: 'gemini-3-flash-preview,
+        gemini_model_used: 'gemini-3-flash-preview',
       }, {
         onConflict: 'source_type,source_id',
       })
@@ -288,7 +288,7 @@ export async function saveTranscription(
       language: output.transcription.language,
       on_screen_text: output.transcription.on_screen_text,
       speakers: output.transcription.speakers,
-      gemini_model_used: 'gemini-3-flash-preview,
+      gemini_model_used: 'gemini-3-flash-preview',
       processing_status: 'completed',
       tokens_used: output.tokens_used,
       processing_cost: output.processing_cost,

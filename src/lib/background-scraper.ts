@@ -184,7 +184,7 @@ Example response:
       const startTime = Date.now();
       
       const response = await genAI.models.generateContent({
-        model: 'gemini-3-pro-preview,
+        model: 'gemini-3-pro-preview',
         contents: prompt,
         config: {
           thinkingConfig: {
