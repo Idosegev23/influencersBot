@@ -133,12 +133,13 @@ export async function loadInfluencerProfileCached(
   const result = await cacheWrap(
     key,
     async () => {
+      // ⚡ Updated to use accounts table
       const { data } = await supabase
-        .from('influencers')
+        .from('accounts')
         .select('*')
         .eq('id', influencerId)
         .single();
-      return data as Influencer | null;
+      return data as any;
     },
     {
       ttlMs: CacheTTL.INFLUENCER_PROFILE,

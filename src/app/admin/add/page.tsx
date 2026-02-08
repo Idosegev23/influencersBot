@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { ArrowRight, Zap, Instagram, User, Lock, Phone } from 'lucide-react';
 
-type WizardStep = 'username' | 'scraping' | 'settings' | 'complete' | 'resume-choice';
+type WizardStep = 'username' | 'scraping' | 'processing' | 'settings' | 'complete' | 'resume-choice';
 
 interface WizardState {
   step: WizardStep;
@@ -14,6 +14,7 @@ interface WizardState {
   jobId: string | null;
   accountId: string | null;
   scrapingComplete: boolean;
+  processingComplete: boolean;
   subdomain: string;
   password: string;
   phoneNumber: string;
@@ -35,6 +36,7 @@ export default function AddInfluencerPage() {
     jobId: null,
     accountId: null,
     scrapingComplete: false,
+    processingComplete: false,
     subdomain: '',
     password: '',
     phoneNumber: '',
@@ -45,6 +47,12 @@ export default function AddInfluencerPage() {
 
   // Polling for scraping progress
   const [jobStatus, setJobStatus] = useState<any>(null);
+  
+  // Processing status
+  const [processingStatus, setProcessingStatus] = useState<any>(null);
+  
+  // Transcription progress (NEW!)
+  const [transcriptionProgress, setTranscriptionProgress] = useState<any>(null);
 
   useEffect(() => {
     fetch('/api/admin')
@@ -76,28 +84,81 @@ export default function AddInfluencerPage() {
     };
   }, [state.step, state.jobId]);
 
-  // Poll job status when in scraping step
+  // Poll processing status when in processing step
+  useEffect(() => {
+    if (state.step !== 'processing' || !state.accountId) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/process/status?accountId=${state.accountId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setProcessingStatus(data.status);
+
+          // Check if persona is built
+          if (data.status?.hasPersona) {
+            console.log('[Processing] Persona built successfully!');
+            setState((prev) => ({
+              ...prev,
+              processingComplete: true,
+              step: 'settings',
+            }));
+            clearInterval(interval);
+          }
+        }
+      } catch (error) {
+        console.error('[Processing] Failed to get status:', error);
+      }
+    }, 3000); // Poll every 3 seconds
+
+    return () => clearInterval(interval);
+  }, [state.step, state.accountId]);
+
+  // ⚡ NEW: Poll transcription progress when in processing step
+  useEffect(() => {
+    if (state.step !== 'processing' || !state.accountId) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/transcribe/progress?accountId=${state.accountId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success) {
+            setTranscriptionProgress(data.progress);
+          }
+        }
+      } catch (error) {
+        console.error('[Transcription] Failed to get progress:', error);
+      }
+    }, 2000); // Poll every 2 seconds
+
+    return () => clearInterval(interval);
+  }, [state.step, state.accountId]);
+
+  // Poll job status when in scraping step (NEW SYSTEM)
   useEffect(() => {
     if (state.step !== 'scraping' || !state.jobId) return;
 
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/scraping/status?jobId=${state.jobId}`);
+        const res = await fetch(`/api/scan/status?jobId=${state.jobId}`);
         if (res.ok) {
           const data = await res.json();
           setJobStatus(data);
 
-          if (data.status === 'completed') {
+          if (data.status === 'succeeded') {
             setState((prev) => ({
               ...prev,
               scrapingComplete: true,
-              step: 'settings',
+              step: 'processing', // ⚡ Move to processing step
             }));
             clearInterval(interval);
+            
+            // ⚡ REMOVED: startContentProcessing() - orchestrator handles this automatically!
           } else if (data.status === 'failed') {
             setState((prev) => ({
               ...prev,
-              error: data.error || 'Scraping failed',
+              error: data.error_message || 'Scraping failed',
               step: 'username',
               isLoading: false,
             }));
@@ -107,7 +168,7 @@ export default function AddInfluencerPage() {
       } catch (error) {
         console.error('Error polling status:', error);
       }
-    }, 5000); // Poll every 5 seconds (reduced from 2s to avoid rate limiting)
+    }, 5000); // Poll every 5 seconds
 
     return () => clearInterval(interval);
   }, [state.step, state.jobId]);
@@ -121,13 +182,32 @@ export default function AddInfluencerPage() {
     setState((prev) => ({ ...prev, isLoading: true }));
 
     try {
-      const hasActiveJob = existingJob && (existingJob.status === 'running' || existingJob.status === 'pending' || existingJob.status === 'failed');
+      // Check if scan already completed successfully
+      const scanCompleted = existingJob && existingJob.status === 'succeeded';
+      
+      if (scanCompleted) {
+        // ✅ Scan already completed - processing runs automatically by orchestrator!
+        console.log(`[Resume] Scan already completed - orchestrator handles processing automatically for account ${existingAccount.id}`);
+        
+        setState((prev) => ({
+          ...prev,
+          accountId: existingAccount.id,
+          jobId: existingJob.id,
+          scrapingComplete: true,
+          step: 'processing', // ⚡ Go to processing step!
+          isLoading: false,
+        }));
+        
+        // ⚡ REMOVED: startContentProcessing(existingAccount.id);
+        // Processing is handled by newScanOrchestrator automatically to avoid duplicate runs!
+        return;
+      }
+
+      const hasActiveJob = existingJob && (existingJob.status === 'running' || existingJob.status === 'pending');
 
       if (hasActiveJob) {
         // Resume from existing job
-        const nextStep = existingJob.status === 'failed' 
-          ? (existingJob.error_step || existingJob.current_step) // Retry failed step
-          : existingJob.current_step + 1; // Continue from next step
+        const nextStep = existingJob.current_step + 1; // Continue from next step
         
         console.log(`[Resume] Continuing job ${existingJob.id} from step ${nextStep}`);
         
@@ -139,20 +219,18 @@ export default function AddInfluencerPage() {
           isLoading: false,
         }));
         
-        // Resume from the appropriate step
-        if (nextStep <= 7) {
-          executeNextStep(existingJob.id, nextStep);
-        }
+        // NEW: Scan continues automatically
       } else {
-        // No active job - start new one with existing account
+        // Job failed or doesn't exist - start new scan
         console.log(`[Resume] Starting new job for existing account ${existingAccount.id}`);
         
-        const scrapingRes = await fetch('/api/scraping/start', {
+        const scrapingRes = await fetch('/api/scan/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             username: state.username,
             accountId: existingAccount.id,
+            force: true, // ⚡ עקוף TTL check
           }),
         });
 
@@ -161,17 +239,17 @@ export default function AddInfluencerPage() {
           throw new Error(error.error || 'Failed to start scraping');
         }
 
-        const { jobId } = await scrapingRes.json();
+      const { jobId } = await scrapingRes.json();
 
-        setState((prev) => ({
-          ...prev,
-          accountId: existingAccount.id,
-          jobId,
-          step: 'scraping',
-          isLoading: false,
-        }));
+      setState((prev) => ({
+        ...prev,
+        accountId: existingAccount.id,
+        jobId,
+        step: 'scraping',
+        isLoading: false,
+      }));
         
-        executeNextStep(jobId, 1);
+        // NEW: Scan starts automatically when created!
       }
     } catch (error: any) {
       setState((prev) => ({
@@ -194,9 +272,9 @@ export default function AddInfluencerPage() {
     try {
       const username = state.username;
 
-      // Delete job if exists
+      // Delete job if exists (NEW SYSTEM - jobs are in scan_jobs table)
       if (existingJob) {
-        await fetch(`/api/scraping/cancel?jobId=${existingJob.id}`, { method: 'DELETE' });
+        await fetch(`/api/scan/status?jobId=${existingJob.id}`, { method: 'DELETE' });
       }
       
       // Delete account
@@ -224,13 +302,14 @@ export default function AddInfluencerPage() {
 
       const { accountId } = await accountRes.json();
 
-      // Start scraping job
-      const scrapingRes = await fetch('/api/scraping/start', {
+      // Start scraping job with NEW system
+      const scrapingRes = await fetch('/api/scan/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           username,
           accountId,
+          force: true, // ⚡ עקוף TTL check
         }),
       });
 
@@ -251,8 +330,7 @@ export default function AddInfluencerPage() {
         existingJob: undefined,
       }));
 
-      // Start executing steps automatically
-      executeNextStep(jobId, 1);
+      // NEW: Scan starts automatically when created!
     } catch (error: any) {
       setState((prev) => ({
         ...prev,
@@ -275,9 +353,9 @@ export default function AddInfluencerPage() {
     if (!confirmed) return;
 
     try {
-      // Delete the job and all associated data
+      // Delete the job and all associated data (NEW SYSTEM)
       if (state.jobId) {
-        await fetch(`/api/scraping/cancel?jobId=${state.jobId}`, {
+        await fetch(`/api/scan/status?jobId=${state.jobId}`, {
           method: 'DELETE',
         });
       }
@@ -330,21 +408,62 @@ export default function AddInfluencerPage() {
     }));
 
     try {
-      // Check if account already exists
-      const checkRes = await fetch(`/api/admin/accounts/check?username=${username}`);
+      // Check account status with smart resume logic
+      const statusRes = await fetch(`/api/admin/accounts/status?username=${username}`);
       
-      if (checkRes.ok) {
-        const { exists, account, job } = await checkRes.json();
+      if (statusRes.ok) {
+        const status = await statusRes.json();
         
-        if (exists && account) {
-          // Account exists - show resume choice screen
+        if (status.exists) {
+          // Account exists - determine what to do based on status
+          const { recommendation, accountId, hasPosts, hasPersona } = status;
+          
+          console.log('[Resume] Status:', status);
+          console.log('[Resume] Recommendation:', recommendation);
+          
           setState((prev) => ({
             ...prev,
-            step: 'resume-choice',
-            existingAccount: account,
-            existingJob: job,
+            accountId,
+            username,
+            existingAccount: { id: accountId, username },
+            existingJob: status.lastJob,
             isLoading: false,
           }));
+          
+          // Auto-navigate based on recommendation
+          if (recommendation.action === 'skip_to_settings') {
+            // Everything done - skip to settings
+            setState((prev) => ({
+              ...prev,
+              step: 'settings',
+              scrapingComplete: true,
+              processingComplete: true,
+            }));
+          } else if (recommendation.action === 'start_processing') {
+            // Scan done, need processing
+            setState((prev) => ({
+              ...prev,
+              step: 'processing',
+              scrapingComplete: true,
+              processingComplete: false,
+            }));
+            // ⚡ REMOVED: startContentProcessing(accountId) - orchestrator handles this automatically!
+          } else if (recommendation.action === 'continue_scan') {
+            // Continue existing scan
+            setState((prev) => ({
+              ...prev,
+              step: 'scraping',
+              jobId: recommendation.jobId,
+              scrapingComplete: false,
+            }));
+          } else {
+            // Start new scan (show resume-choice first)
+            setState((prev) => ({
+              ...prev,
+              step: 'resume-choice',
+            }));
+          }
+          
           return;
         }
       }
@@ -366,13 +485,14 @@ export default function AddInfluencerPage() {
 
       const { accountId } = await accountRes.json();
 
-      // Start scraping job
-      const scrapingRes = await fetch('/api/scraping/start', {
+      // Start scraping job with NEW system
+      const scrapingRes = await fetch('/api/scan/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           username,
           accountId,
+          force: true, // ⚡ עקוף TTL check
         }),
       });
 
@@ -391,8 +511,7 @@ export default function AddInfluencerPage() {
         isLoading: false,
       }));
 
-      // Start executing steps automatically
-      executeNextStep(jobId, 1);
+      // NEW: Scan starts automatically when created!
     } catch (error) {
       setState((prev) => ({
         ...prev,
@@ -402,32 +521,19 @@ export default function AddInfluencerPage() {
     }
   };
 
-  // Execute scraping steps
-  const executeNextStep = async (jobId: string, step: number) => {
-    if (step > 7) return;
+  // NEW SYSTEM: Scan starts automatically when job is created
+  // No need for triggerWorker() - /api/scan/start runs it immediately!
 
-    try {
-      const res = await fetch('/api/scraping/step', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId, step }),
-      });
+  // ============================================
+  // Content Processing Functions
+  // ============================================
 
-      if (!res.ok) {
-        console.error(`Step ${step} failed`);
-        return;
-      }
+  /**
+   * ⚡ REMOVED: startContentProcessing()
+   * Processing is now handled automatically by newScanOrchestrator to prevent duplicate runs!
+   * The orchestrator calls processAccountContent() once at the end of the scan.
+   */
 
-      const data = await res.json();
-      
-      if (data.nextStep && data.nextStep <= 7) {
-        // Continue to next step
-        setTimeout(() => executeNextStep(jobId, data.nextStep), 1000);
-      }
-    } catch (error) {
-      console.error(`Error executing step ${step}:`, error);
-    }
-  };
 
   // Handle publish
   const handlePublish = async (e: React.FormEvent) => {
@@ -444,7 +550,7 @@ export default function AddInfluencerPage() {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      const res = await fetch('/api/admin/influencers/finalize', {
+      const res = await fetch('/api/admin/accounts/finalize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -483,7 +589,8 @@ export default function AddInfluencerPage() {
   const renderStepIndicator = () => {
     const steps = [
       { id: 'username', label: 'שם משתמש', icon: Instagram },
-      { id: 'scraping', label: 'סריקה ובניית פרסונה', icon: Zap },
+      { id: 'scraping', label: 'סריקת תוכן', icon: Zap },
+      { id: 'processing', label: 'עיבוד ופרסונה', icon: Zap },
       { id: 'settings', label: 'הגדרות', icon: User },
       { id: 'complete', label: 'סיום', icon: Lock },
     ];
@@ -757,58 +864,111 @@ export default function AddInfluencerPage() {
                   />
                 </div>
 
-                {/* Current Step */}
+                {/* Current Status */}
                 <div className="text-center">
                   <p className="text-lg font-medium text-white mb-1">
-                    {jobStatus.currentStep ? `שלב ${jobStatus.currentStep} מתוך 7` : 'מתכונן...'}
+                    {jobStatus.status === 'queued' && '⏳ ממתין בתור...'}
+                    {jobStatus.status === 'running' && `🔄 ${jobStatus.current_step || 'סורק נתונים'}...`}
+                    {jobStatus.status === 'succeeded' && '✅ סריקה הושלמה!'}
+                    {jobStatus.status === 'failed' && '❌ נכשל'}
                   </p>
                   <p className="text-sm text-gray-400">
                     {Math.round(jobStatus.progress || 0)}% הושלם
                   </p>
                 </div>
 
-                {/* Step Details */}
-                {jobStatus.stepStatuses && (
-                  <div className="space-y-3">
-                    {jobStatus.stepStatuses.map((step: any, index: number) => (
-                      <div
-                        key={index}
-                        className={`flex items-center gap-3 p-3 rounded-lg ${
-                          step.status === 'completed'
-                            ? 'bg-green-500/10 border border-green-500/20'
-                            : step.status === 'running'
-                            ? 'bg-indigo-500/10 border border-indigo-500/20'
-                            : step.status === 'failed'
-                            ? 'bg-red-500/10 border border-red-500/20'
-                            : 'bg-gray-800'
-                        }`}
-                      >
-                        <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                            step.status === 'completed'
-                              ? 'bg-green-500 text-white'
-                              : step.status === 'running'
-                              ? 'bg-indigo-500 text-white'
-                              : step.status === 'failed'
-                              ? 'bg-red-500 text-white'
-                              : 'bg-gray-700 text-gray-400'
-                          }`}
-                        >
-                          {step.step}
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-white font-medium">{step.name}</p>
-                          {step.duration && (
-                            <p className="text-sm text-gray-400">
-                              {Math.round(step.duration)}s
-                            </p>
+                {/* Detailed Steps (NEW!) */}
+                {jobStatus.steps && Object.keys(jobStatus.steps).length > 0 && (
+                  <div className="bg-gray-800/50 rounded-xl p-5 space-y-3">
+                    <p className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                      🔍 שלבי הסריקה בזמן אמת:
+                    </p>
+                    <div className="space-y-3">
+                      {Object.entries(jobStatus.steps).map(([key, step]: [string, any]) => (
+                        <div key={key} className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-700/30 transition-colors">
+                          <span className={`text-lg mt-0.5 flex-shrink-0 ${
+                            step.status === 'completed' ? 'text-green-400' :
+                            step.status === 'running' ? 'text-blue-400 animate-pulse' :
+                            step.status === 'failed' ? 'text-red-400' :
+                            'text-gray-500'
+                          }`}>
+                            {step.status === 'completed' && '✅'}
+                            {step.status === 'running' && '🔄'}
+                            {step.status === 'failed' && '❌'}
+                            {step.status === 'pending' && '⏸️'}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-200 font-medium">{step.message || key}</p>
+                            {step.timestamp && (
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                {new Date(step.timestamp).toLocaleTimeString('he-IL')}
+                              </p>
+                            )}
+                          </div>
+                          {step.progress > 0 && (
+                            <span className="text-xs text-gray-400 font-mono">
+                              {step.progress}%
+                            </span>
                           )}
                         </div>
-                        {step.status === 'running' && (
-                          <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                        )}
-                      </div>
-                    ))}
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Results Summary (if available) */}
+                {jobStatus.results && (
+                  <div className="bg-gray-800/50 rounded-xl p-4 space-y-2">
+                    <p className="text-sm font-medium text-white mb-3">✅ נסרק בהצלחה:</p>
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      {jobStatus.results.profile && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-green-400">✓</span>
+                          <span className="text-gray-300">פרופיל</span>
+                        </div>
+                      )}
+                      {jobStatus.results.posts_count > 0 && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-green-400">✓</span>
+                          <span className="text-gray-300">{jobStatus.results.posts_count} פוסטים</span>
+                        </div>
+                      )}
+                      {jobStatus.results.highlights_count > 0 && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-green-400">✓</span>
+                          <span className="text-gray-300">{jobStatus.results.highlights_count} הילייטס</span>
+                        </div>
+                      )}
+                      {jobStatus.results.comments_count > 0 && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-green-400">✓</span>
+                          <span className="text-gray-300">{jobStatus.results.comments_count} תגובות</span>
+                        </div>
+                      )}
+                      {jobStatus.results.websites_crawled > 0 && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-green-400">✓</span>
+                          <span className="text-gray-300">{jobStatus.results.websites_crawled} אתרים</span>
+                        </div>
+                      )}
+                      {jobStatus.results.transcripts_count > 0 && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-green-400">✓</span>
+                          <span className="text-gray-300">{jobStatus.results.transcripts_count} תמלולים</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Error Display */}
+                {jobStatus.error && (
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+                    <p className="text-red-400 font-medium mb-1">שגיאה:</p>
+                    <p className="text-sm text-red-300">{jobStatus.error.message}</p>
+                    {jobStatus.error.code && (
+                      <p className="text-xs text-red-400 mt-2">קוד: {jobStatus.error.code}</p>
+                    )}
                   </div>
                 )}
               </div>
@@ -816,7 +976,189 @@ export default function AddInfluencerPage() {
           </motion.div>
         )}
 
-        {/* Step 3: Settings */}
+        {/* Step 3: Processing Content & Building Persona (NEW!) */}
+        {state.step === 'processing' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-2xl p-8"
+          >
+            <div className="text-center mb-8">
+              <Zap className="w-16 h-16 text-purple-500 mx-auto mb-4 animate-pulse" />
+              <h2 className="text-2xl font-bold text-white mb-2">
+                מעבד תוכן ובונה פרסונה 🤖
+              </h2>
+              {/* ⚡ Show transcription progress in header */}
+              {transcriptionProgress && transcriptionProgress.total > 0 && (
+                <p className="text-indigo-400 font-medium mb-1">
+                  מתמלל סרטון {transcriptionProgress.completed + 1} מתוך {transcriptionProgress.total}
+                </p>
+              )}
+              <p className="text-gray-400">
+                תמלול סרטונים + ניתוח AI + בניית אישיות ייחודית
+              </p>
+            </div>
+
+            {/* Processing Stats */}
+            {processingStatus && (
+              <div className="space-y-4">
+                {/* Progress Indicator */}
+                <div className="flex items-center justify-center gap-3 mb-6">
+                  <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                  <span className="text-white font-medium">מעבד...</span>
+                </div>
+
+                {/* Current Content */}
+                <div className="bg-gray-800/50 rounded-xl p-4">
+                  <p className="text-sm font-medium text-white mb-3">📊 תוכן זמין:</p>
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-300">פוסטים</span>
+                      <span className="text-white font-medium">{processingStatus.content?.posts || 0}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-300">Stories</span>
+                      <span className="text-white font-medium">{processingStatus.content?.highlights || 0}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-300">תמלולים</span>
+                      <span className="text-white font-medium">{processingStatus.transcriptions?.completed || 0}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-300">בהמתנה</span>
+                      <span className="text-gray-400">{processingStatus.transcriptions?.pending || 0}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ⚡ NEW: Transcription Progress */}
+                {transcriptionProgress && transcriptionProgress.total > 0 && (
+                  <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-sm font-medium text-white">🎤 התקדמות תמלול:</p>
+                      <span className="text-indigo-400 font-bold">
+                        {transcriptionProgress.completed}/{transcriptionProgress.total}
+                      </span>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="w-full bg-gray-800 rounded-full h-2 mb-3 overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${transcriptionProgress.percentage || 0}%` }}
+                        transition={{ duration: 0.3 }}
+                        className="h-full bg-gradient-to-r from-indigo-500 to-purple-500"
+                      />
+                    </div>
+
+                    {/* Status Breakdown */}
+                    <div className="grid grid-cols-4 gap-2 text-xs mb-3">
+                      <div className="text-center">
+                        <div className="text-green-400 font-bold">{transcriptionProgress.completed}</div>
+                        <div className="text-gray-400">הושלם</div>
+                      </div>
+                      {transcriptionProgress.processing > 0 && (
+                        <div className="text-center">
+                          <div className="text-blue-400 font-bold animate-pulse">{transcriptionProgress.processing}</div>
+                          <div className="text-gray-400">מתמלל</div>
+                        </div>
+                      )}
+                      {transcriptionProgress.pending > 0 && (
+                        <div className="text-center">
+                          <div className="text-yellow-400 font-bold">{transcriptionProgress.pending}</div>
+                          <div className="text-gray-400">ממתין</div>
+                        </div>
+                      )}
+                      {transcriptionProgress.failed > 0 && (
+                        <div className="text-center">
+                          <div className="text-red-400 font-bold">{transcriptionProgress.failed}</div>
+                          <div className="text-gray-400">נכשל</div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Recent Transcriptions Summary */}
+                    {transcriptionProgress.recentTranscriptions && transcriptionProgress.recentTranscriptions.length > 0 && (
+                      <div className="border-t border-indigo-500/20 pt-3">
+                        <p className="text-xs text-gray-400 mb-2">תמלולים אחרונים:</p>
+                        <div className="space-y-2">
+                          {transcriptionProgress.recentTranscriptions.map((t: any, i: number) => (
+                            <div key={i} className="text-xs bg-gray-800/50 rounded p-2">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-indigo-400">{t.sourceType}</span>
+                                <span className="text-gray-500">{t.language}</span>
+                              </div>
+                              <p className="text-gray-300 truncate">{t.preview}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Persona Status */}
+                {processingStatus.hasPersona ? (
+                  <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 text-center">
+                    <p className="text-green-400 font-medium mb-2">✅ הפרסונה נבנתה בהצלחה!</p>
+                    {processingStatus.persona && (
+                      <div className="text-xs text-gray-300 space-y-1">
+                        <p>שם: {processingStatus.persona.name}</p>
+                        <p>טון: {processingStatus.persona.tone}</p>
+                        <p>{processingStatus.persona.topics} נושאים | {processingStatus.persona.products} מוצרים | {processingStatus.persona.coupons} קופונים</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-center">
+                    <p className="text-blue-400 font-medium">🤖 בונה פרסונה...</p>
+                    <p className="text-xs text-gray-400 mt-1">זה עשוי לקחת 1-3 דקות</p>
+                  </div>
+                )}
+
+                {/* Processing Steps */}
+                <div className="bg-gray-800/50 rounded-xl p-4">
+                  <p className="text-sm font-medium text-white mb-3">⚡ מה קורה עכשיו:</p>
+                  <div className="space-y-2 text-xs text-gray-300">
+                    <div className="flex items-center gap-2">
+                      <span className={processingStatus.transcriptions?.completed > 0 ? 'text-green-400' : 'text-blue-400'}>
+                        {processingStatus.transcriptions?.completed > 0 ? '✓' : '⏳'}
+                      </span>
+                      <span>תמלול סרטונים באמצעות Gemini 3 Pro</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={processingStatus.hasPersona ? 'text-green-400' : 'text-blue-400'}>
+                        {processingStatus.hasPersona ? '✓' : '⏳'}
+                      </span>
+                      <span>ניתוח תוכן וזיהוי דפוסים</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={processingStatus.hasPersona ? 'text-green-400' : 'text-blue-400'}>
+                        {processingStatus.hasPersona ? '✓' : '⏳'}
+                      </span>
+                      <span>בניית פרסונה AI ייחודית</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={processingStatus.hasPersona ? 'text-green-400' : 'text-blue-400'}>
+                        {processingStatus.hasPersona ? '✓' : '⏳'}
+                      </span>
+                      <span>זיהוי מוצרים, קופונים ושותפויות</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!processingStatus && (
+              <div className="text-center text-gray-400">
+                <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                <p>מתחבר למערכת העיבוד...</p>
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* Step 4: Settings */}
         {state.step === 'settings' && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}

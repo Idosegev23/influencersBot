@@ -36,19 +36,25 @@ export interface Influencer {
   username: string;
   subdomain: string;
   display_name: string;
-  bio: string;
-  avatar_url: string;
+  bio?: string;
+  avatar_url?: string; // @deprecated Use profile_pic_url
+  profile_pic_url?: string; // NEW: from instagram_profile_history
   followers_count: number;
-  following_count: number;
-  influencer_type: InfluencerType;
-  assistant_id: string | null;
-  persona: InfluencerPersona | null;
-  theme: InfluencerTheme;
-  admin_password_hash: string;
+  following_count?: number;
+  posts_count?: number;
+  influencer_type?: InfluencerType;
+  assistant_id?: string | null;
+  persona?: InfluencerPersona | null;
+  theme?: InfluencerTheme;
+  admin_password_hash?: string;
   is_active: boolean;
-  last_synced_at: string | null;
+  last_synced_at?: string | null;
   created_at: string;
   updated_at: string;
+  // Instagram profile data
+  instagram_username?: string;
+  is_verified?: boolean;
+  category?: string;
   // Personalization fields
   greeting_message?: string | null;
   suggested_questions?: string[];
@@ -61,6 +67,12 @@ export interface Influencer {
   phone_number?: string | null;
   // WhatsApp settings
   whatsapp_enabled?: boolean;
+  // Account info
+  plan?: string;
+  type?: string;
+  persona_name?: string;
+  has_persona?: boolean;
+  has_profile_data?: boolean;
 }
 
 // Scrape Settings Types

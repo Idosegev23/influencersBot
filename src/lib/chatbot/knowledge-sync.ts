@@ -10,8 +10,8 @@ export async function syncKnowledgeBase(accountId: string) {
     // 1. Sync from partnerships (using DB function)
     await syncPartnershipsToKnowledge(accountId);
 
-    // 2. Sync from products
-    await syncProductsToKnowledge(accountId);
+    // 2. Products sync removed - products table deleted
+    // Products are now handled via partnerships/coupons
 
     // 3. Sync from coupons
     await syncCouponsToKnowledge(accountId);
@@ -43,49 +43,12 @@ async function syncPartnershipsToKnowledge(accountId: string) {
 }
 
 /**
- * Sync products to knowledge base
+ * @deprecated Products table deleted - products are now handled via partnerships/coupons
+ * This function is kept for reference but does nothing
  */
 async function syncProductsToKnowledge(accountId: string) {
-  const supabase = createClient();
-
-  // Get all products for this account
-  const { data: products, error: productsError } = await supabase
-    .from('products')
-    .select('*')
-    .eq('account_id', accountId);
-
-  if (productsError) {
-    console.error('Failed to fetch products:', productsError);
-    return 0;
-  }
-
-  let count = 0;
-
-  for (const product of products || []) {
-    // Upsert knowledge entry
-    const { error: upsertError } = await supabase
-      .from('chatbot_knowledge_base')
-      .upsert({
-        account_id: accountId,
-        knowledge_type: 'product',
-        title: `מוצר: ${product.name}`,
-        content: `${product.name}${product.description ? ` - ${product.description}` : ''}${product.price ? ` במחיר ${product.price}` : ''}`,
-        keywords: [product.name, 'מוצר', 'product'],
-        source_type: 'product',
-        source_id: product.id,
-        is_active: true,
-        priority: 5,
-      }, {
-        onConflict: 'account_id,source_type,source_id',
-      });
-
-    if (!upsertError) {
-      count++;
-    }
-  }
-
-  console.log(`Synced ${count} products to knowledge base`);
-  return count;
+  console.log('⚠️ syncProductsToKnowledge deprecated - products table deleted');
+  return 0;
 }
 
 /**

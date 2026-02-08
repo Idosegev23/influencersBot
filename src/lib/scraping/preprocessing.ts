@@ -50,6 +50,13 @@ export interface PreprocessedData {
     unmentionedTopics: string[];
     unansweredQuestions: string[];
   };
+
+  // ⚡ Website data (bio links, linkis, etc.)
+  websites: Array<{
+    url: string;
+    title?: string;
+    content: string;
+  }>;
 }
 
 export interface Topic {
@@ -78,13 +85,14 @@ export async function preprocessInstagramData(accountId: string): Promise<Prepro
   const supabase = await createClient();
 
   // Load data from database
-  const [posts, comments, profile] = await Promise.all([
+  const [posts, comments, profile, websites] = await Promise.all([
     loadPosts(supabase, accountId),
     loadComments(supabase, accountId),
     loadProfile(supabase, accountId),
+    loadWebsites(supabase, accountId), // ⚡ Load website data (linkis, etc.)
   ]);
 
-  console.log(`[Preprocessing] Loaded ${posts.length} posts, ${comments.length} comments`);
+  console.log(`[Preprocessing] Loaded ${posts.length} posts, ${comments.length} comments, ${websites.length} websites`);
 
   // Calculate stats
   const stats = calculateStats(posts);
@@ -107,7 +115,14 @@ export async function preprocessInstagramData(accountId: string): Promise<Prepro
   // Identify boundaries
   const boundaries = identifyBoundaries(posts, comments, topics);
 
-  console.log(`[Preprocessing] Complete: ${topTerms.length} terms, ${topics.length} topics, ${faqCandidates.length} FAQ candidates`);
+  // Format websites for Gemini
+  const formattedWebsites = websites.map(w => ({
+    url: w.url,
+    title: w.page_title,
+    content: w.page_content,
+  }));
+
+  console.log(`[Preprocessing] Complete: ${topTerms.length} terms, ${topics.length} topics, ${faqCandidates.length} FAQ candidates, ${formattedWebsites.length} websites`);
 
   return {
     stats,
@@ -117,6 +132,7 @@ export async function preprocessInstagramData(accountId: string): Promise<Prepro
     ownerReplies,
     faqCandidates,
     boundaries,
+    websites: formattedWebsites, // ⚡ Include websites (linkis, etc.)!
   };
 }
 
@@ -169,6 +185,21 @@ async function loadProfile(supabase: any, accountId: string) {
   }
 
   return data;
+}
+
+async function loadWebsites(supabase: any, accountId: string) {
+  const { data, error } = await supabase
+    .from('instagram_bio_websites')
+    .select('*')
+    .eq('account_id', accountId)
+    .order('scraped_at', { ascending: false });
+
+  if (error) {
+    console.error('[Preprocessing] Error loading websites:', error);
+    return [];
+  }
+
+  return data || [];
 }
 
 // ============================================

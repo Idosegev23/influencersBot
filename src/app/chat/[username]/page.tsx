@@ -435,7 +435,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       }
 
       // === NON-STREAMING MODE ===
-      const response = await fetch('/api/chat', {
+      // ⚡ Using Sandwich Bot (3-layer architecture)
+      const response = await fetch('/api/chat/sandwich', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -552,7 +553,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     );
   }
 
-  const TypeIcon = typeIcons[influencer.influencer_type];
+  const TypeIcon = typeIcons[influencer.influencer_type as InfluencerType] || typeIcons.other;
 
   // Use dynamic greeting and questions from influencer data, with fallbacks
   const greetingMessage = influencer.greeting_message || 
@@ -612,7 +613,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   {influencer.display_name}
                 </h1>
                 <p className="text-xs" style={{ color: 'var(--color-text)', opacity: 0.6 }}>
-                  💬 הבוט האישי | {typeLabels[influencer.influencer_type]}
+                  💬 הבוט האישי | {typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other}
                 </p>
               </div>
             </div>
@@ -701,7 +702,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         {greetingMessage}
                       </h2>
                       <p className="mb-6 max-w-sm text-sm leading-relaxed" style={{ color: 'var(--color-text)', opacity: 0.7 }}>
-                        אני כאן לעזור עם {typeLabels[influencer.influencer_type].toLowerCase()}, מותגים וקופונים
+                        אני כאן לעזור עם {(typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other).toLowerCase()}, מותגים וקופונים
                       </p>
 
                       {/* Suggestions */}

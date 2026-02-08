@@ -101,7 +101,7 @@ async function loadAccountContext(accountId: string, mode: AccountMode): Promise
     return {
       id: account.id,
       mode: account.type as AccountMode,
-      profileId: account.legacy_influencer_id || account.id,
+      profileId: account.id, // ⚡ No more legacy_influencer_id - just use account.id
       timezone: account.timezone || 'Asia/Jerusalem',
       language: account.language || 'he',
       plan: account.plan || 'free',
@@ -120,29 +120,8 @@ async function loadAccountContext(accountId: string, mode: AccountMode): Promise
     };
   }
 
-  // Fallback: try to load from influencers table (legacy)
-  const { data: influencer } = await supabase
-    .from('influencers')
-    .select('id, username')
-    .eq('id', accountId)
-    .single();
-
-  if (influencer) {
-    // Create account for this influencer
-    const { data: newAccount } = await supabase
-      .from('accounts')
-      .insert({
-        type: 'creator',
-        legacy_influencer_id: influencer.id,
-        plan: 'pro',
-      })
-      .select()
-      .single();
-
-    if (newAccount) {
-      return loadAccountContext(newAccount.id, mode);
-    }
-  }
+  // ⚠️ Legacy fallback removed - influencers table deleted
+  // All accounts should be in accounts table now
 
   // Default fallback
   return {
@@ -315,42 +294,18 @@ export async function getAccountByInfluencerUsername(username: string): Promise<
   influencerId: string;
   mode: AccountMode;
 } | null> {
-  // Get influencer
-  const { data: influencer } = await supabase
-    .from('influencers')
-    .select('id')
-    .eq('username', username)
-    .single();
-
-  if (!influencer) return null;
-
-  // Get or create account
-  let { data: account } = await supabase
+  // ⚡ Get account directly by username in config
+  const { data: account } = await supabase
     .from('accounts')
-    .select('id, type')
-    .eq('legacy_influencer_id', influencer.id)
+    .select('id, type, config')
+    .eq('config->>username', username)
     .single();
-
-  if (!account) {
-    // Create account
-    const { data: newAccount } = await supabase
-      .from('accounts')
-      .insert({
-        type: 'creator',
-        legacy_influencer_id: influencer.id,
-        plan: 'pro',
-      })
-      .select('id, type')
-      .single();
-
-    account = newAccount;
-  }
 
   if (!account) return null;
 
   return {
     accountId: account.id,
-    influencerId: influencer.id,
+    influencerId: account.id, // ⚡ Use account.id as influencerId (no more separate influencers table)
     mode: account.type as AccountMode,
   };
 }

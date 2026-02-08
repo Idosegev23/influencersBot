@@ -85,261 +85,227 @@ export function createClient() {
 // Influencer Functions
 // ============================================
 
+/**
+ * @deprecated Use getAccountBySubdomain instead
+ * Wrapper function for backward compatibility
+ */
 export async function getInfluencerBySubdomain(subdomain: string): Promise<Influencer | null> {
   const { data, error } = await supabase
-    .from('influencers')
+    .from('accounts')
     .select('*')
-    .eq('subdomain', subdomain)
-    .eq('is_active', true)
+    .eq('config->>subdomain', subdomain)
+    .eq('status', 'active')
     .single();
 
   if (error) {
-    console.error('Error fetching influencer:', error);
+    console.error('Error fetching account by subdomain:', error);
     return null;
   }
-  return data;
+  return data as any;
 }
 
+/**
+ * @deprecated Use getAccountByUsername instead
+ * Wrapper function for backward compatibility
+ */
 export async function getInfluencerByUsername(username: string): Promise<Influencer | null> {
-  const { data, error } = await supabase
-    .from('influencers')
-    .select('*')
-    .eq('username', username)
-    .eq('is_active', true)
+  const { data: account, error } = await supabase
+    .from('accounts')
+    .select(`
+      *,
+      chatbot_persona(
+        id,
+        name,
+        instagram_username,
+        instagram_followers,
+        tone,
+        response_style,
+        topics,
+        common_phrases,
+        created_at,
+        updated_at
+      ),
+      instagram_profile_history(
+        username,
+        full_name,
+        bio,
+        followers_count,
+        profile_pic_url,
+        is_verified,
+        category,
+        snapshot_date
+      )
+    `)
+    .eq('config->>username', username)
+    .eq('status', 'active')
     .single();
 
   if (error) {
-    console.error('Error fetching influencer by username:', error);
+    console.error('Error fetching account by username:', error);
     return null;
   }
-  return data;
+
+  if (!account) return null;
+
+  // Transform to Influencer format
+  const config = account.config || {};
+  const persona = (account.chatbot_persona as any)?.[0];
+  const profileHistory = account.instagram_profile_history || [];
+  const latestProfile = profileHistory.length > 0 
+    ? profileHistory.sort((a: any, b: any) => 
+        new Date(b.snapshot_date).getTime() - new Date(a.snapshot_date).getTime()
+      )[0]
+    : null;
+
+  return {
+    id: account.id,
+    username: config.username || latestProfile?.username || username,
+    display_name: config.display_name || latestProfile?.full_name || persona?.name || config.username || 'Unknown',
+    subdomain: config.subdomain || config.username || account.id,
+    
+    // Instagram profile data
+    instagram_username: latestProfile?.username || persona?.instagram_username || config.username,
+    followers_count: latestProfile?.followers_count || persona?.instagram_followers || 0,
+    profile_pic_url: latestProfile?.profile_pic_url || null,
+    avatar_url: config.avatar_url || latestProfile?.profile_pic_url || null, // ⚡ Avatar for chat UI
+    bio: latestProfile?.bio || null,
+    is_verified: latestProfile?.is_verified || false,
+    category: latestProfile?.category || null,
+    
+    // Influencer type (from config or default to 'other')
+    influencer_type: config.influencer_type || 'other',
+    
+    // Theme (default colors if not set)
+    theme: config.theme || {
+      colors: {
+        primary: '#6366f1',
+        secondary: '#8b5cf6',
+        accent: '#ec4899',
+        background: '#0f172a',
+        surface: '#1e293b',
+        text: '#f1f5f9',
+        textSecondary: '#94a3b8',
+      },
+      fonts: {
+        heading: 'Heebo',
+        body: 'Inter',
+      }
+    },
+    
+    // Account info
+    is_active: account.status === 'active',
+    plan: account.plan || 'free',
+    type: account.type,
+    created_at: account.created_at,
+    updated_at: account.updated_at,
+    
+    // Persona
+    persona_name: persona?.name,
+    has_persona: !!persona,
+    
+    // Additional config fields
+    greeting_message: config.greeting_message,
+    suggested_questions: config.suggested_questions,
+  } as any;
 }
 
+/**
+ * @deprecated Use getAccountById instead
+ * Wrapper function for backward compatibility
+ */
 export async function getInfluencerById(id: string): Promise<Influencer | null> {
   const { data, error } = await supabase
-    .from('influencers')
+    .from('accounts')
     .select('*')
     .eq('id', id)
     .single();
 
   if (error) {
-    console.error('Error fetching influencer:', error);
+    console.error('Error fetching account by id:', error);
     return null;
   }
-  return data;
-}
-
-export async function getAllInfluencers(): Promise<Influencer[]> {
-  const { data, error } = await supabase
-    .from('influencers')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('Error fetching influencers:', error);
-    return [];
-  }
-  
-  // Enrich with Instagram profile data if available
-  const enriched = await Promise.all((data || []).map(async (influencer) => {
-    // Get account ID
-    const { data: account } = await supabase
-      .from('accounts')
-      .select('id')
-      .eq('legacy_influencer_id', influencer.id)
-      .single();
-    
-    if (!account) return influencer;
-    
-    // Get latest Instagram profile
-    const { data: profile } = await supabase
-      .from('instagram_profile_history')
-      .select('profile_pic_url, bio, followers_count, following_count, posts_count')
-      .eq('account_id', account.id)
-      .order('snapshot_date', { ascending: false })
-      .limit(1)
-      .single();
-    
-    if (!profile) return influencer;
-    
-    // Merge Instagram data with influencer data
-    return {
-      ...influencer,
-      avatar_url: profile.profile_pic_url || influencer.avatar_url,
-      bio: profile.bio || influencer.bio,
-      followers_count: profile.followers_count || influencer.followers_count,
-      following_count: profile.following_count || influencer.following_count,
-    };
-  }));
-  
-  return enriched;
-}
-
-export async function createInfluencer(influencer: Omit<Influencer, 'id' | 'created_at' | 'updated_at'>): Promise<Influencer | null> {
-  // Check if influencer with this username already exists
-  const { data: existingInfluencer } = await supabase
-    .from('influencers')
-    .select('id')
-    .eq('username', influencer.username)
-    .maybeSingle();
-
-  if (existingInfluencer) {
-    console.log(`[createInfluencer] Influencer @${influencer.username} already exists, returning existing`);
-    return await getInfluencerByUsername(influencer.username);
-  }
-
-  // Step 1: Create legacy influencer record
-  const { data, error } = await supabase
-    .from('influencers')
-    .insert(influencer)
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error creating influencer:', error);
-    return null;
-  }
-
-  // Step 2: Check if account already exists for this username
-  const { data: existingAccount } = await supabase
-    .from('accounts')
-    .select('id')
-    .eq('config->>username', influencer.username)
-    .maybeSingle();
-
-  let accountData = existingAccount;
-
-  // Step 3: Create account only if doesn't exist
-  if (!existingAccount && data) {
-    const { data: newAccount, error: accountError } = await supabase
-      .from('accounts')
-      .insert({
-        type: 'creator', // Must be 'creator' or 'brand' per DB constraint
-        legacy_influencer_id: data.id,
-        owner_user_id: null, // Will be set when user registers
-        config: {
-          username: influencer.username,
-          display_name: influencer.display_name,
-          subdomain: influencer.subdomain,
-        },
-        plan: 'free',
-        status: influencer.is_active ? 'active' : 'suspended', // Must be 'active', 'suspended', or 'deleted'
-        timezone: 'Asia/Jerusalem',
-        language: 'he',
-        allowed_channels: {
-          whatsapp: influencer.whatsapp_enabled || false,
-          web: true,
-        },
-        features: {
-          chatbot: true,
-          analytics: true,
-        },
-      })
-      .select()
-      .single();
-
-    if (accountError) {
-      console.error('Error creating account:', accountError);
-      // Don't fail the whole operation, just log the error
-    } else {
-      accountData = newAccount;
-      console.log(`[createInfluencer] Created new account for @${influencer.username}, ID: ${newAccount.id}`);
-    }
-  } else if (existingAccount) {
-    console.log(`[createInfluencer] Using existing account for @${influencer.username}, ID: ${existingAccount.id}`);
-    // Update the legacy_influencer_id if needed
-    await supabase
-      .from('accounts')
-      .update({ legacy_influencer_id: data.id })
-      .eq('id', existingAccount.id);
-  }
-
-  if (accountData) {
-      // Step 3: Create initial chatbot persona
-      const { error: personaError } = await supabase
-        .from('chatbot_persona')
-        .insert({
-          account_id: accountData.id,
-          name: influencer.display_name,
-          tone: influencer.persona?.tone || 'ידידותי ומקצועי',
-          language: 'he',
-          bio: influencer.bio || '',
-          description: influencer.persona?.description || '',
-          interests: influencer.persona?.interests || [],
-          topics: influencer.persona?.topics || [],
-          response_style: influencer.persona?.response_style || 'מפורט אך תמציתי',
-          emoji_usage: influencer.persona?.emoji_usage || 'moderate',
-          greeting_message: influencer.greeting_message || 'שלום! איך אפשר לעזור?',
-          instagram_username: influencer.username,
-          instagram_followers: influencer.followers_count || 0,
-          instagram_following: influencer.following_count || 0,
-          instagram_data: {
-            avatar_url: influencer.avatar_url,
-            influencer_type: influencer.influencer_type,
-          },
-          directives: [
-            'ענה בעברית בלבד',
-            'היה ידידותי ומועיל',
-            'התבסס על המידע שיש לך',
-            'אם אין לך מידע, אמור זאת בכנות',
-          ],
-        });
-
-      if (personaError) {
-        console.error('Error creating chatbot persona:', personaError);
-        // Don't fail the whole operation
-      }
-  }
-
-  return data;
-}
-
-export async function updateInfluencer(id: string, updates: Partial<Influencer>): Promise<boolean> {
-  const { error } = await supabase
-    .from('influencers')
-    .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq('id', id);
-
-  if (error) {
-    console.error('Error updating influencer:', error);
-    return false;
-  }
-
-  // Also update the corresponding account if relevant fields changed
-  const accountUpdates: any = {};
-  if (updates.is_active !== undefined) {
-    accountUpdates.status = updates.is_active ? 'active' : 'inactive';
-  }
-  if (updates.username || updates.display_name || updates.subdomain) {
-    accountUpdates.config = {};
-    if (updates.username) accountUpdates.config.username = updates.username;
-    if (updates.display_name) accountUpdates.config.display_name = updates.display_name;
-    if (updates.subdomain) accountUpdates.config.subdomain = updates.subdomain;
-  }
-
-  if (Object.keys(accountUpdates).length > 0) {
-    const { error: accountError } = await supabase
-      .from('accounts')
-      .update(accountUpdates)
-      .eq('legacy_influencer_id', id);
-
-    if (accountError) {
-      console.error('Error updating account:', accountError);
-      // Don't fail the whole operation
-    }
-  }
-
-  return true;
+  return data as any;
 }
 
 /**
+ * @deprecated Use getAllAccounts instead
+ * Wrapper function for backward compatibility
+ */
+export async function getAllInfluencers(): Promise<Influencer[]> {
+  const { data, error } = await supabase
+    .from('accounts')
+    .select(`
+      *,
+      instagram_profile_history(
+        username,
+        full_name,
+        bio,
+        followers_count,
+        following_count,
+        posts_count,
+        profile_pic_url
+      )
+    `)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching accounts:', error);
+    return [];
+  }
+  
+  // Transform accounts to look like old influencer format
+  return (data || []).map((account: any) => {
+    const config = account.config || {};
+    const profile = account.instagram_profile_history?.[0];
+    
+    return {
+      id: account.id,
+      username: config.username || profile?.username || 'unknown',
+      subdomain: config.subdomain || config.username || account.id,
+      display_name: config.display_name || profile?.full_name || config.username || 'Unknown',
+      bio: profile?.bio || '',
+      avatar_url: profile?.profile_pic_url || '',
+      profile_pic_url: profile?.profile_pic_url || '',
+      followers_count: profile?.followers_count || 0,
+      following_count: profile?.following_count || 0,
+      posts_count: profile?.posts_count || 0,
+      is_active: account.status === 'active',
+      created_at: account.created_at,
+      updated_at: account.updated_at,
+    } as any;
+  });
+}
+
+/**
+ * @deprecated Use POST /api/admin/accounts instead
+ * This function is no longer functional - influencers table deleted
+ */
+export async function createInfluencer(influencer: Omit<Influencer, 'id' | 'created_at' | 'updated_at'>): Promise<Influencer | null> {
+  console.warn('⚠️ createInfluencer is deprecated - use POST /api/admin/accounts');
+  return null;
+}
+
+/**
+ * @deprecated Use PATCH /api/admin/accounts/[id] instead
+ * This function is no longer functional - influencers table deleted
+ */
+export async function updateInfluencer(id: string, updates: Partial<Influencer>): Promise<boolean> {
+  console.warn('⚠️ updateInfluencer is deprecated - use PATCH /api/admin/accounts/[id]');
+  return false;
+}
+
+// ⚠️ Dead code removed (lines 202-338) - all references to influencers table
+
+/**
  * Get account by legacy influencer ID
+ * @deprecated legacy_influencer_id column removed - just use getAccountById instead
  */
 export async function getAccountByInfluencerId(influencerId: string) {
+  // Now just use the ID directly as account ID
   const { data, error } = await supabase
     .from('accounts')
     .select('*')
-    .eq('legacy_influencer_id', influencerId)
+    .eq('id', influencerId)
     .single();
 
   if (error) {
@@ -358,15 +324,15 @@ export async function getAccountByUsername(username: string) {
     .select('*')
     .eq('type', 'creator')
     .eq('config->>username', username)
-    .single();
+    .maybeSingle(); // ⚡ Use maybeSingle() to avoid error when no rows found
 
   if (error) {
-    // Try also from legacy influencer table
-    const influencer = await getInfluencerByUsername(username);
-    if (influencer) {
-      return getAccountByInfluencerId(influencer.id);
-    }
     console.error('Error fetching account by username:', error);
+    return null;
+  }
+  
+  if (!data) {
+    console.log(`[getAccountByUsername] No account found for @${username}`);
     return null;
   }
   return data;
@@ -407,17 +373,23 @@ export async function upsertPosts(posts: Omit<Post, 'id' | 'created_at'>[]): Pro
 // ============================================
 
 export async function getContentByInfluencer(influencerId: string): Promise<ContentItem[]> {
-  const { data, error } = await supabase
-    .from('content_items')
-    .select('*')
-    .eq('influencer_id', influencerId)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('Error fetching content:', error);
-    return [];
-  }
-  return data || [];
+  // ⚡ content_items table doesn't exist - return empty array
+  // This is a legacy feature that's not currently in use
+  console.log('[Content] content_items table not available, returning empty array');
+  return [];
+  
+  // Original code (disabled):
+  // const { data, error } = await supabase
+  //   .from('content_items')
+  //   .select('*')
+  //   .eq('influencer_id', influencerId)
+  //   .order('created_at', { ascending: false });
+  //
+  // if (error) {
+  //   console.error('Error fetching content:', error);
+  //   return [];
+  // }
+  // return data || [];
 }
 
 export async function createContentItem(item: Omit<ContentItem, 'id' | 'created_at'>): Promise<ContentItem | null> {
@@ -529,18 +501,8 @@ export interface Brand {
  * Kept for backward compatibility
  */
 export async function getBrandsByInfluencer(influencerId: string): Promise<Brand[]> {
-  // Get account_id(s) for this influencer
-  const { data: accounts, error: accountError } = await supabase
-    .from('accounts')
-    .select('id')
-    .eq('legacy_influencer_id', influencerId);
-
-  if (accountError || !accounts || accounts.length === 0) {
-    console.error('Error fetching accounts for influencer:', accountError);
-    return [];
-  }
-
-  const accountIds = accounts.map(a => a.id);
+  // ⚡ Now influencerId IS the account_id (no more legacy_influencer_id)
+  const accountIds = [influencerId];
 
   // 1. Get partnerships-based brands
   const partnerships = await getPartnershipsByInfluencer(influencerId);
@@ -651,46 +613,46 @@ export interface Partnership {
 }
 
 export async function getPartnershipsByInfluencer(influencerId: string): Promise<Partnership[]> {
-  // First, get the account_id(s) for this influencer
-  const { data: accounts, error: accountError } = await supabase
-    .from('accounts')
-    .select('id')
-    .eq('legacy_influencer_id', influencerId);
+  try {
+    // ⚡ Now influencerId IS the account_id (no more legacy_influencer_id)
+    const accountIds = [influencerId];
 
-  if (accountError || !accounts || accounts.length === 0) {
-    console.error('Error fetching accounts for influencer:', accountError);
+    const { data, error } = await supabase
+      .from('partnerships')
+      .select(`
+        *,
+        coupons:coupons!partnership_id(
+          id,
+          code,
+          discount_type,
+          discount_value,
+          description,
+          is_active
+        )
+      `)
+      .in('account_id', accountIds)
+      .order('brand_name', { ascending: true });
+
+    if (error) {
+      // ⚡ If partnerships table doesn't exist, return empty array
+      if (error.code === 'PGRST204' || error.code === 'PGRST205' || error.message?.includes('not find')) {
+        console.log('[Partnerships] Table not available, returning empty array');
+        return [];
+      }
+      console.error('Error fetching partnerships:', error);
+      return [];
+    }
+    
+    // Map partnerships with coupons to include coupon_code
+    return (data || []).map(p => ({
+      ...p,
+      coupon_code: p.coupons?.find((c: any) => c.is_active)?.code || null,
+      coupons: undefined, // Remove nested array from final result
+    }));
+  } catch (err) {
+    console.error('Exception fetching partnerships:', err);
     return [];
   }
-
-  const accountIds = accounts.map(a => a.id);
-
-  const { data, error } = await supabase
-    .from('partnerships')
-    .select(`
-      *,
-      coupons:coupons!partnership_id(
-        id,
-        code,
-        discount_type,
-        discount_value,
-        description,
-        is_active
-      )
-    `)
-    .in('account_id', accountIds)
-    .order('brand_name', { ascending: true });
-
-  if (error) {
-    console.error('Error fetching partnerships:', error);
-    return [];
-  }
-  
-  // Map partnerships with coupons to include coupon_code
-  return (data || []).map(p => ({
-    ...p,
-    coupon_code: p.coupons?.find((c: any) => c.is_active)?.code || null,
-    coupons: undefined, // Remove nested array from final result
-  }));
 }
 
 export async function getPartnershipById(id: string): Promise<Partnership | null> {
@@ -754,7 +716,7 @@ export async function deletePartnership(id: string): Promise<boolean> {
 export async function createChatSession(influencerId: string): Promise<ChatSession | null> {
   const { data, error } = await supabase
     .from('chat_sessions')
-    .insert({ influencer_id: influencerId, message_count: 0 })
+    .insert({ account_id: influencerId, message_count: 0 }) // ⚡ Fixed: use account_id not influencer_id
     .select()
     .single();
 
@@ -766,10 +728,11 @@ export async function createChatSession(influencerId: string): Promise<ChatSessi
 }
 
 export async function getChatSessions(influencerId: string): Promise<ChatSession[]> {
+  // ⚡ Now using account_id instead of influencer_id
   const { data, error } = await supabase
     .from('chat_sessions')
     .select('*')
-    .eq('influencer_id', influencerId)
+    .eq('account_id', influencerId)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -891,22 +854,13 @@ export async function trackEvent(
   return true;
 }
 
+/**
+ * @deprecated analytics_events table was deleted - use events table or other analytics
+ */
 export async function getAnalytics(influencerId: string, days: number = 30) {
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - days);
-
-  const { data, error } = await supabase
-    .from('analytics_events')
-    .select('*')
-    .eq('influencer_id', influencerId)
-    .gte('created_at', startDate.toISOString())
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('Error fetching analytics:', error);
-    return [];
-  }
-  return data || [];
+  console.warn('⚠️ getAnalytics is deprecated - analytics_events table was deleted');
+  // Return empty array for now - this function needs to be replaced with new analytics logic
+  return [];
 }
 
 // ============================================

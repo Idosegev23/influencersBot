@@ -29,7 +29,7 @@ import {
 import { getInfluencerByUsername, getChatSessions, getAnalytics, type Partnership } from '@/lib/supabase';
 import { formatNumber, formatRelativeTime } from '@/lib/utils';
 import type { Influencer, ChatSession } from '@/types';
-import NotificationBell from '@/components/NotificationBell';
+// import NotificationBell from '@/components/NotificationBell'; // ⚠️ Removed - notifications not implemented
 
 export default function InfluencerDashboardPage({
   params,
@@ -132,19 +132,11 @@ export default function InfluencerDashboardPage({
 
         // Load new Influencer OS data
         try {
-          // Load audience analytics
-          const audienceRes = await fetch(`/api/influencer/analytics/audience?username=${username}`);
-          if (audienceRes.ok) {
-            const audienceData = await audienceRes.json();
-            setAudienceAnalytics(audienceData);
-          }
-
-          // Load task summary
-          const tasksRes = await fetch(`/api/influencer/tasks/summary?username=${username}&days=7`);
-          if (tasksRes.ok) {
-            const tasksData = await tasksRes.json();
-            setTaskSummary(tasksData);
-          }
+          // ⚠️ Audience analytics endpoint removed
+          // TODO: Re-implement with new analytics architecture
+          
+          // ⚠️ Tasks summary endpoint removed
+          // TODO: Re-implement with new task management system
 
           // Load partnerships
           const partnershipsRes = await fetch(`/api/influencer/partnerships?username=${username}&limit=5`);
@@ -220,38 +212,16 @@ export default function InfluencerDashboardPage({
   };
 
   const handleConnectCalendar = async () => {
-    setConnectingCalendar(true);
-    try {
-      const response = await fetch(`/api/integrations/google-calendar/connect?username=${username}`);
-      const data = await response.json();
-      
-      if (data.authUrl) {
-        window.location.href = data.authUrl;
-      }
-    } catch (error) {
-      console.error('Error connecting calendar:', error);
-      alert('שגיאה בחיבור ליומן. נסה שוב.');
-    } finally {
-      setConnectingCalendar(false);
-    }
+    // ⚠️ Google Calendar integration was removed
+    alert('אינטגרציית יומן Google הוסרה זמנית. תתווסף בעתיד.');
   };
 
   useEffect(() => {
-    // Check if calendar is connected
-    const checkCalendarStatus = async () => {
-      try {
-        const response = await fetch(`/api/integrations/google-calendar/status?username=${username}`);
-        if (response.ok) {
-          const data = await response.json();
-          setCalendarConnected(data.connected);
-        }
-      } catch (error) {
-        console.error('Error checking calendar status:', error);
-      }
-    };
+    // ⚠️ Google Calendar integration was removed
+    // Check calendar status removed
     
     if (influencer) {
-      checkCalendarStatus();
+      // Future: check calendar status when re-implemented
     }
   }, [influencer, username]);
 
@@ -287,7 +257,7 @@ export default function InfluencerDashboardPage({
                 />
               ) : (
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold">
-                  {influencer.display_name.charAt(0)}
+                  {influencer.display_name?.charAt(0) || '?'}
                 </div>
               )}
               <div>
@@ -297,7 +267,7 @@ export default function InfluencerDashboardPage({
             </div>
 
             <div className="flex items-center gap-2">
-              <NotificationBell username={username} accountId={influencer.id} />
+              {/* <NotificationBell username={username} accountId={influencer.id} /> */}
               <a
                 href={chatLink}
                 target="_blank"

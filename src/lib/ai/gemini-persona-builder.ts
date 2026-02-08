@@ -166,6 +166,7 @@ const PERSONA_BUILDER_PROMPT = `
 - רשימת פוסטים שהזכירו
 
 **מותגים**: מותגים שהמשפיען עובד איתם
+- **חפש גם באתרים!** (websites) - אתרי linkis ואתרים אחרים מכילים רשימות קופונים מלאות
 - שם המותג
 - סוג הקשר: partnership, sponsored, organic, affiliate
 - קטגוריה
@@ -174,8 +175,10 @@ const PERSONA_BUILDER_PROMPT = `
 
 הערות חשובות:
 - זהה רק מה שמופיע בפועל בתוכן
+- **האתרים (websites) מכילים רשימות מלאות של קופונים ומוצרים - שים לב במיוחד לאתרי linkis!**
 - הבחן בין שת"פ ממומן (#ad) להמלצה אורגנית
 - אל תמציא מוצרים או קופונים
+- **חלץ את כל הקופונים מאתר linkis שבנתוני websites!**
 
 פלט:
 החזר JSON מובנה הכולל את כל הסעיפים לעיל (כולל products, coupons, brands), מוכן להזנה למערכת תשובות.
@@ -204,7 +207,7 @@ export async function buildPersonaWithGemini(
   // Initialize Gemini
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
   const model = genAI.getGenerativeModel({ 
-    model: 'gemini-3-pro-preview', // Gemini 3 Pro (no version date needed)
+    model: 'gemini-3-pro-preview, // Gemini 3 Pro (no version date needed)
     generationConfig: {
       temperature: 0.3, // Lower temperature for more consistent output
       topK: 40,
@@ -395,6 +398,13 @@ function prepareInputData(preprocessedData: PreprocessedData, profileData?: any)
     })),
     
     boundaries: preprocessedData.boundaries,
+
+    // ⚡ CRITICAL: Include website data (linkis with all coupons!)
+    websites: preprocessedData.websites?.map(w => ({
+      url: w.url,
+      title: w.title,
+      content: w.content,
+    })) || [],
   };
 }
 

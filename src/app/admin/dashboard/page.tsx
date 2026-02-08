@@ -50,7 +50,7 @@ function DashboardContent() {
         return;
       }
 
-      const res = await fetch('/api/admin/influencers');
+      const res = await fetch('/api/admin/accounts');
       if (!res.ok) {
         if (res.status === 401) {
           router.push('/admin');
@@ -92,7 +92,7 @@ function DashboardContent() {
 
     try {
       setLoading(true);
-      const res = await fetch(`/api/admin/influencers?id=${influencer.id}`, {
+      const res = await fetch(`/api/admin/accounts/${influencer.id}`, {
         method: 'DELETE',
       });
 
@@ -243,10 +243,10 @@ function DashboardContent() {
                 className="admin-card p-4 hover:border-indigo-500/50 transition-all"
               >
                 <div className="flex items-start gap-3">
-                  {influencer.avatar_url ? (
-                    <div className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0">
+                  {influencer.profile_pic_url ? (
+                    <div className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 ring-2 ring-indigo-500/20">
                       <Image
-                        src={getProxiedImageUrl(influencer.avatar_url || '')}
+                        src={getProxiedImageUrl(influencer.profile_pic_url || '')}
                         alt={influencer.display_name}
                         fill
                         className="object-cover"

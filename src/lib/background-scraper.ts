@@ -184,7 +184,7 @@ Example response:
       const startTime = Date.now();
       
       const response = await genAI.models.generateContent({
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-3-pro-preview,
         contents: prompt,
         config: {
           thinkingConfig: {
@@ -307,19 +307,10 @@ Example response:
     }
 
     // Save products
-    if (productSet.size > 0) {
-      const productsToInsert = Array.from(productSet).map(name => ({
-        influencer_id: influencer.id,
-        name,
-        category: 'כללי',
-        is_manual: false,
-      }));
-
-      await supabase.from('products').upsert(productsToInsert, {
-        onConflict: 'influencer_id,name',
-        ignoreDuplicates: true,
-      });
-    }
+    // ⚠️ Products table deprecated - products are now handled via partnerships/coupons
+    // if (productSet.size > 0) {
+    //   console.log(`Found ${productSet.size} products (not saving - use partnerships instead)`);
+    // }
 
     const dbElapsed = ((Date.now() - dbStartTime) / 1000).toFixed(2);
     console.log(`✅ [${username}] Database save completed in ${dbElapsed}s`);

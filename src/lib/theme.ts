@@ -165,8 +165,12 @@ export function generateThemeCSS(theme: InfluencerTheme): string {
 }
 
 // Apply theme to document
-export function applyTheme(theme: InfluencerTheme): void {
+export function applyTheme(theme?: InfluencerTheme): void {
   if (typeof document === 'undefined') return;
+  if (!theme || !theme.colors) {
+    console.warn('Theme or colors undefined, skipping theme application');
+    return;
+  }
 
   const root = document.documentElement;
   root.style.setProperty('--color-primary', theme.colors.primary);
@@ -175,8 +179,11 @@ export function applyTheme(theme: InfluencerTheme): void {
   root.style.setProperty('--color-text', theme.colors.text);
   root.style.setProperty('--color-surface', theme.colors.surface);
   root.style.setProperty('--color-border', theme.colors.border);
-  root.style.setProperty('--font-heading', `'${theme.fonts.heading}', sans-serif`);
-  root.style.setProperty('--font-body', `'${theme.fonts.body}', sans-serif`);
+  
+  if (theme.fonts) {
+    root.style.setProperty('--font-heading', `'${theme.fonts.heading}', sans-serif`);
+    root.style.setProperty('--font-body', `'${theme.fonts.body}', sans-serif`);
+  }
 
   // Handle dark mode
   if (theme.darkMode) {
@@ -187,7 +194,12 @@ export function applyTheme(theme: InfluencerTheme): void {
 }
 
 // Get Google Fonts URL for a theme
-export function getGoogleFontsUrl(theme: InfluencerTheme): string {
+export function getGoogleFontsUrl(theme?: InfluencerTheme): string {
+  if (!theme || !theme.fonts || !theme.fonts.heading || !theme.fonts.body) {
+    // Return default fonts if theme is not available
+    return 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Heebo:wght@400;500;600;700&display=swap';
+  }
+  
   const fonts = new Set([theme.fonts.heading, theme.fonts.body]);
   const fontsParam = Array.from(fonts)
     .map((font) => font.replace(/ /g, '+') + ':wght@400;500;600;700')

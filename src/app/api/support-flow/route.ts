@@ -63,12 +63,15 @@ async function saveSupportRequest(
   }
 }
 
-// Intent detection using Responses API
+// Intent detection using Chat API
 async function detectIntent(message: string): Promise<{ intent: 'support' | 'general'; confidence: number }> {
   try {
-    const response = await openai.responses.create({
-      model: 'gpt-5-nano',
-      instructions: `אתה מזהה כוונות. בדוק אם ההודעה מתארת בעיה עם:
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `אתה מזהה כוונות. בדוק אם ההודעה מתארת בעיה עם:
 - קופון שלא עובד
 - הזמנה (בעיה, עיכוב, טעות)
 - משלוח (לא הגיע, איחור, נזק)
@@ -76,27 +79,18 @@ async function detectIntent(message: string): Promise<{ intent: 'support' | 'gen
 - תלונה על מוצר
 - שירות לקוחות
 
-החזר JSON בלבד: {"intent": "support" | "general", "confidence": 0.0-1.0}`,
-      input: message,
-      text: {
-        format: {
-          type: 'json_schema',
-          name: 'intent_detection',
-          strict: true,
-          schema: {
-            type: 'object',
-            properties: {
-              intent: { type: 'string', enum: ['support', 'general'] },
-              confidence: { type: 'number' }
-            },
-            required: ['intent', 'confidence'],
-            additionalProperties: false
-          }
+החזר JSON בלבד: {"intent": "support" | "general", "confidence": 0.0-1.0}`
+        },
+        {
+          role: 'user',
+          content: message
         }
-      }
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.3,
     });
 
-    const result = JSON.parse(response.output_text || '{}');
+    const result = JSON.parse(response.choices[0].message.content || '{}');
     return {
       intent: result.intent || 'general',
       confidence: result.confidence || 0
