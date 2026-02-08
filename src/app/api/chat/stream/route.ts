@@ -402,55 +402,60 @@ export async function POST(req: NextRequest) {
           controller.enqueue(encodeEvent(cardsEvent));
         }
 
-        // === BUILD CONTEXT & STREAM WITH GEMINI ===
-        let contextStr = '';
-        if (brands && brands.length > 0) {
-          contextStr += '## מותגים ושיתופי פעולה:\n';
-          brands.forEach((b) => {
-            contextStr += `- ${b.brand_name}`;
-            if (b.description) contextStr += `: ${b.description}`;
-            if (b.coupon_code) contextStr += ` | קוד קופון: "${b.coupon_code}"`;
-            else contextStr += ` | ללא קוד קופון כרגע`;
-            contextStr += '\n';
-          });
-        }
+        // === USE SANDWICH BOT ===
+        console.log('[Stream] 🥪 Using Sandwich Bot architecture');
+        
+        // Import Sandwich Bot
+        const { processSandwichMessageWithMetadata } = await import('@/lib/chatbot/sandwichBot');
+        
+        // Get conversation history
+        const { data: historyMessages } = await supabase
+          .from('chat_messages')
+          .select('role, message')
+          .eq('session_id', currentSessionId)
+          .order('created_at', { ascending: false })
+          .limit(10);
 
-        if (content && content.length > 0) {
-          const contentSlice = content.slice(0, 10);
-          contextStr += '\n## תוכן אחרון:\n';
-          contentSlice.forEach((c) => {
-            contextStr += `- ${c.type}: ${c.title || c.description || ''}\n`;
-          });
-        }
+        const conversationHistory = (historyMessages || [])
+          .reverse()
+          .map(m => ({
+            role: m.role as 'user' | 'assistant',
+            content: m.message,
+          }));
 
-        // Build persona object safely
-        const persona = influencer.persona || {
-          name: influencer.display_name,
-          voiceAndTone: 'חמה וידידותית',
-          interests: [],
-          directives: [],
-        };
-
-        // Stream from Gemini Flash Preview
         let fullText = '';
         let responseId: string | null = null;
         let tokenInfo = { input: 0, output: 0 };
 
         try {
-          const streamResult = await streamChatWithGemini({
-            message,
-            persona,
-            context: contextStr,
-            conversationHistory: [], // TODO: Load from DB if needed
-            onDelta: (delta) => {
-              fullText += delta;
-              controller.enqueue(encodeEvent({ type: 'delta', text: delta }));
-            },
+          // Process with Sandwich Bot (all 3 layers!)
+          const sandwichResult = await processSandwichMessageWithMetadata({
+            userMessage: message,
+            accountId,
+            username: username,
+            conversationHistory,
           });
 
-          tokenInfo = streamResult.usage || { input: 0, output: 0 };
-        } catch (geminiError: any) {
-          console.error('[Stream] Gemini error:', geminiError);
+          // Stream the complete response
+          fullText = sandwichResult.response;
+          
+          // Stream word by word for smooth UX
+          const words = fullText.split(' ');
+          for (let i = 0; i < words.length; i++) {
+            const word = words[i] + (i < words.length - 1 ? ' ' : '');
+            controller.enqueue(encodeEvent({ type: 'delta', text: word }));
+            // Small delay for streaming effect
+            await new Promise(resolve => setTimeout(resolve, 30));
+          }
+
+          console.log('[Stream] ✅ Sandwich Bot response:', {
+            archetype: sandwichResult.metadata.archetype,
+            confidence: sandwichResult.metadata.confidence,
+            personalityApplied: sandwichResult.metadata.personalityApplied,
+          });
+
+        } catch (sandwichError: any) {
+          console.error('[Stream] Sandwich Bot error:', sandwichError);
           // Fallback response
           fullText = 'מצטער, משהו השתבש. נסה שוב!';
           controller.enqueue(encodeEvent({ type: 'delta', text: fullText }));
