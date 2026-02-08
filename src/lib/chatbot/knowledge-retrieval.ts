@@ -298,15 +298,24 @@ async function fetchRelevantCoupons(
         
         for (const match of couponMatches) {
           const brand = match[2]?.trim();
-          const discount = match[3]?.trim();
+          let discount = match[3]?.trim();
           
           if (brand && discount && !brand.includes('http')) {
+            // ⚡ For coupons without specific codes/discounts, instruct to visit Linkis
+            let finalDiscount = discount;
+            let instructions = '';
+            
+            if (discount === 'הנחה משתנה' || discount === 'לרכישה' || discount === 'קופון זמין' || discount === 'העתק קוד') {
+              instructions = ' - לחץ על הלינק לקבלת הקוד';
+              finalDiscount = 'קופון זמין' + instructions;
+            }
+            
             allCoupons.push({
               brand: brand,
-              code: brand, // Use brand as code if no explicit code
-              discount: discount,
+              code: `לקבלת הקוד לחץ כאן`, // Clear instruction
+              discount: finalDiscount,
               category: 'linkis',
-              link: site.url,
+              link: site.url, // Direct to Linkis profile
             });
           }
         }

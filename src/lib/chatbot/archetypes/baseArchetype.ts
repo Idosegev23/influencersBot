@@ -221,13 +221,18 @@ ${this.definition.logic.responseTemplates?.length ? '📋 איך לענות:\n' 
     
     // Coupons - PRIORITIZE THIS!
     if (kb.coupons?.length > 0) {
-      context += `\n💰 **קופונים זמינים (${kb.coupons.length}) - שתף אותם עם המשתמש:**\n`;
+      context += `\n💰 **קופונים זמינים (${kb.coupons.length}) - MUST תן את הלינק ללינקיס:**\n`;
       kb.coupons.forEach((c: any, i: number) => {
-        context += `${i + 1}. מותג: ${c.brand || c.code} | הנחה: ${c.discount || 'ראה באתר'}`;
-        if (c.code && c.code !== c.brand) context += ` | קוד: ${c.code}`;
-        if (c.link) context += ` | לינק: ${c.link}`;
+        context += `${i + 1}. מותג: ${c.brand || c.code}`;
+        if (c.discount && !c.discount.includes('לחץ על הקישור')) {
+          context += ` | הנחה: ${c.discount}`;
+        }
+        if (c.link) {
+          context += ` | 🔗 לקבלת הקוד: ${c.link}`;
+        }
         context += '\n';
       });
+      context += '\n⚠️ חשוב: הקודים נמצאים בלינק Linkis. תגיד למשתמש ללחוץ על הלינק לקבלת הקוד!\n';
     }
     
     // Partnerships/Brands

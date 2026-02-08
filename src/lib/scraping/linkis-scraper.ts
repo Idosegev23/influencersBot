@@ -95,31 +95,69 @@ export async function scrapeLinkisProfile(profileUrl: string): Promise<LinkisPro
     }
   });
 
-  // Extract coupons
+  // Extract coupons - improved to get actual codes
   const coupons: LinkisCoupon[] = [];
-  $('.coupon-card').each((_, el) => {
-    const $coupon = $(el);
-    
-    // Brand name is in h4
-    const brand = $coupon.find('h4').first().text().trim();
-    
-    // Discount amount is in .amount-coupon
-    const discount = $coupon.find('.amount-coupon').text().trim();
-    
-    // URL is in the link button
-    const url = $coupon.find('a.buy-btn, a.copy-btn, a').attr('href');
-    
-    // Button text might have "קוד" or other info
-    const buttonText = $coupon.find('button, a').text().trim();
-    
-    if (brand) {
-      coupons.push({
-        brand: brand,
-        code: undefined, // linkis doesn't show codes directly
-        description: discount || buttonText || 'קופון',
-        url: url ? (url.startsWith('http') ? url : `${new URL(profileUrl).origin}/${url}`) : undefined,
-      });
-    }
+  
+  // Look for all coupon containers (various selectors)
+  const couponSelectors = ['.coupon-card', '.coupon-item', '[class*="coupon"]', '.discount-card'];
+  
+  couponSelectors.forEach(selector => {
+    $(selector).each((_, el) => {
+      const $coupon = $(el);
+      
+      // Try multiple ways to get brand name
+      const brand = $coupon.find('h4, h3, .brand-name, [class*="brand"]').first().text().trim();
+      
+      // Try to find actual coupon code
+      let code: string | undefined;
+      const codePatterns = [
+        $coupon.find('[data-code]').attr('data-code'),
+        $coupon.find('.coupon-code, .code, [class*="code"]').text().trim(),
+        $coupon.find('input[type="text"]').val() as string,
+        $coupon.find('span').filter((_, span) => {
+          const text = $(span).text().trim();
+          return /^[A-Z0-9]{4,20}$/i.test(text);
+        }).first().text().trim(),
+      ];
+      
+      for (const pattern of codePatterns) {
+        if (pattern && pattern.length >= 4 && pattern.length <= 20) {
+          code = pattern;
+          break;
+        }
+      }
+      
+      // Get discount/description
+      let discount = $coupon.find('.amount-coupon, .discount, [class*="discount"], [class*="amount"]').text().trim();
+      
+      // If no specific discount found, look for percentage in text
+      if (!discount) {
+        const allText = $coupon.text();
+        const percentMatch = allText.match(/(\d+)%/);
+        if (percentMatch) {
+          discount = `${percentMatch[1]}% הנחה`;
+        }
+      }
+      
+      // Get URL
+      const url = $coupon.find('a[href]').attr('href');
+      
+      // Button text as fallback
+      const buttonText = $coupon.find('button, a.btn').text().trim();
+      
+      // Only add if we have a brand and some useful info
+      if (brand && brand.length > 2) {
+        const existingCoupon = coupons.find(c => c.brand === brand);
+        if (!existingCoupon) {
+          coupons.push({
+            brand: brand,
+            code: code || undefined,
+            description: discount || buttonText || 'קופון זמין',
+            url: url ? (url.startsWith('http') ? url : `${new URL(profileUrl).origin}${url.startsWith('/') ? '' : '/'}${url}`) : undefined,
+          });
+        }
+      }
+    });
   });
 
   return {
