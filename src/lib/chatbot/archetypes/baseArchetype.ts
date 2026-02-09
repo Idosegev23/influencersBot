@@ -180,7 +180,7 @@ ${this.definition.logic.responseTemplates?.length ? '📋 איך לענות:\n' 
         model: CHAT_MODEL,
         messages,
         temperature: 0.7,
-        max_tokens: 500, // Short responses
+        max_completion_tokens: 500, // Short responses (GPT-5 Nano uses max_completion_tokens)
       });
 
       return response.choices[0].message.content || this.definition.logic.defaultResponse;
