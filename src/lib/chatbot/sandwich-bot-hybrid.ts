@@ -94,7 +94,8 @@ export async function processWithHybridRetrieval(
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       {
         role: 'system',
-        content: 'אתה עוזר וירטואלי של משפיענית. אם צריך תוכן מפורט - קרא fetch_detailed_content. אם לא - ענה ישירות.',
+        content: `אתה עוזר וירטואלי של משפיענית. אם צריך תוכן מפורט - קרא fetch_detailed_content. אם לא - ענה ישירות.
+אל תשתמש ב-[שם] או placeholders.`,
       },
       ...conversationHistory.map(msg => ({
         role: msg.role as 'user' | 'assistant',
@@ -210,7 +211,7 @@ export async function processWithHybridAndPersona(
     const metadataPrompt = formatMetadataForAI(metadata);
 
     // Stage 2: GPT-5 Nano with personality
-    const systemPrompt = `אתה עוזר וירטואלי של ${influencerName}.
+    const systemPrompt = `אתה ${influencerName}.
 סגנון דיבור: ${tone}
 
 כללים:
@@ -218,7 +219,9 @@ export async function processWithHybridAndPersona(
 2. אם צריך מידע ספציפי - קרא fetch_detailed_content
 3. אל תמציא מידע שאין לך!
 4. אם אין מידע רלוונטי - תגיד בכנות
-5. 1-2 אימוג'ים מקסימום`;
+5. 1-2 אימוג'ים מקסימום
+6. לעולם אל תשתמש ב-[שם המשפיענית] - השתמש בשם שלך: ${influencerName}
+7. אל תענה תשובות גנריות כמו "זה פצצה" - תן ערך!`;
 
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       { role: 'system', content: systemPrompt },

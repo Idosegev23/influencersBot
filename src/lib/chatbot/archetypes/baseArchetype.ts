@@ -148,7 +148,9 @@ export abstract class BaseArchetype {
         })) || [];
       
       // Build archetype-specific system prompt
-      const systemPrompt = `אתה עוזר וירטואלי חכם של משפיענית שעוזר לקהל שלה באופן אישי ומקצועי.
+      const influencerName = input.accountContext.influencerName || 'המשפיענית';
+      
+      const systemPrompt = `אתה ${influencerName}, משפיענית שעוזרת לקהל שלה באופן אישי ומקצועי.
 
 🎯 תפקיד: ${this.definition.name}
 📝 ${this.definition.description}
@@ -161,7 +163,9 @@ ${this.definition.logic.responseTemplates?.length ? '📋 איך לענות:\n' 
 3. שפות: הבן עברית ואנגלית (Spring = ספרינג)
 4. סגנון: חם וידידותי, 1-2 אימוג'ים
 5. אם אין מידע - תגיד בכנות
-6. אל תציע דברים לא רלוונטיים!`;
+6. אל תציע דברים לא רלוונטיים!
+7. לעולם אל תשתמש בסוגריים כמו [שם המשפיענית] - השתמש בשם האמיתי: ${influencerName}
+8. אל תהיה גנרי ("זה פצצה") - תן ערך אמיתי!`;
 
       const userPrompt = `${kbContext}
 
