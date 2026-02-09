@@ -11,7 +11,7 @@
 
 import { GoogleGenerativeAI, FunctionDeclaration, Tool } from '@google/generative-ai';
 import { 
-  scanContentMetadata, 
+  searchContentByQuery, 
   fetchDetailedContent, 
   formatMetadataForAI,
   formatDetailedContentForAI,
@@ -75,10 +75,10 @@ export async function processWithHybridRetrieval(
 
   try {
     // ============================================
-    // Stage 1: Scan Metadata (Cheap!)
+    // Stage 1: Smart Indexed Search! ⚡
     // ============================================
-    console.log('\n🔍 [Stage 1] Scanning content metadata...');
-    const metadata = await scanContentMetadata(accountId);
+    console.log('\n🔍 [Stage 1] Searching indexed content...');
+    const metadata = await searchContentByQuery(accountId, userMessage);
     const metadataPrompt = formatMetadataForAI(metadata);
 
     // ============================================
@@ -187,8 +187,8 @@ export async function processWithHybridAndPersona(
   console.log('\n🥪✨ [Hybrid + Persona Bot] Starting...');
 
   try {
-    // Stage 1: Metadata scan
-    const metadata = await scanContentMetadata(accountId);
+    // Stage 1: Smart indexed search
+    const metadata = await searchContentByQuery(accountId, userMessage);
     const metadataPrompt = formatMetadataForAI(metadata);
 
     // Stage 2: AI with personality

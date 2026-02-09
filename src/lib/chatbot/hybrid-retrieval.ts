@@ -34,92 +34,64 @@ export interface RetrievalRequest {
 }
 
 // ============================================
-// Stage 1: Metadata Scan (Cheap!)
+// Stage 1: Smart Search (Using Index!) ⚡
 // ============================================
 
-export async function scanContentMetadata(
-  accountId: string
+export async function searchContentByQuery(
+  accountId: string,
+  userQuery: string
 ): Promise<ContentMetadata[]> {
   const supabase = await createClient();
   const metadata: ContentMetadata[] = [];
 
-  console.log(`[Hybrid Stage 1] 🔍 Scanning metadata for account: ${accountId}`);
+  console.log(`[Hybrid Stage 1] 🔍 Smart search for: "${userQuery}"`);
+  console.log(`  Using Full Text Search INDEX - כל התוכן נגיש!`);
 
-  // Get posts metadata (title only, no full content!)
-  const { data: posts } = await supabase
-    .from('instagram_posts')
-    .select('id, caption, type, posted_at')
-    .eq('account_id', accountId)
-    .order('posted_at', { ascending: false })
-    .limit(100);
+  // Use indexed search - ALL content is searchable!
+  const { data: searchResults, error } = await supabase
+    .rpc('search_all_content', {
+      p_account_id: accountId,
+      p_query: userQuery,
+      p_limit: 50
+    });
 
-  if (posts) {
-    metadata.push(...posts.map(p => ({
-      id: p.id,
-      type: 'post' as const,
-      title: truncate(p.caption, 150), // Just preview!
-      date: p.posted_at,
+  if (error) {
+    console.warn('[Hybrid Stage 1] Search failed, falling back to recent posts');
+    
+    // Fallback: Get recent posts
+    const { data: posts } = await supabase
+      .from('instagram_posts')
+      .select('id, caption, type, posted_at')
+      .eq('account_id', accountId)
+      .order('posted_at', { ascending: false })
+      .limit(100);
+
+    if (posts) {
+      metadata.push(...posts.map(p => ({
+        id: p.id,
+        type: 'post' as const,
+        title: truncate(p.caption, 150),
+        date: p.posted_at,
+      })));
+    }
+    
+    console.log(`[Hybrid Stage 1] ⚠️ Fallback: ${posts?.length || 0} recent posts`);
+    return metadata;
+  }
+
+  // Parse search results (from indexed search!)
+  if (searchResults && searchResults.length > 0) {
+    metadata.push(...searchResults.map((r: any) => ({
+      id: r.id,
+      type: r.content_type as 'post' | 'transcription',
+      title: truncate(r.content_text, 150),
+      date: r.created_at,
+      relevanceScore: r.relevance,
     })));
   }
 
-  // Get transcriptions metadata
-  const { data: transcriptions } = await supabase
-    .from('instagram_transcriptions')
-    .select('id, transcription_text, created_at, source_id')
-    .eq('account_id', accountId)
-    .order('created_at', { ascending: false })
-    .limit(100);
-
-  if (transcriptions) {
-    metadata.push(...transcriptions.map(t => ({
-      id: t.id,
-      type: 'transcription' as const,
-      title: truncate(t.transcription_text, 150),
-      date: t.created_at,
-    })));
-  }
-
-  // Get highlights metadata
-  const { data: highlights } = await supabase
-    .from('instagram_highlights')
-    .select('id, title, scraped_at, items_count')
-    .eq('account_id', accountId)
-    .order('scraped_at', { ascending: false })
-    .limit(50);
-
-  if (highlights) {
-    metadata.push(...highlights.map(h => ({
-      id: h.id,
-      type: 'highlight' as const,
-      title: h.title || 'Untitled Highlight',
-      date: h.scraped_at,
-    })));
-  }
-
-  // Get stories metadata (active only - 24h)
-  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const { data: stories } = await supabase
-    .from('instagram_stories')
-    .select('id, story_id, posted_at, media_type')
-    .eq('account_id', accountId)
-    .gte('posted_at', oneDayAgo)
-    .order('posted_at', { ascending: false })
-    .limit(20);
-
-  if (stories) {
-    metadata.push(...stories.map(s => ({
-      id: s.id,
-      type: 'story' as const,
-      title: `Story (${s.media_type})`,
-      date: s.posted_at,
-    })));
-  }
-
-  console.log(`[Hybrid Stage 1] ✅ Found ${metadata.length} items (metadata only)`);
-  console.log(`  Posts: ${posts?.length || 0}`);
-  console.log(`  Transcriptions: ${transcriptions?.length || 0}`);
-  console.log(`  Highlights: ${highlights?.length || 0}`);
-  console.log(`  Stories: ${stories?.length || 0}`);
+  console.log(`[Hybrid Stage 1] ✅ Found ${metadata.length} relevant items (indexed search!)`);
+  console.log(`  Average relevance: ${(searchResults?.reduce((sum: number, r: any) => sum + r.relevance, 0) / searchResults?.length || 0).toFixed(2)}`);
 
   return metadata;
 }
