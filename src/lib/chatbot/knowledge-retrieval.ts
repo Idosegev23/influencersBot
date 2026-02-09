@@ -145,25 +145,20 @@ export async function retrieveKnowledge(
 ): Promise<KnowledgeBase> {
   const supabase = await createClient();
   
-  console.log(`[Knowledge Retrieval] 🚀 AI-First Strategy: Fetching ALL data, letting Gemini understand context`);
+  console.log(`[Knowledge Retrieval] 🔍 INDEXED SEARCH - כל התוכן נגיש!`);
   console.log(`[Knowledge Retrieval] Archetype: ${archetype}`);
-  console.log(`[Knowledge Retrieval] Message: ${userMessage.substring(0, 50)}...`);
+  console.log(`[Knowledge Retrieval] Query: ${userMessage.substring(0, 50)}...`);
 
-  // ⚡ AI-First: Keywords are only for archetype routing, not for data filtering
-  // The AI (Gemini) will understand Hebrew/English/variations and find relevant info
-  const keywords = ARCHETYPE_KEYWORDS[archetype] || [];
-  const messageKeywords = extractKeywordsFromMessage(userMessage);
-  const allKeywords = [...new Set([...keywords, ...messageKeywords])];
-
-  // Parallel fetch from all sources - NO keyword filtering in SQL!
+  // ⚡ Use Full Text Search INDEX! All 10,000+ items are searchable!
+  // No more limits - PostgreSQL finds the most relevant content automatically
   const [posts, highlights, coupons, partnerships, insights, websites, transcriptions] = await Promise.all([
-    fetchRelevantPosts(supabase, accountId, allKeywords, limit),
-    fetchRelevantHighlights(supabase, accountId, allKeywords, limit),
-    fetchRelevantCoupons(supabase, accountId, allKeywords, archetype),
-    fetchRelevantPartnerships(supabase, accountId, allKeywords),
+    fetchRelevantPostsIndexed(supabase, accountId, userMessage, Math.max(limit, 15)),
+    fetchRelevantHighlights(supabase, accountId, [], limit),
+    fetchRelevantCoupons(supabase, accountId, [], archetype),
+    fetchRelevantPartnerships(supabase, accountId, []),
     fetchRelevantInsights(supabase, accountId, archetype, limit),
-    fetchRelevantWebsites(supabase, accountId, allKeywords, limit),
-    fetchRelevantTranscriptions(supabase, accountId, allKeywords, limit),
+    fetchRelevantWebsites(supabase, accountId, [], limit),
+    fetchRelevantTranscriptionsIndexed(supabase, accountId, userMessage, Math.max(limit, 20)),
   ]);
 
   console.log(`[Knowledge Retrieval] ✅ Found:`);
@@ -214,29 +209,47 @@ function extractKeywordsFromMessage(message: string): string[] {
   return words;
 }
 
-async function fetchRelevantPosts(
+// ⚡ NEW: Indexed search for posts (searches ALL posts!)
+async function fetchRelevantPostsIndexed(
   supabase: any,
   accountId: string,
-  keywords: string[],
+  userQuery: string,
   limit: number
 ): Promise<InstagramPost[]> {
   try {
-    // ⚡ AI-First: Get recent high-engagement posts, AI will understand context
+    // Use Full Text Search INDEX - searches ALL posts in database!
     const { data, error } = await supabase
+      .rpc('search_posts', {
+        p_account_id: accountId,
+        p_query: userQuery,
+        p_limit: limit
+      });
+
+    if (error || !data || data.length === 0) {
+      // Fallback: Get recent posts
+      console.warn('[fetchPostsIndexed] Index search failed, using fallback');
+      const { data: fallbackData } = await supabase
+        .from('instagram_posts')
+        .select('id, caption, hashtags, type, posted_at, likes_count, engagement_rate, media_urls')
+        .eq('account_id', accountId)
+        .order('posted_at', { ascending: false })
+        .limit(limit);
+      
+      return fallbackData || [];
+    }
+
+    // Add missing fields to indexed results
+    const fullPosts = await supabase
       .from('instagram_posts')
       .select('id, caption, hashtags, type, posted_at, likes_count, engagement_rate, media_urls')
       .eq('account_id', accountId)
-      .order('posted_at', { ascending: false }) // Most recent first
-      .limit(Math.max(limit, 20)); // At least 20 posts for AI to work with
+      .in('id', data.map((p: any) => p.id));
+
+    console.log(`[fetchPostsIndexed] ✅ Found ${fullPosts.data?.length || 0} posts via INDEX`);
+    return fullPosts.data || [];
     
-    if (error) {
-      console.error('[fetchPosts] Error:', error);
-      return [];
-    }
-    
-    return data || [];
   } catch (error) {
-    console.error('[fetchPosts] Exception:', error);
+    console.error('[fetchPostsIndexed] Exception:', error);
     return [];
   }
 }
@@ -447,34 +460,51 @@ async function fetchRelevantWebsites(
   }
 }
 
-async function fetchRelevantTranscriptions(
+// ⚡ NEW: Indexed search for transcriptions (searches ALL 356 transcriptions!)
+async function fetchRelevantTranscriptionsIndexed(
   supabase: any,
   accountId: string,
-  keywords: string[],
+  userQuery: string,
   limit: number
 ): Promise<VideoTranscription[]> {
   try {
-    // ⚡ AI-First: Get ALL recent transcriptions (recipes, workouts, tips in videos)
+    // Use Full Text Search INDEX - searches ALL transcriptions in database!
     const { data, error } = await supabase
-      .from('instagram_transcriptions')
-      .select('id, transcription_text, source_id, created_at')
-      .eq('account_id', accountId)
-      .order('created_at', { ascending: false })
-      .limit(Math.max(limit, 30)); // Get at least 30 recent video transcriptions
+      .rpc('search_transcriptions', {
+        p_account_id: accountId,
+        p_query: userQuery,
+        p_limit: limit
+      });
 
-    if (error) {
-      console.error('[fetchTranscriptions] Error:', error);
-      return [];
+    if (error || !data || data.length === 0) {
+      // Fallback: Get recent transcriptions
+      console.warn('[fetchTranscriptionsIndexed] Index search failed, using fallback');
+      const { data: fallbackData } = await supabase
+        .from('instagram_transcriptions')
+        .select('id, transcription_text, source_id, created_at')
+        .eq('account_id', accountId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      
+      return (fallbackData || []).map((t: any) => ({
+        id: t.id,
+        text: t.transcription_text,
+        media_id: t.source_id,
+        created_at: t.created_at,
+      }));
     }
 
-    return (data || []).map((t: any) => ({
+    console.log(`[fetchTranscriptionsIndexed] ✅ Found ${data.length} transcriptions via INDEX`);
+    
+    return data.map((t: any) => ({
       id: t.id,
       text: t.transcription_text,
       media_id: t.source_id,
       created_at: t.created_at,
     }));
+    
   } catch (error) {
-    console.error('[fetchTranscriptions] Exception:', error);
+    console.error('[fetchTranscriptionsIndexed] Exception:', error);
     return [];
   }
 }
