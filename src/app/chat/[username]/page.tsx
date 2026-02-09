@@ -814,11 +814,104 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                               <DirectiveRenderer
                                 directives={displayDirectives}
                                 brands={displayCards?.type === 'brands' ? displayCards.data : undefined}
-                                onQuickAction={(action, payload) => {
+                                onQuickAction={async (action, payload) => {
                                   trackEvent('quick_action_clicked', { action, payload });
                                   if (action === 'quick_action' && payload?.text) {
-                                    setInputValue(payload.text as string);
-                                    inputRef.current?.focus();
+                                    // Fill input and send automatically
+                                    const text = payload.text as string;
+                                    setInputValue(text);
+                                    
+                                    // Send the message immediately
+                                    const userMessage: Message = {
+                                      id: Date.now().toString(),
+                                      role: 'user',
+                                      content: text,
+                                    };
+                                    setMessages((prev) => [...prev, userMessage]);
+                                    setInputValue('');
+                                    setIsTyping(true);
+                                    
+                                    try {
+                                      // Check for support intent first (if not streaming)
+                                      if (!useStreaming) {
+                                        const supportResponse = await fetch('/api/support-flow', {
+                                          method: 'POST',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({
+                                            message: text,
+                                            supportState: { step: 'detect', data: {} },
+                                            username,
+                                          }),
+                                        });
+                                        const supportData = await supportResponse.json();
+                                        
+                                        if (supportData.action !== 'use_assistant') {
+                                          if (supportData.supportState) {
+                                            setSupportState(supportData.supportState);
+                                          }
+                                          const assistantMessage: Message = {
+                                            id: (Date.now() + 1).toString(),
+                                            role: 'assistant',
+                                            content: supportData.response,
+                                            action: supportData.action,
+                                            brands: supportData.brands,
+                                            inputType: supportData.inputType,
+                                          };
+                                          setMessages((prev) => [...prev, assistantMessage]);
+                                          setIsTyping(false);
+                                          return;
+                                        }
+                                      }
+                                      
+                                      // Use regular chat flow
+                                      if (useStreaming) {
+                                        const assistantMessageId = (Date.now() + 1).toString();
+                                        setStreamingMessageId(assistantMessageId);
+                                        const streamingMessage: Message = {
+                                          id: assistantMessageId,
+                                          role: 'assistant',
+                                          content: '',
+                                        };
+                                        setMessages((prev) => [...prev, streamingMessage]);
+                                        setIsTyping(false);
+                                        await sendStreamMessage({
+                                          message: text,
+                                          username,
+                                          sessionId: sessionId || undefined,
+                                          previousResponseId: responseId || undefined,
+                                          clientMessageId: assistantMessageId,
+                                        });
+                                      } else {
+                                        const response = await fetch('/api/chat/sandwich', {
+                                          method: 'POST',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({
+                                            username,
+                                            message: text,
+                                            responseId,
+                                            sessionId,
+                                          }),
+                                        });
+                                        const data = await response.json();
+                                        const assistantMessage: Message = {
+                                          id: (Date.now() + 1).toString(),
+                                          role: 'assistant',
+                                          content: data.response,
+                                          uiDirectives: data.uiDirectives,
+                                          cardsPayload: data.cardsPayload,
+                                        };
+                                        setMessages((prev) => [...prev, assistantMessage]);
+                                      }
+                                    } catch (error) {
+                                      console.error('Error:', error);
+                                      setMessages((prev) => [...prev, {
+                                        id: (Date.now() + 1).toString(),
+                                        role: 'assistant',
+                                        content: 'אופס! משהו השתבש. נסי שוב.',
+                                      }]);
+                                    } finally {
+                                      setIsTyping(false);
+                                    }
                                   } else if (action === 'start_support') {
                                     handleSupportInput('יש לי בעיה עם הזמנה');
                                   }

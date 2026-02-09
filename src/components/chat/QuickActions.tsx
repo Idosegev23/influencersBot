@@ -111,7 +111,7 @@ export const presetQuickActions = {
   ],
   clarifyOptions: [
     { id: 'coupon', label: 'קופון', action: 'quick_action', payload: { text: 'קופון' }, variant: 'primary' as const },
-    { id: 'support', label: 'בעיה בהזמנה', action: 'quick_action', payload: { text: 'בעיה בהזמנה' }, variant: 'secondary' as const },
+    { id: 'support', label: 'בעיה בהזמנה', action: 'start_support', icon: 'start_support', variant: 'secondary' as const },
     { id: 'product', label: 'מוצר', action: 'quick_action', payload: { text: 'מוצר' }, variant: 'secondary' as const },
     { id: 'other', label: 'אחר', action: 'quick_action', payload: { text: 'אחר' }, variant: 'ghost' as const },
   ],
