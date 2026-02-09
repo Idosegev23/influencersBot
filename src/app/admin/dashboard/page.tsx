@@ -222,13 +222,22 @@ function DashboardContent() {
         {/* Add New Button */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold text-white">משפיענים</h2>
-          <Link
-            href="/admin/add"
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-indigo-500/25"
-          >
-            <Plus className="w-5 h-5" />
-            הוסף משפיען
-          </Link>
+          <div className="flex gap-3">
+            <Link
+              href="/admin/influencers"
+              className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-xl transition-all"
+            >
+              <Users className="w-5 h-5" />
+              תצוגה מפורטת
+            </Link>
+            <Link
+              href="/admin/add"
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-indigo-500/25"
+            >
+              <Plus className="w-5 h-5" />
+              הוסף משפיען
+            </Link>
+          </div>
         </div>
 
         {/* Influencers Grid */}
