@@ -57,6 +57,18 @@ export interface PreprocessedData {
     title?: string;
     content: string;
   }>;
+
+  // ⚡ Transcriptions (loaded from DB)
+  transcriptions: Array<{
+    id: string;
+    media_id: string;
+    text: string;
+    created_at: string;
+  }>;
+
+  // ⚡ Raw data for Gemini
+  posts?: any[];
+  comments?: any[];
 }
 
 export interface Topic {
@@ -85,14 +97,15 @@ export async function preprocessInstagramData(accountId: string): Promise<Prepro
   const supabase = await createClient();
 
   // Load data from database
-  const [posts, comments, profile, websites] = await Promise.all([
+  const [posts, comments, profile, websites, transcriptions] = await Promise.all([
     loadPosts(supabase, accountId),
     loadComments(supabase, accountId),
     loadProfile(supabase, accountId),
     loadWebsites(supabase, accountId), // ⚡ Load website data (linkis, etc.)
+    loadTranscriptions(supabase, accountId), // ⚡ Load transcriptions
   ]);
 
-  console.log(`[Preprocessing] Loaded ${posts.length} posts, ${comments.length} comments, ${websites.length} websites`);
+  console.log(`[Preprocessing] Loaded ${posts.length} posts, ${comments.length} comments, ${websites.length} websites, ${transcriptions.length} transcriptions`);
 
   // Calculate stats
   const stats = calculateStats(posts);
@@ -133,6 +146,9 @@ export async function preprocessInstagramData(accountId: string): Promise<Prepro
     faqCandidates,
     boundaries,
     websites: formattedWebsites, // ⚡ Include websites (linkis, etc.)!
+    transcriptions, // ⚡ Include transcriptions from DB
+    posts, // ⚡ Include raw posts for Gemini!
+    comments, // ⚡ Include raw comments for context
   };
 }
 
@@ -200,6 +216,27 @@ async function loadWebsites(supabase: any, accountId: string) {
   }
 
   return data || [];
+}
+
+async function loadTranscriptions(supabase: any, accountId: string) {
+  const { data, error } = await supabase
+    .from('instagram_transcriptions')
+    .select('id, source_type, source_id, transcription_text, language, created_at')
+    .eq('account_id', accountId)
+    .eq('processing_status', 'completed')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('[Preprocessing] Error loading transcriptions:', error);
+    return [];
+  }
+
+  return (data || []).map(t => ({
+    id: t.id,
+    media_id: t.source_id, // Using source_id as media_id
+    text: t.transcription_text || '',
+    created_at: t.created_at,
+  }));
 }
 
 // ============================================

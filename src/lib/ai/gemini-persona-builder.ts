@@ -100,7 +100,9 @@ const PERSONA_BUILDER_PROMPT = `
 תקבל JSON מאוחד של תוכן מחשבון אינסטגרם אחד, כולל:
 - פרופיל
 - פוסטים ורילסים
+- תמלולי וידאו (transcriptions) - 356 תמלולים מלאים מסרטונים! שים לב במיוחד לאלה!
 - תגובות ותגובות בעל החשבון
+- אתרים (websites) - במיוחד linkis עם קופונים ומותגים
 - הקשר האשטגים
 - הקשר חיפוש
 
@@ -404,6 +406,20 @@ function prepareInputData(preprocessedData: PreprocessedData, profileData?: any)
       url: w.url,
       title: w.title,
       content: w.content,
+    })) || [],
+
+    // ⚡ CRITICAL: Include ALL transcriptions for rich persona!
+    transcriptions: preprocessedData.transcriptions?.map(t => ({
+      id: t.id,
+      text: t.text,
+      source: t.media_id,
+    })) || [],
+
+    // ⚡ CRITICAL: Include post captions (products & brands mentioned here!)
+    posts: preprocessedData.posts?.slice(0, 50).map(p => ({
+      caption: p.caption || '',
+      hashtags: p.hashtags || [],
+      likes: p.likes_count,
     })) || [],
   };
 }

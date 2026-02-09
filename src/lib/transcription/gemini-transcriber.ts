@@ -102,6 +102,54 @@ function getVideoMimeType(url: string): string {
 /**
  * Transcribe a video using Gemini 3 Pro
  */
+/**
+ * Helper: Retry logic with exponential backoff for 429 errors
+ */
+async function callGeminiWithRetry(
+  genAI: GoogleGenAI,
+  model: string,
+  contents: any,
+  config: any,
+  maxRetries: number = 3
+): Promise<any> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[Transcriber] Attempt ${attempt}/${maxRetries} with model: ${model}`);
+      
+      const response = await genAI.models.generateContent({
+        model,
+        contents,
+        config,
+      });
+      
+      return response; // Success!
+      
+    } catch (error: any) {
+      lastError = error;
+      
+      // Check if it's a 429 (rate limit) error
+      const is429 = error.message?.includes('429') || 
+                    error.message?.includes('quota') ||
+                    error.message?.includes('rate limit') ||
+                    error.status === 429;
+      
+      if (is429 && attempt < maxRetries) {
+        const waitTime = Math.pow(2, attempt) * 1000; // Exponential backoff: 2s, 4s, 8s
+        console.log(`[Transcriber] ⚠️ Rate limit (429) - waiting ${waitTime/1000}s before retry...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        continue; // Retry
+      }
+      
+      // If not 429, or no more retries, throw
+      throw error;
+    }
+  }
+  
+  throw lastError || new Error('Max retries exceeded');
+}
+
 export async function transcribeVideo(
   input: TranscriptionInput
 ): Promise<TranscriptionOutput> {
@@ -154,12 +202,13 @@ export async function transcribeVideo(
 
 חשוב: החזר רק JSON תקין, ללא טקסט נוסף.`;
 
-    console.log(`[Transcriber] Calling Gemini 3 Flash...`);
+    console.log(`[Transcriber] Calling Gemini 3 Flash with retry logic...`);
     
-    // Call Gemini with video
-    const response = await genAI.models.generateContent({
-      model: 'gemini-3-flash-preview', // ⚡ Gemini 3 Flash Preview (1M context, cheap!)
-      contents: [
+    // Call Gemini with video (with automatic retry on 429)
+    const response = await callGeminiWithRetry(
+      genAI,
+      'gemini-3-flash-preview', // ⚡ Gemini 3 Flash Preview (1M context, cheap!)
+      [
         {
           parts: [
             { text: prompt },
@@ -172,11 +221,11 @@ export async function transcribeVideo(
           ],
         },
       ],
-      config: {
+      {
         temperature: 0.3, // Lower for more consistent transcription
         responseMimeType: 'application/json',
-      },
-    });
+      }
+    );
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log(`[Transcriber] Gemini responded in ${elapsed}s`);

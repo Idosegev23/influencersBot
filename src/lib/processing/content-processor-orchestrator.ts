@@ -503,23 +503,28 @@ async function transcribeAllVideos(
           `🎬 סרטון ${progressNum}/${toProcess.length}: מתחיל תמלול...`
         );
 
-        // ⚡ Call API endpoint (separate serverless function!)
-        const apiRes = await fetch(`${process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'http://localhost:3000'}/api/transcribe/single`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            accountId,
-            sourceType: video.sourceType,
-            sourceId: video.sourceId,
-            videoUrl: video.videoUrl,
-            videoDuration: video.duration,
-          }),
+        // ⚡ Transcribe directly (no HTTP call needed in background process)
+        const transcriptionResult = await transcribeVideo({
+          source_type: video.sourceType,
+          source_id: video.sourceId,
+          video_url: video.videoUrl,
+          video_duration: video.duration,
         });
 
-        const apiResult = await apiRes.json();
+        // Save transcription to database
+        if (transcriptionResult.success && transcriptionResult.transcription) {
+          const savedId = await saveTranscription(
+            accountId,
+            {
+              source_type: video.sourceType,
+              source_id: video.sourceId,
+              video_url: video.videoUrl,
+              video_duration: video.duration,
+            },
+            transcriptionResult
+          );
 
-        if (apiResult.success && apiResult.transcriptionId) {
-          console.log(`   [${progressNum}/${toProcess.length}] ✅ Success (${apiResult.transcriptionId})`);
+          console.log(`   [${progressNum}/${toProcess.length}] ✅ Success (${savedId})`);
           
           // ⚡ Update UI - success
           await logTranscriptionProgress(
@@ -528,18 +533,18 @@ async function transcribeAllVideos(
             `✅ סרטון ${progressNum}/${toProcess.length}: תומלל בהצלחה!`
           );
           
-          return { success: true, transcriptionId: apiResult.transcriptionId, skipped: false };
+          return { success: true, transcriptionId: savedId, skipped: false };
         } else {
-          console.log(`   [${progressNum}/${toProcess.length}] ❌ Failed: ${apiResult.error}`);
+          console.log(`   [${progressNum}/${toProcess.length}] ❌ Failed: ${transcriptionResult.error}`);
           
           // ⚡ Update UI - failed
           await logTranscriptionProgress(
             progressNum,
             toProcess.length,
-            `❌ סרטון ${progressNum}/${toProcess.length}: נכשל - ${apiResult.error}`
+            `❌ סרטון ${progressNum}/${toProcess.length}: נכשל - ${transcriptionResult.error}`
           );
           
-          return { success: false, error: apiResult.error, sourceId: video.sourceId };
+          return { success: false, error: transcriptionResult.error, sourceId: video.sourceId };
         }
 
       } catch (error: any) {
