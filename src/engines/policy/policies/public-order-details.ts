@@ -44,29 +44,25 @@ export function checkPublicOrderDetails(input: PolicyInput): PolicyCheckResult {
   const issues: string[] = [];
   const overrides: PolicyOverrides = {};
   
-  // Check if decision wants to collect order number
+  // Check if decision wants to collect order number in public
   if (decision.uiDirectives.showForm === 'order') {
     issues.push('order_form_blocked');
+    // Don't show order form in public, but allow the flow to continue
     overrides.uiDirectives = {
       ...overrides.uiDirectives,
       showForm: undefined,
-      showQuickActions: [
-        'אשלח פרטים בפרטי',
-        'צריך עזרה אחרת',
-      ],
+      // No quick actions - let the support flow handle it
     };
   }
 
-  // Check if decision wants to collect phone
+  // Check if decision wants to collect phone in public
   if (decision.uiDirectives.showForm === 'phone') {
     issues.push('phone_form_blocked');
+    // Don't show phone form in public, but allow the flow to continue
     overrides.uiDirectives = {
       ...overrides.uiDirectives,
       showForm: undefined,
-      showQuickActions: [
-        'אשלח טלפון בוואטסאפ',
-        'צריך עזרה אחרת',
-      ],
+      // No quick actions - let the support flow handle it
     };
   }
 
@@ -88,20 +84,18 @@ export function checkPublicOrderDetails(input: PolicyInput): PolicyCheckResult {
     ];
   }
 
-  // If support intent in public, redirect to private flow
+  // If support intent in public, start the support flow directly (like headphone icon)
   if (understanding.intent === 'support' && decision.handler === 'support_flow') {
-    // Allow but modify to not collect sensitive data publicly
+    // Allow support flow to start - it will handle privacy properly
+    // This is the same flow as clicking the headphone icon
+    // NO additional quick actions - just start the flow!
     overrides.uiDirectives = {
       ...overrides.uiDirectives,
-      showQuickActions: [
-        'פנייה דרך וואטסאפ',
-        'פנייה דרך מייל',
-        'להמשיך בצ\'אט (ללא פרטי הזמנה)',
-      ],
       showForm: undefined, // Don't show order/phone forms in public
-      showProgress: undefined, // Don't show support flow progress
+      showProgress: 'support', // Show support flow progress
+      // No showQuickActions - let the support flow logic handle next steps
     };
-    issues.push('support_flow_public_limited');
+    issues.push('support_flow_public_started');
   }
 
   // If any issues found, return with overrides

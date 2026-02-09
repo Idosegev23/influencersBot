@@ -54,14 +54,15 @@ export const routingRules: Rule[] = [
       {
         type: 'set_ui',
         value: {
-          showCardList: 'brands',
+          // NO showCardList - don't show coupons/brands for support!
           showProgress: { current: 1, total: 5, label: 'פותחים פנייה' },
-          responseLength: 'standard',
+          responseLength: 'short', // Keep it brief - we're starting support flow
           tone: 'empathetic',
-          layout: 'cards_first',
+          layout: 'chat', // Simple chat layout, not cards
+          showQuickActions: [], // Will be set by support flow logic
         },
       },
-      { type: 'set_model', value: { model: 'nano', maxTokens: 280, fallback: 'standard' } },
+      { type: 'set_model', value: { model: 'nano', maxTokens: 180, fallback: 'standard' } },
       { type: 'append_context', value: ['brands', 'support_policy', 'persona'] },
     ],
   },
