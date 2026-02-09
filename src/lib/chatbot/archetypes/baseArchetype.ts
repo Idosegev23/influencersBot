@@ -11,11 +11,15 @@ import {
 } from './types';
 import OpenAI from 'openai';
 
-// Initialize OpenAI with GPT-5 Nano - FASTEST!
+// Initialize OpenAI
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
-const CHAT_MODEL = 'gpt-5-nano-2025-08-07'; // ⚡ Fastest, most cost-efficient for chat (specific snapshot)
+
+// Model Configuration
+const CHAT_MODEL = 'gpt-5.2-2025-12-11'; // ⚡ Newest and strongest model
+const FALLBACK_MODEL = 'gpt-4o'; // ⚡ Reliable fallback
+const MAX_TOKENS = 1000; // Allow for detailed Hebrew responses
 
 // ============================================
 // Base Archetype Class
@@ -141,12 +145,14 @@ export abstract class BaseArchetype {
   }
 
   /**
-   * Generate AI response using GPT-5 Nano with archetype-specific context
+   * Generate AI response using GPT-5.2 with archetype-specific context
    */
   protected async generateAIResponse(
     input: ArchetypeInput,
     knowledgeQuery: string
   ): Promise<string> {
+    const influencerName = input.accountContext.influencerName || 'המשפיענית';
+
     try {
       // Build context from knowledge base
       const kbContext = this.buildKnowledgeContext(input.knowledgeBase);
@@ -159,8 +165,6 @@ export abstract class BaseArchetype {
         })) || [];
       
       // Build archetype-specific system prompt
-      const influencerName = input.accountContext.influencerName || 'המשפיענית';
-      
       const systemPrompt = `אתה ${influencerName}, משפיענית שעוזרת לקהל שלה באופן אישי ומקצועי.
 
 🎯 תפקיד: ${this.definition.name}
@@ -191,20 +195,37 @@ ${this.definition.logic.responseTemplates?.length ? '📋 איך לענות:\n' 
         { role: 'user', content: userPrompt },
       ];
 
-      const response = await openai.chat.completions.create({
-        model: CHAT_MODEL,
-        messages,
-        // GPT-5 Nano only supports temperature: 1 (default), so we omit it
-        max_completion_tokens: 500, // Short responses (GPT-5 Nano uses max_completion_tokens)
-      });
+      // Try primary model (GPT-5.2)
+      try {
+        const response = await openai.chat.completions.create({
+          model: CHAT_MODEL,
+          messages,
+          max_completion_tokens: MAX_TOKENS,
+        });
 
-      const aiResponse = response.choices[0].message.content || this.definition.logic.defaultResponse;
-      return this.replaceName(aiResponse, influencerName);
-      
+        const content = response.choices[0].message.content;
+        if (content) return this.replaceName(content, influencerName);
+        throw new Error('Empty response from primary model');
+        
+      } catch (primaryError) {
+        console.warn(`[BaseArchetype] Primary model (${CHAT_MODEL}) failed, trying fallback (${FALLBACK_MODEL}):`, primaryError);
+        
+        // Try fallback model (GPT-4o)
+        const fallbackResponse = await openai.chat.completions.create({
+          model: FALLBACK_MODEL,
+          messages,
+          max_completion_tokens: MAX_TOKENS,
+        });
+
+        const content = fallbackResponse.choices[0].message.content;
+        if (content) return this.replaceName(content, influencerName);
+        throw new Error('Empty response from fallback model');
+      }
+
     } catch (error) {
-      console.error('[BaseArchetype] AI generation error:', error);
-      // Fallback to default response (replaceName will be applied by process())
-      return this.definition.logic.defaultResponse;
+      console.error('[BaseArchetype] All models failed:', error);
+      // Last resort: Generic AI fallback instead of hardcoded string
+      return `היי, אני קצת מתקשה למצוא את המידע המדויק כרגע. ${influencerName} בדרך כלל משתפת המון טיפים בנושא הזה! אולי תוכלי לחדד את השאלה?`;
     }
   }
 

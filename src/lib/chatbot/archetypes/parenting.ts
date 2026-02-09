@@ -38,7 +38,8 @@ const PARENTING_DEFINITION: ArchetypeDefinition = {
   logic: {
     buildKnowledgeQuery: (msg) => `הורות ילדים משפחה פעילויות ${msg}`,
     responseTemplates: [],
-    defaultResponse: 'אני כאן לעזור! [שם המשפיענית] עברה את זה עם הילדים שלה. תוכל/י לפרט קצת יותר מה את/ה מחפש/ת?',
+    // Dynamic fallback that encourages rephrasing
+    defaultResponse: 'אני לא בטוחה שהבנתי בדיוק למה התכוונת, אבל [שם המשפיענית] תמיד שמחה לעזור בנושאי הורות וילדים! תוכלי לנסות לשאול שוב במילים אחרות? אולי על נושא ספציפי כמו שינה, תזונה או פעילויות?',
   },
   guardrails: PARENTING_GUARDRAILS,
   examples: [],
