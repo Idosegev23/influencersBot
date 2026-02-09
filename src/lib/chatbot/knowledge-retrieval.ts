@@ -225,9 +225,23 @@ async function fetchRelevantPostsIndexed(
         p_limit: limit
       });
 
-    if (error || !data || data.length === 0) {
-      // Fallback: Get recent posts
-      console.warn('[fetchPostsIndexed] Index search failed, using fallback');
+    if (error) {
+      // Real error - log it!
+      console.error('[fetchPostsIndexed] RPC error:', error);
+      console.warn('[fetchPostsIndexed] Using fallback query');
+      const { data: fallbackData } = await supabase
+        .from('instagram_posts')
+        .select('id, caption, hashtags, type, posted_at, likes_count, engagement_rate, media_urls')
+        .eq('account_id', accountId)
+        .order('posted_at', { ascending: false })
+        .limit(limit);
+      
+      return fallbackData || [];
+    }
+    
+    if (!data || data.length === 0) {
+      // No results found (legitimate) - no error, just no matching content
+      console.log('[fetchPostsIndexed] ℹ️ No posts match query, using recent posts');
       const { data: fallbackData } = await supabase
         .from('instagram_posts')
         .select('id, caption, hashtags, type, posted_at, likes_count, engagement_rate, media_urls')
@@ -300,40 +314,45 @@ async function fetchRelevantCoupons(
   // Use userMessage if available (better context), otherwise keywords
   const searchQuery = userMessage || keywords.join(' ');
   
-  if (searchQuery && searchQuery.length > 2) {
+    if (searchQuery && searchQuery.length > 2) {
       try {
-        const { data: searchResults } = await supabase
+        const { data: searchResults, error: searchError } = await supabase
           .rpc('search_coupons', {
             p_account_id: accountId,
             p_query: searchQuery,
             p_limit: 20
           });
 
-      if (searchResults && searchResults.length > 0) {
-        console.log(`[fetchCoupons] ✅ Found ${searchResults.length} coupons via INDEXED SEARCH`);
-        for (const c of searchResults) {
-          let discount = c.description || 'הנחה';
-          
-          if (c.discount_type === 'percentage' && c.discount_value) {
-            discount = `${c.discount_value}% הנחה`;
-          } else if (c.discount_type === 'fixed' && c.discount_value) {
-            discount = `₪${c.discount_value} הנחה`;
+        if (searchError) {
+          console.error('[fetchCoupons] RPC error:', searchError);
+          console.warn('[fetchCoupons] Using fallback query');
+        } else if (searchResults && searchResults.length > 0) {
+          console.log(`[fetchCoupons] ✅ Found ${searchResults.length} coupons via INDEXED SEARCH`);
+          for (const c of searchResults) {
+            let discount = c.description || 'הנחה';
+            
+            if (c.discount_type === 'percentage' && c.discount_value) {
+              discount = `${c.discount_value}% הנחה`;
+            } else if (c.discount_type === 'fixed' && c.discount_value) {
+              discount = `₪${c.discount_value} הנחה`;
+            }
+            
+            allCoupons.push({
+              brand: c.brand_name || 'מותג',
+              code: c.code,
+              discount: discount,
+              category: 'general',
+              link: null,
+            });
           }
-          
-          allCoupons.push({
-            brand: c.brand_name || 'מותג',
-            code: c.code,
-            discount: discount,
-            category: 'general',
-            link: null,
-          });
+          return allCoupons;
+        } else {
+          console.log('[fetchCoupons] ℹ️ No coupons match search query');
         }
-        return allCoupons;
+      } catch (error) {
+        console.error('[fetchCoupons] Exception during indexed search:', error);
       }
-    } catch (error) {
-      console.warn('[fetchCoupons] Indexed search failed, using fallback');
     }
-  }
   
   // Fallback: Get ALL active coupons
   try {
@@ -432,20 +451,25 @@ async function fetchRelevantPartnerships(
     const searchQuery = userMessage || userQuery;
 
     if (searchQuery && searchQuery.length > 2) {
-      const { data: searchResults, error } = await supabase
+      const { data: searchResults, error: searchError } = await supabase
         .rpc('search_partnerships', {
           p_account_id: accountId,
           p_query: searchQuery,
           p_limit: 10
         });
 
-      if (searchResults && searchResults.length > 0) {
+      if (searchError) {
+        console.error('[fetchPartnerships] RPC error:', searchError);
+        console.warn('[fetchPartnerships] Using fallback query');
+      } else if (searchResults && searchResults.length > 0) {
         console.log(`[fetchPartnerships] ✅ Found ${searchResults.length} partnerships via INDEXED SEARCH`);
         return searchResults.map((p: any) => ({
           brand_name: p.brand_name,
           partnership_type: p.category || 'collaboration',
           description: p.brief || '',
         }));
+      } else {
+        console.log('[fetchPartnerships] ℹ️ No partnerships match search query');
       }
     }
 
@@ -543,9 +567,28 @@ async function fetchRelevantTranscriptionsIndexed(
         p_limit: limit
       });
 
-    if (error || !data || data.length === 0) {
-      // Fallback: Get recent transcriptions
-      console.warn('[fetchTranscriptionsIndexed] Index search failed, using fallback');
+    if (error) {
+      // Real error - log it!
+      console.error('[fetchTranscriptionsIndexed] RPC error:', error);
+      console.warn('[fetchTranscriptionsIndexed] Using fallback query');
+      const { data: fallbackData } = await supabase
+        .from('instagram_transcriptions')
+        .select('id, transcription_text, source_id, created_at')
+        .eq('account_id', accountId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      
+      return (fallbackData || []).map((t: any) => ({
+        id: t.id,
+        text: t.transcription_text,
+        media_id: t.source_id,
+        created_at: t.created_at,
+      }));
+    }
+    
+    if (!data || data.length === 0) {
+      // No results found (legitimate) - no error, just no matching content
+      console.log('[fetchTranscriptionsIndexed] ℹ️ No transcriptions match query, using recent ones');
       const { data: fallbackData } = await supabase
         .from('instagram_transcriptions')
         .select('id, transcription_text, source_id, created_at')
