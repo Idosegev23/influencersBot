@@ -316,6 +316,25 @@ export async function POST(req: NextRequest) {
             null // Start fresh
           );
 
+          // Use state from decision engine (Support.CollectBrand)
+          const newState = decision.stateTransition?.to || 'Support.CollectBrand';
+
+          // Send meta with support flow metadata
+          controller.enqueue(encodeEvent({
+            type: 'meta',
+            traceId,
+            requestId,
+            decisionId: decision.decisionId,
+            sessionId: currentSessionId,
+            anonId,
+            uiDirectives: {
+              ...decision.uiDirectives,
+              showCardList: null,
+              showQuickActions: [],
+            },
+            stateTransition: { from: 'Chat.Active', to: newState },
+          }));
+
           // Stream the response
           if (supportResult.response) {
             const words = supportResult.response.split(' ');
@@ -341,7 +360,7 @@ export async function POST(req: NextRequest) {
             supabase
               .from('chat_sessions')
               .update({ 
-                state: 'Support.Brand',
+                state: newState,
                 updated_at: new Date().toISOString(),
               })
               .eq('id', currentSessionId),

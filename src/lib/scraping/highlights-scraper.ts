@@ -1,14 +1,10 @@
 /**
  * Highlights & Stories Scraper
- * גריפת הילייטס וסטוריז מאינסטגרם באמצעות Apify
+ * גריפת הילייטס וסטוריז מאינסטגרם באמצעות ScrapeCreators API
  */
 
 import { createClient } from '@/lib/supabase/server';
-
-const APIFY_TOKEN = process.env.APIFY_TOKEN;
-
-// Actor specifically for highlights scraping
-const HIGHLIGHTS_STORIES_ACTOR = 'datavoyantlab/instagram-highlights-scraper-api-by-url';
+import { getScrapeCreatorsClient } from './scrapeCreatorsClient';
 
 // ============================================
 // Type Definitions
@@ -52,143 +48,6 @@ export interface ScrapeHighlightsResult {
 }
 
 // ============================================
-// Apify API Functions
-// ============================================
-
-async function runApifyActor(
-  actorId: string,
-  input: Record<string, unknown>
-): Promise<any> {
-  if (!APIFY_TOKEN) {
-    throw new Error('APIFY_TOKEN is not configured');
-  }
-
-  const encodedActorId = actorId.replace('/', '~');
-  const url = `https://api.apify.com/v2/acts/${encodedActorId}/runs?token=${APIFY_TOKEN}`;
-  const maxRetries = 3;
-
-  console.log(`[Highlights Scraper] Starting actor: ${actorId}`);
-
-  for (let retry = 0; retry < maxRetries; retry++) {
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(input),
-        signal: AbortSignal.timeout(30000),
-      });
-
-      if (!response.ok) {
-        const errorBody = await response.text();
-        if (response.status === 502 || response.status === 503) {
-          throw new Error(`Apify API temporarily unavailable (${response.status})`);
-        }
-        console.error('[Highlights Scraper] Error:', errorBody);
-        throw new Error(`Apify API error: ${response.status} ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      const runId = result.data.id;
-
-      console.log(`[Highlights Scraper] Run started: ${runId}`);
-      return await waitForRun(runId);
-    } catch (error: any) {
-      if (retry === maxRetries - 1) {
-        console.error(`[Highlights Scraper] Failed after ${maxRetries} retries:`, error.message);
-        throw error;
-      }
-      const retryWait = 3000 * (retry + 1);
-      console.warn(`[Highlights Scraper] Retry ${retry + 1}/${maxRetries} after ${retryWait}ms:`, error.message);
-      await new Promise((resolve) => setTimeout(resolve, retryWait));
-    }
-  }
-
-  throw new Error('Failed to start actor after retries');
-}
-
-async function waitForRun(runId: string, maxWaitTime: number = 10 * 60 * 1000): Promise<any> {
-  const pollInterval = 5000;
-  const startTime = Date.now();
-  const maxRetries = 3;
-
-  console.log(`[Highlights Scraper] Waiting for run: ${runId}`);
-
-  while (Date.now() - startTime < maxWaitTime) {
-    for (let retry = 0; retry < maxRetries; retry++) {
-      try {
-        const response = await fetch(
-          `https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_TOKEN}`,
-          { signal: AbortSignal.timeout(15000) }
-        );
-
-        if (!response.ok) {
-          if (response.status === 502 || response.status === 503) {
-            throw new Error(`Apify API temporarily unavailable (${response.status})`);
-          }
-          throw new Error(`Failed to check run status: ${response.status}`);
-        }
-
-        const result = await response.json();
-        const run = result.data;
-        const elapsed = Math.round((Date.now() - startTime) / 1000);
-
-        console.log(`[Highlights Scraper] Status: ${run.status} (${elapsed}s)`);
-
-        if (run.status === 'SUCCEEDED') {
-          return run;
-        }
-
-        if (run.status === 'FAILED' || run.status === 'ABORTED') {
-          throw new Error(`Apify run ${run.status}`);
-        }
-
-        break;
-      } catch (error: any) {
-        if (retry === maxRetries - 1) {
-          throw error;
-        }
-        const retryWait = 2000 * (retry + 1);
-        await new Promise((resolve) => setTimeout(resolve, retryWait));
-      }
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, pollInterval));
-  }
-
-  throw new Error(`Apify run timeout after ${maxWaitTime / 1000}s`);
-}
-
-async function getDatasetItems<T>(datasetId: string): Promise<T[]> {
-  const url = `https://api.apify.com/v2/datasets/${datasetId}/items?token=${APIFY_TOKEN}`;
-  const maxRetries = 3;
-
-  for (let retry = 0; retry < maxRetries; retry++) {
-    try {
-      const response = await fetch(url, {
-        signal: AbortSignal.timeout(30000),
-      });
-
-      if (!response.ok) {
-        if (response.status === 502 || response.status === 503) {
-          throw new Error(`Apify API temporarily unavailable (${response.status})`);
-        }
-        throw new Error(`Failed to get dataset: ${response.status}`);
-      }
-
-      return response.json();
-    } catch (error: any) {
-      if (retry === maxRetries - 1) {
-        throw error;
-      }
-      const retryWait = 2000 * (retry + 1);
-      await new Promise((resolve) => setTimeout(resolve, retryWait));
-    }
-  }
-
-  throw new Error('Failed to get dataset after retries');
-}
-
-// ============================================
 // Main Scraping Functions
 // ============================================
 
@@ -200,98 +59,42 @@ export async function scrapeHighlightsAndStories(
 ): Promise<ScrapeHighlightsResult> {
   console.log(`[Highlights Scraper] Starting scrape for @${username}`);
 
-  const run = await runApifyActor(HIGHLIGHTS_STORIES_ACTOR, {
-    links: [`https://www.instagram.com/${username}/`], // Fixed: Actor expects 'links' array, not 'profileUrl'
-  });
-
-  const items = await getDatasetItems<any>(run.defaultDatasetId);
+  // Use ScrapeCreators API instead of Apify
+  const client = getScrapeCreatorsClient();
+  const result = await client.getHighlightSamples(username, 999, 100); // Get all items from up to 100 highlights
+  
+  const items = result.samples;
 
   if (items.length === 0) {
     console.log(`[Highlights Scraper] No data found for @${username}`);
-    return { highlights: [], stories: [], raw_data: items };
+    return { highlights: [], stories: [], raw_data: [] };
   }
 
-  // Parse the raw data  
-  // apify/instagram-scraper with resultsType='highlights' returns each highlight as a top-level item
+  // Parse ScrapeCreators API response
   const highlights: HighlightData[] = [];
   const stories: StoryData[] = [];
 
-  for (const item of items) {
-    // If item IS a highlight (direct from resultsType='highlights')
-    if (item.id || item.highlightId) {
-      const highlightItems: HighlightItemData[] = [];
-      
-      // Parse items within highlight
-      const items_array = item.items || item.media || [];
-      if (Array.isArray(items_array)) {
-        items_array.forEach((hItem: any, index: number) => {
-          highlightItems.push({
-            item_id: hItem.id || hItem.pk || hItem.storyId || `${item.id}_${index}`,
-            item_index: index,
-            media_type: hItem.type === 'video' || hItem.media_type === 2 || hItem.__typename === 'GraphVideo' ? 'video' : 'image',
-            media_url: hItem.videoUrl || hItem.video_url || hItem.imageUrl || hItem.image_url || hItem.displayUrl || hItem.display_url || '',
-            thumbnail_url: hItem.thumbnailUrl || hItem.thumbnail_url || hItem.displayUrl || hItem.display_url,
-            video_duration: hItem.videoDuration || hItem.video_duration,
-            posted_at: hItem.takenAt || hItem.taken_at ? new Date((hItem.takenAt || hItem.taken_at) * 1000).toISOString() : undefined,
-          });
-        });
-      }
-
-      highlights.push({
-        highlight_id: String(item.id || item.highlightId || item.pk || ''),
-        title: item.title || item.name || 'Untitled',
-        cover_image_url: item.coverMediaUrl || item.cover_media?.cropped_image_version?.url || item.cover_image_url,
-        items_count: highlightItems.length,
-        items: highlightItems,
-      });
-    }
+  // Map highlights from ScrapeCreators format
+  for (const sample of items) {
+    const highlightData = result.highlights.find(h => h.highlight_id === sample.highlightId);
     
-    // If item HAS highlights array (nested structure)
-    else if (item.highlights && Array.isArray(item.highlights)) {
-      for (const h of item.highlights) {
-        const highlightItems: HighlightItemData[] = [];
-        
-        if (h.items && Array.isArray(h.items)) {
-          h.items.forEach((hItem: any, index: number) => {
-            highlightItems.push({
-              item_id: hItem.id || hItem.pk || `${h.id}_${index}`,
-              item_index: index,
-              media_type: hItem.media_type === 2 || hItem.is_video ? 'video' : 'image',
-              media_url: hItem.video_url || hItem.image_url || hItem.display_url || '',
-              thumbnail_url: hItem.thumbnail_url || hItem.display_url,
-              video_duration: hItem.video_duration,
-              posted_at: hItem.taken_at ? new Date(hItem.taken_at * 1000).toISOString() : undefined,
-            });
-          });
-        }
+    const highlightItems: HighlightItemData[] = sample.items.map((item: any, index: number) => ({
+      item_id: item.story_id,
+      item_index: index,
+      media_type: item.media_type,
+      media_url: item.media_url,
+      thumbnail_url: item.thumbnail_url,
+      video_duration: item.video_url ? 15 : undefined, // Estimate duration for videos
+      posted_at: item.timestamp,
+    }));
 
-        highlights.push({
-          highlight_id: h.id || h.pk || '',
-          title: h.title || 'Untitled',
-          cover_image_url: h.cover_media?.cropped_image_version?.url || h.cover_image_url,
-          items_count: highlightItems.length,
-          items: highlightItems,
-        });
-      }
-    }
-
-    // Parse stories (if present)
-    if (item.stories && Array.isArray(item.stories)) {
-      for (const s of item.stories) {
-        stories.push({
-          story_id: s.id || s.pk || '',
-          media_type: s.media_type === 2 || s.is_video ? 'video' : 'image',
-          media_url: s.video_url || s.image_url || s.display_url || '',
-          thumbnail_url: s.thumbnail_url || s.display_url,
-          video_duration: s.video_duration,
-          has_audio: s.has_audio,
-          mentioned_users: s.reel_mentions?.map((m: any) => m.user?.username).filter(Boolean) || [],
-          hashtags: s.story_hashtags?.map((h: any) => h.hashtag?.name).filter(Boolean) || [],
-          posted_at: s.taken_at ? new Date(s.taken_at * 1000).toISOString() : undefined,
-          expires_at: s.expiring_at ? new Date(s.expiring_at * 1000).toISOString() : undefined,
-        });
-      }
-    }
+    highlights.push({
+      highlight_id: sample.highlightId,
+      title: highlightData?.title || 'Untitled',
+      cover_image_url: highlightData?.cover_url,
+      items_count: highlightItems.length,
+      items: highlightItems,
+    });
   }
 
   console.log(`[Highlights Scraper] Found ${highlights.length} highlights, ${stories.length} stories`);

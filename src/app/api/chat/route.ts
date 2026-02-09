@@ -400,6 +400,9 @@ export async function POST(req: NextRequest) {
             null // Start fresh
           );
 
+          // Use state from decision engine (Support.CollectBrand)
+          const newState = decision.stateTransition?.to || 'Support.CollectBrand';
+
           // Save messages
           if (currentSessionId) {
             await Promise.all([
@@ -408,7 +411,7 @@ export async function POST(req: NextRequest) {
               supabase
                 .from('chat_sessions')
                 .update({ 
-                  state: 'Support.Brand', // Update state
+                  state: newState,
                   updated_at: new Date().toISOString(),
                 })
                 .eq('id', currentSessionId),
@@ -426,7 +429,7 @@ export async function POST(req: NextRequest) {
             response: supportResult.response,
             sessionId: currentSessionId,
             traceId,
-            state: 'Support.Brand',
+            state: newState,
             uiDirectives: {
               ...decision.uiDirectives,
               showCardList: null, // Ensure no cards

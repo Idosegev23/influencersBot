@@ -1,12 +1,14 @@
 /**
  * Deep Rescan Script for Miran Buzaglo
  * Runs a comprehensive scrape: 150 posts + highlights + 30 transcriptions
+ * Using ScrapeCreators API (not Apify)
  * 
  * Usage:
  *   npx tsx scripts/rescan-miran-deep.ts
  */
 
-import { runInfluencerScrapeOrchestration, ScrapeProgress } from '../src/lib/scraping/influencer-scrape-orchestrator';
+import { runScanJob } from '../src/lib/scraping/newScanOrchestrator';
+import { randomUUID } from 'crypto';
 
 const USERNAME = 'miranbuzaglo';
 const ACCOUNT_ID = '4e2a0ce8-8753-4876-973c-00c9e1426e51';
@@ -18,32 +20,26 @@ async function main() {
   console.log(`${'='.repeat(80)}\n`);
 
   const startTime = Date.now();
+  const jobId = randomUUID();
 
   try {
-    const result = await runInfluencerScrapeOrchestration(
+    const result = await runScanJob(
+      jobId,
       USERNAME,
       ACCOUNT_ID,
       {
-        scrapeHighlights: true,
-        scrapeStories: true,
-        scrapePosts: true,
-        scrapeComments: true,
-        scrapeBioWebsites: false, // Skip websites for speed
-        scrapeReels: true,
-        
         postsLimit: 150, // Deep scrape!
         commentsPerPost: 3,
-        maxWebsitePages: 0,
-        
-        transcribeVideos: true,
-        processWithGemini: true,
+        maxWebsitePages: 0, // Skip websites for speed
+        samplesPerHighlight: 999, // Get ALL items from highlights
+        transcribeReels: true,
       },
-      (progress: ScrapeProgress) => {
+      (step: string, status: 'pending' | 'running' | 'completed' | 'failed', progress: number, message: string) => {
         // Log progress
-        const emoji = progress.status === 'completed' ? '✅' : 
-                     progress.status === 'failed' ? '❌' : 
-                     progress.status === 'running' ? '⏳' : '⏸️';
-        console.log(`${emoji} [${progress.progress}%] ${progress.step}: ${progress.message}`);
+        const emoji = status === 'completed' ? '✅' : 
+                     status === 'failed' ? '❌' : 
+                     status === 'running' ? '⏳' : '⏸️';
+        console.log(`${emoji} [${progress}%] ${step}: ${message}`);
       }
     );
 
@@ -53,14 +49,15 @@ async function main() {
     if (result.success) {
       console.log(`✅ Deep rescan completed in ${duration} minutes!`);
       console.log(`\n📊 Stats:`);
-      console.log(`   - Highlights: ${result.stats.highlightsSaved} (${result.stats.highlightItemsSaved} items)`);
-      console.log(`   - Posts: ${result.stats.postsSaved}`);
-      console.log(`   - Comments: ${result.stats.commentsSaved}`);
-      console.log(`   - Transcriptions: ${result.stats.videosTranscribed}`);
-      console.log(`   - Data processed: ${result.stats.dataProcessed ? 'Yes' : 'No'}`);
+      console.log(`   - Profile: ${result.stats.profileScraped ? 'Scraped' : 'Failed'}`);
+      console.log(`   - Posts: ${result.stats.postsCount}`);
+      console.log(`   - Comments: ${result.stats.commentsCount}`);
+      console.log(`   - Highlights: ${result.stats.highlightsCount} (${result.stats.highlightItemsCount} items)`);
+      console.log(`   - Websites: ${result.stats.websitesCrawled} (${result.stats.websitePagesCount} pages)`);
+      console.log(`   - Transcripts: ${result.stats.transcriptsCount}`);
     } else {
       console.error(`❌ Deep rescan failed after ${duration} minutes`);
-      console.error(`Error: ${result.error}`);
+      console.error(`Error: ${result.error?.message}`);
       process.exit(1);
     }
     console.log(`${'='.repeat(80)}\n`);
