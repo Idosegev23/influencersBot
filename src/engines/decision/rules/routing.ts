@@ -55,7 +55,7 @@ export const routingRules: Rule[] = [
         type: 'set_ui',
         value: {
           // NO showCardList - don't show coupons/brands for support!
-          showProgress: { current: 1, total: 5, label: 'פותחים פנייה' },
+          // showProgress removed - user request
           responseLength: 'short', // Keep it brief - we're starting support flow
           tone: 'empathetic',
           layout: 'chat', // Simple chat layout, not cards

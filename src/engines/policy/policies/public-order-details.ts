@@ -92,7 +92,7 @@ export function checkPublicOrderDetails(input: PolicyInput): PolicyCheckResult {
     overrides.uiDirectives = {
       ...overrides.uiDirectives,
       showForm: undefined, // Don't show order/phone forms in public
-      showProgress: 'support', // Show support flow progress
+      // showProgress removed - user request
       // No showQuickActions - let the support flow logic handle next steps
     };
     issues.push('support_flow_public_started');
