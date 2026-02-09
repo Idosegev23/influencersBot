@@ -79,7 +79,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const isValid = await verifyPassword(password, influencer.admin_password_hash);
+    // Get password hash from security_config or admin_password_hash column
+    const passwordHash = influencer.admin_password_hash || influencer.security_config?.admin_password_hash;
+    
+    if (!passwordHash) {
+      return NextResponse.json(
+        { error: 'No password configured for this influencer' },
+        { status: 401 }
+      );
+    }
+    
+    const isValid = await verifyPassword(password, passwordHash);
     if (!isValid) {
       return NextResponse.json(
         { error: 'Invalid password' },
