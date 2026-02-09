@@ -282,32 +282,62 @@ async function fetchRelevantCoupons(
 ): Promise<Coupon[]> {
   const allCoupons: Coupon[] = [];
   
-  // ⚡ AI-First Strategy: Get ALL active coupons, let AI decide what's relevant
+  // ⚡ AI-First Strategy: Get ALL active coupons using explicit JOIN
   try {
+    // Use raw SQL with explicit JOIN (more reliable than Supabase nested select)
     const { data: couponsData, error: couponsError } = await supabase
-      .from('coupons')
-      .select(`
-        id,
-        code,
-        description,
-        discount_type,
-        discount_value,
-        partnerships (
-          brand_name,
-          category,
-          link
-        )
-      `)
-      .eq('account_id', accountId)
-      .eq('is_active', true)
-      .order('created_at', { ascending: false })
-      .limit(100); // ⬅️ Get ALL coupons, AI will understand Hebrew/English/variations
+      .rpc('get_coupons_with_partnerships', {
+        p_account_id: accountId
+      });
 
     if (couponsError) {
-      console.error('❌ Error fetching coupons:', couponsError);
+      // Fallback: Try simple query without partnerships
+      console.warn('⚠️ RPC failed, trying fallback query:', couponsError);
+      
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('coupons')
+        .select('id, code, description, discount_type, discount_value, partnership_id')
+        .eq('account_id', accountId)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(100);
+      
+      if (fallbackError) {
+        console.error('❌ Fallback also failed:', fallbackError);
+      } else if (fallbackData) {
+        // Get partnerships separately
+        const partnershipIds = fallbackData.map((c: any) => c.partnership_id).filter(Boolean);
+        const { data: partnershipsData } = await supabase
+          .from('partnerships')
+          .select('id, brand_name, category, link')
+          .in('id', partnershipIds);
+        
+        const partnershipMap = new Map(partnershipsData?.map((p: any) => [p.id, p]) || []);
+        
+        for (const c of fallbackData) {
+          const partnership = c.partnership_id ? partnershipMap.get(c.partnership_id) : null;
+          let discount = c.description || 'הנחה';
+          
+          if (c.discount_type === 'percentage' && c.discount_value) {
+            discount = `${c.discount_value}% הנחה`;
+          } else if (c.discount_type === 'fixed' && c.discount_value) {
+            discount = `₪${c.discount_value} הנחה`;
+          } else if (c.discount_type === 'free_shipping') {
+            discount = 'משלוח חינם';
+          }
+          
+          allCoupons.push({
+            brand: partnership?.brand_name || 'מותג',
+            code: c.code,
+            discount: discount,
+            category: partnership?.category || 'general',
+            link: partnership?.link,
+          });
+        }
+      }
     } else if (couponsData) {
-      allCoupons.push(...couponsData.map((c: any) => {
-        const partnership = c.partnerships;
+      // RPC worked, use the data directly
+      for (const c of couponsData) {
         let discount = c.description || 'הנחה';
         
         if (c.discount_type === 'percentage' && c.discount_value) {
@@ -318,17 +348,17 @@ async function fetchRelevantCoupons(
           discount = 'משלוח חינם';
         }
         
-        return {
-          brand: partnership?.brand_name || 'מותג לא ידוע',
+        allCoupons.push({
+          brand: c.brand_name || 'מותג',
           code: c.code,
           discount: discount,
-          category: partnership?.category || 'general',
-          link: partnership?.link, // Fixed: was 'website', now 'link'
-        };
-      }));
+          category: c.category || 'general',
+          link: c.link,
+        });
+      }
     }
   } catch (error) {
-    console.error('[fetchCoupons] Error loading from coupons table:', error);
+    console.error('[fetchCoupons] Exception:', error);
   }
 
   console.log(`[fetchRelevantCoupons] ✅ Found ${allCoupons.length} total coupons (AI will filter)`);
