@@ -429,10 +429,12 @@ export async function POST(req: NextRequest) {
 
         try {
           // Process with Sandwich Bot (all 3 layers!)
+          const influencerName = influencer.display_name || influencer.username || username || 'Unknown';
           const sandwichResult = await processSandwichMessageWithMetadata({
             userMessage: message,
             accountId,
             username: username,
+            influencerName,
             conversationHistory,
           });
 
