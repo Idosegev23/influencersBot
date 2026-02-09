@@ -251,7 +251,7 @@ async function fetchRelevantHighlights(
     // ⚡ AI-First: Get all highlights, AI understands titles in any language
     const { data, error } = await supabase
       .from('instagram_highlights')
-      .select('id, title, cover_url, media_samples, scraped_at')
+      .select('id, title, cover_image_url, items_count, scraped_at')
       .eq('account_id', accountId)
       .order('scraped_at', { ascending: false })
       .limit(50); // Get all highlights
@@ -261,7 +261,13 @@ async function fetchRelevantHighlights(
       return [];
     }
     
-    return data || [];
+    return (data || []).map((h: any) => ({
+      id: h.id,
+      title: h.title,
+      cover_url: h.cover_image_url, // Map correct column name
+      media_samples: [], // Not available in new schema
+      scraped_at: h.scraped_at,
+    }));
   } catch (error) {
     console.error('[fetchHighlights] Exception:', error);
     return [];
@@ -289,7 +295,7 @@ async function fetchRelevantCoupons(
         partnerships (
           brand_name,
           category,
-          website
+          link
         )
       `)
       .eq('account_id', accountId)
@@ -317,7 +323,7 @@ async function fetchRelevantCoupons(
           code: c.code,
           discount: discount,
           category: partnership?.category || 'general',
-          link: partnership?.website,
+          link: partnership?.link, // Fixed: was 'website', now 'link'
         };
       }));
     }
