@@ -17,6 +17,14 @@ export interface KnowledgeBase {
   partnerships: Partnership[];
   insights: ConversationInsight[];
   websites: WebsiteContent[];
+  transcriptions: VideoTranscription[];
+}
+
+export interface VideoTranscription {
+  id: string;
+  text: string;
+  media_id: string;
+  created_at: string;
 }
 
 export interface InstagramPost {
@@ -89,8 +97,9 @@ const ARCHETYPE_KEYWORDS: Record<ArchetypeType, string[]> = {
   ],
   fitness: [
     'אימון', 'כושר', 'ספורט', 'תרגיל', 'שרירים', 'קרדיו',
-    'משקולות', 'פילאטיס', 'יוגה', 'ריצה', 'כוח',
-    'workout', 'fitness', 'training', 'exercise', 'gym',
+    'משקולות', 'פילאטיס', 'יוגה', 'ריצה', 'כוח', 'מתיחות',
+    'טיפים', 'להתחיל', 'מתאמנת', 'כושר גופני', 'בריאות',
+    'workout', 'fitness', 'training', 'exercise', 'gym', 'yoga',
   ],
   parenting: [
     'ילד', 'תינוק', 'אמא', 'הורות', 'חינוך', 'גיל',
@@ -136,26 +145,25 @@ export async function retrieveKnowledge(
 ): Promise<KnowledgeBase> {
   const supabase = await createClient();
   
-  console.log(`[Knowledge Retrieval] Starting for archetype: ${archetype}`);
-  console.log(`[Knowledge Retrieval] User message: ${userMessage.substring(0, 50)}...`);
+  console.log(`[Knowledge Retrieval] 🚀 AI-First Strategy: Fetching ALL data, letting Gemini understand context`);
+  console.log(`[Knowledge Retrieval] Archetype: ${archetype}`);
+  console.log(`[Knowledge Retrieval] Message: ${userMessage.substring(0, 50)}...`);
 
-  // Get archetype keywords
+  // ⚡ AI-First: Keywords are only for archetype routing, not for data filtering
+  // The AI (Gemini) will understand Hebrew/English/variations and find relevant info
   const keywords = ARCHETYPE_KEYWORDS[archetype] || [];
-  
-  // Extract additional keywords from user message
   const messageKeywords = extractKeywordsFromMessage(userMessage);
   const allKeywords = [...new Set([...keywords, ...messageKeywords])];
-  
-  console.log(`[Knowledge Retrieval] Using keywords: ${allKeywords.slice(0, 5).join(', ')}`);
 
-  // Parallel fetch from all sources
-  const [posts, highlights, coupons, partnerships, insights, websites] = await Promise.all([
+  // Parallel fetch from all sources - NO keyword filtering in SQL!
+  const [posts, highlights, coupons, partnerships, insights, websites, transcriptions] = await Promise.all([
     fetchRelevantPosts(supabase, accountId, allKeywords, limit),
     fetchRelevantHighlights(supabase, accountId, allKeywords, limit),
     fetchRelevantCoupons(supabase, accountId, allKeywords, archetype),
     fetchRelevantPartnerships(supabase, accountId, allKeywords),
     fetchRelevantInsights(supabase, accountId, archetype, limit),
     fetchRelevantWebsites(supabase, accountId, allKeywords, limit),
+    fetchRelevantTranscriptions(supabase, accountId, allKeywords, limit),
   ]);
 
   console.log(`[Knowledge Retrieval] ✅ Found:`);
@@ -165,6 +173,7 @@ export async function retrieveKnowledge(
   console.log(`  - Partnerships: ${partnerships.length}`);
   console.log(`  - Insights: ${insights.length}`);
   console.log(`  - Websites: ${websites.length}`);
+  console.log(`  - Transcriptions: ${transcriptions.length}`);
   
   // 🐛 DEBUG: Show actual data
   if (coupons.length > 0) {
@@ -183,6 +192,7 @@ export async function retrieveKnowledge(
     partnerships,
     insights,
     websites,
+    transcriptions,
   };
 }
 
@@ -191,8 +201,9 @@ export async function retrieveKnowledge(
 // ============================================
 
 function extractKeywordsFromMessage(message: string): string[] {
-  // Remove common words and extract meaningful terms
-  const commonWords = ['את', 'אני', 'של', 'על', 'עם', 'מה', 'איך', 'למה', 'כמה'];
+  // ⚡ AI-First: We barely use keywords anymore - AI understands the full message
+  // This is just for basic archetype routing, not for filtering data
+  const commonWords = ['את', 'אני', 'של', 'על', 'עם', 'מה', 'איך', 'למה', 'כמה', 'יש', 'לך'];
   
   const words = message
     .toLowerCase()
@@ -209,34 +220,25 @@ async function fetchRelevantPosts(
   keywords: string[],
   limit: number
 ): Promise<InstagramPost[]> {
-  if (keywords.length === 0) {
-    // No keywords, return recent posts
-    const { data } = await supabase
+  try {
+    // ⚡ AI-First: Get recent high-engagement posts, AI will understand context
+    const { data, error } = await supabase
       .from('instagram_posts')
       .select('id, caption, hashtags, type, posted_at, likes_count, engagement_rate, media_urls')
       .eq('account_id', accountId)
-      .order('posted_at', { ascending: false })
-      .limit(limit);
+      .order('posted_at', { ascending: false }) // Most recent first
+      .limit(Math.max(limit, 20)); // At least 20 posts for AI to work with
+    
+    if (error) {
+      console.error('[fetchPosts] Error:', error);
+      return [];
+    }
     
     return data || [];
+  } catch (error) {
+    console.error('[fetchPosts] Exception:', error);
+    return [];
   }
-
-  // Build ILIKE conditions for all keywords
-  let query = supabase
-    .from('instagram_posts')
-    .select('id, caption, hashtags, type, posted_at, likes_count, engagement_rate, media_urls')
-    .eq('account_id', accountId);
-
-  // Search in caption with OR logic
-  const captionConditions = keywords.map(k => `caption.ilike.%${k}%`).join(',');
-  query = query.or(captionConditions);
-
-  const { data } = await query
-    .order('engagement_rate', { ascending: false })
-    .order('posted_at', { ascending: false })
-    .limit(limit);
-
-  return data || [];
 }
 
 async function fetchRelevantHighlights(
@@ -245,30 +247,25 @@ async function fetchRelevantHighlights(
   keywords: string[],
   limit: number
 ): Promise<InstagramHighlight[]> {
-  if (keywords.length === 0) {
-    const { data } = await supabase
+  try {
+    // ⚡ AI-First: Get all highlights, AI understands titles in any language
+    const { data, error } = await supabase
       .from('instagram_highlights')
       .select('id, title, cover_url, media_samples, scraped_at')
       .eq('account_id', accountId)
       .order('scraped_at', { ascending: false })
-      .limit(limit);
+      .limit(50); // Get all highlights
+    
+    if (error) {
+      console.error('[fetchHighlights] Error:', error);
+      return [];
+    }
     
     return data || [];
+  } catch (error) {
+    console.error('[fetchHighlights] Exception:', error);
+    return [];
   }
-
-  let query = supabase
-    .from('instagram_highlights')
-    .select('id, title, cover_url, media_samples, scraped_at')
-    .eq('account_id', accountId);
-
-  const titleConditions = keywords.map(k => `title.ilike.%${k}%`).join(',');
-  query = query.or(titleConditions);
-
-  const { data } = await query
-    .order('scraped_at', { ascending: false })
-    .limit(limit);
-
-  return data || [];
 }
 
 async function fetchRelevantCoupons(
@@ -279,83 +276,56 @@ async function fetchRelevantCoupons(
 ): Promise<Coupon[]> {
   const allCoupons: Coupon[] = [];
   
-  // ⚡ FIRST: Get coupons from Linkis/websites (most important!)
+  // ⚡ AI-First Strategy: Get ALL active coupons, let AI decide what's relevant
   try {
-    const { data: websites } = await supabase
-      .from('instagram_bio_websites')
-      .select('page_content, url')
+    const { data: couponsData, error: couponsError } = await supabase
+      .from('coupons')
+      .select(`
+        id,
+        code,
+        description,
+        discount_type,
+        discount_value,
+        partnerships (
+          brand_name,
+          category,
+          website
+        )
+      `)
       .eq('account_id', accountId)
-      .order('scraped_at', { ascending: false })
-      .limit(5);
-    
-    if (websites) {
-      for (const site of websites) {
-        const content = site.page_content || '';
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(100); // ⬅️ Get ALL coupons, AI will understand Hebrew/English/variations
+
+    if (couponsError) {
+      console.error('❌ Error fetching coupons:', couponsError);
+    } else if (couponsData) {
+      allCoupons.push(...couponsData.map((c: any) => {
+        const partnership = c.partnerships;
+        let discount = c.description || 'הנחה';
         
-        // Parse coupons from Linkis format
-        // Format: "1. פלולס - הנחה משתנה"
-        const couponMatches = content.matchAll(/(\d+)\.\s*([^-\n]+)\s*-\s*([^\n]+)/g);
-        
-        for (const match of couponMatches) {
-          const brand = match[2]?.trim();
-          let discount = match[3]?.trim();
-          
-          if (brand && discount && !brand.includes('http')) {
-            // ⚡ For coupons without specific codes/discounts, instruct to visit Linkis
-            let finalDiscount = discount;
-            let instructions = '';
-            
-            if (discount === 'הנחה משתנה' || discount === 'לרכישה' || discount === 'קופון זמין' || discount === 'העתק קוד') {
-              instructions = ' - לחץ על הלינק לקבלת הקוד';
-              finalDiscount = 'קופון זמין' + instructions;
-            }
-            
-            allCoupons.push({
-              brand: brand,
-              code: `לקבלת הקוד לחץ כאן`, // Clear instruction
-              discount: finalDiscount,
-              category: 'linkis',
-              link: site.url, // Direct to Linkis profile
-            });
-          }
+        if (c.discount_type === 'percentage' && c.discount_value) {
+          discount = `${c.discount_value}% הנחה`;
+        } else if (c.discount_type === 'fixed' && c.discount_value) {
+          discount = `₪${c.discount_value} הנחה`;
+        } else if (c.discount_type === 'free_shipping') {
+          discount = 'משלוח חינם';
         }
-      }
+        
+        return {
+          brand: partnership?.brand_name || 'מותג לא ידוע',
+          code: c.code,
+          discount: discount,
+          category: partnership?.category || 'general',
+          link: partnership?.website,
+        };
+      }));
     }
   } catch (error) {
-    console.error('[fetchCoupons] Error loading from websites:', error);
-  }
-  
-  // SECOND: Get coupons from partnerships table
-  try {
-    const shouldFetchAll = archetype === 'coupons' || keywords.some(k => 
-      ['קופון', 'הנחה', 'מבצע', 'קוד', 'coupon'].includes(k.toLowerCase())
-    );
-    
-    if (shouldFetchAll) {
-      const { data } = await supabase
-        .from('partnerships')
-        .select('brand_name, coupon_code, discount_percentage, category, link')
-        .eq('account_id', accountId)
-        .eq('status', 'active')
-        .not('coupon_code', 'is', null)
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      if (data) {
-        allCoupons.push(...data.map((p: any) => ({
-          brand: p.brand_name,
-          code: p.coupon_code,
-          discount: p.discount_percentage ? `${p.discount_percentage}%` : 'הנחה',
-          category: p.category || 'partnership',
-          link: p.link,
-        })));
-      }
-    }
-  } catch (error) {
-    console.error('[fetchCoupons] Error loading from partnerships:', error);
+    console.error('[fetchCoupons] Error loading from coupons table:', error);
   }
 
-  console.log(`[fetchRelevantCoupons] ✅ Found ${allCoupons.length} total coupons`);
+  console.log(`[fetchRelevantCoupons] ✅ Found ${allCoupons.length} total coupons (AI will filter)`);
   
   return allCoupons;
 }
@@ -365,24 +335,30 @@ async function fetchRelevantPartnerships(
   accountId: string,
   keywords: string[]
 ): Promise<Partnership[]> {
-  let query = supabase
-    .from('partnerships')
-    .select('brand_name, partnership_type, description')
-    .eq('account_id', accountId)
-    .eq('status', 'active');
+  try {
+    // ⚡ AI-First: Get ALL partnerships, let Gemini understand the brands
+    const { data, error } = await supabase
+      .from('partnerships')
+      .select('brand_name, status, brief, category')
+      .eq('account_id', accountId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(50); // Get all partnerships
+    
+    if (error) {
+      console.error('[fetchPartnerships] Error:', error);
+      return [];
+    }
 
-  if (keywords.length > 0) {
-    const conditions = keywords.map(k => `brand_name.ilike.%${k}%,description.ilike.%${k}%`).join(',');
-    query = query.or(conditions);
+    return (data || []).map((p: any) => ({
+      brand_name: p.brand_name,
+      partnership_type: 'collaboration',
+      description: p.brief || p.category || '',
+    }));
+  } catch (error) {
+    console.error('[fetchPartnerships] Exception:', error);
+    return [];
   }
-
-  const { data } = await query.limit(10);
-
-  return (data || []).map((p: any) => ({
-    brand_name: p.brand_name,
-    partnership_type: p.partnership_type || 'collaboration',
-    description: p.description || '',
-  }));
 }
 
 async function fetchRelevantInsights(
@@ -409,14 +385,19 @@ async function fetchRelevantWebsites(
   keywords: string[],
   limit: number
 ): Promise<WebsiteContent[]> {
-  // ⚡ Use instagram_bio_websites (correct table name)
-  if (keywords.length === 0) {
-    const { data } = await supabase
+  try {
+    // ⚡ AI-First: Get all Linkis pages (coupons, links, etc.)
+    const { data, error } = await supabase
       .from('instagram_bio_websites')
       .select('url, page_title, page_content, scraped_at')
       .eq('account_id', accountId)
       .order('scraped_at', { ascending: false })
-      .limit(limit);
+      .limit(20); // Get all recent website data
+    
+    if (error) {
+      console.error('[fetchWebsites] Error:', error);
+      return [];
+    }
     
     return (data || []).map((w: any) => ({
       url: w.url,
@@ -424,26 +405,42 @@ async function fetchRelevantWebsites(
       content: w.page_content,
       scraped_at: w.scraped_at,
     }));
+  } catch (error) {
+    console.error('[fetchWebsites] Exception:', error);
+    return [];
   }
+}
 
-  let query = supabase
-    .from('instagram_bio_websites')
-    .select('url, page_title, page_content, scraped_at')
-    .eq('account_id', accountId);
+async function fetchRelevantTranscriptions(
+  supabase: any,
+  accountId: string,
+  keywords: string[],
+  limit: number
+): Promise<VideoTranscription[]> {
+  try {
+    // ⚡ AI-First: Get ALL recent transcriptions (recipes, workouts, tips in videos)
+    const { data, error } = await supabase
+      .from('instagram_transcriptions')
+      .select('id, transcription_text, source_id, created_at')
+      .eq('account_id', accountId)
+      .order('created_at', { ascending: false })
+      .limit(Math.max(limit, 30)); // Get at least 30 recent video transcriptions
 
-  const contentConditions = keywords.map(k => `page_content.ilike.%${k}%,page_title.ilike.%${k}%`).join(',');
-  query = query.or(contentConditions);
+    if (error) {
+      console.error('[fetchTranscriptions] Error:', error);
+      return [];
+    }
 
-  const { data } = await query
-    .order('scraped_at', { ascending: false })
-    .limit(limit);
-
-  return (data || []).map((w: any) => ({
-    url: w.url,
-    title: w.page_title,
-    content: w.page_content,
-    scraped_at: w.scraped_at,
-  })) || [];
+    return (data || []).map((t: any) => ({
+      id: t.id,
+      text: t.transcription_text,
+      media_id: t.source_id,
+      created_at: t.created_at,
+    }));
+  } catch (error) {
+    console.error('[fetchTranscriptions] Exception:', error);
+    return [];
+  }
 }
 
 // ============================================
@@ -499,6 +496,15 @@ export function formatKnowledgeForPrompt(kb: KnowledgeBase, maxLength: number = 
     context += '\n';
   }
 
+  // Add transcriptions (video/reel content) - IMPORTANT for recipes, workouts, tips
+  if (kb.transcriptions.length > 0) {
+    context += '## תמלולים מסרטונים (מתכונים, אימונים, טיפים):\n';
+    kb.transcriptions.slice(0, 5).forEach(t => {
+      context += `- ${t.text}\n\n`; // Show full transcription
+    });
+    context += '\n';
+  }
+
   // Truncate if too long
   if (context.length > maxLength) {
     context = context.substring(0, maxLength) + '\n...(קטע נוסף)';
@@ -522,6 +528,7 @@ export function hasRelevantKnowledge(kb: KnowledgeBase): boolean {
     kb.highlights.length > 0 ||
     kb.coupons.length > 0 ||
     kb.insights.length > 0 ||
-    kb.websites.length > 0
+    kb.websites.length > 0 ||
+    kb.transcriptions.length > 0
   );
 }
