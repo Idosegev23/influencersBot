@@ -295,7 +295,44 @@ async function fetchRelevantCoupons(
 ): Promise<Coupon[]> {
   const allCoupons: Coupon[] = [];
   
-  // ⚡ AI-First Strategy: Get ALL active coupons using explicit JOIN
+  // ⚡ NEW: Use indexed search if user query has keywords
+  const userQuery = keywords.join(' ');
+  if (userQuery && userQuery.length > 2) {
+    try {
+      const { data: searchResults } = await supabase
+        .rpc('search_coupons', {
+          p_account_id: accountId,
+          p_query: userQuery,
+          p_limit: 20
+        });
+
+      if (searchResults && searchResults.length > 0) {
+        console.log(`[fetchCoupons] ✅ Found ${searchResults.length} coupons via INDEXED SEARCH`);
+        for (const c of searchResults) {
+          let discount = c.description || 'הנחה';
+          
+          if (c.discount_type === 'percentage' && c.discount_value) {
+            discount = `${c.discount_value}% הנחה`;
+          } else if (c.discount_type === 'fixed' && c.discount_value) {
+            discount = `₪${c.discount_value} הנחה`;
+          }
+          
+          allCoupons.push({
+            brand: c.brand_name || 'מותג',
+            code: c.code,
+            discount: discount,
+            category: 'general',
+            link: null,
+          });
+        }
+        return allCoupons;
+      }
+    } catch (error) {
+      console.warn('[fetchCoupons] Indexed search failed, using fallback');
+    }
+  }
+  
+  // Fallback: Get ALL active coupons
   try {
     // Use raw SQL with explicit JOIN (more reliable than Supabase nested select)
     const { data: couponsData, error: couponsError } = await supabase
@@ -385,7 +422,27 @@ async function fetchRelevantPartnerships(
   keywords: string[]
 ): Promise<Partnership[]> {
   try {
-    // ⚡ AI-First: Get ALL partnerships, let Gemini understand the brands
+    // ⚡ NEW: Use indexed search if user has query
+    const userQuery = keywords.join(' ');
+    if (userQuery && userQuery.length > 2) {
+      const { data: searchResults, error } = await supabase
+        .rpc('search_partnerships', {
+          p_account_id: accountId,
+          p_query: userQuery,
+          p_limit: 10
+        });
+
+      if (searchResults && searchResults.length > 0) {
+        console.log(`[fetchPartnerships] ✅ Found ${searchResults.length} partnerships via INDEXED SEARCH`);
+        return searchResults.map((p: any) => ({
+          brand_name: p.brand_name,
+          partnership_type: p.category || 'collaboration',
+          description: p.brief || '',
+        }));
+      }
+    }
+
+    // Fallback: Get ALL partnerships, let Gemini understand the brands
     const { data, error } = await supabase
       .from('partnerships')
       .select('brand_name, status, brief, category')
