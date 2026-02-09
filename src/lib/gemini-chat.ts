@@ -1,19 +1,28 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 
-// Initialize Gemini - support both env var names
+// Initialize Gemini - support both env var names (for backward compatibility)
 const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY || '';
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);
 
+// Initialize OpenAI for GPT-5.2 Pro persona building
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
 // Models configuration
-export const GEMINI_MODELS = {
-  PERSONA_BUILDER: 'gemini-3-pro-preview',      // For building persona (quality, depth)
-  CHAT_RESPONSES: 'gemini-3-flash-preview',     // For real-time chat (speed, cost)
+export const AI_MODELS = {
+  PERSONA_BUILDER: 'gpt-5.2-pro',               // 🚀 GPT-5.2 Pro for DEEP persona building (quality, depth, reasoning)
+  CHAT_RESPONSES: 'gemini-3-flash-preview',     // For real-time chat (speed, cost) - handled by sandwich-bot
   ANALYSIS: 'gemini-3-flash-preview',           // For quick analysis
 } as const;
 
 /**
- * Build persona using Gemini 3 Pro
- * High quality, runs once when creating/updating persona
+ * Build persona using GPT-5.2 Pro with HIGH reasoning + verbosity
+ * 🚀 ULTIMATE DEEP ANALYSIS - runs once when creating/updating persona
+ * 
+ * NOTE: Despite the function name, this now uses GPT-5.2 Pro (not Gemini).
+ * Name kept for backward compatibility.
  */
 export async function buildPersonaWithGemini(input: {
   username: string;
@@ -33,7 +42,7 @@ export async function buildPersonaWithGemini(input: {
   };
   customDirectives?: string[];
 }) {
-  const model = genAI.getGenerativeModel({ model: GEMINI_MODELS.PERSONA_BUILDER });
+  console.log(`🧠 [GPT-5.2 Pro] Building DEEP persona for @${input.username}...`);
 
   const prompt = `אתה מומחה בבניית פרסונות אותנטיות למשפיענים.
 
@@ -115,16 +124,29 @@ ${input.customDirectives?.length ? `\n🎯 הנחיות מיוחדות מהמש�
 
 חשוב: התשובה חייבת להיות JSON תקין בלבד, ללא טקסט נוסף.`;
 
-  const result = await model.generateContent(prompt);
-  const text = result.response.text();
-  
-  // Parse JSON response
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new Error('Failed to parse persona JSON');
-  }
+  try {
+    const response = await openai.responses.create({
+      model: AI_MODELS.PERSONA_BUILDER,
+      input: prompt,
+      reasoning: {
+        effort: 'high', // 🧠 DEEP THINKING!
+      },
+      text: {
+        verbosity: 'high', // 📝 DETAILED OUTPUT!
+      },
+    });
 
-  return JSON.parse(jsonMatch[0]);
+    const persona = JSON.parse((response as any).output || '{}');
+    
+    console.log('✅ [GPT-5.2 Pro] Persona built successfully!');
+    console.log(`📊 Reasoning tokens: ${(response as any).usage?.reasoning_tokens || 0}`);
+    
+    return persona;
+
+  } catch (error) {
+    console.error('❌ [GPT-5.2 Pro] Failed to build persona:', error);
+    throw error;
+  }
 }
 
 /**
