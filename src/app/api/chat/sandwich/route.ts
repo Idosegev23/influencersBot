@@ -92,13 +92,15 @@ export async function POST(req: NextRequest) {
     const brands = brandsResult.data;
 
     // Process with Sandwich Bot
+    const resolvedInfluencerName = influencer?.display_name || influencer?.username || instagramUsername || username || 'Unknown';
     console.log('[SandwichBot API] Processing message...');
+    console.log(`[SandwichBot API] Influencer name resolution: display_name="${influencer?.display_name}", username="${influencer?.username}", instagramUsername="${instagramUsername}", resolved="${resolvedInfluencerName}"`);
     
     const result = await processSandwichMessageWithMetadata({
       userMessage: message,
       accountId,
       username: instagramUsername,
-      influencerName: influencer.display_name || influencer.username || instagramUsername,
+      influencerName: resolvedInfluencerName,
       conversationHistory,
     });
 

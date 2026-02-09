@@ -29,9 +29,19 @@ export abstract class BaseArchetype {
   }
 
   /**
+   * Replace [שם המשפיענית] placeholder with actual influencer name
+   */
+  private replaceName(text: string, name: string): string {
+    return text.replace(/\[שם המשפיענית\]/g, name);
+  }
+
+  /**
    * Process user input and generate response
    */
   async process(input: ArchetypeInput): Promise<ArchetypeOutput> {
+    // Extract influencer name early so it's available everywhere
+    const influencerName = input.accountContext?.influencerName || 'המשפיענית';
+
     // 1. Check guardrails first
     const triggeredGuardrails = this.checkGuardrails(input.userMessage);
     
@@ -39,9 +49,10 @@ export abstract class BaseArchetype {
     const criticalGuardrail = triggeredGuardrails.find(g => g.severity === 'critical');
     if (criticalGuardrail) {
       const rule = this.definition.guardrails.find(r => r.id === criticalGuardrail.ruleId);
+      const rawResponse = rule?.blockedResponse || 'מצטערת, אני לא יכולה לעזור בזה. כדאי להתייעץ עם מומחה.';
       
       return {
-        response: rule?.blockedResponse || 'מצטערת, אני לא יכולה לעזור בזה. כדאי להתייעץ עם מומחה.',
+        response: this.replaceName(rawResponse, influencerName),
         triggeredGuardrails,
         knowledgeUsed: [],
         confidence: 1.0, // High confidence in safety block
@@ -58,12 +69,12 @@ export abstract class BaseArchetype {
     let finalResponse = response;
     for (const triggered of triggeredGuardrails) {
       if (triggered.action === 'warn' && triggered.message) {
-        finalResponse += '\n\n⚠️ ' + triggered.message;
+        finalResponse += '\n\n⚠️ ' + this.replaceName(triggered.message, influencerName);
       }
     }
 
     return {
-      response: finalResponse,
+      response: this.replaceName(finalResponse, influencerName),
       triggeredGuardrails,
       knowledgeUsed: [knowledgeQuery],
       confidence: this.calculateConfidence(input, response),
@@ -187,11 +198,13 @@ ${this.definition.logic.responseTemplates?.length ? '📋 איך לענות:\n' 
         max_completion_tokens: 500, // Short responses (GPT-5 Nano uses max_completion_tokens)
       });
 
-      return response.choices[0].message.content || this.definition.logic.defaultResponse;
+      const influencerName = input.accountContext?.influencerName || 'המשפיענית';
+      const aiResponse = response.choices[0].message.content || this.definition.logic.defaultResponse;
+      return this.replaceName(aiResponse, influencerName);
       
     } catch (error) {
       console.error('[BaseArchetype] AI generation error:', error);
-      // Fallback to default response
+      // Fallback to default response (replaceName will be applied by process())
       return this.definition.logic.defaultResponse;
     }
   }
