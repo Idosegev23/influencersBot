@@ -49,6 +49,7 @@ import {
   getUIDirectivesSummary, 
   getModelStrategySummary,
 } from '@/engines/decision';
+import { processSupportFlow } from '@/lib/flows/support';
 import {
   checkPolicies, 
   applyPolicyOverrides, 
@@ -304,6 +305,58 @@ export async function POST(req: NextRequest) {
           traceId,
           requestId,
         });
+
+        // === HANDLE SUPPORT FLOW HAND-OFF ===
+        if (decision.handler === 'support_flow') {
+          console.log('[Stream] 🔄 Handing off to support flow...');
+          
+          const supportResult = await processSupportFlow(
+            message,
+            username,
+            null // Start fresh
+          );
+
+          // Stream the response
+          if (supportResult.response) {
+            const words = supportResult.response.split(' ');
+            for (let i = 0; i < words.length; i++) {
+              const word = words[i] + (i < words.length - 1 ? ' ' : '');
+              controller.enqueue(encodeEvent({ type: 'delta', text: word }));
+              await new Promise(resolve => setTimeout(resolve, 30));
+            }
+          }
+
+          // Send done event
+          controller.enqueue(encodeEvent({
+            type: 'done',
+            responseId: null,
+            latencyMs: Date.now() - startedAt,
+            fullText: supportResult.response || '',
+          }));
+
+          // Save messages
+          await Promise.all([
+            saveChatMessage(currentSessionId, 'user', message),
+            saveChatMessage(currentSessionId, 'assistant', supportResult.response || ''),
+            supabase
+              .from('chat_sessions')
+              .update({ 
+                state: 'Support.Brand',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', currentSessionId),
+          ]);
+
+          // Complete idempotency
+          await completeIdempotencyKey(idempotencyKey, { 
+            response: supportResult.response, 
+            sessionId: currentSessionId 
+          });
+
+          await releaseLock(currentSessionId, requestId);
+          controller.close();
+          return;
+        }
 
         // === POLICY ===
         const securityContext = buildSecurityContext(engineContext);

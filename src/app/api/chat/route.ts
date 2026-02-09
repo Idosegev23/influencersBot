@@ -45,6 +45,7 @@ import {
   getUIDirectivesSummary, 
   getModelStrategySummary,
 } from '@/engines/decision';
+import { processSupportFlow } from '@/lib/flows/support';
 import type { EngineContext, AccountContext, SessionContext, UserContext, KnowledgeRefs, LimitsContext, RequestContext } from '@/engines/context';
 
 // Policy Engine
@@ -388,6 +389,56 @@ export async function POST(req: NextRequest) {
             requestId,
           },
         });
+
+        // === HANDLE SUPPORT FLOW HAND-OFF ===
+        if (decision.handler === 'support_flow') {
+          console.log('[Chat API] 🔄 Handing off to support flow...');
+          
+          const supportResult = await processSupportFlow(
+            message,
+            influencer.username,
+            null // Start fresh
+          );
+
+          // Save messages
+          if (currentSessionId) {
+            await Promise.all([
+              saveChatMessage(currentSessionId, 'user', message),
+              saveChatMessage(currentSessionId, 'assistant', supportResult.response || ''),
+              supabase
+                .from('chat_sessions')
+                .update({ 
+                  state: 'Support.Brand', // Update state
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', currentSessionId),
+            ]);
+          }
+
+          // Complete idempotency
+          await completeIdempotencyKey(idempotencyKey, { 
+            response: supportResult.response, 
+            sessionId: currentSessionId 
+          });
+
+          return NextResponse.json({
+            success: true,
+            response: supportResult.response,
+            sessionId: currentSessionId,
+            traceId,
+            state: 'Support.Brand',
+            uiDirectives: {
+              ...decision.uiDirectives,
+              showCardList: null, // Ensure no cards
+              showQuickActions: [], // Clear quick actions
+            },
+            // Pass support flow specific data
+            supportState: supportResult.supportState,
+            action: supportResult.action,
+            brands: supportResult.brands,
+          });
+        }
+
       } catch (err) {
         console.error('[Decision] Error:', err);
       }
