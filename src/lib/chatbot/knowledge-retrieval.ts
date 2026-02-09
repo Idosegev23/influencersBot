@@ -154,8 +154,8 @@ export async function retrieveKnowledge(
   const [posts, highlights, coupons, partnerships, insights, websites, transcriptions] = await Promise.all([
     fetchRelevantPostsIndexed(supabase, accountId, userMessage, Math.max(limit, 15)),
     fetchRelevantHighlights(supabase, accountId, [], limit),
-    fetchRelevantCoupons(supabase, accountId, [], archetype),
-    fetchRelevantPartnerships(supabase, accountId, []),
+    fetchRelevantCoupons(supabase, accountId, [], archetype, userMessage), // ⚡ Pass userMessage
+    fetchRelevantPartnerships(supabase, accountId, [], userMessage), // ⚡ Pass userMessage
     fetchRelevantInsights(supabase, accountId, archetype, limit),
     fetchRelevantWebsites(supabase, accountId, [], limit),
     fetchRelevantTranscriptionsIndexed(supabase, accountId, userMessage, Math.max(limit, 20)),
@@ -291,20 +291,23 @@ async function fetchRelevantCoupons(
   supabase: any,
   accountId: string,
   keywords: string[],
-  archetype: ArchetypeType
+  archetype: ArchetypeType,
+  userMessage?: string // ⚡ Add userMessage parameter
 ): Promise<Coupon[]> {
   const allCoupons: Coupon[] = [];
   
   // ⚡ NEW: Use indexed search if user query has keywords
-  const userQuery = keywords.join(' ');
-  if (userQuery && userQuery.length > 2) {
-    try {
-      const { data: searchResults } = await supabase
-        .rpc('search_coupons', {
-          p_account_id: accountId,
-          p_query: userQuery,
-          p_limit: 20
-        });
+  // Use userMessage if available (better context), otherwise keywords
+  const searchQuery = userMessage || keywords.join(' ');
+  
+  if (searchQuery && searchQuery.length > 2) {
+      try {
+        const { data: searchResults } = await supabase
+          .rpc('search_coupons', {
+            p_account_id: accountId,
+            p_query: searchQuery,
+            p_limit: 20
+          });
 
       if (searchResults && searchResults.length > 0) {
         console.log(`[fetchCoupons] ✅ Found ${searchResults.length} coupons via INDEXED SEARCH`);
@@ -419,16 +422,20 @@ async function fetchRelevantCoupons(
 async function fetchRelevantPartnerships(
   supabase: any,
   accountId: string,
-  keywords: string[]
+  keywords: string[],
+  userMessage?: string // ⚡ Add userMessage parameter
 ): Promise<Partnership[]> {
   try {
     // ⚡ NEW: Use indexed search if user has query
     const userQuery = keywords.join(' ');
-    if (userQuery && userQuery.length > 2) {
+    // ⚡ FIX: Use full query if available
+    const searchQuery = userMessage || userQuery;
+
+    if (searchQuery && searchQuery.length > 2) {
       const { data: searchResults, error } = await supabase
         .rpc('search_partnerships', {
           p_account_id: accountId,
-          p_query: userQuery,
+          p_query: searchQuery,
           p_limit: 10
         });
 
