@@ -442,19 +442,22 @@ async function fetchRelevantPartnerships(
       }
     }
 
-    // Fallback: Get ALL partnerships, let Gemini understand the brands
+    // Fallback: Get ALL active partnerships
+    // NOTE: This includes brands WITHOUT coupons (they're shown as partnerships only, not as coupons)
     const { data, error } = await supabase
       .from('partnerships')
       .select('brand_name, status, brief, category')
       .eq('account_id', accountId)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
-      .limit(50); // Get all partnerships
+      .limit(50);
     
     if (error) {
       console.error('[fetchPartnerships] Error:', error);
       return [];
     }
+
+    console.log(`[fetchPartnerships] ✅ Found ${data?.length || 0} partnerships (includes brands without coupons)`);
 
     return (data || []).map((p: any) => ({
       brand_name: p.brand_name,
