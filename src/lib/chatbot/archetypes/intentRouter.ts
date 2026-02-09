@@ -213,13 +213,13 @@ ${input.conversationHistory.slice(-3).map(m => `${m.role}: ${m.content}`).join('
 }`;
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-5-nano',
+      model: 'gpt-5-nano-2025-08-07',
       messages: [
         { role: 'system', content: 'אתה מסווג כוונות. החזר JSON בלבד.' },
         { role: 'user', content: prompt },
       ],
       response_format: { type: 'json_object' },
-      temperature: 0.3,
+      // GPT-5 Nano only supports temperature: 1 (default)
     });
 
     const classification = JSON.parse(response.choices[0].message.content || '{}');

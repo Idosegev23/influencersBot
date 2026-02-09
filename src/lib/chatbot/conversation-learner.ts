@@ -216,13 +216,13 @@ ${conversationText.substring(0, 10000)}
 
     try {
       const response = await openai.chat.completions.create({
-        model: 'gpt-5-nano',
+        model: 'gpt-5-nano-2025-08-07',
         messages: [
           { role: 'system', content: 'אתה מנתח שיחות. החזר JSON בלבד.' },
           { role: 'user', content: prompt },
         ],
         response_format: { type: 'json_object' },
-        temperature: 0.5,
+        // GPT-5 Nano only supports temperature: 1 (default)
       });
 
       const parsed = JSON.parse(response.choices[0].message.content || '{}');

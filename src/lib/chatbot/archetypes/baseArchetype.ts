@@ -15,7 +15,7 @@ import OpenAI from 'openai';
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
-const CHAT_MODEL = 'gpt-5-nano'; // ⚡ Fastest, most cost-efficient for chat
+const CHAT_MODEL = 'gpt-5-nano-2025-08-07'; // ⚡ Fastest, most cost-efficient for chat (specific snapshot)
 
 // ============================================
 // Base Archetype Class
@@ -179,7 +179,7 @@ ${this.definition.logic.responseTemplates?.length ? '📋 איך לענות:\n' 
       const response = await openai.chat.completions.create({
         model: CHAT_MODEL,
         messages,
-        temperature: 0.7,
+        // GPT-5 Nano only supports temperature: 1 (default), so we omit it
         max_completion_tokens: 500, // Short responses (GPT-5 Nano uses max_completion_tokens)
       });
 

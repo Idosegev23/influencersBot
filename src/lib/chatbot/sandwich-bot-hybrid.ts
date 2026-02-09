@@ -122,10 +122,10 @@ ${metadataPrompt}
     ];
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-5-nano',
+      model: 'gpt-5-nano-2025-08-07',
       messages,
       tools,
-      temperature: 0.7,
+      // GPT-5 Nano only supports temperature: 1 (default)
     });
 
     const message = response.choices[0].message;
@@ -173,9 +173,9 @@ ${metadataPrompt}
     ];
 
     const finalResponse = await openai.chat.completions.create({
-      model: 'gpt-5-nano',
+      model: 'gpt-5-nano-2025-08-07',
       messages: finalMessages,
-      temperature: 0.7,
+      // GPT-5 Nano only supports temperature: 1 (default)
     });
 
     const finalAnswer = finalResponse.choices[0].message.content || 'מצטערת, לא הצלחתי להשלים.';
@@ -237,10 +237,10 @@ export async function processWithHybridAndPersona(
     ];
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-5-nano',
+      model: 'gpt-5-nano-2025-08-07',
       messages,
       tools,
-      temperature: 0.7,
+      // GPT-5 Nano only supports temperature: 1 (default)
     });
 
     const message = response.choices[0].message;
@@ -273,9 +273,9 @@ export async function processWithHybridAndPersona(
     ];
 
     const finalResponse = await openai.chat.completions.create({
-      model: 'gpt-5-nano',
+      model: 'gpt-5-nano-2025-08-07',
       messages: finalMessages,
-      temperature: 0.7,
+      // GPT-5 Nano only supports temperature: 1 (default)
     });
 
     console.log('✅ [Hybrid + Persona Bot] Complete with GPT-5 Nano!');
