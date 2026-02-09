@@ -553,16 +553,25 @@ export async function POST(req: NextRequest) {
     
     if (brands.length > 0) {
       contextStr += '## מותגים ושיתופי פעולה:\n';
-      contextStr += 'אלו המותגים שאני עובדת איתם ויש לי קופונים עבורם:\n';
+      contextStr += 'אלו המותגים שאני עובדת איתם ויש לי קופונים עבורם:\n\n';
       brands.forEach((b) => {
-        contextStr += `- ${b.brand_name}`;
-        if (b.description) contextStr += `: ${b.description}`;
-        if (b.coupon_code) contextStr += ` | קוד קופון: "${b.coupon_code}"`;
-        else contextStr += ` | ללא קוד קופון כרגע`;
-        if (b.link) contextStr += ` | לינק: ${b.link}`;
+        contextStr += `🏷️ **${b.brand_name}**\n`;
+        if (b.description) contextStr += `   תיאור: ${b.description}\n`;
+        if (b.coupon_code) {
+          const codes = b.coupon_code.split(',').map((c: string) => c.trim());
+          if (codes.length > 1) {
+            contextStr += `   קודי קופון זמינים: ${codes.map((c: string) => `"${c}"`).join(', ')}\n`;
+          } else {
+            contextStr += `   קוד קופון: "${b.coupon_code}"\n`;
+          }
+        } else {
+          contextStr += `   ללא קוד קופון כרגע\n`;
+        }
+        if (b.link) contextStr += `   לינק: ${b.link}\n`;
         contextStr += '\n';
       });
-      contextStr += '\nכשמישהו שואל על קופונים או הנחות, תן להם את הקוד הרלוונטי מהרשימה למעלה.\n';
+      contextStr += '⚠️ חשוב: כשמישהו שואל על קופון או הנחה למותג ספציפי, חפש את שם המותג ברשימה למעלה ותן את הקוד/ים הרלוונטיים.\n';
+      contextStr += 'אם יש מספר קודים למותג אחד, ציין את כולם!\n\n';
     }
 
     if (products.length > 0) {

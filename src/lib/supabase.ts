@@ -509,19 +509,35 @@ export async function getBrandsByInfluencer(influencerId: string): Promise<Brand
 
   // 1. Get partnerships-based brands
   const partnerships = await getPartnershipsByInfluencer(influencerId);
-  const partnershipBrands = partnerships.map(p => ({
-    id: p.id,
-    influencer_id: influencerId,
-    brand_name: p.brand_name,
-    description: p.brief,
-    coupon_code: p.coupon_code,
-    link: p.link,
-    short_link: p.short_link,
-    category: p.category,
-    whatsapp_phone: p.whatsapp_phone,
-    is_active: p.is_active || false,
-    created_at: p.created_at,
-    updated_at: p.updated_at,
+  
+  // 2. For each partnership, get all its coupons
+  const partnershipBrands = await Promise.all(partnerships.map(async (p) => {
+    // Get all coupons for this partnership
+    const { data: coupons } = await supabase
+      .from('coupons')
+      .select('code')
+      .eq('partnership_id', p.id)
+      .eq('is_active', true);
+    
+    // Join all coupon codes with commas, or use the partnership's coupon_code as fallback
+    const couponCodes = coupons && coupons.length > 0 
+      ? coupons.map(c => c.code).join(', ')
+      : p.coupon_code;
+    
+    return {
+      id: p.id,
+      influencer_id: influencerId,
+      brand_name: p.brand_name,
+      description: p.brief,
+      coupon_code: couponCodes,
+      link: p.link,
+      short_link: p.short_link,
+      category: p.category,
+      whatsapp_phone: p.whatsapp_phone,
+      is_active: p.is_active || false,
+      created_at: p.created_at,
+      updated_at: p.updated_at,
+    };
   }));
 
   // 2. Get standalone coupons (without partnership)
