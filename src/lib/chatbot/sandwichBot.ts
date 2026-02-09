@@ -22,6 +22,7 @@ export interface SandwichBotInput {
   userMessage: string;
   accountId: string;
   username: string;
+  influencerName: string;
   conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
   userName?: string;
 }
@@ -91,6 +92,11 @@ export class SandwichBot {
       {
         conversationHistory: input.conversationHistory,
         userName: input.userName,
+        accountContext: {
+          accountId: input.accountId,
+          username: input.username,
+          influencerName: input.influencerName,
+        }
       }
     );
 

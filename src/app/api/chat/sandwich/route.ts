@@ -98,6 +98,7 @@ export async function POST(req: NextRequest) {
       userMessage: message,
       accountId,
       username: instagramUsername,
+      influencerName: influencer.full_name || influencer.username || instagramUsername,
       conversationHistory,
     });
 

@@ -96,6 +96,11 @@ export interface ArchetypeInput {
   conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
   knowledgeBase: any; // Retrieved knowledge
   userName?: string;
+  accountContext: {
+    accountId: string;
+    username: string;
+    influencerName: string;
+  };
 }
 
 export interface ArchetypeOutput {

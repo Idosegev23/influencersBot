@@ -113,12 +113,21 @@ export async function processWithArchetype(
   type: ArchetypeType,
   userMessage: string,
   knowledgeBase: any,
-  context?: any
+  context: {
+    conversationHistory?: any[];
+    userName?: string;
+    accountContext: {
+      accountId: string;
+      username: string;
+      influencerName: string;
+    };
+  }
 ) {
   console.log('\n' + '='.repeat(80));
   console.log('🎯 [ARCHETYPE PROCESSING]');
   console.log('='.repeat(80));
   console.log(`📋 Type: ${type}`);
+  console.log(`👤 Influencer: ${context.accountContext.influencerName}`);
   console.log(`💬 Message: ${userMessage.substring(0, 100)}...`);
   console.log('\n📚 Knowledge Base Content:');
   console.log(`   Posts: ${knowledgeBase.posts?.length || 0}`);
@@ -150,8 +159,9 @@ export async function processWithArchetype(
   const result = await archetype.process({
     userMessage,
     knowledgeBase,
-    conversationHistory: context?.conversationHistory,
-    userName: context?.userName,
+    conversationHistory: context.conversationHistory,
+    userName: context.userName,
+    accountContext: context.accountContext,
   });
   
   console.log('\n' + '='.repeat(80));
