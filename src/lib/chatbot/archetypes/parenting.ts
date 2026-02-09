@@ -36,9 +36,9 @@ const PARENTING_DEFINITION: ArchetypeDefinition = {
   description: 'עוזרת עם הורות, שינה, אוכל, וגמילה',
   triggers: { keywords: ['ילד', 'תינוק', 'בייבי', 'שינה', 'גמילה'] },
   logic: {
-    buildKnowledgeQuery: (msg) => `parenting kids baby tips ${msg}`,
+    buildKnowledgeQuery: (msg) => `הורות ילדים משפחה פעילויות ${msg}`,
     responseTemplates: [],
-    defaultResponse: 'אני כאן לעזור! [שם המשפיענית] עברה את זה עם הילדים שלה.',
+    defaultResponse: 'אני כאן לעזור! [שם המשפיענית] עברה את זה עם הילדים שלה. תוכל/י לפרט קצת יותר מה את/ה מחפש/ת?',
   },
   guardrails: PARENTING_GUARDRAILS,
   examples: [],

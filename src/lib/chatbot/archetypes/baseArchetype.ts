@@ -169,7 +169,7 @@ export abstract class BaseArchetype {
 ${this.definition.logic.responseTemplates?.length ? '📋 איך לענות:\n' + this.definition.logic.responseTemplates.map(t => `• ${t.situation}: ${t.template}`).join('\n') : ''}
 
 ⚠️ כללים קריטיים:
-1. תשובה קצרה (3-4 משפטים)
+1. תשובה מועילה ומלאה (אפשר עד 6 משפטים אם יש תוכן רלוונטי)
 2. השתמש במידע ספציפי מבסיס הידע - תן תוכן מלא!
 3. שפות: הבן עברית ואנגלית (Spring = ספרינג)
 4. סגנון: חם וידידותי, 1-2 אימוג'ים
@@ -225,6 +225,20 @@ ${this.definition.logic.responseTemplates?.length ? '📋 איך לענות:\n' 
         context += `${i + 1}. ${caption}\n`;
         if (p.hashtags?.length > 0) {
           context += `   תגיות: ${p.hashtags.slice(0, 5).join(' ')}\n`;
+        }
+        context += '\n';
+      });
+    }
+
+    // Highlights - SHOW FULL CONTENT
+    if (kb.highlights?.length > 0) {
+      context += `\n✨ **הילייטס וסטוריז (${kb.highlights.length}) - מידע אישי וחשוב:**\n`;
+      kb.highlights.slice(0, 10).forEach((h: any, i: number) => {
+        context += `${i + 1}. ${h.title}`;
+        if (h.items?.length > 0) {
+           // Extract text from items if available (transcriptions/OCR)
+           const itemsText = h.items.map((item: any) => item.text || item.transcription).filter(Boolean).join(' ');
+           if (itemsText) context += `: ${itemsText.substring(0, 200)}...`;
         }
         context += '\n';
       });
