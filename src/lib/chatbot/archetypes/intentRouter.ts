@@ -45,8 +45,9 @@ const ARCHETYPE_TRIGGERS: Record<ArchetypeType, string[]> = {
   
   parenting: [
     'ילד', 'תינוק', 'בייבי', 'שינה', 'אוכל', 'גמילה', 'מוצץ',
-    'עגלה', 'מיטת תינוק', 'חיתול', 'הנקה', 'בקבוק', 'פורמולה',
-    'גן', 'משחקים', 'התפתחות', 'הליכה', 'דיבור'
+    'עגלת תינוק', 'מיטת תינוק', 'חיתול', 'הנקה', 'בקבוק', 'פורמולה',
+    'גן', 'משחקים', 'התפתחות', 'הליכה', 'דיבור',
+    // רק עגלת תינוק, לא "עגלה" כסלנג
   ],
   
   coupons: [
@@ -95,7 +96,9 @@ export class IntentRouter {
 
     // 1. Try simple keyword matching first (fast)
     const keywordMatch = this.quickKeywordMatch(userMessage);
-    if (keywordMatch.confidence > 0.5) { // ⚡ Lowered threshold from 0.7 to 0.5
+    // ⚡ RAISED THRESHOLD: Only bypass AI if we are VERY confident (e.g. multiple keywords)
+    // Single keyword match gives 0.6, so 0.8 ensures single words go to AI for context check
+    if (keywordMatch.confidence > 0.8) { 
       console.log(`[IntentRouter] ✅ Keyword match: ${keywordMatch.primaryArchetype} (${keywordMatch.confidence.toFixed(2)})`);
       return keywordMatch;
     }
