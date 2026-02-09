@@ -72,7 +72,7 @@ export async function runBackgroundScrape(
     });
 
     // 1. Scrape posts
-    const postsLimit = influencer.scrape_settings?.posts_limit || 50;
+    const postsLimit = influencer.scrape_settings?.posts_limit || 150; // Upgraded from 50 to 150
     
     console.log(`\n📸 [${username}] STAGE 1/5: Scraping ${postsLimit} posts...`);
     await updateProgress(username, {
@@ -99,7 +99,7 @@ export async function runBackgroundScrape(
     console.log(`✅ [${username}] Posts scraped: ${posts.length} in ${postsElapsed}s`);
 
     // 2. Scrape reels
-    const reelsLimit = influencer.scrape_settings?.reels_limit || 30;
+    const reelsLimit = influencer.scrape_settings?.reels_limit || 50; // Upgraded from 30 to 50 for more content
     
     console.log(`\n🎬 [${username}] STAGE 2/5: Scraping ${reelsLimit} reels...`);
     await updateProgress(username, {

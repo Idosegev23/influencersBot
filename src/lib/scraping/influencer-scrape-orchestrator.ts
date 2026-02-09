@@ -96,7 +96,7 @@ export const DEFAULT_SCRAPE_CONFIG: ScrapeOrchestrationConfig = {
   scrapeBioWebsites: true,
   scrapeReels: true,
   
-  postsLimit: 10,
+  postsLimit: 150, // Upgraded from 10 to 150 for deeper content analysis
   commentsPerPost: 3,
   maxWebsitePages: 6,
   
@@ -359,7 +359,7 @@ export async function runInfluencerScrapeOrchestration(
       reportProgress('transcription', 'running', 80, 'מתמלל סרטונים...');
       
       try {
-        const transcriptionResult = await processPendingTranscriptions(accountId, 10);
+        const transcriptionResult = await processPendingTranscriptions(accountId, 30); // Upgraded from 10 to 30 for deeper coverage
         stats.videosTranscribed = transcriptionResult.succeeded;
 
         reportProgress('transcription', 'completed', 90, 

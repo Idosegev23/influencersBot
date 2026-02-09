@@ -404,7 +404,7 @@ ${content}
     const genAI = getGeminiClient();
 
     const response = await genAI.models.generateContent({
-      model: 'gemini-3-pro-preview,
+      model: 'gemini-3-pro-preview',
       contents: prompt,
       config: {
         temperature: 0.5,
@@ -504,7 +504,7 @@ export async function saveProcessedData(
       topics: data.topics,
       recommended_products: data.recommended_products,
       values_and_approach: data.values_and_approach,
-      gemini_model_used: 'gemini-3-pro-preview,
+      gemini_model_used: 'gemini-3-pro-preview',
       processed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }, {

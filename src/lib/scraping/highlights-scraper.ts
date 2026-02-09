@@ -201,7 +201,7 @@ export async function scrapeHighlightsAndStories(
   console.log(`[Highlights Scraper] Starting scrape for @${username}`);
 
   const run = await runApifyActor(HIGHLIGHTS_STORIES_ACTOR, {
-    profileUrl: `https://www.instagram.com/${username}/`,
+    links: [`https://www.instagram.com/${username}/`], // Fixed: Actor expects 'links' array, not 'profileUrl'
   });
 
   const items = await getDatasetItems<any>(run.defaultDatasetId);
