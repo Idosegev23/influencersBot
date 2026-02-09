@@ -9,12 +9,13 @@ import {
   ArchetypeOutput, 
   GuardrailRule 
 } from './types';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 
-// Initialize Gemini
-const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY || '';
-const genAI = new GoogleGenerativeAI(GEMINI_KEY);
-const GEMINI_MODEL = 'gemini-3-flash-preview'; // Fast, reliable model for chat responses
+// Initialize OpenAI with GPT-5 Nano - FASTEST!
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+const CHAT_MODEL = 'gpt-5-nano'; // ⚡ Fastest, most cost-efficient for chat
 
 // ============================================
 // Base Archetype Class
@@ -129,81 +130,60 @@ export abstract class BaseArchetype {
   }
 
   /**
-   * Generate AI response using Gemini with archetype-specific context
+   * Generate AI response using GPT-5 Nano with archetype-specific context
    */
   protected async generateAIResponse(
     input: ArchetypeInput,
     knowledgeQuery: string
   ): Promise<string> {
     try {
-      const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
-      
       // Build context from knowledge base
       const kbContext = this.buildKnowledgeContext(input.knowledgeBase);
       
       // Build conversation history
-      const historyContext = input.conversationHistory?.length 
-        ? `\n📜 היסטוריית שיחה:\n${input.conversationHistory.map(m => `${m.role === 'user' ? 'משתמש' : 'אני'}: ${m.content}`).join('\n')}\n`
-        : '';
+      const historyMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = 
+        input.conversationHistory?.map(m => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+        })) || [];
       
-      // Build archetype-specific prompt
-      const prompt = `אתה עוזר וירטואלי חכם של משפיענית שעוזר לקהל שלה באופן אישי ומקצועי.
+      // Build archetype-specific system prompt
+      const systemPrompt = `אתה עוזר וירטואלי חכם של משפיענית שעוזר לקהל שלה באופן אישי ומקצועי.
 
 🎯 תפקיד: ${this.definition.name}
 📝 ${this.definition.description}
 
-${kbContext}
-${historyContext}
+${this.definition.logic.responseTemplates?.length ? '📋 איך לענות:\n' + this.definition.logic.responseTemplates.map(t => `• ${t.situation}: ${t.template}`).join('\n') : ''}
+
+⚠️ כללים קריטיים:
+1. תשובה קצרה (3-4 משפטים)
+2. השתמש במידע ספציפי מבסיס הידע - תן תוכן מלא!
+3. שפות: הבן עברית ואנגלית (Spring = ספרינג)
+4. סגנון: חם וידידותי, 1-2 אימוג'ים
+5. אם אין מידע - תגיד בכנות
+6. אל תציע דברים לא רלוונטיים!`;
+
+      const userPrompt = `${kbContext}
 
 💬 שאלת המשתמש:
 "${input.userMessage}"
 
-${this.definition.logic.responseTemplates?.length ? '📋 איך לענות:\n' + this.definition.logic.responseTemplates.map(t => `• ${t.situation}: ${t.template}`).join('\n') : ''}
-
-⚠️ כללים קריטיים (MUST FOLLOW):
-
-1. תשובה קצרה וממוקדת:
-   • מקסימום 3-4 משפטים קצרים
-   • ישר לעניין, בלי הקדמות ארוכות
-   • אל תדבר בכלליות!
-
-2. השתמש במידע ספציפי מבסיס הידע - תן תוכן מלא!
-   • אם יש קופונים/מותגים - תן שמות מדויקים + אחוזי הנחה + קודים
-   • אם יש מתכונים/טיפים בפוסטים/תמלולים - תן את המידע המלא, אל תגיד "יש לי פוסט"
-   • דוגמה טובה למתכון: "המרכיבים: 2 כוסות קמח, 1 כף שמן... שלבים: ..."
-   • דוגמה רעה: "יש לי פוסט עם מתכון" (אסור!)
-   • אם שואלים על מתכון/טיפ - תן את התוכן המלא מהפוסט או מהתמלול
-
-3. שפות ושמות מותגים - CRITICAL:
-   • משתמשים יכולים לשאול באנגלית או בעברית
-   • שמות מותגים יכולים להיות באנגלית (Spring, Argania) או בעברית (ספרינג, ארגניה)
-   • תבין שאלות בשתי השפות! "יש קופון לספרינג?" = "יש קופון ל-Spring?"
-   • אל תגיד "אין מידע" אם המידע קיים בשפה אחרת!
-
-4. סגנון תקשורת:
-   • חם וידידותי אבל לא מוגזם
-   • 1-2 אימוג'ים מקסימום
-   • גוף ראשון רבים: "אנחנו ממליצות", "יש לנו"
-   • אל תתחיל עם "היי אהובה!" או דברים דומים
-
-5. אם אין מידע רלוונטי - CRITICAL:
-   • תגיד בכנות: "אין לי כרגע מידע על זה, אני מעדכנת את המשפיענית"
-   • אל תמציא מידע!
-   • אל תציע קופונים/מוצרים לא רלוונטיים!
-   • אם המשפיענית לא מומחית בנושא - תגיד את זה בכנות
-   • דוגמה טובה: "מירן מתמחה בעיקר באימוני כוח, לא ביוגה"
-   • דוגמה רעה: "אין מידע על יוגה, אבל יש קופון ל-Leaves!" (אסור!)
-
-6. אל תנסה להיות "מועיל מדי":
-   • אם השאלה על יוגה ואין תוכן - תגיד שאין תוכן
-   • אל תשנה נושא לקופונים/מתכונים לא רלוונטיים
-   • תשובה כנה עדיפה על תשובה מבולבלת!
-
 תן תשובה קצרה, ספציפית ומועילה בעברית:`;
 
-      const result = await model.generateContent(prompt);
-      const response = result.response;
-      return response.text();
+      const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+        { role: 'system', content: systemPrompt },
+        ...historyMessages,
+        { role: 'user', content: userPrompt },
+      ];
+
+      const response = await openai.chat.completions.create({
+        model: CHAT_MODEL,
+        messages,
+        temperature: 0.7,
+        max_tokens: 500, // Short responses
+      });
+
+      return response.choices[0].message.content || this.definition.logic.defaultResponse;
       
     } catch (error) {
       console.error('[BaseArchetype] AI generation error:', error);

@@ -1,12 +1,15 @@
 /**
  * Conversation Learner
  * מנגנון למידה מהשיחות - מזהה תובנות ומשפר את הבוט
+ * ⚡ Powered by GPT-5 Nano for FAST analysis
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 import { createClient } from '@/lib/supabase/server';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 // ============================================
 // Type Definitions
@@ -169,11 +172,9 @@ export class ConversationLearner {
   }
 
   /**
-   * Extract insights from conversations using Gemini
+   * Extract insights from conversations using GPT-5 Nano (FAST!)
    */
   private async extractInsights(conversations: any[]): Promise<ConversationInsight[]> {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
-
     // Build conversation text
     let conversationText = '';
     for (const conv of conversations) {
@@ -190,33 +191,11 @@ export class ConversationLearner {
 נתח את השיחות הבאות וזהה:
 
 1. **שאלות נפוצות (FAQ)** - שאלות שחוזרות על עצמן
-   - מה השאלה?
-   - מה התשובה הטובה ביותר?
-
 2. **נושאים מעניינים** - על מה הקהל שואל הכי הרבה?
-   - קופונים והנחות
-   - שיתופי פעולה
-   - טיפים ועצות
-   - מוצרים ספציפיים
-
 3. **בעיות/Pain Points** - עם מה הקהל מתמודד?
-   - מה הבעיה?
-   - איך אפשר לעזור?
-
 4. **פידבק** - מה אומרים על המשפיענית/מוצרים?
-   - פידבק חיובי
-   - פידבק שלילי
-   - הצעות לשיפור
-
 5. **התנגדויות** - מה עוצר אנשים?
-   - מחיר
-   - ספקות
-   - שאלות נוספות
-
 6. **דפוסי שפה** - איך הקהל מדבר?
-   - מילים נפוצות
-   - סגנון (פורמלי/לא פורמלי)
-   - אמוג'ים נפוצים
 
 שיחות:
 ${conversationText.substring(0, 10000)}
@@ -236,16 +215,17 @@ ${conversationText.substring(0, 10000)}
 }`;
 
     try {
-      const result = await model.generateContent(prompt);
-      const response = result.response.text();
+      const response = await openai.chat.completions.create({
+        model: 'gpt-5-nano',
+        messages: [
+          { role: 'system', content: 'אתה מנתח שיחות. החזר JSON בלבד.' },
+          { role: 'user', content: prompt },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.5,
+      });
 
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        console.error('[ConversationLearner] Failed to parse Gemini response');
-        return [];
-      }
-
-      const parsed = JSON.parse(jsonMatch[0]);
+      const parsed = JSON.parse(response.choices[0].message.content || '{}');
       return parsed.insights || [];
 
     } catch (error) {

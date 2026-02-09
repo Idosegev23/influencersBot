@@ -3,14 +3,16 @@
  * מזהה את כוונת המשתמש ומנתב לארכיטיפ המתאים
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 import { 
   ArchetypeType, 
   IntentClassification, 
   RouterInput 
 } from './types';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 // ============================================
 // Archetype Triggers Map
@@ -175,11 +177,9 @@ export class IntentRouter {
   }
 
   /**
-   * Use Gemini for intent classification
+   * Use GPT-5 Nano for intent classification (FAST!)
    */
   private async geminiClassify(input: RouterInput): Promise<IntentClassification> {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
-
     const prompt = `אתה מסווג כוונות למערכת בוט צ'אט של משפיענית.
 
 קטגוריות אפשריות:
@@ -212,22 +212,23 @@ ${input.conversationHistory.slice(-3).map(m => `${m.role}: ${m.content}`).join('
   "reasoning": "הסבר קצר"
 }`;
 
-    const result = await model.generateContent(prompt);
-    const response = result.response.text();
+    const response = await openai.chat.completions.create({
+      model: 'gpt-5-nano',
+      messages: [
+        { role: 'system', content: 'אתה מסווג כוונות. החזר JSON בלבד.' },
+        { role: 'user', content: prompt },
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.3,
+    });
 
-    // Parse JSON from response
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('Failed to parse Gemini response');
-    }
-
-    const classification = JSON.parse(jsonMatch[0]);
+    const classification = JSON.parse(response.choices[0].message.content || '{}');
 
     return {
-      primaryArchetype: classification.primaryArchetype,
+      primaryArchetype: classification.primaryArchetype || 'general',
       secondaryArchetypes: classification.secondaryArchetypes || [],
-      confidence: classification.confidence,
-      reasoning: classification.reasoning,
+      confidence: classification.confidence || 0.5,
+      reasoning: classification.reasoning || 'auto-classified',
     };
   }
 }

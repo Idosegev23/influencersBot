@@ -7,9 +7,11 @@
  * 3. AI requests specific content (function call)
  * 4. Fetch only what's needed
  * 5. AI answers with full context
+ * 
+ * 🚀 Now using GPT-5 Nano - FASTEST + CHEAPEST!
  */
 
-import { GoogleGenerativeAI, FunctionDeclaration, Tool } from '@google/generative-ai';
+import OpenAI from 'openai';
 import { 
   searchContentByQuery, 
   fetchDetailedContent, 
@@ -19,47 +21,49 @@ import {
   type ContentMetadata 
 } from './hybrid-retrieval';
 
-const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY || '';
-const genAI = new GoogleGenerativeAI(GEMINI_KEY);
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 // ============================================
-// Function Declarations for AI
+// Function Declarations for OpenAI
 // ============================================
 
-const fetchContentFunction: FunctionDeclaration = {
-  name: 'fetch_detailed_content',
-  description: 'שלוף תוכן מלא של פוסטים, תמלולים או הילייטס ספציפיים לפי ID. השתמש בזה אחרי שראית את ה-metadata וקבעת מה רלוונטי.',
-  parameters: {
-    type: 'object',
-    properties: {
-      posts: {
-        type: 'array',
-        items: { type: 'string' },
-        description: 'רשימת IDs של פוסטים לשליפה',
-      },
-      transcriptions: {
-        type: 'array',
-        items: { type: 'string' },
-        description: 'רשימת IDs של תמלולים לשליפה',
-      },
-      highlights: {
-        type: 'array',
-        items: { type: 'string' },
-        description: 'רשימת IDs של הילייטס לשליפה',
-      },
-      stories: {
-        type: 'array',
-        items: { type: 'string' },
-        description: 'רשימת IDs של סטוריז לשליפה',
+const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
+  {
+    type: 'function',
+    function: {
+      name: 'fetch_detailed_content',
+      description: 'שלוף תוכן מלא של פוסטים, תמלולים או הילייטס ספציפיים לפי ID. השתמש בזה אחרי שראית את ה-metadata וקבעת מה רלוונטי.',
+      parameters: {
+        type: 'object',
+        properties: {
+          posts: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'רשימת IDs של פוסטים לשליפה',
+          },
+          transcriptions: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'רשימת IDs של תמלולים לשליפה',
+          },
+          highlights: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'רשימת IDs של הילייטס לשליפה',
+          },
+          stories: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'רשימת IDs של סטוריז לשליפה',
+          },
+        },
+        required: [],
       },
     },
-    required: [],
   },
-};
-
-const contentTool: Tool = {
-  functionDeclarations: [fetchContentFunction],
-};
+];
 
 // ============================================
 // Main Hybrid Bot Function
@@ -70,7 +74,7 @@ export async function processWithHybridRetrieval(
   userMessage: string,
   conversationHistory: Array<{ role: string; content: string }> = []
 ): Promise<string> {
-  console.log('\n🥪 [Hybrid Sandwich Bot] Starting...');
+  console.log('\n🥪 [Hybrid Sandwich Bot] Starting with GPT-5 Nano...');
   console.log(`📝 Message: ${userMessage.substring(0, 50)}...`);
 
   try {
@@ -82,24 +86,23 @@ export async function processWithHybridRetrieval(
     const metadataPrompt = formatMetadataForAI(metadata);
 
     // ============================================
-    // Stage 2: AI Decides What to Fetch
+    // Stage 2: AI Decides What to Fetch (GPT-5 Nano)
     // ============================================
-    console.log('\n🤖 [Stage 2] AI analyzing metadata...');
+    console.log('\n🤖 [Stage 2] GPT-5 Nano analyzing metadata...');
     
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-3-flash-preview',
-      tools: [contentTool],
-    });
-
-    const chat = model.startChat({
-      history: conversationHistory.map(msg => ({
-        role: msg.role === 'user' ? 'user' : 'model',
-        parts: [{ text: msg.content }],
+    // Build messages array
+    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+      {
+        role: 'system',
+        content: 'אתה עוזר וירטואלי של משפיענית. אם צריך תוכן מפורט - קרא fetch_detailed_content. אם לא - ענה ישירות.',
+      },
+      ...conversationHistory.map(msg => ({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content,
       })),
-    });
-
-    // Build initial prompt with metadata
-    const stage2Prompt = `אתה עוזר וירטואלי של משפיענית. המשתמש שאל:
+      {
+        role: 'user',
+        content: `אתה עוזר וירטואלי של משפיענית. המשתמש שאל:
 "${userMessage}"
 
 ${metadataPrompt}
@@ -114,18 +117,24 @@ ${metadataPrompt}
 אם אין צורך בתוכן מפורט (למשל: שאלה כללית):
 - פשוט ענה ישירות
 
-תחשוב היטב - שלוף רק מה שבאמת צריך! ⚡`;
+תחשוב היטב - שלוף רק מה שבאמת צריך! ⚡`,
+      },
+    ];
 
-    const result = await chat.sendMessage(stage2Prompt);
-    const response = result.response;
+    const response = await openai.chat.completions.create({
+      model: 'gpt-5-nano',
+      messages,
+      tools,
+      temperature: 0.7,
+    });
+
+    const message = response.choices[0].message;
 
     // Check if AI requested function call
-    const functionCalls = response.functionCalls();
-    
-    if (!functionCalls || functionCalls.length === 0) {
+    if (!message.tool_calls || message.tool_calls.length === 0) {
       // No function call needed - direct answer
       console.log('✅ [Stage 2] AI answered directly (no content fetch needed)');
-      return response.text();
+      return message.content || 'מצטערת, לא הצלחתי להבין. נסי שוב?';
     }
 
     // ============================================
@@ -133,8 +142,8 @@ ${metadataPrompt}
     // ============================================
     console.log('\n📥 [Stage 3] AI requested detailed content...');
     
-    const functionCall = functionCalls[0];
-    const request: RetrievalRequest = functionCall.args as RetrievalRequest;
+    const toolCall = message.tool_calls[0];
+    const request: RetrievalRequest = JSON.parse(toolCall.function.arguments);
     
     console.log(`  Posts: ${request.posts?.length || 0}`);
     console.log(`  Transcriptions: ${request.transcriptions?.length || 0}`);
@@ -147,20 +156,29 @@ ${metadataPrompt}
     // ============================================
     // Stage 4: AI Answers with Full Context
     // ============================================
-    console.log('\n💬 [Stage 4] AI generating final answer...');
+    console.log('\n💬 [Stage 4] GPT-5 Nano generating final answer...');
 
     // Send function response back to AI
-    const finalResult = await chat.sendMessage([{
-      functionResponse: {
-        name: 'fetch_detailed_content',
-        response: {
+    const finalMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+      ...messages,
+      message,
+      {
+        role: 'tool',
+        tool_call_id: toolCall.id,
+        content: JSON.stringify({
           content: detailedPrompt,
           itemsRetrieved: detailedContent.length,
-        },
+        }),
       },
-    }]);
+    ];
 
-    const finalAnswer = finalResult.response.text();
+    const finalResponse = await openai.chat.completions.create({
+      model: 'gpt-5-nano',
+      messages: finalMessages,
+      temperature: 0.7,
+    });
+
+    const finalAnswer = finalResponse.choices[0].message.content || 'מצטערת, לא הצלחתי להשלים.';
     
     console.log('✅ [Hybrid Bot] Complete!');
     console.log(`📊 Stats: Metadata: ${metadata.length}, Detailed: ${detailedContent.length}`);
@@ -184,18 +202,15 @@ export async function processWithHybridAndPersona(
   tone: string,
   conversationHistory: Array<{ role: string; content: string }> = []
 ): Promise<string> {
-  console.log('\n🥪✨ [Hybrid + Persona Bot] Starting...');
+  console.log('\n🥪✨ [Hybrid + Persona Bot] Starting with GPT-5 Nano...');
 
   try {
     // Stage 1: Smart indexed search
     const metadata = await searchContentByQuery(accountId, userMessage);
     const metadataPrompt = formatMetadataForAI(metadata);
 
-    // Stage 2: AI with personality
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-3-flash-preview',
-      tools: [contentTool],
-      systemInstruction: `אתה עוזר וירטואלי של ${influencerName}.
+    // Stage 2: GPT-5 Nano with personality
+    const systemPrompt = `אתה עוזר וירטואלי של ${influencerName}.
 סגנון דיבור: ${tone}
 
 כללים:
@@ -203,48 +218,68 @@ export async function processWithHybridAndPersona(
 2. אם צריך מידע ספציפי - קרא fetch_detailed_content
 3. אל תמציא מידע שאין לך!
 4. אם אין מידע רלוונטי - תגיד בכנות
-5. 1-2 אימוג'ים מקסימום`,
-    });
+5. 1-2 אימוג'ים מקסימום`;
 
-    const chat = model.startChat({
-      history: conversationHistory.map(msg => ({
-        role: msg.role === 'user' ? 'user' : 'model',
-        parts: [{ text: msg.content }],
+    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+      { role: 'system', content: systemPrompt },
+      ...conversationHistory.map(msg => ({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content,
       })),
-    });
-
-    const stage2Prompt = `${metadataPrompt}
+      {
+        role: 'user',
+        content: `${metadataPrompt}
 
 שאלת המשתמש: "${userMessage}"
 
-החלט אם אתה צריך תוכן מפורט, או שאתה יכול לענות ישירות.`;
+החלט אם אתה צריך תוכן מפורט, או שאתה יכול לענות ישירות.`,
+      },
+    ];
 
-    const result = await chat.sendMessage(stage2Prompt);
-    const response = result.response;
-    const functionCalls = response.functionCalls();
+    const response = await openai.chat.completions.create({
+      model: 'gpt-5-nano',
+      messages,
+      tools,
+      temperature: 0.7,
+    });
 
-    if (!functionCalls || functionCalls.length === 0) {
-      return response.text();
+    const message = response.choices[0].message;
+
+    if (!message.tool_calls || message.tool_calls.length === 0) {
+      return message.content || 'מצטערת, לא הצלחתי להבין. נסי שוב?';
     }
 
     // Stage 3: Fetch detailed
-    const functionCall = functionCalls[0];
-    const request: RetrievalRequest = functionCall.args as RetrievalRequest;
+    const toolCall = message.tool_calls[0];
+    const request: RetrievalRequest = JSON.parse(toolCall.function.arguments);
+    
+    console.log(`\n📥 [Stage 3] Fetching: ${request.posts?.length || 0} posts, ${request.transcriptions?.length || 0} transcriptions`);
+    
     const detailedContent = await fetchDetailedContent(accountId, request);
     const detailedPrompt = formatDetailedContentForAI(detailedContent);
 
-    // Stage 4: Final answer
-    const finalResult = await chat.sendMessage([{
-      functionResponse: {
-        name: 'fetch_detailed_content',
-        response: {
+    // Stage 4: Final answer with context
+    const finalMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+      ...messages,
+      message,
+      {
+        role: 'tool',
+        tool_call_id: toolCall.id,
+        content: JSON.stringify({
           content: detailedPrompt,
           itemsRetrieved: detailedContent.length,
-        },
+        }),
       },
-    }]);
+    ];
 
-    return finalResult.response.text();
+    const finalResponse = await openai.chat.completions.create({
+      model: 'gpt-5-nano',
+      messages: finalMessages,
+      temperature: 0.7,
+    });
+
+    console.log('✅ [Hybrid + Persona Bot] Complete with GPT-5 Nano!');
+    return finalResponse.choices[0].message.content || 'מצטערת, נתקלתי בבעיה.';
 
   } catch (error) {
     console.error('❌ [Hybrid + Persona Bot] Error:', error);
