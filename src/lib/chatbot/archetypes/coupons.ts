@@ -33,16 +33,6 @@ const COUPONS_GUARDRAILS: GuardrailRule[] = [
     warningMessage: 'שימי לב - מחירים משתנים כל הזמן בחנויות. המחיר שאני נותנת זה מה שפעיל כרגע, אבל כדאי לבדוק שוב לפני הרכישה.',
     severity: 'high',
   },
-  {
-    id: 'verify-code-validity',
-    description: 'חובת בדיקת תוקף קוד',
-    triggers: {
-      keywords: ['קוד', 'קופון', 'הנחה'],
-    },
-    action: 'redirect',
-    warningMessage: 'רגע, אני מוודאת שהקוד הזה עדיין פעיל... ⏳',
-    severity: 'medium',
-  },
 ];
 
 // ============================================
@@ -79,7 +69,7 @@ const COUPONS_DEFINITION: ArchetypeDefinition = {
       },
     ],
     
-    defaultResponse: 'אני כאן כדי לעזור לך לחסוך! ספרי לי מה את מחפשת.',
+    defaultResponse: 'מצאתי כמה קופונים שווים עבורך! 👇 הנה הרשימה המלאה:',
   },
   
   guardrails: COUPONS_GUARDRAILS,

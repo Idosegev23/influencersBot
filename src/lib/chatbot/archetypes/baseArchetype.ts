@@ -125,7 +125,7 @@ export abstract class BaseArchetype {
           ruleId: rule.id,
           severity: rule.severity,
           action: rule.action,
-          message: rule.action === 'warn' ? rule.warningMessage : rule.blockedResponse,
+          message: rule.action === 'warn' ? rule.warningMessage : (rule.blockedResponse || rule.warningMessage),
         });
       }
     }
