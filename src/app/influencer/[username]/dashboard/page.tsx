@@ -650,7 +650,7 @@ export default function InfluencerDashboardPage({
           </motion.div>
         </div>
 
-        {/* Bot Content Management - MAIN ACTION */}
+        {/* Bot Management - MAIN ACTION */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -658,7 +658,7 @@ export default function InfluencerDashboardPage({
           className="mb-6"
         >
           <Link
-            href={`/influencer/${username}/bot-content`}
+            href={`/influencer/${username}/manage`}
             className="block p-6 bg-gradient-to-r from-indigo-600/30 to-purple-600/30 hover:from-indigo-600/40 hover:to-purple-600/40 border-2 border-indigo-500/50 hover:border-indigo-400 rounded-2xl transition-all"
           >
             <div className="flex items-center justify-between">
@@ -668,7 +668,7 @@ export default function InfluencerDashboardPage({
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-white mb-1">ניהול תוכן הבוט</h3>
-                  <p className="text-sm text-gray-300">ערוך קופונים, מוצרים, מותגים ושאלות</p>
+                  <p className="text-sm text-gray-300">מותגים, קופונים, מוצרים, תוכן והגדרות</p>
                 </div>
               </div>
               <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-white/10 rounded-lg">
