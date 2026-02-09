@@ -206,6 +206,9 @@ export async function getInfluencerByUsername(username: string): Promise<Influen
     // Additional config fields
     greeting_message: config.greeting_message,
     suggested_questions: config.suggested_questions,
+    
+    // Security config for authentication
+    security_config: account.security_config,
   } as any;
 }
 
