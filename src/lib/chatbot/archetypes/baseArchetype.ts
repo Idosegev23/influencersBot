@@ -198,7 +198,6 @@ ${this.definition.logic.responseTemplates?.length ? '📋 איך לענות:\n' 
         max_completion_tokens: 500, // Short responses (GPT-5 Nano uses max_completion_tokens)
       });
 
-      const influencerName = input.accountContext?.influencerName || 'המשפיענית';
       const aiResponse = response.choices[0].message.content || this.definition.logic.defaultResponse;
       return this.replaceName(aiResponse, influencerName);
       
