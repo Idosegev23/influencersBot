@@ -310,10 +310,25 @@ export async function POST(req: NextRequest) {
         if (decision.handler === 'support_flow') {
           console.log('[Stream] 🔄 Handing off to support flow...');
           
+          // Map session state to support flow state
+          let supportState = null;
+          if (session?.state) {
+            const stateMap: Record<string, 'detect' | 'brand' | 'name' | 'order' | 'problem' | 'phone' | 'complete'> = {
+              'Support.CollectBrand': 'detect', // Start fresh
+              'Support.CollectName': 'brand',
+              'Support.CollectOrder': 'name',
+              'Support.CollectProblem': 'order',
+              'Support.CollectPhone': 'problem',
+              'Support.Complete': 'complete',
+            };
+            const step = stateMap[session.state] || 'detect';
+            supportState = { step, data: session.metadata || {} };
+          }
+          
           const supportResult = await processSupportFlow(
             message,
             username,
-            null // Start fresh
+            supportState
           );
 
           // Use state from decision engine (Support.CollectBrand)
@@ -332,7 +347,11 @@ export async function POST(req: NextRequest) {
               showCardList: null,
               showQuickActions: [],
             },
-            stateTransition: { from: 'Chat.Active', to: newState },
+            stateTransition: { from: session?.state || 'Idle', to: newState },
+            // Support flow specific data
+            supportState: supportResult.supportState,
+            action: supportResult.action,
+            brands: supportResult.brands,
           }));
 
           // Stream the response
@@ -353,7 +372,7 @@ export async function POST(req: NextRequest) {
             fullText: supportResult.response || '',
           }));
 
-          // Save messages
+          // Save messages and update session
           await Promise.all([
             saveChatMessage(currentSessionId, 'user', message),
             saveChatMessage(currentSessionId, 'assistant', supportResult.response || ''),
@@ -361,6 +380,7 @@ export async function POST(req: NextRequest) {
               .from('chat_sessions')
               .update({ 
                 state: newState,
+                metadata: supportResult.supportState?.data || {},
                 updated_at: new Date().toISOString(),
               })
               .eq('id', currentSessionId),

@@ -394,16 +394,31 @@ export async function POST(req: NextRequest) {
         if (decision.handler === 'support_flow') {
           console.log('[Chat API] 🔄 Handing off to support flow...');
           
+          // Map session state to support flow state
+          let supportState = null;
+          if (session?.state) {
+            const stateMap: Record<string, 'detect' | 'brand' | 'name' | 'order' | 'problem' | 'phone' | 'complete'> = {
+              'Support.CollectBrand': 'detect', // Start fresh
+              'Support.CollectName': 'brand',
+              'Support.CollectOrder': 'name',
+              'Support.CollectProblem': 'order',
+              'Support.CollectPhone': 'problem',
+              'Support.Complete': 'complete',
+            };
+            const step = stateMap[session.state] || 'detect';
+            supportState = { step, data: session.metadata || {} };
+          }
+          
           const supportResult = await processSupportFlow(
             message,
             influencer.username,
-            null // Start fresh
+            supportState
           );
 
           // Use state from decision engine (Support.CollectBrand)
           const newState = decision.stateTransition?.to || 'Support.CollectBrand';
 
-          // Save messages
+          // Save messages and update session
           if (currentSessionId) {
             await Promise.all([
               saveChatMessage(currentSessionId, 'user', message),
@@ -412,6 +427,7 @@ export async function POST(req: NextRequest) {
                 .from('chat_sessions')
                 .update({ 
                   state: newState,
+                  metadata: supportResult.supportState?.data || {},
                   updated_at: new Date().toISOString(),
                 })
                 .eq('id', currentSessionId),
