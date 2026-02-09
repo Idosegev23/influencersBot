@@ -25,6 +25,7 @@ import {
   FileCheck,
   DollarSign,
   AlertCircle,
+  Sparkles,
 } from 'lucide-react';
 import { getInfluencerByUsername, getChatSessions, getAnalytics, type Partnership } from '@/lib/supabase';
 import { formatNumber, formatRelativeTime } from '@/lib/utils';
@@ -649,11 +650,40 @@ export default function InfluencerDashboardPage({
           </motion.div>
         </div>
 
-        {/* Navigation */}
+        {/* Bot Content Management - MAIN ACTION */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.55 }}
+          className="mb-6"
+        >
+          <Link
+            href={`/influencer/${username}/bot-content`}
+            className="block p-6 bg-gradient-to-r from-indigo-600/30 to-purple-600/30 hover:from-indigo-600/40 hover:to-purple-600/40 border-2 border-indigo-500/50 hover:border-indigo-400 rounded-2xl transition-all"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                  <Sparkles className="w-7 h-7 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white mb-1">ניהול תוכן הבוט</h3>
+                  <p className="text-sm text-gray-300">ערוך קופונים, מוצרים, מותגים ושאלות</p>
+                </div>
+              </div>
+              <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-white/10 rounded-lg">
+                <span className="text-white font-medium">כניסה לניהול</span>
+                <ExternalLink className="w-4 h-4 text-white" />
+              </div>
+            </div>
+          </Link>
+        </motion.div>
+
+        {/* Navigation */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
           className="grid grid-cols-2 sm:grid-cols-4 gap-4"
         >
           <Link
