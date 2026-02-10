@@ -571,8 +571,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const suggestedQuestions = (influencer.suggested_questions && influencer.suggested_questions.length > 0)
     ? influencer.suggested_questions
     : influencer.influencer_type === 'food'
-      ? ['מה הקופון הכי שווה?', 'יש מתכון מהיר?', 'מה התחליף לביצים?', 'יש לי בעיה עם הזמנה']
-      : ['מה הקופון הכי שווה?', 'יש המלצה?', 'איפה קונים את זה?', 'יש לי בעיה עם הזמנה'];
+      ? ['מה הקופון הכי שווה?', 'יש מתכון מהיר?', 'מה התחליף לביצים?']
+      : ['מה הקופון הכי שווה?', 'יש המלצה?', 'איפה קונים את זה?'];
   
   // Check if branding should be hidden (white label)
   const hideBranding = influencer.hide_branding || false;
@@ -715,7 +715,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                       </p>
 
                       {/* Suggestions */}
-                      <div className="flex flex-wrap gap-2 justify-center max-w-md mb-8">
+                      <div className="flex flex-wrap gap-2 justify-center max-w-md mb-4">
                         {suggestedQuestions.map((q, i) => (
                           <button
                             key={i}
@@ -733,6 +733,21 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             {q}
                           </button>
                         ))}
+                      </div>
+
+                      {/* Support Button */}
+                      <div className="flex justify-center mb-8">
+                        <button
+                          onClick={() => setShowSupportModal(true)}
+                          className="px-4 py-3 text-sm font-medium rounded-xl transition-all hover:shadow-lg hover:scale-105 flex items-center gap-2"
+                          style={{ 
+                            backgroundColor: '#ef4444',
+                            color: 'white',
+                          }}
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                          יש לי בעיה בהזמנה
+                        </button>
                       </div>
 
                       {/* Brands Preview */}
