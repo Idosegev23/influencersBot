@@ -65,10 +65,12 @@ export async function POST(req: NextRequest) {
     const { data: supportRequest, error: dbError } = await supabase
       .from('support_requests')
       .insert({
-        influencer_id: influencer.id,
+        account_id: influencer.id,
         customer_name: sanitizedName,
         customer_phone: sanitizedPhone,
         message: enhancedMessage,
+        brand: sanitizedBrand,
+        order_number: sanitizedOrderNumber,
         product_id: productId || null,
         session_id: sessionId || null,
         status: 'new',
