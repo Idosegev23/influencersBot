@@ -975,7 +975,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                       setIsTyping(false);
                                     }
                                   } else if (action === 'start_support') {
-                                    handleSupportInput('יש לי בעיה עם הזמנה');
+                                    setShowSupportModal(true);
                                   }
                                 }}
                                 onBrandAction={(action, brand) => {
@@ -995,7 +995,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                     trackEvent('support_started', { 
                                       brandName: brand.brand_name,
                                     });
-                                    handleSupportInput(`יש לי בעיה עם הזמנה מ${brand.brand_name}`);
+                                    setShowSupportModal(true);
                                   }
                                 }}
                                 onFormSubmit={(type, value) => {
