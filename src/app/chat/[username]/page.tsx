@@ -1171,7 +1171,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
         <AnimatePresence>
           {showSupportModal && (
             <SupportForm
-              username={params.username}
+              username={username}
               influencerName={influencer.display_name}
               products={brands.map(b => ({ 
                 id: b.id, 
