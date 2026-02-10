@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, getInfluencerByUsername, getProductsByInfluencer } from '@/lib/supabase';
-import { notifyInfluencerSupport, sendSupportConfirmation } from '@/lib/whatsapp';
+import { notifyBrandSupport, sendSupportConfirmation } from '@/lib/whatsapp';
 import { sanitizeHtml } from '@/lib/sanitize';
 
 export async function POST(req: NextRequest) {
@@ -52,6 +52,19 @@ export async function POST(req: NextRequest) {
       product = products.find(p => p.id === productId);
     }
 
+    // Get brand partnership details for WhatsApp phone
+    let brandPhone: string | undefined;
+    if (sanitizedBrand) {
+      const { data: partnership } = await supabase
+        .from('partnerships')
+        .select('whatsapp_phone')
+        .eq('account_id', influencer.id)
+        .ilike('brand_name', sanitizedBrand)
+        .single();
+      
+      brandPhone = partnership?.whatsapp_phone || undefined;
+    }
+
     // Build enhanced message with brand and order info
     let enhancedMessage = sanitizedMessage;
     if (sanitizedBrand) {
@@ -86,27 +99,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Send WhatsApp notification to influencer if enabled
+    // Send WhatsApp notification to BRAND (not influencer)
     let whatsappSent = false;
-    if (influencer.whatsapp_enabled && influencer.phone_number) {
-      const result = await notifyInfluencerSupport({
+    if (brandPhone || influencer.whatsapp_enabled) {
+      const result = await notifyBrandSupport({
+        brandName: sanitizedBrand || 'מותג לא צוין',
+        brandPhone: brandPhone || '0547667775', // Fallback to default if brand phone not found
         influencerName: influencer.display_name,
-        influencerPhone: influencer.phone_number,
         customerName: sanitizedName,
-        customerPhone: sanitizedPhone || undefined,
-        message: enhancedMessage, // Send enhanced message with brand and order info
-        couponCode: product?.coupon_code || undefined,
-        productName: sanitizedBrand || product?.name || undefined,
+        customerPhone: sanitizedPhone || '',
+        orderNumber: sanitizedOrderNumber || undefined,
+        problemDetails: sanitizedMessage,
       });
       whatsappSent = result.success;
     }
 
-    // Send confirmation to customer if they provided phone
+    // Send confirmation to CUSTOMER if they provided phone
     let confirmationSent = false;
-    if (sanitizedPhone && influencer.whatsapp_enabled) {
+    if (sanitizedPhone) {
       const result = await sendSupportConfirmation(
         sanitizedPhone,
-        sanitizedBrand || influencer.display_name // Use brand name if available, fallback to influencer name
+        sanitizedBrand || influencer.display_name // Use brand name if available
       );
       confirmationSent = result.success;
     }
