@@ -569,14 +569,12 @@ export async function getBrandsByInfluencer(influencerId: string): Promise<Brand
     updated_at: c.updated_at,
   }));
 
-  // 4. Combine and filter - only return brands WITH active coupons!
-  // This prevents showing brands without coupons in the UI
+  // 4. Combine all brands - show ALL partnerships, with or without coupons
   const allBrands = [...partnershipBrands, ...standaloneBrands];
-  const brandsWithCoupons = allBrands.filter(b => b.coupon_code && b.coupon_code.trim().length > 0);
   
-  console.log(`[getBrandsByInfluencer] ✅ Found ${brandsWithCoupons.length}/${allBrands.length} brands WITH COUPONS`);
+  console.log(`[getBrandsByInfluencer] ✅ Found ${allBrands.length} brands (${allBrands.filter(b => b.coupon_code).length} with coupons)`);
   
-  return brandsWithCoupons;
+  return allBrands;
 }
 
 /**
