@@ -279,33 +279,6 @@ export async function POST(req: NextRequest) {
           mode: 'creator',
         });
 
-        // === DECISION ===
-        const engineContext: EngineContext = {
-          account: {
-            id: accountId,
-            mode: 'creator',
-            profileId: influencer.id,
-            timezone: 'Asia/Jerusalem',
-            language: 'he',
-            plan: 'pro',
-            allowedChannels: ['chat'],
-            security: { publicChatAllowed: true, requireAuthForSupport: false, allowedOrigins: [] },
-            features: { supportFlowEnabled: true, salesFlowEnabled: false, whatsappEnabled: false, analyticsEnabled: true },
-          } as AccountContext,
-          session: { id: currentSessionId, state: 'Chat.Active', version: 1, lastActiveAt: new Date(), messageCount: 0 } as SessionContext,
-          user: { anonId: `anon_${Date.now()}`, isRepeatVisitor: false } as UserContext,
-          knowledge: { brandsRef: `brands:${accountId}`, contentIndexRef: `content:${accountId}` } as KnowledgeRefs,
-          limits: { tokenBudgetRemaining: 100000, tokenBudgetTotal: 100000, costCeiling: 100, costUsed: 0, rateLimitRemaining: 100, rateLimitResetAt: new Date(Date.now() + 60000), periodType: 'month', periodStart: new Date(), periodEnd: new Date() } as LimitsContext,
-          request: { requestId, traceId, timestamp: new Date(), source: 'chat', messageId: `msg_${Date.now()}`, clientMessageId } as RequestContext,
-        };
-
-        let decision = await decide({
-          ctx: engineContext,
-          understanding,
-          traceId,
-          requestId,
-        });
-
         // === EARLY DEFINITIONS FOR SUPPORT FLOW ===
         // Define anonId early (used in support flow meta)
         const anonId = `anon_${currentSessionId?.slice(0, 8) || 'guest'}`;
@@ -321,19 +294,63 @@ export async function POST(req: NextRequest) {
           session = existingSession;
         }
 
+        // === CHECK IF ALREADY IN SUPPORT FLOW ===
+        const isInSupportFlow = session?.state?.startsWith('Support.');
+        
+        // === DECISION ===
+        let decision;
+        if (!isInSupportFlow) {
+          const engineContext: EngineContext = {
+            account: {
+              id: accountId,
+              mode: 'creator',
+              profileId: influencer.id,
+              timezone: 'Asia/Jerusalem',
+              language: 'he',
+              plan: 'pro',
+              allowedChannels: ['chat'],
+              security: { publicChatAllowed: true, requireAuthForSupport: false, allowedOrigins: [] },
+              features: { supportFlowEnabled: true, salesFlowEnabled: false, whatsappEnabled: false, analyticsEnabled: true },
+            } as AccountContext,
+            session: { id: currentSessionId, state: session?.state || 'Chat.Active', version: 1, lastActiveAt: new Date(), messageCount: 0 } as SessionContext,
+            user: { anonId: `anon_${Date.now()}`, isRepeatVisitor: false } as UserContext,
+            knowledge: { brandsRef: `brands:${accountId}`, contentIndexRef: `content:${accountId}` } as KnowledgeRefs,
+            limits: { tokenBudgetRemaining: 100000, tokenBudgetTotal: 100000, costCeiling: 100, costUsed: 0, rateLimitRemaining: 100, rateLimitResetAt: new Date(Date.now() + 60000), periodType: 'month', periodStart: new Date(), periodEnd: new Date() } as LimitsContext,
+            request: { requestId, traceId, timestamp: new Date(), source: 'chat', messageId: `msg_${Date.now()}`, clientMessageId } as RequestContext,
+          };
+
+          decision = await decide({
+            ctx: engineContext,
+            understanding,
+            traceId,
+            requestId,
+          });
+        } else {
+          // Already in support flow - force support_flow handler
+          console.log('[Stream] 🔄 Already in support flow, continuing...');
+          decision = {
+            handler: 'support_flow',
+            archetype: null,
+            uiDirectives: {},
+            stateTransition: null,
+            decisionId: `support_${Date.now()}`,
+          };
+        }
+
         // === HANDLE SUPPORT FLOW HAND-OFF ===
-        if (decision.handler === 'support_flow') {
+        if (decision.handler === 'support_flow' || isInSupportFlow) {
           console.log('[Stream] 🔄 Handing off to support flow...');
           
           // Map session state to support flow state
           let supportState = null;
           if (session?.state) {
             const stateMap: Record<string, 'detect' | 'brand' | 'name' | 'order' | 'problem' | 'phone' | 'complete'> = {
-              'Support.CollectBrand': 'detect', // Start fresh
-              'Support.CollectName': 'brand',
-              'Support.CollectOrder': 'name',
-              'Support.CollectProblem': 'order',
-              'Support.CollectPhone': 'problem',
+              'Idle': 'detect',
+              'Support.CollectBrand': 'brand',  // Already asked for brand, waiting for answer
+              'Support.CollectName': 'name',
+              'Support.CollectOrder': 'order',
+              'Support.CollectProblem': 'problem',
+              'Support.CollectPhone': 'phone',
               'Support.Complete': 'complete',
             };
             const step = stateMap[session.state] || 'detect';
@@ -346,8 +363,19 @@ export async function POST(req: NextRequest) {
             supportState
           );
 
-          // Use state from decision engine (Support.CollectBrand)
-          const newState = decision.stateTransition?.to || 'Support.CollectBrand';
+          // Map support flow step back to session state
+          const reverseStateMap: Record<string, string> = {
+            'detect': 'Idle',
+            'brand': 'Support.CollectBrand',
+            'name': 'Support.CollectName',
+            'order': 'Support.CollectOrder',
+            'problem': 'Support.CollectProblem',
+            'phone': 'Support.CollectPhone',
+            'complete': 'Support.Complete',
+          };
+          const newState = supportResult.supportState?.step 
+            ? reverseStateMap[supportResult.supportState.step] || 'Support.CollectBrand'
+            : decision.stateTransition?.to || 'Support.CollectBrand';
 
           // Send meta with support flow metadata
           controller.enqueue(encodeEvent({
