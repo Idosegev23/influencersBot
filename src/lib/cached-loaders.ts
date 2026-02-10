@@ -133,13 +133,71 @@ export async function loadInfluencerProfileCached(
   const result = await cacheWrap(
     key,
     async () => {
-      // ⚡ Updated to use accounts table
-      const { data } = await supabase
+      // ⚡ Fetch with full relations like getInfluencerByUsername
+      const { data: account } = await supabase
         .from('accounts')
-        .select('*')
+        .select(`
+          *,
+          chatbot_persona(
+            id,
+            name,
+            instagram_username,
+            instagram_followers,
+            tone,
+            response_style,
+            topics,
+            common_phrases,
+            created_at,
+            updated_at
+          ),
+          instagram_profile_history(
+            username,
+            full_name,
+            bio,
+            followers_count,
+            profile_pic_url,
+            is_verified,
+            category,
+            snapshot_date
+          )
+        `)
         .eq('id', influencerId)
         .single();
-      return data as any;
+
+      if (!account) return null;
+
+      // Transform to Influencer format (same logic as getInfluencerByUsername)
+      const config = account.config || {};
+      const persona = (account.chatbot_persona as any)?.[0];
+      const profileHistory = account.instagram_profile_history || [];
+      const latestProfile = profileHistory.length > 0 
+        ? profileHistory.sort((a: any, b: any) => 
+            new Date(b.snapshot_date).getTime() - new Date(a.snapshot_date).getTime()
+          )[0]
+        : null;
+
+      return {
+        id: account.id,
+        username: config.username || latestProfile?.username || 'unknown',
+        display_name: config.display_name || latestProfile?.full_name || persona?.name || config.username || 'Unknown',
+        subdomain: config.subdomain || config.username || account.id,
+        
+        // Instagram profile data
+        instagram_username: latestProfile?.username || persona?.instagram_username || config.username,
+        followers_count: latestProfile?.followers_count || persona?.instagram_followers || 0,
+        profile_pic_url: latestProfile?.profile_pic_url || null,
+        avatar_url: config.avatar_url || latestProfile?.profile_pic_url || null,
+        bio: latestProfile?.bio || null,
+        is_verified: latestProfile?.is_verified || false,
+        category: latestProfile?.category || null,
+        
+        influencer_type: config.influencer_type || 'other',
+        theme: config.theme || {},
+        status: account.status || 'active',
+        
+        // Include raw config for other fields
+        ...config,
+      } as Influencer;
     },
     {
       ttlMs: CacheTTL.INFLUENCER_PROFILE,

@@ -306,6 +306,21 @@ export async function POST(req: NextRequest) {
           requestId,
         });
 
+        // === EARLY DEFINITIONS FOR SUPPORT FLOW ===
+        // Define anonId early (used in support flow meta)
+        const anonId = `anon_${currentSessionId?.slice(0, 8) || 'guest'}`;
+        
+        // Load session if exists (needed for state mapping)
+        let session = null;
+        if (currentSessionId && isValidSessionId(currentSessionId)) {
+          const { data: existingSession } = await supabase
+            .from('chat_sessions')
+            .select('*')
+            .eq('id', currentSessionId)
+            .single();
+          session = existingSession;
+        }
+
         // === HANDLE SUPPORT FLOW HAND-OFF ===
         if (decision.handler === 'support_flow') {
           console.log('[Stream] 🔄 Handing off to support flow...');
@@ -344,8 +359,8 @@ export async function POST(req: NextRequest) {
             anonId,
             uiDirectives: {
               ...decision.uiDirectives,
-              showCardList: null,
-              showQuickActions: [],
+              showCardList: supportResult.action === 'show_brands' ? 'brands' : null,
+              showQuickActions: supportResult.action === 'show_brands' ? [] : ['המשך'],
             },
             stateTransition: { from: session?.state || 'Idle', to: newState },
             // Support flow specific data

@@ -316,10 +316,26 @@ async function fetchRelevantCoupons(
   
     if (searchQuery && searchQuery.length > 2) {
       try {
+        // Map Hebrew to English brand names for better search results
+        const brandMap: Record<string, string> = {
+          'ספרינג': 'Spring',
+          'ארגניה': 'Argania',
+          'ליבס': 'Leaves',
+          'קייר': 'K-Care',
+          'אורגניקס': 'Organics',
+        };
+
+        let mappedQuery = searchQuery;
+        Object.entries(brandMap).forEach(([he, en]) => {
+          if (searchQuery.toLowerCase().includes(he.toLowerCase())) {
+            mappedQuery = `${mappedQuery} ${en}`;
+          }
+        });
+
         const { data: searchResults, error: searchError } = await supabase
           .rpc('search_coupons', {
             p_account_id: accountId,
-            p_query: searchQuery,
+            p_query: mappedQuery,
             p_limit: 20
           });
 
@@ -328,7 +344,22 @@ async function fetchRelevantCoupons(
           console.warn('[fetchCoupons] Using fallback query');
         } else if (searchResults && searchResults.length > 0) {
           console.log(`[fetchCoupons] ✅ Found ${searchResults.length} coupons via INDEXED SEARCH`);
-          for (const c of searchResults) {
+          
+          // Fetch partnerships links in parallel
+          const partnershipPromises = searchResults.map(async (c: any) => {
+            const { data: partnership } = await supabase
+              .from('partnerships')
+              .select('link')
+              .eq('account_id', accountId)
+              .ilike('brand_name', c.brand_name)
+              .maybeSingle();
+            return partnership?.link || null;
+          });
+          
+          const links = await Promise.all(partnershipPromises);
+          
+          for (let i = 0; i < searchResults.length; i++) {
+            const c = searchResults[i];
             let discount = c.description || 'הנחה';
             
             if (c.discount_type === 'percentage' && c.discount_value) {
@@ -342,7 +373,7 @@ async function fetchRelevantCoupons(
               code: c.code,
               discount: discount,
               category: 'general',
-              link: null,
+              link: links[i],
             });
           }
           return allCoupons;

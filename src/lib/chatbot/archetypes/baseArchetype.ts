@@ -63,8 +63,19 @@ export abstract class BaseArchetype {
       };
     }
 
-    // 2. Build knowledge query
-    const knowledgeQuery = this.definition.logic.buildKnowledgeQuery(input.userMessage);
+    // 2. Build knowledge query with conversation context
+    // Extract keywords from last 2 messages for context
+    const historyKeywords = input.conversationHistory?.slice(-2)
+      .map(m => m.content)
+      .join(' ')
+      .split(/\s+/)
+      .filter(w => w.length > 3)
+      .slice(0, 10)
+      .join(' ') || '';
+
+    const knowledgeQuery = this.definition.logic.buildKnowledgeQuery(
+      `${input.userMessage} ${historyKeywords}`
+    );
 
     // 3. Generate response using knowledge
     const response = await this.generateResponse(input, knowledgeQuery);
@@ -180,7 +191,8 @@ ${this.definition.logic.responseTemplates?.length ? '📋 איך לענות:\n' 
 5. אם אין מידע - תגיד בכנות
 6. אל תציע דברים לא רלוונטיים!
 7. לעולם אל תשתמש בסוגריים כמו [שם המשפיענית] - השתמש בשם האמיתי: ${influencerName}
-8. אל תהיה גנרי ("זה פצצה") - תן ערך אמיתי!`;
+8. אל תהיה גנרי ("זה פצצה") - דבר מניסיון אישי, אל תעתיק רשימות טכניות, נסח בצורה אישית ומקצועית
+9. הקשר שיחה: התייחס להיסטוריית השיחה! אם השאלה הנוכחית מתייחסת לנושא שהועלה קודם (למשל "ספרת על הבוקר של הילדים"), התייחס לשאלה הקודמת ולתוכן שהוזכר.`;
 
       const userPrompt = `${kbContext}
 
@@ -308,13 +320,14 @@ ${this.definition.logic.responseTemplates?.length ? '📋 איך לענות:\n' 
       });
     }
     
-    // Transcriptions - SHOW FULL VIDEO CONTENT
+    // Transcriptions - SHOW VIDEO CONTENT (truncated for readability)
     if (kb.transcriptions?.length > 0) {
       context += `\n🎥 **תמלולים מסרטונים/רילים (${kb.transcriptions.length}) - זה תוכן חשוב (מתכונים, טיפים, אימונים):**\n`;
       kb.transcriptions.slice(0, 10).forEach((t: any, i: number) => {
-        context += `${i + 1}. ${t.text}\n\n`;
+        const truncated = t.text.length > 300 ? t.text.substring(0, 300) + '...' : t.text;
+        context += `${i + 1}. ${truncated}\n\n`;
       });
-      context += '⚠️ אם יש מתכון או טיפ בתמלולים - תן את כל המידע! אל תגיד "יש לי סרטון"\n';
+      context += '⚠️ אם יש מתכון או טיפ בתמלולים - תן את כל המידע! אל תגיד "יש לי סרטון". נסח בצורה אישית, לא העתקה טכנית.\n';
     }
     
     // Websites/Linkis

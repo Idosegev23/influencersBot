@@ -36,8 +36,21 @@ const FITNESS_DEFINITION: ArchetypeDefinition = {
   description: 'עוזרת עם תוכניות אימון, מוטיבציה, וציוד',
   triggers: { keywords: ['אימון', 'כושר', 'ריצה', 'משקל', 'שרירים'] },
   logic: {
-    buildKnowledgeQuery: (msg) => `fitness workout exercise ${msg}`,
-    responseTemplates: [],
+    buildKnowledgeQuery: (msg) => `fitness workout exercise yoga training ${msg}`,
+    responseTemplates: [
+      {
+        situation: 'מתחילה',
+        template: 'בואי נדבר על {נושא}! כך את יכולה להתחיל...',
+      },
+      {
+        situation: 'מחפשת המלצות',
+        template: 'מעולה שאת מעוניינת ב-{נושא}. הנה כמה טיפים מהניסיון שלי...',
+      },
+      {
+        situation: 'שאלה ספציפית',
+        template: 'נהדר שאת שואלת! לגבי {נושא}, אני ממליצה...',
+      },
+    ],
     defaultResponse: 'בואי נדבר על אימון! איך אפשר לעזור?',
   },
   guardrails: FITNESS_GUARDRAILS,

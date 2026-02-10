@@ -309,9 +309,9 @@ ${JSON.stringify(inputData, null, 2)}
     try {
       console.log(`⚡ Attempt ${attempt}/${retries}...`);
       
-      // Set a timeout of 3 minutes for GPT-5.2 Pro call (reasoning takes time!)
+      // Set a timeout of 10 minutes for GPT-5.2 Pro call (reasoning takes time with large datasets!)
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('GPT-5.2 Pro request timeout (180s)')), 180000);
+        setTimeout(() => reject(new Error('GPT-5.2 Pro request timeout (600s)')), 600000);
       });
 
       const gptPromise = openai.responses.create({
@@ -326,12 +326,24 @@ ${JSON.stringify(inputData, null, 2)}
       });
       
       const response = await Promise.race([gptPromise, timeoutPromise]);
-      // Type assertion for non-streaming response
-      text = (response as any).output;
       
       console.log('✅ [GPT-5.2 Pro] Request succeeded!');
       console.log(`🧠 Reasoning tokens used: ${(response as any).usage?.reasoning_tokens || 0}`);
       console.log(`📊 Total tokens: ${(response as any).usage?.total_tokens || 0}`);
+      
+      // Extract text from response (handle different formats)
+      const rawOutput = (response as any).output;
+      if (typeof rawOutput === 'string') {
+        text = rawOutput;
+      } else if (rawOutput && typeof rawOutput === 'object') {
+        // If output is an object, try to stringify it or extract text field
+        text = rawOutput.text || rawOutput.content || JSON.stringify(rawOutput);
+        console.log('⚠️ [GPT-5.2 Pro] Output was object, extracted:', typeof text);
+      } else {
+        console.error('❌ [GPT-5.2 Pro] Unexpected output format:', typeof rawOutput, rawOutput);
+        throw new Error(`Unexpected output format: ${typeof rawOutput}`);
+      }
+      
       break; // Success, exit retry loop
       
     } catch (error: any) {

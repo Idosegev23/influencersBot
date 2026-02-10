@@ -211,7 +211,7 @@ export class IntentRouter {
 
 ${input.conversationHistory ? `
 היסטוריית שיחה (להבנת ההקשר):
-${input.conversationHistory.slice(-3).map(m => `${m.role}: ${m.content}`).join('\n')}
+${input.conversationHistory.slice(-5).map(m => `${m.role}: ${m.content}`).join('\n')}
 ` : ''}
 
 תחום עיקרי של המשפיענית: ${input.accountContext.primaryNiche || 'לא ידוע'}
