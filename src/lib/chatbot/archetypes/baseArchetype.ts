@@ -193,7 +193,12 @@ ${this.definition.logic.responseTemplates?.length ? '📋 איך לענות:\n' 
 7. לעולם אל תשתמש בסוגריים כמו [שם המשפיענית] - השתמש בשם האמיתי: ${influencerName}
 8. אל תהיה גנרי ("זה פצצה") - דבר מניסיון אישי, אל תעתיק רשימות טכניות, נסח בצורה אישית ומקצועית
 9. הקשר שיחה: התייחס להיסטוריית השיחה! אם השאלה הנוכחית מתייחסת לנושא שהועלה קודם (למשל "ספרת על הבוקר של הילדים"), התייחס לשאלה הקודמת ולתוכן שהוזכר.
-10. **פורמט לינקים**: כל לינק חייב להיות בפורמט Markdown: [טקסט להצגה](https://url.com) - זה חובה! לדוגמה: "לחצי [כאן](https://example.com)" או "[לקנייה](https://shop.com/product)"`;
+10. **פורמט לינקים - CRITICAL**: 
+    - כל לינק חייב להיות בפורמט: [טקסט](URL)
+    - העתק את ה-URL בדיוק כמו שהוא מופיע במידע! אל תשנה, תוסיף או תמחק אותיות
+    - אל תוסיף רווחים, מילים בעברית או סימנים מיוחדים בתוך ה-URL
+    - דוגמה נכונה: [לחצי כאן](https://argania-cosmetics.com)
+    - דוגמה שגויה: [לחצי כאן](https://www. מותק - argania-cosmetics.com)"`;
 
       const userPrompt = `${kbContext}
 
@@ -301,7 +306,11 @@ ${this.definition.logic.responseTemplates?.length ? '📋 איך לענות:\n' 
 3. דוגמאות: "ספרינג" = "Spring", "ארגניה" = "Argania", "ליבס" = "Leaves"
 4. תן את כל הקופונים הרלוונטיים למותג + הקוד המלא
 5. אם יש מספר קופונים למותג - תן את כולם!
-6. **פורמט לינקים חובה**: אם יש LINK במידע, תציג אותו כ-Markdown: [לחצי כאן](URL) - לא טקסט גולמי!\n`;
+6. **פורמט לינקים - CRITICAL**:
+   - אם יש LINK במידע, תציג: [לחצי כאן](LINK)
+   - העתק את ה-URL בדיוק כמו שהוא! אל תוסיף מילים, רווחים או טקסט עברי בתוך ה-URL
+   - דוגמה נכונה: [לחצי כאן](https://argania-cosmetics.com)
+   - דוגמה שגויה: [לחצי כאן](https://www. מותק - argania-cosmetics.com)\n`;
     }
     
     // Partnerships/Brands

@@ -368,12 +368,24 @@ async function fetchRelevantCoupons(
               discount = `₪${c.discount_value} הנחה`;
             }
             
+            // Clean and validate link
+            let cleanLink = links[i];
+            if (cleanLink) {
+              cleanLink = cleanLink.trim();
+              // Remove any non-URL characters (Hebrew text, spaces in the middle)
+              cleanLink = cleanLink.replace(/\s+/g, '');
+              // Ensure it starts with http/https
+              if (!cleanLink.startsWith('http')) {
+                cleanLink = 'https://' + cleanLink;
+              }
+            }
+            
             allCoupons.push({
               brand: c.brand_name || 'מותג',
               code: c.code,
               discount: discount,
               category: 'general',
-              link: links[i],
+              link: cleanLink || null,
             });
           }
           return allCoupons;
