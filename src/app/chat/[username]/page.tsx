@@ -502,9 +502,9 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     inputRef.current?.focus();
   };
 
-  const handleCopyCode = (code: string) => {
+  const handleCopyCode = (code: string, brandId: string) => {
     navigator.clipboard.writeText(code);
-    setCopiedCode(code);
+    setCopiedCode(brandId);
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
@@ -760,7 +760,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             {brands.slice(0, 6).map((brand) => (
                               <button
                                 key={brand.id}
-                                onClick={() => brand.coupon_code && handleCopyCode(brand.coupon_code)}
+                                onClick={() => brand.coupon_code && handleCopyCode(brand.coupon_code, brand.id)}
                                 className="flex-shrink-0 w-32 p-3 rounded-xl text-right transition-all hover:shadow-lg"
                                 style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
                               >
@@ -777,7 +777,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                     className="inline-block mt-2 px-2 py-1 text-[10px] font-mono font-semibold rounded"
                                     style={{ backgroundColor: 'rgba(16,185,129,0.1)', color: '#10b981' }}
                                   >
-                                    {copiedCode === brand.coupon_code ? 'הועתק!' : brand.coupon_code}
+                                    {copiedCode === brand.id ? 'הועתק!' : brand.coupon_code}
                                   </span>
                                 ) : (
                                   <span className="inline-block mt-2 text-[10px]" style={{ color: 'var(--color-text)', opacity: 0.4 }}>
@@ -984,7 +984,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                       brandName: brand.brand_name, 
                                       couponCode: brand.coupon_code,
                                     });
-                                    handleCopyCode(brand.coupon_code);
+                                    handleCopyCode(brand.coupon_code, brand.id);
                                   } else if (action === 'open' && brand.link) {
                                     trackEvent('link_opened', { 
                                       brandName: brand.brand_name, 
@@ -1105,14 +1105,14 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           {brands.filter((b) => b.coupon_code).map((brand) => (
                             <button
                               key={brand.id}
-                              onClick={() => handleCopyCode(brand.coupon_code!)}
+                              onClick={() => handleCopyCode(brand.coupon_code!, brand.id)}
                               className="p-4 rounded-xl text-right transition-all"
                               style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
                             >
                               <div className="flex items-center justify-between mb-2">
                                 <span className="text-xs" style={{ color: 'var(--color-text)', opacity: 0.6 }}>{brand.category || 'מותג'}</span>
-                                <span className="text-xs font-medium" style={{ color: copiedCode === brand.coupon_code ? '#10b981' : 'var(--color-primary)' }}>
-                                  {copiedCode === brand.coupon_code ? 'הועתק!' : 'העתק'}
+                                <span className="text-xs font-medium" style={{ color: copiedCode === brand.id ? '#10b981' : 'var(--color-primary)' }}>
+                                  {copiedCode === brand.id ? 'הועתק!' : 'העתק'}
                                 </span>
                               </div>
                               <p className="font-mono font-bold text-base" style={{ color: 'var(--color-text)' }}>{brand.coupon_code}</p>
@@ -1130,7 +1130,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         {filteredBrands.map((brand) => (
                           <button
                             key={brand.id}
-                            onClick={() => brand.coupon_code && handleCopyCode(brand.coupon_code)}
+                            onClick={() => brand.coupon_code && handleCopyCode(brand.coupon_code, brand.id)}
                             className="p-4 rounded-xl text-right transition-all hover:shadow-lg"
                             style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
                           >
@@ -1149,8 +1149,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                 >
                                   {brand.coupon_code}
                                 </span>
-                                <span className="text-xs" style={{ color: copiedCode === brand.coupon_code ? '#10b981' : 'var(--color-text)', opacity: copiedCode === brand.coupon_code ? 1 : 0.5 }}>
-                                  {copiedCode === brand.coupon_code ? 'הועתק!' : 'לחץ להעתקה'}
+                                <span className="text-xs" style={{ color: copiedCode === brand.id ? '#10b981' : 'var(--color-text)', opacity: copiedCode === brand.id ? 1 : 0.5 }}>
+                                  {copiedCode === brand.id ? 'הועתק!' : 'לחץ להעתקה'}
                                 </span>
                               </div>
                             ) : (
