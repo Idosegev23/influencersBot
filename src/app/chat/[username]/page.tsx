@@ -798,7 +798,45 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                       <span>מקליד...</span>
                                     </div>
                                   )}
-                                  {displayContent && <ReactMarkdown>{displayContent}</ReactMarkdown>}
+                                  {displayContent && (
+                                    <ReactMarkdown
+                                      components={{
+                                        // Style links as clickable blue text
+                                        a: ({ node, ...props }) => (
+                                          <a
+                                            {...props}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-600 hover:text-blue-800 underline decoration-2 underline-offset-2 font-semibold cursor-pointer transition-colors"
+                                          />
+                                        ),
+                                        // Style paragraphs
+                                        p: ({ node, ...props }) => (
+                                          <p {...props} className="mb-2 last:mb-0 leading-relaxed" />
+                                        ),
+                                        // Style lists
+                                        ul: ({ node, ...props }) => (
+                                          <ul {...props} className="list-disc list-inside space-y-1 my-2" />
+                                        ),
+                                        ol: ({ node, ...props }) => (
+                                          <ol {...props} className="list-decimal list-inside space-y-1 my-2" />
+                                        ),
+                                        li: ({ node, ...props }) => (
+                                          <li {...props} className="leading-relaxed" />
+                                        ),
+                                        // Style strong/bold
+                                        strong: ({ node, ...props }) => (
+                                          <strong {...props} className="font-bold" />
+                                        ),
+                                        // Style code
+                                        code: ({ node, ...props }) => (
+                                          <code {...props} className="px-1.5 py-0.5 rounded text-xs font-mono bg-gray-100" />
+                                        ),
+                                      }}
+                                    >
+                                      {displayContent}
+                                    </ReactMarkdown>
+                                  )}
                                   {/* Show cursor while streaming */}
                                   {isStreamingThis && displayContent && (
                                     <span className="inline-block w-2 h-4 bg-current opacity-60 animate-pulse" />
