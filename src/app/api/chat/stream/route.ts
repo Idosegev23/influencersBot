@@ -297,28 +297,29 @@ export async function POST(req: NextRequest) {
         // === CHECK IF ALREADY IN SUPPORT FLOW ===
         const isInSupportFlow = session?.state?.startsWith('Support.');
         
+        // === BUILD ENGINE CONTEXT (needed for both decision and policy) ===
+        const engineContext: EngineContext = {
+          account: {
+            id: accountId,
+            mode: 'creator',
+            profileId: influencer.id,
+            timezone: 'Asia/Jerusalem',
+            language: 'he',
+            plan: 'pro',
+            allowedChannels: ['chat'],
+            security: { publicChatAllowed: true, requireAuthForSupport: false, allowedOrigins: [] },
+            features: { supportFlowEnabled: true, salesFlowEnabled: false, whatsappEnabled: false, analyticsEnabled: true },
+          } as AccountContext,
+          session: { id: currentSessionId, state: session?.state || 'Chat.Active', version: 1, lastActiveAt: new Date(), messageCount: 0 } as SessionContext,
+          user: { anonId: `anon_${Date.now()}`, isRepeatVisitor: false } as UserContext,
+          knowledge: { brandsRef: `brands:${accountId}`, contentIndexRef: `content:${accountId}` } as KnowledgeRefs,
+          limits: { tokenBudgetRemaining: 100000, tokenBudgetTotal: 100000, costCeiling: 100, costUsed: 0, rateLimitRemaining: 100, rateLimitResetAt: new Date(Date.now() + 60000), periodType: 'month', periodStart: new Date(), periodEnd: new Date() } as LimitsContext,
+          request: { requestId, traceId, timestamp: new Date(), source: 'chat', messageId: `msg_${Date.now()}`, clientMessageId } as RequestContext,
+        };
+        
         // === DECISION ===
         let decision;
         if (!isInSupportFlow) {
-          const engineContext: EngineContext = {
-            account: {
-              id: accountId,
-              mode: 'creator',
-              profileId: influencer.id,
-              timezone: 'Asia/Jerusalem',
-              language: 'he',
-              plan: 'pro',
-              allowedChannels: ['chat'],
-              security: { publicChatAllowed: true, requireAuthForSupport: false, allowedOrigins: [] },
-              features: { supportFlowEnabled: true, salesFlowEnabled: false, whatsappEnabled: false, analyticsEnabled: true },
-            } as AccountContext,
-            session: { id: currentSessionId, state: session?.state || 'Chat.Active', version: 1, lastActiveAt: new Date(), messageCount: 0 } as SessionContext,
-            user: { anonId: `anon_${Date.now()}`, isRepeatVisitor: false } as UserContext,
-            knowledge: { brandsRef: `brands:${accountId}`, contentIndexRef: `content:${accountId}` } as KnowledgeRefs,
-            limits: { tokenBudgetRemaining: 100000, tokenBudgetTotal: 100000, costCeiling: 100, costUsed: 0, rateLimitRemaining: 100, rateLimitResetAt: new Date(Date.now() + 60000), periodType: 'month', periodStart: new Date(), periodEnd: new Date() } as LimitsContext,
-            request: { requestId, traceId, timestamp: new Date(), source: 'chat', messageId: `msg_${Date.now()}`, clientMessageId } as RequestContext,
-          };
-
           decision = await decide({
             ctx: engineContext,
             understanding,
