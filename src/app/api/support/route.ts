@@ -58,14 +58,18 @@ export async function POST(req: NextRequest) {
     // Get brand partnership details for WhatsApp phone
     let brandPhone: string | undefined;
     if (sanitizedBrand) {
-      const { data: partnership } = await supabase
+      console.log('[Support] Looking up partnership for brand:', sanitizedBrand, 'account:', influencer.id);
+      const { data: partnership, error: partnershipError } = await supabase
         .from('partnerships')
-        .select('whatsapp_phone')
+        .select('whatsapp_phone, brand_name')
         .eq('account_id', influencer.id)
         .ilike('brand_name', sanitizedBrand)
         .single();
       
+      console.log('[Support] Partnership found:', partnership);
+      console.log('[Support] Partnership error:', partnershipError);
       brandPhone = partnership?.whatsapp_phone || undefined;
+      console.log('[Support] Brand phone extracted:', brandPhone);
     }
 
     // Build enhanced message with brand and order info
@@ -102,23 +106,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Send WhatsApp notification to BRAND (not influencer)
+    // Send WhatsApp notification to BRAND (only if brand has WhatsApp configured)
     let whatsappSent = false;
-    const targetBrandPhone = brandPhone || '0547667775';
-    console.log('[Support] Sending brand notification to:', targetBrandPhone, 'for brand:', sanitizedBrand);
-    
-    if (brandPhone || influencer.whatsapp_enabled) {
-      const result = await notifyBrandSupport({
-        brandName: sanitizedBrand || 'מותג לא צוין',
-        brandPhone: targetBrandPhone, // Fallback to default if brand phone not found
-        influencerName: influencer.display_name,
-        customerName: sanitizedName,
-        customerPhone: sanitizedPhone || '',
-        orderNumber: sanitizedOrderNumber || undefined,
-        problemDetails: sanitizedMessage,
-      });
-      console.log('[Support] Brand notification result:', result);
-      whatsappSent = result.success;
+    if (brandPhone && sanitizedBrand) {
+      console.log('[Support] Sending brand notification to:', brandPhone, 'for brand:', sanitizedBrand);
+      try {
+        const result = await notifyBrandSupport({
+          brandName: sanitizedBrand,
+          brandPhone: brandPhone,
+          influencerName: influencer.display_name,
+          customerName: sanitizedName,
+          customerPhone: sanitizedPhone || '',
+          orderNumber: sanitizedOrderNumber || undefined,
+          problemDetails: sanitizedMessage,
+        });
+        console.log('[Support] Brand notification result:', result);
+        whatsappSent = result.success;
+      } catch (err) {
+        console.error('[Support] Brand notification error:', err);
+      }
+    } else {
+      console.log('[Support] Skipping brand notification - no WhatsApp phone configured for brand:', sanitizedBrand);
     }
 
     // Send confirmation to CUSTOMER if they provided phone
