@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { initSession, generateAnonymousSession } from '@/lib/chatbot/session-manager';
+import ReactMarkdown from 'react-markdown';
 
 // ============================================
 // Type Definitions
@@ -211,15 +212,73 @@ export default function ChatWidget({
               >
                 <div
                   className={`
-                    max-w-[80%] rounded-2xl px-4 py-2 shadow-sm
+                    max-w-[80%] rounded-2xl px-4 py-3 shadow-sm
                     ${message.role === 'user'
                       ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
                       : 'bg-white text-gray-800 border border-gray-200'
                     }
                   `}
                 >
-                  <p className="text-sm whitespace-pre-wrap">{message.text}</p>
-                  <p className="text-xs opacity-70 mt-1">
+                  <div className={`text-sm prose prose-sm max-w-none ${message.role === 'user' ? 'prose-invert' : ''}`}>
+                    <ReactMarkdown
+                      components={{
+                        // Style links
+                        a: ({ node, ...props }) => (
+                          <a
+                            {...props}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`
+                              font-semibold underline decoration-2 underline-offset-2
+                              ${message.role === 'user' 
+                                ? 'text-white hover:text-blue-100' 
+                                : 'text-blue-600 hover:text-blue-800'
+                              }
+                              cursor-pointer transition-colors
+                            `}
+                            onClick={(e) => {
+                              // Allow copy on right-click/long-press
+                              if (e.button === 2) return;
+                            }}
+                          />
+                        ),
+                        // Style paragraphs
+                        p: ({ node, ...props }) => (
+                          <p {...props} className="mb-2 last:mb-0 leading-relaxed" />
+                        ),
+                        // Style lists
+                        ul: ({ node, ...props }) => (
+                          <ul {...props} className="list-disc list-inside space-y-1 my-2" />
+                        ),
+                        ol: ({ node, ...props }) => (
+                          <ol {...props} className="list-decimal list-inside space-y-1 my-2" />
+                        ),
+                        li: ({ node, ...props }) => (
+                          <li {...props} className="leading-relaxed" />
+                        ),
+                        // Style strong/bold
+                        strong: ({ node, ...props }) => (
+                          <strong {...props} className="font-bold" />
+                        ),
+                        // Style code
+                        code: ({ node, ...props }) => (
+                          <code
+                            {...props}
+                            className={`
+                              px-1.5 py-0.5 rounded text-xs font-mono
+                              ${message.role === 'user'
+                                ? 'bg-white/20'
+                                : 'bg-gray-100'
+                              }
+                            `}
+                          />
+                        ),
+                      }}
+                    >
+                      {message.text}
+                    </ReactMarkdown>
+                  </div>
+                  <p className="text-xs opacity-70 mt-2">
                     {message.timestamp.toLocaleTimeString('he-IL', {
                       hour: '2-digit',
                       minute: '2-digit',
