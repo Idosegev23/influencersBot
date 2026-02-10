@@ -212,10 +212,24 @@ function createDefaultResult(message: string, processingTimeMs: number): Underst
   let topic = 'general';
   let suggestedHandler: RouteHints['suggestedHandler'] = 'chat';
   
-  if (lowerMessage.includes('קופון') || lowerMessage.includes('הנחה') || lowerMessage.includes('קוד')) {
+  // PRIORITY: Support flow - check FIRST before other intents
+  if (
+    (lowerMessage.includes('בעיה') && lowerMessage.includes('הזמנה')) ||
+    (lowerMessage.includes('תקלה') && lowerMessage.includes('הזמנה')) ||
+    lowerMessage.includes('בעיה בהזמנה') ||
+    lowerMessage.includes('בעיה עם הזמנה') ||
+    lowerMessage.includes('בעיה בקופון') ||
+    lowerMessage.includes('הקופון לא עובד') ||
+    lowerMessage.includes('לא הגיעה הזמנה') ||
+    lowerMessage.includes('איפה ההזמנה')
+  ) {
+    intent = 'support';
+    topic = 'support';
+    suggestedHandler = 'support_flow';
+  } else if (lowerMessage.includes('קופון') || lowerMessage.includes('הנחה') || lowerMessage.includes('קוד')) {
     intent = 'coupon';
     topic = 'coupons';
-  } else if (lowerMessage.includes('בעיה') || lowerMessage.includes('תקלה') || lowerMessage.includes('לא עובד') || lowerMessage.includes('הזמנה')) {
+  } else if (lowerMessage.includes('בעיה') || lowerMessage.includes('תקלה') || lowerMessage.includes('לא עובד')) {
     intent = 'support';
     topic = 'support';
     suggestedHandler = 'support_flow';
