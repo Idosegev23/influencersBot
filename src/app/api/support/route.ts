@@ -11,12 +11,18 @@ export async function POST(req: NextRequest) {
       customerName, 
       customerPhone, 
       message, 
+      problem,
+      brand,
+      orderNumber,
       productId,
       sessionId 
     } = body;
 
+    // Support both old format (message) and new format (problem)
+    const messageText = message || problem;
+
     // Validate required fields
-    if (!username || !customerName || !message) {
+    if (!username || !customerName || !messageText) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -25,8 +31,10 @@ export async function POST(req: NextRequest) {
 
     // Sanitize inputs
     const sanitizedName = sanitizeHtml(customerName);
-    const sanitizedMessage = sanitizeHtml(message);
+    const sanitizedMessage = sanitizeHtml(messageText);
     const sanitizedPhone = customerPhone ? customerPhone.replace(/[^\d+]/g, '') : null;
+    const sanitizedBrand = brand ? sanitizeHtml(brand) : null;
+    const sanitizedOrderNumber = orderNumber ? sanitizeHtml(orderNumber) : null;
 
     // Get influencer
     const influencer = await getInfluencerByUsername(username);
@@ -44,6 +52,15 @@ export async function POST(req: NextRequest) {
       product = products.find(p => p.id === productId);
     }
 
+    // Build enhanced message with brand and order info
+    let enhancedMessage = sanitizedMessage;
+    if (sanitizedBrand) {
+      enhancedMessage = `מותג: ${sanitizedBrand}\n${enhancedMessage}`;
+    }
+    if (sanitizedOrderNumber) {
+      enhancedMessage = `מספר הזמנה: ${sanitizedOrderNumber}\n${enhancedMessage}`;
+    }
+
     // Create support request in database
     const { data: supportRequest, error: dbError } = await supabase
       .from('support_requests')
@@ -51,7 +68,7 @@ export async function POST(req: NextRequest) {
         influencer_id: influencer.id,
         customer_name: sanitizedName,
         customer_phone: sanitizedPhone,
-        message: sanitizedMessage,
+        message: enhancedMessage,
         product_id: productId || null,
         session_id: sessionId || null,
         status: 'new',

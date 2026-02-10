@@ -14,6 +14,7 @@ export interface UIDirectives {
   showQuickActions?: string[];
   showProgress?: ProgressData;
   showForm?: FormType;
+  showSupportModal?: boolean;
   layout?: 'default' | 'cards-first' | 'form-focus' | 'minimal';
   nextBestActions?: Array<{
     label: string;

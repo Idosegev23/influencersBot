@@ -35,7 +35,7 @@ export const routingRules: Rule[] = [
 
   {
     id: 'routing_support',
-    name: 'Support intent routes to support flow',
+    name: 'Support intent shows simple support form',
     category: 'routing',
     priority: 11,
     mode: 'both',
@@ -45,25 +45,17 @@ export const routingRules: Rule[] = [
     ],
     actions: [
       { type: 'set_action', value: 'respond' },
-      { type: 'set_handler', value: 'support_flow' },
-      {
-        type: 'transition_state',
-        to: 'Support.CollectBrand',
-        reason: 'support_flow_start',
-      },
+      { type: 'set_handler', value: 'chat' },
       {
         type: 'set_ui',
         value: {
-          // NO showCardList - don't show coupons/brands for support!
-          // showProgress removed - user request
-          responseLength: 'short', // Keep it brief - we're starting support flow
+          showSupportModal: true,
+          responseLength: 'short',
           tone: 'empathetic',
-          layout: 'chat', // Simple chat layout, not cards
-          showQuickActions: [], // Will be set by support flow logic
+          layout: 'form',
         },
       },
-      { type: 'set_model', value: { model: 'nano', maxTokens: 180, fallback: 'standard' } },
-      { type: 'append_context', value: ['brands', 'support_policy', 'persona'] },
+      { type: 'set_model', value: { model: 'nano', maxTokens: 100 } },
     ],
   },
 
