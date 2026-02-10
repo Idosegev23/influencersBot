@@ -440,9 +440,7 @@ export async function POST(req: NextRequest) {
         }
 
         // === EXPERIMENTS ===
-        // Generate consistent anonId (from client or session-based)
-        const anonId = `anon_${currentSessionId.slice(0, 8)}`;
-        
+        // Use anonId defined earlier (before support flow)
         const expContext: ExperimentContext = {
           anonId,
           sessionId: currentSessionId,
