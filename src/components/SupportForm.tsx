@@ -29,7 +29,7 @@ export default function SupportForm({ username, influencerName, products, onClos
   const brands = Array.from(new Set(
     products
       .filter(p => p.brand || p.coupon_code)
-      .map(p => p.brand || p.name.replace('קופון ', ''))
+      .map(p => p.brand || (p.name ? p.name.replace('קופון ', '') : ''))
   )).filter(Boolean);
 
   const handleSubmit = async () => {

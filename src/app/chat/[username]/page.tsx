@@ -1175,8 +1175,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
               influencerName={influencer.display_name}
               products={brands.map(b => ({ 
                 id: b.id, 
-                name: b.name, 
-                brand: b.name,
+                name: b.name || 'מותג ללא שם', 
+                brand: b.name || 'מותג ללא שם',
                 coupon_code: b.coupon_code || null,
                 image_url: b.image_url || null,
               }))}
