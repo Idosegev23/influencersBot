@@ -43,6 +43,7 @@ export function EnhancedBrandCards({
 }: EnhancedBrandCardsProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const [confirmLinkBrand, setConfirmLinkBrand] = useState<BrandCardData | null>(null);
 
   const displayBrands = showAll ? brands : brands.slice(0, maxDisplay);
   const hasMore = brands.length > maxDisplay;
@@ -76,6 +77,13 @@ export function EnhancedBrandCards({
     setShowAll(true);
   };
 
+  const handleCardClick = (brand: BrandCardData) => {
+    // If brand has no coupon but has a link, show confirmation modal
+    if (!brand.coupon_code && brand.link) {
+      setConfirmLinkBrand(brand);
+    }
+  };
+
   const getColors = (category: string | null) => {
     const cat = category?.toLowerCase() || 'default';
     return categoryColors[cat] || categoryColors.default;
@@ -99,10 +107,12 @@ export function EnhancedBrandCards({
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05, duration: 0.2 }}
+              onClick={() => handleCardClick(brand)}
               className={`
                 relative overflow-hidden rounded-xl border-2 ${colors.border}
                 ${colors.bg} p-4 transition-all duration-200
                 hover:shadow-lg hover:scale-[1.02] group
+                ${!brand.coupon_code && brand.link ? 'cursor-pointer' : ''}
               `}
             >
               {/* Discount badge */}
@@ -205,6 +215,47 @@ export function EnhancedBrandCards({
         >
           הצג עוד {brands.length - maxDisplay} מותגים
         </motion.button>
+      )}
+
+      {/* Link confirmation modal */}
+      {confirmLinkBrand && (
+        <div 
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setConfirmLinkBrand(null)}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl"
+          >
+            <h3 className="text-xl font-bold text-gray-900 mb-2 text-center">
+              {confirmLinkBrand.brand_name}
+            </h3>
+            <p className="text-sm text-gray-600 mb-6 text-center">
+              רוצה לפתוח את אתר המותג?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  if (confirmLinkBrand.link) {
+                    onOpen(confirmLinkBrand);
+                  }
+                  setConfirmLinkBrand(null);
+                }}
+                className="flex-1 py-3 px-4 bg-[var(--color-primary)] text-white rounded-xl font-medium hover:opacity-90 transition-all"
+              >
+                כן, פתח אתר
+              </button>
+              <button
+                onClick={() => setConfirmLinkBrand(null)}
+                className="flex-1 py-3 px-4 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-all"
+              >
+                ביטול
+              </button>
+            </div>
+          </motion.div>
+        </div>
       )}
     </div>
   );
