@@ -94,9 +94,9 @@ export async function POST(req: NextRequest) {
         influencerPhone: influencer.phone_number,
         customerName: sanitizedName,
         customerPhone: sanitizedPhone || undefined,
-        message: sanitizedMessage,
+        message: enhancedMessage, // Send enhanced message with brand and order info
         couponCode: product?.coupon_code || undefined,
-        productName: product?.name || undefined,
+        productName: sanitizedBrand || product?.name || undefined,
       });
       whatsappSent = result.success;
     }
@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
     if (sanitizedPhone && influencer.whatsapp_enabled) {
       const result = await sendSupportConfirmation(
         sanitizedPhone,
-        influencer.display_name
+        sanitizedBrand || influencer.display_name // Use brand name if available, fallback to influencer name
       );
       confirmationSent = result.success;
     }
@@ -159,7 +159,7 @@ export async function GET(req: NextRequest) {
           brand
         )
       `)
-      .eq('influencer_id', influencer.id)
+      .eq('account_id', influencer.id)
       .order('created_at', { ascending: false });
 
     if (error) {
