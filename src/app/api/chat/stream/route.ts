@@ -296,6 +296,11 @@ export async function POST(req: NextRequest) {
 
         // === CHECK IF ALREADY IN SUPPORT FLOW ===
         const isInSupportFlow = session?.state?.startsWith('Support.');
+        console.log('[Stream] Session check:', {
+          sessionId: currentSessionId,
+          sessionState: session?.state,
+          isInSupportFlow,
+        });
         
         // === BUILD ENGINE CONTEXT (needed for both decision and policy) ===
         const engineContext: EngineContext = {
@@ -326,6 +331,10 @@ export async function POST(req: NextRequest) {
             traceId,
             requestId,
           });
+          console.log('[Stream] Decision made:', {
+            handler: decision.handler,
+            intent: understanding.intent,
+          });
         } else {
           // Already in support flow - force support_flow handler
           console.log('[Stream] 🔄 Already in support flow, continuing...');
@@ -340,7 +349,11 @@ export async function POST(req: NextRequest) {
 
         // === HANDLE SUPPORT FLOW HAND-OFF ===
         if (decision.handler === 'support_flow' || isInSupportFlow) {
-          console.log('[Stream] 🔄 Handing off to support flow...');
+          console.log('[Stream] 🔄 Handing off to support flow...', {
+            viaHandler: decision.handler === 'support_flow',
+            viaSessionState: isInSupportFlow,
+            currentState: session?.state,
+          });
           
           // Map session state to support flow state
           let supportState = null;
