@@ -55,11 +55,20 @@ export function DirectiveRenderer({
   // Add showQuickActions
   if (directives.showQuickActions?.length) {
     directives.showQuickActions.forEach((label, i) => {
+      // Map special labels to specific actions
+      let action = 'quick_action';
+      let payload: Record<string, unknown> = { text: label };
+      
+      if (label.includes('בעיה') && (label.includes('קופון') || label.includes('הזמנה'))) {
+        action = 'start_support';
+        payload = {};
+      }
+      
       quickActions.push({
         id: `quick-${i}`,
         label,
-        action: 'quick_action',
-        payload: { text: label },
+        action,
+        payload,
         variant: i === 0 ? 'primary' : 'secondary',
       });
     });
@@ -68,11 +77,20 @@ export function DirectiveRenderer({
   // Add nextBestActions with higher priority
   if (directives.nextBestActions?.length) {
     directives.nextBestActions.forEach((nba, i) => {
+      // Map special labels to specific actions if not already specified
+      let action = nba.action || 'quick_action';
+      let payload = nba.payload || {};
+      
+      if (!nba.action && nba.label.includes('בעיה') && (nba.label.includes('קופון') || nba.label.includes('הזמנה'))) {
+        action = 'start_support';
+        payload = {};
+      }
+      
       quickActions.push({
         id: `nba-${i}`,
         label: nba.label,
-        action: nba.action,
-        payload: nba.payload,
+        action,
+        payload,
         variant: i === 0 ? 'primary' : 'ghost',
       });
     });
