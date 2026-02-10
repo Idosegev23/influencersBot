@@ -36,6 +36,9 @@ export async function POST(req: NextRequest) {
     const sanitizedBrand = brand ? sanitizeHtml(brand) : null;
     const sanitizedOrderNumber = orderNumber ? sanitizeHtml(orderNumber) : null;
 
+    console.log('[Support] Customer phone received:', customerPhone);
+    console.log('[Support] Sanitized phone:', sanitizedPhone);
+
     // Get influencer
     const influencer = await getInfluencerByUsername(username);
     if (!influencer) {
@@ -101,27 +104,35 @@ export async function POST(req: NextRequest) {
 
     // Send WhatsApp notification to BRAND (not influencer)
     let whatsappSent = false;
+    const targetBrandPhone = brandPhone || '0547667775';
+    console.log('[Support] Sending brand notification to:', targetBrandPhone, 'for brand:', sanitizedBrand);
+    
     if (brandPhone || influencer.whatsapp_enabled) {
       const result = await notifyBrandSupport({
         brandName: sanitizedBrand || 'מותג לא צוין',
-        brandPhone: brandPhone || '0547667775', // Fallback to default if brand phone not found
+        brandPhone: targetBrandPhone, // Fallback to default if brand phone not found
         influencerName: influencer.display_name,
         customerName: sanitizedName,
         customerPhone: sanitizedPhone || '',
         orderNumber: sanitizedOrderNumber || undefined,
         problemDetails: sanitizedMessage,
       });
+      console.log('[Support] Brand notification result:', result);
       whatsappSent = result.success;
     }
 
     // Send confirmation to CUSTOMER if they provided phone
     let confirmationSent = false;
     if (sanitizedPhone) {
+      console.log('[Support] Sending customer confirmation to:', sanitizedPhone);
       const result = await sendSupportConfirmation(
         sanitizedPhone,
         sanitizedBrand || influencer.display_name // Use brand name if available
       );
+      console.log('[Support] Customer confirmation result:', result);
       confirmationSent = result.success;
+    } else {
+      console.log('[Support] No customer phone provided, skipping customer notification');
     }
 
     return NextResponse.json({
