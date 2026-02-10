@@ -114,6 +114,9 @@ export async function PATCH(
     if (updates.brand_contact_phone !== undefined) {
       sanitizedUpdates.brand_contact_phone = updates.brand_contact_phone || null;
     }
+    if (updates.whatsapp_phone !== undefined) {
+      sanitizedUpdates.whatsapp_phone = updates.whatsapp_phone || null;
+    }
     if (updates.status !== undefined) {
       sanitizedUpdates.status = updates.status;
     }

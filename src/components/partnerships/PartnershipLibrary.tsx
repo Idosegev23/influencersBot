@@ -12,6 +12,7 @@ interface Partnership {
   end_date: string;
   total_amount: number;
   created_at: string;
+  whatsapp_phone?: string | null;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -43,6 +44,9 @@ export function PartnershipLibrary({
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'date' | 'amount' | 'brand'>('date');
+  const [editingPhone, setEditingPhone] = useState<string | null>(null);
+  const [phoneValues, setPhoneValues] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState<string | null>(null);
 
   // Filter & Sort
   let filteredPartnerships = partnerships.filter((p) => {
@@ -69,6 +73,34 @@ export function PartnershipLibrary({
         return 0;
     }
   });
+
+  const handleSavePhone = async (partnershipId: string) => {
+    setSaving(partnershipId);
+    try {
+      const phone = phoneValues[partnershipId];
+      const response = await fetch(`/api/influencer/partnerships/${partnershipId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          username,
+          whatsapp_phone: phone || null,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update phone');
+      }
+
+      setEditingPhone(null);
+      // Refresh data
+      window.location.reload();
+    } catch (err) {
+      console.error('Error saving phone:', err);
+      alert('שגיאה בשמירת המספר');
+    } finally {
+      setSaving(null);
+    }
+  };
 
   return (
     <div className="bg-white rounded-lg border border-gray-200">
@@ -126,7 +158,7 @@ export function PartnershipLibrary({
                   מותג
                 </th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">
-                  קמפיין
+                  WhatsApp
                 </th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">
                   סטטוס
@@ -154,9 +186,46 @@ export function PartnershipLibrary({
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <div className="text-gray-600">
-                      {partnership.campaign_name || '—'}
-                    </div>
+                    {editingPhone === partnership.id ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="tel"
+                          value={phoneValues[partnership.id] || partnership.whatsapp_phone || ''}
+                          onChange={(e) => setPhoneValues({ ...phoneValues, [partnership.id]: e.target.value.replace(/[^\d+]/g, '') })}
+                          placeholder="05X-XXX-XXXX"
+                          className="px-2 py-1 text-sm border border-gray-300 rounded w-32"
+                          dir="ltr"
+                        />
+                        <button
+                          onClick={() => handleSavePhone(partnership.id)}
+                          disabled={saving === partnership.id}
+                          className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                        >
+                          {saving === partnership.id ? '...' : 'שמור'}
+                        </button>
+                        <button
+                          onClick={() => setEditingPhone(null)}
+                          className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                        >
+                          ביטול
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-600" dir="ltr">
+                          {partnership.whatsapp_phone || '—'}
+                        </span>
+                        <button
+                          onClick={() => {
+                            setEditingPhone(partnership.id);
+                            setPhoneValues({ ...phoneValues, [partnership.id]: partnership.whatsapp_phone || '' });
+                          }}
+                          className="text-xs text-blue-600 hover:text-blue-700"
+                        >
+                          ערוך
+                        </button>
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <span
