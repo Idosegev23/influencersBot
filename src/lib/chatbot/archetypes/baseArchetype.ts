@@ -269,18 +269,23 @@ ${this.definition.logic.responseTemplates?.length ? '📋 איך לענות:\n' 
       });
     }
 
-    // Highlights - SHOW FULL CONTENT
+    // Highlights - SHOW FULL CONTENT (including OCR!)
     if (kb.highlights?.length > 0) {
-      context += `\n✨ **הילייטס וסטוריז (${kb.highlights.length}) - מידע אישי וחשוב:**\n`;
-      kb.highlights.slice(0, 10).forEach((h: any, i: number) => {
-        context += `${i + 1}. ${h.title}`;
-        if (h.items?.length > 0) {
-           // Extract text from items if available (transcriptions/OCR)
-           const itemsText = h.items.map((item: any) => item.text || item.transcription).filter(Boolean).join(' ');
-           if (itemsText) context += `: ${itemsText.substring(0, 200)}...`;
+      context += `\n✨ **הילייטס וסטוריז (${kb.highlights.length}) - מידע אישי וחשוב (כולל טקסט מהתמונות!):**\n`;
+      kb.highlights.slice(0, 15).forEach((h: any, i: number) => {
+        context += `${i + 1}. "${h.title}"`;
+        
+        // Use the new content_text field which includes transcription + OCR
+        if (h.content_text && h.content_text.trim().length > 0) {
+          const truncated = h.content_text.length > 400 
+            ? h.content_text.substring(0, 400) + '...' 
+            : h.content_text;
+          context += `\n   תוכן: ${truncated}`;
         }
+        
         context += '\n';
       });
+      context += '⚠️ **ההיילייטס כוללים טקסט שמופיע על התמונות (מתכונים, רשימות מוצרים, המלצות ספרים, וכו\')** - תן את המידע המלא!\n';
     }
     
     // Coupons - PRIORITIZE THIS!
