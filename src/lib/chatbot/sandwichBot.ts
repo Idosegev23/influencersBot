@@ -25,6 +25,7 @@ export interface SandwichBotInput {
   influencerName: string;
   conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
   userName?: string;
+  onToken?: (token: string) => void; // Real-time streaming callback
 }
 
 export interface SandwichBotOutput {
@@ -84,6 +85,7 @@ export class SandwichBot {
     // LAYER 2 + 3: Process with Archetype (includes Guardrails)
     // ==========================================
     console.log('\n🎯 [Layer 2+3] Processing with archetype + guardrails...');
+    console.log(`   ⚡ Streaming mode: ${input.onToken ? 'YES' : 'NO'}`);
     
     const archetypeResult = await processWithArchetype(
       classification.primaryArchetype,
@@ -96,7 +98,8 @@ export class SandwichBot {
           accountId: input.accountId,
           username: input.username,
           influencerName: input.influencerName,
-        }
+        },
+        onToken: input.onToken,
       }
     );
 
@@ -111,17 +114,25 @@ export class SandwichBot {
     // ==========================================
     // LAYER 1: Wrap with Personality
     // ==========================================
-    console.log('\n✨ [Layer 1] Wrapping with personality...');
+    let finalResponse: string;
     
-    const finalResponse = await wrapResponseWithPersonality(
-      input.accountId,
-      archetypeResult.response,
-      classification.primaryArchetype,
-      {
-        userName: input.userName,
-        conversationHistory: input.conversationHistory,
-      }
-    );
+    if (input.onToken) {
+      // Streaming mode: personality is already in the prompt, skip wrapper
+      console.log('\n✨ [Layer 1] Personality already in prompt (streaming mode), skipping wrapper');
+      finalResponse = archetypeResult.response;
+    } else {
+      // Non-streaming mode: use personality wrapper (backward compatible)
+      console.log('\n✨ [Layer 1] Wrapping with personality...');
+      finalResponse = await wrapResponseWithPersonality(
+        input.accountId,
+        archetypeResult.response,
+        classification.primaryArchetype,
+        {
+          userName: input.userName,
+          conversationHistory: input.conversationHistory,
+        }
+      );
+    }
 
     console.log(`   → Final response: ${finalResponse.substring(0, 100)}...`);
     console.log(`\n${'='.repeat(60)}`);

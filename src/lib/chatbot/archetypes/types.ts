@@ -101,6 +101,7 @@ export interface ArchetypeInput {
     username: string;
     influencerName: string;
   };
+  onToken?: (token: string) => void; // Real-time streaming callback
 }
 
 export interface ArchetypeOutput {

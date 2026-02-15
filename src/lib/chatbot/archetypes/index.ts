@@ -121,6 +121,7 @@ export async function processWithArchetype(
       username: string;
       influencerName: string;
     };
+    onToken?: (token: string) => void;
   }
 ) {
   console.log('\n' + '='.repeat(80));
@@ -129,6 +130,7 @@ export async function processWithArchetype(
   console.log(`📋 Type: ${type}`);
   console.log(`👤 Influencer: ${context.accountContext.influencerName}`);
   console.log(`💬 Message: ${userMessage.substring(0, 100)}...`);
+  console.log(`⚡ Streaming: ${context.onToken ? 'YES' : 'NO'}`);
   console.log('\n📚 Knowledge Base Content:');
   console.log(`   Posts: ${knowledgeBase.posts?.length || 0}`);
   console.log(`   Highlights: ${knowledgeBase.highlights?.length || 0}`);
@@ -162,6 +164,7 @@ export async function processWithArchetype(
     conversationHistory: context.conversationHistory,
     userName: context.userName,
     accountContext: context.accountContext,
+    onToken: context.onToken,
   });
   
   console.log('\n' + '='.repeat(80));

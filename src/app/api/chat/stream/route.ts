@@ -575,32 +575,38 @@ export async function POST(req: NextRequest) {
         let tokenInfo = { input: 0, output: 0 };
 
         try {
-          // Process with Sandwich Bot (all 3 layers!)
+          // Process with Sandwich Bot (all 3 layers!) with REAL streaming
           const influencerName = influencer.display_name || influencer.username || username || 'Unknown';
+          const streamStartMs = Date.now();
+          
           const sandwichResult = await processSandwichMessageWithMetadata({
             userMessage: message,
             accountId,
             username: username,
             influencerName,
             conversationHistory,
+            // Real-time streaming: tokens go directly to client as they arrive from OpenAI
+            onToken: (token: string) => {
+              fullText += token;
+              controller.enqueue(encodeEvent({ type: 'delta', text: token }));
+            },
           });
 
-          // Stream the complete response
-          fullText = sandwichResult.response;
-          
-          // Stream word by word for smooth UX
-          const words = fullText.split(' ');
-          for (let i = 0; i < words.length; i++) {
-            const word = words[i] + (i < words.length - 1 ? ' ' : '');
-            controller.enqueue(encodeEvent({ type: 'delta', text: word }));
-            // Small delay for streaming effect
-            await new Promise(resolve => setTimeout(resolve, 30));
+          // If streaming was used, fullText was already accumulated via onToken
+          // If not (fallback), use the response directly
+          if (!fullText && sandwichResult.response) {
+            fullText = sandwichResult.response;
+            // Fallback: send response as a single chunk
+            controller.enqueue(encodeEvent({ type: 'delta', text: fullText }));
           }
 
+          const streamDurationMs = Date.now() - streamStartMs;
           console.log('[Stream] ✅ Sandwich Bot response:', {
             archetype: sandwichResult.metadata.archetype,
             confidence: sandwichResult.metadata.confidence,
             personalityApplied: sandwichResult.metadata.personalityApplied,
+            streamingDurationMs: streamDurationMs,
+            responseLength: fullText.length,
           });
 
         } catch (sandwichError: any) {

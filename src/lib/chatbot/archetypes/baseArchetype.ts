@@ -10,6 +10,7 @@ import {
   GuardrailRule 
 } from './types';
 import OpenAI from 'openai';
+import { buildPersonalityFromDB, type PersonalityConfig } from '../personality-wrapper';
 
 // Initialize OpenAI
 const openai = new OpenAI({
@@ -156,7 +157,55 @@ export abstract class BaseArchetype {
   }
 
   /**
+   * Build personality instructions for the system prompt
+   * Replaces post-processing personality wrapper for streaming mode
+   */
+  private buildPersonalityPrompt(config: PersonalityConfig, name: string): string {
+    const lines: string[] = [];
+
+    // Narrative perspective
+    if (config.narrativePerspective === 'direct') {
+      lines.push('דבר/י בגוף ראשון (אני, שלי).');
+    } else if (config.narrativePerspective === 'sidekick-professional') {
+      lines.push(`דבר/י כעוזר/ת של ${name}. "היא" לעובדות, "אנחנו" להמלצות.`);
+    } else if (config.narrativePerspective === 'sidekick-personal') {
+      lines.push('דבר/י בגוף ראשון רבים (אנחנו ממליצות, אנחנו אומרות).');
+    }
+
+    // Emoji
+    const emojiMap: Record<string, string> = {
+      none: 'אל תשתמש/י באימוג\'ים.',
+      minimal: 'אימוג\'י אחד לפעמים, לא יותר.',
+      moderate: `2-3 אימוג'ים בתשובה. מועדפים: ${config.emojiTypes.slice(0, 4).join(' ')}`,
+      heavy: `הרבה אימוג'ים! ${config.emojiTypes.slice(0, 6).join(' ')}`,
+    };
+    if (emojiMap[config.emojiUsage]) {
+      lines.push(emojiMap[config.emojiUsage]);
+    }
+
+    // Common phrases
+    if (config.commonPhrases.length > 0) {
+      lines.push(`ביטויים אופייניים (השתמש/י לפעמים, באופן טבעי, לא בסוף כהוספה מאולצת): ${config.commonPhrases.slice(0, 4).join(', ')}`);
+    }
+
+    // Message structure
+    if (config.messageStructure === 'whatsapp') {
+      lines.push('פסקאות קצרות, כמו הודעת ווטסאפ.');
+    }
+
+    // Storytelling
+    if (config.storytellingMode === 'concise') {
+      lines.push('ענה/י בצורה תכליתית וקצרה.');
+    } else if (config.storytellingMode === 'anecdotal') {
+      lines.push('אפשר לשלב סיפורים וחוויות אישיות.');
+    }
+
+    return lines.filter(Boolean).join('\n');
+  }
+
+  /**
    * Generate AI response using GPT-5.2 with archetype-specific context
+   * Supports real-time streaming via onToken callback
    */
   protected async generateAIResponse(
     input: ArchetypeInput,
@@ -174,6 +223,17 @@ export abstract class BaseArchetype {
           role: m.role as 'user' | 'assistant',
           content: m.content,
         })) || [];
+
+      // Load personality and build prompt instructions (replaces post-processing wrapper)
+      let personalityBlock = '';
+      if (input.onToken) {
+        try {
+          const personalityConfig = await buildPersonalityFromDB(input.accountContext.accountId);
+          personalityBlock = `\n🎭 סגנון אישיות:\n${this.buildPersonalityPrompt(personalityConfig, influencerName)}`;
+        } catch (e) {
+          console.warn('[BaseArchetype] Failed to load personality, using defaults');
+        }
+      }
       
       // Build archetype-specific system prompt
       const systemPrompt = `אתה ${influencerName}, משפיענית שעוזרת לקהל שלה באופן אישי ומקצועי.
@@ -182,12 +242,13 @@ export abstract class BaseArchetype {
 📝 ${this.definition.description}
 
 ${this.definition.logic.responseTemplates?.length ? '📋 איך לענות:\n' + this.definition.logic.responseTemplates.map(t => `• ${t.situation}: ${t.template}`).join('\n') : ''}
+${personalityBlock}
 
 ⚠️ כללים קריטיים:
 1. תשובה מועילה ומלאה (אפשר עד 6 משפטים אם יש תוכן רלוונטי)
 2. השתמש במידע ספציפי מבסיס הידע - תן תוכן מלא!
 3. שפות: הבן עברית ואנגלית (Spring = ספרינג)
-4. סגנון: חם וידידותי, 1-2 אימוג'ים
+4. סגנון: חם וידידותי
 5. אם אין מידע - תגיד בכנות
 6. אל תציע דברים לא רלוונטיים!
 7. לעולם אל תשתמש בסוגריים כמו [שם המשפיענית] - השתמש בשם האמיתי: ${influencerName}
@@ -213,7 +274,54 @@ ${this.definition.logic.responseTemplates?.length ? '📋 איך לענות:\n' 
         { role: 'user', content: userPrompt },
       ];
 
-      // Try primary model (GPT-5.2)
+      // === STREAMING MODE (when onToken callback is provided) ===
+      if (input.onToken) {
+        console.log('[BaseArchetype] Using STREAMING mode with onToken callback');
+        try {
+          const stream = await openai.chat.completions.create({
+            model: CHAT_MODEL,
+            messages,
+            max_completion_tokens: MAX_TOKENS,
+            stream: true,
+          });
+
+          let fullContent = '';
+          for await (const chunk of stream) {
+            const delta = chunk.choices[0]?.delta?.content;
+            if (delta) {
+              fullContent += delta;
+              input.onToken(delta);
+            }
+          }
+
+          if (fullContent) return this.replaceName(fullContent, influencerName);
+          throw new Error('Empty streaming response from primary model');
+
+        } catch (primaryError) {
+          console.warn(`[BaseArchetype] Primary streaming model (${CHAT_MODEL}) failed, trying fallback:`, primaryError);
+          
+          const fallbackStream = await openai.chat.completions.create({
+            model: FALLBACK_MODEL,
+            messages,
+            max_completion_tokens: MAX_TOKENS,
+            stream: true,
+          });
+
+          let fullContent = '';
+          for await (const chunk of fallbackStream) {
+            const delta = chunk.choices[0]?.delta?.content;
+            if (delta) {
+              fullContent += delta;
+              input.onToken(delta);
+            }
+          }
+
+          if (fullContent) return this.replaceName(fullContent, influencerName);
+          throw new Error('Empty streaming response from fallback model');
+        }
+      }
+
+      // === BLOCKING MODE (backward compatible, no onToken) ===
       try {
         const response = await openai.chat.completions.create({
           model: CHAT_MODEL,
@@ -228,7 +336,6 @@ ${this.definition.logic.responseTemplates?.length ? '📋 איך לענות:\n' 
       } catch (primaryError) {
         console.warn(`[BaseArchetype] Primary model (${CHAT_MODEL}) failed, trying fallback (${FALLBACK_MODEL}):`, primaryError);
         
-        // Try fallback model (GPT-4o)
         const fallbackResponse = await openai.chat.completions.create({
           model: FALLBACK_MODEL,
           messages,
@@ -242,7 +349,6 @@ ${this.definition.logic.responseTemplates?.length ? '📋 איך לענות:\n' 
 
     } catch (error) {
       console.error('[BaseArchetype] All models failed:', error);
-      // Last resort: Generic AI fallback instead of hardcoded string
       return `היי, אני קצת מתקשה למצוא את המידע המדויק כרגע. ${influencerName} בדרך כלל משתפת המון טיפים בנושא הזה! אולי תוכלי לחדד את השאלה?`;
     }
   }
