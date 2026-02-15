@@ -44,6 +44,7 @@ export interface InstagramHighlight {
   cover_url: string;
   media_samples: any[];
   scraped_at: string;
+  content_text?: string; // Combined transcription + OCR text
 }
 
 export interface Coupon {
@@ -275,10 +276,16 @@ async function fetchRelevantHighlights(
   limit: number
 ): Promise<InstagramHighlight[]> {
   try {
-    // ⚡ AI-First: Get all highlights, AI understands titles in any language
+    // ⚡ AI-First: Get all highlights with transcriptions (including OCR!)
     const { data, error } = await supabase
       .from('instagram_highlights')
-      .select('id, title, cover_image_url, items_count, scraped_at')
+      .select(`
+        id, 
+        title, 
+        cover_image_url, 
+        items_count, 
+        scraped_at
+      `)
       .eq('account_id', accountId)
       .order('scraped_at', { ascending: false })
       .limit(50); // Get all highlights
@@ -288,13 +295,64 @@ async function fetchRelevantHighlights(
       return [];
     }
     
-    return (data || []).map((h: any) => ({
-      id: h.id,
-      title: h.title,
-      cover_url: h.cover_image_url, // Map correct column name
-      media_samples: [], // Not available in new schema
-      scraped_at: h.scraped_at,
-    }));
+    // Fetch transcriptions for highlight items (includes OCR!)
+    const highlightIds = (data || []).map((h: any) => h.id);
+    const transcriptions: Record<string, any[]> = {};
+    
+    if (highlightIds.length > 0) {
+      const { data: items } = await supabase
+        .from('instagram_highlight_items')
+        .select('id, highlight_id')
+        .in('highlight_id', highlightIds);
+      
+      if (items && items.length > 0) {
+        const itemIds = items.map((i: any) => i.id);
+        
+        const { data: trans } = await supabase
+          .from('instagram_transcriptions')
+          .select('source_id, transcription_text, on_screen_text')
+          .eq('source_type', 'highlight_item')
+          .in('source_id', itemIds)
+          .eq('processing_status', 'completed');
+        
+        // Group transcriptions by highlight_id
+        if (trans) {
+          trans.forEach((t: any) => {
+            const item = items.find((i: any) => i.id === t.source_id);
+            if (item) {
+              if (!transcriptions[item.highlight_id]) {
+                transcriptions[item.highlight_id] = [];
+              }
+              transcriptions[item.highlight_id].push(t);
+            }
+          });
+        }
+      }
+    }
+    
+    return (data || []).map((h: any) => {
+      const highlightTrans = transcriptions[h.id] || [];
+      
+      // Combine all text from this highlight (transcription + OCR)
+      const allText = highlightTrans.map((t: any) => {
+        const parts = [];
+        if (t.transcription_text) parts.push(t.transcription_text);
+        if (t.on_screen_text && Array.isArray(t.on_screen_text)) {
+          parts.push(t.on_screen_text.join(' '));
+        }
+        return parts.join(' ');
+      }).join(' | ');
+      
+      return {
+        id: h.id,
+        title: h.title,
+        cover_url: h.cover_image_url,
+        media_samples: highlightTrans, // Include transcriptions with OCR!
+        scraped_at: h.scraped_at,
+        // Add searchable text for AI
+        content_text: allText,
+      };
+    });
   } catch (error) {
     console.error('[fetchHighlights] Exception:', error);
     return [];

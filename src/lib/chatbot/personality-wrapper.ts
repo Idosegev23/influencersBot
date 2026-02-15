@@ -122,11 +122,11 @@ export class PersonalityWrapper {
     // 5. Format message structure
     text = this.formatMessageStructure(text);
 
-    // 6. Maybe add signature phrase - DISABLED to avoid incomplete sentences
-    // if (Math.random() < 0.3 && this.config.commonPhrases.length > 0) {
-    //   const phrase = this.config.commonPhrases[Math.floor(Math.random() * this.config.commonPhrases.length)];
-    //   text = this.insertSignaturePhrase(text, phrase);
-    // }
+    // 6. Maybe add signature phrase
+    if (Math.random() < 0.3 && this.config.commonPhrases.length > 0) {
+      const phrase = this.config.commonPhrases[Math.floor(Math.random() * this.config.commonPhrases.length)];
+      text = this.insertSignaturePhrase(text, phrase);
+    }
 
     return {
       text,
