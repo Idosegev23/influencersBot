@@ -346,6 +346,14 @@ function buildSystemInstructions(persona: any): string {
   if (persona.tone && toneMap[persona.tone]) {
     instructions.push(`\n🗣️ ${toneMap[persona.tone]}`);
   }
+  
+  // Common phrases and signature style - from DB persona
+  if (persona.common_phrases && Array.isArray(persona.common_phrases) && persona.common_phrases.length > 0) {
+    instructions.push(`\n✍️ **סגנון חתימה (השתמש לפעמים, אל תגזים):**`);
+    instructions.push(`משפטים מאפיינים: ${persona.common_phrases.slice(0, 5).join(', ')}`);
+    instructions.push(`⚠️ השתמש במשפטים אלה באופן טבעי בתוך התשובה, לא בסוף כהוספה מאולצת.`);
+    instructions.push(`⚠️ רק כאשר זה רלוונטי! אל תדביק משפט לא קשור בסוף תשובה מלאה.`);
+  }
 
   // Emoji usage - keep for backward compatibility
   const emojiMap: Record<string, string> = {
