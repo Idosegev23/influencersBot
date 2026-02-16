@@ -524,6 +524,8 @@ export async function getBrandsByInfluencer(influencerId: string): Promise<Brand
       ? coupons.map(c => c.code).join(', ')
       : p.coupon_code;
     
+    console.log(`[getBrandsByInfluencer] Brand: ${p.brand_name}, Partnership coupon: ${p.coupon_code}, Final coupon: ${couponCodes}`);
+    
     return {
       id: p.id,
       influencer_id: influencerId,
@@ -669,7 +671,8 @@ export async function getPartnershipsByInfluencer(influencerId: string): Promise
     // Map partnerships with coupons to include coupon_code
     return (data || []).map(p => ({
       ...p,
-      coupon_code: p.coupons?.find((c: any) => c.is_active)?.code || null,
+      // First try coupons table, then fallback to partnership's coupon_code field
+      coupon_code: p.coupons?.find((c: any) => c.is_active)?.code || p.coupon_code || null,
       coupons: undefined, // Remove nested array from final result
     }));
   } catch (err) {

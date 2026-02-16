@@ -280,6 +280,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
           getBrandsByInfluencer(inf.id),
           getContentByInfluencer(inf.id),
         ]);
+        console.log('[Chat Page] Loaded brands:', brandsData.length, brandsData.map(b => ({ name: b.brand_name, coupon: b.coupon_code })));
         setBrands(brandsData);
         setContent(cont);
       } catch (error) {
