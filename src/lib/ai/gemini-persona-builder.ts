@@ -331,17 +331,34 @@ ${JSON.stringify(inputData, null, 2)}
       console.log(`🧠 Reasoning tokens used: ${(response as any).usage?.reasoning_tokens || 0}`);
       console.log(`📊 Total tokens: ${(response as any).usage?.total_tokens || 0}`);
       
-      // Extract text from response (handle different formats)
+      // Extract text from response (handle GPT-5.2 Pro complex format)
       const rawOutput = (response as any).output;
+      
       if (typeof rawOutput === 'string') {
         text = rawOutput;
+        console.log('✅ [GPT-5.2 Pro] Output was string');
+      } else if (Array.isArray(rawOutput)) {
+        // GPT-5.2 Pro returns: [{"type":"reasoning",...}, {"type":"message", "content":[{"text":"..."}]}]
+        console.log('⚙️ [GPT-5.2 Pro] Output is array, extracting message content...');
+        const messageObj = rawOutput.find((item: any) => item.type === 'message');
+        if (messageObj && messageObj.content && Array.isArray(messageObj.content)) {
+          const textContent = messageObj.content.find((c: any) => c.type === 'output_text' || c.text);
+          text = textContent?.text;
+          console.log('✅ [GPT-5.2 Pro] Extracted text from message object');
+        } else {
+          throw new Error('Could not find message content in array response');
+        }
       } else if (rawOutput && typeof rawOutput === 'object') {
-        // If output is an object, try to stringify it or extract text field
-        text = rawOutput.text || rawOutput.content || JSON.stringify(rawOutput);
+        // Fallback: try to extract text field
+        text = rawOutput.text || rawOutput.content;
         console.log('⚠️ [GPT-5.2 Pro] Output was object, extracted:', typeof text);
       } else {
         console.error('❌ [GPT-5.2 Pro] Unexpected output format:', typeof rawOutput, rawOutput);
         throw new Error(`Unexpected output format: ${typeof rawOutput}`);
+      }
+      
+      if (!text || typeof text !== 'string') {
+        throw new Error('Failed to extract text from GPT-5.2 Pro response');
       }
       
       break; // Success, exit retry loop
