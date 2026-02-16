@@ -1,6 +1,14 @@
 /**
  * Gemini Video Transcriber
- * תמלול סרטונים באמצעות Gemini 3 Pro
+ * תמלול סרטונים + OCR באמצעות Gemini 3 Flash (with high media resolution)
+ * 
+ * Models:
+ * - Gemini 3 Flash (default): $0.50/$3 per 1M tokens - מהיר וזול, מצוין ל-OCR
+ * - Gemini 3 Pro (optional): $2/$12 per 1M tokens - איטי ויקר, דיוק מקסימלי
+ * 
+ * Media Resolution for Video OCR:
+ * - media_resolution_high: 280 tokens/frame (מומלץ לטקסט במסך)
+ * - media_resolution_low: 70 tokens/frame (לא מספיק ל-OCR איכותי)
  */
 
 import { GoogleGenAI } from '@google/genai';
@@ -165,16 +173,26 @@ export async function transcribeVideo(
     const genAI = getGeminiClient();
     
     // Build the prompt
-    const prompt = `אתה מומחה לתמלול סרטונים באינסטגרם.
+    const prompt = `אתה מומחה לתמלול ואנליזה ויזואלית של סרטונים באינסטגרם.
 
-תמלל את הסרטון הזה במדויק וחלץ את כל המידע הרלוונטי.
+⚡ אתה יכול לראות ולקרוא את הסרטון - לא רק לשמוע אותו!
 
-הנחיות:
+תמלל את הסרטון הזה במדויק וחלץ את כל המידע הרלוונטי:
+
+הנחיות - תמלול:
 1. תמלל את כל הטקסט המדובר - מילה במילה, בשפה המקורית
 2. זהה את שפת הדיבור הראשית
-3. אם יש טקסט על המסך (כותרות, subtitles, overlays) - חלץ אותו בנפרד
-4. אם יש יותר מדובר אחד - הפרד לפי דוברים
-5. שמור על דיוק מקסימלי - אל תוסיף מידע שלא קיים בסרטון
+3. אם יש יותר מדובר אחד - הפרד לפי דוברים
+
+הנחיות - OCR (טקסט על המסך):
+4. **CRITICAL**: חפש וחלץ כל טקסט שמופיע על המסך:
+   - כותרות וסאבטייטלים
+   - טקסט overlay (מתכונים, רשימות קניות, שמות מוצרים)
+   - מספרים (מחירים, כמויות)
+   - שמות מותגים
+   - כל טקסט אחר שנראה בפריים
+5. אם הטקסט קטן או לא ברור - השתמש ביכולות הראייה שלך לזהות אותו
+6. שמור על דיוק מקסימלי - אל תוסיף מידע שלא קיים בסרטון
 
 פורמט התשובה - JSON בלבד:
 {
@@ -202,9 +220,10 @@ export async function transcribeVideo(
 
 חשוב: החזר רק JSON תקין, ללא טקסט נוסף.`;
 
-    console.log(`[Transcriber] Calling Gemini 3 Flash with retry logic...`);
+    console.log(`[Transcriber] Calling Gemini 3 Flash with HIGH media resolution for OCR...`);
     
     // Call Gemini with video (with automatic retry on 429)
+    // ⚡ CRITICAL: Use media_resolution_high for TEXT-HEAVY videos (OCR)
     const response = await callGeminiWithRetry(
       genAI,
       'gemini-3-flash-preview', // ⚡ Gemini 3 Flash Preview (1M context, cheap!)
@@ -216,6 +235,10 @@ export async function transcribeVideo(
               inlineData: {
                 mimeType: mimeType,
                 data: videoData,
+              },
+              // ⚡ NEW: High resolution for OCR (280 tokens/frame instead of 70)
+              mediaResolution: {
+                level: 'media_resolution_high'
               },
             },
           ],
