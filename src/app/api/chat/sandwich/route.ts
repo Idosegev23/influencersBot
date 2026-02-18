@@ -129,18 +129,12 @@ export async function POST(req: NextRequest) {
       showCardList: null,
     };
 
-    // For product recommendation archetype - show brands
+    // For product recommendation archetype - show quick actions
     if (result.metadata.archetype === 'ProductRecommendation' && brands.length > 0) {
-      uiDirectives.showCardList = 'brands';
       uiDirectives.showQuickActions = [
         'יש עוד המלצות?',
         'מה הקופון הכי שווה?',
       ];
-    }
-
-    // For coupon inquiry - show brands
-    if (result.metadata.archetype === 'CouponInquiry' && brands.length > 0) {
-      uiDirectives.showCardList = 'brands';
     }
 
     // For support - show support actions

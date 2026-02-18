@@ -22,10 +22,8 @@ export const routingRules: Rule[] = [
       {
         type: 'set_ui',
         value: {
-          showCardList: 'brands',
           showQuickActions: ['העתק קופון', 'פתח אתר', 'בעיה בקופון'],
           responseLength: 'short',
-          layout: 'cards_first',
         },
       },
       { type: 'append_context', value: ['brands', 'coupon_policy', 'persona'] },

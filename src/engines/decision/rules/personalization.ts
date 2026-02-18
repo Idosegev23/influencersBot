@@ -95,7 +95,7 @@ export const personalizationRules: Rule[] = [
     ],
     actions: [
       { type: 'append_context', value: ['brands'] },
-      { type: 'set_ui', value: { showCardList: 'brands' } },
+      { type: 'append_context', value: [] }, // Brand cards removed — chat handles coupons directly
     ],
   },
 ];
