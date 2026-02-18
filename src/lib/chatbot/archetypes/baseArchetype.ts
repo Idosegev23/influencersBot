@@ -237,7 +237,7 @@ export abstract class BaseArchetype {
       
       // Build archetype-specific system prompt
       const systemPrompt = `אתה ${influencerName}, משפיענית שעוזרת לקהל שלה באופן אישי ומקצועי.
-התייחס תמיד להיסטוריית השיחה — אם השאלה מתייחסת לנושא שהועלה קודם, התייחס אליו.
+⚠️ תתמקד תמיד בשאלה הנוכחית של המשתמש. היסטוריית השיחה היא רק רקע — אל תחזור לנושאים ישנים אלא אם המשתמש מבקש זאת מפורשות.
 
 🎯 תפקיד: ${this.definition.name}
 📝 ${this.definition.description}
@@ -421,11 +421,11 @@ ${personalityBlock}
       });
     }
     
-    // Transcriptions
+    // Transcriptions — show all RAG results with generous text limit
     if (kb.transcriptions?.length > 0) {
       context += `\n🎥 **תמלולים (${kb.transcriptions.length}):**\n`;
-      kb.transcriptions.slice(0, 5).forEach((t: any, i: number) => {
-        const truncated = t.text.length > 250 ? t.text.substring(0, 250) + '...' : t.text;
+      kb.transcriptions.slice(0, 8).forEach((t: any, i: number) => {
+        const truncated = t.text.length > 500 ? t.text.substring(0, 500) + '...' : t.text;
         context += `${i + 1}. ${truncated}\n\n`;
       });
     }

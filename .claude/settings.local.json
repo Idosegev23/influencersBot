@@ -13,7 +13,10 @@
       "Bash(grep:*)",
       "Bash(npx tsx:*)",
       "Bash(npm run test:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(node -e:*)",
+      "Bash(source:*)",
+      "Bash(ls:*)"
     ]
   }
 }

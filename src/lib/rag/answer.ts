@@ -6,6 +6,8 @@
  * - Calls retrieveContext to get relevant sources
  * - If no sources found: returns "I don't have enough information" + a follow-up question
  * - Otherwise: calls the LLM with strict context and produces a cited answer
+ *
+ * Uses GPT-5 Nano via Responses API with low reasoning for speed.
  */
 
 import OpenAI from 'openai';
@@ -66,16 +68,15 @@ export async function answerQuestion(input: AnswerInput): Promise<AnswerResult> 
     log.info('No sources found, generating follow-up', { accountId }, accountId);
 
     const client = getClient();
-    const response = await client.chat.completions.create({
+    const response = await client.responses.create({
       model: 'gpt-5-nano-2025-08-07',
-      messages: [
-        { role: 'system', content: NO_INFO_PROMPT },
-        { role: 'user', content: query },
-      ],
-      // GPT-5 Nano only supports default temperature and no max_completion_tokens
+      instructions: NO_INFO_PROMPT,
+      input: query,
+      reasoning: { effort: 'minimal' as any },
+      max_output_tokens: 300,
     });
 
-    const answer = response.choices[0].message.content || 'I don\'t have enough information to answer this question.';
+    const answer = response.output_text || 'I don\'t have enough information to answer this question.';
 
     // Extract the follow-up question (heuristic: last sentence ending with ?)
     const sentences = answer.split(/[.?!]\s+/);
@@ -94,19 +95,16 @@ export async function answerQuestion(input: AnswerInput): Promise<AnswerResult> 
   const client = getClient();
   const sourcesContext = formatSourcesForLLM(sources);
 
-  const response = await client.chat.completions.create({
+  const response = await client.responses.create({
     model: 'gpt-5-nano-2025-08-07',
-    messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      {
-        role: 'user',
-        content: `${sourcesContext}\n\nQuestion: ${query}\n\nAnswer using ONLY the sources above. Cite with [source_id].`,
-      },
-    ],
-    // GPT-5 Nano only supports default temperature and no max_completion_tokens
+    instructions: SYSTEM_PROMPT,
+    input: `${sourcesContext}\n\nQuestion: ${query}\n\nAnswer using ONLY the sources above. Cite with [source_id].`,
+    reasoning: { effort: 'low' as any },
+    text: { verbosity: 'low' as any },
+    max_output_tokens: 1000,
   });
 
-  const answer = response.choices[0].message.content || 'Unable to generate an answer.';
+  const answer = response.output_text || 'Unable to generate an answer.';
 
   log.info('Answer generated', {
     answerLength: answer.length,

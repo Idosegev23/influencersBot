@@ -12,6 +12,7 @@
  */
 
 import OpenAI from 'openai';
+import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@/lib/supabase/server';
 import { generateEmbedding } from './embeddings';
 import { rerankCandidates } from './rerank';
@@ -33,6 +34,12 @@ let openaiClient: OpenAI | null = null;
 function getOpenAI(): OpenAI {
   if (!openaiClient) openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   return openaiClient;
+}
+
+let geminiClient: GoogleGenAI | null = null;
+function getGemini(): GoogleGenAI {
+  if (!geminiClient) geminiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+  return geminiClient;
 }
 
 // ============================================
@@ -63,30 +70,30 @@ const STRUCTURED_INDICATORS = [
 // ============================================
 
 /**
- * Expand query with semantically related terms using a fast LLM.
+ * Expand query with semantically related terms using Gemini 2.5 Flash Lite.
  * This helps bridge vocabulary gaps, e.g. "פסטה" → includes "רביולי, לזניה, ספגטי".
- * The expanded query is used ONLY for embedding generation, not for reranking.
+ * Gemini 2.5 Flash Lite: ~600ms, 100% consistent, supports temperature=0.
  */
 async function expandQuery(query: string): Promise<string> {
   try {
-    const client = getOpenAI();
-    const response = await client.chat.completions.create({
-      model: 'gpt-5-nano-2025-08-07',
-      messages: [
-        {
-          role: 'system',
-          content: `You expand search queries with related terms to improve retrieval.
-Given a short query, return the ORIGINAL query followed by 5-10 closely related terms/synonyms.
-Keep the same language as the query. Return ONLY the expanded text, no explanations.
-Example: "פסטה טובה" → "פסטה טובה, רביולי, לזניה, ספגטי, פנה, ניוקי, מאכל איטלקי, מתכון פסטה"
-Example: "good pasta" → "good pasta, ravioli, lasagna, spaghetti, penne, gnocchi, Italian food, pasta recipe"`,
-        },
-        { role: 'user', content: query },
-      ],
-      // GPT-5 Nano only supports default temperature and no max_completion_tokens
+    const gemini = getGemini();
+    const response = await gemini.models.generateContent({
+      model: 'gemini-2.5-flash-lite',
+      contents: query,
+      config: {
+        systemInstruction: `Expand search queries with 8-12 related specific terms for better retrieval.
+Return the ORIGINAL query + related terms, comma-separated. ONLY the expanded text — no explanations.
+
+Examples:
+"פסטה טובה" → "פסטה טובה, רביולי, לזניה, ספגטי, פנה, ניוקי, פטוצ'יני, טורטליני, קנלוני, מתכון פסטה"
+"קרם פנים" → "קרם פנים, סרום, לחות, רטינול, ויטמין C, SPF, טיפוח, שגרת טיפוח, קרם לילה, קרם יום"
+"good pasta" → "good pasta, ravioli, lasagna, spaghetti, penne, gnocchi, fettuccine, tortellini, Italian food"`,
+        maxOutputTokens: 150,
+        temperature: 0,
+      },
     });
 
-    const expanded = response.choices[0].message.content?.trim();
+    const expanded = response.text?.trim();
     if (expanded && expanded.length > query.length) {
       log.info('Query expanded', {
         original: query,
@@ -264,14 +271,11 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
   // --- Step 3: Vector search ---
   const vectorStart = Date.now();
 
-  // Expand query with related terms for better recall
+  // Expand query first, then embed the expanded version for better recall.
   const expandedQuery = await expandQuery(query);
-
-  // Enrich with conversation context for better embedding
   const enrichedQuery = conversationSummary
     ? `${expandedQuery}\n\nContext: ${conversationSummary}`
     : expandedQuery;
-
   const queryEmbedding = await generateEmbedding(enrichedQuery);
 
   const supabase = createClient();
@@ -312,6 +316,7 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
   // --- Step 3b: Keyword supplement (hybrid search) ---
   // Search for expanded terms via ILIKE to catch content where
   // the embedding is diluted by noise (e.g. garbled speech + useful on_screen_text)
+  let keywordSupplementAdded = false;
   if (expandedQuery !== query) {
     const keyTerms = extractKeyTerms(query, expandedQuery);
     if (keyTerms.length > 0) {
@@ -319,7 +324,7 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
       let added = 0;
 
       // Run ILIKE searches in parallel for speed
-      const searches = keyTerms.slice(0, 6).map(term =>
+      const searches = keyTerms.slice(0, 10).map(term =>
         supabase
           .from('document_chunks')
           .select('id, document_id, entity_type, chunk_index, chunk_text, token_count, metadata, updated_at')
@@ -336,7 +341,7 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
             existingIds.add(kr.id);
             candidates.push({
               ...kr,
-              similarity: 0.40, // Keyword matches get competitive baseline
+              similarity: 0.45, // Keyword matches get competitive baseline
             });
             added++;
           }
@@ -356,7 +361,7 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
           for (const kr of data) {
             if (!existingIds.has(kr.id)) {
               existingIds.add(kr.id);
-              candidates.push({ ...kr, similarity: 0.40 });
+              candidates.push({ ...kr, similarity: 0.45 });
               added++;
             }
           }
@@ -364,6 +369,7 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
       }
 
       if (added > 0) {
+        keywordSupplementAdded = true;
         log.info('Keyword supplement added candidates', { added, keyTerms }, accountId);
       }
     }
@@ -407,7 +413,7 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
     });
   }
 
-  // --- Step 4: Rerank ---
+  // --- Step 4: Rerank (conditional — skip when confident) ---
   const rerankStart = Date.now();
 
   const rerankCandidatesList: RerankCandidate[] = filtered.map(c => ({
@@ -417,23 +423,33 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
     metadata: c.metadata,
   }));
 
-  // Precision V2: Skip rerank when top result is dominant
+  // Skip LLM rerank when:
+  // - Top similarity > 0.5 AND no keyword supplement was added
+  //   (keyword supplements need reranking since their 0.40 baseline may outrank
+  //    higher-similarity but less-relevant vector results)
+  // - Precision V2 + dominant result (>0.85) AND no keyword supplement
   let reranked;
-  const skipRerank = process.env.MEMORY_V2_ENABLED === 'true'
-    && filtered.length > 0
-    && filtered[0].similarity > 0.85;
+  const topSimilarity = filtered[0]?.similarity || 0;
+  const skipRerank = filtered.length > 0 && !keywordSupplementAdded && (
+    topSimilarity > 0.5 ||
+    (process.env.MEMORY_V2_ENABLED === 'true' && topSimilarity > 0.85)
+  );
 
   if (skipRerank) {
-    // Take top results directly by similarity, no LLM rerank needed
-    reranked = rerankCandidatesList.slice(0, topK).map(c => ({
-      id: c.id,
-      score: c.similarity,
-    }));
-    log.info('Skipped rerank (dominant result)', {
-      topSimilarity: filtered[0].similarity,
+    // Take top results directly by similarity — no LLM rerank needed
+    reranked = rerankCandidatesList
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, topK)
+      .map(c => ({
+        id: c.id,
+        score: c.similarity,
+      }));
+    log.info('Skipped rerank (confident results)', {
+      topSimilarity,
+      candidateCount: filtered.length,
     }, accountId);
   } else {
-    // Use expanded query for reranking so the model knows related terms
+    // Only rerank when results are uncertain — use expanded query for hints
     const rerankQuery = expandedQuery !== query
       ? `${query} (related: ${expandedQuery})`
       : query;
@@ -530,16 +546,23 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
  */
 function extractKeyTerms(originalQuery: string, expandedQuery: string): string[] {
   const originalWords = new Set(
-    originalQuery.toLowerCase().replace(/[?!.,]/g, '').split(/\s+/).filter(w => w.length > 1)
+    originalQuery.toLowerCase().replace(/[?!.,?؟]/g, '').split(/\s+/).filter(w => w.length > 1)
   );
   const expandedTerms = expandedQuery
-    .replace(/[?!.,]/g, '')
-    .split(/[,،\s]+/)
-    .map(t => t.trim())
-    .filter(t => t.length > 1 && !originalWords.has(t.toLowerCase()));
+    .split(/[,،]+/)  // Split by commas first
+    .map(t => t.trim().replace(/^[(\[{]+|[)\]}.!?:]+$/g, ''))  // Strip surrounding punctuation
+    .filter(t => {
+      if (t.length < 2) return false;
+      if (originalWords.has(t.toLowerCase())) return false;
+      // Filter out noise: terms with parentheses, brackets, or mostly punctuation
+      if (/[()[\]{}]/.test(t)) return false;
+      // Must contain at least 2 actual word characters
+      const wordChars = t.replace(/[^a-zA-Zא-ת\u0600-\u06FF]/g, '');
+      return wordChars.length >= 2;
+    });
 
-  // Return unique terms, max 8
-  return [...new Set(expandedTerms)].slice(0, 8);
+  // Return unique terms, max 12
+  return [...new Set(expandedTerms)].slice(0, 12);
 }
 
 function truncate(text: string | null, maxLen: number): string {

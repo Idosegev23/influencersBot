@@ -6,23 +6,23 @@
  *
  * Strategy:
  * 1. If candidates <= finalK, return as-is (no reranking needed)
- * 2. Otherwise, use GPT-5 Nano to score each candidate against the query
+ * 2. Otherwise, use Gemini 2.5 Flash (thinkingBudget=0) to score each candidate against the query
  * 3. Combine similarity score + rerank score with configurable weights
  */
 
-import OpenAI from 'openai';
+import { GoogleGenAI } from '@google/genai';
 import { createLogger } from './logger';
 import type { RerankCandidate, RerankResult } from './types';
 
 const log = createLogger('rerank');
 
-let openaiClient: OpenAI | null = null;
+let geminiClient: GoogleGenAI | null = null;
 
-function getClient(): OpenAI {
-  if (!openaiClient) {
-    openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+function getGemini(): GoogleGenAI {
+  if (!geminiClient) {
+    geminiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
   }
-  return openaiClient;
+  return geminiClient;
 }
 
 export interface RerankOptions {
@@ -61,10 +61,8 @@ export async function rerankCandidates(
     }));
   }
 
-  const client = getClient();
-
-  // Cap candidates to avoid overwhelming the model
-  const maxCandidates = 25;
+  // Cap candidates for speed — fewer = faster LLM call
+  const maxCandidates = 15;
   const scoringCandidates = candidates.length > maxCandidates
     ? candidates.slice(0, maxCandidates)
     : candidates;
@@ -75,12 +73,17 @@ export async function rerankCandidates(
     .join('\n\n');
 
   try {
-    const response = await client.chat.completions.create({
-      model: 'gpt-5-nano-2025-08-07',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a relevance scorer. Given a user query and a list of text passages, rate each passage's relevance on a scale of 0-10.
+    const gemini = getGemini();
+    const response = await gemini.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: `Query: "${query}"
+
+Passages:
+${candidateList}
+
+Rate each passage (0-10):`,
+      config: {
+        systemInstruction: `You are a relevance scorer. Given a user query and a list of text passages, rate each passage's relevance on a scale of 0-10.
 10 = directly answers the query or contains exactly what was asked for
 7-9 = highly relevant, contains related/useful information
 4-6 = somewhat related but doesn't answer the query
@@ -92,21 +95,13 @@ The query may include "(related: ...)" hints showing related terms — use these
 
 Respond ONLY with a JSON array of scores in order, like: [8, 3, 9, 1, 5, ...]
 No explanations, just the array.`,
-        },
-        {
-          role: 'user',
-          content: `Query: "${query}"
-
-Passages:
-${candidateList}
-
-Rate each passage (0-10):`,
-        },
-      ],
-      // GPT-5 Nano only supports default temperature and no max_completion_tokens
+        thinkingConfig: { thinkingBudget: 0 },
+        maxOutputTokens: 200,
+        temperature: 0,
+      },
     });
 
-    const content = response.choices[0].message.content || '[]';
+    const content = response.text || '[]';
 
     // Parse scores - handle various formats
     let scores: number[];
