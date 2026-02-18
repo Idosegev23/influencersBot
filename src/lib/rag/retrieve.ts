@@ -59,6 +59,51 @@ const STRUCTURED_INDICATORS = [
 ];
 
 // ============================================
+// Step 0: Query Expansion
+// ============================================
+
+/**
+ * Expand query with semantically related terms using a fast LLM.
+ * This helps bridge vocabulary gaps, e.g. "פסטה" → includes "רביולי, לזניה, ספגטי".
+ * The expanded query is used ONLY for embedding generation, not for reranking.
+ */
+async function expandQuery(query: string): Promise<string> {
+  try {
+    const client = getOpenAI();
+    const response = await client.chat.completions.create({
+      model: 'gpt-5-nano-2025-08-07',
+      messages: [
+        {
+          role: 'system',
+          content: `You expand search queries with related terms to improve retrieval.
+Given a short query, return the ORIGINAL query followed by 5-10 closely related terms/synonyms.
+Keep the same language as the query. Return ONLY the expanded text, no explanations.
+Example: "פסטה טובה" → "פסטה טובה, רביולי, לזניה, ספגטי, פנה, ניוקי, מאכל איטלקי, מתכון פסטה"
+Example: "good pasta" → "good pasta, ravioli, lasagna, spaghetti, penne, gnocchi, Italian food, pasta recipe"`,
+        },
+        { role: 'user', content: query },
+      ],
+      // GPT-5 Nano only supports default temperature and no max_completion_tokens
+    });
+
+    const expanded = response.choices[0].message.content?.trim();
+    if (expanded && expanded.length > query.length) {
+      log.info('Query expanded', {
+        original: query,
+        expanded: expanded.substring(0, 200),
+      });
+      return expanded;
+    }
+    return query;
+  } catch (err) {
+    log.warn('Query expansion failed, using original', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return query;
+  }
+}
+
+// ============================================
 // Step 1: Query Classification
 // ============================================
 
@@ -219,10 +264,13 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
   // --- Step 3: Vector search ---
   const vectorStart = Date.now();
 
-  // Enrich query with conversation context for better embedding
+  // Expand query with related terms for better recall
+  const expandedQuery = await expandQuery(query);
+
+  // Enrich with conversation context for better embedding
   const enrichedQuery = conversationSummary
-    ? `${query}\n\nContext: ${conversationSummary}`
-    : query;
+    ? `${expandedQuery}\n\nContext: ${conversationSummary}`
+    : expandedQuery;
 
   const queryEmbedding = await generateEmbedding(enrichedQuery);
 
@@ -260,6 +308,66 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
     topSimilarity: candidates[0]?.similarity,
     bottomSimilarity: candidates[candidates.length - 1]?.similarity,
   }, accountId);
+
+  // --- Step 3b: Keyword supplement (hybrid search) ---
+  // Search for expanded terms via ILIKE to catch content where
+  // the embedding is diluted by noise (e.g. garbled speech + useful on_screen_text)
+  if (expandedQuery !== query) {
+    const keyTerms = extractKeyTerms(query, expandedQuery);
+    if (keyTerms.length > 0) {
+      const existingIds = new Set(candidates.map(c => c.id));
+      let added = 0;
+
+      // Run ILIKE searches in parallel for speed
+      const searches = keyTerms.slice(0, 6).map(term =>
+        supabase
+          .from('document_chunks')
+          .select('id, document_id, entity_type, chunk_index, chunk_text, token_count, metadata, updated_at')
+          .eq('account_id', accountId)
+          .ilike('chunk_text', `%${term}%`)
+          .limit(5)
+      );
+      const results = await Promise.all(searches);
+
+      for (const { data } of results) {
+        if (!data) continue;
+        for (const kr of data) {
+          if (!existingIds.has(kr.id)) {
+            existingIds.add(kr.id);
+            candidates.push({
+              ...kr,
+              similarity: 0.40, // Keyword matches get competitive baseline
+            });
+            added++;
+          }
+        }
+      }
+
+      // Also search for the original query terms via ILIKE
+      const originalTerms = query.replace(/[?!.,؟]/g, '').split(/\s+/).filter(w => w.length > 2);
+      for (const term of originalTerms.slice(0, 3)) {
+        const { data } = await supabase
+          .from('document_chunks')
+          .select('id, document_id, entity_type, chunk_index, chunk_text, token_count, metadata, updated_at')
+          .eq('account_id', accountId)
+          .ilike('chunk_text', `%${term}%`)
+          .limit(5);
+        if (data) {
+          for (const kr of data) {
+            if (!existingIds.has(kr.id)) {
+              existingIds.add(kr.id);
+              candidates.push({ ...kr, similarity: 0.40 });
+              added++;
+            }
+          }
+        }
+      }
+
+      if (added > 0) {
+        log.info('Keyword supplement added candidates', { added, keyTerms }, accountId);
+      }
+    }
+  }
 
   // --- Handle time "before" filter client-side (Supabase RPC only has "after") ---
   let filtered = candidates;
@@ -325,7 +433,11 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
       topSimilarity: filtered[0].similarity,
     }, accountId);
   } else {
-    reranked = await rerankCandidates(query, rerankCandidatesList, { finalK: topK });
+    // Use expanded query for reranking so the model knows related terms
+    const rerankQuery = expandedQuery !== query
+      ? `${query} (related: ${expandedQuery})`
+      : query;
+    reranked = await rerankCandidates(rerankQuery, rerankCandidatesList, { finalK: topK });
   }
   stages.rerankMs = Date.now() - rerankStart;
 
@@ -411,6 +523,24 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
 // ============================================
 // Helpers
 // ============================================
+
+/**
+ * Extract key terms that were added by query expansion.
+ * Returns the new terms (not in original query) that are meaningful words.
+ */
+function extractKeyTerms(originalQuery: string, expandedQuery: string): string[] {
+  const originalWords = new Set(
+    originalQuery.toLowerCase().replace(/[?!.,]/g, '').split(/\s+/).filter(w => w.length > 1)
+  );
+  const expandedTerms = expandedQuery
+    .replace(/[?!.,]/g, '')
+    .split(/[,،\s]+/)
+    .map(t => t.trim())
+    .filter(t => t.length > 1 && !originalWords.has(t.toLowerCase()));
+
+  // Return unique terms, max 8
+  return [...new Set(expandedTerms)].slice(0, 8);
+}
 
 function truncate(text: string | null, maxLen: number): string {
   if (!text) return '';

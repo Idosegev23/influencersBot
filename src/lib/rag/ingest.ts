@@ -263,21 +263,24 @@ async function ingestEntityType(
           if (!hasSpokenText && !hasScreenText) continue;
 
           try {
-            // Build text from spoken + on-screen content
+            // Build text: put on_screen_text FIRST for better embedding quality.
+            // On-screen text is usually structured (recipes, instructions, key info)
+            // while spoken text can be noisy filler.
             let text = '';
-            if (hasSpokenText) {
-              text = t.transcription_text!;
-            }
             if (hasScreenText) {
               const screenContent = t.on_screen_text.join(' | ');
+              text = screenContent;
+            }
+            if (hasSpokenText) {
               text = text
-                ? text + '\n\n[On-screen text]: ' + screenContent
-                : '[On-screen text]: ' + screenContent;
+                ? text + '\n\n' + t.transcription_text!
+                : t.transcription_text!;
             }
 
-            const title = hasSpokenText
-              ? truncate(t.transcription_text, 120)
-              : truncate(t.on_screen_text[0], 120);
+            // Title: prefer on_screen_text since it's more descriptive
+            const title = hasScreenText
+              ? truncate(t.on_screen_text[0], 120)
+              : truncate(t.transcription_text, 120);
 
             await ingestDocument({
               accountId,

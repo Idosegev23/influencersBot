@@ -67,13 +67,12 @@ export async function answerQuestion(input: AnswerInput): Promise<AnswerResult> 
 
     const client = getClient();
     const response = await client.chat.completions.create({
-      model: 'gpt-4.1-nano',
+      model: 'gpt-5-nano-2025-08-07',
       messages: [
         { role: 'system', content: NO_INFO_PROMPT },
         { role: 'user', content: query },
       ],
-      temperature: 0.3,
-      max_tokens: 300,
+      // GPT-5 Nano only supports default temperature and no max_completion_tokens
     });
 
     const answer = response.choices[0].message.content || 'I don\'t have enough information to answer this question.';
@@ -96,7 +95,7 @@ export async function answerQuestion(input: AnswerInput): Promise<AnswerResult> 
   const sourcesContext = formatSourcesForLLM(sources);
 
   const response = await client.chat.completions.create({
-    model: 'gpt-4.1-nano',
+    model: 'gpt-5-nano-2025-08-07',
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       {
@@ -104,8 +103,7 @@ export async function answerQuestion(input: AnswerInput): Promise<AnswerResult> 
         content: `${sourcesContext}\n\nQuestion: ${query}\n\nAnswer using ONLY the sources above. Cite with [source_id].`,
       },
     ],
-    temperature: 0.2,
-    max_tokens: 1000,
+    // GPT-5 Nano only supports default temperature and no max_completion_tokens
   });
 
   const answer = response.choices[0].message.content || 'Unable to generate an answer.';
