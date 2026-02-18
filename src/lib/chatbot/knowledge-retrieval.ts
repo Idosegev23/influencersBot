@@ -4,6 +4,8 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
+import { retrieveContext } from '@/lib/rag';
+import type { RetrievedSource } from '@/lib/rag';
 import type { ArchetypeType } from './archetypes/types';
 
 // ============================================
@@ -164,16 +166,64 @@ export async function retrieveKnowledge(
     };
   }
 
-  console.log(`[Knowledge Retrieval] 🔍 INDEXED SEARCH - כל התוכן נגיש!`);
   console.log(`[Knowledge Retrieval] Archetype: ${archetype}`);
   console.log(`[Knowledge Retrieval] Query: ${userMessage.substring(0, 50)}...`);
 
-  // ⚡ Use Full Text Search INDEX! All 10,000+ items are searchable!
-  // No more limits - PostgreSQL finds the most relevant content automatically
-  // Normalize Hebrew query for better FTS matching
-  // e.g. "איזה מתכונים יש לי" → "מתכונים מתכון" (strips stopwords, adds stems)
+  // ============================================
+  // Try Vector Search (RAG) first — semantic search via embeddings
+  // Falls back to FTS if no RAG data available
+  // ============================================
+  const ragAvailable = await isRAGAvailable(supabase, accountId);
+
+  if (ragAvailable) {
+    console.log(`[Knowledge Retrieval] 🧠 VECTOR SEARCH mode`);
+    try {
+      const { sources } = await retrieveContext({
+        accountId,
+        query: userMessage,
+        topK: 8,
+      });
+
+      console.log(`[Knowledge Retrieval] Vector search returned ${sources.length} sources`);
+      const ragKnowledge = mapRAGSourcesToKnowledge(sources);
+
+      // Always fetch coupons directly (need complete list + structured data for links)
+      // Also fetch insights (not in RAG pipeline)
+      const [coupons, insights] = await Promise.all([
+        fetchRelevantCoupons(supabase, accountId, [], archetype, userMessage),
+        fetchRelevantInsights(supabase, accountId, archetype, 3),
+      ]);
+
+      console.log(`[Knowledge Retrieval] ✅ RAG Found:`);
+      console.log(`  - Posts: ${ragKnowledge.posts.length}`);
+      console.log(`  - Transcriptions: ${ragKnowledge.transcriptions.length}`);
+      console.log(`  - Highlights: ${ragKnowledge.highlights.length}`);
+      console.log(`  - Partnerships: ${ragKnowledge.partnerships.length}`);
+      console.log(`  - Websites: ${ragKnowledge.websites.length}`);
+      console.log(`  - Coupons: ${coupons.length} (direct query)`);
+      console.log(`  - Insights: ${insights.length} (direct query)`);
+
+      return {
+        posts: ragKnowledge.posts,
+        highlights: ragKnowledge.highlights,
+        coupons,
+        partnerships: ragKnowledge.partnerships,
+        insights,
+        websites: ragKnowledge.websites,
+        transcriptions: ragKnowledge.transcriptions,
+      };
+    } catch (ragError) {
+      console.error(`[Knowledge Retrieval] RAG failed, falling back to FTS:`, ragError);
+      // Fall through to FTS below
+    }
+  }
+
+  // ============================================
+  // Fallback: Full Text Search (FTS)
+  // ============================================
+  console.log(`[Knowledge Retrieval] 🔍 FTS FALLBACK mode`);
+
   const normalizedQuery = normalizeHebrewQuery(userMessage);
-  console.log(`[Knowledge Retrieval] Normalized query: "${normalizedQuery}"`);
 
   const [posts, highlights, coupons, partnerships, insights, websites, transcriptions] = await Promise.all([
     fetchRelevantPostsIndexed(supabase, accountId, normalizedQuery, 5),
@@ -185,24 +235,10 @@ export async function retrieveKnowledge(
     fetchRelevantTranscriptionsIndexed(supabase, accountId, normalizedQuery, 5),
   ]);
 
-  console.log(`[Knowledge Retrieval] ✅ Found:`);
-  console.log(`  - Posts: ${posts.length}`);
-  console.log(`  - Highlights: ${highlights.length}`);
-  console.log(`  - Coupons: ${coupons.length}`);
-  console.log(`  - Partnerships: ${partnerships.length}`);
-  console.log(`  - Insights: ${insights.length}`);
-  console.log(`  - Websites: ${websites.length}`);
+  console.log(`[Knowledge Retrieval] ✅ FTS Found:`);
+  console.log(`  - Posts: ${posts.length}, Highlights: ${highlights.length}`);
+  console.log(`  - Coupons: ${coupons.length}, Partnerships: ${partnerships.length}`);
   console.log(`  - Transcriptions: ${transcriptions.length}`);
-  
-  // 🐛 DEBUG: Show actual data
-  if (coupons.length > 0) {
-    console.log(`\n📋 [DEBUG] Coupons data:`);
-    coupons.forEach(c => console.log(`   - ${c.brand}: ${c.code} (${c.discount})`));
-  }
-  if (posts.length > 0) {
-    console.log(`\n📋 [DEBUG] Posts data:`);
-    posts.slice(0, 3).forEach(p => console.log(`   - ${p.caption?.substring(0, 60)}...`));
-  }
 
   return {
     posts,
@@ -239,6 +275,104 @@ function isSimpleGreeting(message: string): boolean {
     || (normalized.length <= 8 && !normalized.includes('?'));
 }
 
+// ============================================
+// RAG Vector Search Helpers
+// ============================================
+
+/**
+ * Check if RAG vector data is available for this account.
+ * Cached for 60s to avoid repeated DB hits.
+ */
+const ragAvailabilityCache = new Map<string, { available: boolean; expiry: number }>();
+
+async function isRAGAvailable(supabase: any, accountId: string): Promise<boolean> {
+  const cached = ragAvailabilityCache.get(accountId);
+  if (cached && cached.expiry > Date.now()) return cached.available;
+
+  try {
+    const { count, error } = await supabase
+      .from('document_chunks')
+      .select('id', { count: 'exact', head: true })
+      .eq('account_id', accountId)
+      .limit(1);
+    const available = !error && (count || 0) > 0;
+    ragAvailabilityCache.set(accountId, { available, expiry: Date.now() + 60_000 });
+    return available;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Map RAG RetrievedSource[] to KnowledgeBase fields.
+ * Preserves the KnowledgeBase interface so downstream code (baseArchetype) stays untouched.
+ */
+function mapRAGSourcesToKnowledge(sources: RetrievedSource[]): {
+  posts: InstagramPost[];
+  transcriptions: VideoTranscription[];
+  highlights: InstagramHighlight[];
+  partnerships: Partnership[];
+  websites: WebsiteContent[];
+} {
+  const posts: InstagramPost[] = [];
+  const transcriptions: VideoTranscription[] = [];
+  const highlights: InstagramHighlight[] = [];
+  const partnerships: Partnership[] = [];
+  const websites: WebsiteContent[] = [];
+
+  for (const source of sources) {
+    switch (source.entityType) {
+      case 'post':
+        posts.push({
+          id: source.documentId,
+          caption: source.excerpt,
+          hashtags: (source.metadata.hashtags as string[]) || [],
+          type: (source.metadata.postType as 'post' | 'reel' | 'carousel') || 'post',
+          posted_at: (source.metadata.postedAt as string) || source.updatedAt,
+          likes_count: (source.metadata.likesCount as number) || 0,
+          engagement_rate: 0,
+          media_urls: [],
+        });
+        break;
+      case 'transcription':
+        transcriptions.push({
+          id: source.documentId,
+          text: source.excerpt,
+          media_id: (source.metadata.originalSourceId as string) || '',
+          created_at: source.updatedAt,
+        });
+        break;
+      case 'highlight':
+        highlights.push({
+          id: source.documentId,
+          title: source.title,
+          cover_url: '',
+          media_samples: [],
+          scraped_at: source.updatedAt,
+          content_text: source.excerpt,
+        });
+        break;
+      case 'partnership':
+        partnerships.push({
+          brand_name: (source.metadata.brandName as string) || source.title,
+          partnership_type: (source.metadata.category as string) || 'collaboration',
+          description: source.excerpt,
+        });
+        break;
+      case 'website':
+        websites.push({
+          url: (source.metadata.url as string) || '',
+          title: source.title,
+          content: source.excerpt,
+          scraped_at: source.updatedAt,
+        });
+        break;
+    }
+  }
+
+  return { posts, transcriptions, highlights, partnerships, websites };
+}
+
 function extractKeywordsFromMessage(message: string): string[] {
   const commonWords = ['את', 'אני', 'של', 'על', 'עם', 'מה', 'איך', 'למה', 'כמה', 'יש', 'לך'];
 
@@ -272,11 +406,34 @@ const HEBREW_STOP_WORDS = new Set([
 const HEBREW_PREFIXES = /^[הבלמכשו]/;
 // Common Hebrew plural/suffix patterns
 const HEBREW_SUFFIXES = [
-  { pattern: /ים$/, replacement: '' },   // masculine plural: מתכונים → מתכון
-  { pattern: /ות$/, replacement: '' },   // feminine plural: חולצות → חולצ (imperfect but helps)
+  { pattern: /ים$/, replacement: '' },   // masculine plural: מתכונים → מתכונ → מתכון (after sofit)
+  { pattern: /ות$/, replacement: '' },   // feminine plural: חולצות → חולצ → חולץ (after sofit)
   { pattern: /ית$/, replacement: '' },   // feminine: ישראלית → ישראל
-  { pattern: /ים$/, replacement: 'ה' },  // some patterns: מתכונים might also be מתכונה
 ];
+
+// Hebrew sofit (final-form) letter pairs: regular → sofit
+// When a suffix is stripped, the new final letter needs its sofit form
+const SOFIT_MAP: Record<string, string> = {
+  'נ': 'ן', // nun → nun sofit
+  'מ': 'ם', // mem → mem sofit
+  'צ': 'ץ', // tsade → tsade sofit
+  'פ': 'ף', // pe → pe sofit
+  'כ': 'ך', // kaf → kaf sofit
+};
+
+/**
+ * Apply sofit (final-form) conversion to last character of a Hebrew word.
+ * e.g. "מתכונ" (regular nun) → "מתכון" (sofit nun)
+ */
+function applySofit(word: string): string {
+  if (word.length === 0) return word;
+  const lastChar = word[word.length - 1];
+  const sofit = SOFIT_MAP[lastChar];
+  if (sofit) {
+    return word.slice(0, -1) + sofit;
+  }
+  return word;
+}
 
 function normalizeHebrewQuery(message: string): string {
   const words = message
@@ -306,7 +463,9 @@ function normalizeHebrewQuery(message: string): string {
       if (pattern.test(word) && word.length > 4) {
         const stemmed = word.replace(pattern, replacement);
         if (stemmed.length >= 2) {
+          // Add both raw stemmed form and sofit-corrected form
           normalized.add(stemmed);
+          normalized.add(applySofit(stemmed));
         }
       }
     }

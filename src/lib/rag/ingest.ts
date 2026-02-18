@@ -221,22 +221,26 @@ async function ingestEntityType(
       if (posts) {
         for (const post of posts) {
           if (!post.caption?.trim()) continue;
-          const text = buildPostText(post);
-          await ingestDocument({
-            accountId,
-            entityType: 'post',
-            sourceId: post.id,
-            title: truncate(post.caption, 120),
-            text,
-            metadata: {
-              postType: post.type,
-              hashtags: post.hashtags,
-              postedAt: post.posted_at,
-              likesCount: post.likes_count,
-              isSponsored: post.is_sponsored,
-            },
-          });
-          count++;
+          try {
+            const text = buildPostText(post);
+            await ingestDocument({
+              accountId,
+              entityType: 'post',
+              sourceId: post.id,
+              title: truncate(post.caption, 120),
+              text,
+              metadata: {
+                postType: post.type,
+                hashtags: post.hashtags,
+                postedAt: post.posted_at,
+                likesCount: post.likes_count,
+                isSponsored: post.is_sponsored,
+              },
+            });
+            count++;
+          } catch (err) {
+            log.warn(`Skipping post ${post.id}: ${err instanceof Error ? err.message : String(err)}`, { accountId, postId: post.id }, accountId);
+          }
         }
       }
       break;
@@ -253,23 +257,27 @@ async function ingestEntityType(
       if (trans) {
         for (const t of trans) {
           if (!t.transcription_text?.trim()) continue;
-          let text = t.transcription_text;
-          if (t.on_screen_text?.length) {
-            text += '\n\n[On-screen text]: ' + t.on_screen_text.join(' | ');
+          try {
+            let text = t.transcription_text;
+            if (t.on_screen_text?.length) {
+              text += '\n\n[On-screen text]: ' + t.on_screen_text.join(' | ');
+            }
+            await ingestDocument({
+              accountId,
+              entityType: 'transcription',
+              sourceId: t.id,
+              title: truncate(t.transcription_text, 120),
+              text,
+              metadata: {
+                sourceType: t.source_type,
+                originalSourceId: t.source_id,
+                language: t.language,
+              },
+            });
+            count++;
+          } catch (err) {
+            log.warn(`Skipping transcription ${t.id}: ${err instanceof Error ? err.message : String(err)}`, { accountId, transcriptionId: t.id }, accountId);
           }
-          await ingestDocument({
-            accountId,
-            entityType: 'transcription',
-            sourceId: t.id,
-            title: truncate(t.transcription_text, 120),
-            text,
-            metadata: {
-              sourceType: t.source_type,
-              originalSourceId: t.source_id,
-              language: t.language,
-            },
-          });
-          count++;
         }
       }
       break;
