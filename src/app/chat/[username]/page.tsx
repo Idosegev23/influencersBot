@@ -585,10 +585,10 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       
       <main className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--color-background)' }}>
         {/* Header */}
-        <header className="sticky top-0 z-50 glass px-4 py-3">
+        <header className="sticky top-0 z-50 glass header-border px-4 py-3">
           <div className="max-w-2xl mx-auto flex items-center justify-between">
             {/* Right side - Back button + Avatar */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <button
                 onClick={() => window.history.back()}
                 className="p-2 rounded-lg transition-all hover:bg-black/10"
@@ -597,60 +597,66 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
               >
                 <ArrowRight className="w-5 h-5" />
               </button>
-              <div onClick={handleAvatarTap} className="cursor-pointer select-none">
+              <div onClick={handleAvatarTap} className="cursor-pointer select-none relative">
                 {influencer.avatar_url ? (
-                  <div className="relative w-10 h-10 rounded-xl overflow-hidden">
-                    <Image
-                      src={getProxiedImageUrl(influencer.avatar_url)}
-                      alt={influencer.display_name}
-                      fill
-                      className="object-cover"
-                      sizes="40px"
-                      unoptimized
-                    />
+                  <div className="avatar-ring">
+                    <div className="relative w-11 h-11 rounded-[14px] overflow-hidden">
+                      <Image
+                        src={getProxiedImageUrl(influencer.avatar_url)}
+                        alt={influencer.display_name}
+                        fill
+                        className="object-cover"
+                        sizes="44px"
+                        unoptimized
+                      />
+                    </div>
                   </div>
                 ) : (
-                  <div 
-                    className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold"
-                    style={{ backgroundColor: 'var(--color-primary)' }}
-                  >
-                    {influencer.display_name.charAt(0)}
+                  <div className="avatar-ring">
+                    <div
+                      className="w-11 h-11 rounded-[14px] flex items-center justify-center text-white font-bold text-lg"
+                      style={{ backgroundColor: 'var(--color-primary)' }}
+                    >
+                      {influencer.display_name.charAt(0)}
+                    </div>
                   </div>
                 )}
+                {/* Online status dot */}
+                <div className="status-dot absolute -bottom-0.5 -left-0.5" />
               </div>
               <div>
                 <h1 className="font-semibold text-base" style={{ color: 'var(--color-text)' }}>
                   {influencer.display_name}
                 </h1>
-                <p className="text-xs" style={{ color: 'var(--color-text)', opacity: 0.6 }}>
-                  💬 הבוט האישי | {typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other}
+                <p className="text-xs" style={{ color: 'var(--color-text)', opacity: 0.5 }}>
+                  {typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other}
                 </p>
               </div>
             </div>
 
             {/* Left side - Tabs + New Chat */}
             <div className="flex items-center gap-2">
-              <div className="flex gap-1 p-1 rounded-lg" style={{ backgroundColor: 'var(--color-surface)' }}>
+              <div className="flex gap-1 p-1 rounded-full" style={{ backgroundColor: 'var(--color-surface)' }}>
                 <button
                   onClick={() => setActiveTab('chat')}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                    activeTab === 'chat' ? 'bg-white shadow-sm' : ''
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                    activeTab === 'chat' ? 'tab-active' : ''
                   }`}
-                  style={{ color: 'var(--color-text)' }}
+                  style={activeTab === 'chat' ? {} : { color: 'var(--color-text)' }}
                 >
                   צ'אט
                 </button>
                 <button
                   onClick={() => setActiveTab('search')}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                    activeTab === 'search' ? 'bg-white shadow-sm' : ''
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                    activeTab === 'search' ? 'tab-active' : ''
                   }`}
-                  style={{ color: 'var(--color-text)' }}
+                  style={activeTab === 'search' ? {} : { color: 'var(--color-text)' }}
                 >
                   חיפוש
                 </button>
               </div>
-              
+
               {/* Support Button */}
               {influencer.whatsapp_enabled && (
                 <button
@@ -663,7 +669,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   <Headphones className="w-5 h-5" />
                 </button>
               )}
-              
+
               {/* New Chat Button - only visible when there are messages */}
               {messages.length > 0 && (
                 <button
@@ -692,31 +698,66 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 className="h-full flex flex-col relative"
               >
                 {/* Chat Messages */}
-                <div className="flex-1 overflow-y-auto px-4 py-6 pb-24 space-y-4">
+                <div className="flex-1 overflow-y-auto px-4 py-6 pb-28 space-y-5 chat-bg chat-messages-scroll">
                   {messages.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center text-center px-4 pt-12">
-                      {influencer.avatar_url && (
-                        <div className="relative w-16 h-16 rounded-2xl overflow-hidden mb-5">
-                          <Image
-                            src={getProxiedImageUrl(influencer.avatar_url)}
-                            alt={influencer.display_name}
-                            fill
-                            className="object-cover"
-                            sizes="64px"
-                            unoptimized
-                          />
-                        </div>
-                      )}
+                    <div className="flex flex-col items-center justify-center text-center px-4 pt-10">
+                      {/* Avatar with decorative ring */}
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.4 }}
+                      >
+                        {influencer.avatar_url ? (
+                          <div className="avatar-ring-lg mb-5">
+                            <div className="relative w-20 h-20 rounded-[20px] overflow-hidden">
+                              <Image
+                                src={getProxiedImageUrl(influencer.avatar_url)}
+                                alt={influencer.display_name}
+                                fill
+                                className="object-cover"
+                                sizes="80px"
+                                unoptimized
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="avatar-ring-lg mb-5">
+                            <div
+                              className="w-20 h-20 rounded-[20px] flex items-center justify-center text-white font-bold text-2xl"
+                              style={{ backgroundColor: 'var(--color-primary)' }}
+                            >
+                              {influencer.display_name.charAt(0)}
+                            </div>
+                          </div>
+                        )}
+                      </motion.div>
 
-                      <h2 className="text-xl font-semibold mb-2" style={{ color: 'var(--color-text)' }}>
+                      <motion.h2
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.4, delay: 0.1 }}
+                        className="text-xl font-semibold mb-2"
+                        style={{ color: 'var(--color-text)' }}
+                      >
                         {greetingMessage}
-                      </h2>
-                      <p className="mb-6 max-w-sm text-sm leading-relaxed" style={{ color: 'var(--color-text)', opacity: 0.7 }}>
+                      </motion.h2>
+                      <motion.p
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.4, delay: 0.2 }}
+                        className="mb-7 max-w-sm text-sm leading-relaxed"
+                        style={{ color: 'var(--color-text)', opacity: 0.6 }}
+                      >
                         אני כאן לעזור עם {(typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other).toLowerCase()}, מותגים וקופונים
-                      </p>
+                      </motion.p>
 
-                      {/* Suggestions */}
-                      <div className="flex flex-wrap gap-2 justify-center max-w-md mb-4">
+                      {/* Suggestion Pills */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.4, delay: 0.3 }}
+                        className="flex flex-wrap gap-2.5 justify-center max-w-md mb-8"
+                      >
                         {suggestedQuestions.map((q, i) => (
                           <button
                             key={i}
@@ -724,37 +765,22 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                               setInputValue(q);
                               inputRef.current?.focus();
                             }}
-                            className="px-3 py-2 text-sm border rounded-lg transition-all hover:border-gray-300"
-                            style={{ 
-                              backgroundColor: 'var(--color-surface)', 
-                              borderColor: 'var(--color-border)',
-                              color: 'var(--color-text)',
-                            }}
+                            className="suggestion-pill"
                           >
                             {q}
                           </button>
                         ))}
-                      </div>
-
-                      {/* Support Button */}
-                      <div className="flex justify-center mb-8">
-                        <button
-                          onClick={() => setShowSupportModal(true)}
-                          className="px-4 py-3 text-sm font-medium rounded-xl transition-all hover:shadow-lg hover:scale-105 flex items-center gap-2"
-                          style={{ 
-                            backgroundColor: '#ef4444',
-                            color: 'white',
-                          }}
-                        >
-                          <MessageCircle className="w-4 h-4" />
-                          יש לי בעיה בהזמנה
-                        </button>
-                      </div>
+                      </motion.div>
 
                       {/* Brands Preview */}
                       {brands.length > 0 && (
-                        <div className="w-full mt-6">
-                          <p className="text-xs mb-3 text-center" style={{ color: 'var(--color-text)', opacity: 0.5 }}>
+                        <motion.div
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.4, delay: 0.4 }}
+                          className="w-full mt-2"
+                        >
+                          <p className="text-xs mb-3 text-center" style={{ color: 'var(--color-text)', opacity: 0.4 }}>
                             מותגים וקופונים
                           </p>
                           <div className="flex gap-3 overflow-x-auto pb-3 px-4 scrollbar-hide">
@@ -762,7 +788,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                               <button
                                 key={brand.id}
                                 onClick={() => brand.coupon_code && handleCopyCode(brand.coupon_code, brand.id)}
-                                className="flex-shrink-0 w-32 p-3 rounded-xl text-right transition-all hover:shadow-lg"
+                                className="flex-shrink-0 w-32 p-3.5 rounded-2xl text-right transition-all hover:shadow-md"
                                 style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
                               >
                                 <p className="font-medium text-sm truncate" style={{ color: 'var(--color-text)' }}>
@@ -774,8 +800,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                   </p>
                                 )}
                                 {brand.coupon_code ? (
-                                  <span 
-                                    className="inline-block mt-2 px-2 py-1 text-[10px] font-mono font-semibold rounded"
+                                  <span
+                                    className="inline-block mt-2 px-2 py-1 text-[10px] font-mono font-semibold rounded-md"
                                     style={{ backgroundColor: 'rgba(16,185,129,0.1)', color: '#10b981' }}
                                   >
                                     {copiedCode === brand.id ? 'הועתק!' : brand.coupon_code}
@@ -788,7 +814,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                               </button>
                             ))}
                           </div>
-                        </div>
+                        </motion.div>
                       )}
                     </div>
                   ) : (
@@ -807,67 +833,86 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           : msg.cardsPayload;
                         
                         return (
-                        <div key={msg.id}>
+                        <motion.div
+                          key={msg.id}
+                          initial={{ opacity: 0, x: msg.role === 'user' ? 20 : -20, y: 6 }}
+                          animate={{ opacity: 1, x: 0, y: 0 }}
+                          transition={{ duration: 0.3, ease: 'easeOut' }}
+                        >
                           <div
-                            className={`flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'}`}
+                            className={`flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'} items-end gap-2`}
                           >
-                            <div className={`max-w-[85%] px-4 py-3 ${msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-assistant'}`}>
-                              {msg.role === 'user' ? (
-                                <p className="text-sm whitespace-pre-wrap">{displayContent}</p>
-                              ) : (
-                                <div className="text-sm markdown-content">
-                                  {/* Show typing indicator when streaming starts but no text yet */}
-                                  {isStreamingThis && !displayContent && (
-                                    <div className="flex items-center gap-1 text-gray-400">
-                                      <Loader2 className="w-4 h-4 animate-spin" />
-                                      <span>מקליד...</span>
-                                    </div>
-                                  )}
-                                  {displayContent && (
-                                    <ReactMarkdown
-                                      components={{
-                                        // Style links as clickable blue text
-                                        a: ({ node, ...props }) => (
-                                          <a
-                                            {...props}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-blue-600 hover:text-blue-800 underline decoration-2 underline-offset-2 font-semibold cursor-pointer transition-colors"
-                                          />
-                                        ),
-                                        // Style paragraphs
-                                        p: ({ node, ...props }) => (
-                                          <p {...props} className="mb-2 last:mb-0 leading-relaxed" />
-                                        ),
-                                        // Style lists
-                                        ul: ({ node, ...props }) => (
-                                          <ul {...props} className="list-disc list-inside space-y-1 my-2" />
-                                        ),
-                                        ol: ({ node, ...props }) => (
-                                          <ol {...props} className="list-decimal list-inside space-y-1 my-2" />
-                                        ),
-                                        li: ({ node, ...props }) => (
-                                          <li {...props} className="leading-relaxed" />
-                                        ),
-                                        // Style strong/bold
-                                        strong: ({ node, ...props }) => (
-                                          <strong {...props} className="font-bold" />
-                                        ),
-                                        // Style code
-                                        code: ({ node, ...props }) => (
-                                          <code {...props} className="px-1.5 py-0.5 rounded text-xs font-mono bg-gray-100" />
-                                        ),
-                                      }}
-                                    >
-                                      {displayContent}
-                                    </ReactMarkdown>
-                                  )}
-                                  {/* Show cursor while streaming */}
-                                  {isStreamingThis && displayContent && (
-                                    <span className="inline-block w-2 h-4 bg-current opacity-60 animate-pulse" />
-                                  )}
-                                </div>
-                              )}
+                            {/* Bot avatar (assistant messages only) */}
+                            {msg.role === 'assistant' && influencer.avatar_url && (
+                              <div className="relative w-6 h-6 rounded-full overflow-hidden flex-shrink-0 mb-5">
+                                <Image
+                                  src={getProxiedImageUrl(influencer.avatar_url)}
+                                  alt=""
+                                  fill
+                                  className="object-cover"
+                                  sizes="24px"
+                                  unoptimized
+                                />
+                              </div>
+                            )}
+                            <div>
+                              <div className={`max-w-[85%] px-5 py-3.5 ${msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-assistant'}`}>
+                                {msg.role === 'user' ? (
+                                  <p className="text-sm whitespace-pre-wrap">{displayContent}</p>
+                                ) : (
+                                  <div className="text-sm markdown-content">
+                                    {/* Show typing indicator when streaming starts but no text yet */}
+                                    {isStreamingThis && !displayContent && (
+                                      <div className="flex items-center gap-1 text-gray-400">
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        <span>מקליד...</span>
+                                      </div>
+                                    )}
+                                    {displayContent && (
+                                      <ReactMarkdown
+                                        components={{
+                                          a: ({ node, ...props }) => (
+                                            <a
+                                              {...props}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="text-blue-600 hover:text-blue-800 underline decoration-2 underline-offset-2 font-semibold cursor-pointer transition-colors"
+                                            />
+                                          ),
+                                          p: ({ node, ...props }) => (
+                                            <p {...props} className="mb-2 last:mb-0 leading-relaxed" />
+                                          ),
+                                          ul: ({ node, ...props }) => (
+                                            <ul {...props} className="list-disc list-inside space-y-1 my-2" />
+                                          ),
+                                          ol: ({ node, ...props }) => (
+                                            <ol {...props} className="list-decimal list-inside space-y-1 my-2" />
+                                          ),
+                                          li: ({ node, ...props }) => (
+                                            <li {...props} className="leading-relaxed" />
+                                          ),
+                                          strong: ({ node, ...props }) => (
+                                            <strong {...props} className="font-bold" />
+                                          ),
+                                          code: ({ node, ...props }) => (
+                                            <code {...props} className="px-1.5 py-0.5 rounded text-xs font-mono bg-gray-100" />
+                                          ),
+                                        }}
+                                      >
+                                        {displayContent}
+                                      </ReactMarkdown>
+                                    )}
+                                    {/* Show cursor while streaming */}
+                                    {isStreamingThis && displayContent && (
+                                      <span className="inline-block w-2 h-4 bg-current opacity-60 animate-pulse" />
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              {/* Timestamp */}
+                              <div className={`msg-time ${msg.role === 'user' ? 'text-right' : 'text-left'}`} style={{ color: 'var(--color-text)' }}>
+                                {new Date(parseInt(msg.id)).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}
+                              </div>
                             </div>
                           </div>
                           
@@ -1028,17 +1073,33 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                               />
                             </div>
                           )}
-                        </div>
+                        </motion.div>
                         );
                       })}
                       {isTyping && (
-                        <div className="flex justify-end">
-                          <div className="chat-bubble-assistant px-4 py-3 flex gap-1">
+                        <motion.div
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="flex justify-end items-end gap-2"
+                        >
+                          {influencer.avatar_url && (
+                            <div className="relative w-6 h-6 rounded-full overflow-hidden flex-shrink-0 mb-0.5">
+                              <Image
+                                src={getProxiedImageUrl(influencer.avatar_url)}
+                                alt=""
+                                fill
+                                className="object-cover"
+                                sizes="24px"
+                                unoptimized
+                              />
+                            </div>
+                          )}
+                          <div className="typing-indicator">
                             <div className="typing-dot" />
                             <div className="typing-dot" />
                             <div className="typing-dot" />
                           </div>
-                        </div>
+                        </motion.div>
                       )}
                       <div ref={messagesEndRef} />
                     </>
@@ -1046,28 +1107,29 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 </div>
 
                 {/* Chat Input */}
-                <div 
-                  className="absolute bottom-0 left-0 right-0 p-4 border-t"
-                  style={{ backgroundColor: 'var(--color-background)', borderColor: 'var(--color-border)' }}
+                <div
+                  className="absolute bottom-0 left-0 right-0 px-4 pt-3 pb-safe"
+                  style={{ background: `linear-gradient(to top, var(--color-background) 70%, transparent)` }}
                 >
-                  <div className="max-w-2xl mx-auto flex gap-3">
-                    <input
-                      ref={inputRef}
-                      type="text"
-                      value={inputValue}
-                      onChange={(e) => setInputValue(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                      placeholder="שאלו אותי משהו..."
-                      className="input flex-1"
-                      disabled={isTyping}
-                    />
-                    <button
-                      onClick={handleSendMessage}
-                      disabled={!inputValue.trim() || isTyping}
-                      className="btn-primary px-5 disabled:opacity-40"
-                    >
-                      <Send className="w-5 h-5" />
-                    </button>
+                  <div className="max-w-2xl mx-auto">
+                    <div className="chat-input-pill">
+                      <input
+                        ref={inputRef}
+                        type="text"
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                        placeholder="מה רצית לשאול?"
+                        disabled={isTyping}
+                      />
+                      <button
+                        onClick={handleSendMessage}
+                        disabled={!inputValue.trim() || isTyping}
+                        className="send-btn"
+                      >
+                        <Send className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </motion.div>
