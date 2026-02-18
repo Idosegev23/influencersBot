@@ -488,7 +488,7 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
       documentId: c.document_id,
       entityType: c.entity_type as EntityType,
       title: doc?.title || `${c.entity_type} chunk`,
-      excerpt: c.chunk_text.substring(0, 500),
+      excerpt: c.chunk_text.substring(0, 800),
       updatedAt: c.updated_at,
       confidence: rerank?.score || c.similarity,
       chunkIndex: c.chunk_index,
