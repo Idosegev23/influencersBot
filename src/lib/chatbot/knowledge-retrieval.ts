@@ -170,14 +170,19 @@ export async function retrieveKnowledge(
 
   // ⚡ Use Full Text Search INDEX! All 10,000+ items are searchable!
   // No more limits - PostgreSQL finds the most relevant content automatically
+  // Normalize Hebrew query for better FTS matching
+  // e.g. "איזה מתכונים יש לי" → "מתכונים מתכון" (strips stopwords, adds stems)
+  const normalizedQuery = normalizeHebrewQuery(userMessage);
+  console.log(`[Knowledge Retrieval] Normalized query: "${normalizedQuery}"`);
+
   const [posts, highlights, coupons, partnerships, insights, websites, transcriptions] = await Promise.all([
-    fetchRelevantPostsIndexed(supabase, accountId, userMessage, 5),
+    fetchRelevantPostsIndexed(supabase, accountId, normalizedQuery, 5),
     fetchRelevantHighlights(supabase, accountId, [], 20),
     fetchRelevantCoupons(supabase, accountId, [], archetype, userMessage),
     fetchRelevantPartnerships(supabase, accountId, [], userMessage),
     fetchRelevantInsights(supabase, accountId, archetype, 3),
     fetchRelevantWebsites(supabase, accountId, [], 3),
-    fetchRelevantTranscriptionsIndexed(supabase, accountId, userMessage, 5),
+    fetchRelevantTranscriptionsIndexed(supabase, accountId, normalizedQuery, 5),
   ]);
 
   console.log(`[Knowledge Retrieval] ✅ Found:`);
@@ -235,17 +240,79 @@ function isSimpleGreeting(message: string): boolean {
 }
 
 function extractKeywordsFromMessage(message: string): string[] {
-  // ⚡ AI-First: We barely use keywords anymore - AI understands the full message
-  // This is just for basic archetype routing, not for filtering data
   const commonWords = ['את', 'אני', 'של', 'על', 'עם', 'מה', 'איך', 'למה', 'כמה', 'יש', 'לך'];
-  
+
   const words = message
     .toLowerCase()
     .split(/\s+/)
     .filter(word => word.length > 2)
     .filter(word => !commonWords.includes(word));
-  
+
   return words;
+}
+
+// ============================================
+// Hebrew Query Normalization
+// ============================================
+// Hebrew FTS with 'simple' config has no stemming —
+// "מתכונים" (plural) won't match "מתכון" (singular).
+// This normalizer strips common prefixes/suffixes and stop words
+// so FTS has a much better chance of matching.
+
+const HEBREW_STOP_WORDS = new Set([
+  'את', 'אני', 'של', 'על', 'עם', 'מה', 'איך', 'למה', 'כמה', 'יש', 'לי',
+  'לך', 'אם', 'גם', 'רק', 'כל', 'הוא', 'היא', 'הם', 'הן', 'אנחנו',
+  'זה', 'זו', 'זאת', 'אלה', 'אלו', 'כבר', 'עוד', 'מאוד', 'פה', 'שם',
+  'איזה', 'אילו', 'כמו', 'לפני', 'אחרי', 'בין', 'תחת', 'מול', 'ליד',
+  'בלי', 'עד', 'כדי', 'לא', 'כן', 'או', 'אבל', 'כי', 'שלי', 'שלך',
+  'can', 'you', 'the', 'is', 'are', 'do', 'have', 'what', 'how', 'me', 'my',
+]);
+
+// Common Hebrew prefixes: ה (the), ב (in), ל (to), מ (from), כ (like), ש (that), ו (and)
+const HEBREW_PREFIXES = /^[הבלמכשו]/;
+// Common Hebrew plural/suffix patterns
+const HEBREW_SUFFIXES = [
+  { pattern: /ים$/, replacement: '' },   // masculine plural: מתכונים → מתכון
+  { pattern: /ות$/, replacement: '' },   // feminine plural: חולצות → חולצ (imperfect but helps)
+  { pattern: /ית$/, replacement: '' },   // feminine: ישראלית → ישראל
+  { pattern: /ים$/, replacement: 'ה' },  // some patterns: מתכונים might also be מתכונה
+];
+
+function normalizeHebrewQuery(message: string): string {
+  const words = message
+    .trim()
+    .split(/\s+/)
+    .filter(w => w.length > 1)
+    .filter(w => !HEBREW_STOP_WORDS.has(w));
+
+  const normalized = new Set<string>();
+
+  for (const word of words) {
+    // Always include the original word
+    normalized.add(word);
+
+    // Skip short words and English words
+    if (word.length < 3 || /^[a-zA-Z]/.test(word)) {
+      continue;
+    }
+
+    // Try stripping prefix (only if word is long enough after)
+    if (word.length > 3 && HEBREW_PREFIXES.test(word)) {
+      normalized.add(word.slice(1));
+    }
+
+    // Try stripping suffixes
+    for (const { pattern, replacement } of HEBREW_SUFFIXES) {
+      if (pattern.test(word) && word.length > 4) {
+        const stemmed = word.replace(pattern, replacement);
+        if (stemmed.length >= 2) {
+          normalized.add(stemmed);
+        }
+      }
+    }
+  }
+
+  return Array.from(normalized).join(' ');
 }
 
 // ⚡ NEW: Indexed search for posts (searches ALL posts!)
