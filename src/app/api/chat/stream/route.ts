@@ -558,7 +558,7 @@ export async function POST(req: NextRequest) {
         // Get conversation history
         const { data: historyMessages } = await supabase
           .from('chat_messages')
-          .select('role, message')
+          .select('role, content')
           .eq('session_id', currentSessionId)
           .order('created_at', { ascending: false })
           .limit(10);
@@ -567,8 +567,55 @@ export async function POST(req: NextRequest) {
           .reverse()
           .map(m => ({
             role: m.role as 'user' | 'assistant',
-            content: m.message,
+            content: m.content,
           }));
+
+        // --- Memory V2: Prepend rolling summary + token budget ---
+        // Check global flag OR per-account override (accounts.features.memory_v2)
+        let memoryV2Active = process.env.MEMORY_V2_ENABLED === 'true';
+        if (!memoryV2Active && accountId) {
+          const { data: acctFlags } = await supabase
+            .from('accounts')
+            .select('features')
+            .eq('id', accountId)
+            .single();
+          memoryV2Active = acctFlags?.features?.memory_v2 === true;
+        }
+
+        if (memoryV2Active && currentSessionId) {
+          try {
+            const { buildConversationContext, trimToTokenBudget } = await import('@/lib/chatbot/conversation-memory');
+            const memoryCtx = await buildConversationContext(currentSessionId, conversationHistory);
+
+            // Apply token budget: trim history if needed
+            const budgetResult = trimToTokenBudget(
+              conversationHistory,
+              memoryCtx.rollingSummary,
+            );
+
+            // Replace history with trimmed version
+            conversationHistory.length = 0;
+            conversationHistory.push(...budgetResult.messages);
+
+            // Prepend summary if available
+            if (budgetResult.rollingSummary) {
+              conversationHistory.unshift({
+                role: 'assistant' as const,
+                content: `[סיכום שיחה קודמת: ${budgetResult.rollingSummary}]`,
+              });
+            }
+
+            console.log('[Memory] Context prepared', {
+              sessionId: currentSessionId,
+              turns: budgetResult.messages.length,
+              hasSummary: !!budgetResult.rollingSummary,
+              trimmed: budgetResult.trimmedCount,
+              estimatedTokens: budgetResult.estimatedTokens,
+            });
+          } catch (memErr) {
+            console.error('[Memory] Failed to load context:', memErr);
+          }
+        }
 
         let fullText = '';
         let responseId: string | null = null;
@@ -652,6 +699,24 @@ export async function POST(req: NextRequest) {
             },
           }),
         ]);
+
+        // --- Memory V2: Update rolling summary if threshold reached ---
+        if (memoryV2Active && currentSessionId) {
+          try {
+            const { updateRollingSummary, shouldUpdateSummary } = await import('@/lib/chatbot/conversation-memory');
+            // Use DB message_count (incremented by saveChatMessage above) + 2 for just-saved pair
+            const msgCount = (session?.message_count || 0) + 2;
+            if (shouldUpdateSummary(msgCount)) {
+              // Fire-and-forget: don't block the response
+              updateRollingSummary(
+                currentSessionId,
+                [...conversationHistory, { role: 'user', content: message }, { role: 'assistant', content: fullText }],
+              ).catch(err => console.error('[Memory] Summary update failed:', err));
+            }
+          } catch (memErr) {
+            console.error('[Memory] Summary scheduling failed:', memErr);
+          }
+        }
 
         // Complete idempotency
         await completeIdempotencyKey(idempotencyKey, { response: fullText, responseId });

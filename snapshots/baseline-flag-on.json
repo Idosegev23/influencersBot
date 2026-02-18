@@ -1,0 +1,97 @@
+[dotenv@17.2.3] injecting env (15) from .env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+{
+  "meta": {
+    "accountId": "e5a5076a-faaf-4e67-8bdd-61c15153fb20",
+    "sessionId": "36ef45e0-cd36-42c4-8497-8484230fa358",
+    "memoryV2": true,
+    "timestamp": "2026-02-17T21:25:31.512Z"
+  },
+  "payload": {
+    "systemPrompt": "[archetype + personality + rules + grounding directive]",
+    "rollingSummary": null,
+    "historyMessages": [
+      {
+        "position": 0,
+        "role": "assistant",
+        "contentPreview": "דקל משתמשת בניאצינמיד כי זה ויטמין B3 שממש עושה טוב לעור — והיא אמרה עליו מלא שה...[REDACTED]",
+        "contentLength": 251
+      },
+      {
+        "position": 1,
+        "role": "user",
+        "contentPreview": "מה דקל אומרת על ניאצינמיד לעור רגיש? שווה להכניס לשגרה או שעלול לגרום לגירוי?",
+        "contentLength": 77
+      },
+      {
+        "position": 2,
+        "role": "user",
+        "contentPreview": "אני בתחילת הריון – על איזה רכיבים דקל אומרת שצריך במיוחד לשים לב ולא להשתמש בהם?",
+        "contentLength": 80
+      },
+      {
+        "position": 3,
+        "role": "assistant",
+        "contentPreview": "לא נזכר לי שדקל דיברה אצלנו ממש ספציפית על **רכיבים אסורים בהריון** בהיילייטס/סט...[REDACTED]",
+        "contentLength": 250
+      },
+      {
+        "position": 4,
+        "role": "assistant",
+        "contentPreview": "דקל אומרת שה‑Hyal(u) B5 של לה רוש פוזה הוא בול כשיש יובש/רגישות כי הוא נותן בוסט...[REDACTED]",
+        "contentLength": 202
+      },
+      {
+        "position": 5,
+        "role": "user",
+        "contentPreview": "אני משתמשת בזה היום: היאלו B5 סרום פעיל במיוחד לה רוש פוזה",
+        "contentLength": 58
+      },
+      {
+        "position": 6,
+        "role": "assistant",
+        "contentPreview": "לא נזכר לי שדקל | Dekel דיברה בתוכן ששלחת על מוצר ספציפי בהקשר של הריון, אז אני ...[REDACTED]",
+        "contentLength": 258
+      },
+      {
+        "position": 7,
+        "role": "user",
+        "contentPreview": "אבל האם הוא טוב להריון?",
+        "contentLength": 23
+      },
+      {
+        "position": 8,
+        "role": "user",
+        "contentPreview": "איפה אפשר לראות במקום אחד את כל המוצרים שקיבלו Dekel Verified עם הטבת מחיר לעוקב...[REDACTED]",
+        "contentLength": 83
+      },
+      {
+        "position": 9,
+        "role": "assistant",
+        "contentPreview": "לא נזכר לי שדקל | Dekel שמה מקום אחד מרוכז שמאגד *את כל* ה‑Dekel Verified יחד עם...[REDACTED]",
+        "contentLength": 242
+      }
+    ],
+    "userPrompt": "[FTS knowledge context + user message]"
+  },
+  "ordering": [
+    "messages[0]: system (archetype + personality + rules + grounding)",
+    "messages[1]: assistant",
+    "messages[2]: user",
+    "messages[3]: user",
+    "messages[4]: assistant",
+    "messages[5]: assistant",
+    "messages[6]: user",
+    "messages[7]: assistant",
+    "messages[8]: user",
+    "messages[9]: user",
+    "messages[10]: assistant",
+    "messages[last]: user (knowledge context + question)"
+  ],
+  "stats": {
+    "historyCount": 10,
+    "totalHistoryChars": 1524,
+    "estimatedHistoryTokens": 381,
+    "summaryChars": 0,
+    "summaryTokens": 0
+  }
+}
