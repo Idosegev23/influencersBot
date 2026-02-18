@@ -287,6 +287,16 @@ function createDefaultResult(message: string, processingTimeMs: number): Underst
 }
 
 /**
+ * Fast keyword-based understanding (no AI call).
+ * Uses the same logic as the API fallback — detects intent, entities, risk
+ * via regex/keywords. Sufficient for chat routing where SandwichBot handles
+ * the real content generation.
+ */
+export function understandMessageFast(message: string): UnderstandingResult {
+  return createDefaultResult(message, 0);
+}
+
+/**
  * Quick intent check (for routing decisions)
  */
 export async function quickIntentCheck(message: string): Promise<SimpleIntent> {

@@ -9,7 +9,8 @@
       "mcp__supabase__execute_sql",
       "mcp__supabase__apply_migration",
       "Bash(npx vitest:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(grep:*)"
     ]
   }
 }

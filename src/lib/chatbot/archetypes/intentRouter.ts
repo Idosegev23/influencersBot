@@ -92,13 +92,20 @@ export class IntentRouter {
    * Classify user intent and route to archetype
    */
   async classify(input: RouterInput): Promise<IntentClassification> {
-    const userMessage = input.userMessage.toLowerCase();
+    const userMessage = input.userMessage.toLowerCase().trim();
+
+    // 0. Fast-path: detect greetings instantly (skip AI call entirely)
+    const greetingMatch = this.detectGreeting(userMessage);
+    if (greetingMatch) {
+      console.log(`[IntentRouter] 👋 Greeting detected — skipping AI classification`);
+      return greetingMatch;
+    }
 
     // 1. Try simple keyword matching first (fast)
     const keywordMatch = this.quickKeywordMatch(userMessage);
     // ⚡ RAISED THRESHOLD: Only bypass AI if we are VERY confident (e.g. multiple keywords)
     // Single keyword match gives 0.6, so 0.8 ensures single words go to AI for context check
-    if (keywordMatch.confidence > 0.8) { 
+    if (keywordMatch.confidence > 0.8) {
       console.log(`[IntentRouter] ✅ Keyword match: ${keywordMatch.primaryArchetype} (${keywordMatch.confidence.toFixed(2)})`);
       return keywordMatch;
     }
@@ -110,6 +117,40 @@ export class IntentRouter {
       console.error('[IntentRouter] Gemini classification failed, using keyword match');
       return keywordMatch;
     }
+  }
+
+  /**
+   * Detect simple greetings — returns immediately without AI call
+   */
+  private detectGreeting(message: string): IntentClassification | null {
+    const GREETING_PATTERNS = [
+      'היי', 'הי', 'שלום', 'אהלן', 'מה קורה', 'מה נשמע', 'מה שלומך',
+      'מה העניינים', 'בוקר טוב', 'ערב טוב', 'לילה טוב', 'יום טוב',
+      'hey', 'hi', 'hello', 'sup', 'yo', 'hola',
+      'מה המצב', 'שלומות', 'אהלן וסהלן',
+    ];
+
+    // Very short messages (<15 chars) that match a greeting pattern
+    if (message.length <= 15 && GREETING_PATTERNS.some(g => message.includes(g))) {
+      return {
+        primaryArchetype: 'general',
+        secondaryArchetypes: [],
+        confidence: 0.95,
+        reasoning: 'greeting',
+      };
+    }
+
+    // Exact match for very short messages (1-2 words, <8 chars) — treat as greeting
+    if (message.length <= 8 && !message.includes('?') && !message.includes('קופון') && !message.includes('הנחה')) {
+      return {
+        primaryArchetype: 'general',
+        secondaryArchetypes: [],
+        confidence: 0.9,
+        reasoning: 'short_greeting',
+      };
+    }
+
+    return null;
   }
 
   /**

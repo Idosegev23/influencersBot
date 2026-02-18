@@ -145,7 +145,25 @@ export async function retrieveKnowledge(
   limit: number = 10
 ): Promise<KnowledgeBase> {
   const supabase = await createClient();
-  
+
+  // Detect greetings — minimal retrieval to avoid knowledge dumping
+  const isGreeting = isSimpleGreeting(userMessage);
+
+  if (isGreeting) {
+    console.log(`[Knowledge Retrieval] 👋 Greeting detected — minimal retrieval`);
+    // For greetings: only fetch coupons (in case user asks next) — skip everything else
+    const coupons = await fetchRelevantCoupons(supabase, accountId, [], archetype, '');
+    return {
+      posts: [],
+      highlights: [],
+      coupons,
+      partnerships: [],
+      insights: [],
+      websites: [],
+      transcriptions: [],
+    };
+  }
+
   console.log(`[Knowledge Retrieval] 🔍 INDEXED SEARCH - כל התוכן נגיש!`);
   console.log(`[Knowledge Retrieval] Archetype: ${archetype}`);
   console.log(`[Knowledge Retrieval] Query: ${userMessage.substring(0, 50)}...`);
@@ -153,13 +171,13 @@ export async function retrieveKnowledge(
   // ⚡ Use Full Text Search INDEX! All 10,000+ items are searchable!
   // No more limits - PostgreSQL finds the most relevant content automatically
   const [posts, highlights, coupons, partnerships, insights, websites, transcriptions] = await Promise.all([
-    fetchRelevantPostsIndexed(supabase, accountId, userMessage, Math.max(limit, 15)),
-    fetchRelevantHighlights(supabase, accountId, [], limit),
-    fetchRelevantCoupons(supabase, accountId, [], archetype, userMessage), // ⚡ Pass userMessage
-    fetchRelevantPartnerships(supabase, accountId, [], userMessage), // ⚡ Pass userMessage
-    fetchRelevantInsights(supabase, accountId, archetype, limit),
-    fetchRelevantWebsites(supabase, accountId, [], limit),
-    fetchRelevantTranscriptionsIndexed(supabase, accountId, userMessage, Math.max(limit, 20)),
+    fetchRelevantPostsIndexed(supabase, accountId, userMessage, 5),
+    fetchRelevantHighlights(supabase, accountId, [], 20),
+    fetchRelevantCoupons(supabase, accountId, [], archetype, userMessage),
+    fetchRelevantPartnerships(supabase, accountId, [], userMessage),
+    fetchRelevantInsights(supabase, accountId, archetype, 3),
+    fetchRelevantWebsites(supabase, accountId, [], 3),
+    fetchRelevantTranscriptionsIndexed(supabase, accountId, userMessage, 5),
   ]);
 
   console.log(`[Knowledge Retrieval] ✅ Found:`);
@@ -195,6 +213,26 @@ export async function retrieveKnowledge(
 // ============================================
 // Helper Functions
 // ============================================
+
+/**
+ * Detect simple greetings that don't need full knowledge retrieval
+ */
+function isSimpleGreeting(message: string): boolean {
+  const normalized = message.toLowerCase().trim();
+
+  // Very short messages (<15 chars) with no question marks are likely greetings
+  if (normalized.length > 20) return false;
+
+  const GREETING_WORDS = [
+    'היי', 'הי', 'שלום', 'אהלן', 'מה קורה', 'מה נשמע', 'מה שלומך',
+    'מה העניינים', 'בוקר טוב', 'ערב טוב', 'לילה טוב', 'יום טוב',
+    'hey', 'hi', 'hello', 'sup', 'yo', 'hola',
+    'מה המצב', 'שלומות', 'אהלן וסהלן',
+  ];
+
+  return GREETING_WORDS.some(g => normalized.includes(g))
+    || (normalized.length <= 8 && !normalized.includes('?'));
+}
 
 function extractKeywordsFromMessage(message: string): string[] {
   // ⚡ AI-First: We barely use keywords anymore - AI understands the full message
@@ -241,16 +279,10 @@ async function fetchRelevantPostsIndexed(
     }
     
     if (!data || data.length === 0) {
-      // No results found (legitimate) - no error, just no matching content
-      console.log('[fetchPostsIndexed] ℹ️ No posts match query, using recent posts');
-      const { data: fallbackData } = await supabase
-        .from('instagram_posts')
-        .select('id, caption, hashtags, type, posted_at, likes_count, engagement_rate, media_urls')
-        .eq('account_id', accountId)
-        .order('posted_at', { ascending: false })
-        .limit(limit);
-      
-      return fallbackData || [];
+      // No FTS results — return empty instead of dumping recent posts
+      // This lets the AI honestly say "I don't have info about that"
+      console.log('[fetchPostsIndexed] ℹ️ No posts match query — returning empty');
+      return [];
     }
 
     // Add missing fields to indexed results
@@ -276,64 +308,57 @@ async function fetchRelevantHighlights(
   limit: number
 ): Promise<InstagramHighlight[]> {
   try {
-    // ⚡ AI-First: Get all highlights with transcriptions (including OCR!)
+    // Fetch highlights + items + transcriptions in 2 parallel queries instead of 3 serial ones
     const { data, error } = await supabase
       .from('instagram_highlights')
-      .select(`
-        id, 
-        title, 
-        cover_image_url, 
-        items_count, 
-        scraped_at
-      `)
+      .select('id, title, cover_image_url, items_count, scraped_at')
       .eq('account_id', accountId)
       .order('scraped_at', { ascending: false })
-      .limit(50); // Get all highlights
-    
+      .limit(limit);
+
     if (error) {
       console.error('[fetchHighlights] Error:', error);
       return [];
     }
-    
-    // Fetch transcriptions for highlight items (includes OCR!)
+
     const highlightIds = (data || []).map((h: any) => h.id);
+    if (highlightIds.length === 0) return [];
+
+    // Single query: join items → transcriptions via source_id
+    // Get items and transcriptions in parallel
+    const { data: items } = await supabase
+      .from('instagram_highlight_items')
+      .select('id, highlight_id')
+      .in('highlight_id', highlightIds);
+
+    const itemIds = (items || []).map((i: any) => i.id);
+
+    // Only query transcriptions if we have items
+    let trans: any[] = [];
+    if (itemIds.length > 0) {
+      const { data: transData } = await supabase
+        .from('instagram_transcriptions')
+        .select('source_id, transcription_text, on_screen_text')
+        .eq('source_type', 'highlight_item')
+        .in('source_id', itemIds)
+        .eq('processing_status', 'completed');
+      trans = transData || [];
+    }
+
+    // Build item→highlight lookup
+    const itemToHighlight = new Map((items || []).map((i: any) => [i.id, i.highlight_id]));
+
+    // Group transcriptions by highlight_id
     const transcriptions: Record<string, any[]> = {};
-    
-    if (highlightIds.length > 0) {
-      const { data: items } = await supabase
-        .from('instagram_highlight_items')
-        .select('id, highlight_id')
-        .in('highlight_id', highlightIds);
-      
-      if (items && items.length > 0) {
-        const itemIds = items.map((i: any) => i.id);
-        
-        const { data: trans } = await supabase
-          .from('instagram_transcriptions')
-          .select('source_id, transcription_text, on_screen_text')
-          .eq('source_type', 'highlight_item')
-          .in('source_id', itemIds)
-          .eq('processing_status', 'completed');
-        
-        // Group transcriptions by highlight_id
-        if (trans) {
-          trans.forEach((t: any) => {
-            const item = items.find((i: any) => i.id === t.source_id);
-            if (item) {
-              if (!transcriptions[item.highlight_id]) {
-                transcriptions[item.highlight_id] = [];
-              }
-              transcriptions[item.highlight_id].push(t);
-            }
-          });
-        }
+    for (const t of trans) {
+      const highlightId = itemToHighlight.get(t.source_id);
+      if (highlightId) {
+        (transcriptions[highlightId] ??= []).push(t);
       }
     }
-    
+
     return (data || []).map((h: any) => {
       const highlightTrans = transcriptions[h.id] || [];
-      
-      // Combine all text from this highlight (transcription + OCR)
       const allText = highlightTrans.map((t: any) => {
         const parts = [];
         if (t.transcription_text) parts.push(t.transcription_text);
@@ -342,14 +367,13 @@ async function fetchRelevantHighlights(
         }
         return parts.join(' ');
       }).join(' | ');
-      
+
       return {
         id: h.id,
         title: h.title,
         cover_url: h.cover_image_url,
-        media_samples: highlightTrans, // Include transcriptions with OCR!
+        media_samples: highlightTrans,
         scraped_at: h.scraped_at,
-        // Add searchable text for AI
         content_text: allText,
       };
     });
@@ -402,48 +426,42 @@ async function fetchRelevantCoupons(
           console.warn('[fetchCoupons] Using fallback query');
         } else if (searchResults && searchResults.length > 0) {
           console.log(`[fetchCoupons] ✅ Found ${searchResults.length} coupons via INDEXED SEARCH`);
-          
-          // Fetch partnerships links in parallel
-          const partnershipPromises = searchResults.map(async (c: any) => {
-            const { data: partnership } = await supabase
-              .from('partnerships')
-              .select('link')
-              .eq('account_id', accountId)
-              .ilike('brand_name', c.brand_name)
-              .maybeSingle();
-            return partnership?.link || null;
-          });
-          
-          const links = await Promise.all(partnershipPromises);
-          
-          for (let i = 0; i < searchResults.length; i++) {
-            const c = searchResults[i];
+
+          // Batch-fetch all partnership links in ONE query (instead of N+1)
+          const brandNames = searchResults.map((c: any) => c.brand_name).filter(Boolean);
+          const { data: partnershipsData } = brandNames.length > 0
+            ? await supabase
+                .from('partnerships')
+                .select('brand_name, link')
+                .eq('account_id', accountId)
+                .in('brand_name', brandNames)
+            : { data: [] };
+          const linkMap = new Map((partnershipsData || []).map((p: any) => [p.brand_name?.toLowerCase(), p.link]));
+
+          for (const c of searchResults) {
             let discount = c.description || 'הנחה';
-            
+
             if (c.discount_type === 'percentage' && c.discount_value) {
               discount = `${c.discount_value}% הנחה`;
             } else if (c.discount_type === 'fixed' && c.discount_value) {
               discount = `₪${c.discount_value} הנחה`;
             }
-            
+
             // Clean and validate link
-            let cleanLink = links[i];
+            let cleanLink = linkMap.get(c.brand_name?.toLowerCase()) || null;
             if (cleanLink) {
-              cleanLink = cleanLink.trim();
-              // Remove any non-URL characters (Hebrew text, spaces in the middle)
-              cleanLink = cleanLink.replace(/\s+/g, '');
-              // Ensure it starts with http/https
+              cleanLink = cleanLink.trim().replace(/\s+/g, '');
               if (!cleanLink.startsWith('http')) {
                 cleanLink = 'https://' + cleanLink;
               }
             }
-            
+
             allCoupons.push({
               brand: c.brand_name || 'מותג',
               code: c.code,
               discount: discount,
               category: 'general',
-              link: cleanLink || null,
+              link: cleanLink,
             });
           }
           return allCoupons;
@@ -574,15 +592,14 @@ async function fetchRelevantPartnerships(
       }
     }
 
-    // Fallback: Get ALL active partnerships
-    // NOTE: This includes brands WITHOUT coupons (they're shown as partnerships only, not as coupons)
+    // Fallback: Get active partnerships
     const { data, error } = await supabase
       .from('partnerships')
       .select('brand_name, status, brief, category')
       .eq('account_id', accountId)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
-      .limit(50);
+      .limit(15);
     
     if (error) {
       console.error('[fetchPartnerships] Error:', error);
@@ -688,21 +705,9 @@ async function fetchRelevantTranscriptionsIndexed(
     }
     
     if (!data || data.length === 0) {
-      // No results found (legitimate) - no error, just no matching content
-      console.log('[fetchTranscriptionsIndexed] ℹ️ No transcriptions match query, using recent ones');
-      const { data: fallbackData } = await supabase
-        .from('instagram_transcriptions')
-        .select('id, transcription_text, source_id, created_at')
-        .eq('account_id', accountId)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-      
-      return (fallbackData || []).map((t: any) => ({
-        id: t.id,
-        text: t.transcription_text,
-        media_id: t.source_id,
-        created_at: t.created_at,
-      }));
+      // No FTS results — return empty instead of dumping recent transcriptions
+      console.log('[fetchTranscriptionsIndexed] ℹ️ No transcriptions match query — returning empty');
+      return [];
     }
 
     console.log(`[fetchTranscriptionsIndexed] ✅ Found ${data.length} transcriptions via INDEX`);

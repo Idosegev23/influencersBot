@@ -237,6 +237,7 @@ export abstract class BaseArchetype {
       
       // Build archetype-specific system prompt
       const systemPrompt = `אתה ${influencerName}, משפיענית שעוזרת לקהל שלה באופן אישי ומקצועי.
+התייחס תמיד להיסטוריית השיחה — אם השאלה מתייחסת לנושא שהועלה קודם, התייחס אליו.
 
 🎯 תפקיד: ${this.definition.name}
 📝 ${this.definition.description}
@@ -244,27 +245,14 @@ export abstract class BaseArchetype {
 ${this.definition.logic.responseTemplates?.length ? '📋 איך לענות:\n' + this.definition.logic.responseTemplates.map(t => `• ${t.situation}: ${t.template}`).join('\n') : ''}
 ${personalityBlock}
 
-⚠️ כללים קריטיים:
-1. **תשובה קצרה וממוקדת**: 2-3 משפטים מקסימום. אל תסביר יותר מדי. תן תשובה תמציתית ותשאיר מקום לשאלות המשך.
-2. **מידע ספציפי**: השתמש במידע מהתוכן שלי (סטוריז, פוסטים, הילייטס) - תן תוכן מלא!
-3. **שפות**: הבן עברית ואנגלית (Spring = ספרינג, Renuar = רנואר)
-4. **סגנון**: חם, אישי וידידותי - כמו שיחה עם חברה טובה
-5. **אם אין מידע**: תגיד בכנות בניסוח חם כמו "לא נזכר לי שדיברתי על זה" או "אין לי מידע על זה ממש". **לעולם אל תשתמש בניסוחים טכניים כמו "בבסיס הידע"**.
-6. **אל תציע דברים לא רלוונטיים**: אם שואלים על משהו ספציפי ואין לי אותו - אל תציע אלטרנטיבות אחרות!
-7. לעולם אל תשתמש בסוגריים כמו [שם המשפיענית] - השתמש בשם האמיתי: ${influencerName}
-8. אל תהיה גנרי ("זה פצצה") - דבר מניסיון אישי, אל תעתיק רשימות טכניות, נסח בצורה אישית ומקצועית
-9. הקשר שיחה: התייחס להיסטוריית השיחה! אם השאלה הנוכחית מתייחסת לנושא שהועלה קודם (למשל "ספרת על הבוקר של הילדים"), התייחס לשאלה הקודמת ולתוכן שהוזכר.
-10. **פורמט לינקים - CRITICAL**: 
-    - כל לינק חייב להיות בפורמט: [טקסט](URL)
-    - העתק את ה-URL בדיוק כמו שהוא מופיע במידע! אל תשנה, תוסיף או תמחק אותיות
-    - אל תוסיף רווחים, מילים בעברית או סימנים מיוחדים בתוך ה-URL
-    - דוגמה נכונה: [לחצי כאן](https://argania-cosmetics.com)
-    - דוגמה שגויה: [לחצי כאן](https://www. מותק - argania-cosmetics.com)"
-${process.env.MEMORY_V2_ENABLED === 'true' ? `
-🔒 הנחיית דיוק:
-- ענה **רק** על בסיס המידע שניתן לך (פוסטים, תמלולים, קופונים, שיתופי פעולה, היילייטס).
-- אם אין לך מספיק מידע — אמור זאת בכנות ושאלי שאלה ממוקדת אחת.
-- **אל תמציאי** מידע, מחירים, תאריכים או פרטים שלא הוזכרו במקורות.` : ''}`;
+⚠️ 5 כללים קריטיים:
+1. **קצר**: 2-3 משפטים מקסימום. תמציתית, מקום לשאלות המשך.
+2. **ברכות**: כש"היי"/"שלום"/"מה קורה" — ענה חם (1-2 משפטים). **אל תציע מוצרים/קופונים** אלא אם ביקש.
+3. **דיוק**: ענה רק מהמידע שניתן. אם אין מידע — "לא נזכר לי שדיברתי על זה". **אל תמציא**. אל תשתמש בביטויים טכניים כמו "בבסיס הידע".
+4. **רלוונטיות**: ענה רק על מה שנשאל. אם אין קופון/מוצר למותג שביקשו — אמור בכנות, **אל תציע אלטרנטיבות לא קשורות**.
+5. **לינקים**: פורמט [טקסט](URL). העתק URL בדיוק כמו שהוא — ללא שינויים, רווחים או עברית בתוך ה-URL.
+
+השם שלך: ${influencerName} (לעולם אל תכתוב [שם המשפיענית])`;
 
       const userPrompt = `${kbContext}
 
@@ -366,37 +354,29 @@ ${process.env.MEMORY_V2_ENABLED === 'true' ? `
     
     let context = '📚 **בסיס הידע שלי (השתמש בתוכן המלא, לא להפנות!):**\n';
     
-    // Posts - SHOW FULL CONTENT
+    // Posts
     if (kb.posts?.length > 0) {
-      context += `\n📸 **תוכן מפוסטים (${kb.posts.length}) - תן את המידע המלא מכאן:**\n`;
-      kb.posts.slice(0, 5).forEach((p: any, i: number) => {
+      context += `\n📸 **פוסטים (${kb.posts.length}):**\n`;
+      kb.posts.slice(0, 3).forEach((p: any, i: number) => {
         const caption = p.caption || 'ללא כיתוב';
-        // Show full caption, not just 150 chars
-        context += `${i + 1}. ${caption}\n`;
-        if (p.hashtags?.length > 0) {
-          context += `   תגיות: ${p.hashtags.slice(0, 5).join(' ')}\n`;
-        }
-        context += '\n';
+        const truncated = caption.length > 500 ? caption.substring(0, 500) + '...' : caption;
+        context += `${i + 1}. ${truncated}\n\n`;
       });
     }
 
-    // Highlights - SHOW FULL CONTENT (including OCR!)
+    // Highlights
     if (kb.highlights?.length > 0) {
-      context += `\n✨ **הילייטס וסטוריז (${kb.highlights.length}) - מידע אישי וחשוב (כולל טקסט מהתמונות!):**\n`;
-      kb.highlights.slice(0, 15).forEach((h: any, i: number) => {
+      context += `\n✨ **הילייטס (${kb.highlights.length}):**\n`;
+      kb.highlights.slice(0, 5).forEach((h: any, i: number) => {
         context += `${i + 1}. "${h.title}"`;
-        
-        // Use the new content_text field which includes transcription + OCR
         if (h.content_text && h.content_text.trim().length > 0) {
-          const truncated = h.content_text.length > 400 
-            ? h.content_text.substring(0, 400) + '...' 
+          const truncated = h.content_text.length > 250
+            ? h.content_text.substring(0, 250) + '...'
             : h.content_text;
-          context += `\n   תוכן: ${truncated}`;
+          context += ` — ${truncated}`;
         }
-        
         context += '\n';
       });
-      context += '⚠️ **ההיילייטס כוללים טקסט שמופיע על התמונות (מתכונים, רשימות מוצרים, המלצות ספרים, וכו\')** - תן את המידע המלא!\n';
     }
     
     // Coupons - PRIORITIZE THIS!
@@ -415,32 +395,15 @@ ${process.env.MEMORY_V2_ENABLED === 'true' ? `
         }
         context += '\n';
       });
-      context += `
-⚠️ CRITICAL INSTRUCTIONS FOR COUPONS:
-1. שמות מותגים יכולים להיות באנגלית (Spring, Argania, Leaves, Renuar) או בעברית (ספרינג, ארגניה, ליבס, רנואר)
-2. כשמישהו שואל על מותג - חפש גם באנגלית וגם בעברית!
-3. דוגמאות: "ספרינג" = "Spring", "ארגניה" = "Argania", "ליבס" = "Leaves", "רנואר" = "Renuar"
-4. תן את כל הקופונים הרלוונטיים למותג המבוקש + הקוד המלא
-5. אם יש מספר קופונים למותג - תן את כולם!
-6. **🚨 SUPER CRITICAL - אם אין קופון למותג המבוקש**:
-   - אם שואלים על מותג ספציפי (לדוגמה "יש קופון לרנואר?") ו**אין** קופון למותג הזה ברשימה
-   - תענה בכנות: "אין לי קופון לרנואר כרגע 🙏" 
-   - **לעולם אל תציע קופונים של מותגים אחרים שלא קשורים לשאלה!**
-   - **אל תהיה מסחרי ותדחוף קופונים לא רלוונטיים** - זה נראה desperate ולא אותנטי
-   - רק אם שואלים "יש לך קופונים?" (שאלה כללית) - תן את כל הקופונים
-7. **פורמט לינקים - CRITICAL**:
-   - אם יש LINK במידע, תציג: [לחצי כאן](LINK)
-   - העתק את ה-URL בדיוק כמו שהוא! אל תוסיף מילים, רווחים או טקסט עברי בתוך ה-URL
-   - דוגמה נכונה: [לחצי כאן](https://argania-cosmetics.com)
-   - דוגמה שגויה: [לחצי כאן](https://www. מותק - argania-cosmetics.com)\n`;
+      context += `⚠️ חפש מותגים גם בעברית וגם באנגלית (ספרינג=Spring, ארגניה=Argania, ליבס=Leaves, רנואר=Renuar). אם יש LINK — הצג כ-[לחצי כאן](LINK).\n`;
     }
     
     // Partnerships/Brands
     if (kb.partnerships?.length > 0) {
-      context += `\n🤝 **שיתופי פעולה ומותגים (${kb.partnerships.length}):**\n`;
-      kb.partnerships.slice(0, 10).forEach((p: any, i: number) => {
+      context += `\n🤝 **שיתופי פעולה (${kb.partnerships.length}):**\n`;
+      kb.partnerships.slice(0, 5).forEach((p: any, i: number) => {
         context += `${i + 1}. ${p.brandName || p.brand_name}`;
-        if (p.brief) context += ` - ${p.brief.substring(0, 100)}`;
+        if (p.brief) context += ` - ${p.brief.substring(0, 80)}`;
         context += '\n';
       });
     }
@@ -453,14 +416,13 @@ ${process.env.MEMORY_V2_ENABLED === 'true' ? `
       });
     }
     
-    // Transcriptions - SHOW VIDEO CONTENT (truncated for readability)
+    // Transcriptions
     if (kb.transcriptions?.length > 0) {
-      context += `\n🎥 **תמלולים מסרטונים/רילים (${kb.transcriptions.length}) - זה תוכן חשוב (מתכונים, טיפים, אימונים):**\n`;
-      kb.transcriptions.slice(0, 10).forEach((t: any, i: number) => {
-        const truncated = t.text.length > 300 ? t.text.substring(0, 300) + '...' : t.text;
+      context += `\n🎥 **תמלולים (${kb.transcriptions.length}):**\n`;
+      kb.transcriptions.slice(0, 5).forEach((t: any, i: number) => {
+        const truncated = t.text.length > 250 ? t.text.substring(0, 250) + '...' : t.text;
         context += `${i + 1}. ${truncated}\n\n`;
       });
-      context += '⚠️ אם יש מתכון או טיפ בתמלולים - תן את כל המידע! אל תגיד "יש לי סרטון". נסח בצורה אישית, לא העתקה טכנית.\n';
     }
     
     // Websites/Linkis

@@ -43,7 +43,7 @@ import {
   hashMessage,
 } from '@/engines';
 
-import { understandMessage } from '@/engines/understanding';
+import { understandMessageFast } from '@/engines/understanding';
 import { 
   decide, 
   getUIDirectivesSummary, 
@@ -63,6 +63,8 @@ import {
   type ExperimentAssignment,
 } from '@/engines/experiments';
 import type { EngineContext, AccountContext, SessionContext, UserContext, KnowledgeRefs, LimitsContext, RequestContext } from '@/engines/context';
+import { processSandwichMessageWithMetadata } from '@/lib/chatbot/sandwichBot';
+import { buildConversationContext, trimToTokenBudget, updateRollingSummary, shouldUpdateSummary } from '@/lib/chatbot/conversation-memory';
 
 // ============================================
 // Stream Event Types
@@ -117,9 +119,9 @@ type StreamEvent = StreamMeta | StreamCards | StreamDelta | StreamDone | StreamE
 // Helper: Encode NDJSON
 // ============================================
 
+const _encoder = new TextEncoder();
 function encodeEvent(event: StreamEvent): Uint8Array {
-  const encoder = new TextEncoder();
-  return encoder.encode(JSON.stringify(event) + '\n');
+  return _encoder.encode(JSON.stringify(event) + '\n');
 }
 
 // ============================================
@@ -205,7 +207,7 @@ export async function POST(req: NextRequest) {
         // === IDEMPOTENCY ===
         idempotencyKey = `${accountId}:${currentSessionId}:chat:${hashMessage(message)}:${clientMessageId || 'na'}`;
         const idempotencyResult = await claimIdempotencyKey(idempotencyKey);
-        
+
         if (!idempotencyResult.allowed) {
           if (idempotencyResult.cachedResult) {
             // Return cached response
@@ -242,57 +244,51 @@ export async function POST(req: NextRequest) {
           return;
         }
 
-        // === LOCK ===
-        await acquireLock(currentSessionId, requestId);
+        // === Understanding (fast keyword-based, no AI call) ===
+        const understanding = understandMessageFast(message);
 
-        // Emit stream started with cache metrics (L1 + L2)
-        await emitEvent({
-          type: 'message_received',
-          accountId,
-          sessionId: currentSessionId,
-          mode: 'creator',
-          payload: { 
-            messageLength: message.length, 
-            streaming: true,
-            cacheMetrics: {
-              loadMs: cacheLoadMs,
-              hitRate: cachedData.metrics.cacheHitRate,
-              usernameHit: cachedData.metrics.usernameHit,
-              influencerHit: cachedData.metrics.influencerHit,
-              brandsHit: cachedData.metrics.brandsHit,
-              contentHit: cachedData.metrics.contentHit,
-              // L2 metrics
-              redisAvailable: cachedData.metrics.redisAvailable,
-              l1Hits: cachedData.metrics.l1Hits,
-              l2Hits: cachedData.metrics.l2Hits,
-              dbHits: cachedData.metrics.dbHits,
-            },
-          },
-          metadata: { source: 'chat', engineVersion: 'v2', traceId, requestId },
-        });
-
-        // === UNDERSTANDING ===
-        const understanding = await understandMessage({
-          message,
-          accountId,
-          sessionId: currentSessionId,
-          mode: 'creator',
-        });
-
-        // === EARLY DEFINITIONS FOR SUPPORT FLOW ===
-        // Define anonId early (used in support flow meta)
+        // === PARALLEL: Lock + Event + Session Load ===
         const anonId = `anon_${currentSessionId?.slice(0, 8) || 'guest'}`;
-        
-        // Load session if exists (needed for state mapping)
-        let session = null;
-        if (currentSessionId && isValidSessionId(currentSessionId)) {
-          const { data: existingSession } = await supabase
-            .from('chat_sessions')
-            .select('*')
-            .eq('id', currentSessionId)
-            .single();
-          session = existingSession;
-        }
+
+        const [, , sessionData] = await Promise.all([
+          // Lock
+          acquireLock(currentSessionId, requestId),
+          // Event emission
+          emitEvent({
+            type: 'message_received',
+            accountId,
+            sessionId: currentSessionId,
+            mode: 'creator',
+            payload: {
+              messageLength: message.length,
+              streaming: true,
+              cacheMetrics: {
+                loadMs: cacheLoadMs,
+                hitRate: cachedData.metrics.cacheHitRate,
+                usernameHit: cachedData.metrics.usernameHit,
+                influencerHit: cachedData.metrics.influencerHit,
+                brandsHit: cachedData.metrics.brandsHit,
+                contentHit: cachedData.metrics.contentHit,
+                redisAvailable: cachedData.metrics.redisAvailable,
+                l1Hits: cachedData.metrics.l1Hits,
+                l2Hits: cachedData.metrics.l2Hits,
+                dbHits: cachedData.metrics.dbHits,
+              },
+            },
+            metadata: { source: 'chat', engineVersion: 'v2', traceId, requestId },
+          }),
+          // Session load (needed for state/support flow check)
+          (currentSessionId && isValidSessionId(currentSessionId))
+            ? supabase
+                .from('chat_sessions')
+                .select('*')
+                .eq('id', currentSessionId)
+                .single()
+                .then(r => r.data)
+            : Promise.resolve(null),
+        ]);
+
+        let session = sessionData;
 
         // === CHECK IF ALREADY IN SUPPORT FLOW ===
         const isInSupportFlow = session?.state?.startsWith('Support.');
@@ -411,14 +407,9 @@ export async function POST(req: NextRequest) {
             brands: supportResult.brands,
           }));
 
-          // Stream the response
+          // Stream the response (sent as a single chunk for speed)
           if (supportResult.response) {
-            const words = supportResult.response.split(' ');
-            for (let i = 0; i < words.length; i++) {
-              const word = words[i] + (i < words.length - 1 ? ' ' : '');
-              controller.enqueue(encodeEvent({ type: 'delta', text: word }));
-              await new Promise(resolve => setTimeout(resolve, 30));
-            }
+            controller.enqueue(encodeEvent({ type: 'delta', text: supportResult.response }));
           }
 
           // Send done event
@@ -552,8 +543,7 @@ export async function POST(req: NextRequest) {
         // === USE SANDWICH BOT ===
         console.log('[Stream] 🥪 Using Sandwich Bot architecture');
         
-        // Import Sandwich Bot
-        const { processSandwichMessageWithMetadata } = await import('@/lib/chatbot/sandwichBot');
+        // Sandwich Bot (static import)
         
         // Get conversation history
         const { data: historyMessages } = await supabase
@@ -584,7 +574,7 @@ export async function POST(req: NextRequest) {
 
         if (memoryV2Active && currentSessionId) {
           try {
-            const { buildConversationContext, trimToTokenBudget } = await import('@/lib/chatbot/conversation-memory');
+            // conversation-memory (static import)
             const memoryCtx = await buildConversationContext(currentSessionId, conversationHistory);
 
             // Apply token budget: trim history if needed
@@ -703,7 +693,7 @@ export async function POST(req: NextRequest) {
         // --- Memory V2: Update rolling summary if threshold reached ---
         if (memoryV2Active && currentSessionId) {
           try {
-            const { updateRollingSummary, shouldUpdateSummary } = await import('@/lib/chatbot/conversation-memory');
+            // conversation-memory (static import)
             // Use DB message_count (incremented by saveChatMessage above) + 2 for just-saved pair
             const msgCount = (session?.message_count || 0) + 2;
             if (shouldUpdateSummary(msgCount)) {
