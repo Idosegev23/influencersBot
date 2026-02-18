@@ -247,26 +247,43 @@ async function ingestEntityType(
     }
 
     case 'transcription': {
+      // Fetch ALL completed transcriptions — including those with only on_screen_text
       const { data: trans } = await supabase
         .from('instagram_transcriptions')
         .select('id, transcription_text, source_type, source_id, language, on_screen_text, created_at')
         .eq('account_id', accountId)
-        .eq('processing_status', 'completed')
-        .not('transcription_text', 'is', null);
+        .eq('processing_status', 'completed');
 
       if (trans) {
         for (const t of trans) {
-          if (!t.transcription_text?.trim()) continue;
+          const hasSpokenText = !!t.transcription_text?.trim();
+          const hasScreenText = Array.isArray(t.on_screen_text) && t.on_screen_text.length > 0;
+
+          // Skip only if BOTH are empty
+          if (!hasSpokenText && !hasScreenText) continue;
+
           try {
-            let text = t.transcription_text;
-            if (t.on_screen_text?.length) {
-              text += '\n\n[On-screen text]: ' + t.on_screen_text.join(' | ');
+            // Build text from spoken + on-screen content
+            let text = '';
+            if (hasSpokenText) {
+              text = t.transcription_text!;
             }
+            if (hasScreenText) {
+              const screenContent = t.on_screen_text.join(' | ');
+              text = text
+                ? text + '\n\n[On-screen text]: ' + screenContent
+                : '[On-screen text]: ' + screenContent;
+            }
+
+            const title = hasSpokenText
+              ? truncate(t.transcription_text, 120)
+              : truncate(t.on_screen_text[0], 120);
+
             await ingestDocument({
               accountId,
               entityType: 'transcription',
               sourceId: t.id,
-              title: truncate(t.transcription_text, 120),
+              title,
               text,
               metadata: {
                 sourceType: t.source_type,
