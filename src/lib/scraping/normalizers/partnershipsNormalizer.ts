@@ -130,7 +130,7 @@ export class PartnershipsNormalizer {
    * Use Gemini to detect partnerships and coupons
    */
   private async geminiDetection(text: string): Promise<NormalizationResult> {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
 
     const prompt = `נתח את התוכן הבא וזהה:
 

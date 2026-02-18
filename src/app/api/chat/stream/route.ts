@@ -399,17 +399,12 @@ export async function POST(req: NextRequest) {
               ...decision.uiDirectives,
               showCardList: supportResult.action === 'show_brands' ? 'brands' : null,
               showQuickActions: supportResult.action === 'show_brands' ? [] : ['המשך'],
-            },
-            stateTransition: { from: session?.state || 'Idle', to: newState },
-            // Place support flow specific data inside uiDirectives to avoid type error
-            uiDirectives: {
-              ...decision.uiDirectives,
-              showCardList: supportResult.action === 'show_brands' ? 'brands' : null,
-              showQuickActions: supportResult.action === 'show_brands' ? [] : ['המשך'],
               supportState: supportResult.supportState,
               action: supportResult.action,
               brands: supportResult.brands,
             },
+            stateTransition: { from: session?.state || 'Idle', to: newState },
+          }));
 
           // Stream the response (sent as a single chunk for speed)
           if (supportResult.response) {
