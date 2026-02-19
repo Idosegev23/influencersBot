@@ -78,10 +78,13 @@ export class SandwichBot {
       ? [...input.conversationHistory].reverse().find(m => m.role === 'assistant')
       : null;
 
-    // Detect quick follow-ups: user answering bot's question (< 30 chars, bot asked a question)
+    // Detect quick follow-ups: user answering bot's question with a short choice
+    // Only skip RAG for very short answers (< 10 chars) that don't contain content keywords
+    const hasContentKeywords = /מתכון|איך|קופון|מוצר|המלצה|טיפ|שווארמה|פסטה|עוגה|סלט|מה ה/.test(input.userMessage);
     const isQuickFollowUp = !!(
       lastAssistant &&
-      input.userMessage.length < 30 &&
+      input.userMessage.length < 10 &&
+      !hasContentKeywords &&
       lastAssistant.content.includes('?')
     );
 
