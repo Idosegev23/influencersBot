@@ -98,6 +98,65 @@ const typeLabels: Record<InfluencerType, string> = {
   other: 'טיפים והמלצות',
 };
 
+/**
+ * Generate dynamic follow-up suggestions based on the last bot response.
+ * Zero latency — runs client-side with simple keyword matching.
+ */
+function generateDynamicSuggestions(
+  lastBotContent: string,
+  influencerType: string,
+): string[] {
+  if (!lastBotContent || lastBotContent.length < 20) return [];
+  const t = lastBotContent;
+  const picks: string[] = [];
+
+  // Recipe / food content
+  if (/מתכון|מצרכים|בישול|רוטב|תנור|מחבת|אפייה/.test(t)) {
+    if (/מצרכים|רכיבים/.test(t)) picks.push('תני טיפ להגשה');
+    else picks.push('תני את כל המצרכים והשלבים');
+    if (/שמנת/.test(t)) picks.push('יש גרסה בלי שמנת?');
+    else if (/בריא|דיאטה|קל/.test(t)) picks.push('יש גרסה יותר מפנקת?');
+    else picks.push('יש גרסה בריאה יותר?');
+    picks.push('יש עוד מתכון שאת ממליצה?');
+  }
+  // Skincare / beauty
+  else if (/קרם|סרום|טיפוח|עור|פנים|שגרה|רטינול/.test(t)) {
+    picks.push('מתאים לעור רגיש?');
+    picks.push('מה השגרה שלך?');
+    picks.push('יש קופון למוצר?');
+  }
+  // Fashion / outfit
+  else if (/בגד|אאוטפיט|שמלה|לוק|סטייל|נעליים|מידה/.test(t)) {
+    picks.push('מאיפה זה?');
+    picks.push('יש קופון?');
+    picks.push('מה עוד הולך עם זה?');
+  }
+  // Fitness
+  else if (/אימון|כושר|תרגיל|שרירים|ריצה|יוגה/.test(t)) {
+    picks.push('כמה פעמים בשבוע?');
+    picks.push('מתאים למתחילים?');
+    picks.push('יש אימון בית?');
+  }
+  // Coupons / brands
+  else if (/קופון|הנחה|קוד|מבצע/.test(t)) {
+    picks.push('יש עוד קופונים?');
+    picks.push('עד מתי זה בתוקף?');
+  }
+
+  // Default by influencer type
+  if (picks.length === 0) {
+    switch (influencerType) {
+      case 'food': picks.push('יש עוד מתכון?', 'מה הכי שווה לנסות?', 'יש טיפ מהיר?'); break;
+      case 'fashion': picks.push('מה הלוק שלך היום?', 'יש המלצה לאאוטפיט?'); break;
+      case 'beauty': picks.push('מה שגרת הטיפוח שלך?', 'יש מוצר חדש?'); break;
+      case 'fitness': picks.push('יש אימון להיום?', 'טיפ לתזונה?'); break;
+      default: picks.push('ספרי לי עוד', 'יש עוד טיפ?'); break;
+    }
+  }
+
+  return picks.slice(0, 3);
+}
+
 export default function ChatbotPage({ params }: { params: Promise<{ username: string }> }) {
   const resolvedParams = use(params);
   const username = resolvedParams.username;
@@ -201,7 +260,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       if (msgId) {
         setMessages(prev => prev.map(m =>
           m.id === msgId
-            ? { ...m, content: error.message || 'שגיאה בעיבוד הבקשה' }
+            ? { ...m, content: error.message || 'אופס, משהו השתבש 😅 נסה לשלוח שוב' }
             : m
         ));
       }
@@ -485,7 +544,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'אופס! משהו השתבש. נסה שוב בבקשה.',
+        content: 'אופס, משהו השתבש 😅 נסה לשלוח שוב או לנסח את השאלה אחרת',
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
@@ -751,14 +810,41 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         אני כאן לעזור עם {(typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other).toLowerCase()}, מותגים וקופונים
                       </motion.p>
 
-                      {/* Suggestion Pills */}
+                      {/* Quick Action Buttons */}
                       <motion.div
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4, delay: 0.3 }}
+                        className="flex gap-3 justify-center mb-8"
+                      >
+                        {brands.length > 0 && (
+                          <button
+                            onClick={() => setActiveTab('search')}
+                            className="px-5 py-2.5 rounded-full text-sm font-medium transition-all hover:shadow-md"
+                            style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+                          >
+                            🛍️ קופונים ומותגים
+                          </button>
+                        )}
+                        {influencer.whatsapp_enabled && (
+                          <button
+                            onClick={() => setShowSupportModal(true)}
+                            className="px-5 py-2.5 rounded-full text-sm font-medium transition-all hover:shadow-md"
+                            style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+                          >
+                            💬 יש לי בעיה
+                          </button>
+                        )}
+                      </motion.div>
+
+                      {/* Dynamic welcome suggestion — one smart prompt */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.4, delay: 0.4 }}
                         className="flex flex-wrap gap-2.5 justify-center max-w-md mb-8"
                       >
-                        {suggestedQuestions.map((q, i) => (
+                        {suggestedQuestions.slice(0, 3).map((q, i) => (
                           <button
                             key={i}
                             onClick={() => {
@@ -1076,6 +1162,37 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         </motion.div>
                         );
                       })}
+
+                      {/* Dynamic suggestions after last bot response */}
+                      {!isTyping && !isStreamActive && messages.length > 0 && messages[messages.length - 1]?.role === 'assistant' && messages[messages.length - 1]?.content && (() => {
+                        const suggestions = generateDynamicSuggestions(
+                          messages[messages.length - 1].content,
+                          influencer.influencer_type || 'other',
+                        );
+                        if (suggestions.length === 0) return null;
+                        return (
+                          <motion.div
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.3, delay: 0.2 }}
+                            className="flex flex-wrap gap-2 justify-end pr-8 mt-1"
+                          >
+                            {suggestions.map((s, i) => (
+                              <button
+                                key={i}
+                                onClick={() => {
+                                  setInputValue(s);
+                                  inputRef.current?.focus();
+                                }}
+                                className="suggestion-pill text-xs"
+                              >
+                                {s}
+                              </button>
+                            ))}
+                          </motion.div>
+                        );
+                      })()}
+
                       {isTyping && (
                         <motion.div
                           initial={{ opacity: 0, y: 6 }}
@@ -1106,12 +1223,35 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   )}
                 </div>
 
-                {/* Chat Input */}
+                {/* Chat Input + Quick Actions */}
                 <div
-                  className="absolute bottom-0 left-0 right-0 px-4 pt-3 pb-safe"
+                  className="absolute bottom-0 left-0 right-0 px-4 pt-2 pb-safe"
                   style={{ background: `linear-gradient(to top, var(--color-background) 70%, transparent)` }}
                 >
                   <div className="max-w-2xl mx-auto">
+                    {/* Quick action row — coupons + support (visible when chat has messages) */}
+                    {messages.length > 0 && (
+                      <div className="flex gap-2 mb-2 justify-center">
+                        {brands.length > 0 && (
+                          <button
+                            onClick={() => setActiveTab('search')}
+                            className="px-3.5 py-1.5 rounded-full text-xs font-medium transition-all hover:shadow-sm"
+                            style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)', opacity: 0.8 }}
+                          >
+                            🛍️ קופונים
+                          </button>
+                        )}
+                        {influencer.whatsapp_enabled && (
+                          <button
+                            onClick={() => setShowSupportModal(true)}
+                            className="px-3.5 py-1.5 rounded-full text-xs font-medium transition-all hover:shadow-sm"
+                            style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)', opacity: 0.8 }}
+                          >
+                            💬 בעיה
+                          </button>
+                        )}
+                      </div>
+                    )}
                     <div className="chat-input-pill">
                       <input
                         ref={inputRef}

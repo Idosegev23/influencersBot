@@ -271,8 +271,9 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
   // --- Step 3: Vector search ---
   const vectorStart = Date.now();
 
-  // Expand query first, then embed the expanded version for better recall.
-  const expandedQuery = await expandQuery(query);
+  // Expand query for better recall — skip for already-enriched queries (> 100 chars)
+  // or very short queries where expansion has minimal benefit.
+  const expandedQuery = query.length > 100 ? query : await expandQuery(query);
   const enrichedQuery = conversationSummary
     ? `${expandedQuery}\n\nContext: ${conversationSummary}`
     : expandedQuery;

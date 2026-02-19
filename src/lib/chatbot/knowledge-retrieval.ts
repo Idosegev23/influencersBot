@@ -296,7 +296,7 @@ async function isRAGAvailable(supabase: any, accountId: string): Promise<boolean
       .eq('account_id', accountId)
       .limit(1);
     const available = !error && (count || 0) > 0;
-    ragAvailabilityCache.set(accountId, { available, expiry: Date.now() + 60_000 });
+    ragAvailabilityCache.set(accountId, { available, expiry: Date.now() + 300_000 });
     return available;
   } catch {
     return false;

@@ -560,15 +560,23 @@ export async function POST(req: NextRequest) {
           }));
 
         // --- Memory V2: Prepend rolling summary + token budget ---
-        // Check global flag OR per-account override (accounts.features.memory_v2)
+        // Check global flag OR per-account override (cached 5 min)
         let memoryV2Active = process.env.MEMORY_V2_ENABLED === 'true';
         if (!memoryV2Active && accountId) {
-          const { data: acctFlags } = await supabase
-            .from('accounts')
-            .select('features')
-            .eq('id', accountId)
-            .single();
-          memoryV2Active = acctFlags?.features?.memory_v2 === true;
+          const flagKey = `memv2:${accountId}`;
+          const cachedFlag = (globalThis as any).__memV2Cache?.get(flagKey);
+          if (cachedFlag !== undefined && cachedFlag.exp > Date.now()) {
+            memoryV2Active = cachedFlag.val;
+          } else {
+            const { data: acctFlags } = await supabase
+              .from('accounts')
+              .select('features')
+              .eq('id', accountId)
+              .single();
+            memoryV2Active = acctFlags?.features?.memory_v2 === true;
+            if (!(globalThis as any).__memV2Cache) (globalThis as any).__memV2Cache = new Map();
+            (globalThis as any).__memV2Cache.set(flagKey, { val: memoryV2Active, exp: Date.now() + 300_000 });
+          }
         }
 
         if (memoryV2Active && currentSessionId) {
@@ -647,8 +655,16 @@ export async function POST(req: NextRequest) {
 
         } catch (sandwichError: any) {
           console.error('[Stream] Sandwich Bot error:', sandwichError);
-          // Fallback response
-          fullText = 'מצטער, משהו השתבש. נסה שוב!';
+          // Smart fallback based on error type
+          const isTimeout = sandwichError.message?.includes('timeout') || sandwichError.code === 'ECONNRESET';
+          const isRateLimit = sandwichError.status === 429;
+          if (isRateLimit) {
+            fullText = 'אופס, יותר מדי הודעות ברגע 😅 נסה שוב עוד כמה שניות!';
+          } else if (isTimeout) {
+            fullText = 'לקח לי יותר מדי זמן לענות 😊 אפשר לנסות שוב? אולי תנסח/י את השאלה קצת אחרת';
+          } else {
+            fullText = 'אופס, משהו השתבש אצלי 😅 נסה לשלוח שוב או לנסח את השאלה אחרת';
+          }
           controller.enqueue(encodeEvent({ type: 'delta', text: fullText }));
         }
 
