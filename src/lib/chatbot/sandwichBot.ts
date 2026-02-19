@@ -70,28 +70,42 @@ export class SandwichBot {
     console.log(`   → Confidence: ${(classification.confidence * 100).toFixed(0)}%`);
 
     // ==========================================
-    // Retrieve Knowledge Base
+    // Retrieve Knowledge Base (with smart follow-up detection)
     // ==========================================
     console.log('\n📚 Retrieving knowledge...');
 
-    // Enrich query with conversation context for follow-up messages
-    // e.g. "תני לי את המתכון" → "פסטה רביולי ... תני לי את המתכון"
-    let knowledgeQuery = input.userMessage;
-    if (input.conversationHistory?.length && input.userMessage.length < 60) {
-      const lastAssistant = [...input.conversationHistory]
-        .reverse()
-        .find(m => m.role === 'assistant');
-      if (lastAssistant) {
+    const lastAssistant = input.conversationHistory?.length
+      ? [...input.conversationHistory].reverse().find(m => m.role === 'assistant')
+      : null;
+
+    // Detect quick follow-ups: user answering bot's question (< 30 chars, bot asked a question)
+    const isQuickFollowUp = !!(
+      lastAssistant &&
+      input.userMessage.length < 30 &&
+      lastAssistant.content.includes('?')
+    );
+
+    let knowledgeBase: KnowledgeBase;
+
+    if (isQuickFollowUp) {
+      // ⚡ Skip RAG entirely — conversation history has the context
+      console.log('   ⚡ Quick follow-up detected — skipping RAG for speed');
+      knowledgeBase = { posts: [], highlights: [], coupons: [], partnerships: [], insights: [], websites: [], transcriptions: [] };
+    } else {
+      // Enrich query with conversation context for follow-up messages
+      // e.g. "תני לי את המתכון" → "פסטה רביולי ... תני לי את המתכון"
+      let knowledgeQuery = input.userMessage;
+      if (lastAssistant && input.userMessage.length < 60) {
         knowledgeQuery = `${lastAssistant.content.substring(0, 300)} ${input.userMessage}`;
         console.log(`   → Enriched query with conversation context (${knowledgeQuery.length} chars)`);
       }
-    }
 
-    const knowledgeBase = await this.retrieveKnowledge(
-      input.accountId,
-      classification.primaryArchetype,
-      knowledgeQuery
-    );
+      knowledgeBase = await this.retrieveKnowledge(
+        input.accountId,
+        classification.primaryArchetype,
+        knowledgeQuery
+      );
+    }
 
     // ==========================================
     // LAYER 2 + 3: Process with Archetype (includes Guardrails)
