@@ -22,7 +22,7 @@ export const routingRules: Rule[] = [
       {
         type: 'set_ui',
         value: {
-          showQuickActions: ['העתק קופון', 'פתח אתר', 'בעיה בקופון'],
+          showQuickActions: [],
           responseLength: 'short',
         },
       },
@@ -74,7 +74,7 @@ export const routingRules: Rule[] = [
         type: 'set_ui',
         value: {
           showCardList: 'products',
-          showQuickActions: ['מחירים', 'מבצעים', 'המלצה אישית'],
+          showQuickActions: [],
           responseLength: 'standard',
           layout: 'cards_first',
         },
@@ -100,7 +100,7 @@ export const routingRules: Rule[] = [
       {
         type: 'set_ui',
         value: {
-          showQuickActions: ['קופונים', 'המלצות', 'בעיה בהזמנה'],
+          showQuickActions: [],
           responseLength: 'standard',
           layout: 'chat',
         },

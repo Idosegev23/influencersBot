@@ -44,7 +44,7 @@ export function buildDefaultDecision(args: {
     layout: 'chat',
     tone: ctx.account.mode === 'creator' ? 'casual' : 'professional',
     responseLength: 'standard',
-    showQuickActions: ['קופונים', 'המלצות', 'בעיה בהזמנה'],
+    showQuickActions: [],
   };
 
   // Default model strategy

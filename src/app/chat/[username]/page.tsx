@@ -1211,7 +1211,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             initial={{ opacity: 0, y: 8 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.3, delay: 0.2 }}
-                            className="flex flex-wrap gap-2 justify-end pr-8 mt-1"
+                            className="flex flex-wrap gap-2 justify-center mt-3"
                           >
                             {suggestions.map((s, i) => (
                               <button
@@ -1256,28 +1256,28 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   )}
                 </div>
 
-                {/* Chat Input + Quick Actions */}
+                {/* Chat Input */}
                 <div
-                  className="absolute bottom-0 left-0 right-0 px-4 pt-2 pb-safe"
+                  className="absolute bottom-0 left-0 right-0 px-4 pt-3 pb-safe"
                   style={{ background: `linear-gradient(to top, var(--color-background) 70%, transparent)` }}
                 >
                   <div className="max-w-2xl mx-auto">
-                    {/* Quick action row — coupons + support (visible when chat has messages) */}
+                    {/* Quick action buttons above input */}
                     {messages.length > 0 && (
                       <div className="flex gap-2 mb-2 justify-center">
                         {brands.length > 0 && (
                           <button
                             onClick={() => setActiveTab('search')}
-                            className="px-3.5 py-1.5 rounded-full text-xs font-medium transition-all hover:shadow-sm"
-                            style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)', opacity: 0.8 }}
+                            className="px-3 py-1.5 rounded-full text-xs font-medium transition-all"
+                            style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
                           >
                             🛍️ קופונים
                           </button>
                         )}
                         <button
                           onClick={() => setShowSupportModal(true)}
-                          className="px-3.5 py-1.5 rounded-full text-xs font-medium transition-all hover:shadow-sm"
-                          style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)', opacity: 0.8 }}
+                          className="px-3 py-1.5 rounded-full text-xs font-medium transition-all"
+                          style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
                         >
                           💬 בעיה בהזמנה
                         </button>

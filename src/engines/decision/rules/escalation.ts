@@ -22,7 +22,7 @@ export const escalationRules: Rule[] = [
       {
         type: 'set_ui',
         value: {
-          showQuickActions: ['קופון', 'בעיה בהזמנה', 'מוצר', 'שאלה כללית'],
+          showQuickActions: [],
           responseLength: 'short',
           tone: 'professional',
           layout: 'chat',
@@ -51,7 +51,7 @@ export const escalationRules: Rule[] = [
         value: {
           responseLength: 'short',
           tone: 'empathetic',
-          showQuickActions: ['חזרה לצ\'אט'],
+          showQuickActions: [],
         },
       },
       { type: 'set_model', value: { model: 'nano', maxTokens: 140 } },
