@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Copy, Check, ExternalLink, HeadphonesIcon, Gift, Sparkles } from 'lucide-react';
+import { Check, Gift, Sparkles } from 'lucide-react';
 
 export interface BrandCardData {
   id: string;
@@ -43,44 +43,18 @@ export function EnhancedBrandCards({
 }: EnhancedBrandCardsProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
-  const [confirmLinkBrand, setConfirmLinkBrand] = useState<BrandCardData | null>(null);
 
   const displayBrands = showAll ? brands : brands.slice(0, maxDisplay);
   const hasMore = brands.length > maxDisplay;
 
-  const handleCopy = (e: React.MouseEvent, brand: BrandCardData) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleCardTap = (brand: BrandCardData) => {
     if (brand.coupon_code) {
       navigator.clipboard.writeText(brand.coupon_code);
       setCopiedId(brand.id);
       setTimeout(() => setCopiedId(null), 2000);
       onCopy(brand);
-    }
-  };
-
-  const handleOpen = (e: React.MouseEvent, brand: BrandCardData) => {
-    e.preventDefault();
-    e.stopPropagation();
-    onOpen(brand);
-  };
-
-  const handleSupport = (e: React.MouseEvent, brand: BrandCardData) => {
-    e.preventDefault();
-    e.stopPropagation();
-    onSupport(brand);
-  };
-
-  const handleShowAll = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setShowAll(true);
-  };
-
-  const handleCardClick = (brand: BrandCardData) => {
-    // If brand has no coupon but has a link, show confirmation modal
-    if (!brand.coupon_code && brand.link) {
-      setConfirmLinkBrand(brand);
+    } else if (brand.link) {
+      onOpen(brand);
     }
   };
 
@@ -96,168 +70,78 @@ export function EnhancedBrandCards({
         <span className="text-sm font-medium text-gray-700">קופונים והטבות</span>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2.5">
         {displayBrands.map((brand, index) => {
           const colors = getColors(brand.category);
           const isCopied = copiedId === brand.id;
 
           return (
-            <motion.div
+            <motion.button
               key={brand.id}
+              type="button"
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05, duration: 0.2 }}
-              onClick={() => handleCardClick(brand)}
+              onClick={() => handleCardTap(brand)}
               className={`
-                relative overflow-hidden rounded-xl border-2 ${colors.border}
-                ${colors.bg} p-4 transition-all duration-200
-                hover:shadow-lg hover:scale-[1.02] group
-                ${!brand.coupon_code && brand.link ? 'cursor-pointer' : ''}
+                relative overflow-hidden rounded-xl border ${colors.border}
+                ${colors.bg} p-3 transition-all duration-200 text-right
+                hover:shadow-md active:scale-[0.98]
               `}
             >
               {/* Discount badge */}
               {brand.discount_percent && (
                 <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg rounded-tr-lg">
-                  {brand.discount_percent}% הנחה
+                  {brand.discount_percent}%
                 </div>
               )}
 
-              {/* Brand info */}
-              <div className="mb-3">
-                <h4 className={`font-bold text-base ${colors.text}`}>
-                  {brand.brand_name}
-                </h4>
-                {brand.description && (
-                  <p className="text-xs text-gray-600 mt-1 line-clamp-2">
-                    {brand.description}
-                  </p>
-                )}
-              </div>
+              {/* Brand name */}
+              <h4 className={`font-bold text-sm ${colors.text} truncate`}>
+                {brand.brand_name}
+              </h4>
 
-              {/* Coupon code */}
+              {/* Coupon code — tap to copy */}
               {brand.coupon_code && (
-                <div className="mb-3 bg-white/60 rounded-lg p-2 border border-white/80">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5">
-                      <Gift className="w-3.5 h-3.5 text-gray-500" />
-                      <span className="text-xs text-gray-500">קוד קופון:</span>
+                <div className="mt-2 flex items-center gap-1.5">
+                  {isCopied ? (
+                    <div className="flex items-center gap-1 text-green-600">
+                      <Check className="w-3.5 h-3.5" />
+                      <span className="text-xs font-medium">הועתק!</span>
                     </div>
-                    <code className="font-mono font-bold text-sm tracking-wide">
-                      {brand.coupon_code}
-                    </code>
-                  </div>
+                  ) : (
+                    <>
+                      <Gift className="w-3 h-3 text-gray-400" />
+                      <code className="font-mono font-bold text-xs tracking-wide">
+                        {brand.coupon_code}
+                      </code>
+                    </>
+                  )}
                 </div>
               )}
 
-              {/* Action buttons */}
-              <div className="flex gap-2">
-                {brand.coupon_code && (
-                  <button
-                    type="button"
-                    onClick={(e) => handleCopy(e, brand)}
-                    className={`
-                      flex-1 flex items-center justify-center gap-1.5 py-2 px-3 
-                      rounded-lg font-medium text-sm transition-all
-                      ${isCopied 
-                        ? 'bg-green-500 text-white' 
-                        : 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-200'
-                      }
-                    `}
-                  >
-                    {isCopied ? (
-                      <>
-                        <Check className="w-4 h-4" />
-                        <span>הועתק!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-4 h-4" />
-                        <span>העתק</span>
-                      </>
-                    )}
-                  </button>
-                )}
-
-                {brand.link && (
-                  <button
-                    type="button"
-                    onClick={(e) => handleOpen(e, brand)}
-                    className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-[var(--color-primary)] text-white font-medium text-sm hover:opacity-90 transition-all"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    <span>לאתר</span>
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={(e) => handleSupport(e, brand)}
-                  className="flex items-center justify-center p-2 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-all"
-                  title="בעיה עם הזמנה?"
-                >
-                  <HeadphonesIcon className="w-4 h-4" />
-                </button>
-              </div>
-            </motion.div>
+              {/* No coupon — show link hint */}
+              {!brand.coupon_code && brand.link && (
+                <p className="text-[10px] text-gray-400 mt-1">לחץ לאתר</p>
+              )}
+            </motion.button>
           );
         })}
       </div>
 
-      {/* Show more button */}
+      {/* Show more */}
       {hasMore && !showAll && (
         <motion.button
           type="button"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
-          onClick={handleShowAll}
+          onClick={() => setShowAll(true)}
           className="w-full mt-3 py-2 text-sm text-[var(--color-primary)] hover:bg-[var(--color-primary)]/5 rounded-lg transition-all"
         >
-          הצג עוד {brands.length - maxDisplay} מותגים
+          עוד {brands.length - maxDisplay} מותגים
         </motion.button>
-      )}
-
-      {/* Link confirmation modal */}
-      {confirmLinkBrand && (
-        <div 
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onClick={() => setConfirmLinkBrand(null)}
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl"
-          >
-            <h3 className="text-xl font-bold text-gray-900 mb-2 text-center">
-              {confirmLinkBrand.brand_name}
-            </h3>
-            <p className="text-sm text-gray-600 mb-6 text-center">
-              רוצה לפתוח את אתר המותג?
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  if (confirmLinkBrand.link) {
-                    onOpen(confirmLinkBrand);
-                  }
-                  setConfirmLinkBrand(null);
-                }}
-                className="flex-1 py-3 px-4 bg-[var(--color-primary)] text-white rounded-xl font-medium hover:opacity-90 transition-all"
-              >
-                כן, פתח אתר
-              </button>
-              <button
-                onClick={() => setConfirmLinkBrand(null)}
-                className="flex-1 py-3 px-4 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-all"
-              >
-                ביטול
-              </button>
-            </div>
-          </motion.div>
-        </div>
       )}
     </div>
   );
 }
-

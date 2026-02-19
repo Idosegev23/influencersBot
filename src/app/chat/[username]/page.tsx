@@ -421,6 +421,40 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     }
   };
 
+  // Send a quick message directly (used by suggestion pills)
+  const sendQuickMessage = (text: string) => {
+    if (isTyping || isStreamActive || !influencer) return;
+    setInputValue(text);
+    // Use a microtask to ensure state is updated before sending
+    setTimeout(() => {
+      const fakeInput = text.trim();
+      if (!fakeInput) return;
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        role: 'user',
+        content: fakeInput,
+      };
+      setMessages((prev) => [...prev, userMessage]);
+      setInputValue('');
+      setIsTyping(true);
+
+      // Streaming send
+      if (useStreaming) {
+        const assistantMessageId = (Date.now() + 1).toString();
+        setStreamingMessageId(assistantMessageId);
+        setMessages((prev) => [...prev, { id: assistantMessageId, role: 'assistant', content: '' }]);
+        setIsTyping(false);
+        sendStreamMessage({
+          message: fakeInput,
+          username,
+          sessionId: sessionId || undefined,
+          previousResponseId: responseId || undefined,
+          clientMessageId: assistantMessageId,
+        });
+      }
+    }, 0);
+  };
+
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isTyping || isStreamActive || !influencer) return;
 
@@ -826,15 +860,13 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             🛍️ קופונים ומותגים
                           </button>
                         )}
-                        {influencer.whatsapp_enabled && (
-                          <button
-                            onClick={() => setShowSupportModal(true)}
-                            className="px-5 py-2.5 rounded-full text-sm font-medium transition-all hover:shadow-md"
-                            style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
-                          >
-                            💬 יש לי בעיה
-                          </button>
-                        )}
+                        <button
+                          onClick={() => setShowSupportModal(true)}
+                          className="px-5 py-2.5 rounded-full text-sm font-medium transition-all hover:shadow-md"
+                          style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+                        >
+                          💬 בעיה בהזמנה
+                        </button>
                       </motion.div>
 
                       {/* Dynamic welcome suggestion — one smart prompt */}
@@ -1163,10 +1195,14 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         );
                       })}
 
-                      {/* Dynamic suggestions after last bot response */}
-                      {!isTyping && !isStreamActive && messages.length > 0 && messages[messages.length - 1]?.role === 'assistant' && messages[messages.length - 1]?.content && (() => {
+                      {/* Dynamic suggestions after last bot response (skip when brand cards shown) */}
+                      {!isTyping && !isStreamActive && messages.length > 0 && (() => {
+                        const lastMsg = messages[messages.length - 1];
+                        if (lastMsg?.role !== 'assistant' || !lastMsg.content) return null;
+                        // Don't show suggestions after brand cards or UI directives with cards
+                        if (lastMsg.cardsPayload || lastMsg.action === 'show_brands') return null;
                         const suggestions = generateDynamicSuggestions(
-                          messages[messages.length - 1].content,
+                          lastMsg.content,
                           influencer.influencer_type || 'other',
                         );
                         if (suggestions.length === 0) return null;
@@ -1180,10 +1216,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             {suggestions.map((s, i) => (
                               <button
                                 key={i}
-                                onClick={() => {
-                                  setInputValue(s);
-                                  inputRef.current?.focus();
-                                }}
+                                onClick={() => sendQuickMessage(s)}
                                 className="suggestion-pill text-xs"
                               >
                                 {s}
@@ -1241,15 +1274,13 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             🛍️ קופונים
                           </button>
                         )}
-                        {influencer.whatsapp_enabled && (
-                          <button
-                            onClick={() => setShowSupportModal(true)}
-                            className="px-3.5 py-1.5 rounded-full text-xs font-medium transition-all hover:shadow-sm"
-                            style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)', opacity: 0.8 }}
-                          >
-                            💬 בעיה
-                          </button>
-                        )}
+                        <button
+                          onClick={() => setShowSupportModal(true)}
+                          className="px-3.5 py-1.5 rounded-full text-xs font-medium transition-all hover:shadow-sm"
+                          style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)', opacity: 0.8 }}
+                        >
+                          💬 בעיה בהזמנה
+                        </button>
                       </div>
                     )}
                     <div className="chat-input-pill">
