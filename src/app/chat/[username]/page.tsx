@@ -72,6 +72,7 @@ interface Message {
   state?: string;
   traceId?: string;
   decisionId?: string; // For linking UI actions to decisions
+  suggestions?: string[]; // AI-generated follow-up suggestions
 }
 
 const typeIcons: Record<InfluencerType, typeof ChefHat> = {
@@ -99,62 +100,24 @@ const typeLabels: Record<InfluencerType, string> = {
 };
 
 /**
- * Generate dynamic follow-up suggestions based on the last bot response.
- * Zero latency — runs client-side with simple keyword matching.
+ * Parse AI-generated suggestions from bot response.
+ * Format: <<SUGGESTIONS>>suggestion1|suggestion2|suggestion3<</SUGGESTIONS>>
+ * Returns clean text (without the tag) and parsed suggestions array.
  */
-function generateDynamicSuggestions(
-  lastBotContent: string,
-  influencerType: string,
-): string[] {
-  if (!lastBotContent || lastBotContent.length < 20) return [];
-  const t = lastBotContent;
-  const picks: string[] = [];
-
-  // Recipe / food content
-  if (/מתכון|מצרכים|בישול|רוטב|תנור|מחבת|אפייה/.test(t)) {
-    if (/מצרכים|רכיבים/.test(t)) picks.push('תני טיפ להגשה');
-    else picks.push('תני את כל המצרכים והשלבים');
-    if (/שמנת/.test(t)) picks.push('יש גרסה בלי שמנת?');
-    else if (/בריא|דיאטה|קל/.test(t)) picks.push('יש גרסה יותר מפנקת?');
-    else picks.push('יש גרסה בריאה יותר?');
-    picks.push('יש עוד מתכון שאת ממליצה?');
+function parseSuggestions(text: string): { cleanText: string; suggestions: string[] } {
+  const match = text.match(/<<SUGGESTIONS>>(.*?)<\/SUGGESTIONS>>/s);
+  if (!match) {
+    // Also strip partial tag at end (during streaming)
+    const partialClean = text.replace(/<<SUGGESTIONS>>.*$/s, '').trim();
+    return { cleanText: partialClean, suggestions: [] };
   }
-  // Skincare / beauty
-  else if (/קרם|סרום|טיפוח|עור|פנים|שגרה|רטינול/.test(t)) {
-    picks.push('מתאים לעור רגיש?');
-    picks.push('מה השגרה שלך?');
-    picks.push('יש קופון למוצר?');
-  }
-  // Fashion / outfit
-  else if (/בגד|אאוטפיט|שמלה|לוק|סטייל|נעליים|מידה/.test(t)) {
-    picks.push('מאיפה זה?');
-    picks.push('יש קופון?');
-    picks.push('מה עוד הולך עם זה?');
-  }
-  // Fitness
-  else if (/אימון|כושר|תרגיל|שרירים|ריצה|יוגה/.test(t)) {
-    picks.push('כמה פעמים בשבוע?');
-    picks.push('מתאים למתחילים?');
-    picks.push('יש אימון בית?');
-  }
-  // Coupons / brands
-  else if (/קופון|הנחה|קוד|מבצע/.test(t)) {
-    picks.push('יש עוד קופונים?');
-    picks.push('עד מתי זה בתוקף?');
-  }
-
-  // Default by influencer type
-  if (picks.length === 0) {
-    switch (influencerType) {
-      case 'food': picks.push('יש עוד מתכון?', 'מה הכי שווה לנסות?', 'יש טיפ מהיר?'); break;
-      case 'fashion': picks.push('מה הלוק שלך היום?', 'יש המלצה לאאוטפיט?'); break;
-      case 'beauty': picks.push('מה שגרת הטיפוח שלך?', 'יש מוצר חדש?'); break;
-      case 'fitness': picks.push('יש אימון להיום?', 'טיפ לתזונה?'); break;
-      default: picks.push('ספרי לי עוד', 'יש עוד טיפ?'); break;
-    }
-  }
-
-  return picks.slice(0, 3);
+  const cleanText = text.replace(/<<SUGGESTIONS>>.*?<\/SUGGESTIONS>>/s, '').trim();
+  const suggestions = match[1]
+    .split('|')
+    .map(s => s.trim())
+    .filter(s => s.length > 0 && s.length < 40)
+    .slice(0, 3);
+  return { cleanText, suggestions };
 }
 
 export default function ChatbotPage({ params }: { params: Promise<{ username: string }> }) {
@@ -234,18 +197,20 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       const cards = streamCardsRef.current;
       
       if (msgId && done.fullText) {
+        const { cleanText, suggestions } = parseSuggestions(done.fullText);
         setMessages(prev => prev.map(m => {
           if (m.id !== msgId) return m;
-          return { 
-            ...m, 
-            content: done.fullText,
+          return {
+            ...m,
+            content: cleanText,
+            suggestions: suggestions.length > 0 ? suggestions : undefined,
             traceId: meta?.traceId,
             decisionId: meta?.decisionId,
             state: meta?.stateTransition?.to,
             uiDirectives: meta?.uiDirectives as UIDirectives,
-            cardsPayload: cards ? { 
-              type: cards.cardsType, 
-              data: cards.items as BrandCardData[] 
+            cardsPayload: cards ? {
+              type: cards.cardsType,
+              data: cards.items as BrandCardData[]
             } : undefined,
           };
         }));
@@ -555,10 +520,13 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       if (data.responseId) setResponseId(data.responseId);
       if (data.sessionId) setSessionId(data.sessionId);
 
+      const rawResponse = data.response || 'מצטער, משהו השתבש. נסה שוב!';
+      const { cleanText: cleanResponse, suggestions: parsedSuggestions } = parseSuggestions(rawResponse);
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: data.response || 'מצטער, משהו השתבש. נסה שוב!',
+        content: cleanResponse,
+        suggestions: parsedSuggestions.length > 0 ? parsedSuggestions : undefined,
         // Engine v2 fields
         uiDirectives: data.uiDirectives,
         cardsPayload: data.cardsPayload,
@@ -938,9 +906,10 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   ) : (
                     <>
                       {messages.map((msg, index) => {
-                        // For streaming messages, use the live text
+                        // For streaming messages, use the live text (strip suggestions tag)
                         const isStreamingThis = streamingMessageId === msg.id && isStreamActive;
-                        const displayContent = isStreamingThis ? streamText : msg.content;
+                        const rawContent = isStreamingThis ? streamText : msg.content;
+                        const displayContent = rawContent.replace(/<<SUGGESTIONS>>.*$/s, '').trim();
                         // For streaming, use meta directives until done
                         const displayDirectives = isStreamingThis && streamMeta?.uiDirectives 
                           ? streamMeta.uiDirectives as UIDirectives 
@@ -1195,17 +1164,12 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         );
                       })}
 
-                      {/* Dynamic suggestions after last bot response (skip when brand cards shown) */}
+                      {/* AI-generated suggestions after last bot response */}
                       {!isTyping && !isStreamActive && messages.length > 0 && (() => {
                         const lastMsg = messages[messages.length - 1];
-                        if (lastMsg?.role !== 'assistant' || !lastMsg.content) return null;
-                        // Don't show suggestions after brand cards or UI directives with cards
+                        if (lastMsg?.role !== 'assistant' || !lastMsg.suggestions?.length) return null;
+                        // Don't show suggestions after brand cards
                         if (lastMsg.cardsPayload || lastMsg.action === 'show_brands') return null;
-                        const suggestions = generateDynamicSuggestions(
-                          lastMsg.content,
-                          influencer.influencer_type || 'other',
-                        );
-                        if (suggestions.length === 0) return null;
                         return (
                           <motion.div
                             initial={{ opacity: 0, y: 8 }}
@@ -1213,7 +1177,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             transition={{ duration: 0.3, delay: 0.2 }}
                             className="flex flex-wrap gap-2 justify-center mt-3"
                           >
-                            {suggestions.map((s, i) => (
+                            {lastMsg.suggestions.map((s, i) => (
                               <button
                                 key={i}
                                 onClick={() => sendQuickMessage(s)}
