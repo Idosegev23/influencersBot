@@ -429,7 +429,7 @@ async function ingestEntityType(
 // Text Builders
 // ============================================
 
-function buildPostText(post: {
+export function buildPostText(post: {
   caption: string | null;
   type?: string;
   hashtags?: string[];

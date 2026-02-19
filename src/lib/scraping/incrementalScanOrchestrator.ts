@@ -295,13 +295,20 @@ export class IncrementalScanOrchestrator {
       }
 
       // ==========================================
-      // STEP 6: Update embeddings (only for new content)
+      // STEP 6: Build RAG vectors for new content
       // ==========================================
-      console.log(`[Step 6] Updating embeddings for new content...`);
-      
-      // This will be handled by the background processor
-      // We just mark the content as needing processing
-      console.log(`[Step 6] ✓ New content marked for embedding update`);
+      console.log(`[Step 6] Building RAG vector index for new content...`);
+
+      try {
+        const { ingestAllForAccount } = await import('@/lib/rag/ingest');
+        const ragResult = await ingestAllForAccount(accountId);
+        console.log(`[Step 6] ✓ RAG index updated: ${ragResult.total} documents (${Object.entries(ragResult.byType).map(([t,c]) => `${t}:${c}`).join(', ')})`);
+        if (ragResult.errors.length > 0) {
+          console.warn(`[Step 6] ⚠️ RAG errors: ${ragResult.errors.join('; ')}`);
+        }
+      } catch (ragError: any) {
+        console.error(`[Step 6] ❌ RAG indexing failed (non-blocking):`, ragError.message);
+      }
 
       // ==========================================
       // Done

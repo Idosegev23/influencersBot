@@ -8,6 +8,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { InstagramActorManager } from '@/lib/scraping/apify-actors';
 import { runPreprocessing } from '@/lib/scraping/preprocessing';
+import { ingestDocument, buildPostText } from '@/lib/rag/ingest';
 
 // Vercel timeout: 300 seconds (5 דקות) - יותר מספיק
 export const maxDuration = 300;
@@ -119,6 +120,31 @@ export async function GET(request: Request) {
         // Update persona incrementally (light update, not full rebuild)
         await updatePersonaIncrementally(supabase, account.id, preprocessed);
 
+        // Ingest new posts into RAG vector index
+        let ragIngested = 0;
+        try {
+          for (const post of newPosts) {
+            if (!post.caption?.trim()) continue;
+            await ingestDocument({
+              accountId: account.id,
+              entityType: 'post',
+              sourceId: post.shortcode || post.post_id || `daily-${Date.now()}`,
+              title: (post.caption || '').substring(0, 120),
+              text: buildPostText(post),
+              metadata: {
+                postType: post.type,
+                hashtags: post.hashtags,
+                postedAt: post.posted_at,
+                isSponsored: post.is_sponsored,
+              },
+            });
+            ragIngested++;
+          }
+          console.log(`[Daily Update] @${username} - RAG: ingested ${ragIngested} new posts`);
+        } catch (ragErr: any) {
+          console.error(`[Daily Update] @${username} - RAG ingestion error (non-blocking):`, ragErr.message);
+        }
+
         const duration = Math.round((Date.now() - accountStartTime) / 1000);
 
         results.push({
@@ -126,6 +152,7 @@ export async function GET(request: Request) {
           username,
           status: 'updated',
           newPosts: newPosts.length,
+          ragIngested,
           duration,
         });
 

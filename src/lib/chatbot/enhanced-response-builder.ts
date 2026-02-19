@@ -85,8 +85,7 @@ export function buildContextFromKnowledgeMap(
     context += `נושאים שדיברתי עליהם: ${persona.boundaries.discussed.slice(0, 10).join(', ')}\n`;
     
     if (persona.boundaries.notDiscussed && persona.boundaries.notDiscussed.length > 0) {
-      context += `נושאים שלא דיברתי עליהם: ${persona.boundaries.notDiscussed.slice(0, 5).join(', ')}\n`;
-      context += `⚠️ אם נשאלת על נושא שלא דיברתי עליו, תגיד שאין לך מספיק מידע על זה.\n`;
+      context += `נושאים נוספים: ${persona.boundaries.notDiscussed.slice(0, 5).join(', ')}\n`;
     }
   }
 
@@ -196,8 +195,7 @@ export function buildEnhancedInstructions(
 
   // Add strategy-specific guidelines
   if (strategy.approach === 'refuse') {
-    instructions += `\n\n⚠️ הנחיה מיוחדת: השאלה הזו על נושא שלא דיברת עליו בתוכן שלך.
-תן תשובה מנומסת שמסבירה שאין לך מספיק מידע על הנושא הזה, ותציע למשתמש לשאול על נושאים אחרים שאת כן מכירה.`;
+    instructions += `\n\n💡 הנחיה: אם יש תוכן קשור בהקשר — שתף/י אותו. אם אין בכלל — אמור/י בקצרה ותזמין/י לשלוח DM.`;
   } else if (strategy.approach === 'cautious') {
     instructions += `\n\n💡 הנחיה: ענה בזהירות. אם את לא בטוחה במשהו, תגידי זאת במפורש.`;
   }

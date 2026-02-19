@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server';
 import { transcribeVideo, saveTranscription, getAllTranscriptions } from '@/lib/transcription/gemini-transcriber';
 import { buildPersonaWithGemini, savePersonaToDatabase } from '@/lib/ai/gemini-persona-builder';
 import { preprocessInstagramData } from '@/lib/scraping/preprocessing';
+import { ingestAllForAccount } from '@/lib/rag/ingest';
 
 // ============================================
 // Type Definitions
@@ -15,12 +16,13 @@ import { preprocessInstagramData } from '@/lib/scraping/preprocessing';
 export interface ProcessingJobConfig {
   accountId: string;
   scanJobId?: string;
-  
+
   // Processing options
   transcribeVideos: boolean;
   maxVideosToTranscribe?: number;
+  buildRagIndex: boolean;
   buildPersona: boolean;
-  
+
   // Priority
   priority?: 'low' | 'normal' | 'high';
 }
@@ -32,6 +34,7 @@ export interface ProcessingJobResult {
   stats: {
     videosTranscribed: number;
     transcriptionsFailed: number;
+    ragDocumentsIngested: number;
     personaBuilt: boolean;
     processingTimeMs: number;
   };
@@ -73,6 +76,7 @@ export async function processAccountContent(
     stats: {
       videosTranscribed: 0,
       transcriptionsFailed: 0,
+      ragDocumentsIngested: 0,
       personaBuilt: false,
       processingTimeMs: 0,
     },
@@ -112,7 +116,7 @@ export async function processAccountContent(
       // ============================================
       // Step 1: Load all scraped content
       // ============================================
-      console.log('\n📥 [Step 1/4] Loading scraped content...');
+      console.log('\n📥 [Step 1/5] Loading scraped content...');
       await logProgress('load_start', '📥 טוען תוכן שנסרק ממסד הנתונים...');
       
       const content = await loadScrapedContent(config.accountId);
@@ -137,7 +141,7 @@ export async function processAccountContent(
     // ⚠️ CRITICAL: Must complete ALL transcriptions before building persona!
     // ============================================
     if (config.transcribeVideos) {
-      console.log('\n🎥 [Step 2/4] Transcribing videos...');
+      console.log('\n🎥 [Step 2/5] Transcribing videos...');
       console.log(`⚠️ [CRITICAL] Waiting for ALL transcriptions to complete before proceeding!`);
       console.log(`[DEBUG] Starting video transcription at ${new Date().toISOString()}`);
       
@@ -175,7 +179,7 @@ export async function processAccountContent(
       
       await logProgress('transcribe_complete', transcribeSummary);
     } else {
-      console.log('\n⏭️  [Step 2/4] Skipping video transcription (disabled)');
+      console.log('\n⏭️  [Step 2/5] Skipping video transcription (disabled)');
       await logProgress('transcribe', '⏭️ דילוג על תמלול (מושבת)');
     }
 
@@ -183,7 +187,7 @@ export async function processAccountContent(
     // Step 3: Preprocess Data
     // ⚠️ Loads ALL transcriptions from database (completed in step 2)
     // ============================================
-    console.log('\n🔄 [Step 3/4] Preprocessing data...');
+    console.log('\n🔄 [Step 3/5] Preprocessing data...');
     console.log(`[DEBUG] Starting preprocessing at ${new Date().toISOString()}`);
     await logProgress('preprocess_start', '🔄 טוען תמלולים ומנתח תוכן...');
     
@@ -212,11 +216,47 @@ export async function processAccountContent(
     await logProgress('preprocess_complete', preprocessSummary);
 
     // ============================================
-    // Step 4: Build Persona with Gemini
+    // Step 4: Build RAG Index (Vector Embeddings)
+    // ============================================
+    if (config.buildRagIndex !== false) {
+      console.log('\n🔍 [Step 4/5] Building RAG vector index...');
+      await logProgress('rag_start', '🔍 בונה אינדקס חיפוש וקטורי (RAG)...');
+
+      try {
+        const ragResult = await ingestAllForAccount(config.accountId);
+
+        result.stats.ragDocumentsIngested = ragResult.total;
+
+        const ragSummary = [
+          `✅ אינדקס RAG נבנה!`,
+          `${ragResult.total} מסמכים`,
+          ...Object.entries(ragResult.byType).map(([type, count]) => `${type}: ${count}`),
+          ragResult.errors.length > 0 ? `${ragResult.errors.length} שגיאות` : '',
+        ].filter(Boolean).join(' • ');
+
+        console.log(`✅ RAG indexing complete: ${ragResult.total} documents`);
+        console.log(`   By type:`, ragResult.byType);
+        if (ragResult.errors.length > 0) {
+          console.warn(`   ⚠️ RAG errors:`, ragResult.errors);
+        }
+
+        await logProgress('rag_complete', ragSummary);
+      } catch (error: any) {
+        console.error('❌ RAG indexing failed (non-blocking):', error.message);
+        result.errors.push(`RAG indexing failed: ${error.message}`);
+        await logProgress('rag_error', `❌ שגיאה בבניית אינדקס RAG: ${error.message}`);
+      }
+    } else {
+      console.log('\n⏭️  [Step 4/5] Skipping RAG indexing (disabled)');
+      await logProgress('rag', '⏭️ דילוג על בניית אינדקס RAG (מושבת)');
+    }
+
+    // ============================================
+    // Step 5: Build Persona with Gemini
     // ⚠️ ONLY runs after ALL transcriptions are complete!
     // ============================================
     if (config.buildPersona) {
-      console.log('\n🤖 [Step 4/4] Building persona with Gemini 3 Flash...');
+      console.log('\n🤖 [Step 5/5] Building persona with Gemini 3 Flash...');
       console.log(`✅ All data ready (${preprocessedData.transcriptions.length} transcriptions loaded)`);
       console.log(`[DEBUG] Starting Gemini persona build at ${new Date().toISOString()}`);
       
@@ -274,7 +314,7 @@ export async function processAccountContent(
         await logProgress('persona_error', `❌ שגיאה בבניית פרסונה: ${error.message}`);
       }
     } else {
-      console.log('\n⏭️  [Step 4/4] Skipping persona building (disabled)');
+      console.log('\n⏭️  [Step 5/5] Skipping persona building (disabled)');
       await logProgress('persona', '⏭️ דילוג על בניית פרסונה (מושבת)');
     }
 
@@ -607,6 +647,7 @@ export async function processAccountContentDefault(accountId: string): Promise<P
     accountId,
     transcribeVideos: true,
     maxVideosToTranscribe: 20,
+    buildRagIndex: true,
     buildPersona: true,
     priority: 'normal',
   });
@@ -623,6 +664,7 @@ export async function transcribeAccountVideos(
     accountId,
     transcribeVideos: true,
     maxVideosToTranscribe: maxVideos,
+    buildRagIndex: false,
     buildPersona: false,
   });
 }
@@ -634,6 +676,7 @@ export async function buildAccountPersona(accountId: string): Promise<Processing
   return processAccountContent({
     accountId,
     transcribeVideos: false,
+    buildRagIndex: true,
     buildPersona: true,
   });
 }
