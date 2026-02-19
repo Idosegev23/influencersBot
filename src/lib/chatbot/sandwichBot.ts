@@ -73,12 +73,24 @@ export class SandwichBot {
     // Retrieve Knowledge Base
     // ==========================================
     console.log('\n📚 Retrieving knowledge...');
-    
-    // TODO: Implement RAG retrieval based on archetype
+
+    // Enrich query with conversation context for follow-up messages
+    // e.g. "תני לי את המתכון" → "פסטה רביולי ... תני לי את המתכון"
+    let knowledgeQuery = input.userMessage;
+    if (input.conversationHistory?.length && input.userMessage.length < 60) {
+      const lastAssistant = [...input.conversationHistory]
+        .reverse()
+        .find(m => m.role === 'assistant');
+      if (lastAssistant) {
+        knowledgeQuery = `${lastAssistant.content.substring(0, 300)} ${input.userMessage}`;
+        console.log(`   → Enriched query with conversation context (${knowledgeQuery.length} chars)`);
+      }
+    }
+
     const knowledgeBase = await this.retrieveKnowledge(
       input.accountId,
       classification.primaryArchetype,
-      input.userMessage
+      knowledgeQuery
     );
 
     // ==========================================
