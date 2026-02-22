@@ -27,7 +27,7 @@ export const routingRules: Rule[] = [
         },
       },
       { type: 'append_context', value: ['brands', 'coupon_policy', 'persona'] },
-      { type: 'set_model', value: { model: 'nano', maxTokens: 220, fallback: 'standard' } },
+      { type: 'set_model', value: { model: 'standard', maxTokens: 300, fallback: 'standard' } },
     ],
   },
 
@@ -105,7 +105,7 @@ export const routingRules: Rule[] = [
           layout: 'chat',
         },
       },
-      { type: 'set_model', value: { model: 'nano', maxTokens: 300, fallback: 'standard' } },
+      { type: 'set_model', value: { model: 'standard', maxTokens: 300, fallback: 'standard' } },
       { type: 'append_context', value: ['persona', 'content'] },
     ],
   },

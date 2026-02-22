@@ -28,7 +28,7 @@ export const escalationRules: Rule[] = [
           layout: 'chat',
         },
       },
-      { type: 'set_model', value: { model: 'nano', maxTokens: 180, fallback: 'standard' } },
+      { type: 'set_model', value: { model: 'standard', maxTokens: 300, fallback: 'standard' } },
       { type: 'append_context', value: ['suggestedClarifications', 'persona'] },
     ],
   },

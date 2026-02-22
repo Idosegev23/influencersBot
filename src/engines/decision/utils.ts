@@ -47,9 +47,9 @@ export function buildDefaultDecision(args: {
     showQuickActions: [],
   };
 
-  // Default model strategy
+  // Default model strategy — standard (gpt-5.2) for quality responses
   const modelStrategy: ModelStrategy = {
-    model: 'nano',
+    model: 'standard',
     fallback: 'standard',
     maxTokens: 300,
     temperature: 0.7,
@@ -68,7 +68,7 @@ export function buildDefaultDecision(args: {
     inputTokens: 0,
     outputTokens: 0,
     estimatedCost: 0,
-    modelUsed: 'nano',
+    modelUsed: 'standard',
   };
 
   return {
