@@ -122,6 +122,7 @@ export async function processWithArchetype(
       influencerName: string;
     };
     onToken?: (token: string) => void;
+    modelTier?: 'nano' | 'standard' | 'full';
   }
 ) {
   console.log('\n' + '='.repeat(80));
@@ -165,6 +166,7 @@ export async function processWithArchetype(
     userName: context.userName,
     accountContext: context.accountContext,
     onToken: context.onToken,
+    modelTier: context.modelTier,
   });
   
   console.log('\n' + '='.repeat(80));

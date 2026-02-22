@@ -18,6 +18,7 @@ import { generateEmbedding } from './embeddings';
 import { rerankCandidates } from './rerank';
 import { createLogger } from './logger';
 import { cacheWrap, CacheTTL } from '@/lib/cache';
+import { getMetrics } from '@/lib/metrics/pipeline-metrics';
 import type {
   EntityType,
   QueryType,
@@ -271,32 +272,35 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
   // --- Step 3: Vector search ---
   const vectorStart = Date.now();
 
-  // Expand query for better recall — skip for already-enriched queries (> 100 chars)
-  // or very short queries where expansion has minimal benefit.
-  const expandedQuery = query.length > 100 ? query : await expandQuery(query);
-  const enrichedQuery = conversationSummary
-    ? `${expandedQuery}\n\nContext: ${conversationSummary}`
-    : expandedQuery;
-  const queryEmbedding = await generateEmbedding(enrichedQuery);
-
   const supabase = createClient();
-  const { data: vectorResults, error: vectorError } = await supabase
+
+  // Step 3a: Embed ORIGINAL query first (no expansion — saves ~600ms when confident)
+  const pm = getMetrics();
+  const baseEnrichedQuery = conversationSummary
+    ? `${query}\n\nContext: ${conversationSummary}`
+    : query;
+  pm?.mark('embed_start');
+  const baseEmbedding = await generateEmbedding(baseEnrichedQuery);
+  pm?.measure('embeddingMs', 'embed_start');
+
+  // Step 3b: Vector search with raised threshold (0.4 vs old 0.25)
+  pm?.mark('rpc_start');
+  const { data: initialResults, error: vectorError } = await supabase
     .rpc('match_document_chunks', {
       p_account_id: accountId,
-      p_embedding: JSON.stringify(queryEmbedding),
+      p_embedding: JSON.stringify(baseEmbedding),
       p_match_count: 20,
-      p_match_threshold: 0.25,
+      p_match_threshold: 0.4,
       p_entity_types: entityTypes,
       p_updated_after: timeWindow?.after || null,
     });
-
-  stages.vectorSearchMs = Date.now() - vectorStart;
+  pm?.measure('matchDocChunksMs', 'rpc_start');
 
   if (vectorError) {
     log.error('Vector search failed', { error: vectorError.message }, accountId);
   }
 
-  const candidates = (vectorResults || []) as Array<{
+  type CandidateRow = {
     id: string;
     document_id: string;
     entity_type: string;
@@ -306,7 +310,76 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
     metadata: Record<string, unknown>;
     similarity: number;
     updated_at: string;
-  }>;
+  };
+
+  let candidates = (initialResults || []) as CandidateRow[];
+  const initialTopSimilarity = candidates[0]?.similarity || 0;
+
+  // Step 3c: Conditional query expansion — only when top similarity < 0.6
+  // Saves ~600ms Gemini API call on confident matches
+  let expandedQuery = query;
+  if (initialTopSimilarity < 0.6 && query.length <= 100) {
+    pm?.inc('expandQueryCalled');
+    pm?.mark('expand_start');
+    expandedQuery = await expandQuery(query);
+    pm?.measure('expandQueryMs', 'expand_start');
+    if (expandedQuery !== query) {
+      // Re-embed with expanded terms and search at lower threshold
+      const expandedEnriched = conversationSummary
+        ? `${expandedQuery}\n\nContext: ${conversationSummary}`
+        : expandedQuery;
+      const expandedEmbedding = await generateEmbedding(expandedEnriched);
+
+      const { data: expandedResults } = await supabase
+        .rpc('match_document_chunks', {
+          p_account_id: accountId,
+          p_embedding: JSON.stringify(expandedEmbedding),
+          p_match_count: 20,
+          p_match_threshold: 0.25,
+          p_entity_types: entityTypes,
+          p_updated_after: timeWindow?.after || null,
+        });
+
+      // Merge: add new results not already in candidates
+      if (expandedResults?.length) {
+        const existingIds = new Set(candidates.map(c => c.id));
+        for (const r of expandedResults as CandidateRow[]) {
+          if (!existingIds.has(r.id)) {
+            candidates.push(r);
+          }
+        }
+        log.info('Expanded search merged', {
+          initialCount: initialResults?.length || 0,
+          expandedNew: candidates.length - (initialResults?.length || 0),
+        }, accountId);
+      }
+    }
+  } else if (initialTopSimilarity >= 0.6) {
+    pm?.inc('expandQuerySkippedConfident');
+    log.info('Skipped query expansion (confident match)', {
+      topSimilarity: initialTopSimilarity,
+    }, accountId);
+  }
+
+  // Step 3d: Fallback to lower threshold if zero results at 0.4
+  if (candidates.length === 0) {
+    pm?.set('thresholdUsed', '0.25_fallback');
+    log.info('Zero results at 0.4 threshold, retrying at 0.25', {}, accountId);
+    const { data: fallbackResults } = await supabase
+      .rpc('match_document_chunks', {
+        p_account_id: accountId,
+        p_embedding: JSON.stringify(baseEmbedding),
+        p_match_count: 20,
+        p_match_threshold: 0.25,
+        p_entity_types: entityTypes,
+        p_updated_after: timeWindow?.after || null,
+      });
+    if (fallbackResults?.length) {
+      candidates = fallbackResults as CandidateRow[];
+    }
+  }
+
+  stages.vectorSearchMs = Date.now() - vectorStart;
 
   log.info('Vector search results', {
     candidateCount: candidates.length,
@@ -314,11 +387,13 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
     bottomSimilarity: candidates[candidates.length - 1]?.similarity,
   }, accountId);
 
-  // --- Step 3b: Keyword supplement (hybrid search) ---
-  // Search for expanded terms via ILIKE to catch content where
-  // the embedding is diluted by noise (e.g. garbled speech + useful on_screen_text)
+  // --- Step 3e: Keyword supplement (hybrid search) ---
+  // Only run when results are uncertain: topSimilarity < 0.45 or fewer than 5 chunks
   let keywordSupplementAdded = false;
-  if (expandedQuery !== query) {
+  const topSimilarityFinal = candidates[0]?.similarity || 0;
+  if (expandedQuery !== query && (topSimilarityFinal < 0.45 || candidates.length < 5)) {
+    pm?.inc('keywordSupplementCalled');
+    pm?.mark('kw_start');
     const keyTerms = extractKeyTerms(query, expandedQuery);
     if (keyTerms.length > 0) {
       const existingIds = new Set(candidates.map(c => c.id));
@@ -342,7 +417,7 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
             existingIds.add(kr.id);
             candidates.push({
               ...kr,
-              similarity: 0.45, // Keyword matches get competitive baseline
+              similarity: 0.45,
             });
             added++;
           }
@@ -374,6 +449,13 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
         log.info('Keyword supplement added candidates', { added, keyTerms }, accountId);
       }
     }
+    pm?.measure('keywordSupplementMs', 'kw_start');
+  } else if (expandedQuery !== query) {
+    pm?.inc('keywordSupplementSkipped');
+    log.info('Skipped keyword supplement (confident results)', {
+      topSimilarity: topSimilarityFinal,
+      candidateCount: candidates.length,
+    }, accountId);
   }
 
   // --- Handle time "before" filter client-side (Supabase RPC only has "after") ---
@@ -393,25 +475,41 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
     });
   }
 
-  // --- Precision V2: Dynamic threshold + diversity (gated) ---
+  // --- Heuristic reranking: boost recency + chunk position ---
+  const now = Date.now();
+  for (const c of filtered) {
+    // Recency bonus: content from last 30 days gets +0.05
+    const ageMs = now - new Date(c.updated_at).getTime();
+    if (ageMs < 30 * 24 * 60 * 60 * 1000) {
+      c.similarity += 0.05;
+    }
+    // First chunk bonus: chunk_index 0 usually has the most important content
+    if (c.chunk_index === 0) {
+      c.similarity += 0.03;
+    }
+  }
+  // Re-sort after heuristic adjustments
+  filtered.sort((a, b) => b.similarity - a.similarity);
+
+  // --- Chunk dedup + diversity (always active) ---
+  // Max 2 chunks per document, max 3 per entity_type
+  const perSource = new Map<string, number>();
+  const perType = new Map<string, number>();
+  filtered = filtered.filter(c => {
+    const srcCount = perSource.get(c.document_id) || 0;
+    const typeCount = perType.get(c.entity_type) || 0;
+    if (srcCount >= 2 || typeCount >= 3) return false;
+    perSource.set(c.document_id, srcCount + 1);
+    perType.set(c.entity_type, typeCount + 1);
+    return true;
+  });
+
+  // --- Precision V2: Dynamic threshold (gated) ---
   if (process.env.MEMORY_V2_ENABLED === 'true') {
-    // Dynamic threshold: if top result is very strong, raise floor for others
     const topSim = filtered[0]?.similarity || 0;
     if (topSim > 0.8) {
       filtered = filtered.filter(c => c.similarity >= 0.5 || c.id === filtered[0].id);
     }
-
-    // Diversity guardrail: max 2 chunks per source_id, max 3 per entity_type
-    const perSource = new Map<string, number>();
-    const perType = new Map<string, number>();
-    filtered = filtered.filter(c => {
-      const srcCount = perSource.get(c.document_id) || 0;
-      const typeCount = perType.get(c.entity_type) || 0;
-      if (srcCount >= 2 || typeCount >= 3) return false;
-      perSource.set(c.document_id, srcCount + 1);
-      perType.set(c.entity_type, typeCount + 1);
-      return true;
-    });
   }
 
   // --- Step 4: Rerank (conditional — skip when confident) ---
@@ -438,6 +536,7 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
 
   if (skipRerank) {
     // Take top results directly by similarity — no LLM rerank needed
+    pm?.mark('heuristic_rerank_start');
     reranked = rerankCandidatesList
       .sort((a, b) => b.similarity - a.similarity)
       .slice(0, topK)
@@ -445,16 +544,19 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
         id: c.id,
         score: c.similarity,
       }));
+    pm?.measure('heuristicRerankMs', 'heuristic_rerank_start');
     log.info('Skipped rerank (confident results)', {
       topSimilarity,
       candidateCount: filtered.length,
     }, accountId);
   } else {
     // Only rerank when results are uncertain — use expanded query for hints
+    pm?.mark('llm_rerank_start');
     const rerankQuery = expandedQuery !== query
       ? `${query} (related: ${expandedQuery})`
       : query;
     reranked = await rerankCandidates(rerankQuery, rerankCandidatesList, { finalK: topK });
+    pm?.measure('llmRerankMs', 'llm_rerank_start');
   }
   stages.rerankMs = Date.now() - rerankStart;
 
@@ -526,6 +628,13 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
     stages,
     startMs,
   });
+
+  // Record final metrics
+  pm?.set('chunksReturned', sources.length);
+  pm?.set('topSimilarity', sources[0]?.confidence || 0);
+  if (expandedQuery !== query && candidates.length > (initialResults?.length || 0)) {
+    pm?.set('thresholdUsed', '0.4+0.25_expanded');
+  }
 
   log.info('Retrieval complete', {
     queryType: classification.queryType,

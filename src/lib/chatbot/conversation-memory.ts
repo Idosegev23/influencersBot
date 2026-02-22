@@ -58,8 +58,8 @@ export async function buildConversationContext(
  * Determine if the rolling summary should be updated based on message count.
  */
 export function shouldUpdateSummary(messageCount: number): boolean {
-  // Update at intervals: 6, 12, 18, 24, ...
-  return messageCount > 0 && messageCount % SUMMARY_UPDATE_INTERVAL === 0;
+  // Early summary for short sessions (msg 3), then at intervals: 6, 12, 18, 24, ...
+  return messageCount === 3 || (messageCount > 0 && messageCount % SUMMARY_UPDATE_INTERVAL === 0);
 }
 
 /**

@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server';
 import { retrieveContext } from '@/lib/rag';
 import type { RetrievedSource } from '@/lib/rag';
 import type { ArchetypeType } from './archetypes/types';
+import { getMetrics } from '@/lib/metrics/pipeline-metrics';
 
 // ============================================
 // Type Definitions
@@ -144,7 +145,8 @@ export async function retrieveKnowledge(
   accountId: string,
   archetype: ArchetypeType,
   userMessage: string,
-  limit: number = 10
+  limit: number = 10,
+  rollingSummary?: string
 ): Promise<KnowledgeBase> {
   const supabase = await createClient();
 
@@ -153,6 +155,7 @@ export async function retrieveKnowledge(
 
   if (isGreeting) {
     console.log(`[Knowledge Retrieval] 👋 Greeting detected — minimal retrieval`);
+    getMetrics()?.set('retrievalPath', 'greeting_skip');
     // For greetings: only fetch coupons (in case user asks next) — skip everything else
     const coupons = await fetchRelevantCoupons(supabase, accountId, [], archetype, '');
     return {
@@ -177,22 +180,23 @@ export async function retrieveKnowledge(
 
   if (ragAvailable) {
     console.log(`[Knowledge Retrieval] 🧠 VECTOR SEARCH mode`);
+    getMetrics()?.set('retrievalPath', 'rag');
     try {
-      const { sources } = await retrieveContext({
-        accountId,
-        query: userMessage,
-        topK: 8,
-      });
-
-      console.log(`[Knowledge Retrieval] Vector search returned ${sources.length} sources`);
-      const ragKnowledge = mapRAGSourcesToKnowledge(sources);
-
-      // Always fetch coupons directly (need complete list + structured data for links)
-      // Also fetch insights (not in RAG pipeline)
-      const [coupons, insights] = await Promise.all([
+      // Run RAG + coupons + insights in parallel (coupons/insights don't depend on RAG)
+      const [ragResult, coupons, insights] = await Promise.all([
+        retrieveContext({
+          accountId,
+          query: userMessage,
+          topK: 8,
+          conversationSummary: rollingSummary,
+        }),
         fetchRelevantCoupons(supabase, accountId, [], archetype, userMessage),
         fetchRelevantInsights(supabase, accountId, archetype, 3),
       ]);
+
+      const { sources } = ragResult;
+      console.log(`[Knowledge Retrieval] Vector search returned ${sources.length} sources`);
+      const ragKnowledge = mapRAGSourcesToKnowledge(sources);
 
       console.log(`[Knowledge Retrieval] ✅ RAG Found:`);
       console.log(`  - Posts: ${ragKnowledge.posts.length}`);
@@ -222,6 +226,7 @@ export async function retrieveKnowledge(
   // Fallback: Full Text Search (FTS)
   // ============================================
   console.log(`[Knowledge Retrieval] 🔍 FTS FALLBACK mode`);
+  getMetrics()?.set('retrievalPath', 'fts');
 
   const normalizedQuery = normalizeHebrewQuery(userMessage);
 

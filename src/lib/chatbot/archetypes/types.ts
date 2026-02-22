@@ -102,6 +102,7 @@ export interface ArchetypeInput {
     influencerName: string;
   };
   onToken?: (token: string) => void; // Real-time streaming callback
+  modelTier?: 'nano' | 'standard' | 'full'; // From decision engine modelStrategy
 }
 
 export interface ArchetypeOutput {

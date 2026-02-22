@@ -11,6 +11,7 @@ import {
 } from './types';
 import OpenAI from 'openai';
 import { buildPersonalityFromDB, type PersonalityConfig } from '../personality-wrapper';
+import { compactKnowledgeContext } from '@/lib/rag/compact-knowledge-context';
 
 // Initialize OpenAI
 const openai = new OpenAI({
@@ -20,7 +21,20 @@ const openai = new OpenAI({
 // Model Configuration
 const CHAT_MODEL = 'gpt-5.2-2025-12-11'; // ⚡ Newest and strongest model
 const FALLBACK_MODEL = 'gpt-4o'; // ⚡ Reliable fallback
+const NANO_MODEL = 'gpt-5-nano'; // ⚡ Fastest + cheapest for simple queries
 const MAX_TOKENS = 500; // Shorter responses for conversational flow
+
+// Map decision engine model tiers to actual OpenAI model names
+function resolveModel(tier?: 'nano' | 'standard' | 'full'): { primary: string; fallback: string } {
+  switch (tier) {
+    case 'nano':
+      return { primary: NANO_MODEL, fallback: CHAT_MODEL };
+    case 'full':
+    case 'standard':
+    default:
+      return { primary: CHAT_MODEL, fallback: FALLBACK_MODEL };
+  }
+}
 
 // ============================================
 // Base Archetype Class
@@ -291,12 +305,15 @@ ${personalityBlock}
         { role: 'user', content: userPrompt },
       ];
 
+      // Resolve model based on decision engine's modelStrategy
+      const { primary: primaryModel, fallback: fallbackModel } = resolveModel(input.modelTier);
+
       // === STREAMING MODE (when onToken callback is provided) ===
       if (input.onToken) {
-        console.log('[BaseArchetype] Using STREAMING mode with onToken callback');
+        console.log(`[BaseArchetype] Using STREAMING mode with ${primaryModel}`);
         try {
           const stream = await openai.chat.completions.create({
-            model: CHAT_MODEL,
+            model: primaryModel,
             messages,
             max_completion_tokens: MAX_TOKENS,
             stream: true,
@@ -315,10 +332,10 @@ ${personalityBlock}
           throw new Error('Empty streaming response from primary model');
 
         } catch (primaryError) {
-          console.warn(`[BaseArchetype] Primary streaming model (${CHAT_MODEL}) failed, trying fallback:`, primaryError);
-          
+          console.warn(`[BaseArchetype] Primary streaming model (${primaryModel}) failed, trying fallback:`, primaryError);
+
           const fallbackStream = await openai.chat.completions.create({
-            model: FALLBACK_MODEL,
+            model: fallbackModel,
             messages,
             max_completion_tokens: MAX_TOKENS,
             stream: true,
@@ -341,7 +358,7 @@ ${personalityBlock}
       // === BLOCKING MODE (backward compatible, no onToken) ===
       try {
         const response = await openai.chat.completions.create({
-          model: CHAT_MODEL,
+          model: primaryModel,
           messages,
           max_completion_tokens: MAX_TOKENS,
         });
@@ -349,12 +366,12 @@ ${personalityBlock}
         const content = response.choices[0].message.content;
         if (content) return this.replaceName(content, influencerName);
         throw new Error('Empty response from primary model');
-        
+
       } catch (primaryError) {
-        console.warn(`[BaseArchetype] Primary model (${CHAT_MODEL}) failed, trying fallback (${FALLBACK_MODEL}):`, primaryError);
-        
+        console.warn(`[BaseArchetype] Primary model (${primaryModel}) failed, trying fallback (${fallbackModel}):`, primaryError);
+
         const fallbackResponse = await openai.chat.completions.create({
-          model: FALLBACK_MODEL,
+          model: fallbackModel,
           messages,
           max_completion_tokens: MAX_TOKENS,
         });
@@ -371,93 +388,16 @@ ${personalityBlock}
   }
 
   /**
-   * Build knowledge context string from knowledge base
+   * Build knowledge context string from knowledge base.
+   * Delegates to compactKnowledgeContext for dedup + trimming.
    */
   private buildKnowledgeContext(kb: any): string {
     if (!kb) return '📚 **בסיס ידע:** אין מידע זמין כרגע.';
-    
-    let context = '📚 **בסיס הידע שלי (השתמש בתוכן המלא, לא להפנות!):**\n';
-    
-    // Posts
-    if (kb.posts?.length > 0) {
-      context += `\n📸 **פוסטים (${kb.posts.length}):**\n`;
-      kb.posts.slice(0, 5).forEach((p: any, i: number) => {
-        const caption = p.caption || 'ללא כיתוב';
-        const truncated = caption.length > 800 ? caption.substring(0, 800) + '...' : caption;
-        context += `${i + 1}. ${truncated}\n\n`;
-      });
-    }
 
-    // Highlights
-    if (kb.highlights?.length > 0) {
-      context += `\n✨ **הילייטס (${kb.highlights.length}):**\n`;
-      kb.highlights.slice(0, 5).forEach((h: any, i: number) => {
-        context += `${i + 1}. "${h.title}"`;
-        if (h.content_text && h.content_text.trim().length > 0) {
-          const truncated = h.content_text.length > 250
-            ? h.content_text.substring(0, 250) + '...'
-            : h.content_text;
-          context += ` — ${truncated}`;
-        }
-        context += '\n';
-      });
-    }
-    
-    // Coupons - PRIORITIZE THIS!
-    if (kb.coupons?.length > 0) {
-      context += `\n💰 **קופונים זמינים (${kb.coupons.length}) - CRITICAL: שמות המותגים יכולים להיות באנגלית או בעברית:**\n`;
-      kb.coupons.forEach((c: any, i: number) => {
-        context += `${i + 1}. מותג: ${c.brand || c.code}`;
-        if (c.discount && !c.discount.includes('לחץ על הקישור')) {
-          context += ` | הנחה: ${c.discount}`;
-        }
-        if (c.code) {
-          context += ` | קוד: ${c.code}`;
-        }
-        if (c.link) {
-          context += ` | LINK: ${c.link}`;
-        }
-        context += '\n';
-      });
-      context += `⚠️ חפש מותגים גם בעברית וגם באנגלית (ספרינג=Spring, ארגניה=Argania, ליבס=Leaves, רנואר=Renuar). אם יש LINK — הצג כ-[לחצי כאן](LINK).\n`;
-    }
-    
-    // Partnerships/Brands
-    if (kb.partnerships?.length > 0) {
-      context += `\n🤝 **שיתופי פעולה (${kb.partnerships.length}):**\n`;
-      kb.partnerships.slice(0, 5).forEach((p: any, i: number) => {
-        context += `${i + 1}. ${p.brandName || p.brand_name}`;
-        if (p.brief) context += ` - ${p.brief.substring(0, 80)}`;
-        context += '\n';
-      });
-    }
-    
-    // Insights
-    if (kb.insights?.length > 0) {
-      context += `\n💡 **תובנות (${kb.insights.length}):**\n`;
-      kb.insights.slice(0, 3).forEach((ins: any, i: number) => {
-        context += `${i + 1}. ${ins.insight || ins.content}\n`;
-      });
-    }
-    
-    // Transcriptions — show all RAG results with generous text limit
-    if (kb.transcriptions?.length > 0) {
-      context += `\n🎥 **תמלולים (${kb.transcriptions.length}):**\n`;
-      kb.transcriptions.slice(0, 8).forEach((t: any, i: number) => {
-        const truncated = t.text.length > 800 ? t.text.substring(0, 800) + '...' : t.text;
-        context += `${i + 1}. ${truncated}\n\n`;
-      });
-    }
-    
-    // Websites/Linkis
-    if (kb.websites?.length > 0) {
-      context += `\n🌐 **אתרים וקישורים (${kb.websites.length}):**\n`;
-      kb.websites.forEach((w: any, i: number) => {
-        context += `${i + 1}. ${w.title || w.url}\n`;
-        if (w.content) context += `   ${w.content.substring(0, 200)}...\n`;
-      });
-    }
-    
+    const { context, stats } = compactKnowledgeContext(kb);
+
+    console.log(`[BaseArchetype] Knowledge context: ${stats.inputChars} → ${stats.outputChars} chars (${stats.reductionPct}% reduction, ${stats.deduplicatedItems} deduped)`);
+
     return context;
   }
 

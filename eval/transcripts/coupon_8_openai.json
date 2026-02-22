@@ -1,0 +1,48 @@
+{
+  "scenario_id": "coupon_8",
+  "category": "coupon",
+  "provider": "openai",
+  "model": "gpt-5.2-2025-12-11",
+  "turns": [
+    {
+      "turn": 0,
+      "user": "יש לך קופון לARGANIA?",
+      "assistant": "כן 🙂 יש לי קופון ל־ARGANIA: **40% הנחה** עם הקוד **MIRAN**.  \nלרכישה: [לחצי כאן](https://www.argania-cosmetics.com)\n\nרוצה שאני אגיד לך מה הכי שווה לקחת משם (שיער/פנים/גוף) כדי לנצל את ה־40% חכם?  \n<<SUGGESTIONS>>מה מומלץ להזמין מ-ARGANIA לשיער?|יש לך גם קופון ל-Leaves?|תני לי נשנוש בריא מהיר<<</SUGGESTIONS>>",
+      "ttft_ms": 1554,
+      "total_ms": 3341,
+      "error": null
+    },
+    {
+      "turn": 1,
+      "user": "מה בדיוק ההנחה?",
+      "assistant": "ל־ARGANIA ההנחה היא **40%** עם הקוד **MIRAN**.  \nלרכישה: [לחצי כאן](https://www.argania-cosmetics.com) 🙂\n\nרוצה גם קופון ל־**Leaves (45%)** או ל־**Spring (15%)** או שאת נשארת עם ARGANIA?  \n<<SUGGESTIONS>>תני לי קופון ל-Leaves|תני לי קופון ל-Spring|מה הכי מומלץ לקחת מ-ARGANIA?<<</SUGGESTIONS>>",
+      "ttft_ms": 813,
+      "total_ms": 2258,
+      "error": null
+    },
+    {
+      "turn": 2,
+      "user": "ויש משהו דומה לMAC?",
+      "assistant": "אין לי קופון ל‑MAC כרגע.  \nמה שכן יש לי: **Spring – 15%** עם הקוד **MIRAN** לרכישה [לחצי כאן](https://www.spring-perfume.com), וגם **Leaves/K‑Care Organics – 45%** עם הקוד **MIRAN** [לחצי כאן](https://www.k-care.co.il), ו‑**ARGANIA – 40%** עם הקוד **MIRAN** [לחצי כאן](https://www.argania-cosmetics.com).\n\nכדי לכוון אותך למה “דומה” ל‑MAC: את מחפשת **איפור** (שפתון/מייקאפ/סומק) או דווקא **טיפוח/שיער**?  \n<<SUGGESTIONS>>תני לי קופון ל-Spring|תני לי קופון ל-ARGANIA|תני לי קופון ל-Leaves<<</SUGGESTIONS>>",
+      "ttft_ms": 647,
+      "total_ms": 3691,
+      "error": null
+    },
+    {
+      "turn": 3,
+      "user": "מתי פג התוקף?",
+      "assistant": "אין לי כאן מידע על **תאריך תפוגה** לקופונים, אז אני לא יכולה להגיד לך “עד מתי” בוודאות בלי להמציא.  \n\nעל איזה קופון את שואלת בדיוק — **ARGANIA (40%)**, **Leaves/K‑Care (45%)** או **Spring (15%)**? אם תגידי לי איזה מהם, אני אגיד לך מה כן יש לי עליו (קוד + לינק), ובדרך כלל הכי בטוח פשוט לנסות בקופה ולראות שהוא נתפס באותו רגע.  \n<<SUGGESTIONS>>ARGANIA - תני לי שוב את הקוד והלינק|Leaves/K-Care - תני לי שוב את הקוד והלינק|Spring - תני לי שוב את הקוד והלינק<<</SUGGESTIONS>>",
+      "ttft_ms": 741,
+      "total_ms": 3489,
+      "error": null
+    },
+    {
+      "turn": 4,
+      "user": "תודה! עוד קופון אחד?",
+      "assistant": "יש 😊 יש לי עוד 2 קופונים חוץ מ־ARGANIA:\n\n- **Leaves / K‑Care Organics – 45% הנחה** | קוד: **MIRAN** | [לחצי כאן](https://www.k-care.co.il)  \n- **Spring – 15% הנחה** | קוד: **MIRAN** | [לחצי כאן](https://www.spring-perfume.com)\n\nמה את צריכה יותר עכשיו — **טיפוח/שיער** (Leaves) או **בשמים** (Spring)?  \n<<SUGGESTIONS>>תני לי את הקופון של Leaves|תני לי את הקופון של Spring|מה מומלץ להזמין מ-ARGANIA?<<</SUGGESTIONS>>",
+      "ttft_ms": 498,
+      "total_ms": 2426,
+      "error": null
+    }
+  ]
+}

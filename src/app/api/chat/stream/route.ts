@@ -43,7 +43,7 @@ import {
   hashMessage,
 } from '@/engines';
 
-import { understandMessageFast } from '@/engines/understanding';
+import { understandMessageWithTimeout } from '@/engines/understanding';
 import { 
   decide, 
   getUIDirectivesSummary, 
@@ -65,6 +65,7 @@ import {
 import type { EngineContext, AccountContext, SessionContext, UserContext, KnowledgeRefs, LimitsContext, RequestContext } from '@/engines/context';
 import { processSandwichMessageWithMetadata } from '@/lib/chatbot/sandwichBot';
 import { buildConversationContext, trimToTokenBudget, updateRollingSummary, shouldUpdateSummary } from '@/lib/chatbot/conversation-memory';
+import { createPipelineMetrics, withMetrics, logPipelineMetrics, recordMetrics } from '@/lib/metrics/pipeline-metrics';
 
 // ============================================
 // Stream Event Types
@@ -141,6 +142,10 @@ export async function POST(req: NextRequest) {
   // Create readable stream
   const stream = new ReadableStream({
     async start(controller) {
+      const pm = createPipelineMetrics(requestId, 'pending');
+      pm.mark('request_start');
+
+      await withMetrics(pm, async () => {
       try {
         // === PARSE REQUEST ===
         const body = await req.json();
@@ -195,6 +200,7 @@ export async function POST(req: NextRequest) {
         const brands = cachedData.brands || [];
         const content = cachedData.content || [];
         accountId = cachedData.accountId || influencer.id;
+        pm.data.accountId = accountId;
 
         // === SESSION ===
         let currentSessionId = rawSessionId;
@@ -244,13 +250,12 @@ export async function POST(req: NextRequest) {
           return;
         }
 
-        // === Understanding (fast keyword-based, no AI call) ===
-        const understanding = understandMessageFast(message);
-
-        // === PARALLEL: Lock + Event + Session Load ===
+        // === PARALLEL: Understanding (600ms timeout) + Lock + Event + Session Load ===
         const anonId = `anon_${currentSessionId?.slice(0, 8) || 'guest'}`;
 
-        const [, , sessionData] = await Promise.all([
+        const [understanding, , , sessionData] = await Promise.all([
+          // Understanding: GPT-5 Nano with 600ms timeout, regex fallback
+          understandMessageWithTimeout(message, { timeoutMs: 600, accountId }),
           // Lock
           acquireLock(currentSessionId, requestId),
           // Event emission
@@ -622,19 +627,29 @@ export async function POST(req: NextRequest) {
           // Process with Sandwich Bot (all 3 layers!) with REAL streaming
           const influencerName = influencer.display_name || influencer.username || username || 'Unknown';
           const streamStartMs = Date.now();
-          
+          pm.mark('sandwich_start');
+          let firstTokenSent = false;
+
           const sandwichResult = await processSandwichMessageWithMetadata({
             userMessage: message,
             accountId,
             username: username,
             influencerName,
             conversationHistory,
+            rollingSummary: session?.rolling_summary || undefined,
+            modelTier: decision?.modelStrategy?.model,
             // Real-time streaming: tokens go directly to client as they arrive from OpenAI
             onToken: (token: string) => {
+              if (!firstTokenSent) {
+                firstTokenSent = true;
+                pm.measure('ttftMs', 'request_start');
+                pm.mark('streaming_start');
+              }
               fullText += token;
               controller.enqueue(encodeEvent({ type: 'delta', text: token }));
             },
           });
+          pm.measure('openaiStreamMs', 'streaming_start');
 
           // If streaming was used, fullText was already accumulated via onToken
           // If not (fallback), use the response directly
@@ -645,6 +660,7 @@ export async function POST(req: NextRequest) {
           }
 
           const streamDurationMs = Date.now() - streamStartMs;
+          pm.set('archetype', sandwichResult.metadata.archetype || 'general');
           console.log('[Stream] ✅ Sandwich Bot response:', {
             archetype: sandwichResult.metadata.archetype,
             confidence: sandwichResult.metadata.confidence,
@@ -763,6 +779,12 @@ export async function POST(req: NextRequest) {
 
         controller.close();
       }
+      }); // end withMetrics
+
+      // Always log metrics after request completes
+      pm.set('totalMs', Date.now() - startedAt);
+      logPipelineMetrics(pm);
+      recordMetrics(pm);
     },
   });
 

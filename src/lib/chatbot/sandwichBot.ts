@@ -5,14 +5,27 @@
 
 import { routeToArchetype } from './archetypes/intentRouter';
 import { processWithArchetype } from './archetypes';
-import { wrapResponseWithPersonality } from './personality-wrapper';
 import { getInsightsForPersona } from './conversation-learner';
-import { 
+import {
   retrieveKnowledge as retrieveKnowledgeFromSources,
   formatKnowledgeForPrompt,
   hasRelevantKnowledge,
   type KnowledgeBase,
 } from './knowledge-retrieval';
+
+// Fallback suggestions per archetype when LLM omits <<SUGGESTIONS>>
+const ARCHETYPE_FALLBACK_SUGGESTIONS: Record<string, string> = {
+  cooking: 'מתכון מהיר|טיפ למטבח|מה הכי שווה לנסות?',
+  skincare: 'שגרת טיפוח|מוצר מומלץ|טיפ לעור',
+  fashion: 'מה ללבוש?|טרנד חדש|המלצה לאאוטפיט',
+  fitness: 'אימון מהיר|טיפ לכושר|תוכנית אימונים',
+  coupons: 'קופונים פעילים|מבצע חדש|הנחה למותג',
+  general: 'ספרי לי עוד|יש קופון?|מה חדש?',
+};
+
+function getArchetypeFallbackSuggestions(archetype: string): string {
+  return ARCHETYPE_FALLBACK_SUGGESTIONS[archetype] || ARCHETYPE_FALLBACK_SUGGESTIONS.general;
+}
 
 // ============================================
 // Type Definitions
@@ -25,6 +38,8 @@ export interface SandwichBotInput {
   influencerName: string;
   conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
   userName?: string;
+  rollingSummary?: string; // Memory V2: conversation summary for context-aware retrieval
+  modelTier?: 'nano' | 'standard' | 'full'; // From decision engine modelStrategy
   onToken?: (token: string) => void; // Real-time streaming callback
 }
 
@@ -98,15 +113,25 @@ export class SandwichBot {
       // Enrich query with conversation context for follow-up messages
       // e.g. "תני לי את המתכון" → "פסטה רביולי ... תני לי את המתכון"
       let knowledgeQuery = input.userMessage;
-      if (lastAssistant && input.userMessage.length < 60) {
-        knowledgeQuery = `${lastAssistant.content.substring(0, 300)} ${input.userMessage}`;
-        console.log(`   → Enriched query with conversation context (${knowledgeQuery.length} chars)`);
+      if (input.userMessage.length < 60) {
+        const contextParts: string[] = [];
+        if (input.rollingSummary) {
+          contextParts.push(input.rollingSummary.substring(0, 200));
+        }
+        if (lastAssistant) {
+          contextParts.push(lastAssistant.content.substring(0, 300));
+        }
+        if (contextParts.length > 0) {
+          knowledgeQuery = `${contextParts.join(' ')} ${input.userMessage}`;
+          console.log(`   → Enriched query with conversation context (${knowledgeQuery.length} chars)`);
+        }
       }
 
       knowledgeBase = await this.retrieveKnowledge(
         input.accountId,
         classification.primaryArchetype,
-        knowledgeQuery
+        knowledgeQuery,
+        input.rollingSummary
       );
     }
 
@@ -129,6 +154,7 @@ export class SandwichBot {
           influencerName: input.influencerName,
         },
         onToken: input.onToken,
+        modelTier: input.modelTier,
       }
     );
 
@@ -141,26 +167,18 @@ export class SandwichBot {
     }
 
     // ==========================================
-    // LAYER 1: Wrap with Personality
+    // LAYER 1: Personality (already in system prompt — no post-hoc wrapper needed)
     // ==========================================
-    let finalResponse: string;
-    
-    if (input.onToken) {
-      // Streaming mode: personality is already in the prompt, skip wrapper
-      console.log('\n✨ [Layer 1] Personality already in prompt (streaming mode), skipping wrapper');
-      finalResponse = archetypeResult.response;
-    } else {
-      // Non-streaming mode: use personality wrapper (backward compatible)
-      console.log('\n✨ [Layer 1] Wrapping with personality...');
-      finalResponse = await wrapResponseWithPersonality(
-        input.accountId,
-        archetypeResult.response,
-        classification.primaryArchetype,
-        {
-          userName: input.userName,
-          conversationHistory: input.conversationHistory,
-        }
-      );
+    console.log('\n✨ [Layer 1] Personality already in system prompt, skipping post-hoc wrapper');
+    let finalResponse = archetypeResult.response;
+
+    // ==========================================
+    // Suggestion fallback: if LLM didn't produce <<SUGGESTIONS>>, add basic ones
+    // ==========================================
+    if (!finalResponse.includes('<<SUGGESTIONS>>')) {
+      const fallbackSuggestions = getArchetypeFallbackSuggestions(classification.primaryArchetype);
+      finalResponse += `\n<<SUGGESTIONS>>${fallbackSuggestions}<</SUGGESTIONS>>`;
+      console.log('   → Added fallback suggestions (LLM omitted them)');
     }
 
     console.log(`   → Final response: ${finalResponse.substring(0, 100)}...`);
@@ -185,7 +203,8 @@ export class SandwichBot {
   private async retrieveKnowledge(
     accountId: string,
     archetype: string,
-    userMessage: string
+    userMessage: string,
+    rollingSummary?: string
   ): Promise<KnowledgeBase> {
     console.log(`   → Querying KB for archetype: ${archetype}`);
 
@@ -194,7 +213,8 @@ export class SandwichBot {
       accountId,
       archetype as any,
       userMessage,
-      10 // limit
+      10, // limit
+      rollingSummary
     );
 
     // Log what we found

@@ -1,0 +1,48 @@
+{
+  "scenario_id": "coupon_10",
+  "category": "coupon",
+  "provider": "openai",
+  "model": "gpt-5.2-2025-12-11",
+  "turns": [
+    {
+      "turn": 0,
+      "user": "יש לך קופון לLeaves / K-Care Organics?",
+      "assistant": "כן 🙂 יש לי קופון ל־Leaves / K-Care Organics: **45% הנחה** עם הקוד **MIRAN**.  \nלקנייה: [לחצי כאן](https://www.k-care.co.il)\n\nרוצה שאגיד לך מה הכי שווה לקחת משם—טיפוח שיער או עור?  \n<<SUGGESTIONS>>תני לי לדעת מה את מחפשת ב-Leaves ואכוון אותך|רוצה גם קופון ל-Spring או ARGANIA?|לשלוח לך את המתכון של הנשנוש הבריא מהתמלול (בננות-שיבולת שועל)?<</SUGGESTIONS>>",
+      "ttft_ms": 617,
+      "total_ms": 3395,
+      "error": null
+    },
+    {
+      "turn": 1,
+      "user": "מה בדיוק ההנחה?",
+      "assistant": "ב־Leaves / K-Care Organics ההנחה היא **45%** עם הקוד **MIRAN**.  \nלקנייה: [לחצי כאן](https://www.k-care.co.il)\n\nאם תרצי, תגידי לי מה את מתכננת לקנות שם (שיער/עור/משהו אחר) ואכוון אותך מה הכי משתלם להכניס לסל 🙂  \n<<SUGGESTIONS>>רוצה גם את הקופון של Spring (15%)?|רוצה גם את הקופון של ARGANIA (40%)?|לשלוח לך את המתכון לנשנוש הבריא עם בננות ושיבולת שועל?<</SUGGESTIONS>>",
+      "ttft_ms": 730,
+      "total_ms": 2350,
+      "error": null
+    },
+    {
+      "turn": 2,
+      "user": "ויש משהו דומה לLeaves / K-Care Organics?",
+      "assistant": "כן — יש משהו דומה 🙂 אם הכוונה לעוד מותג טיפוח/קוסמטיקה עם קופון, יש לי גם:\n\n- **ARGANIA** — **40% הנחה** עם הקוד **MIRAN**: [לחצי כאן](https://www.argania-cosmetics.com)\n\nוגם אם את מחפשת יותר בכיוון של בישום/ריח:\n- **Spring** — **15% הנחה** עם הקוד **MIRAN**: [לחצי כאן](https://www.spring-perfume.com)\n\nרוצה משהו יותר קרוב ל־Leaves מבחינת מה שאת צריכה—טיפוח **שיער** או **עור**?  \n<<SUGGESTIONS>>רוצה קישור ישיר ל-ARGANIA?|להזכיר לך שוב את הקוד והלינק של Leaves?|לשלוח לך את המתכון לנשנוש הבננות-שיבולת שועל?<</SUGGESTIONS>>",
+      "ttft_ms": 1582,
+      "total_ms": 4253,
+      "error": null
+    },
+    {
+      "turn": 3,
+      "user": "מתי פג התוקף?",
+      "assistant": "אין לי מידע בבסיס הידע על **תאריך תפוגה** לקופונים (לא ל-Leaves / K‑Care Organics ולא לאחרים), אז אני לא יכולה להגיד תאריך מדויק בלי להמציא.\n\nמה שאני כן יודעת בוודאות:\n- **Leaves / K‑Care Organics** — **45% הנחה**, קוד **MIRAN**: [לחצי כאן](https://www.k-care.co.il)  \n- **Spring** — **15%**, קוד **MIRAN**: [לחצי כאן](https://www.spring-perfume.com)  \n- **ARGANIA** — **40%**, קוד **MIRAN**: [לחצי כאן](https://www.argania-cosmetics.com)\n\nאם תגידי לי לאיזה מותג את מתכוונת—Leaves / Spring / ARGANIA—אני אגיד לך איך הכי נכון לבדוק את זה באתר (בדרך כלל זה מופיע בקופה/בעת הזנת הקוד).  \n<<SUGGESTIONS>>באיזה מותג מדובר—Leaves או Spring או ARGANIA?|רוצה שאשלח לך שוב את הקופון של Leaves עם הלינק?|להביא לך גם את המתכון לנשנוש הבננות-שיבולת שועל?<</SUGGESTIONS>>",
+      "ttft_ms": 605,
+      "total_ms": 4784,
+      "error": null
+    },
+    {
+      "turn": 4,
+      "user": "תודה! עוד קופון אחד?",
+      "assistant": "יש 🙂 יש לי עוד קופון אחד (ובעצם עוד שניים לבחור מהם):\n\n- **Spring** — **15% הנחה** עם הקוד **MIRAN**: [לחצי כאן](https://www.spring-perfume.com)  \n- **ARGANIA** — **40% הנחה** עם הקוד **MIRAN**: [לחצי כאן](https://www.argania-cosmetics.com)\n\nאת רוצה קופון ליותר בכיוון של **בישום/ריח (Spring)** או **טיפוח/קוסמטיקה (ARGANIA)**?  \n<<SUGGESTIONS>>תני לי מה את מחפשת ואבחר לך בין Spring ל-ARGANIA|להזכיר לך גם את הקופון של Leaves (45%)?|לשלוח לך את המתכון לנשנוש הבננות-שיבולת שועל?<</SUGGESTIONS>>",
+      "ttft_ms": 559,
+      "total_ms": 3015,
+      "error": null
+    }
+  ]
+}

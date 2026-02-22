@@ -14,6 +14,7 @@
 import OpenAI from 'openai';
 import { SYSTEM_PROMPT, DEVELOPER_PROMPT, USER_PROMPT, OUTPUT_SCHEMA } from './prompt';
 import type { UnderstandingResult, UnderstandMessageInput, SimpleIntent, ExtractedEntities, RiskFlags, RouteHints } from './types';
+import { getMetrics } from '@/lib/metrics/pipeline-metrics';
 
 // Re-export types
 export * from './types';
@@ -294,6 +295,59 @@ function createDefaultResult(message: string, processingTimeMs: number): Underst
  */
 export function understandMessageFast(message: string): UnderstandingResult {
   return createDefaultResult(message, 0);
+}
+
+/**
+ * Understanding with timeout — tries GPT-5 Nano within timeoutMs,
+ * falls back to regex if Nano is too slow or fails.
+ * Gives better intent/entity detection when Nano responds quickly (~100ms).
+ */
+export async function understandMessageWithTimeout(
+  message: string,
+  options?: { timeoutMs?: number; accountId?: string; brands?: string[] }
+): Promise<UnderstandingResult> {
+  const timeoutMs = options?.timeoutMs ?? 150;
+  const startTime = Date.now();
+  const pm = getMetrics();
+
+  pm?.inc('nanoAttempted');
+  pm?.mark('understanding_start');
+
+  // Regex result is instant — always available as fallback
+  const regexResult = createDefaultResult(message, 0);
+
+  try {
+    const nanoPromise = callUnderstandingAPI(
+      { message, accountId: options?.accountId || 'chat', mode: 'creator', brands: options?.brands },
+      UNDERSTANDING_MODEL
+    );
+    const timeoutPromise = new Promise<null>((resolve) =>
+      setTimeout(() => resolve(null), timeoutMs)
+    );
+
+    const result = await Promise.race([nanoPromise, timeoutPromise]);
+
+    if (result) {
+      pm?.inc('nanoSucceeded');
+      pm?.measure('understandingMs', 'understanding_start');
+      return {
+        ...result,
+        rawInput: message,
+        processingTimeMs: Date.now() - startTime,
+      };
+    }
+
+    // Timed out — use regex result
+    pm?.inc('nanoTimedOut');
+    pm?.inc('regexFallback');
+    pm?.measure('understandingMs', 'understanding_start');
+    console.log(`[Understanding] Nano timed out after ${timeoutMs}ms, using regex fallback`);
+    return { ...regexResult, processingTimeMs: Date.now() - startTime };
+  } catch {
+    pm?.inc('regexFallback');
+    pm?.measure('understandingMs', 'understanding_start');
+    return { ...regexResult, processingTimeMs: Date.now() - startTime };
+  }
 }
 
 /**
