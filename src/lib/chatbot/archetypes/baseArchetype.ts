@@ -22,7 +22,7 @@ const openai = new OpenAI({
 const CHAT_MODEL = 'gpt-5.2-2025-12-11'; // ⚡ Newest and strongest model
 const FALLBACK_MODEL = 'gpt-4o'; // ⚡ Reliable fallback
 const NANO_MODEL = 'gpt-5-nano'; // ⚡ Fastest + cheapest for simple queries
-const MAX_TOKENS = 500; // Shorter responses for conversational flow
+const MAX_TOKENS = 1024; // Enough for detailed Hebrew responses (recipes, routines)
 
 // Map decision engine model tiers to actual OpenAI model names
 function resolveModel(tier?: 'nano' | 'standard' | 'full'): { primary: string; fallback: string } {
@@ -78,15 +78,19 @@ export abstract class BaseArchetype {
       };
     }
 
-    // 2. Build knowledge query — only add history keywords if same topic
-    // Detect topic change: if user message shares very few words with last
-    // assistant reply, the user likely switched subjects.
-    let historyKeywords = '';
+    // 2. Detect topic change and manage context accordingly
     const lastAssistant = input.conversationHistory
       ?.filter(m => m.role === 'assistant')
       .slice(-1)[0]?.content || '';
 
-    if (lastAssistant && !this.isTopicChange(input.userMessage, lastAssistant)) {
+    const topicChanged = lastAssistant
+      ? this.isTopicChange(input.userMessage, lastAssistant)
+      : false;
+
+    // If topic changed: don't pollute KB query AND trim history so GPT
+    // doesn't bleed old topics into the new answer.
+    let historyKeywords = '';
+    if (!topicChanged && lastAssistant) {
       historyKeywords = input.conversationHistory?.slice(-2)
         .map(m => m.content)
         .join(' ')
@@ -94,6 +98,15 @@ export abstract class BaseArchetype {
         .filter(w => w.length > 3)
         .slice(0, 10)
         .join(' ') || '';
+    }
+
+    if (topicChanged && input.conversationHistory) {
+      // Keep only the last user+assistant pair so basic pronouns still work
+      // but old topics are gone
+      const trimmed = input.conversationHistory.slice(-2);
+      input.conversationHistory.length = 0;
+      input.conversationHistory.push(...trimmed);
+      console.log(`[BaseArchetype] 🔀 Topic change detected — trimmed history to ${trimmed.length} messages`);
     }
 
     const knowledgeQuery = this.definition.logic.buildKnowledgeQuery(
