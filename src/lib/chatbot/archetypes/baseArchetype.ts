@@ -78,18 +78,26 @@ export abstract class BaseArchetype {
       };
     }
 
-    // 2. Build knowledge query with conversation context
-    // Extract keywords from last 2 messages for context
-    const historyKeywords = input.conversationHistory?.slice(-2)
-      .map(m => m.content)
-      .join(' ')
-      .split(/\s+/)
-      .filter(w => w.length > 3)
-      .slice(0, 10)
-      .join(' ') || '';
+    // 2. Build knowledge query — only add history keywords if same topic
+    // Detect topic change: if user message shares very few words with last
+    // assistant reply, the user likely switched subjects.
+    let historyKeywords = '';
+    const lastAssistant = input.conversationHistory
+      ?.filter(m => m.role === 'assistant')
+      .slice(-1)[0]?.content || '';
+
+    if (lastAssistant && !this.isTopicChange(input.userMessage, lastAssistant)) {
+      historyKeywords = input.conversationHistory?.slice(-2)
+        .map(m => m.content)
+        .join(' ')
+        .split(/\s+/)
+        .filter(w => w.length > 3)
+        .slice(0, 10)
+        .join(' ') || '';
+    }
 
     const knowledgeQuery = this.definition.logic.buildKnowledgeQuery(
-      `${input.userMessage} ${historyKeywords}`
+      historyKeywords ? `${input.userMessage} ${historyKeywords}` : input.userMessage
     );
 
     // 3. Generate response using knowledge
@@ -255,6 +263,12 @@ export abstract class BaseArchetype {
 
 📜 הקשר שיחה: **תמיד** תבין/י הפניות להיסטוריה ("המתכון", "מה שאמרת", "זה"). השיחה זורמת — אל תתנהג/י כאילו כל הודעה מתחילה מאפס.
 
+🔀 **זיהוי מעבר נושא — קריטי!**
+כשהמשתמש/ת שואל/ת על נושא חדש שלא קשור לשאלה הקודמת:
+• ענה/י **רק** על הנושא החדש. **אל תערבב** מידע מנושאים קודמים.
+• אל תזכיר/י מוצרים, מתכונים, או טיפים מתשובות קודמות אלא אם המשתמש/ת ביקש/ה במפורש.
+• אם אין לך מידע על הנושא החדש — אמור/י בכנות במקום להציע משהו לא קשור מנושא ישן.
+
 🎯 תפקיד: ${this.definition.name}
 📝 ${this.definition.description}
 
@@ -399,6 +413,44 @@ ${personalityBlock}
     console.log(`[BaseArchetype] Knowledge context: ${stats.inputChars} → ${stats.outputChars} chars (${stats.reductionPct}% reduction, ${stats.deduplicatedItems} deduped)`);
 
     return context;
+  }
+
+  /**
+   * Detect if the user switched topics.
+   * Compares meaningful-word overlap between the new message and last
+   * assistant reply. Low overlap → topic change → don't pollute query.
+   */
+  private isTopicChange(userMessage: string, lastAssistantReply: string): boolean {
+    // Hebrew stop-words / filler — skip these when comparing
+    const STOP = new Set([
+      'את','של','על','עם','זה','היא','הוא','אני','לי','לך','שלי','שלך',
+      'מה','איך','למה','כמה','מתי','איפה','אם','גם','כל','הרבה','עוד',
+      'יש','אין','היה','הזה','הזאת','אבל','רק','כן','לא','טוב','ממש',
+      'בבקשה','תודה','אוקי','that','this','the','and','for','with','from',
+    ]);
+
+    const tokenise = (text: string): Set<string> => {
+      const words = text
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}\s]/gu, '')   // keep letters + numbers
+        .split(/\s+/)
+        .filter(w => w.length > 2 && !STOP.has(w));
+      return new Set(words);
+    };
+
+    const userWords = tokenise(userMessage);
+    const assistantWords = tokenise(lastAssistantReply);
+
+    if (userWords.size === 0) return false; // can't tell — assume same topic
+
+    let overlap = 0;
+    for (const w of userWords) {
+      if (assistantWords.has(w)) overlap++;
+    }
+
+    const overlapRatio = overlap / userWords.size;
+    // If fewer than 20% of user words appear in the last reply → topic change
+    return overlapRatio < 0.2;
   }
 
   /**

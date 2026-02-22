@@ -307,15 +307,20 @@ export default function ChatWidget({
           {/* Input */}
           <div className="p-4 bg-white border-t border-gray-200">
             <div className="flex gap-2">
-              <input
-                type="text"
+              <textarea
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                onKeyPress={handleKeyPress}
+                onKeyDown={handleKeyPress}
                 placeholder="הקלד/י הודעה..."
                 disabled={isLoading}
-                className="flex-1 px-4 py-2 border-2 border-gray-300 rounded-full focus:border-purple-500 focus:outline-none transition-colors disabled:bg-gray-100"
+                className="flex-1 px-4 py-2 border-2 border-gray-300 rounded-2xl focus:border-purple-500 focus:outline-none transition-colors disabled:bg-gray-100 resize-none"
                 dir="auto"
+                rows={1}
+                onInput={(e) => {
+                  const t = e.currentTarget;
+                  t.style.height = 'auto';
+                  t.style.height = Math.min(t.scrollHeight, 120) + 'px';
+                }}
               />
               <button
                 onClick={() => sendMessage(inputText)}

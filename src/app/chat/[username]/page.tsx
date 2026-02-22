@@ -157,7 +157,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastTapRef = useRef<number>(0);
   const streamingMessageIdRef = useRef<string | null>(null);
 
@@ -1248,14 +1248,24 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                       </div>
                     )}
                     <div className="chat-input-pill">
-                      <input
+                      <textarea
                         ref={inputRef}
-                        type="text"
                         value={inputValue}
                         onChange={(e) => setInputValue(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSendMessage();
+                          }
+                        }}
                         placeholder="מה רצית לשאול?"
                         disabled={isTyping}
+                        rows={1}
+                        onInput={(e) => {
+                          const t = e.currentTarget;
+                          t.style.height = 'auto';
+                          t.style.height = Math.min(t.scrollHeight, 120) + 'px';
+                        }}
                       />
                       <button
                         onClick={handleSendMessage}
