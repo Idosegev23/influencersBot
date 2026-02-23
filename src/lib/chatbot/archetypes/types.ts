@@ -103,6 +103,7 @@ export interface ArchetypeInput {
   };
   onToken?: (token: string) => void; // Real-time streaming callback
   modelTier?: 'nano' | 'standard' | 'full'; // From decision engine modelStrategy
+  personalityConfig?: any; // Pre-loaded personality config (avoids DB call in archetype)
 }
 
 export interface ArchetypeOutput {

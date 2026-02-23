@@ -259,11 +259,11 @@ export abstract class BaseArchetype {
           content: m.content,
         })) || [];
 
-      // Load personality and build prompt instructions (replaces post-processing wrapper)
+      // Build personality prompt (use pre-loaded config if available, else load from DB)
       let personalityBlock = '';
       if (input.onToken) {
         try {
-          const personalityConfig = await buildPersonalityFromDB(input.accountContext.accountId);
+          const personalityConfig = input.personalityConfig || await buildPersonalityFromDB(input.accountContext.accountId);
           personalityBlock = `\n🎭 סגנון אישיות:\n${this.buildPersonalityPrompt(personalityConfig, influencerName)}`;
         } catch (e) {
           console.warn('[BaseArchetype] Failed to load personality, using defaults');

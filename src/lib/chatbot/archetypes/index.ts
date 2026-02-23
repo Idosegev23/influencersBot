@@ -123,6 +123,7 @@ export async function processWithArchetype(
     };
     onToken?: (token: string) => void;
     modelTier?: 'nano' | 'standard' | 'full';
+    personalityConfig?: any;
   }
 ) {
   console.log('\n' + '='.repeat(80));
@@ -167,6 +168,7 @@ export async function processWithArchetype(
     accountContext: context.accountContext,
     onToken: context.onToken,
     modelTier: context.modelTier,
+    personalityConfig: context.personalityConfig,
   });
   
   console.log('\n' + '='.repeat(80));

@@ -62,6 +62,7 @@ import type { EngineContext, AccountContext, SessionContext, UserContext, Knowle
 import { processSandwichMessageWithMetadata } from '@/lib/chatbot/sandwichBot';
 import { buildConversationContext, trimToTokenBudget, updateRollingSummary, shouldUpdateSummary } from '@/lib/chatbot/conversation-memory';
 import { createPipelineMetrics, withMetrics, logPipelineMetrics, recordMetrics } from '@/lib/metrics/pipeline-metrics';
+import { buildPersonalityFromDB } from '@/lib/chatbot/personality-wrapper';
 
 // ============================================
 // Stream Event Types
@@ -249,7 +250,7 @@ export async function POST(req: NextRequest) {
         // === PARALLEL: Understanding + Lock + Event + Session + History ===
         const anonId = `anon_${currentSessionId?.slice(0, 8) || 'guest'}`;
 
-        const [understanding, , , sessionData, historyData] = await Promise.all([
+        const [understanding, , , sessionData, historyData, personalityConfig] = await Promise.all([
           // Understanding: GPT-5 Nano with 600ms timeout, regex fallback
           understandMessageWithTimeout(message, { timeoutMs: 600, accountId }),
           // Lock
@@ -297,6 +298,8 @@ export async function POST(req: NextRequest) {
                 .limit(10)
                 .then(r => r.data)
             : Promise.resolve(null),
+          // Personality config (pre-load to avoid DB call inside archetype)
+          buildPersonalityFromDB(accountId).catch(() => null),
         ]);
 
         let session = sessionData;
@@ -603,6 +606,7 @@ export async function POST(req: NextRequest) {
             conversationHistory,
             rollingSummary: session?.rolling_summary || undefined,
             modelTier: decision?.modelStrategy?.model,
+            personalityConfig: personalityConfig || undefined,
             // Real-time streaming: tokens go directly to client as they arrive from OpenAI
             onToken: (token: string) => {
               if (!firstTokenSent) {

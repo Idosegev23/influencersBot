@@ -41,6 +41,7 @@ export interface SandwichBotInput {
   rollingSummary?: string; // Memory V2: conversation summary for context-aware retrieval
   modelTier?: 'nano' | 'standard' | 'full'; // From decision engine modelStrategy
   onToken?: (token: string) => void; // Real-time streaming callback
+  personalityConfig?: any; // Pre-loaded personality (avoids DB call)
 }
 
 export interface SandwichBotOutput {
@@ -155,6 +156,7 @@ export class SandwichBot {
         },
         onToken: input.onToken,
         modelTier: input.modelTier,
+        personalityConfig: input.personalityConfig,
       }
     );
 
