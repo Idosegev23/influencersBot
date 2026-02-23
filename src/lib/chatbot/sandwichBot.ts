@@ -115,8 +115,13 @@ export class SandwichBot {
     } else {
       // Enrich query with conversation context for follow-up messages
       // e.g. "תני לי את המתכון" → "פסטה רביולי ... תני לי את המתכון"
+      // BUT: skip enrichment on topic change — old context pollutes the KB query
       let knowledgeQuery = input.userMessage;
-      if (input.userMessage.length < 60) {
+      const isTopicChange = lastAssistant ? this.detectTopicChange(input.userMessage, lastAssistant.content) : false;
+
+      if (isTopicChange) {
+        console.log('   🔀 Topic change detected — using raw query (no context enrichment)');
+      } else if (input.userMessage.length < 60) {
         const contextParts: string[] = [];
         if (input.rollingSummary) {
           contextParts.push(input.rollingSummary.substring(0, 200));
@@ -234,6 +239,29 @@ export class SandwichBot {
     }
 
     return knowledgeBase;
+  }
+
+  /**
+   * Detect if user switched topics (word overlap heuristic).
+   * Mirrors the logic in BaseArchetype.isTopicChange.
+   */
+  private detectTopicChange(userMessage: string, lastAssistantReply: string): boolean {
+    const STOP = new Set([
+      'את','של','על','עם','זה','היא','הוא','אני','לי','לך','שלי','שלך',
+      'מה','איך','למה','כמה','מתי','איפה','אם','גם','כל','הרבה','עוד',
+      'יש','אין','היה','הזה','הזאת','אבל','רק','כן','לא','טוב','ממש',
+      'בבקשה','תודה','אוקי','that','this','the','and','for','with','from',
+    ]);
+    const tokenise = (text: string): Set<string> => {
+      const words = text.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, '').split(/\s+/).filter(w => w.length > 2 && !STOP.has(w));
+      return new Set(words);
+    };
+    const userWords = tokenise(userMessage);
+    const assistantWords = tokenise(lastAssistantReply);
+    if (userWords.size === 0) return false;
+    let overlap = 0;
+    for (const w of userWords) { if (assistantWords.has(w)) overlap++; }
+    return (overlap / userWords.size) < 0.2;
   }
 
   /**

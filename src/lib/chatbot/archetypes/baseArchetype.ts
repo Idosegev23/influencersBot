@@ -340,7 +340,12 @@ ${personalityBlock}
 
       if (!previousResponseId && input.conversationHistory?.length) {
         // No chain: include history manually
-        for (const m of input.conversationHistory) {
+        // On topic change: only keep last 2 messages (basic pronoun context)
+        // so old topics don't bleed into the new answer
+        const historyToSend = topicChanged
+          ? input.conversationHistory.slice(-2)
+          : input.conversationHistory;
+        for (const m of historyToSend) {
           inputMessages.push({ role: m.role, content: m.content });
         }
       }
