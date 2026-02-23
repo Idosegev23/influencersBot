@@ -607,6 +607,7 @@ export async function POST(req: NextRequest) {
             rollingSummary: session?.rolling_summary || undefined,
             modelTier: decision?.modelStrategy?.model,
             personalityConfig: personalityConfig || undefined,
+            previousResponseId: session?.last_response_id || previousResponseId || null,
             // Real-time streaming: tokens go directly to client as they arrive from OpenAI
             onToken: (token: string) => {
               if (!firstTokenSent) {
@@ -628,6 +629,9 @@ export async function POST(req: NextRequest) {
             controller.enqueue(encodeEvent({ type: 'delta', text: fullText }));
           }
 
+          // Capture Responses API response ID for context chaining
+          responseId = sandwichResult.responseId || null;
+
           const streamDurationMs = Date.now() - streamStartMs;
           pm.set('archetype', sandwichResult.metadata.archetype || 'general');
           console.log('[Stream] ✅ Sandwich Bot response:', {
@@ -636,6 +640,7 @@ export async function POST(req: NextRequest) {
             personalityApplied: sandwichResult.metadata.personalityApplied,
             streamingDurationMs: streamDurationMs,
             responseLength: fullText.length,
+            responseId: responseId ? responseId.slice(0, 20) + '...' : null,
           });
 
         } catch (sandwichError: any) {
@@ -667,6 +672,13 @@ export async function POST(req: NextRequest) {
         await Promise.all([
           saveChatMessage(currentSessionId, 'user', message),
           saveChatMessage(currentSessionId, 'assistant', fullText),
+          // Save Responses API response_id for context chaining on next turn
+          responseId
+            ? supabase
+                .from('chat_sessions')
+                .update({ last_response_id: responseId })
+                .eq('id', currentSessionId)
+            : Promise.resolve(),
           emitEvent({
             type: 'response_sent',
             accountId,

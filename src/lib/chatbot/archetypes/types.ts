@@ -104,10 +104,12 @@ export interface ArchetypeInput {
   onToken?: (token: string) => void; // Real-time streaming callback
   modelTier?: 'nano' | 'standard' | 'full'; // From decision engine modelStrategy
   personalityConfig?: any; // Pre-loaded personality config (avoids DB call in archetype)
+  previousResponseId?: string | null; // OpenAI Responses API: chain context across turns
 }
 
 export interface ArchetypeOutput {
   response: string;
+  responseId?: string | null; // OpenAI Responses API response ID
   triggeredGuardrails: {
     ruleId: string;
     severity: string;

@@ -124,6 +124,7 @@ export async function processWithArchetype(
     onToken?: (token: string) => void;
     modelTier?: 'nano' | 'standard' | 'full';
     personalityConfig?: any;
+    previousResponseId?: string | null;
   }
 ) {
   console.log('\n' + '='.repeat(80));
@@ -169,6 +170,7 @@ export async function processWithArchetype(
     onToken: context.onToken,
     modelTier: context.modelTier,
     personalityConfig: context.personalityConfig,
+    previousResponseId: context.previousResponseId,
   });
   
   console.log('\n' + '='.repeat(80));

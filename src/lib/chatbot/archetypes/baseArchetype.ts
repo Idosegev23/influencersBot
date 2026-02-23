@@ -3,13 +3,14 @@
  * מחלקת בסיס לכל הארכיטיפים
  */
 
-import { 
-  ArchetypeDefinition, 
-  ArchetypeInput, 
-  ArchetypeOutput, 
-  GuardrailRule 
+import {
+  ArchetypeDefinition,
+  ArchetypeInput,
+  ArchetypeOutput,
+  GuardrailRule
 } from './types';
 import OpenAI from 'openai';
+import type { ResponseStreamEvent } from 'openai/resources/responses/responses';
 import { buildPersonalityFromDB, type PersonalityConfig } from '../personality-wrapper';
 import { compactKnowledgeContext } from '@/lib/rag/compact-knowledge-context';
 
@@ -100,14 +101,8 @@ export abstract class BaseArchetype {
         .join(' ') || '';
     }
 
-    if (topicChanged && input.conversationHistory) {
-      // Keep only the last user+assistant pair so basic pronouns still work
-      // but old topics are gone
-      const trimmed = input.conversationHistory.slice(-2);
-      input.conversationHistory.length = 0;
-      input.conversationHistory.push(...trimmed);
-      console.log(`[BaseArchetype] 🔀 Topic change detected — trimmed history to ${trimmed.length} messages`);
-    }
+    // Note: history trimming is no longer needed here — the Responses API
+    // handles context via previous_response_id chain, which is broken on topic change.
 
     const knowledgeQuery = this.definition.logic.buildKnowledgeQuery(
       historyKeywords ? `${input.userMessage} ${historyKeywords}` : input.userMessage
@@ -117,7 +112,7 @@ export abstract class BaseArchetype {
     const response = await this.generateResponse(input, knowledgeQuery);
 
     // 4. Add warnings if needed
-    let finalResponse = response;
+    let finalResponse = response.text;
     for (const triggered of triggeredGuardrails) {
       if (triggered.action === 'warn' && triggered.message) {
         finalResponse += '\n\n⚠️ ' + this.replaceName(triggered.message, influencerName);
@@ -126,9 +121,10 @@ export abstract class BaseArchetype {
 
     return {
       response: this.replaceName(finalResponse, influencerName),
+      responseId: response.responseId,
       triggeredGuardrails,
       knowledgeUsed: [knowledgeQuery],
-      confidence: this.calculateConfidence(input, response),
+      confidence: this.calculateConfidence(input, response.text),
     };
   }
 
@@ -181,13 +177,13 @@ export abstract class BaseArchetype {
   }
 
   /**
-   * Generate response using Gemini AI
+   * Generate response using OpenAI Responses API
    * Can be overridden by subclasses for custom logic
    */
   protected async generateResponse(
     input: ArchetypeInput,
     knowledgeQuery: string
-  ): Promise<string> {
+  ): Promise<{ text: string; responseId?: string | null }> {
     return this.generateAIResponse(input, knowledgeQuery);
   }
 
@@ -239,25 +235,19 @@ export abstract class BaseArchetype {
   }
 
   /**
-   * Generate AI response using GPT-5.2 with archetype-specific context
-   * Supports real-time streaming via onToken callback
+   * Generate AI response using OpenAI Responses API (GPT-5.2)
+   * Uses previous_response_id for server-side context chaining.
+   * Supports real-time streaming via onToken callback.
    */
   protected async generateAIResponse(
     input: ArchetypeInput,
     knowledgeQuery: string
-  ): Promise<string> {
+  ): Promise<{ text: string; responseId?: string | null }> {
     const influencerName = input.accountContext.influencerName || 'המשפיענית';
 
     try {
       // Build context from knowledge base
       const kbContext = this.buildKnowledgeContext(input.knowledgeBase);
-      
-      // Build conversation history
-      const historyMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = 
-        input.conversationHistory?.map(m => ({
-          role: m.role as 'user' | 'assistant',
-          content: m.content,
-        })) || [];
 
       // Build personality prompt (use pre-loaded config if available, else load from DB)
       let personalityBlock = '';
@@ -269,9 +259,9 @@ export abstract class BaseArchetype {
           console.warn('[BaseArchetype] Failed to load personality, using defaults');
         }
       }
-      
-      // Build archetype-specific system prompt
-      const systemPrompt = `אתה ${influencerName}, משפיענית שמנהלת שיחה טבעית עם הקהל שלה — כמו חברה, לא כמו מכונת חיפוש.
+
+      // Build archetype-specific instructions (replaces system prompt)
+      const instructions = `אתה ${influencerName}, משפיענית שמנהלת שיחה טבעית עם הקהל שלה — כמו חברה, לא כמו מכונת חיפוש.
 ⚠️ **אל תפתח/י כל הודעה עם כינויי חיבה** ("מאמי", "אהובה", "יקירה"). תפתח/י ישר לעניין. כינוי חיבה מותר לפעמים, לא בכל הודעה.
 
 📜 הקשר שיחה: **תמיד** תבין/י הפניות להיסטוריה ("המתכון", "מה שאמרת", "זה"). השיחה זורמת — אל תתנהג/י כאילו כל הודעה מתחילה מאפס.
@@ -326,92 +316,162 @@ ${personalityBlock}
 ענה בעברית. אם השאלה רחבה — שאל/י שאלה מכוונת (עם רמז קצר למה שיש לך). אם ברור מה רוצים — תן/י תשובה מלאה.
 🚨 אל תמציא תוכן שלא מופיע בבסיס הידע.`;
 
-      const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-        { role: 'system', content: systemPrompt },
-        ...historyMessages,
-        { role: 'user', content: userPrompt },
-      ];
-
       // Resolve model based on decision engine's modelStrategy
       const { primary: primaryModel, fallback: fallbackModel } = resolveModel(input.modelTier);
 
+      // Determine if we should use previous_response_id for context chaining
+      // On topic change we break the chain — OpenAI starts fresh
+      const lastAssistant = input.conversationHistory
+        ?.filter(m => m.role === 'assistant')
+        .slice(-1)[0]?.content || '';
+      const topicChanged = lastAssistant ? this.isTopicChange(input.userMessage, lastAssistant) : false;
+      const previousResponseId = topicChanged ? null : (input.previousResponseId || null);
+
+      if (topicChanged) {
+        console.log('[BaseArchetype] 🔀 Topic change detected — breaking response chain');
+      }
+
+      // Build input for Responses API
+      // When we have previous_response_id, OpenAI manages context server-side.
+      // We only send the new user message + fresh KB context.
+      // When no previous_response_id (first message or topic change), we include
+      // conversation history manually so the model has context.
+      const inputMessages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+
+      if (!previousResponseId && input.conversationHistory?.length) {
+        // No chain: include history manually
+        for (const m of input.conversationHistory) {
+          inputMessages.push({ role: m.role, content: m.content });
+        }
+      }
+
+      // Always add the current user message with KB context
+      inputMessages.push({ role: 'user', content: userPrompt });
+
       // === STREAMING MODE (when onToken callback is provided) ===
       if (input.onToken) {
-        console.log(`[BaseArchetype] Using STREAMING mode with ${primaryModel}`);
+        console.log(`[BaseArchetype] Using Responses API STREAMING with ${primaryModel}${previousResponseId ? ' + context chain' : ''}`);
         try {
-          const stream = await openai.chat.completions.create({
+          const result = await this.streamResponsesAPI({
             model: primaryModel,
-            messages,
-            max_completion_tokens: MAX_TOKENS,
-            stream: true,
+            instructions,
+            input: inputMessages,
+            previousResponseId,
+            onToken: input.onToken,
           });
 
-          let fullContent = '';
-          for await (const chunk of stream) {
-            const delta = chunk.choices[0]?.delta?.content;
-            if (delta) {
-              fullContent += delta;
-              input.onToken(delta);
-            }
+          if (result.text) {
+            return {
+              text: this.replaceName(result.text, influencerName),
+              responseId: result.responseId,
+            };
           }
-
-          if (fullContent) return this.replaceName(fullContent, influencerName);
           throw new Error('Empty streaming response from primary model');
 
         } catch (primaryError) {
-          console.warn(`[BaseArchetype] Primary streaming model (${primaryModel}) failed, trying fallback:`, primaryError);
+          console.warn(`[BaseArchetype] Primary model (${primaryModel}) failed, trying fallback:`, primaryError);
 
-          const fallbackStream = await openai.chat.completions.create({
+          // Fallback: no previous_response_id (chain is model-specific)
+          const result = await this.streamResponsesAPI({
             model: fallbackModel,
-            messages,
-            max_completion_tokens: MAX_TOKENS,
-            stream: true,
+            instructions,
+            input: inputMessages,
+            previousResponseId: null,
+            onToken: input.onToken,
           });
 
-          let fullContent = '';
-          for await (const chunk of fallbackStream) {
-            const delta = chunk.choices[0]?.delta?.content;
-            if (delta) {
-              fullContent += delta;
-              input.onToken(delta);
-            }
+          if (result.text) {
+            return {
+              text: this.replaceName(result.text, influencerName),
+              responseId: result.responseId,
+            };
           }
-
-          if (fullContent) return this.replaceName(fullContent, influencerName);
           throw new Error('Empty streaming response from fallback model');
         }
       }
 
       // === BLOCKING MODE (backward compatible, no onToken) ===
       try {
-        const response = await openai.chat.completions.create({
+        const response = await openai.responses.create({
           model: primaryModel,
-          messages,
-          max_completion_tokens: MAX_TOKENS,
+          instructions,
+          input: inputMessages,
+          ...(previousResponseId ? { previous_response_id: previousResponseId } : {}),
+          max_output_tokens: MAX_TOKENS,
         });
 
-        const content = response.choices[0].message.content;
-        if (content) return this.replaceName(content, influencerName);
+        if (response.output_text) {
+          return {
+            text: this.replaceName(response.output_text, influencerName),
+            responseId: response.id,
+          };
+        }
         throw new Error('Empty response from primary model');
 
       } catch (primaryError) {
         console.warn(`[BaseArchetype] Primary model (${primaryModel}) failed, trying fallback (${fallbackModel}):`, primaryError);
 
-        const fallbackResponse = await openai.chat.completions.create({
+        const fallbackResponse = await openai.responses.create({
           model: fallbackModel,
-          messages,
-          max_completion_tokens: MAX_TOKENS,
+          instructions,
+          input: inputMessages,
+          max_output_tokens: MAX_TOKENS,
         });
 
-        const content = fallbackResponse.choices[0].message.content;
-        if (content) return this.replaceName(content, influencerName);
+        if (fallbackResponse.output_text) {
+          return {
+            text: this.replaceName(fallbackResponse.output_text, influencerName),
+            responseId: fallbackResponse.id,
+          };
+        }
         throw new Error('Empty response from fallback model');
       }
 
     } catch (error) {
       console.error('[BaseArchetype] All models failed:', error);
-      return `היי, אני קצת מתקשה למצוא את המידע המדויק כרגע. ${influencerName} בדרך כלל משתפת המון טיפים בנושא הזה! אולי תוכלי לחדד את השאלה?`;
+      return {
+        text: `היי, אני קצת מתקשה למצוא את המידע המדויק כרגע. ${influencerName} בדרך כלל משתפת המון טיפים בנושא הזה! אולי תוכלי לחדד את השאלה?`,
+        responseId: null,
+      };
     }
+  }
+
+  /**
+   * Stream response using OpenAI Responses API
+   */
+  private async streamResponsesAPI(params: {
+    model: string;
+    instructions: string;
+    input: Array<{ role: 'user' | 'assistant'; content: string }>;
+    previousResponseId: string | null;
+    onToken: (token: string) => void;
+  }): Promise<{ text: string; responseId: string | null }> {
+    const stream = await openai.responses.create({
+      model: params.model,
+      instructions: params.instructions,
+      input: params.input,
+      ...(params.previousResponseId ? { previous_response_id: params.previousResponseId } : {}),
+      max_output_tokens: MAX_TOKENS,
+      stream: true,
+    });
+
+    let fullContent = '';
+    let responseId: string | null = null;
+
+    for await (const event of stream as AsyncIterable<ResponseStreamEvent>) {
+      if (event.type === 'response.output_text.delta') {
+        const delta = (event as any).delta as string;
+        if (delta) {
+          fullContent += delta;
+          params.onToken(delta);
+        }
+      }
+      if (event.type === 'response.completed') {
+        responseId = (event as any).response?.id || null;
+      }
+    }
+
+    return { text: fullContent, responseId };
   }
 
   /**

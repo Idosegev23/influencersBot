@@ -42,10 +42,12 @@ export interface SandwichBotInput {
   modelTier?: 'nano' | 'standard' | 'full'; // From decision engine modelStrategy
   onToken?: (token: string) => void; // Real-time streaming callback
   personalityConfig?: any; // Pre-loaded personality (avoids DB call)
+  previousResponseId?: string | null; // OpenAI Responses API: chain context
 }
 
 export interface SandwichBotOutput {
   response: string;
+  responseId?: string | null; // OpenAI Responses API response ID for context chaining
   metadata: {
     archetype: string;
     confidence: number;
@@ -157,6 +159,7 @@ export class SandwichBot {
         onToken: input.onToken,
         modelTier: input.modelTier,
         personalityConfig: input.personalityConfig,
+        previousResponseId: input.previousResponseId,
       }
     );
 
@@ -190,6 +193,7 @@ export class SandwichBot {
 
     return {
       response: finalResponse,
+      responseId: archetypeResult.responseId,
       metadata: {
         archetype: classification.primaryArchetype,
         confidence: classification.confidence,
