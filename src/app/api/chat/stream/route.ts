@@ -56,12 +56,8 @@ import {
   buildSecurityContext,
   getPolicySummary,
 } from '@/engines/policy';
-import {
-  applyExperiments,
-  trackExperimentExposure,
-  type ExperimentContext,
-  type ExperimentAssignment,
-} from '@/engines/experiments';
+// Experiments disabled — table doesn't exist yet
+// import { applyExperiments, trackExperimentExposure, type ExperimentContext } from '@/engines/experiments';
 import type { EngineContext, AccountContext, SessionContext, UserContext, KnowledgeRefs, LimitsContext, RequestContext } from '@/engines/context';
 import { processSandwichMessageWithMetadata } from '@/lib/chatbot/sandwichBot';
 import { buildConversationContext, trimToTokenBudget, updateRollingSummary, shouldUpdateSummary } from '@/lib/chatbot/conversation-memory';
@@ -250,10 +246,10 @@ export async function POST(req: NextRequest) {
           return;
         }
 
-        // === PARALLEL: Understanding (600ms timeout) + Lock + Event + Session Load ===
+        // === PARALLEL: Understanding + Lock + Event + Session + History ===
         const anonId = `anon_${currentSessionId?.slice(0, 8) || 'guest'}`;
 
-        const [understanding, , , sessionData] = await Promise.all([
+        const [understanding, , , sessionData, historyData] = await Promise.all([
           // Understanding: GPT-5 Nano with 600ms timeout, regex fallback
           understandMessageWithTimeout(message, { timeoutMs: 600, accountId }),
           // Lock
@@ -289,6 +285,16 @@ export async function POST(req: NextRequest) {
                 .select('*')
                 .eq('id', currentSessionId)
                 .single()
+                .then(r => r.data)
+            : Promise.resolve(null),
+          // Conversation history (moved here — runs in parallel instead of sequentially)
+          (currentSessionId && isValidSessionId(currentSessionId))
+            ? supabase
+                .from('chat_messages')
+                .select('role, content')
+                .eq('session_id', currentSessionId)
+                .order('created_at', { ascending: false })
+                .limit(10)
                 .then(r => r.data)
             : Promise.resolve(null),
         ]);
@@ -476,33 +482,6 @@ export async function POST(req: NextRequest) {
           decision = applyPolicyOverrides(decision, policyResult.overrides);
         }
 
-        // === EXPERIMENTS ===
-        // Use anonId defined earlier (before support flow)
-        const expContext: ExperimentContext = {
-          anonId,
-          sessionId: currentSessionId,
-          accountId,
-          mode: 'creator',
-          intent: understanding?.intent,
-        };
-
-        // Apply experiment overrides to UI directives
-        const { directives: experimentDirectives, experiments } = await applyExperiments(
-          expContext,
-          decision.uiDirectives
-        );
-        
-        // Update decision with experiment overrides
-        decision = {
-          ...decision,
-          uiDirectives: experimentDirectives,
-        };
-
-        // Track experiment exposures
-        for (const exp of experiments) {
-          await trackExperimentExposure(expContext, exp, decision.decisionId);
-        }
-
         // === SEND META (fast!) ===
         const metaEvent: StreamMeta = {
           type: 'meta',
@@ -518,12 +497,7 @@ export async function POST(req: NextRequest) {
             label,
             action: 'quick_action',
           })),
-          // Pass experiments to client for attribution
-          experiments: experiments.map(e => ({
-            experimentKey: e.experimentKey,
-            variantId: e.variantId,
-            variantName: e.variantName,
-          })),
+          experiments: [],
         };
         controller.enqueue(encodeEvent(metaEvent));
 
@@ -546,18 +520,9 @@ export async function POST(req: NextRequest) {
 
         // === USE SANDWICH BOT ===
         console.log('[Stream] 🥪 Using Sandwich Bot architecture');
-        
-        // Sandwich Bot (static import)
-        
-        // Get conversation history
-        const { data: historyMessages } = await supabase
-          .from('chat_messages')
-          .select('role, content')
-          .eq('session_id', currentSessionId)
-          .order('created_at', { ascending: false })
-          .limit(10);
 
-        const conversationHistory = (historyMessages || [])
+        // Conversation history was loaded in parallel above (historyData)
+        const conversationHistory = (historyData || [])
           .reverse()
           .map(m => ({
             role: m.role as 'user' | 'assistant',
