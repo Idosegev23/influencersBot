@@ -351,7 +351,7 @@ export class NewScanOrchestrator {
           const postId = postIdMap.get(comment.post_shortcode);
           if (!postId) continue;
 
-          await this.supabase.from('instagram_comments').upsert({
+          const { error: commentError } = await this.supabase.from('instagram_comments').upsert({
             post_id: postId,
             account_id: accountId,
             comment_id: comment.comment_id,
@@ -360,13 +360,17 @@ export class NewScanOrchestrator {
             author_profile_pic: comment.author_profile_pic,
             is_owner_reply: comment.is_owner_reply,
             likes_count: comment.likes_count,
-            commented_at: comment.commented_at,
+            commented_at: comment.commented_at || new Date().toISOString(),
             scraped_at: new Date().toISOString(),
           }, {
             onConflict: 'post_id,comment_id',
           });
 
-          stats.commentsCount++;
+          if (commentError) {
+            console.error(`[Scan] Failed to save comment ${comment.comment_id}:`, commentError.message);
+          } else {
+            stats.commentsCount++;
+          }
         }
       }
 

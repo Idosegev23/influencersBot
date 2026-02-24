@@ -737,7 +737,10 @@ export class ScrapeCreatorsClient {
       }
     }
 
-    return { highlights: allHighlights, samples };
+    // Return only the highlights we actually processed for samples (not all)
+    // The orchestrator saves metadata and matches items — returning unprocessed
+    // highlights leads to metadata-only entries with 0 items
+    return { highlights, samples };
   }
 
   /**

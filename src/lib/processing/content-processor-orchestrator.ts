@@ -374,7 +374,7 @@ async function loadScrapedContent(accountId: string): Promise<ContentForProcessi
     .from('instagram_comments')
     .select('*')
     .eq('account_id', accountId)
-    .order('posted_at', { ascending: false });
+    .order('commented_at', { ascending: false });
 
   // Load websites
   const { data: websites } = await supabase
