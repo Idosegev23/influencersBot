@@ -1,8 +1,7 @@
 /**
- * AI Persona Builder - בניית פרסונה מקצועית עם GPT-5.2 Pro
- * 🚀 UPGRADED: Now using GPT-5.2 Pro with HIGH reasoning + verbosity for DEEP analysis
- * 
- * NOTE: Still importing Gemini for backward compatibility, but main function uses GPT-5.2 Pro
+ * AI Persona Builder - בניית פרסונה מקצועית
+ * Primary: GPT-5.2 Pro (reasoning)
+ * Fallback: Gemini 3 Pro (when OpenAI quota exceeded / errors)
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
@@ -15,6 +14,9 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_A
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+// Initialize Gemini
+const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
 
 // ============================================
 // Type Definitions
@@ -208,17 +210,143 @@ export async function buildPersonaWithGemini(
   preprocessedData: PreprocessedData,
   profileData?: any
 ): Promise<GeminiPersonaOutput> {
-  console.log('🧠 [GPT-5.2 Pro] Starting DEEP persona generation...');
+  // Prepare input data + prompt (shared between providers)
+  const inputData = prepareInputData(preprocessedData, profileData);
+  const fullPrompt = buildFullPrompt(inputData);
+  const inputSize = JSON.stringify(inputData).length;
 
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error('OPENAI_API_KEY is not configured');
+  // Try GPT-5.2 Pro first, then fallback to Gemini 3.1 Pro
+  let text: string | null = null;
+
+  // ── Attempt 1: GPT-5.2 Pro ──
+  if (process.env.OPENAI_API_KEY) {
+    text = await tryGPT(fullPrompt, inputSize);
   }
 
-  // Prepare input data
-  const inputData = prepareInputData(preprocessedData, profileData);
+  // ── Attempt 2: Gemini 3.1 Pro fallback ──
+  if (!text) {
+    console.log('🔄 [Fallback] GPT-5.2 Pro unavailable, trying Gemini 3.1 Pro...');
+    text = await tryGemini(fullPrompt, inputSize);
+  }
 
-  // Build the full prompt
-  const fullPrompt = `${PERSONA_BUILDER_PROMPT}
+  if (!text) {
+    throw new Error('All AI providers failed for persona building (GPT-5.2 Pro + Gemini 3.1 Pro)');
+  }
+
+  console.log(`📝 Response length: ${text.length} characters`);
+  const persona = parseGeminiResponse(text);
+  console.log('🎉 Persona generation complete!');
+  return persona;
+}
+
+// ── GPT-5.2 Pro ──
+async function tryGPT(fullPrompt: string, inputSize: number): Promise<string | null> {
+  console.log('🧠 [GPT-5.2 Pro] Starting persona generation...');
+  console.log(`📊 Input data size: ${inputSize} characters`);
+
+  let text: string | null = null;
+  const retries = 2;
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      console.log(`⚡ [GPT] Attempt ${attempt}/${retries}...`);
+
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('GPT-5.2 Pro request timeout (600s)')), 600000);
+      });
+
+      const gptPromise = openai.responses.create({
+        model: 'gpt-5.2-pro',
+        input: fullPrompt,
+        reasoning: { effort: 'high' },
+        text: { verbosity: 'high' },
+      });
+
+      const response = await Promise.race([gptPromise, timeoutPromise]);
+
+      console.log('✅ [GPT-5.2 Pro] Request succeeded!');
+
+      // Extract text from response
+      const rawOutput = (response as any).output;
+
+      if (typeof rawOutput === 'string') {
+        text = rawOutput;
+      } else if (Array.isArray(rawOutput)) {
+        const messageObj = rawOutput.find((item: any) => item.type === 'message');
+        if (messageObj?.content && Array.isArray(messageObj.content)) {
+          const textContent = messageObj.content.find((c: any) => c.type === 'output_text' || c.text);
+          text = textContent?.text;
+        }
+      } else if (rawOutput && typeof rawOutput === 'object') {
+        text = rawOutput.text || rawOutput.content;
+      }
+
+      if (text && typeof text === 'string') break;
+      throw new Error('Failed to extract text from GPT response');
+    } catch (error: any) {
+      console.error(`❌ [GPT] Attempt ${attempt} failed:`, error.message);
+      if (attempt < retries) {
+        await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+      }
+    }
+  }
+
+  return text;
+}
+
+// ── Gemini 3.1 Pro ──
+async function tryGemini(fullPrompt: string, inputSize: number): Promise<string | null> {
+  if (!genAI) {
+    console.error('❌ [Gemini] GEMINI_API_KEY not configured, cannot fallback');
+    return null;
+  }
+
+  console.log('🧠 [Gemini 3.1 Pro] Starting persona generation...');
+  console.log(`📊 Input data size: ${inputSize} characters`);
+
+  const retries = 2;
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      console.log(`⚡ [Gemini] Attempt ${attempt}/${retries}...`);
+
+      const model = genAI.getGenerativeModel({
+        model: 'gemini-3.1-pro-preview',
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.3,
+          maxOutputTokens: 16384,
+        },
+      });
+
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Gemini 3.1 Pro request timeout (300s)')), 300000);
+      });
+
+      const geminiPromise = model.generateContent(fullPrompt);
+      const result = await Promise.race([geminiPromise, timeoutPromise]);
+      const text = result.response.text();
+
+      if (text && text.length > 100) {
+        console.log('✅ [Gemini 3.1 Pro] Request succeeded!');
+        return text;
+      }
+
+      throw new Error('Gemini returned empty or too-short response');
+    } catch (error: any) {
+      console.error(`❌ [Gemini] Attempt ${attempt} failed:`, error.message);
+      if (attempt < retries) {
+        await new Promise(resolve => setTimeout(resolve, attempt * 3000));
+      }
+    }
+  }
+
+  return null;
+}
+
+// ── Build the full prompt (shared) ──
+function buildFullPrompt(inputData: any): string {
+  return `${PERSONA_BUILDER_PROMPT}
 
 נתונים מעובדים:
 ${JSON.stringify(inputData, null, 2)}
@@ -229,15 +357,15 @@ ${JSON.stringify(inputData, null, 2)}
     "who": "תיאור הדמות",
     "targetAudience": "קהל היעד",
     "corePromise": "ההבטחה המרכזית",
-    "values": ["ערך 1", "ערך 2", ...]
+    "values": ["ערך 1", "ערך 2"]
   },
   "voice": {
     "tone": "תיאור טון הדיבור",
     "responseStructure": "מבנה תשובה אופייני",
     "avgLength": "אורך ממוצע",
-    "firstPerson": true/false,
-    "recurringPhrases": ["ביטוי 1", "ביטוי 2", ...],
-    "avoidedWords": ["מילה 1", "מילה 2", ...]
+    "firstPerson": true,
+    "recurringPhrases": ["ביטוי 1", "ביטוי 2"],
+    "avoidedWords": ["מילה 1", "מילה 2"]
   },
   "knowledgeMap": {
     "coreTopics": [
@@ -296,98 +424,6 @@ ${JSON.stringify(inputData, null, 2)}
     }
   ]
 }`;
-
-  console.log('🚀 [GPT-5.2 Pro] Sending request with HIGH reasoning...');
-  console.log(`📊 Input data size: ${JSON.stringify(inputData).length} characters`);
-
-  // Call GPT-5.2 Pro with retry mechanism
-  let text: string | null = null;
-  let retries = 3;
-  let lastError: any;
-
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      console.log(`⚡ Attempt ${attempt}/${retries}...`);
-      
-      // Set a timeout of 10 minutes for GPT-5.2 Pro call (reasoning takes time with large datasets!)
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('GPT-5.2 Pro request timeout (600s)')), 600000);
-      });
-
-      const gptPromise = openai.responses.create({
-        model: 'gpt-5.2-pro',
-        input: fullPrompt,
-        reasoning: {
-          effort: 'high', // 🧠 DEEP THINKING!
-        },
-        text: {
-          verbosity: 'high', // 📝 DETAILED OUTPUT!
-        },
-      });
-      
-      const response = await Promise.race([gptPromise, timeoutPromise]);
-      
-      console.log('✅ [GPT-5.2 Pro] Request succeeded!');
-      console.log(`🧠 Reasoning tokens used: ${(response as any).usage?.reasoning_tokens || 0}`);
-      console.log(`📊 Total tokens: ${(response as any).usage?.total_tokens || 0}`);
-      
-      // Extract text from response (handle GPT-5.2 Pro complex format)
-      const rawOutput = (response as any).output;
-      
-      if (typeof rawOutput === 'string') {
-        text = rawOutput;
-        console.log('✅ [GPT-5.2 Pro] Output was string');
-      } else if (Array.isArray(rawOutput)) {
-        // GPT-5.2 Pro returns: [{"type":"reasoning",...}, {"type":"message", "content":[{"text":"..."}]}]
-        console.log('⚙️ [GPT-5.2 Pro] Output is array, extracting message content...');
-        const messageObj = rawOutput.find((item: any) => item.type === 'message');
-        if (messageObj && messageObj.content && Array.isArray(messageObj.content)) {
-          const textContent = messageObj.content.find((c: any) => c.type === 'output_text' || c.text);
-          text = textContent?.text;
-          console.log('✅ [GPT-5.2 Pro] Extracted text from message object');
-        } else {
-          throw new Error('Could not find message content in array response');
-        }
-      } else if (rawOutput && typeof rawOutput === 'object') {
-        // Fallback: try to extract text field
-        text = rawOutput.text || rawOutput.content;
-        console.log('⚠️ [GPT-5.2 Pro] Output was object, extracted:', typeof text);
-      } else {
-        console.error('❌ [GPT-5.2 Pro] Unexpected output format:', typeof rawOutput, rawOutput);
-        throw new Error(`Unexpected output format: ${typeof rawOutput}`);
-      }
-      
-      if (!text || typeof text !== 'string') {
-        throw new Error('Failed to extract text from GPT-5.2 Pro response');
-      }
-      
-      break; // Success, exit retry loop
-      
-    } catch (error: any) {
-      lastError = error;
-      console.error(`❌ Attempt ${attempt} failed:`, error.message);
-      
-      if (attempt < retries) {
-        const delay = attempt * 2000; // 2s, 4s
-        console.log(`⏳ Retrying in ${delay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
-  }
-
-  if (!text) {
-    throw new Error(`GPT-5.2 Pro failed after ${retries} attempts: ${lastError?.message}`);
-  }
-
-  console.log('✅ [GPT-5.2 Pro] Received response');
-  console.log(`📝 Response length: ${text.length} characters`);
-
-  // Parse JSON response
-  const persona = parseGeminiResponse(text);
-
-  console.log('🎉 [GPT-5.2 Pro] Persona generation complete!');
-
-  return persona;
 }
 
 // ============================================
