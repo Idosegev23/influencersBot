@@ -32,10 +32,18 @@ export async function GET(request: Request) {
     const results = [];
 
     // 2. מציאת accounts שצריכים עדכון (לא עודכנו ב-24 שעות)
-    const { data: accounts, error: accountsError } = await supabase
-      .from('accounts')
-      .select('id, username, instagram_username')
+    // instagram_username lives on chatbot_persona, not accounts
+    const { data: personas, error: accountsError } = await supabase
+      .from('chatbot_persona')
+      .select('account_id, instagram_username')
       .not('instagram_username', 'is', null);
+
+    // Map to expected shape
+    const accounts = personas?.map(p => ({
+      id: p.account_id,
+      instagram_username: p.instagram_username,
+      username: p.instagram_username,
+    })) || null;
 
     if (accountsError || !accounts) {
       console.error('[Daily Update] Error loading accounts:', accountsError);

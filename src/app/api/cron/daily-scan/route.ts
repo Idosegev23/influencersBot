@@ -1,6 +1,6 @@
 /**
  * POST /api/cron/daily-scan
- * סריקה יומית ב-5:00 בבוקר
+ * סריקה יומית ב-3:00 לפנות בוקר (01:00 UTC)
  * יוצר jobs לכל החשבונות שצריכים סריקה
  */
 
@@ -26,12 +26,15 @@ export async function POST(req: NextRequest) {
     const supabase = await createClient();
     const repo = getScanJobsRepo();
 
-    // Get all active accounts
-    const { data: accounts, error: accountsError } = await supabase
-      .from('accounts')
-      .select('id, instagram_username')
-      .eq('status', 'active')
+    // Get all accounts with instagram_username from chatbot_persona
+    // (instagram_username lives on chatbot_persona, not accounts)
+    const { data: personas, error: accountsError } = await supabase
+      .from('chatbot_persona')
+      .select('account_id, instagram_username')
       .not('instagram_username', 'is', null);
+
+    // Map to expected shape
+    const accounts = personas?.map(p => ({ id: p.account_id, instagram_username: p.instagram_username })) || null;
 
     if (accountsError) {
       throw new Error(`Failed to fetch accounts: ${accountsError.message}`);

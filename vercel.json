@@ -14,12 +14,12 @@
       "schedule": "0 */6 * * *"
     },
     {
-      "path": "/api/cron/daily-persona-update",
-      "schedule": "0 2 * * *"
+      "path": "/api/cron/daily-scan",
+      "schedule": "0 1 * * *"
     },
     {
-      "path": "/api/cron/daily-scan",
-      "schedule": "0 5 * * *"
+      "path": "/api/cron/daily-persona-update",
+      "schedule": "0 2 * * *"
     },
     {
       "path": "/api/cron/analyze-conversations",
