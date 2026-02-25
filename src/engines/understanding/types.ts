@@ -70,9 +70,13 @@ export interface UnderstandingResult {
   // Route hints for Decision Engine
   routeHints: RouteHints;
   
+  // Search keywords: content-only terms stripped of conversational wrappers
+  // Used by knowledge-retrieval for FTS queries instead of raw message
+  searchKeywords: string[];
+
   // PII tracking for redaction
   piiDetectedPaths: string[];
-  
+
   // Debug
   rawInput: string;
   processingTimeMs: number;

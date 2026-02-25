@@ -166,6 +166,11 @@ function validateAndNormalize(
     ? (raw.sentiment as 'positive' | 'neutral' | 'negative')
     : 'neutral';
 
+  // Validate searchKeywords
+  const searchKeywords: string[] = Array.isArray(raw.searchKeywords)
+    ? (raw.searchKeywords as string[]).filter(k => typeof k === 'string' && k.trim().length > 0)
+    : [];
+
   return {
     intent,
     confidence,
@@ -179,8 +184,9 @@ function validateAndNormalize(
     risk,
     requiresHuman: raw.requiresHuman === true || intent === 'handoff_human' || risk.harassment,
     routeHints,
-    piiDetectedPaths: Array.isArray(raw.piiDetectedPaths) 
-      ? raw.piiDetectedPaths 
+    searchKeywords,
+    piiDetectedPaths: Array.isArray(raw.piiDetectedPaths)
+      ? raw.piiDetectedPaths
       : entities.phoneNumbers.length > 0 ? ['entities.phoneNumbers'] : [],
   };
 }
@@ -200,6 +206,43 @@ function mapIntentToHandler(intent: SimpleIntent): RouteHints['suggestedHandler'
     default:
       return 'chat';
   }
+}
+
+// ============================================
+// Regex-based keyword extraction (fallback when GPT-5 Nano times out)
+// ============================================
+
+const KEYWORD_STOP_WORDS = new Set([
+  // Pronouns, prepositions, conjunctions
+  'את', 'אני', 'של', 'על', 'עם', 'מה', 'איך', 'למה', 'כמה', 'יש', 'לי',
+  'לך', 'אם', 'גם', 'רק', 'כל', 'הוא', 'היא', 'הם', 'הן', 'אנחנו',
+  'זה', 'זו', 'זאת', 'אלה', 'אלו', 'כבר', 'עוד', 'מאוד', 'פה', 'שם',
+  'איזה', 'אילו', 'כמו', 'לפני', 'אחרי', 'בין', 'תחת', 'מול', 'ליד',
+  'בלי', 'עד', 'כדי', 'לא', 'כן', 'או', 'אבל', 'כי', 'שלי', 'שלך',
+  // Imperative verbs (chatbot commands)
+  'תעשי', 'תעשה', 'תני', 'תן', 'תראי', 'תראה', 'עשי', 'עשה',
+  'תסבירי', 'תסביר', 'הסבירי', 'הסביר', 'תספרי', 'תספר', 'ספרי', 'ספר',
+  'תגידי', 'תגיד', 'תכתבי', 'תכתב', 'תעזרי', 'תעזור', 'תביאי', 'תביא',
+  'תפרטי', 'תפרט', 'תדברי', 'תדבר', 'תמליצי', 'תמליץ',
+  // Functional/filler words
+  'סדר', 'קצת', 'בעצם', 'בקיצור', 'בקצרה', 'בבקשה', 'תודה',
+  'אוקי', 'אוקיי', 'בסדר', 'נראה', 'אפשר', 'צריך', 'רוצה', 'רוצים',
+  // English common words
+  'can', 'you', 'the', 'is', 'are', 'do', 'have', 'what', 'how', 'me', 'my',
+  'tell', 'show', 'give', 'make', 'please', 'about', 'between', 'versus', 'vs',
+]);
+
+/**
+ * Extract content keywords from message via regex.
+ * Strips Hebrew imperative verbs, stop words, and conversational filler.
+ * Keeps nouns, brand names, technical terms, English words.
+ */
+function extractSearchKeywords(message: string): string[] {
+  return message
+    .trim()
+    .split(/\s+/)
+    .filter(w => w.length > 1)
+    .filter(w => !KEYWORD_STOP_WORDS.has(w) && !KEYWORD_STOP_WORDS.has(w.toLowerCase()));
 }
 
 /**
@@ -281,6 +324,7 @@ function createDefaultResult(message: string, processingTimeMs: number): Underst
     routeHints: {
       suggestedHandler,
     },
+    searchKeywords: extractSearchKeywords(message),
     piiDetectedPaths: phoneNumbers.length > 0 ? ['entities.phoneNumbers'] : [],
     rawInput: message,
     processingTimeMs,
