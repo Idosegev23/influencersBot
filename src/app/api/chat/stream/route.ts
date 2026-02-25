@@ -608,7 +608,6 @@ export async function POST(req: NextRequest) {
             modelTier: decision?.modelStrategy?.model,
             personalityConfig: personalityConfig || undefined,
             previousResponseId: session?.last_response_id || previousResponseId || null,
-            searchKeywords: understanding.searchKeywords, // AI-extracted content keywords for FTS
             // Real-time streaming: tokens go directly to client as they arrive from OpenAI
             onToken: (token: string) => {
               if (!firstTokenSent) {

@@ -20,11 +20,6 @@ const ARCHETYPE_FALLBACK_SUGGESTIONS: Record<string, string> = {
   fashion: 'מה ללבוש?|טרנד חדש|המלצה לאאוטפיט',
   fitness: 'אימון מהיר|טיפ לכושר|תוכנית אימונים',
   coupons: 'קופונים פעילים|מבצע חדש|הנחה למותג',
-  tech: 'טיפ טכנולוגי|כלי AI מומלץ|מה חדש בתחום?',
-  travel: 'יעד מומלץ|טיפ לטיול|איפה הכי שווה?',
-  parenting: 'טיפ להורים|פעילות לילדים|המלצה לגיל',
-  mindset: 'טיפ למוטיבציה|הרגל חדש|איך להתחיל?',
-  interior: 'רעיון לעיצוב|טיפ לבית|טרנד חדש',
   general: 'ספרי לי עוד|יש קופון?|מה חדש?',
 };
 
@@ -45,7 +40,6 @@ export interface SandwichBotInput {
   userName?: string;
   rollingSummary?: string; // Memory V2: conversation summary for context-aware retrieval
   modelTier?: 'nano' | 'standard' | 'full'; // From decision engine modelStrategy
-  searchKeywords?: string[]; // AI-extracted content keywords for FTS
   onToken?: (token: string) => void; // Real-time streaming callback
   personalityConfig?: any; // Pre-loaded personality (avoids DB call)
   previousResponseId?: string | null; // OpenAI Responses API: chain context
@@ -145,8 +139,7 @@ export class SandwichBot {
         input.accountId,
         classification.primaryArchetype,
         knowledgeQuery,
-        input.rollingSummary,
-        input.searchKeywords
+        input.rollingSummary
       );
     }
 
@@ -222,13 +215,9 @@ export class SandwichBot {
     accountId: string,
     archetype: string,
     userMessage: string,
-    rollingSummary?: string,
-    searchKeywords?: string[]
+    rollingSummary?: string
   ): Promise<KnowledgeBase> {
     console.log(`   → Querying KB for archetype: ${archetype}`);
-    if (searchKeywords?.length) {
-      console.log(`   → AI keywords: [${searchKeywords.join(', ')}]`);
-    }
 
     // Retrieve from all sources (posts, highlights, coupons, insights, websites)
     const knowledgeBase = await retrieveKnowledgeFromSources(
@@ -236,8 +225,7 @@ export class SandwichBot {
       archetype as any,
       userMessage,
       10, // limit
-      rollingSummary,
-      searchKeywords
+      rollingSummary
     );
 
     // Log what we found

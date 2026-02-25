@@ -146,8 +146,7 @@ export async function retrieveKnowledge(
   archetype: ArchetypeType,
   userMessage: string,
   limit: number = 10,
-  rollingSummary?: string,
-  searchKeywords?: string[]
+  rollingSummary?: string
 ): Promise<KnowledgeBase> {
   const supabase = await createClient();
 
@@ -229,7 +228,7 @@ export async function retrieveKnowledge(
   console.log(`[Knowledge Retrieval] 🔍 FTS FALLBACK mode`);
   getMetrics()?.set('retrievalPath', 'fts');
 
-  const normalizedQuery = buildFTSQuery(userMessage, searchKeywords);
+  const normalizedQuery = normalizeHebrewQuery(userMessage);
 
   const [posts, highlights, coupons, partnerships, insights, websites, transcriptions] = await Promise.all([
     fetchRelevantPostsIndexed(supabase, accountId, normalizedQuery, 5),
@@ -392,46 +391,6 @@ function extractKeywordsFromMessage(message: string): string[] {
 }
 
 // ============================================
-// Smart FTS Query Builder
-// ============================================
-
-/**
- * Build the FTS query string.
- * Prefers AI-extracted searchKeywords when available (from Understanding Engine).
- * Falls back to normalizeHebrewQuery(userMessage) when keywords are empty.
- */
-function buildFTSQuery(userMessage: string, searchKeywords?: string[]): string {
-  // If AI provided content keywords, use them directly
-  if (searchKeywords && searchKeywords.length > 0) {
-    console.log(`[Knowledge Retrieval] 🧠 Using AI keywords for FTS: [${searchKeywords.join(', ')}]`);
-    const expanded = new Set<string>();
-    for (const kw of searchKeywords) {
-      expanded.add(kw);
-      // For Hebrew words, add prefix-stripped and suffix-stripped variants
-      if (kw.length >= 3 && !/^[a-zA-Z]/.test(kw)) {
-        if (kw.length > 3 && HEBREW_PREFIXES.test(kw)) {
-          expanded.add(kw.slice(1));
-        }
-        for (const { pattern, replacement } of HEBREW_SUFFIXES) {
-          if (pattern.test(kw) && kw.length > 4) {
-            const stemmed = kw.replace(pattern, replacement);
-            if (stemmed.length >= 2) {
-              expanded.add(stemmed);
-              expanded.add(applySofit(stemmed));
-            }
-          }
-        }
-      }
-    }
-    return Array.from(expanded).join(' OR ');
-  }
-
-  // Fallback: normalize raw message (existing behavior)
-  console.log(`[Knowledge Retrieval] ⚠️ No AI keywords, using normalizeHebrewQuery fallback`);
-  return normalizeHebrewQuery(userMessage);
-}
-
-// ============================================
 // Hebrew Query Normalization
 // ============================================
 // Hebrew FTS with 'simple' config has no stemming —
@@ -440,23 +399,12 @@ function buildFTSQuery(userMessage: string, searchKeywords?: string[]): string {
 // so FTS has a much better chance of matching.
 
 const HEBREW_STOP_WORDS = new Set([
-  // Pronouns, prepositions, conjunctions
   'את', 'אני', 'של', 'על', 'עם', 'מה', 'איך', 'למה', 'כמה', 'יש', 'לי',
   'לך', 'אם', 'גם', 'רק', 'כל', 'הוא', 'היא', 'הם', 'הן', 'אנחנו',
   'זה', 'זו', 'זאת', 'אלה', 'אלו', 'כבר', 'עוד', 'מאוד', 'פה', 'שם',
   'איזה', 'אילו', 'כמו', 'לפני', 'אחרי', 'בין', 'תחת', 'מול', 'ליד',
   'בלי', 'עד', 'כדי', 'לא', 'כן', 'או', 'אבל', 'כי', 'שלי', 'שלך',
-  // Imperative verbs (chatbot commands) — don't pollute FTS queries
-  'תעשי', 'תעשה', 'תני', 'תן', 'תראי', 'תראה', 'עשי', 'עשה',
-  'תסבירי', 'תסביר', 'הסבירי', 'הסביר', 'תספרי', 'תספר', 'ספרי', 'ספר',
-  'תגידי', 'תגיד', 'תכתבי', 'תכתב', 'תעזרי', 'תעזור', 'תביאי', 'תביא',
-  'תפרטי', 'תפרט', 'תדברי', 'תדבר', 'תמליצי', 'תמליץ',
-  // Functional/filler words common in chatbot queries
-  'סדר', 'קצת', 'בעצם', 'בקיצור', 'בקצרה', 'בבקשה', 'תודה',
-  'אוקי', 'אוקיי', 'בסדר', 'נראה', 'אפשר', 'צריך', 'רוצה', 'רוצים',
-  // English stop words
   'can', 'you', 'the', 'is', 'are', 'do', 'have', 'what', 'how', 'me', 'my',
-  'tell', 'show', 'give', 'make', 'please', 'about', 'between', 'versus',
 ]);
 
 // Common Hebrew prefixes: ה (the), ב (in), ל (to), מ (from), כ (like), ש (that), ו (and)
@@ -528,10 +476,7 @@ function normalizeHebrewQuery(message: string): string {
     }
   }
 
-  // Use OR logic so stem variants BROADEN matching instead of narrowing it.
-  // websearch_to_tsquery('simple', 'NPU OR TPU') → 'npu' | 'tpu'
-  // ts_rank naturally sorts by how many terms match (more = higher).
-  return Array.from(normalized).join(' OR ');
+  return Array.from(normalized).join(' ');
 }
 
 // ⚡ NEW: Indexed search for posts (searches ALL posts!)

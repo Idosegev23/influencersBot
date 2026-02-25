@@ -13,13 +13,6 @@ export const SYSTEM_PROMPT = `אתה מנוע הבנת שפה למערכת צ'א
 3. זהה intent, entities, urgency, sentiment
 4. סמן סיכונים (privacy, harassment) אם קיימים
 5. הצע handler מתאים
-6. חלץ מילות חיפוש (searchKeywords) - רק מילות התוכן מהשאלה, בלי פועלי פנייה, מילות קישור, או מילות שיחה
-   דוגמאות:
-   - "תעשי סדר NPU מול TPU" → ["NPU", "TPU"]
-   - "יש לך מתכון לפסטה?" → ["מתכון", "פסטה"]
-   - "מה את חושבת על קרם הפנים של The Ordinary?" → ["קרם פנים", "The Ordinary"]
-   - "ספרי לי על האימון שעשית" → ["אימון"]
-   - "היי מה קורה" → []
 
 ## Intent Types:
 - general: שיחה כללית, ברכות, small talk
@@ -64,7 +57,6 @@ export const SYSTEM_PROMPT = `אתה מנוע הבנת שפה למערכת צ'א
       "showQuickActions": ["string"]
     }
   },
-  "searchKeywords": ["string - מילות תוכן בלבד לחיפוש, בלי פעלים ומילות שיחה"],
   "piiDetectedPaths": ["string - נתיבים שבהם זוהה מידע אישי"]
 }`;
 
@@ -169,10 +161,6 @@ export const OUTPUT_SCHEMA = {
       },
       required: ['suggestedHandler', 'suggestedUi'],
     },
-    searchKeywords: {
-      type: 'array',
-      items: { type: 'string' },
-    },
     piiDetectedPaths: {
       type: 'array',
       items: { type: 'string' },
@@ -191,7 +179,6 @@ export const OUTPUT_SCHEMA = {
     'risk',
     'requiresHuman',
     'routeHints',
-    'searchKeywords',
     'piiDetectedPaths',
   ],
 };
