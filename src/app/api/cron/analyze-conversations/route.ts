@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { analyzeConversations } from '@/lib/chatbot/conversation-learner';
 
-export async function POST(req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
     // Security: Verify cron secret
     const authHeader = req.headers.get('authorization');
