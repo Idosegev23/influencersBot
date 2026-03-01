@@ -212,7 +212,7 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
     accountId,
     query,
     conversationSummary,
-    topK = 5,
+    topK = 8,
     entityTypes: inputEntityTypes,
     timeWindow: inputTimeWindow,
     metadataFilter,
@@ -388,10 +388,11 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
   }, accountId);
 
   // --- Step 3e: Keyword supplement (hybrid search) ---
-  // Run when results are uncertain OR too few candidates
+  // ALWAYS run — ensures brand names, Hebrew terms, and specific phrases are found
+  // even when vector search returns confident but off-topic results
   let keywordSupplementAdded = false;
   const topSimilarityFinal = candidates[0]?.similarity || 0;
-  if (topSimilarityFinal < 0.45 || candidates.length < 5) {
+  {
     pm?.inc('keywordSupplementCalled');
     pm?.mark('kw_start');
     const existingIds = new Set(candidates.map(c => c.id));
@@ -424,20 +425,41 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
 
     // Always search original query terms via ILIKE (catches brand names, Hebrew terms)
     const originalTerms = query.replace(/[?!.,؟]/g, '').split(/\s+/).filter(w => w.length > 2);
+
+    // For Hebrew morphology: also search shorter prefixes of long words
+    // e.g. "פנטניות" (6 chars) → also search "פנטני" (5), "פנטנ" (4)
+    // This handles Hebrew suffixes like ות, ים, ה etc.
+    const allSearchTerms = new Set<string>();
     for (const term of originalTerms.slice(0, 5)) {
-      const { data } = await supabase
+      allSearchTerms.add(term);
+      // Add shorter prefixes for Hebrew words (3+ chars prefix)
+      if (term.length >= 5) {
+        const prefix4 = term.slice(0, 4);
+        allSearchTerms.add(prefix4);
+      }
+      if (term.length >= 6) {
+        const prefix5 = term.slice(0, 5);
+        allSearchTerms.add(prefix5);
+      }
+    }
+
+    // Run all ILIKE searches in parallel for performance
+    const originalSearches = [...allSearchTerms].map(term =>
+      supabase
         .from('document_chunks')
         .select('id, document_id, entity_type, chunk_index, chunk_text, token_count, metadata, updated_at')
         .eq('account_id', accountId)
         .ilike('chunk_text', `%${term}%`)
-        .limit(5);
-      if (data) {
-        for (const kr of data) {
-          if (!existingIds.has(kr.id)) {
-            existingIds.add(kr.id);
-            candidates.push({ ...kr, similarity: 0.45 });
-            added++;
-          }
+        .limit(8)
+    );
+    const originalResults = await Promise.all(originalSearches);
+    for (const { data } of originalResults) {
+      if (!data) continue;
+      for (const kr of data) {
+        if (!existingIds.has(kr.id)) {
+          existingIds.add(kr.id);
+          candidates.push({ ...kr, similarity: 0.45 });
+          added++;
         }
       }
     }
@@ -447,12 +469,6 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
       log.info('Keyword supplement added candidates', { added, keyTerms, originalTerms }, accountId);
     }
     pm?.measure('keywordSupplementMs', 'kw_start');
-  } else {
-    pm?.inc('keywordSupplementSkipped');
-    log.info('Skipped keyword supplement (confident results)', {
-      topSimilarity: topSimilarityFinal,
-      candidateCount: candidates.length,
-    }, accountId);
   }
 
   // --- Handle time "before" filter client-side (Supabase RPC only has "after") ---
@@ -489,13 +505,13 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
   filtered.sort((a, b) => b.similarity - a.similarity);
 
   // --- Chunk dedup + diversity (always active) ---
-  // Max 2 chunks per document, max 3 per entity_type
+  // Max 2 chunks per document, max 6 per entity_type (raised for transcription-heavy accounts)
   const perSource = new Map<string, number>();
   const perType = new Map<string, number>();
   filtered = filtered.filter(c => {
     const srcCount = perSource.get(c.document_id) || 0;
     const typeCount = perType.get(c.entity_type) || 0;
-    if (srcCount >= 2 || typeCount >= 3) return false;
+    if (srcCount >= 2 || typeCount >= 6) return false;
     perSource.set(c.document_id, srcCount + 1);
     perType.set(c.entity_type, typeCount + 1);
     return true;

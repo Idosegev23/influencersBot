@@ -9,6 +9,7 @@ import { buildPersonaWithGemini, savePersonaToDatabase } from '@/lib/ai/gemini-p
 import { preprocessInstagramData } from '@/lib/scraping/preprocessing';
 import { ingestAllForAccount } from '@/lib/rag/ingest';
 import { generateAndSaveChatConfig } from './generate-chat-config';
+import { syncCommerceData } from './sync-commerce-data';
 
 // ============================================
 // Type Definitions
@@ -334,6 +335,24 @@ export async function processAccountContent(
           console.error('❌ Chat config generation failed (non-blocking):', error.message);
           result.errors.push(`Chat config failed: ${error.message}`);
           await logProgress('chat_config_error', `❌ שגיאה בהתאמת צ׳אט: ${error.message}`);
+        }
+      }
+
+      // ============================================
+      // Step 7: Sync Commerce Data (brands → partnerships, coupons → coupons)
+      // ============================================
+      if (config.buildPersona && result.stats.personaBuilt) {
+        console.log('\n🛍️ [Step 7] Syncing extracted commerce data to DB tables...');
+        await logProgress('commerce_sync_start', '🛍️ מסנכרן מותגים וקופונים...');
+
+        try {
+          const commerce = await syncCommerceData(config.accountId);
+          console.log(`✅ Commerce sync: ${commerce.partnershipsCreated} partnerships, ${commerce.couponsCreated} coupons`);
+          await logProgress('commerce_sync_complete', `✅ סונכרנו ${commerce.partnershipsCreated} מותגים ו-${commerce.couponsCreated} קופונים`);
+        } catch (error: any) {
+          console.error('❌ Commerce sync failed (non-blocking):', error.message);
+          result.errors.push(`Commerce sync failed: ${error.message}`);
+          await logProgress('commerce_sync_error', `❌ שגיאה בסנכרון מותגים: ${error.message}`);
         }
       }
 
