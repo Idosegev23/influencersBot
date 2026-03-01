@@ -283,14 +283,14 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
   const baseEmbedding = await generateEmbedding(baseEnrichedQuery);
   pm?.measure('embeddingMs', 'embed_start');
 
-  // Step 3b: Vector search with raised threshold (0.4 vs old 0.25)
+  // Step 3b: Vector search (threshold 0.3 — lower for Hebrew brand names)
   pm?.mark('rpc_start');
   const { data: initialResults, error: vectorError } = await supabase
     .rpc('match_document_chunks', {
       p_account_id: accountId,
       p_embedding: JSON.stringify(baseEmbedding),
       p_match_count: 20,
-      p_match_threshold: 0.4,
+      p_match_threshold: 0.3,
       p_entity_types: entityTypes,
       p_updated_after: timeWindow?.after || null,
     });
@@ -388,18 +388,18 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
   }, accountId);
 
   // --- Step 3e: Keyword supplement (hybrid search) ---
-  // Only run when results are uncertain: topSimilarity < 0.45 or fewer than 5 chunks
+  // Run when results are uncertain OR too few candidates
   let keywordSupplementAdded = false;
   const topSimilarityFinal = candidates[0]?.similarity || 0;
-  if (expandedQuery !== query && (topSimilarityFinal < 0.45 || candidates.length < 5)) {
+  if (topSimilarityFinal < 0.45 || candidates.length < 5) {
     pm?.inc('keywordSupplementCalled');
     pm?.mark('kw_start');
+    const existingIds = new Set(candidates.map(c => c.id));
+    let added = 0;
+
+    // Search expanded key terms (if query was expanded)
     const keyTerms = extractKeyTerms(query, expandedQuery);
     if (keyTerms.length > 0) {
-      const existingIds = new Set(candidates.map(c => c.id));
-      let added = 0;
-
-      // Run ILIKE searches in parallel for speed
       const searches = keyTerms.slice(0, 10).map(term =>
         supabase
           .from('document_chunks')
@@ -415,42 +415,39 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
         for (const kr of data) {
           if (!existingIds.has(kr.id)) {
             existingIds.add(kr.id);
-            candidates.push({
-              ...kr,
-              similarity: 0.45,
-            });
+            candidates.push({ ...kr, similarity: 0.45 });
             added++;
           }
         }
       }
+    }
 
-      // Also search for the original query terms via ILIKE
-      const originalTerms = query.replace(/[?!.,؟]/g, '').split(/\s+/).filter(w => w.length > 2);
-      for (const term of originalTerms.slice(0, 3)) {
-        const { data } = await supabase
-          .from('document_chunks')
-          .select('id, document_id, entity_type, chunk_index, chunk_text, token_count, metadata, updated_at')
-          .eq('account_id', accountId)
-          .ilike('chunk_text', `%${term}%`)
-          .limit(5);
-        if (data) {
-          for (const kr of data) {
-            if (!existingIds.has(kr.id)) {
-              existingIds.add(kr.id);
-              candidates.push({ ...kr, similarity: 0.45 });
-              added++;
-            }
+    // Always search original query terms via ILIKE (catches brand names, Hebrew terms)
+    const originalTerms = query.replace(/[?!.,؟]/g, '').split(/\s+/).filter(w => w.length > 2);
+    for (const term of originalTerms.slice(0, 5)) {
+      const { data } = await supabase
+        .from('document_chunks')
+        .select('id, document_id, entity_type, chunk_index, chunk_text, token_count, metadata, updated_at')
+        .eq('account_id', accountId)
+        .ilike('chunk_text', `%${term}%`)
+        .limit(5);
+      if (data) {
+        for (const kr of data) {
+          if (!existingIds.has(kr.id)) {
+            existingIds.add(kr.id);
+            candidates.push({ ...kr, similarity: 0.45 });
+            added++;
           }
         }
       }
+    }
 
-      if (added > 0) {
-        keywordSupplementAdded = true;
-        log.info('Keyword supplement added candidates', { added, keyTerms }, accountId);
-      }
+    if (added > 0) {
+      keywordSupplementAdded = true;
+      log.info('Keyword supplement added candidates', { added, keyTerms, originalTerms }, accountId);
     }
     pm?.measure('keywordSupplementMs', 'kw_start');
-  } else if (expandedQuery !== query) {
+  } else {
     pm?.inc('keywordSupplementSkipped');
     log.info('Skipped keyword supplement (confident results)', {
       topSimilarity: topSimilarityFinal,

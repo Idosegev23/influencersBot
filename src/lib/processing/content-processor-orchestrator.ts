@@ -8,6 +8,7 @@ import { transcribeVideo, saveTranscription, getAllTranscriptions } from '@/lib/
 import { buildPersonaWithGemini, savePersonaToDatabase } from '@/lib/ai/gemini-persona-builder';
 import { preprocessInstagramData } from '@/lib/scraping/preprocessing';
 import { ingestAllForAccount } from '@/lib/rag/ingest';
+import { generateAndSaveChatConfig } from './generate-chat-config';
 
 // ============================================
 // Type Definitions
@@ -317,6 +318,24 @@ export async function processAccountContent(
       console.log('\n⏭️  [Step 5/5] Skipping persona building (disabled)');
       await logProgress('persona', '⏭️ דילוג על בניית פרסונה (מושבת)');
     }
+
+      // ============================================
+      // Step 6: Auto-generate Chat Config from Persona
+      // ============================================
+      if (config.buildPersona && result.stats.personaBuilt) {
+        console.log('\n🎨 [Step 6] Generating chat page config from persona...');
+        await logProgress('chat_config_start', '🎨 מייצר הגדרות צ׳אט מהפרסונה...');
+
+        try {
+          const chatConfig = await generateAndSaveChatConfig(config.accountId);
+          console.log(`✅ Chat config generated: type=${chatConfig.influencerType}, ${chatConfig.questions.length} questions`);
+          await logProgress('chat_config_complete', `✅ עמוד צ׳אט הותאם: ${chatConfig.influencerType} • ${chatConfig.questions.length} שאלות מוצעות`);
+        } catch (error: any) {
+          console.error('❌ Chat config generation failed (non-blocking):', error.message);
+          result.errors.push(`Chat config failed: ${error.message}`);
+          await logProgress('chat_config_error', `❌ שגיאה בהתאמת צ׳אט: ${error.message}`);
+        }
+      }
 
       // ============================================
       // Mark as complete
