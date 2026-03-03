@@ -19,6 +19,7 @@ const RATE_LIMITS = {
   admin: { windowMs: 60 * 1000, maxRequests: 20 },
   auth: { windowMs: 60 * 1000, maxRequests: 50 },
   influencer: { windowMs: 60 * 1000, maxRequests: 200 }, // High limit for dashboard
+  widget: { windowMs: 60 * 1000, maxRequests: 50 }, // Widget chat endpoint
 };
 
 function getClientIP(request: NextRequest): string {
@@ -81,7 +82,10 @@ export function middleware(request: NextRequest) {
     let prefix = 'api';
     
     // Different limits for different endpoints
-    if (pathname.startsWith('/api/chat')) {
+    if (pathname.startsWith('/api/widget')) {
+      config = RATE_LIMITS.widget;
+      prefix = 'widget';
+    } else if (pathname.startsWith('/api/chat')) {
       config = RATE_LIMITS.chat;
       prefix = 'chat';
     } else if (pathname.includes('/auth')) {
