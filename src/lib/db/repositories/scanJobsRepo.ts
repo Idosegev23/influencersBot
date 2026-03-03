@@ -241,9 +241,8 @@ export class ScanJobsRepository {
       .eq('id', jobId)
       .single();
 
-    const currentLogs = job?.step_logs || [];
-    
-    // Add new log entry
+    const currentLogs: ScanStepLog[] = job?.step_logs || [];
+
     const newLog: ScanStepLog = {
       step,
       status,
@@ -252,7 +251,17 @@ export class ScanJobsRepository {
       timestamp: new Date().toISOString(),
     };
 
-    const updatedLogs = [...currentLogs, newLog];
+    // Upsert: if a running entry with the same step name exists, update it in place
+    const existingIdx = currentLogs.findIndex(
+      (l) => l.step === step && l.status === 'running',
+    );
+    let updatedLogs: ScanStepLog[];
+    if (existingIdx >= 0 && status === 'running') {
+      updatedLogs = [...currentLogs];
+      updatedLogs[existingIdx] = newLog;
+    } else {
+      updatedLogs = [...currentLogs, newLog];
+    }
 
     // Update job with new logs
     const { error } = await supabase

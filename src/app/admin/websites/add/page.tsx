@@ -262,9 +262,9 @@ export default function AddWebsitePage() {
             <p className="text-gray-400 mb-6">התהליך עשוי לקחת כמה דקות. אל תסגרו את הדף.</p>
 
             <div className="space-y-3 mb-6">
-              {(jobStatus?.steps || []).map((step: any, i: number) => (
-                <div key={i} className="flex items-center gap-3">
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
+              {deduplicateSteps(jobStatus?.steps || []).map((step: any, i: number) => (
+                <div key={step.step || i} className="flex items-center gap-3">
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 ${
                     step.status === 'completed' ? 'bg-green-500 text-white' :
                     step.status === 'running' ? 'bg-indigo-500 text-white animate-pulse' :
                     step.status === 'failed' ? 'bg-red-500 text-white' :
@@ -274,7 +274,7 @@ export default function AddWebsitePage() {
                      step.status === 'running' ? <Loader2 className="w-3 h-3 animate-spin" /> :
                      ''}
                   </div>
-                  <span className={`text-sm ${step.status === 'running' ? 'text-white' : 'text-gray-400'}`}>
+                  <span className={`text-sm ${step.status === 'running' ? 'text-white font-medium' : step.status === 'completed' ? 'text-green-400' : 'text-gray-400'}`}>
                     {step.message}
                   </span>
                 </div>
@@ -286,7 +286,7 @@ export default function AddWebsitePage() {
               <motion.div
                 className="h-full bg-gradient-to-r from-indigo-500 to-purple-500"
                 initial={{ width: '5%' }}
-                animate={{ width: `${jobStatus?.steps?.slice(-1)[0]?.progress || 10}%` }}
+                animate={{ width: `${getLatestProgress(jobStatus?.steps || [])}%` }}
                 transition={{ duration: 0.5 }}
               />
             </div>
@@ -437,4 +437,23 @@ function formatNumber(num: number): string {
   if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
   if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
   return num.toString();
+}
+
+/** Show only the latest entry per step name */
+function deduplicateSteps(steps: any[]): any[] {
+  const map = new Map<string, any>();
+  for (const s of steps) {
+    map.set(s.step, s);
+  }
+  return Array.from(map.values());
+}
+
+/** Get the highest progress value from step logs */
+function getLatestProgress(steps: any[]): number {
+  if (!steps || steps.length === 0) return 5;
+  let max = 5;
+  for (const s of steps) {
+    if (s.progress > max) max = s.progress;
+  }
+  return max;
 }

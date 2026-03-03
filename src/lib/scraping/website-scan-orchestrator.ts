@@ -5,7 +5,7 @@
 
 import { randomUUID } from 'crypto';
 import { crawlWebsiteFull, saveFullCrawlResults } from './website-crawler';
-import type { WebsiteCrawlResult } from './website-crawler';
+import type { WebsiteCrawlResult, CrawlProgressCallback } from './website-crawler';
 import { getScanJobsRepo } from '@/lib/db/repositories/scanJobsRepo';
 import type { ProgressCallback } from './newScanOrchestrator';
 
@@ -100,16 +100,24 @@ export class WebsiteScanOrchestrator {
 
       let crawlResult: WebsiteCrawlResult;
       try {
+        const crawlProgress: CrawlProgressCallback = (pagesFound, status, elapsed) => {
+          const minutes = Math.floor(elapsed / 60);
+          const seconds = elapsed % 60;
+          const timeStr = minutes > 0 ? `${minutes}:${String(seconds).padStart(2, '0')}` : `${seconds}s`;
+          const pct = 15 + Math.min(Math.round((pagesFound / fullConfig.maxPages) * 25), 25);
+          progress('crawl', 'running', pct, `סורק... נמצאו ${pagesFound} דפים (${timeStr})`);
+        };
+
         crawlResult = await crawlWebsiteFull(validatedUrl, {
           maxPages: fullConfig.maxPages,
           maxDepth: fullConfig.maxDepth,
-        });
+        }, crawlProgress);
 
         stats.pagesScraped = crawlResult.stats.pagesSucceeded;
         stats.totalWords = crawlResult.stats.totalWords;
         stats.totalImages = crawlResult.stats.totalImages;
 
-        progress('crawl', 'completed', 40, `נסרקו ${stats.pagesScraped} דפים (${stats.totalWords} מילים)`);
+        progress('crawl', 'completed', 40, `נסרקו ${stats.pagesScraped} דפים (${stats.totalWords.toLocaleString()} מילים, ${stats.totalImages} תמונות)`);
       } catch (error: any) {
         progress('crawl', 'failed', 40, `שגיאה בסריקה: ${error.message}`);
         throw error;

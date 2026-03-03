@@ -58,6 +58,10 @@ export interface WebsiteCrawlResult {
   errors: Array<{ url: string; error: string }>;
 }
 
+export interface CrawlProgressCallback {
+  (pagesFound: number, status: string, elapsed: number): void;
+}
+
 const DEFAULT_CRAWL_CONFIG: WebsiteCrawlConfig = {
   maxPages: 50,
   maxDepth: 3,
@@ -70,6 +74,7 @@ const DEFAULT_CRAWL_CONFIG: WebsiteCrawlConfig = {
 
 async function runApifyWebsiteCrawler(
   input: Record<string, unknown>,
+  onProgress?: CrawlProgressCallback,
 ): Promise<any> {
   if (!APIFY_TOKEN) {
     throw new Error('APIFY_TOKEN is not configured');
@@ -101,9 +106,10 @@ async function runApifyWebsiteCrawler(
 
       const result = await response.json();
       const runId = result.data.id;
-      console.log(`[Website Crawler] Run started: ${runId}`);
+      const datasetId = result.data.defaultDatasetId;
+      console.log(`[Website Crawler] Run started: ${runId}, dataset: ${datasetId}`);
 
-      return await waitForApifyRun(runId);
+      return await waitForApifyRun(runId, datasetId, onProgress);
     } catch (error: any) {
       if (retry === maxRetries - 1) {
         console.error(`[Website Crawler] Failed after ${maxRetries} retries:`, error.message);
@@ -118,7 +124,12 @@ async function runApifyWebsiteCrawler(
   throw new Error('Failed to start website crawler after retries');
 }
 
-async function waitForApifyRun(runId: string, maxWaitTime: number = 10 * 60 * 1000): Promise<any> {
+async function waitForApifyRun(
+  runId: string,
+  datasetId: string,
+  onProgress?: CrawlProgressCallback,
+  maxWaitTime: number = 10 * 60 * 1000,
+): Promise<any> {
   const pollInterval = 5000;
   const startTime = Date.now();
   const maxRetries = 3;
@@ -144,7 +155,30 @@ async function waitForApifyRun(runId: string, maxWaitTime: number = 10 * 60 * 10
         const run = result.data;
         const elapsed = Math.round((Date.now() - startTime) / 1000);
 
-        console.log(`[Website Crawler] Status: ${run.status} (${elapsed}s elapsed)`);
+        // Check dataset item count for live progress
+        let pagesFound = 0;
+        if (datasetId && onProgress) {
+          try {
+            const dsRes = await fetch(
+              `https://api.apify.com/v2/datasets/${datasetId}?token=${APIFY_TOKEN}`,
+              { signal: AbortSignal.timeout(10000) },
+            );
+            if (dsRes.ok) {
+              const dsData = await dsRes.json();
+              pagesFound = dsData.data?.itemCount || 0;
+            }
+          } catch {
+            // Non-critical — skip this progress update
+          }
+        }
+
+        console.log(`[Website Crawler] Status: ${run.status}, pages: ${pagesFound} (${elapsed}s elapsed)`);
+
+        // Report progress
+        if (onProgress) {
+          const statusText = run.status === 'RUNNING' ? 'crawling' : run.status.toLowerCase();
+          onProgress(pagesFound, statusText, elapsed);
+        }
 
         if (run.status === 'SUCCEEDED') {
           console.log(`[Website Crawler] Completed in ${elapsed}s`);
@@ -210,6 +244,7 @@ async function getApifyDatasetItems<T>(datasetId: string): Promise<T[]> {
 export async function crawlWebsiteFull(
   rootUrl: string,
   config: Partial<WebsiteCrawlConfig> = {},
+  onProgress?: CrawlProgressCallback,
 ): Promise<WebsiteCrawlResult> {
   const fullConfig = { ...DEFAULT_CRAWL_CONFIG, ...config };
   const startTime = Date.now();
@@ -231,7 +266,7 @@ export async function crawlWebsiteFull(
     saveScreenshots: false,
     saveHtml: false,
     saveMarkdown: true,
-  });
+  }, onProgress);
 
   const items = await getApifyDatasetItems<any>(run.defaultDatasetId);
 
