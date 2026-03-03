@@ -108,10 +108,13 @@ export default function AddWebsitePage() {
       let accountId: string;
       if (accountRes.ok) {
         const accountData = await accountRes.json();
-        accountId = accountData.account?.id || accountData.id;
+        accountId = accountData.accountId || accountData.account?.id || accountData.id;
       } else {
-        // If account creation fails, try to use URL hostname as a fallback ID
         throw new Error('Failed to create account for website');
+      }
+
+      if (!accountId) {
+        throw new Error('Failed to get account ID');
       }
 
       setState((s) => ({ ...s, accountId }));
