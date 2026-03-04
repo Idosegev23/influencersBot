@@ -64,26 +64,25 @@ const nextConfig: NextConfig = {
     ],
   },
   async headers() {
-    // Security headers without X-Frame-Options (for proxy/widget routes)
-    const headersWithoutFrame = securityHeaders.filter(
+    // Headers without X-Frame-Options (for iframe-embeddable routes)
+    const headersNoFrame = securityHeaders.filter(
       (h) => h.key !== 'X-Frame-Options',
     );
 
     return [
       {
-        // Proxy route must be embeddable in iframe
-        source: '/api/admin/proxy',
-        headers: headersWithoutFrame,
-      },
-      {
-        // Widget routes must be embeddable
-        source: '/api/widget/:path*',
-        headers: headersWithoutFrame,
-      },
-      {
-        // All other routes get full security headers
-        source: '/:path*',
+        // All routes EXCEPT proxy and widget get X-Frame-Options: DENY
+        source: '/((?!api/admin/proxy|api/widget).*)',
         headers: securityHeaders,
+      },
+      {
+        // Proxy + widget routes: no X-Frame-Options (must be embeddable)
+        source: '/api/admin/proxy',
+        headers: headersNoFrame,
+      },
+      {
+        source: '/api/widget/:path*',
+        headers: headersNoFrame,
       },
     ];
   },
