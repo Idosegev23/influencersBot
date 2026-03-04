@@ -75,6 +75,30 @@ interface Message {
   suggestions?: string[]; // AI-generated follow-up suggestions
 }
 
+/**
+ * Fix inline numbered/bullet lists that the LLM sometimes outputs on a single line.
+ * e.g. "intro: 1. item 2. item" → "intro:\n\n1. item\n2. item"
+ */
+function fixMarkdownLists(text: string): string {
+  if (!text) return text;
+  // Fix inline numbered lists: "some text 1. item 2. item"
+  // Look for patterns where a number+dot follows text (not at line start)
+  let fixed = text.replace(/([^\n])(\s+)(\d+)\.\s+\*\*/g, (_, before, _space, num) => {
+    // If this is the first item, add double newline for list start
+    return num === '1' ? `${before}\n\n${num}. **` : `${before}\n${num}. **`;
+  });
+  // Also fix cases without bold: "text 1. item 2. item"
+  fixed = fixed.replace(/([.!?،:])(\s+)(\d+)\.\s+(?!\*\*)/g, (_, punct, _space, num) => {
+    return num === '1' ? `${punct}\n\n${num}. ` : `${punct}\n${num}. `;
+  });
+  // Fix remaining inline numbered items (2., 3., etc.) that aren't at line start
+  fixed = fixed.replace(/([^\n])\s+(\d+)\.\s+\*\*/g, (match, before, num) => {
+    if (Number(num) > 1) return `${before}\n${num}. **`;
+    return match;
+  });
+  return fixed;
+}
+
 const typeIcons: Record<InfluencerType, typeof ChefHat> = {
   food: ChefHat,
   fashion: Shirt,
@@ -909,7 +933,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         // For streaming messages, use the live text (strip suggestions tag)
                         const isStreamingThis = streamingMessageId === msg.id && isStreamActive;
                         const rawContent = isStreamingThis ? streamText : msg.content;
-                        const displayContent = rawContent.replace(/<<SUGGESTIONS>>.*$/s, '').trim();
+                        const displayContent = fixMarkdownLists(rawContent.replace(/<<SUGGESTIONS>>.*$/s, '').trim());
                         // For streaming, use meta directives until done
                         const displayDirectives = isStreamingThis && streamMeta?.uiDirectives 
                           ? streamMeta.uiDirectives as UIDirectives 
