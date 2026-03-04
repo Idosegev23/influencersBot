@@ -260,7 +260,7 @@ function DashboardContent() {
               }`}
             >
               <Users className="w-4 h-4" />
-              משפיענים ({influencers.length})
+              סושיאל ({influencers.length})
             </button>
             <button
               onClick={() => setActiveTab('websites')}
@@ -391,8 +391,8 @@ function DashboardContent() {
                 <div className="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center mx-auto mb-4">
                   <Users className="w-8 h-8 text-gray-600" />
                 </div>
-                <h3 className="text-lg font-medium text-white mb-2">אין עדיין משפיענים</h3>
-                <p className="text-gray-400 mb-6">התחילו על ידי הוספת המשפיען הראשון</p>
+                <h3 className="text-lg font-medium text-white mb-2">אין עדיין חשבונות סושיאל</h3>
+                <p className="text-gray-400 mb-6">התחילו על ידי הוספת חשבון ראשון</p>
                 <Link
                   href="/admin/add"
                   className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-indigo-500/25"
