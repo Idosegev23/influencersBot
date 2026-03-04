@@ -86,6 +86,7 @@ export default function WebsitePreviewPage() {
             src={proxyUrl}
             className="w-full h-full border-0"
             title="Website Preview"
+            sandbox="allow-same-origin"
           />
         )}
 
