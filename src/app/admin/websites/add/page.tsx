@@ -148,6 +148,20 @@ export default function AddWebsitePage() {
     }
   };
 
+  const handleCancelScan = async () => {
+    if (!state.jobId) return;
+    try {
+      await fetch('/api/scraping/website/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: state.jobId }),
+      });
+    } catch {
+      // Ignore errors — we're resetting anyway
+    }
+    setState((s) => ({ ...s, step: 'url', jobId: null, error: null, isLoading: false }));
+  };
+
   const handleCopyCode = () => {
     const snippet = `<!-- InfluencerBot Widget -->\n<script src="${window.location.origin}/widget.js" data-account-id="${state.accountId}"></script>`;
     navigator.clipboard.writeText(snippet);
@@ -302,6 +316,14 @@ export default function AddWebsitePage() {
                 </button>
               </div>
             )}
+
+            {/* Cancel button */}
+            <button
+              onClick={handleCancelScan}
+              className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-red-400 hover:text-red-300 border border-red-500/30 hover:border-red-500/50 rounded-lg transition-colors"
+            >
+              ביטול סריקה
+            </button>
           </motion.div>
         )}
 

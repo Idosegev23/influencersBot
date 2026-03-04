@@ -35,10 +35,18 @@ export async function POST(req: NextRequest) {
       (j) => j.platform === 'website' && j.status === 'running',
     );
     if (runningJob) {
-      return NextResponse.json(
-        { error: 'A website scan is already running for this account', jobId: runningJob.id },
-        { status: 409 },
-      );
+      // If the job has been "running" for over 10 minutes with no updates, it's stale — auto-cancel
+      const updatedAt = new Date(runningJob.updated_at || runningJob.started_at || 0).getTime();
+      const staleThreshold = 10 * 60 * 1000; // 10 minutes
+      if (Date.now() - updatedAt > staleThreshold) {
+        console.log(`[Website Scan] Auto-cancelling stale job ${runningJob.id}`);
+        await repo.cancel(runningJob.id);
+      } else {
+        return NextResponse.json(
+          { error: 'A website scan is already running for this account', jobId: runningJob.id },
+          { status: 409 },
+        );
+      }
     }
 
     // Create job
