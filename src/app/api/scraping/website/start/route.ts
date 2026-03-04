@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { after } from 'next/server';
 import { getScanJobsRepo } from '@/lib/db/repositories/scanJobsRepo';
 import { getWebsiteScanOrchestrator } from '@/lib/scraping/website-scan-orchestrator';
 
@@ -48,11 +49,22 @@ export async function POST(req: NextRequest) {
       config: { url, maxPages },
     });
 
-    // Start orchestrator in background (fire-and-forget)
-    const orchestrator = getWebsiteScanOrchestrator();
-    orchestrator
-      .run(job.id, url, accountId, { maxPages })
-      .catch((err) => console.error(`[Website Scan] Background run failed:`, err.message));
+    // Run orchestrator in background using after() —
+    // keeps the serverless function alive after the response is sent
+    after(async () => {
+      try {
+        const orchestrator = getWebsiteScanOrchestrator();
+        await orchestrator.run(job.id, url, accountId, { maxPages });
+      } catch (err: any) {
+        console.error(`[Website Scan] Background run failed:`, err.message);
+        // Ensure job is marked failed if orchestrator crashes unexpectedly
+        try {
+          await repo.markFailed(job.id, 'ORCHESTRATOR_CRASH', err.message);
+        } catch {
+          // Last resort — nothing we can do
+        }
+      }
+    });
 
     return NextResponse.json({
       jobId: job.id,
