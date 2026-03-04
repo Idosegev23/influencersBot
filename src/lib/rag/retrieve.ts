@@ -505,13 +505,13 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
   filtered.sort((a, b) => b.similarity - a.similarity);
 
   // --- Chunk dedup + diversity (always active) ---
-  // Max 2 chunks per document, max 6 per entity_type (raised for transcription-heavy accounts)
+  // Max 4 chunks per document (raised to allow full recipes/articles), max 8 per entity_type
   const perSource = new Map<string, number>();
   const perType = new Map<string, number>();
   filtered = filtered.filter(c => {
     const srcCount = perSource.get(c.document_id) || 0;
     const typeCount = perType.get(c.entity_type) || 0;
-    if (srcCount >= 2 || typeCount >= 6) return false;
+    if (srcCount >= 4 || typeCount >= 8) return false;
     perSource.set(c.document_id, srcCount + 1);
     perType.set(c.entity_type, typeCount + 1);
     return true;
@@ -604,7 +604,7 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
       documentId: c.document_id,
       entityType: c.entity_type as EntityType,
       title: doc?.title || `${c.entity_type} chunk`,
-      excerpt: c.chunk_text.substring(0, 800),
+      excerpt: c.chunk_text.substring(0, 3000),
       updatedAt: c.updated_at,
       confidence: rerank?.score || c.similarity,
       chunkIndex: c.chunk_index,

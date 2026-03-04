@@ -94,7 +94,7 @@ export async function processWithHybridRetrieval(
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       {
         role: 'system',
-        content: `אתה עוזר וירטואלי של משפיענית. אם צריך תוכן מפורט - קרא fetch_detailed_content. אם לא - ענה ישירות.
+        content: `אתה עוזר וירטואלי של יוצר/ת תוכן. אם צריך תוכן מפורט - קרא fetch_detailed_content. אם לא - ענה ישירות.
 אל תשתמש ב-[שם] או placeholders.`,
       },
       ...conversationHistory.map(msg => ({
@@ -103,7 +103,7 @@ export async function processWithHybridRetrieval(
       })),
       {
         role: 'user',
-        content: `אתה עוזר וירטואלי של משפיענית. המשתמש שאל:
+        content: `אתה עוזר וירטואלי של יוצר/ת תוכן. המשתמש שאל:
 "${userMessage}"
 
 ${metadataPrompt}
@@ -135,7 +135,7 @@ ${metadataPrompt}
     if (!message.tool_calls || message.tool_calls.length === 0) {
       // No function call needed - direct answer
       console.log('✅ [Stage 2] AI answered directly (no content fetch needed)');
-      return message.content || 'מצטערת, לא הצלחתי להבין. נסי שוב?';
+      return message.content || 'מצטער/ת, לא הצלחתי להבין. נסה/י שוב?';
     }
 
     // ============================================
@@ -179,7 +179,7 @@ ${metadataPrompt}
       // GPT-5 Nano only supports temperature: 1 (default)
     });
 
-    const finalAnswer = finalResponse.choices[0].message.content || 'מצטערת, לא הצלחתי להשלים.';
+    const finalAnswer = finalResponse.choices[0].message.content || 'מצטער/ת, לא הצלחתי להשלים.';
     
     console.log('✅ [Hybrid Bot] Complete!');
     console.log(`📊 Stats: Metadata: ${metadata.length}, Detailed: ${detailedContent.length}`);
@@ -188,7 +188,7 @@ ${metadataPrompt}
 
   } catch (error) {
     console.error('❌ [Hybrid Bot] Error:', error);
-    return 'מצטערת, נתקלתי בבעיה טכנית. נסי שוב בעוד רגע! 🙏';
+    return 'מצטער/ת, נתקלתי בבעיה טכנית. נסה/י שוב בעוד רגע! 🙏';
   }
 }
 
@@ -252,7 +252,7 @@ export async function processWithHybridAndPersona(
     const message = response.choices[0].message;
 
     if (!message.tool_calls || message.tool_calls.length === 0) {
-      return message.content || 'מצטערת, לא הצלחתי להבין. נסי שוב?';
+      return message.content || 'מצטער/ת, לא הצלחתי להבין. נסה/י שוב?';
     }
 
     // Stage 3: Fetch detailed
@@ -285,10 +285,10 @@ export async function processWithHybridAndPersona(
     });
 
     console.log('✅ [Hybrid + Persona Bot] Complete with GPT-5 Nano!');
-    return finalResponse.choices[0].message.content || 'מצטערת, נתקלתי בבעיה.';
+    return finalResponse.choices[0].message.content || 'מצטער/ת, נתקלתי בבעיה.';
 
   } catch (error) {
     console.error('❌ [Hybrid + Persona Bot] Error:', error);
-    return 'מצטערת, נתקלתי בבעיה. נסי שוב! 🙏';
+    return 'מצטער/ת, נתקלתי בבעיה. נסה/י שוב! 🙏';
   }
 }

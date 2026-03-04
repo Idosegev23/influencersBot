@@ -29,16 +29,16 @@ export interface CompactOptions {
 }
 
 const DEFAULTS: CompactOptions = {
-  maxTotalChars: 6000,
-  maxPosts: 4,
-  maxTranscriptions: 5,
-  maxHighlights: 4,
+  maxTotalChars: 20_000,
+  maxPosts: 8,
+  maxTranscriptions: 8,
+  maxHighlights: 6,
   maxPartnerships: 5,
-  maxWebsites: 3,
-  maxPostChars: 400,
-  maxTranscriptionChars: 400,
-  maxHighlightChars: 150,
-  maxWebsiteChars: 200,
+  maxWebsites: 4,
+  maxPostChars: 1500,
+  maxTranscriptionChars: 1500,
+  maxHighlightChars: 600,
+  maxWebsiteChars: 500,
 };
 
 // ============================================

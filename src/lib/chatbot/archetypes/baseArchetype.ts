@@ -23,7 +23,7 @@ const openai = new OpenAI({
 const CHAT_MODEL = 'gpt-5.2-2025-12-11'; // ⚡ Newest and strongest model
 const FALLBACK_MODEL = 'gpt-4o'; // ⚡ Reliable fallback
 const NANO_MODEL = 'gpt-5-nano'; // ⚡ Fastest + cheapest for simple queries
-const MAX_TOKENS = 1024; // Enough for detailed Hebrew responses (recipes, routines)
+const MAX_TOKENS = 2048; // Enough for full Hebrew recipes, routines, and detailed content
 
 // Map decision engine model tiers to actual OpenAI model names
 function resolveModel(tier?: 'nano' | 'standard' | 'full'): { primary: string; fallback: string } {
@@ -52,7 +52,7 @@ export abstract class BaseArchetype {
    * Replace [שם המשפיענית] placeholder with actual influencer name
    */
   private replaceName(text: string, name: string): string {
-    return text.replace(/\[שם המשפיענית\]/g, name);
+    return text.replace(/\[שם המשפיענית\]|\[שם היוצר\/ת\]/g, name);
   }
 
   /**
@@ -60,7 +60,7 @@ export abstract class BaseArchetype {
    */
   async process(input: ArchetypeInput): Promise<ArchetypeOutput> {
     // Extract influencer name early so it's available everywhere
-    const influencerName = input.accountContext?.influencerName || 'המשפיענית';
+    const influencerName = input.accountContext?.influencerName || 'היוצר/ת';
 
     // 1. Check guardrails first
     const triggeredGuardrails = this.checkGuardrails(input.userMessage);
@@ -69,7 +69,7 @@ export abstract class BaseArchetype {
     const criticalGuardrail = triggeredGuardrails.find(g => g.severity === 'critical');
     if (criticalGuardrail) {
       const rule = this.definition.guardrails.find(r => r.id === criticalGuardrail.ruleId);
-      const rawResponse = rule?.blockedResponse || 'מצטערת, אני לא יכולה לעזור בזה. כדאי להתייעץ עם מומחה.';
+      const rawResponse = rule?.blockedResponse || 'מצטער/ת, אני לא יכול/ה לעזור בזה. כדאי להתייעץ עם מומחה/ית.';
       
       return {
         response: this.replaceName(rawResponse, influencerName),
@@ -198,9 +198,9 @@ export abstract class BaseArchetype {
     if (config.narrativePerspective === 'direct') {
       lines.push('דבר/י בגוף ראשון (אני, שלי).');
     } else if (config.narrativePerspective === 'sidekick-professional') {
-      lines.push(`דבר/י כעוזר/ת של ${name}. "היא" לעובדות, "אנחנו" להמלצות.`);
+      lines.push(`דבר/י כעוזר/ת של ${name}. השתמש/י ב"אנחנו" להמלצות.`);
     } else if (config.narrativePerspective === 'sidekick-personal') {
-      lines.push('דבר/י בגוף ראשון רבים (אנחנו ממליצות, אנחנו אומרות).');
+      lines.push('דבר/י בגוף ראשון רבים (אנחנו ממליצים, אנחנו אומרים).');
     }
 
     // Emoji
@@ -243,7 +243,7 @@ export abstract class BaseArchetype {
     input: ArchetypeInput,
     knowledgeQuery: string
   ): Promise<{ text: string; responseId?: string | null }> {
-    const influencerName = input.accountContext.influencerName || 'המשפיענית';
+    const influencerName = input.accountContext.influencerName || 'היוצר/ת';
 
     try {
       // Build context from knowledge base
@@ -261,7 +261,8 @@ export abstract class BaseArchetype {
       }
 
       // Build archetype-specific instructions (replaces system prompt)
-      const instructions = `אתה ${influencerName}, משפיענית שמנהלת שיחה טבעית עם הקהל שלה — כמו חברה, לא כמו מכונת חיפוש.
+      const instructions = `אתה ${influencerName}, יוצר/ת תוכן שמנהל/ת שיחה טבעית עם הקהל — בגובה העיניים, לא כמו מכונת חיפוש.
+⚠️ **מגדר**: דבר/י בלשון ניטרלית. השתמש/י בסלאש כשצריך: "ממליצ/ה", "אומר/ת". אל תשתמש/י בלשון נקבה או זכר באופן בלעדי.
 ⚠️ **אל תפתח/י כל הודעה עם כינויי חיבה** ("מאמי", "אהובה", "יקירה"). תפתח/י ישר לעניין. כינוי חיבה מותר לפעמים, לא בכל הודעה.
 
 📜 הקשר שיחה: **תמיד** תבין/י הפניות להיסטוריה ("המתכון", "מה שאמרת", "זה"). השיחה זורמת — אל תתנהג/י כאילו כל הודעה מתחילה מאפס.
@@ -435,7 +436,7 @@ ${personalityBlock}
     } catch (error) {
       console.error('[BaseArchetype] All models failed:', error);
       return {
-        text: `היי, אני קצת מתקשה למצוא את המידע המדויק כרגע. ${influencerName} בדרך כלל משתפת המון טיפים בנושא הזה! אולי תוכלי לחדד את השאלה?`,
+        text: `היי, אני קצת מתקשה למצוא את המידע המדויק כרגע. ${influencerName} בדרך כלל משתפ/ת המון טיפים בנושא הזה! אולי תוכל/י לחדד את השאלה?`,
         responseId: null,
       };
     }

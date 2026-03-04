@@ -19,7 +19,7 @@ const FASHION_GUARDRAILS: GuardrailRule[] = [
       patterns: [/איך (להיראות|להיות) (יותר )?רז(ה|ות)/i],
     },
     action: 'block',
-    blockedResponse: 'סטייל זה לא עניין של מידה, זה עניין של ביטחון עצמי! 💕\n\n[שם המשפיענית] מאמינה שכל גוף יפה, ושסטייל טוב זה סטייל שגורם לך להרגיש טוב עם עצמך.\n\nבואי נתמקד בגזרות שמחמיאות למבנה הגוף שלך ובצבעים שאת אוהבת!',
+    blockedResponse: 'סטייל זה לא עניין של מידה, זה עניין של ביטחון עצמי! 💕\n\n[שם המשפיענית] מאמינ/ה שכל גוף יפה, ושסטייל טוב זה סטייל שגורם לך להרגיש טוב עם עצמך.\n\nבוא/י נתמקד בגזרות שמחמיאות למבנה הגוף שלך ובצבעים שמתאימים לך!',
     severity: 'critical',
   },
   {
@@ -29,7 +29,7 @@ const FASHION_GUARDRAILS: GuardrailRule[] = [
       keywords: ['זיוף', 'העתק', 'חיקוי', 'פייק', 'לא מקורי'],
     },
     action: 'block',
-    blockedResponse: 'אנחנו לא תומכות בזיופים ❌\n\nיש הרבה מותגים נגישים ומדהימים שנותנים את אותו ה-Vibe. [שם המשפיענית] תמיד מחפשת אופציות במחיר טוב אבל חוקיות.\n\nאת מעוניינת שאמצא לך אלטרנטיבה דומה במחיר נגיש?',
+    blockedResponse: 'אנחנו לא תומכים בזיופים ❌\n\nיש הרבה מותגים נגישים ומדהימים שנותנים את אותו ה-Vibe. [שם המשפיענית] תמיד מחפש/ת אופציות במחיר טוב אבל חוקיות.\n\nמעוניינ/ת שאמצא לך אלטרנטיבה דומה במחיר נגיש?',
     severity: 'critical',
   },
   {
@@ -39,7 +39,7 @@ const FASHION_GUARDRAILS: GuardrailRule[] = [
       keywords: ['מידה', 'size', 'גזרה', 'פיטינג'],
     },
     action: 'warn',
-    warningMessage: 'שימי לב שמידות משתנות בין מותגים! כדאי תמיד לבדוק את טבלת המידות של המותג הספציפי.',
+    warningMessage: 'שים/י לב שמידות משתנות בין מותגים! כדאי תמיד לבדוק את טבלת המידות של המותג הספציפי.',
     severity: 'medium',
   },
 ];
@@ -51,38 +51,38 @@ const FASHION_GUARDRAILS: GuardrailRule[] = [
 const FASHION_DEFINITION: ArchetypeDefinition = {
   type: 'fashion',
   name: 'פאשניסטה',
-  description: 'עוזרת עם סטיילינג, בחירת בגדים, שילובים, ומידות',
-  
+  description: 'עוזר/ת עם סטיילינג, בחירת בגדים, שילובים, ומידות',
+
   triggers: {
     keywords: [
       'בגד', 'אאוטפיט', 'שמלה', 'חולצה', 'מכנסיים', 'נעליים',
       'סטייל', 'מידה', 'צבע', 'איך משלבים', 'איפה קנית',
     ],
   },
-  
+
   logic: {
     buildKnowledgeQuery: (userMessage: string) => {
       return `fashion outfit styling products ${userMessage}`;
     },
-    
+
     responseTemplates: [
       {
         situation: 'חיפוש מוצר',
-        template: 'את מחפשת את {item} שהיא לובשת? אני אשלח לך את הלינק! {coupon}',
+        template: 'מחפש/ת את {item}? אני אשלח לך את הלינק! {coupon}',
         requiredFields: ['item'],
       },
       {
         situation: 'שאלת סטיילינג',
-        template: '{name} משלבת את זה עם {combination}. זה נראה מהמם! 🔥',
+        template: '{name} משלב/ת את זה עם {combination}. זה נראה מהמם! 🔥',
         requiredFields: ['combination'],
       },
     ],
-    
-    defaultResponse: 'אני כאן לעזור עם הסטייל! ספרי לי מה את מחפשת.',
+
+    defaultResponse: 'אני כאן לעזור עם הסטייל! ספר/י לי מה מחפש/ת.',
   },
-  
+
   guardrails: FASHION_GUARDRAILS,
-  
+
   examples: [
     {
       userQuestion: 'איך להיראות רזה יותר בבגדים?',
@@ -104,17 +104,17 @@ export class FashionArchetype extends BaseArchetype {
   // The AI will automatically provide archetype-specific responses based on knowledge base
 
   private buildProductLocationResponse(kb: any): string {
-    return `אני אשלח לך את הלינק המדויק! 
+    return `אני אשלח לך את הלינק המדויק!
 
-[שם המשפיענית] קנתה את זה מ-[מותג] ויש קוד הנחה מיוחד: [קופון]
+[שם המשפיענית] קנה/תה את זה מ-[מותג] ויש קוד הנחה מיוחד: [קופון]
 
-רגע, אני מוודאת שהקוד פעיל... ✨`;
+רגע, אני מוודא/ת שהקוד פעיל... ✨`;
   }
 
   private buildSizingResponse(kb: any): string {
-    return `לגבי מידות - [שם המשפיענית] לוקחת [מידה] במותג הזה.
+    return `לגבי מידות - [שם המשפיענית] לוקח/ת [מידה] במותג הזה.
 
-אבל שימי לב! 👗
+אבל שים/י לב! 👗
 כל מותג עם הגזרות שלו. כדאי לבדוק:
 - את טבלת המידות שלהם
 - את הביקורות (אם כותבים שזה גדול/קטן)
@@ -124,14 +124,14 @@ export class FashionArchetype extends BaseArchetype {
   }
 
   private buildStylingResponse(kb: any): string {
-    return `אוהבת את השאלה! 🔥
+    return `אוהב/ת את השאלה! 🔥
 
-[שם המשפיענית] משלבת את זה ככה:
+[שם המשפיענית] משלב/ת את זה ככה:
 ✨ עם ג'ינס קלאסי לפשטות
 ✨ נעליים שטוחות למראה casual
 ✨ תיק קטן לאיזון
 
-זה הסוד שלה - פשטות שנראית expensive!
+זה הסוד — פשטות שנראית expensive!
 
 רוצה עוד רעיונות לשילובים?`;
   }
@@ -139,14 +139,14 @@ export class FashionArchetype extends BaseArchetype {
   private buildGeneralFashionResponse(kb: any): string {
     return `אני כאן לעזור עם הסטייל! 👗
 
-[שם המשפיענית] מאמינה שאופנה זה להרגיש טוב עם מה שאת לובשת.
+[שם המשפיענית] מאמינ/ה שאופנה זה להרגיש טוב עם מה שלובשים.
 
-ספרי לי:
-- את מחפשת משהו ספציפי?
+ספר/י לי:
+- מחפש/ת משהו ספציפי?
 - יש אירוע מסוים?
 - רוצה רעיונות לשילובים?
 
-בואי נמצא את הלוק המושלם! ✨`;
+בוא/י נמצא את הלוק המושלם! ✨`;
   }
 }
 

@@ -187,7 +187,7 @@ export async function retrieveKnowledge(
         retrieveContext({
           accountId,
           query: userMessage,
-          topK: 8,
+          topK: 12,
           conversationSummary: rollingSummary,
         }),
         fetchRelevantCoupons(supabase, accountId, [], archetype, userMessage),
