@@ -129,9 +129,39 @@ export class WebsiteScanOrchestrator {
       }
 
       // ============================================
+      // Step 2.5: Analyze images with Gemini Vision
+      // ============================================
+      progress('images', 'running', 42, 'מנתח תמונות מוצרים...');
+
+      try {
+        const { analyzeImages, buildImageSection } = await import('./image-analyzer');
+        let totalImagesAnalyzed = 0;
+
+        for (const page of crawlResult.pages) {
+          if (!page.imageData || page.imageData.length === 0) continue;
+
+          const analyses = await analyzeImages(page.imageData, page.url, 5);
+          if (analyses.length > 0) {
+            const imageSection = buildImageSection(analyses);
+            if (imageSection) {
+              page.content += imageSection;
+            }
+            totalImagesAnalyzed += analyses.length;
+          }
+        }
+
+        stats.totalImages = totalImagesAnalyzed;
+        progress('images', 'completed', 45, `נותחו ${totalImagesAnalyzed} תמונות`);
+      } catch (error: any) {
+        // Image analysis failure is non-fatal
+        console.error(`[WebsiteScan] Image analysis failed:`, error.message);
+        progress('images', 'failed', 45, `שגיאה בניתוח תמונות: ${error.message}`);
+      }
+
+      // ============================================
       // Step 3: Save pages to DB
       // ============================================
-      progress('save', 'running', 45, 'שומר דפים למסד נתונים...');
+      progress('save', 'running', 48, 'שומר דפים למסד נתונים...');
 
       const { saved, failed } = await saveFullCrawlResults(accountId, crawlResult, sessionId);
       stats.pagesSaved = saved;

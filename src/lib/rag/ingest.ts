@@ -393,7 +393,7 @@ async function ingestEntityType(
     case 'website': {
       const { data: websites } = await supabase
         .from('instagram_bio_websites')
-        .select('id, url, page_title, page_content, page_description')
+        .select('id, url, page_title, page_content, page_description, image_urls, extracted_data')
         .eq('account_id', accountId)
         .eq('processing_status', 'completed')
         .not('page_content', 'is', null);
@@ -406,13 +406,27 @@ async function ingestEntityType(
           if (w.page_description) text += `Description: ${w.page_description}\n\n`;
           text += w.page_content;
 
+          // Append image alt texts from extracted_data if available
+          const extractedImages = (w.extracted_data as any)?.imageData;
+          if (Array.isArray(extractedImages) && extractedImages.length > 0) {
+            const altTexts = extractedImages
+              .filter((img: any) => img.alt && img.alt.length > 5)
+              .map((img: any) => img.alt + (img.context ? ` (${img.context})` : ''));
+            if (altTexts.length > 0) {
+              text += `\n\nתיאורי תמונות: ${altTexts.join('; ')}`;
+            }
+          }
+
           await ingestDocument({
             accountId,
             entityType: 'website',
             sourceId: w.id,
             title: w.page_title || w.url,
             text,
-            metadata: { url: w.url },
+            metadata: {
+              url: w.url,
+              imageCount: w.image_urls?.length || 0,
+            },
           });
           count++;
         }

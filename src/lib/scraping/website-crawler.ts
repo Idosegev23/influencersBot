@@ -27,7 +27,9 @@ export interface CrawledPage {
   title: string;
   description: string;
   content: string;
+  rawHtml?: string;
   imageUrls: string[];
+  imageData: import('./image-analyzer').ExtractedImage[];
   metaTags: Record<string, string>;
   structuredData: any[];
   httpStatus: number;
@@ -259,13 +261,12 @@ export async function crawlWebsiteFull(
     crawlerType: fullConfig.crawlerType,
     // Stay on the same domain
     globs: [{ glob: `https://${domain}/**` }, { glob: `http://${domain}/**` }],
-    // Extract all useful content
+    // Extract content — markdown preserves image alt text: ![alt](url)
     htmlTransformer: 'readableText',
     removeElementsCssSelector: 'nav, footer, header, .cookie-banner, .popup, #cookie-consent',
-    // Save screenshots = false (we only need content)
     saveScreenshots: false,
-    saveHtml: false,
-    saveMarkdown: true,
+    saveHtml: true,      // needed for img tag extraction (alt, title, figcaption)
+    saveMarkdown: true,  // preferred content source (includes image alt text)
   }, onProgress);
 
   const items = await getApifyDatasetItems<any>(run.defaultDatasetId);
@@ -277,10 +278,14 @@ export async function crawlWebsiteFull(
   let totalWords = 0;
   let totalImages = 0;
 
+  const { extractImageData } = await import('./image-analyzer');
+
   for (const item of items) {
     try {
-      const content = item.text || item.markdown || '';
+      // Prefer markdown (includes ![alt](url)) over plain text
+      const content = item.markdown || item.text || '';
       const imageUrls = extractImageUrls(item);
+      const imageData = extractImageData(item.html);
       const wordCount = content.split(/\s+/).filter(Boolean).length;
 
       pages.push({
@@ -288,7 +293,9 @@ export async function crawlWebsiteFull(
         title: item.metadata?.title || item.title || '',
         description: item.metadata?.description || '',
         content,
+        rawHtml: item.html || undefined,
         imageUrls,
+        imageData,
         metaTags: item.metadata || {},
         structuredData: item.jsonLd || [],
         httpStatus: item.httpStatusCode || 200,
@@ -299,7 +306,7 @@ export async function crawlWebsiteFull(
       });
 
       totalWords += wordCount;
-      totalImages += imageUrls.length;
+      totalImages += imageData.length || imageUrls.length;
     } catch (error: any) {
       errors.push({ url: item.url || 'unknown', error: error.message });
     }
@@ -526,7 +533,9 @@ export async function saveFullCrawlResults(
         image_urls: page.imageUrls,
         meta_tags: page.metaTags,
         structured_data: page.structuredData,
-        extracted_data: {},
+        extracted_data: {
+          imageData: page.imageData?.map(i => ({ src: i.src, alt: i.alt, title: i.title, context: i.context })) || [],
+        },
         parent_url: page.parentUrl,
         crawl_depth: page.crawlDepth,
         http_status: page.httpStatus,

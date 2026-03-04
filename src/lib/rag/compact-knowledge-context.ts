@@ -134,7 +134,11 @@ export function compactKnowledgeContext(
     for (const p of items) {
       const caption = p.caption || 'ללא כיתוב';
       if (isDuplicate(caption)) continue;
-      section += `${++count}. ${truncate(caption, opts.maxPostChars)}\n\n`;
+      section += `${++count}. ${truncate(caption, opts.maxPostChars)}`;
+      if (p.media_urls?.length > 0) {
+        section += `\n   [image_url: ${p.media_urls[0]}]`;
+      }
+      section += '\n\n';
     }
     if (count > 0) context += section;
     sectionCounts.posts = count;
@@ -203,6 +207,9 @@ export function compactKnowledgeContext(
     items.forEach((w, i) => {
       section += `${i + 1}. ${w.title || w.url}\n`;
       if (w.content) section += `   ${truncate(w.content, opts.maxWebsiteChars)}\n`;
+      if ((w as any).image_urls?.length > 0) {
+        section += `   [image_url: ${(w as any).image_urls[0]}]\n`;
+      }
     });
     context += section;
     sectionCounts.websites = items.length;

@@ -984,6 +984,15 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                           code: ({ node, ...props }) => (
                                             <code {...props} className="px-1.5 py-0.5 rounded text-xs font-mono bg-gray-100" />
                                           ),
+                                          img: ({ node, src, alt, ...props }) => (
+                                            <img
+                                              src={src}
+                                              alt={alt || ''}
+                                              className="max-w-full rounded-xl my-3 shadow-sm"
+                                              loading="lazy"
+                                              style={{ maxHeight: '300px', objectFit: 'cover' }}
+                                            />
+                                          ),
                                         }}
                                       >
                                         {displayContent}
