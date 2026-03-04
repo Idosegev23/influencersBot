@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import { 
   Send, 
   Search, 
@@ -981,6 +983,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                     )}
                                     {displayContent && (
                                       <ReactMarkdown
+                                        remarkPlugins={[remarkGfm, remarkBreaks]}
                                         components={{
                                           a: ({ node, ...props }) => (
                                             <a
@@ -991,19 +994,34 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                             />
                                           ),
                                           p: ({ node, ...props }) => (
-                                            <p {...props} className="mb-2 last:mb-0 leading-relaxed" />
+                                            <p {...props} className="mb-3 last:mb-0 leading-relaxed" />
                                           ),
                                           ul: ({ node, ...props }) => (
-                                            <ul {...props} className="list-disc list-inside space-y-1 my-2" />
+                                            <ul {...props} className="list-disc pr-5 space-y-1.5 my-3" />
                                           ),
                                           ol: ({ node, ...props }) => (
-                                            <ol {...props} className="list-decimal list-inside space-y-1 my-2" />
+                                            <ol {...props} className="list-decimal pr-5 space-y-1.5 my-3" />
                                           ),
                                           li: ({ node, ...props }) => (
-                                            <li {...props} className="leading-relaxed" />
+                                            <li {...props} className="leading-relaxed pr-1" />
                                           ),
                                           strong: ({ node, ...props }) => (
                                             <strong {...props} className="font-bold" />
+                                          ),
+                                          em: ({ node, ...props }) => (
+                                            <em {...props} className="italic" />
+                                          ),
+                                          h3: ({ node, ...props }) => (
+                                            <h3 {...props} className="font-bold text-base mt-3 mb-1" />
+                                          ),
+                                          h4: ({ node, ...props }) => (
+                                            <h4 {...props} className="font-semibold mt-2 mb-1" />
+                                          ),
+                                          hr: ({ node, ...props }) => (
+                                            <hr {...props} className="my-3 border-gray-200" />
+                                          ),
+                                          blockquote: ({ node, ...props }) => (
+                                            <blockquote {...props} className="border-r-3 border-gray-300 pr-3 my-2 text-gray-600 italic" />
                                           ),
                                           code: ({ node, ...props }) => (
                                             <code {...props} className="px-1.5 py-0.5 rounded text-xs font-mono bg-gray-100" />
