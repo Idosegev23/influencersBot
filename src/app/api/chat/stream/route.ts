@@ -672,8 +672,13 @@ export async function POST(req: NextRequest) {
         await Promise.all([
           saveChatMessage(currentSessionId, 'user', message),
           saveChatMessage(currentSessionId, 'assistant', fullText),
-          // Context chaining via response_id no longer used (Gemini uses full history)
-          Promise.resolve(),
+          // Save Responses API response_id for context chaining on next turn
+          responseId
+            ? supabase
+                .from('chat_sessions')
+                .update({ last_response_id: responseId })
+                .eq('id', currentSessionId)
+            : Promise.resolve(),
           emitEvent({
             type: 'response_sent',
             accountId,

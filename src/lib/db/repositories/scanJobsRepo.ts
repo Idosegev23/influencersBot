@@ -11,7 +11,7 @@ import { createClient } from '@/lib/supabase/server';
 
 export interface ScanJob {
   id: string;
-  platform: 'instagram' | 'tiktok' | 'youtube' | 'website';
+  platform: 'instagram' | 'tiktok' | 'youtube';
   username: string;
   account_id?: string;
   status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
@@ -42,7 +42,6 @@ export interface ScanStepLog {
 }
 
 export interface CreateScanJobParams {
-  platform?: 'instagram' | 'tiktok' | 'youtube' | 'website';
   username: string;
   account_id?: string;
   priority?: number;
@@ -83,7 +82,7 @@ export class ScanJobsRepository {
     const { data, error } = await supabase
       .from('scan_jobs')
       .insert({
-        platform: params.platform || 'instagram',
+        platform: 'instagram',
         username: params.username,
         account_id: params.account_id,
         priority: params.priority || 100,
@@ -241,8 +240,9 @@ export class ScanJobsRepository {
       .eq('id', jobId)
       .single();
 
-    const currentLogs: ScanStepLog[] = job?.step_logs || [];
-
+    const currentLogs = job?.step_logs || [];
+    
+    // Add new log entry
     const newLog: ScanStepLog = {
       step,
       status,
@@ -251,17 +251,7 @@ export class ScanJobsRepository {
       timestamp: new Date().toISOString(),
     };
 
-    // Upsert: if a running entry with the same step name exists, update it in place
-    const existingIdx = currentLogs.findIndex(
-      (l) => l.step === step && l.status === 'running',
-    );
-    let updatedLogs: ScanStepLog[];
-    if (existingIdx >= 0 && status === 'running') {
-      updatedLogs = [...currentLogs];
-      updatedLogs[existingIdx] = newLog;
-    } else {
-      updatedLogs = [...currentLogs, newLog];
-    }
+    const updatedLogs = [...currentLogs, newLog];
 
     // Update job with new logs
     const { error } = await supabase

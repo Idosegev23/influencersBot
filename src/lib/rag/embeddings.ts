@@ -1,17 +1,27 @@
 /**
  * Embedding Generation
- * Uses Google Gemini gemini-embedding-001 (1536 dimensions).
+ * Uses OpenAI text-embedding-3-small (1536 dimensions).
  * Batches requests for efficiency.
  */
 
-import { getGeminiClient, MODELS, EMBEDDING_DIMENSIONS } from '@/lib/ai/google-client';
+import OpenAI from 'openai';
 import { createLogger } from './logger';
 
 const log = createLogger('embeddings');
 
-const EMBEDDING_MODEL = MODELS.EMBEDDING;
-const MAX_BATCH_SIZE = 100;
-const MAX_CHARS_PER_INPUT = 8000 * 4; // ~8K tokens
+const EMBEDDING_MODEL = 'text-embedding-3-small';
+const EMBEDDING_DIMENSIONS = 1536;
+const MAX_BATCH_SIZE = 100; // OpenAI limit per request
+const MAX_TOKENS_PER_INPUT = 8191; // Model limit
+
+let openaiClient: OpenAI | null = null;
+
+function getClient(): OpenAI {
+  if (!openaiClient) {
+    openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return openaiClient;
+}
 
 /**
  * Generate embedding for a single text.
@@ -27,37 +37,38 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
   if (texts.length === 0) return [];
 
-  const client = getGeminiClient();
+  const client = getClient();
   const allEmbeddings: number[][] = [];
 
+  // Process in batches
   for (let i = 0; i < texts.length; i += MAX_BATCH_SIZE) {
     const batch = texts.slice(i, i + MAX_BATCH_SIZE);
 
     // Truncate texts that are too long
-    const safeBatch = batch.map(t =>
-      t.length > MAX_CHARS_PER_INPUT ? t.substring(0, MAX_CHARS_PER_INPUT) : t,
-    );
+    const safeBatch = batch.map(t => {
+      if (t.length > MAX_TOKENS_PER_INPUT * 4) {
+        return t.substring(0, MAX_TOKENS_PER_INPUT * 4);
+      }
+      return t;
+    });
 
     try {
-      // Gemini embedContent supports batch via contents array
-      const response = await client.models.embedContent({
+      const response = await client.embeddings.create({
         model: EMBEDDING_MODEL,
-        contents: safeBatch.map(t => ({ parts: [{ text: t }] })),
-        config: {
-          outputDimensionality: EMBEDDING_DIMENSIONS,
-        },
+        input: safeBatch,
+        dimensions: EMBEDDING_DIMENSIONS,
       });
 
-      // Extract embeddings from response
-      const batchEmbeddings = (response as any).embeddings
-        ? (response as any).embeddings.map((e: any) => e.values)
-        : [(response as any).embedding?.values];
+      const batchEmbeddings = response.data
+        .sort((a, b) => a.index - b.index)
+        .map(d => d.embedding);
 
       allEmbeddings.push(...batchEmbeddings);
 
       log.debug('Batch embeddings generated', {
         batchIndex: i / MAX_BATCH_SIZE,
         batchSize: batch.length,
+        tokensUsed: response.usage?.total_tokens,
       });
     } catch (err) {
       log.error('Embedding generation failed', {

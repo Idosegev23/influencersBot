@@ -198,20 +198,15 @@ function truncate(text: string | null, maxLength: number): string {
 
 function formatPostContent(post: any): string {
   let content = post.caption || '';
-
+  
   if (post.hashtags && post.hashtags.length > 0) {
     content += '\n\n#' + post.hashtags.join(' #');
   }
-
+  
   if (post.likes_count) {
     content += `\n\n❤️ ${post.likes_count} likes`;
   }
-
-  // Include first image URL so the AI can reference it
-  if (post.media_urls && post.media_urls.length > 0) {
-    content += `\n\n[image_url: ${post.media_urls[0]}]`;
-  }
-
+  
   return content;
 }
 

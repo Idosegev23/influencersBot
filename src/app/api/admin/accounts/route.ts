@@ -105,19 +105,13 @@ export async function GET() {
         persona_name: persona?.name,
         has_persona: !!persona,
         has_profile_data: !!latestProfile,
-        is_website: !!config.is_website,
       };
     });
 
-    // Separate website accounts from influencers
-    const influencerAccounts = transformed.filter((a: any) => !a.is_website);
-    const websiteAccounts = transformed.filter((a: any) => a.is_website);
-
     return NextResponse.json({
       success: true,
-      influencers: influencerAccounts, // Only non-website accounts
-      accounts: transformed,           // All accounts for new code
-      websiteAccounts,                 // Website-only accounts
+      influencers: transformed, // ⚡ Wrap in object for dashboard compatibility
+      accounts: transformed,    // ⚡ Also provide as 'accounts' for new code
     });
   } catch (error) {
     console.error('Error in GET /api/admin/accounts:', error);
@@ -140,7 +134,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { username, type = 'influencer', is_website = false } = body;
+    const { username, type = 'influencer' } = body;
 
     if (!username) {
       return NextResponse.json(
@@ -184,7 +178,6 @@ export async function POST(request: Request) {
           username,
           display_name: displayName,
           subdomain: subdomain,
-          ...(is_website ? { is_website: true } : {}),
         },
         plan: 'free',
         status: 'active',

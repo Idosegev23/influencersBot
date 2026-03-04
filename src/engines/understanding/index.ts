@@ -11,7 +11,7 @@
  * - Route hints
  */
 
-import { getGeminiClient, MODELS } from '@/lib/ai/google-client';
+import OpenAI from 'openai';
 import { SYSTEM_PROMPT, DEVELOPER_PROMPT, USER_PROMPT, OUTPUT_SCHEMA } from './prompt';
 import type { UnderstandingResult, UnderstandMessageInput, SimpleIntent, ExtractedEntities, RiskFlags, RouteHints } from './types';
 import { getMetrics } from '@/lib/metrics/pipeline-metrics';
@@ -19,9 +19,14 @@ import { getMetrics } from '@/lib/metrics/pipeline-metrics';
 // Re-export types
 export * from './types';
 
+// OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
 // Model configuration
-const UNDERSTANDING_MODEL = MODELS.CHAT_LITE;
-const FALLBACK_MODEL = MODELS.CHAT_FAST;
+const UNDERSTANDING_MODEL = 'gpt-5-nano'; // Fast and cheap for understanding
+const FALLBACK_MODEL = 'gpt-5';           // Fallback if nano fails
 
 /**
  * Main entry point for Understanding Engine
@@ -58,7 +63,7 @@ export async function understandMessage(input: UnderstandMessageInput): Promise<
 }
 
 /**
- * Call Gemini API for understanding
+ * Call OpenAI API for understanding
  */
 async function callUnderstandingAPI(
   input: UnderstandMessageInput,
@@ -69,20 +74,35 @@ async function callUnderstandingAPI(
     brands: input.brands,
   });
 
-  const client = getGeminiClient();
-  const response = await client.models.generateContent({
+  const response = await openai.responses.create({
     model,
-    contents: USER_PROMPT(input.message),
-    config: {
-      systemInstruction: SYSTEM_PROMPT + '\n\n' + developerContext,
-      responseMimeType: 'application/json',
-      temperature: 0,
-      maxOutputTokens: 500,
+    input: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'developer', content: developerContext },
+      { role: 'user', content: USER_PROMPT(input.message) },
+    ],
+    text: {
+      format: {
+        type: 'json_schema',
+        name: 'understanding_result',
+        schema: OUTPUT_SCHEMA,
+        strict: true,
+      },
     },
   });
 
-  const text = response.text || '{}';
-  const parsed = JSON.parse(text);
+  // Extract the text content
+  const textOutput = response.output.find(item => item.type === 'message');
+  if (!textOutput || textOutput.type !== 'message') {
+    throw new Error('No text output from understanding API');
+  }
+
+  const content = textOutput.content.find(c => c.type === 'output_text');
+  if (!content || content.type !== 'output_text') {
+    throw new Error('No output_text content from understanding API');
+  }
+
+  const parsed = JSON.parse(content.text);
   return validateAndNormalize(parsed);
 }
 

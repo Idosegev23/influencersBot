@@ -10,7 +10,7 @@
  * Uses GPT-5 Nano via Responses API with low reasoning for speed.
  */
 
-import { getGeminiClient, MODELS } from '@/lib/ai/google-client';
+import OpenAI from 'openai';
 import { retrieveContext, formatSourcesForLLM } from './retrieve';
 import { createLogger } from './logger';
 import type {
@@ -20,6 +20,12 @@ import type {
 } from './types';
 
 const log = createLogger('answer');
+
+let openaiClient: OpenAI | null = null;
+function getClient(): OpenAI {
+  if (!openaiClient) openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  return openaiClient;
+}
 
 const SYSTEM_PROMPT = `You are a helpful assistant that answers questions based ONLY on the provided sources.
 
@@ -61,18 +67,16 @@ export async function answerQuestion(input: AnswerInput): Promise<AnswerResult> 
   if (sources.length === 0) {
     log.info('No sources found, generating follow-up', { accountId }, accountId);
 
-    const client = getGeminiClient();
-    const response = await client.models.generateContent({
-      model: MODELS.CHAT_LITE,
-      contents: query,
-      config: {
-        systemInstruction: NO_INFO_PROMPT,
-        maxOutputTokens: 300,
-        temperature: 0.3,
-      },
+    const client = getClient();
+    const response = await client.responses.create({
+      model: 'gpt-5-nano-2025-08-07',
+      instructions: NO_INFO_PROMPT,
+      input: query,
+      reasoning: { effort: 'minimal' as any },
+      max_output_tokens: 300,
     });
 
-    const answer = response.text || 'I don\'t have enough information to answer this question.';
+    const answer = response.output_text || 'I don\'t have enough information to answer this question.';
 
     // Extract the follow-up question (heuristic: last sentence ending with ?)
     const sentences = answer.split(/[.?!]\s+/);
@@ -88,20 +92,19 @@ export async function answerQuestion(input: AnswerInput): Promise<AnswerResult> 
   }
 
   // Step 3: Generate answer with sources
-  const client = getGeminiClient();
+  const client = getClient();
   const sourcesContext = formatSourcesForLLM(sources);
 
-  const response = await client.models.generateContent({
-    model: MODELS.CHAT_LITE,
-    contents: `${sourcesContext}\n\nQuestion: ${query}\n\nAnswer using ONLY the sources above. Cite with [source_id].`,
-    config: {
-      systemInstruction: SYSTEM_PROMPT,
-      maxOutputTokens: 1000,
-      temperature: 0.3,
-    },
+  const response = await client.responses.create({
+    model: 'gpt-5-nano-2025-08-07',
+    instructions: SYSTEM_PROMPT,
+    input: `${sourcesContext}\n\nQuestion: ${query}\n\nAnswer using ONLY the sources above. Cite with [source_id].`,
+    reasoning: { effort: 'low' as any },
+    text: { verbosity: 'low' as any },
+    max_output_tokens: 1000,
   });
 
-  const answer = response.text || 'Unable to generate an answer.';
+  const answer = response.output_text || 'Unable to generate an answer.';
 
   log.info('Answer generated', {
     answerLength: answer.length,

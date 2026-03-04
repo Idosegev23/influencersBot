@@ -4,8 +4,12 @@
  * ⚡ Powered by GPT-5 Nano for FAST analysis
  */
 
-import { getGeminiClient, MODELS } from '@/lib/ai/google-client';
+import OpenAI from 'openai';
 import { createClient } from '@/lib/supabase/server';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 // ============================================
 // Type Definitions
@@ -211,18 +215,17 @@ ${conversationText.substring(0, 10000)}
 }`;
 
     try {
-      const client = getGeminiClient();
-      const response = await client.models.generateContent({
-        model: MODELS.CHAT_LITE,
-        contents: prompt,
-        config: {
-          systemInstruction: 'אתה מנתח שיחות. החזר JSON בלבד.',
-          responseMimeType: 'application/json',
-          temperature: 0.3,
-        },
+      const response = await openai.chat.completions.create({
+        model: 'gpt-5-nano-2025-08-07',
+        messages: [
+          { role: 'system', content: 'אתה מנתח שיחות. החזר JSON בלבד.' },
+          { role: 'user', content: prompt },
+        ],
+        response_format: { type: 'json_object' },
+        // GPT-5 Nano only supports temperature: 1 (default)
       });
 
-      const parsed = JSON.parse(response.text || '{}');
+      const parsed = JSON.parse(response.choices[0].message.content || '{}');
       return parsed.insights || [];
 
     } catch (error) {

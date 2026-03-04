@@ -1,10 +1,17 @@
-import { getGeminiClient, MODELS } from '@/lib/ai/google-client';
+import OpenAI from 'openai';
 import type { InfluencerType, InfluencerPersona, ExtractedData, ApifyPostData } from '@/types';
 
-// Models configuration - using Gemini
-const CHAT_MODEL = MODELS.CHAT_LITE;      // Fastest, cheapest - for chat
-const ANALYSIS_MODEL = MODELS.CHAT_LITE;  // For analysis
-const COMPLEX_MODEL = MODELS.COMPLEX;     // For persona generation
+// Lazy initialization to avoid build errors
+function getClient() {
+  return new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+}
+
+// Models configuration - using Responses API
+const CHAT_MODEL = 'gpt-5-nano';      // Fastest, cheapest - for chat
+const ANALYSIS_MODEL = 'gpt-5-nano';  // For analysis  
+const COMPLEX_MODEL = 'gpt-5';        // For persona generation
 
 // ============================================
 // Influencer Type Detection
@@ -14,15 +21,13 @@ export async function detectInfluencerType(
   bio: string,
   captions: string[]
 ): Promise<{ type: InfluencerType; confidence: number }> {
-  const client = getGeminiClient();
+  const client = getClient();
   const sampleCaptions = captions.slice(0, 20).join('\n---\n');
 
   try {
-    const response = await client.models.generateContent({
+    const response = await client.responses.create({
       model: ANALYSIS_MODEL,
-      contents: `Bio: ${bio}\n\nPosts:\n${sampleCaptions}`,
-      config: {
-        systemInstruction: `אתה מנתח פרופילי אינסטגרם. קבע את סוג המשפיען לפי הביו והפוסטים.
+      instructions: `אתה מנתח פרופילי אינסטגרם. קבע את סוג המשפיען לפי הביו והפוסטים.
 
 סוגים אפשריים:
 - food: מתכונים, בישול, מזון, מסעדות
@@ -31,15 +36,30 @@ export async function detectInfluencerType(
 - lifestyle: לייפסטייל כללי, טיפים, חיים
 - fitness: כושר, אימונים, תזונה ספורטיבית
 - beauty: יופי, איפור, טיפוח
-- other: אחר
-
-החזר JSON בפורמט: {"type": "...", "confidence": 0.0-1.0}`,
-        responseMimeType: 'application/json',
-        temperature: 0.1,
-      },
+- other: אחר`,
+      input: `Bio: ${bio}\n\nPosts:\n${sampleCaptions}`,
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'influencer_type',
+          strict: true,
+          schema: {
+            type: 'object',
+            properties: {
+              type: { 
+                type: 'string',
+                enum: ['food', 'fashion', 'tech', 'lifestyle', 'fitness', 'beauty', 'other']
+              },
+              confidence: { type: 'number' }
+            },
+            required: ['type', 'confidence'],
+            additionalProperties: false
+          }
+        }
+      }
     });
 
-    const result = JSON.parse(response.text || '{}');
+    const result = JSON.parse(response.output_text);
     return {
       type: result.type || 'other',
       confidence: result.confidence || 0.5,
@@ -59,31 +79,37 @@ export async function generatePersona(
   captions: string[],
   influencerType: InfluencerType
 ): Promise<InfluencerPersona> {
-  const client = getGeminiClient();
+  const client = getClient();
   const sampleCaptions = captions.slice(0, 15).join('\n---\n');
 
   try {
-    const response = await client.models.generateContent({
-      model: COMPLEX_MODEL,
-      contents: `סוג משפיען: ${influencerType}\nBio: ${bio}\n\nPosts:\n${sampleCaptions}`,
-      config: {
-        systemInstruction: `אתה מנתח סגנון כתיבה של משפיענים. נתח את הפוסטים וצור פרסונה.
-
-החזר JSON בפורמט:
-{
-  "tone": "טון הכתיבה (חם/מקצועי/משעשע/אינפורמטיבי)",
-  "style": "סגנון (קליל/רשמי/ידידותי/מעורר השראה)",
-  "interests": ["תחום 1", "תחום 2"],
-  "signature_phrases": ["ביטוי 1", "ביטוי 2"],
-  "emoji_style": "none|minimal|frequent",
-  "language": "he|en|mixed"
-}`,
-        responseMimeType: 'application/json',
-        temperature: 0.3,
-      },
+    const response = await client.responses.create({
+      model: COMPLEX_MODEL, // Use gpt-5 for better persona generation
+      instructions: `אתה מנתח סגנון כתיבה של משפיענים. נתח את הפוסטים וצור פרסונה.`,
+      input: `סוג משפיען: ${influencerType}\nBio: ${bio}\n\nPosts:\n${sampleCaptions}`,
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'persona',
+          strict: true,
+          schema: {
+            type: 'object',
+            properties: {
+              tone: { type: 'string', description: 'טון הכתיבה (חם/מקצועי/משעשע/אינפורמטיבי)' },
+              style: { type: 'string', description: 'סגנון (קליל/רשמי/ידידותי/מעורר השראה)' },
+              interests: { type: 'array', items: { type: 'string' } },
+              signature_phrases: { type: 'array', items: { type: 'string' } },
+              emoji_style: { type: 'string', enum: ['none', 'minimal', 'frequent'] },
+              language: { type: 'string', enum: ['he', 'en', 'mixed'] }
+            },
+            required: ['tone', 'style', 'interests', 'signature_phrases', 'emoji_style', 'language'],
+            additionalProperties: false
+          }
+        }
+      }
     });
 
-    const result = JSON.parse(response.text || '{}');
+    const result = JSON.parse(response.output_text);
     return {
       tone: result.tone || 'ידידותי',
       style: result.style || 'קליל',
@@ -123,34 +149,62 @@ export async function generatePersonaFromPosts(
 // ============================================
 
 export async function extractDataFromPost(caption: string): Promise<ExtractedData> {
-  const client = getGeminiClient();
-
+  const client = getClient();
+  
   try {
-    const response = await client.models.generateContent({
+    const response = await client.responses.create({
       model: ANALYSIS_MODEL,
-      contents: caption,
-      config: {
-        systemInstruction: `נתח את הפוסט וחלץ מידע רלוונטי.
+      instructions: `נתח את הפוסט וחלץ מידע רלוונטי.
 
 חפש:
 - שמות מותגים (בעברית או אנגלית)
 - קודי קופון (בדרך כלל באותיות גדולות/מספרים)
 - מוצרים שמוזכרים
-- נושאים עיקריים
-
-החזר JSON בפורמט:
-{
-  "brands": ["מותג 1"],
-  "coupons": [{"code": "CODE", "brand": "מותג"}],
-  "topics": ["נושא 1"],
-  "products": [{"name": "מוצר", "link": ""}]
-}`,
-        responseMimeType: 'application/json',
-        temperature: 0.1,
-      },
+- נושאים עיקריים`,
+      input: caption,
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'extracted_data',
+          strict: true,
+          schema: {
+            type: 'object',
+            properties: {
+              brands: { type: 'array', items: { type: 'string' } },
+              coupons: { 
+                type: 'array', 
+                items: { 
+                  type: 'object',
+                  properties: {
+                    code: { type: 'string' },
+                    brand: { type: 'string' }
+                  },
+                  required: ['code', 'brand'],
+                  additionalProperties: false
+                }
+              },
+              topics: { type: 'array', items: { type: 'string' } },
+              products: { 
+                type: 'array', 
+                items: { 
+                  type: 'object',
+                  properties: {
+                    name: { type: 'string' },
+                    link: { type: 'string' }
+                  },
+                  required: ['name', 'link'],
+                  additionalProperties: false
+                }
+              }
+            },
+            required: ['brands', 'coupons', 'topics', 'products'],
+            additionalProperties: false
+          }
+        }
+      }
     });
 
-    const result = JSON.parse(response.text || '{}');
+    const result = JSON.parse(response.output_text);
     return {
       brands: result.brands || [],
       coupons: result.coupons || [],
@@ -168,28 +222,34 @@ export async function extractRecipeFromPost(caption: string): Promise<{
   ingredients: string[];
   instructions: string[];
 } | null> {
-  const client = getGeminiClient();
-
+  const client = getClient();
+  
   try {
-    const response = await client.models.generateContent({
+    const response = await client.responses.create({
       model: ANALYSIS_MODEL,
-      contents: caption,
-      config: {
-        systemInstruction: `בדוק אם הפוסט מכיל מתכון. אם כן, חלץ אותו.
-
-החזר JSON בפורמט:
-{
-  "is_recipe": true/false,
-  "title": "שם המתכון",
-  "ingredients": ["מרכיב 1"],
-  "instructions": ["שלב 1"]
-}`,
-        responseMimeType: 'application/json',
-        temperature: 0.1,
-      },
+      instructions: `בדוק אם הפוסט מכיל מתכון. אם כן, חלץ אותו.`,
+      input: caption,
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'recipe',
+          strict: true,
+          schema: {
+            type: 'object',
+            properties: {
+              is_recipe: { type: 'boolean' },
+              title: { type: 'string' },
+              ingredients: { type: 'array', items: { type: 'string' } },
+              instructions: { type: 'array', items: { type: 'string' } }
+            },
+            required: ['is_recipe', 'title', 'ingredients', 'instructions'],
+            additionalProperties: false
+          }
+        }
+      }
     });
 
-    const result = JSON.parse(response.text || '{}');
+    const result = JSON.parse(response.output_text);
     if (result.is_recipe && result.title) {
       return {
         title: result.title,
@@ -228,50 +288,62 @@ export async function extractContentFromPost(
   description: string;
   content: Record<string, unknown>;
 } | null> {
-  const client = getGeminiClient();
-
+  const client = getClient();
+  
   // Skip very short or empty captions
   if (!caption || caption.trim().length < 10) return null;
-
+  
   const contentTypes = CONTENT_TYPES_BY_INFLUENCER[influencerType] || CONTENT_TYPES_BY_INFLUENCER.other;
-
+  
   try {
-    const response = await client.models.generateContent({
+    const response = await client.responses.create({
       model: ANALYSIS_MODEL,
-      contents: caption.slice(0, 2500),
-      config: {
-        systemInstruction: `אתה מנתח תוכן של משפיען/ית מסוג ${influencerType}.
+      instructions: `אתה מנתח תוכן של משפיען/ית מסוג ${influencerType}.
 נתח את הפוסט וחלץ ממנו את התוכן העיקרי.
 
 סוגי תוכן אפשריים: ${contentTypes.join(', ')}
 
-חשוב:
+חשוב: 
 - כל פוסט מכיל תוכן כלשהו - אל תחזיר "none" אלא אם הטקסט באמת ריק
 - תן כותרת תמציתית שמתארת את תוכן הפוסט
 - תאר את התוכן בקצרה
 - חלץ נקודות מפתח, מוצרים שהוזכרו, מותגים, טיפים
 
-החזר JSON בפורמט:
-{
-  "content_type": "סוג",
-  "title": "כותרת",
-  "description": "תיאור",
-  "key_points": ["נקודה 1"],
-  "brands_mentioned": ["מותג 1"],
-  "products_mentioned": ["מוצר 1"],
-  "hashtags": ["#tag"],
-  "ingredients": [],
-  "instructions": [],
-  "mood": "מצב רוח",
-  "is_sponsored": false
-}`,
-        responseMimeType: 'application/json',
-        temperature: 0.1,
-      },
+לדוגמה:
+- לוק אופנה → סוג: look, כותרת: "לוק שחור אלגנטי לערב", נקודות: פריטי הלבוש
+- מתכון → סוג: recipe, כותרת: שם המנה, מרכיבים והוראות
+- רגע משפחתי → סוג: moment/story, כותרת: תיאור הרגע
+- שיתוף פעולה עם מותג → סוג: collaboration, כותרת: המותג והמוצר`,
+      input: caption.slice(0, 2500),
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'dynamic_content',
+          strict: true,
+          schema: {
+            type: 'object',
+            properties: {
+              content_type: { type: 'string' },
+              title: { type: 'string' },
+              description: { type: 'string' },
+              key_points: { type: 'array', items: { type: 'string' } },
+              brands_mentioned: { type: 'array', items: { type: 'string' } },
+              products_mentioned: { type: 'array', items: { type: 'string' } },
+              hashtags: { type: 'array', items: { type: 'string' } },
+              ingredients: { type: 'array', items: { type: 'string' } },
+              instructions: { type: 'array', items: { type: 'string' } },
+              mood: { type: 'string' },
+              is_sponsored: { type: 'boolean' }
+            },
+            required: ['content_type', 'title', 'description', 'key_points', 'brands_mentioned', 'products_mentioned', 'hashtags', 'ingredients', 'instructions', 'mood', 'is_sponsored'],
+            additionalProperties: false
+          }
+        }
+      }
     });
 
-    const result = JSON.parse(response.text || '{}');
-
+    const result = JSON.parse(response.output_text);
+    
     if (!result.title || result.title.trim() === '') {
       return null;
     }
@@ -282,14 +354,14 @@ export async function extractContentFromPost(
       'tutorial', 'routine', 'tip', 'moment', 'story', 'workout', 'motivation',
       'collaboration', 'event', 'unboxing', 'itinerary'
     ];
-
+    
     let contentType = result.content_type?.toLowerCase().replace(/\s+/g, '_') || 'tip';
-
+    
     // Handle combined types like "moment/story" - take the first one
     if (contentType.includes('/')) {
       contentType = contentType.split('/')[0];
     }
-
+    
     // Map common variations to valid types
     const typeMapping: Record<string, string> = {
       'lifestyle': 'story',
@@ -306,11 +378,11 @@ export async function extractContentFromPost(
       'howto': 'tutorial',
       'how_to': 'tutorial',
     };
-
+    
     if (typeMapping[contentType]) {
       contentType = typeMapping[contentType];
     }
-
+    
     // If still not valid, default to 'tip'
     if (!validTypes.includes(contentType)) {
       contentType = 'tip';
@@ -325,17 +397,17 @@ export async function extractContentFromPost(
       mood: result.mood || '',
       is_sponsored: result.is_sponsored || false
     };
-
+    
     // Add specific fields based on content type
     if (contentType === 'recipe' && result.ingredients?.length > 0) {
       content.ingredients = result.ingredients;
       content.instructions = result.instructions || [];
     }
-
+    
     if (contentType === 'look' || contentType === 'outfit') {
       content.items = result.key_points || [];
     }
-
+    
     if (contentType === 'workout' || contentType === 'routine') {
       content.exercises = result.key_points || [];
       content.instructions = result.instructions || [];
@@ -382,28 +454,28 @@ export async function analyzeAllPosts(
 }
 
 // ============================================
-// Chat - Using Gemini
+// Chat - Using Responses API
 // ============================================
 
 export async function chat(
   instructions: string,
   input: string,
   previousResponseId?: string
-): Promise<{ response: string; responseId: string | null }> {
-  const client = getGeminiClient();
-
+): Promise<{ response: string; responseId: string }> {
+  const client = getClient();
+  
   try {
-    const response = await client.models.generateContent({
+    const response = await client.responses.create({
       model: CHAT_MODEL,
-      contents: input,
-      config: {
-        systemInstruction: instructions,
-      },
+      instructions,
+      input,
+      ...(previousResponseId && { previous_response_id: previousResponseId }),
+      store: true, // Enable stateful context
     });
 
     return {
-      response: response.text || '',
-      responseId: null,
+      response: response.output_text,
+      responseId: response.id,
     };
   } catch (error) {
     console.error('Error in chat:', error);
@@ -412,7 +484,7 @@ export async function chat(
 }
 
 // ============================================
-// Streaming Chat - Using Gemini streaming
+// Streaming Chat - Using Responses API with streaming
 // ============================================
 
 interface StreamChatParams {
@@ -428,26 +500,39 @@ interface StreamChatResult {
 }
 
 export async function streamChat(params: StreamChatParams): Promise<StreamChatResult> {
-  const { message, instructions, onDelta } = params;
-  const client = getGeminiClient();
-
+  const { message, instructions, previousResponseId, onDelta } = params;
+  const client = getClient();
+  
   try {
-    const response = await client.models.generateContentStream({
+    const response = await client.responses.create({
       model: CHAT_MODEL,
-      contents: message,
-      config: {
-        systemInstruction: instructions,
-      },
+      instructions,
+      input: message,
+      ...(previousResponseId && { previous_response_id: previousResponseId }),
+      store: true,
+      stream: true,
     });
 
-    for await (const chunk of response) {
-      const text = chunk.text || '';
-      if (text) {
-        onDelta(text);
+    let responseId: string | null = null;
+    let tokens = { input: 0, output: 0 };
+
+    // Process stream events
+    for await (const event of response) {
+      if (event.type === 'response.output_text.delta') {
+        onDelta(event.delta || '');
+      } else if (event.type === 'response.completed') {
+        responseId = event.response?.id || null;
+        // Extract token usage if available
+        if (event.response?.usage) {
+          tokens = {
+            input: event.response.usage.input_tokens || 0,
+            output: event.response.usage.output_tokens || 0,
+          };
+        }
       }
     }
 
-    return { responseId: null };
+    return { responseId, tokens };
   } catch (error) {
     console.error('Error in streamChat:', error);
     throw error;
@@ -462,22 +547,22 @@ export async function chatWithWebSearch(
   instructions: string,
   input: string,
   previousResponseId?: string
-): Promise<{ response: string; responseId: string | null }> {
-  const client = getGeminiClient();
-
+): Promise<{ response: string; responseId: string }> {
+  const client = getClient();
+  
   try {
-    const response = await client.models.generateContent({
+    const response = await client.responses.create({
       model: CHAT_MODEL,
-      contents: input,
-      config: {
-        systemInstruction: instructions,
-        tools: [{ googleSearch: {} }],
-      },
+      instructions,
+      input,
+      tools: [{ type: 'web_search' }], // Built-in web search!
+      ...(previousResponseId && { previous_response_id: previousResponseId }),
+      store: true,
     });
 
     return {
-      response: response.text || '',
-      responseId: null,
+      response: response.output_text,
+      responseId: response.id,
     };
   } catch (error) {
     console.error('Error in chat with web search:', error);
@@ -496,30 +581,20 @@ export async function generateGreetingAndQuestions(
   products: Array<{ name: string; brand?: string; coupon_code?: string }>,
   contentItems: Array<{ title: string; type: string }> = []
 ): Promise<{ greeting: string; questions: string[] }> {
-  const client = getGeminiClient();
-
-  const productContext = products.length > 0
+  const client = getClient();
+  
+  const productContext = products.length > 0 
     ? `מוצרים וקופונים: ${products.map(p => `${p.name}${p.brand ? ` (${p.brand})` : ''}${p.coupon_code ? ` - קופון: ${p.coupon_code}` : ''}`).join(', ')}`
     : 'אין מוצרים מוגדרים עדיין';
-
+  
   const contentContext = contentItems.length > 0
     ? `תוכן: ${contentItems.map(c => `${c.title} (${c.type})`).join(', ')}`
     : '';
 
   try {
-    const response = await client.models.generateContent({
+    const response = await client.responses.create({
       model: COMPLEX_MODEL,
-      contents: JSON.stringify({
-        name: displayName,
-        type: influencerType,
-        tone: persona.tone,
-        style: persona.style,
-        interests: persona.interests,
-        products: productContext,
-        content: contentContext
-      }),
-      config: {
-        systemInstruction: `צור הודעת פתיחה ושאלות מוצעות לצ'אטבוט של משפיען.
+      instructions: `צור הודעת פתיחה ושאלות מוצעות לצ'אטבוט של משפיען.
 
 ## ההודעה צריכה להיות:
 - חמה ומזמינה
@@ -534,19 +609,39 @@ export async function generateGreetingAndQuestions(
 - מגוונות (חלקן על מוצרים, חלקן על תוכן)
 - בעברית
 
-אם יש קופונים - לפחות שאלה אחת צריכה להיות על הנחות/קופונים.
-
-החזר JSON בפורמט:
-{
-  "greeting": "הודעת פתיחה חמה",
-  "questions": ["שאלה 1", "שאלה 2", "שאלה 3", "שאלה 4"]
-}`,
-        responseMimeType: 'application/json',
-        temperature: 0.7,
-      },
+אם יש קופונים - לפחות שאלה אחת צריכה להיות על הנחות/קופונים.`,
+      input: JSON.stringify({
+        name: displayName,
+        type: influencerType,
+        tone: persona.tone,
+        style: persona.style,
+        interests: persona.interests,
+        products: productContext,
+        content: contentContext
+      }),
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'greeting_questions',
+          strict: true,
+          schema: {
+            type: 'object',
+            properties: {
+              greeting: { type: 'string', description: 'הודעת פתיחה חמה' },
+              questions: { 
+                type: 'array', 
+                items: { type: 'string' },
+                description: '4-6 שאלות מוצעות'
+              }
+            },
+            required: ['greeting', 'questions'],
+            additionalProperties: false
+          }
+        }
+      }
     });
 
-    const result = JSON.parse(response.text || '{}');
+    const result = JSON.parse(response.output_text);
     return {
       greeting: result.greeting || `היי! אני הבוט של ${displayName}. איך אפשר לעזור?`,
       questions: result.questions || [
@@ -569,9 +664,9 @@ export async function generateGreetingAndQuestions(
       lifestyle: ['מה ההמלצה החמה שלך?', 'יש קופונים?', 'איזה טיפ יש לך לחיים?', 'מה חדש אצלך?'],
       other: ['איך אפשר לעזור?', 'יש המלצות?', 'מה חדש?', 'יש קופונים?']
     };
-
+    
     return {
-      greeting: `היי! אני הבוט של ${displayName}. מה תרצו לדעת?`,
+      greeting: `היי! אני הבוט של ${displayName} 💫 מה תרצו לדעת?`,
       questions: typeDefaults[influencerType] || typeDefaults.other,
     };
   }

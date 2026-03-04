@@ -5,8 +5,6 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import remarkBreaks from 'remark-breaks';
 import { 
   Send, 
   Search, 
@@ -75,30 +73,6 @@ interface Message {
   traceId?: string;
   decisionId?: string; // For linking UI actions to decisions
   suggestions?: string[]; // AI-generated follow-up suggestions
-}
-
-/**
- * Fix inline numbered/bullet lists that the LLM sometimes outputs on a single line.
- * e.g. "intro: 1. item 2. item" → "intro:\n\n1. item\n2. item"
- */
-function fixMarkdownLists(text: string): string {
-  if (!text) return text;
-  // Fix inline numbered lists: "some text 1. item 2. item"
-  // Look for patterns where a number+dot follows text (not at line start)
-  let fixed = text.replace(/([^\n])(\s+)(\d+)\.\s+\*\*/g, (_, before, _space, num) => {
-    // If this is the first item, add double newline for list start
-    return num === '1' ? `${before}\n\n${num}. **` : `${before}\n${num}. **`;
-  });
-  // Also fix cases without bold: "text 1. item 2. item"
-  fixed = fixed.replace(/([.!?،:])(\s+)(\d+)\.\s+(?!\*\*)/g, (_, punct, _space, num) => {
-    return num === '1' ? `${punct}\n\n${num}. ` : `${punct}\n${num}. `;
-  });
-  // Fix remaining inline numbered items (2., 3., etc.) that aren't at line start
-  fixed = fixed.replace(/([^\n])\s+(\d+)\.\s+\*\*/g, (match, before, num) => {
-    if (Number(num) > 1) return `${before}\n${num}. **`;
-    return match;
-  });
-  return fixed;
 }
 
 const typeIcons: Record<InfluencerType, typeof ChefHat> = {
@@ -935,7 +909,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         // For streaming messages, use the live text (strip suggestions tag)
                         const isStreamingThis = streamingMessageId === msg.id && isStreamActive;
                         const rawContent = isStreamingThis ? streamText : msg.content;
-                        const displayContent = fixMarkdownLists(rawContent.replace(/<<SUGGESTIONS>>.*$/s, '').trim());
+                        const displayContent = rawContent.replace(/<<SUGGESTIONS>>.*$/s, '').trim();
                         // For streaming, use meta directives until done
                         const displayDirectives = isStreamingThis && streamMeta?.uiDirectives 
                           ? streamMeta.uiDirectives as UIDirectives 
@@ -983,7 +957,6 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                     )}
                                     {displayContent && (
                                       <ReactMarkdown
-                                        remarkPlugins={[remarkGfm, remarkBreaks]}
                                         components={{
                                           a: ({ node, ...props }) => (
                                             <a
@@ -994,46 +967,22 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                             />
                                           ),
                                           p: ({ node, ...props }) => (
-                                            <p {...props} className="mb-3 last:mb-0 leading-relaxed" />
+                                            <p {...props} className="mb-2 last:mb-0 leading-relaxed" />
                                           ),
                                           ul: ({ node, ...props }) => (
-                                            <ul {...props} className="list-disc pr-5 space-y-1.5 my-3" />
+                                            <ul {...props} className="list-disc list-inside space-y-1 my-2" />
                                           ),
                                           ol: ({ node, ...props }) => (
-                                            <ol {...props} className="list-decimal pr-5 space-y-1.5 my-3" />
+                                            <ol {...props} className="list-decimal list-inside space-y-1 my-2" />
                                           ),
                                           li: ({ node, ...props }) => (
-                                            <li {...props} className="leading-relaxed pr-1" />
+                                            <li {...props} className="leading-relaxed" />
                                           ),
                                           strong: ({ node, ...props }) => (
                                             <strong {...props} className="font-bold" />
                                           ),
-                                          em: ({ node, ...props }) => (
-                                            <em {...props} className="italic" />
-                                          ),
-                                          h3: ({ node, ...props }) => (
-                                            <h3 {...props} className="font-bold text-base mt-3 mb-1" />
-                                          ),
-                                          h4: ({ node, ...props }) => (
-                                            <h4 {...props} className="font-semibold mt-2 mb-1" />
-                                          ),
-                                          hr: ({ node, ...props }) => (
-                                            <hr {...props} className="my-3 border-gray-200" />
-                                          ),
-                                          blockquote: ({ node, ...props }) => (
-                                            <blockquote {...props} className="border-r-3 border-gray-300 pr-3 my-2 text-gray-600 italic" />
-                                          ),
                                           code: ({ node, ...props }) => (
                                             <code {...props} className="px-1.5 py-0.5 rounded text-xs font-mono bg-gray-100" />
-                                          ),
-                                          img: ({ node, src, alt, ...props }) => (
-                                            <img
-                                              src={src}
-                                              alt={alt || ''}
-                                              className="max-w-full rounded-xl my-3 shadow-sm"
-                                              loading="lazy"
-                                              style={{ maxHeight: '300px', objectFit: 'cover' }}
-                                            />
                                           ),
                                         }}
                                       >

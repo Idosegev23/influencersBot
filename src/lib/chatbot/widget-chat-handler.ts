@@ -57,32 +57,31 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
   // 4. Build system prompt
   const systemPrompt = buildWidgetSystemPrompt(websiteContext);
 
-  // 5. Generate response via Gemini
-  const { getGeminiClient, MODELS } = await import('@/lib/ai/google-client');
-  const client = getGeminiClient();
+  // 5. Generate response via OpenAI
+  const { default: OpenAI } = await import('openai');
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-  const contents = [
+  const messages = [
+    { role: 'system' as const, content: systemPrompt },
     ...conversationHistory.map((m: any) => ({
-      role: m.role === 'assistant' ? 'model' as const : 'user' as const,
-      parts: [{ text: m.content }],
+      role: m.role as 'user' | 'assistant',
+      content: m.content,
     })),
-    { role: 'user' as const, parts: [{ text: message }] },
+    { role: 'user' as const, content: message },
   ];
 
   let fullText = '';
 
-  const stream = await client.models.generateContentStream({
-    model: MODELS.CHAT_LITE,
-    contents,
-    config: {
-      systemInstruction: systemPrompt,
-      maxOutputTokens: 1000,
-      temperature: 0.7,
-    },
+  const stream = await openai.chat.completions.create({
+    model: process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini',
+    messages,
+    stream: true,
+    max_tokens: 1000,
+    temperature: 0.7,
   });
 
   for await (const chunk of stream) {
-    const token = chunk.text || '';
+    const token = chunk.choices[0]?.delta?.content || '';
     if (token) {
       fullText += token;
       onToken?.(token);

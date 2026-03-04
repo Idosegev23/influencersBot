@@ -1,6 +1,10 @@
 import { getInfluencerByUsername, getBrandsByInfluencer, supabase } from '@/lib/supabase';
 import { notifyBrandSupport, sendSupportConfirmation } from '@/lib/whatsapp';
-import { getGeminiClient, MODELS } from '@/lib/ai/google-client';
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 // Types
 export interface SupportData {
@@ -69,15 +73,15 @@ async function saveSupportRequest(
   }
 }
 
-// Intent detection using Gemini
+// Intent detection using Chat API
 export async function detectSupportIntent(message: string): Promise<{ intent: 'support' | 'general'; confidence: number }> {
   try {
-    const client = getGeminiClient();
-    const response = await client.models.generateContent({
-      model: MODELS.CHAT_LITE,
-      contents: message,
-      config: {
-        systemInstruction: `אתה מזהה כוונות. בדוק אם ההודעה מתארת בעיה עם:
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `אתה מזהה כוונות. בדוק אם ההודעה מתארת בעיה עם:
 - קופון שלא עובד
 - הזמנה (בעיה, עיכוב, טעות)
 - משלוח (לא הגיע, איחור, נזק)
@@ -85,13 +89,18 @@ export async function detectSupportIntent(message: string): Promise<{ intent: 's
 - תלונה על מוצר
 - שירות לקוחות
 
-החזר JSON בלבד: {"intent": "support" | "general", "confidence": 0.0-1.0}`,
-        responseMimeType: 'application/json',
-        temperature: 0.3,
-      },
+החזר JSON בלבד: {"intent": "support" | "general", "confidence": 0.0-1.0}`
+        },
+        {
+          role: 'user',
+          content: message
+        }
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.3,
     });
 
-    const result = JSON.parse(response.text || '{}');
+    const result = JSON.parse(response.choices[0].message.content || '{}');
     return {
       intent: result.intent || 'general',
       confidence: result.confidence || 0
