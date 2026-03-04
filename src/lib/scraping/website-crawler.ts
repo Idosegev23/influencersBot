@@ -40,7 +40,7 @@ export interface CrawledPage {
 export interface WebsiteCrawlConfig {
   maxPages: number;
   maxDepth: number;
-  crawlerType: 'playwright' | 'cheerio';
+  crawlerType: 'playwright:adaptive' | 'playwright:firefox' | 'playwright:chrome' | 'cheerio' | 'jsdom';
 }
 
 export interface WebsiteCrawlResult {
@@ -65,7 +65,7 @@ export interface CrawlProgressCallback {
 const DEFAULT_CRAWL_CONFIG: WebsiteCrawlConfig = {
   maxPages: 50,
   maxDepth: 3,
-  crawlerType: 'playwright',
+  crawlerType: 'playwright:adaptive',
 };
 
 // ============================================
