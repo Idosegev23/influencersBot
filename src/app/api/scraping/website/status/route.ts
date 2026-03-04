@@ -191,11 +191,8 @@ async function processApifyResults(jobId: string, accountId: string, config: any
     // 3. Save to DB
     await repo.addStepLog(jobId, 'save', 'running', 50, `שומר ${pages.length} דפים...`);
 
-    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
-    const supabase = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    );
+    const { createClient } = await import('@/lib/supabase/server');
+    const supabase = await createClient();
 
     const sessionId = `crawl_${Date.now()}`;
     let saved = 0;

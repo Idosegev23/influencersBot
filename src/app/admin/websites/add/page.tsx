@@ -102,6 +102,7 @@ export default function AddWebsitePage() {
           type: 'creator',
           username: new URL(state.url.startsWith('http') ? state.url : `https://${state.url}`).hostname,
           display_name: new URL(state.url.startsWith('http') ? state.url : `https://${state.url}`).hostname,
+          is_website: true,
         }),
       });
 
