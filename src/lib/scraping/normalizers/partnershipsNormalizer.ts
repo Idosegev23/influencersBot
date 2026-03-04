@@ -3,10 +3,8 @@
  * זיהוי אוטומטי של שיתופי פעולה וקופונים מתוכן נסרק
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getGeminiClient, MODELS } from '@/lib/ai/google-client';
 import { createClient } from '@/lib/supabase/server';
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 // ============================================
 // Type Definitions
@@ -15,9 +13,9 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 export interface DetectedPartnership {
   brand_name: string;
   type: 'sponsored' | 'affiliate' | 'gift' | 'collaboration';
-  confidence: number; // 0-1
-  evidence: string[]; // Mentions, hashtags, etc.
-  posts: string[]; // Post IDs where mentioned
+  confidence: number;
+  evidence: string[];
+  posts: string[];
 }
 
 export interface DetectedCoupon {
@@ -39,9 +37,9 @@ export interface NormalizationResult {
 // ============================================
 
 const COUPON_PATTERNS = [
-  /\b([A-Z0-9]{4,12})\b/g,           // Generic codes: SAVE20, CODE123
-  /\b([A-Z]+\d+)\b/g,                 // Mixed: SAVE20, WINTER30
-  /\b(\d+%?OFF)\b/gi,                 // Discount: 20OFF, 30%OFF
+  /\b([A-Z0-9]{4,12})\b/g,
+  /\b([A-Z]+\d+)\b/g,
+  /\b(\d+%?OFF)\b/gi,
 ];
 
 const PARTNERSHIP_INDICATORS = [
@@ -60,9 +58,6 @@ const PARTNERSHIP_INDICATORS = [
 // ============================================
 
 export class PartnershipsNormalizer {
-  /**
-   * Analyze content and detect partnerships & coupons
-   */
   async analyze(
     accountId: string,
     content: {
@@ -73,32 +68,23 @@ export class PartnershipsNormalizer {
     }
   ): Promise<NormalizationResult> {
     const allText = this.extractAllText(content);
-    
-    // Use Gemini for intelligent detection
-    const detected = await this.geminiDetection(allText);
 
-    // Also do pattern-based detection for coupons
+    const detected = await this.geminiDetection(allText);
     const patternCoupons = this.detectCouponsByPattern(allText);
 
-    // Merge results
     const partnerships = detected.partnerships;
     const coupons = this.mergeCoupons(detected.coupons, patternCoupons);
 
     return { partnerships, coupons };
   }
 
-  /**
-   * Extract all text from scraped content
-   */
   private extractAllText(content: any): string {
     let text = '';
 
-    // Bio
     if (content.bio) {
       text += `[BIO]\n${content.bio}\n\n`;
     }
 
-    // Posts
     if (content.posts) {
       for (const post of content.posts) {
         text += `[POST]\n${post.caption || ''}\n`;
@@ -109,14 +95,12 @@ export class PartnershipsNormalizer {
       }
     }
 
-    // Highlights
     if (content.highlights) {
       for (const highlight of content.highlights) {
         text += `[HIGHLIGHT: ${highlight.title}]\n\n`;
       }
     }
 
-    // Websites
     if (content.websites) {
       for (const site of content.websites) {
         text += `[WEBSITE: ${site.url}]\n${site.page_content || ''}\n\n`;
@@ -126,11 +110,8 @@ export class PartnershipsNormalizer {
     return text;
   }
 
-  /**
-   * Use Gemini to detect partnerships and coupons
-   */
   private async geminiDetection(text: string): Promise<NormalizationResult> {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
+    const client = getGeminiClient();
 
     const prompt = `נתח את התוכן הבא וזהה:
 
@@ -170,10 +151,17 @@ ${text.substring(0, 8000)}
 }`;
 
     try {
-      const result = await model.generateContent(prompt);
-      const response = result.response.text();
+      const result = await client.models.generateContent({
+        model: MODELS.CHAT_FAST,
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          temperature: 0.1,
+        },
+      });
 
-      // Parse JSON
+      const response = result.text || '{}';
+
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         console.error('[PartnershipsNormalizer] Failed to parse Gemini response');
@@ -192,30 +180,23 @@ ${text.substring(0, 8000)}
     }
   }
 
-  /**
-   * Detect coupons by regex patterns
-   */
   private detectCouponsByPattern(text: string): DetectedCoupon[] {
     const coupons: DetectedCoupon[] = [];
     const seen = new Set<string>();
 
     for (const pattern of COUPON_PATTERNS) {
       const matches = text.matchAll(pattern);
-      
+
       for (const match of matches) {
         const code = match[1];
-        
-        // Skip if already found or too short
         if (seen.has(code) || code.length < 4) continue;
-        
-        // Check if looks like a coupon (not just random text)
+
         if (this.looksLikeCoupon(code)) {
           seen.add(code);
-          
           coupons.push({
             code,
             source: 'post',
-            confidence: 0.6, // Lower confidence for pattern-based
+            confidence: 0.6,
           });
         }
       }
@@ -224,32 +205,22 @@ ${text.substring(0, 8000)}
     return coupons;
   }
 
-  /**
-   * Check if string looks like a coupon code
-   */
   private looksLikeCoupon(str: string): boolean {
-    // Must have at least one letter and one number, or be all caps
     const hasLetterAndNumber = /[A-Z]/.test(str) && /\d/.test(str);
     const isAllCaps = str === str.toUpperCase() && /[A-Z]/.test(str);
-    
     return hasLetterAndNumber || isAllCaps;
   }
 
-  /**
-   * Merge coupons from different sources
-   */
   private mergeCoupons(
     geminiCoupons: DetectedCoupon[],
     patternCoupons: DetectedCoupon[]
   ): DetectedCoupon[] {
     const merged = new Map<string, DetectedCoupon>();
 
-    // Add Gemini coupons (higher confidence)
     for (const coupon of geminiCoupons) {
       merged.set(coupon.code, coupon);
     }
 
-    // Add pattern coupons if not already found
     for (const coupon of patternCoupons) {
       if (!merged.has(coupon.code)) {
         merged.set(coupon.code, coupon);
@@ -259,18 +230,11 @@ ${text.substring(0, 8000)}
     return Array.from(merged.values());
   }
 
-  /**
-   * Save detected partnerships to database
-   */
-  async savePartnerships(
-    accountId: string,
-    partnerships: DetectedPartnership[]
-  ): Promise<number> {
+  async savePartnerships(accountId: string, partnerships: DetectedPartnership[]): Promise<number> {
     const supabase = await createClient();
     let saved = 0;
 
     for (const partnership of partnerships) {
-      // Check if partnership already exists
       const { data: existing } = await supabase
         .from('partnerships')
         .select('id')
@@ -279,7 +243,6 @@ ${text.substring(0, 8000)}
         .single();
 
       if (!existing) {
-        // Create new partnership
         const { error } = await supabase.from('partnerships').insert({
           account_id: accountId,
           brand_name: partnership.brand_name,
@@ -296,18 +259,11 @@ ${text.substring(0, 8000)}
     return saved;
   }
 
-  /**
-   * Save detected coupons to database
-   */
-  async saveCoupons(
-    accountId: string,
-    coupons: DetectedCoupon[]
-  ): Promise<number> {
+  async saveCoupons(accountId: string, coupons: DetectedCoupon[]): Promise<number> {
     const supabase = await createClient();
     let saved = 0;
 
     for (const coupon of coupons) {
-      // Check if coupon already exists
       const { data: existing } = await supabase
         .from('coupons')
         .select('id')
@@ -316,7 +272,6 @@ ${text.substring(0, 8000)}
         .single();
 
       if (!existing && coupon.confidence > 0.7) {
-        // Create new coupon
         const { error } = await supabase.from('coupons').insert({
           account_id: accountId,
           code: coupon.code,
@@ -347,19 +302,13 @@ export function getPartnershipsNormalizer(): PartnershipsNormalizer {
   return normalizerInstance;
 }
 
-/**
- * Analyze and save partnerships & coupons
- */
 export async function analyzeAndSavePartnerships(
   accountId: string,
   content: any
 ): Promise<{ partnershipsFound: number; couponsFound: number }> {
   const normalizer = getPartnershipsNormalizer();
-  
   const result = await normalizer.analyze(accountId, content);
-  
   const partnershipsFound = await normalizer.savePartnerships(accountId, result.partnerships);
   const couponsFound = await normalizer.saveCoupons(accountId, result.coupons);
-
   return { partnershipsFound, couponsFound };
 }

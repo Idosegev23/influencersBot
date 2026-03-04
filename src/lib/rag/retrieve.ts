@@ -11,8 +11,7 @@
  * 5. Build context for LLM
  */
 
-import OpenAI from 'openai';
-import { GoogleGenAI } from '@google/genai';
+import { getGeminiClient, MODELS } from '@/lib/ai/google-client';
 import { createClient } from '@/lib/supabase/server';
 import { generateEmbedding } from './embeddings';
 import { rerankCandidates } from './rerank';
@@ -30,18 +29,6 @@ import type {
 } from './types';
 
 const log = createLogger('retrieve');
-
-let openaiClient: OpenAI | null = null;
-function getOpenAI(): OpenAI {
-  if (!openaiClient) openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  return openaiClient;
-}
-
-let geminiClient: GoogleGenAI | null = null;
-function getGemini(): GoogleGenAI {
-  if (!geminiClient) geminiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-  return geminiClient;
-}
 
 // ============================================
 // Entity type inference from query
@@ -77,9 +64,9 @@ const STRUCTURED_INDICATORS = [
  */
 async function expandQuery(query: string): Promise<string> {
   try {
-    const gemini = getGemini();
+    const gemini = getGeminiClient();
     const response = await gemini.models.generateContent({
-      model: 'gemini-2.5-flash-lite',
+      model: MODELS.EXPAND,
       contents: query,
       config: {
         systemInstruction: `Expand search queries with 8-12 related specific terms for better retrieval.
