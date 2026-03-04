@@ -274,19 +274,6 @@ ${personalityBlock}
 • **אחרי כל תשובה**: הציע/י בקצרה המשך טבעי אחד בתוך הטקסט.
 • 1-2 אימוג'ים מקסימום לכל תשובה.
 
-✍️ **עיצוב תשובה — חובה!**
-• כשיש רשימה (מוצרים, מתכונים, טיפים) — כל פריט בשורה נפרדת עם ירידת שורה.
-• השתמש/י ב-**bold** לשמות מוצרים ולכותרות חשובות.
-• הפרד/י בין פסקאות בשורה ריקה.
-• דוגמה לפורמט נכון:
-הנה כמה מוצרים מומלצים:
-
-1. **שם מוצר** — תיאור קצר
-2. **שם מוצר** — תיאור קצר
-3. **שם מוצר** — תיאור קצר
-
-• ⚠️ **לעולם** לא לכתוב רשימה בשורה אחת כמו "1. X 2. Y 3. Z" — תמיד ירידת שורה בין פריטים!
-
 📌 המלצות המשך:
 בסוף **כל** תשובה, הוסף שורה אחרונה בפורמט הזה בדיוק:
 <<SUGGESTIONS>>הצעה 1|הצעה 2|הצעה 3<</SUGGESTIONS>>
@@ -308,6 +295,7 @@ ${personalityBlock}
 3. **מתכונים ותוכן**: כשנותנים מתכון — תן אותו **מלא** עם מצרכים ושלבים. אם יש משהו דומה — הציע אותו!
 4. **לינקים**: פורמט [טקסט](URL). העתק URL בדיוק כמו שהוא.
 5. **תמונות**: כשממליצ/ה על מוצר ויש [image_url: ...] בתוכן — הוסיפ/י את התמונה בפורמט ![תיאור קצר](URL). תמונה אחת בלבד לכל המלצה.
+6. **עיצוב**: רשימות — כל פריט בשורה נפרדת. **bold** לשמות חשובים. שורה ריקה בין פסקאות.
 
 השם שלך: ${influencerName} (לעולם אל תכתוב [שם המשפיענית])`;
 
@@ -400,6 +388,10 @@ ${personalityBlock}
           config: {
             systemInstruction: instructions,
             maxOutputTokens: MAX_TOKENS,
+            thinkingConfig: {
+              includeThoughts: false,
+              thinkingBudget: 0,
+            },
           },
         });
 
@@ -421,6 +413,10 @@ ${personalityBlock}
           config: {
             systemInstruction: instructions,
             maxOutputTokens: MAX_TOKENS,
+            thinkingConfig: {
+              includeThoughts: false,
+              thinkingBudget: 0,
+            },
           },
         });
 
@@ -460,6 +456,10 @@ ${personalityBlock}
       config: {
         systemInstruction: params.systemInstruction,
         maxOutputTokens: MAX_TOKENS,
+        thinkingConfig: {
+          includeThoughts: false,
+          thinkingLevel: 'HIGH' as any,
+        },
       },
     });
 
