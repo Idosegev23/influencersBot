@@ -1,14 +1,15 @@
 /**
- * Re-embed all accounts — run locally with:
+ * Re-embed all accounts with OpenAI embeddings — run locally with:
  *   npx tsx --tsconfig tsconfig.json scripts/re-embed-all.ts
  *
- * Requires .env.local with GEMINI_API_KEY + SUPABASE vars
+ * Requires .env.local with OPENAI_API_KEY + SUPABASE vars
  */
 
 import { config } from 'dotenv';
 config({ path: '.env.local' });
 
 import { createClient } from '@supabase/supabase-js';
+import OpenAI from 'openai';
 
 // ---- Inline Supabase client (avoids path alias issues) ----
 const supabase = createClient(
@@ -17,31 +18,29 @@ const supabase = createClient(
   { auth: { persistSession: false, autoRefreshToken: false } }
 );
 
-// ---- Inline Gemini client ----
-import { GoogleGenAI } from '@google/genai';
-
-const gemini = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-const EMBEDDING_MODEL = 'gemini-embedding-001';
+// ---- OpenAI client ----
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+const EMBEDDING_MODEL = 'text-embedding-3-small';
 const EMBEDDING_DIMENSIONS = 1536;
-const MAX_BATCH = 100;
-const MAX_CHARS = 8000 * 4;
+const MAX_BATCH = 100; // OpenAI limit per request
+const MAX_TOKENS_PER_INPUT = 8191;
 
 async function generateEmbeddings(texts: string[]): Promise<number[][]> {
   const all: number[][] = [];
   for (let i = 0; i < texts.length; i += MAX_BATCH) {
     const batch = texts.slice(i, i + MAX_BATCH).map(t =>
-      t.length > MAX_CHARS ? t.substring(0, MAX_CHARS) : t
+      t.length > MAX_TOKENS_PER_INPUT * 4 ? t.substring(0, MAX_TOKENS_PER_INPUT * 4) : t
     );
 
-    const response = await gemini.models.embedContent({
+    const response = await openai.embeddings.create({
       model: EMBEDDING_MODEL,
-      contents: batch.map(t => ({ parts: [{ text: t }] })),
-      config: { outputDimensionality: EMBEDDING_DIMENSIONS },
+      input: batch,
+      dimensions: EMBEDDING_DIMENSIONS,
     });
 
-    const embeddings = (response as any).embeddings
-      ? (response as any).embeddings.map((e: any) => e.values)
-      : [(response as any).embedding?.values];
+    const embeddings = response.data
+      .sort((a, b) => a.index - b.index)
+      .map(d => d.embedding);
 
     all.push(...embeddings);
   }
@@ -49,8 +48,7 @@ async function generateEmbeddings(texts: string[]): Promise<number[][]> {
 }
 
 // ---- Main logic ----
-async function reEmbedAccount(accountId: string, accountName: string) {
-  // Get all chunks for this account
+async function reEmbedAccount(accountId: string) {
   const { data: chunks, error } = await supabase
     .from('document_chunks')
     .select('id, chunk_text')
@@ -58,20 +56,20 @@ async function reEmbedAccount(accountId: string, accountName: string) {
     .order('id');
 
   if (error) {
-    console.error(`  ❌ Failed to fetch chunks: ${error.message}`);
+    console.error(`  Failed to fetch chunks: ${error.message}`);
     return { updated: 0, errors: 1 };
   }
 
   if (!chunks || chunks.length === 0) {
-    console.log(`  ⏭️  No chunks found, skipping`);
+    console.log(`  No chunks found, skipping`);
     return { updated: 0, errors: 0 };
   }
 
-  console.log(`  📦 Found ${chunks.length} chunks, generating embeddings...`);
+  console.log(`  Found ${chunks.length} chunks, generating OpenAI embeddings...`);
 
   let updated = 0;
   let errors = 0;
-  const BATCH_SIZE = 50; // Gemini rate-friendly batches
+  const BATCH_SIZE = 50;
 
   for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
     const batch = chunks.slice(i, i + BATCH_SIZE);
@@ -80,7 +78,6 @@ async function reEmbedAccount(accountId: string, accountName: string) {
     try {
       const embeddings = await generateEmbeddings(texts);
 
-      // Update each chunk with new embedding
       for (let j = 0; j < batch.length; j++) {
         const { error: updateError } = await supabase
           .from('document_chunks')
@@ -88,7 +85,7 @@ async function reEmbedAccount(accountId: string, accountName: string) {
           .eq('id', batch[j].id);
 
         if (updateError) {
-          console.error(`  ❌ Chunk ${batch[j].id}: ${updateError.message}`);
+          console.error(`  Chunk ${batch[j].id}: ${updateError.message}`);
           errors++;
         } else {
           updated++;
@@ -96,18 +93,16 @@ async function reEmbedAccount(accountId: string, accountName: string) {
       }
 
       const progress = Math.min(i + BATCH_SIZE, chunks.length);
-      console.log(`  ✅ ${progress}/${chunks.length} chunks updated`);
+      console.log(`  ${progress}/${chunks.length} chunks updated`);
 
-      // Small delay to respect rate limits (100 RPM free tier)
+      // Small delay between batches
       if (i + BATCH_SIZE < chunks.length) {
-        await new Promise(r => setTimeout(r, 700));
+        await new Promise(r => setTimeout(r, 200));
       }
     } catch (err: any) {
-      console.error(`  ❌ Batch ${i}-${i + BATCH_SIZE} failed: ${err.message}`);
+      console.error(`  Batch ${i}-${i + BATCH_SIZE} failed: ${err.message}`);
       errors += batch.length;
-
-      // Wait longer on error (likely rate limit)
-      await new Promise(r => setTimeout(r, 5000));
+      await new Promise(r => setTimeout(r, 3000));
     }
   }
 
@@ -115,9 +110,8 @@ async function reEmbedAccount(accountId: string, accountName: string) {
 }
 
 async function main() {
-  console.log('🔄 Re-embedding all accounts with Gemini embeddings\n');
+  console.log('Re-embedding all accounts with OpenAI text-embedding-3-small\n');
 
-  // Get all active accounts (username is in config JSONB, not a column)
   const { data: accounts, error } = await supabase
     .from('accounts')
     .select('id, config, status')
@@ -140,17 +134,17 @@ async function main() {
     const name = cfg.display_name || cfg.username || acc.id;
     console.log(`[${i + 1}/${accounts.length}] ${name} (${acc.id})`);
 
-    const { updated, errors } = await reEmbedAccount(acc.id, name);
+    const { updated, errors } = await reEmbedAccount(acc.id);
     totalUpdated += updated;
     totalErrors += errors;
 
     console.log(`  Done: ${updated} updated, ${errors} errors\n`);
   }
 
-  console.log('═══════════════════════════════════');
-  console.log(`✅ Complete: ${totalUpdated} chunks re-embedded across ${accounts.length} accounts`);
+  console.log('='.repeat(40));
+  console.log(`Complete: ${totalUpdated} chunks re-embedded across ${accounts.length} accounts`);
   if (totalErrors > 0) {
-    console.log(`⚠️  ${totalErrors} errors`);
+    console.log(`${totalErrors} errors`);
   }
 }
 
