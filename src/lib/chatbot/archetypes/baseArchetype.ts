@@ -79,25 +79,16 @@ export abstract class BaseArchetype {
       };
     }
 
-    // 2. Detect topic change and manage context accordingly
-    const lastAssistant = input.conversationHistory
-      ?.filter(m => m.role === 'assistant')
-      .slice(-1)[0]?.content || '';
-
-    const topicChanged = lastAssistant
-      ? this.isTopicChange(input.userMessage, lastAssistant)
-      : false;
-
-    // If topic changed: don't pollute KB query AND trim history so GPT
-    // doesn't bleed old topics into the new answer.
+    // 2. Extract history keywords for KB query enrichment
+    // Always use recent context — let the model handle topic transitions naturally
     let historyKeywords = '';
-    if (!topicChanged && lastAssistant) {
-      historyKeywords = input.conversationHistory?.slice(-2)
+    if (input.conversationHistory?.length) {
+      historyKeywords = input.conversationHistory.slice(-4)
         .map(m => m.content)
         .join(' ')
         .split(/\s+/)
         .filter(w => w.length > 3)
-        .slice(0, 10)
+        .slice(0, 15)
         .join(' ') || '';
     }
 
@@ -266,12 +257,8 @@ export abstract class BaseArchetype {
 ⚠️ **אל תפתח/י כל הודעה עם כינויי חיבה** ("מאמי", "אהובה", "יקירה"). תפתח/י ישר לעניין. כינוי חיבה מותר לפעמים, לא בכל הודעה.
 
 📜 הקשר שיחה: **תמיד** תבין/י הפניות להיסטוריה ("המתכון", "מה שאמרת", "זה"). השיחה זורמת — אל תתנהג/י כאילו כל הודעה מתחילה מאפס.
-
-🔀 **זיהוי מעבר נושא — קריטי!**
-כשהמשתמש/ת שואל/ת על נושא חדש שלא קשור לשאלה הקודמת:
-• ענה/י **רק** על הנושא החדש. **אל תערבב** מידע מנושאים קודמים.
-• אל תזכיר/י מוצרים, מתכונים, או טיפים מתשובות קודמות אלא אם המשתמש/ת ביקש/ה במפורש.
-• אם אין לך מידע על הנושא החדש — אמור/י בכנות במקום להציע משהו לא קשור מנושא ישן.
+• אם המשתמש/ת שואל/ת שאלת המשך (למשל "איזה תבלינים לשפר?" אחרי מתכון) — **חבר/י את זה לנושא הקודם** ותן/י תשובה ספציפית.
+• רק אם ברור לחלוטין שהמשתמש/ת עבר/ה לנושא אחר (שאלה על מוצר אחר / נושא לא קשור) — ענה/י רק על הנושא החדש.
 
 🎯 תפקיד: ${this.definition.name}
 📝 ${this.definition.description}
@@ -320,33 +307,21 @@ ${personalityBlock}
       // Resolve model based on decision engine's modelStrategy
       const { primary: primaryModel, fallback: fallbackModel } = resolveModel(input.modelTier);
 
-      // Determine if we should use previous_response_id for context chaining
-      // On topic change we break the chain — OpenAI starts fresh
-      const lastAssistant = input.conversationHistory
-        ?.filter(m => m.role === 'assistant')
-        .slice(-1)[0]?.content || '';
-      const topicChanged = lastAssistant ? this.isTopicChange(input.userMessage, lastAssistant) : false;
-      const previousResponseId = topicChanged ? null : (input.previousResponseId || null);
-
-      if (topicChanged) {
-        console.log('[BaseArchetype] 🔀 Topic change detected — breaking response chain');
-      }
+      // Context chaining via OpenAI Responses API
+      // Always try to keep the chain alive — the model manages server-side context
+      // and handles topic transitions naturally
+      const previousResponseId = input.previousResponseId || null;
 
       // Build input for Responses API
       // When we have previous_response_id, OpenAI manages context server-side.
       // We only send the new user message + fresh KB context.
-      // When no previous_response_id (first message or topic change), we include
+      // When no previous_response_id (first message), we include
       // conversation history manually so the model has context.
       const inputMessages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
 
       if (!previousResponseId && input.conversationHistory?.length) {
-        // No chain: include history manually
-        // On topic change: only keep last 2 messages (basic pronoun context)
-        // so old topics don't bleed into the new answer
-        const historyToSend = topicChanged
-          ? input.conversationHistory.slice(-2)
-          : input.conversationHistory;
-        for (const m of historyToSend) {
+        // No chain: include full history (already limited to 10 messages from DB)
+        for (const m of input.conversationHistory) {
           inputMessages.push({ role: m.role, content: m.content });
         }
       }

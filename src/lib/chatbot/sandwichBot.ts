@@ -96,52 +96,36 @@ export class SandwichBot {
       ? [...input.conversationHistory].reverse().find(m => m.role === 'assistant')
       : null;
 
-    // Detect quick follow-ups: user answering bot's question with a short choice
-    // Only skip RAG for very short answers (< 10 chars) that don't contain content keywords
-    const hasContentKeywords = /מתכון|איך|קופון|מוצר|המלצה|טיפ|שווארמה|פסטה|עוגה|סלט|מה ה/.test(input.userMessage);
-    const isQuickFollowUp = !!(
-      lastAssistant &&
-      input.userMessage.length < 10 &&
-      !hasContentKeywords &&
-      lastAssistant.content.includes('?')
-    );
+    // Enrich query with conversation context for follow-up messages
+    // e.g. "תני לי את המתכון" → "פסטה רביולי ... תני לי את המתכון"
+    // Always run RAG — even short follow-ups benefit from context-aware retrieval
+    let knowledgeQuery = input.userMessage;
+
+    if (input.userMessage.length < 80) {
+      const contextParts: string[] = [];
+      if (input.rollingSummary) {
+        contextParts.push(input.rollingSummary.substring(0, 200));
+      }
+      // Use last 2 assistant messages for richer context
+      const recentAssistants = (input.conversationHistory || [])
+        .filter(m => m.role === 'assistant')
+        .slice(-2);
+      for (const msg of recentAssistants) {
+        contextParts.push(msg.content.substring(0, 300));
+      }
+      if (contextParts.length > 0) {
+        knowledgeQuery = `${contextParts.join(' ')} ${input.userMessage}`;
+        console.log(`   → Enriched query with conversation context (${knowledgeQuery.length} chars)`);
+      }
+    }
 
     let knowledgeBase: KnowledgeBase;
-
-    if (isQuickFollowUp) {
-      // ⚡ Skip RAG entirely — conversation history has the context
-      console.log('   ⚡ Quick follow-up detected — skipping RAG for speed');
-      knowledgeBase = { posts: [], highlights: [], coupons: [], partnerships: [], insights: [], websites: [], transcriptions: [] };
-    } else {
-      // Enrich query with conversation context for follow-up messages
-      // e.g. "תני לי את המתכון" → "פסטה רביולי ... תני לי את המתכון"
-      // BUT: skip enrichment on topic change — old context pollutes the KB query
-      let knowledgeQuery = input.userMessage;
-      const isTopicChange = lastAssistant ? this.detectTopicChange(input.userMessage, lastAssistant.content) : false;
-
-      if (isTopicChange) {
-        console.log('   🔀 Topic change detected — using raw query (no context enrichment)');
-      } else if (input.userMessage.length < 60) {
-        const contextParts: string[] = [];
-        if (input.rollingSummary) {
-          contextParts.push(input.rollingSummary.substring(0, 200));
-        }
-        if (lastAssistant) {
-          contextParts.push(lastAssistant.content.substring(0, 300));
-        }
-        if (contextParts.length > 0) {
-          knowledgeQuery = `${contextParts.join(' ')} ${input.userMessage}`;
-          console.log(`   → Enriched query with conversation context (${knowledgeQuery.length} chars)`);
-        }
-      }
-
-      knowledgeBase = await this.retrieveKnowledge(
-        input.accountId,
-        classification.primaryArchetype,
-        knowledgeQuery,
-        input.rollingSummary
-      );
-    }
+    knowledgeBase = await this.retrieveKnowledge(
+      input.accountId,
+      classification.primaryArchetype,
+      knowledgeQuery,
+      input.rollingSummary
+    );
 
     // ==========================================
     // LAYER 2 + 3: Process with Archetype (includes Guardrails)
