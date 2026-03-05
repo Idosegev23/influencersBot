@@ -200,6 +200,8 @@
           reader.read().then(function (result) {
             if (result.done) {
               isLoading = false;
+              // Strip <<SUGGESTIONS>> tags before final render
+              messages[messages.length - 1].content = fullText.replace(/<<SUGGESTIONS>>[\s\S]*?<<\/SUGGESTIONS>>/g, '').trim();
               render();
               return;
             }
@@ -212,7 +214,9 @@
                 var event = JSON.parse(lines[i]);
                 if (event.type === 'delta' && event.text) {
                   fullText += event.text;
-                  messages[messages.length - 1].content = fullText;
+                  // Hide <<SUGGESTIONS>> during streaming — strip everything from <<SUGGESTIONS>> onward
+                  var displayText = fullText.replace(/<<SUGGESTIONS>>[\s\S]*/g, '').trim();
+                  messages[messages.length - 1].content = displayText;
                   render();
                 } else if (event.type === 'error') {
                   messages[messages.length - 1].content = event.message || 'שגיאה בעיבוד הבקשה.';
