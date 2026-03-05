@@ -366,11 +366,31 @@ export default function AddWebsitePage() {
             </div>
 
             <button
-              onClick={() => setState((s) => ({ ...s, step: 'complete' }))}
-              className="w-full mt-6 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-indigo-500/25"
+              onClick={async () => {
+                setState((s) => ({ ...s, isLoading: true }));
+                try {
+                  // Save widget settings to account config
+                  await fetch(`/api/admin/accounts/${state.accountId}/config`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      widget: {
+                        primaryColor: state.widgetColor,
+                        welcomeMessage: state.welcomeMessage,
+                        position: 'bottom-right',
+                      },
+                    }),
+                  });
+                } catch {
+                  // Continue even if save fails — defaults will work
+                }
+                setState((s) => ({ ...s, step: 'complete', isLoading: false }));
+              }}
+              disabled={state.isLoading}
+              className="w-full mt-6 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-indigo-500/25 disabled:opacity-50"
             >
-              <Check className="w-5 h-5" />
-              סיום
+              {state.isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
+              {state.isLoading ? 'שומר...' : 'סיום'}
             </button>
           </motion.div>
         )}

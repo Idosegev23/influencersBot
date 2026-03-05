@@ -1,10 +1,12 @@
 /**
  * Widget Chat Handler
- * מטפל בהודעות צ'אט מהווידג'ט — ניטרלי, בלי פרסונה
- * מחפש רק בתוכן אתרים (לא אינסטגרם)
+ * מטפל בהודעות צ'אט מהווידג'ט — משתמש באותו מנוע SandwichBot של הסושיאל
+ * "אותו מוח, שני מקומות שונים"
  */
 
 import { createClient } from '@/lib/supabase/server';
+import { processSandwichMessageWithMetadata } from './sandwichBot';
+import { buildPersonalityFromDB } from './personality-wrapper';
 
 // ============================================
 // Type Definitions
@@ -41,127 +43,152 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
     });
   }
 
-  // 2. Retrieve relevant website content via FTS
-  const websiteContext = await retrieveWebsiteContext(supabase, accountId, message);
+  // 2. Load account info + personality in parallel
+  const [accountData, personalityConfig, historyData] = await Promise.all([
+    // Account info (username, display name)
+    supabase
+      .from('accounts')
+      .select('username, display_name, account_type')
+      .eq('id', accountId)
+      .single()
+      .then(r => r.data),
+    // Personality config
+    buildPersonalityFromDB(accountId).catch(() => null),
+    // Conversation history (last 10 messages)
+    supabase
+      .from('chat_messages')
+      .select('role, content')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: false })
+      .limit(10)
+      .then(r => r.data),
+  ]);
 
-  // 3. Get conversation history (last 10 messages)
-  const { data: history } = await supabase
-    .from('chat_messages')
-    .select('role, content')
-    .eq('session_id', sessionId)
-    .order('created_at', { ascending: false })
-    .limit(10);
+  const username = accountData?.username || 'website';
+  const influencerName = accountData?.display_name || accountData?.username || 'Website';
 
-  const conversationHistory = (history || []).reverse();
-
-  // 4. Build system prompt
-  const systemPrompt = buildWidgetSystemPrompt(websiteContext);
-
-  // 5. Generate response via OpenAI
-  const { default: OpenAI } = await import('openai');
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-  const messages = [
-    { role: 'system' as const, content: systemPrompt },
-    ...conversationHistory.map((m: any) => ({
+  const conversationHistory = (historyData || [])
+    .reverse()
+    .map((m: any) => ({
       role: m.role as 'user' | 'assistant',
       content: m.content,
-    })),
-    { role: 'user' as const, content: message },
-  ];
+    }));
 
-  let fullText = '';
-
-  const stream = await openai.chat.completions.create({
-    model: process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini',
-    messages,
-    stream: true,
-    max_tokens: 1000,
-    temperature: 0.7,
-  });
-
-  for await (const chunk of stream) {
-    const token = chunk.choices[0]?.delta?.content || '';
-    if (token) {
-      fullText += token;
-      onToken?.(token);
+  // 3. If this is a website-only account (no social data), find the linked social account
+  //    so SandwichBot can access ALL knowledge (posts, transcriptions, website, coupons, etc.)
+  let effectiveAccountId = accountId;
+  if (accountData?.account_type === 'website') {
+    const linkedSocial = await findLinkedSocialAccount(supabase, accountId);
+    if (linkedSocial) {
+      effectiveAccountId = linkedSocial.id;
+      console.log(`[WidgetChat] Website account ${accountId} → linked social ${linkedSocial.id} (@${linkedSocial.username})`);
     }
   }
 
-  // 6. Save messages
-  await Promise.all([
-    supabase.from('chat_messages').insert({
-      session_id: sessionId,
-      role: 'user',
-      content: message,
-    }),
-    supabase.from('chat_messages').insert({
-      session_id: sessionId,
-      role: 'assistant',
-      content: fullText,
-    }),
-  ]);
+  // 4. Process through SandwichBot — same engine as social chatbot
+  let fullText = '';
+
+  try {
+    const sandwichResult = await processSandwichMessageWithMetadata({
+      userMessage: message,
+      accountId: effectiveAccountId,
+      username,
+      influencerName,
+      conversationHistory,
+      personalityConfig: personalityConfig || undefined,
+      onToken: (token: string) => {
+        fullText += token;
+        onToken?.(token);
+      },
+    });
+
+    // If streaming was used, fullText was accumulated via onToken
+    // If not (fallback), use the response directly
+    if (!fullText && sandwichResult.response) {
+      fullText = sandwichResult.response;
+    }
+
+    // Strip <<SUGGESTIONS>> tags — widget doesn't use suggestion chips
+    fullText = stripSuggestions(fullText);
+
+    console.log(`[WidgetChat] SandwichBot response:`, {
+      archetype: sandwichResult.metadata.archetype,
+      confidence: sandwichResult.metadata.confidence,
+      personalityApplied: sandwichResult.metadata.personalityApplied,
+      responseLength: fullText.length,
+    });
+  } catch (error: any) {
+    console.error('[WidgetChat] SandwichBot error:', error.message);
+    fullText = 'מצטער, לא הצלחתי לעבד את הבקשה. נסו שוב.';
+  }
+
+  // 5. Save messages (sequential to ensure correct created_at ordering)
+  await supabase.from('chat_messages').insert({
+    session_id: sessionId,
+    role: 'user',
+    content: message,
+  });
+  await supabase.from('chat_messages').insert({
+    session_id: sessionId,
+    role: 'assistant',
+    content: fullText,
+  });
 
   return { response: fullText, sessionId };
 }
 
 // ============================================
-// Website Context Retrieval
+// Helpers
 // ============================================
 
-async function retrieveWebsiteContext(
+/**
+ * Find the linked social account for a website account.
+ * Looks for a social account with matching domain in their bio websites.
+ */
+async function findLinkedSocialAccount(
   supabase: any,
-  accountId: string,
-  query: string,
-): Promise<string> {
+  websiteAccountId: string,
+): Promise<{ id: string; username: string } | null> {
   try {
-    // FTS search on website content
-    const { data: ftsResults } = await supabase.rpc('search_website_content', {
-      p_account_id: accountId,
-      p_query: query,
-      p_limit: 5,
-    });
+    // Get the website URL from the website account
+    const { data: websiteAccount } = await supabase
+      .from('accounts')
+      .select('username, config')
+      .eq('id', websiteAccountId)
+      .single();
 
-    if (!ftsResults || ftsResults.length === 0) {
-      // Fallback: get most recent pages
-      const { data: pages } = await supabase
-        .from('instagram_bio_websites')
-        .select('page_title, page_content, url, image_urls')
-        .eq('account_id', accountId)
-        .eq('source_type', 'standalone')
-        .eq('processing_status', 'completed')
-        .order('scraped_at', { ascending: false })
-        .limit(5);
+    if (!websiteAccount) return null;
 
-      if (!pages || pages.length === 0) return '';
+    // The username for website accounts is the domain (e.g., "argania-oil.co.il")
+    const domain = websiteAccount.username;
 
-      return pages
-        .map((p: any) => `## ${p.page_title || p.url}\n${(p.page_content || '').slice(0, 2000)}`)
-        .join('\n\n---\n\n');
+    // Find social accounts that have this domain in their bio websites
+    const { data: linkedPages } = await supabase
+      .from('instagram_bio_websites')
+      .select('account_id')
+      .ilike('url', `%${domain}%`)
+      .neq('account_id', websiteAccountId)
+      .limit(1);
+
+    if (linkedPages?.[0]) {
+      const { data: socialAccount } = await supabase
+        .from('accounts')
+        .select('id, username')
+        .eq('id', linkedPages[0].account_id)
+        .single();
+      return socialAccount || null;
     }
 
-    return ftsResults
-      .map((r: any) => `## ${r.page_title || r.url}\n${(r.page_content || '').slice(0, 2000)}`)
-      .join('\n\n---\n\n');
+    return null;
   } catch (error: any) {
-    console.error('[WidgetChat] Context retrieval failed:', error.message);
-    return '';
+    console.error('[WidgetChat] Failed to find linked social account:', error.message);
+    return null;
   }
 }
 
-// ============================================
-// System Prompt Builder
-// ============================================
-
-function buildWidgetSystemPrompt(websiteContext: string): string {
-  return `אתה עוזר חכם שעונה על שאלות לגבי האתר.
-עליך לענות אך ורק על בסיס תוכן האתר שמופיע למטה.
-אם אין לך מידע רלוונטי, אמור בנימוס שאין לך מספיק מידע לענות על השאלה.
-אל תמציא מידע.
-התאם את שפת התשובה לשפת השואל.
-ענה בצורה תמציתית ומועילה.
-
-=== תוכן האתר ===
-${websiteContext || 'לא נמצא תוכן רלוונטי.'}
-=== סוף תוכן האתר ===`;
+/**
+ * Strip <<SUGGESTIONS>> tags from response — widget doesn't use suggestion chips.
+ */
+function stripSuggestions(text: string): string {
+  return text.replace(/<<SUGGESTIONS>>[\s\S]*?<<\/SUGGESTIONS>>/g, '').trim();
 }

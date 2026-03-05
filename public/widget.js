@@ -49,6 +49,10 @@
       }
       if (data.welcomeMessage) config.welcomeMessage = data.welcomeMessage;
       if (data.placeholder) config.placeholder = data.placeholder;
+      // Update container position after config loads
+      container.style.cssText = 'position:fixed;z-index:2147483647;' +
+        (config.position === 'bottom-left' ? 'bottom:24px;left:24px;' : 'bottom:24px;right:24px;') +
+        'font-family:system-ui,-apple-system,sans-serif;direction:rtl;';
       messages = [{ role: 'assistant', content: config.welcomeMessage }];
       render();
     })
@@ -109,7 +113,7 @@
         '<div style="max-width:80%;padding:8px 12px;border-radius:12px;font-size:14px;line-height:1.5;' +
         'background:' + (isUser ? pc + '15' : '#f3f4f6') + ';' +
         'color:#1f2937;word-break:break-word;">' +
-        escapeHtml(m.content || (isLoading ? '...' : '')) +
+        formatMessage(m.content || (isLoading ? '...' : '')) +
         '</div></div>';
     }).join('');
 
@@ -210,6 +214,10 @@
                   fullText += event.text;
                   messages[messages.length - 1].content = fullText;
                   render();
+                } else if (event.type === 'error') {
+                  messages[messages.length - 1].content = event.message || 'שגיאה בעיבוד הבקשה.';
+                  isLoading = false;
+                  render();
                 } else if (event.type === 'done') {
                   if (event.sessionId) {
                     sessionId = event.sessionId;
@@ -249,6 +257,20 @@
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  function formatMessage(str) {
+    if (!str) return '';
+    var safe = escapeHtml(str);
+    // Convert markdown links [text](url) to clickable HTML links
+    safe = safe.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function (_, text, url) {
+      return '<a href="' + url + '" target="_blank" rel="noopener" style="color:' + config.primaryColor + ';text-decoration:underline;">' + text + '</a>';
+    });
+    // Convert **bold** to <strong>
+    safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    // Convert newlines to <br>
+    safe = safe.replace(/\n/g, '<br>');
+    return safe;
   }
 
   // Initial render

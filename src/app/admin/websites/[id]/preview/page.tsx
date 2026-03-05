@@ -216,7 +216,7 @@ function WidgetPreview({ accountId }: { accountId: string }) {
                   : 'bg-gray-100 text-gray-800'
               }`}
             >
-              {msg.content || (isLoading && i === messages.length - 1 ? '...' : '')}
+              <span dangerouslySetInnerHTML={{ __html: formatWidgetMessage(msg.content || (isLoading && i === messages.length - 1 ? '...' : '')) }} />
             </div>
           </div>
         ))}
@@ -250,4 +250,20 @@ function WidgetPreview({ accountId }: { accountId: string }) {
       </div>
     </div>
   );
+}
+
+function formatWidgetMessage(text: string): string {
+  if (!text) return '';
+  let safe = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  // Markdown links [text](url) → <a>
+  safe = safe.replace(/\[([^\]]+)\]\(([^)]+)\)/g,
+    '<a href="$2" target="_blank" rel="noopener" class="text-indigo-600 underline hover:text-indigo-500">$1</a>');
+  // **bold** → <strong>
+  safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  // Newlines → <br>
+  safe = safe.replace(/\n/g, '<br>');
+  return safe;
 }

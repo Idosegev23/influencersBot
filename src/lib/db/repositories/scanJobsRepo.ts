@@ -11,7 +11,7 @@ import { createClient } from '@/lib/supabase/server';
 
 export interface ScanJob {
   id: string;
-  platform: 'instagram' | 'tiktok' | 'youtube';
+  platform: 'instagram' | 'tiktok' | 'youtube' | 'website';
   username: string;
   account_id?: string;
   status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
@@ -42,6 +42,7 @@ export interface ScanStepLog {
 }
 
 export interface CreateScanJobParams {
+  platform?: 'instagram' | 'tiktok' | 'youtube' | 'website';
   username: string;
   account_id?: string;
   priority?: number;
@@ -82,7 +83,7 @@ export class ScanJobsRepository {
     const { data, error } = await supabase
       .from('scan_jobs')
       .insert({
-        platform: 'instagram',
+        platform: params.platform || 'instagram',
         username: params.username,
         account_id: params.account_id,
         priority: params.priority || 100,
