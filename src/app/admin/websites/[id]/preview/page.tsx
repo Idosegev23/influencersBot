@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowRight, ExternalLink, Copy, Check, MessageCircle, X, Send } from 'lucide-react';
+import { ArrowRight, ExternalLink, Copy, Check, X, Send } from 'lucide-react';
 
 export default function WebsitePreviewPage() {
   const params = useParams();
@@ -99,17 +99,52 @@ export default function WebsitePreviewPage() {
   );
 }
 
+// ============================================
+// CSS Animations — injected via style tag
+// ============================================
+
+const widgetStyles = `
+@keyframes widget-slide-up {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes widget-fade-in {
+  from { opacity: 0; transform: translateX(10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes widget-bounce {
+  0%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-5px); }
+}
+@keyframes widget-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(99,102,241,0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(99,102,241,0); }
+}
+`;
+
 /**
- * Functional widget preview — mimics the real widget.js behavior
+ * Widget Preview v2.0 — matches the real widget.js design
+ * Glassmorphism, animations, gradient header, AI avatar, typing indicator
  */
 function WidgetPreview({ accountId }: { accountId: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Array<{ role: string; content: string }>>([
-    { role: 'assistant', content: 'שלום! איך אפשר לעזור?' },
+    { role: 'assistant', content: 'שלום! איך אפשר לעזור? ✨' },
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Inject animations style
+  useEffect(() => {
+    if (!document.getElementById('widget-preview-styles')) {
+      const style = document.createElement('style');
+      style.id = 'widget-preview-styles';
+      style.textContent = widgetStyles;
+      document.head.appendChild(style);
+    }
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -120,22 +155,20 @@ function WidgetPreview({ accountId }: { accountId: string }) {
 
     const userMessage = input.trim();
     setInput('');
-    setMessages((m) => [...m, { role: 'user', content: userMessage }]);
+    setMessages((m) => [...m, { role: 'user', content: userMessage }, { role: 'assistant', content: '' }]);
     setIsLoading(true);
 
     try {
       const res = await fetch('/api/widget/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMessage, accountId }),
+        body: JSON.stringify({ message: userMessage, accountId, sessionId }),
       });
 
       if (res.ok && res.body) {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let fullText = '';
-
-        setMessages((m) => [...m, { role: 'assistant', content: '' }]);
 
         while (true) {
           const { done, value } = await reader.read();
@@ -149,121 +182,220 @@ function WidgetPreview({ accountId }: { accountId: string }) {
               const event = JSON.parse(line);
               if (event.type === 'delta') {
                 fullText += event.text;
+                const displayText = fullText.replace(/<<SUGGESTIONS>>[\s\S]*/g, '').trim();
                 setMessages((m) => {
                   const updated = [...m];
-                  updated[updated.length - 1] = { role: 'assistant', content: fullText };
+                  updated[updated.length - 1] = { role: 'assistant', content: displayText };
                   return updated;
                 });
+              } else if (event.type === 'done' && event.sessionId) {
+                setSessionId(event.sessionId);
               }
             } catch {
               // Skip malformed
             }
           }
         }
+
+        // Final strip of SUGGESTIONS
+        setMessages((m) => {
+          const updated = [...m];
+          const last = updated[updated.length - 1];
+          if (last?.role === 'assistant') {
+            last.content = fullText.replace(/<<SUGGESTIONS>>[\s\S]*?<<\/SUGGESTIONS>>/g, '').trim();
+          }
+          return updated;
+        });
       } else {
-        setMessages((m) => [...m, { role: 'assistant', content: 'מצטער, לא הצלחתי לעבד את הבקשה.' }]);
+        setMessages((m) => {
+          const updated = [...m];
+          updated[updated.length - 1] = { role: 'assistant', content: 'מצטער, לא הצלחתי לעבד את הבקשה.' };
+          return updated;
+        });
       }
     } catch {
-      setMessages((m) => [...m, { role: 'assistant', content: 'שגיאה בחיבור. נסו שוב.' }]);
+      setMessages((m) => {
+        const updated = [...m];
+        updated[updated.length - 1] = { role: 'assistant', content: 'שגיאה בחיבור. נסו שוב.' };
+        return updated;
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Bubble button
+  // ---- Closed: toggle button with pulse animation ----
   if (!isOpen) {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="w-14 h-14 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/30 flex items-center justify-center transition-all hover:scale-110"
+        className="w-[62px] h-[62px] rounded-full overflow-hidden border-none cursor-pointer p-0 transition-all duration-300 hover:scale-110"
+        style={{
+          boxShadow: '0 4px 24px rgba(99,102,241,0.4)',
+          animation: 'widget-pulse 2.5s infinite',
+        }}
         title="פתח צ'אט"
       >
-        <MessageCircle className="w-6 h-6" />
+        <img src="/widget-icon.png" alt="Chat" className="w-full h-full rounded-full object-cover" />
       </button>
     );
   }
 
-  // Chat panel — side panel style, not fullscreen
+  // ---- Open: chat panel with glassmorphism ----
   return (
     <div
-      className="flex flex-col bg-white rounded-2xl overflow-hidden"
+      className="flex flex-col overflow-hidden"
       dir="rtl"
       style={{
-        width: '340px',
-        height: '440px',
-        boxShadow: '0 8px 40px rgba(0,0,0,0.25)',
+        width: '370px',
+        height: '520px',
+        borderRadius: '20px',
+        background: 'rgba(255,255,255,0.92)',
+        backdropFilter: 'blur(20px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+        boxShadow: '0 8px 40px rgba(0,0,0,0.15)',
+        border: '1px solid #e5e7eb',
+        animation: 'widget-slide-up 0.35s cubic-bezier(0.34,1.56,0.64,1)',
       }}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-indigo-600 text-white shrink-0">
-        <span className="font-semibold text-sm">צ'אט</span>
+      {/* Gradient Header */}
+      <div
+        className="flex items-center gap-2.5 px-4 py-3.5 text-white shrink-0 relative overflow-hidden"
+        style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%)' }}
+      >
+        {/* Decorative glows */}
+        <div className="absolute -top-5 -right-5 w-20 h-20 rounded-full bg-white/10" />
+        <div className="absolute -bottom-8 -left-3 w-16 h-16 rounded-full bg-white/[0.07]" />
+        {/* AI Icon */}
+        <div className="w-9 h-9 rounded-full overflow-hidden border-2 border-white/30 shrink-0 relative z-10">
+          <img src="/widget-icon.png" alt="" className="w-full h-full object-cover" />
+        </div>
+        {/* Title */}
+        <div className="flex-1 relative z-10">
+          <div className="font-bold text-[15px] tracking-tight">העוזר החכם</div>
+          <div className="text-[11px] opacity-85 mt-0.5">מקוון עכשיו</div>
+        </div>
+        {/* Close */}
         <button
           onClick={() => setIsOpen(false)}
-          className="text-white/70 hover:text-white transition-colors"
+          className="w-[30px] h-[30px] rounded-full bg-white/15 hover:bg-white/25 border-none text-white cursor-pointer flex items-center justify-center transition-colors relative z-10"
         >
-          <X className="w-5 h-5" />
+          <X className="w-[18px] h-[18px]" />
         </button>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-2">
-        {messages.map((msg, i) => (
-          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'}`}>
-            <div
-              className={`max-w-[80%] px-3 py-2 rounded-xl text-sm leading-relaxed ${
-                msg.role === 'user'
-                  ? 'bg-indigo-50 text-gray-800'
-                  : 'bg-gray-100 text-gray-800'
-              }`}
-            >
-              <span dangerouslySetInnerHTML={{ __html: formatWidgetMessage(msg.content || (isLoading && i === messages.length - 1 ? '...' : '')) }} />
+      <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-thin scrollbar-thumb-gray-300/30">
+        {messages.map((msg, i) => {
+          const isUser = msg.role === 'user';
+          const isLast = i === messages.length - 1;
+          const isEmpty = !msg.content && isLoading && isLast;
+
+          // Typing indicator
+          if (isEmpty) {
+            return (
+              <div key={i} className="flex justify-end" style={{ animation: 'widget-fade-in 0.3s ease-out' }}>
+                <div className="flex items-end gap-1.5 max-w-[85%]">
+                  <div className="w-[26px] h-[26px] rounded-full overflow-hidden shrink-0">
+                    <img src="/widget-icon.png" className="w-full h-full object-cover" alt="" />
+                  </div>
+                  <div className="px-4 py-3 rounded-2xl rounded-br-sm bg-gray-100 flex gap-1 items-center">
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400" style={{ animation: 'widget-bounce 1.2s ease-in-out infinite' }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400" style={{ animation: 'widget-bounce 1.2s ease-in-out 0.15s infinite' }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400" style={{ animation: 'widget-bounce 1.2s ease-in-out 0.3s infinite' }} />
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          if (isUser) {
+            return (
+              <div key={i} className="flex justify-start" style={{ animation: 'widget-fade-in 0.3s ease-out' }}>
+                <div
+                  className="max-w-[82%] px-3.5 py-2.5 rounded-2xl rounded-bl-sm text-sm leading-relaxed text-white"
+                  style={{
+                    background: 'linear-gradient(135deg, #6366f1, #6366f1dd)',
+                    boxShadow: '0 2px 8px rgba(99,102,241,0.2)',
+                  }}
+                >
+                  <span dangerouslySetInnerHTML={{ __html: formatWidgetMessage(msg.content) }} />
+                </div>
+              </div>
+            );
+          }
+
+          // Assistant message with avatar
+          return (
+            <div key={i} className="flex justify-end" style={{ animation: 'widget-fade-in 0.3s ease-out' }}>
+              <div className="flex items-end gap-1.5 max-w-[85%]">
+                <div className="w-[26px] h-[26px] rounded-full overflow-hidden shrink-0">
+                  <img src="/widget-icon.png" className="w-full h-full object-cover" alt="" />
+                </div>
+                <div
+                  className="px-3.5 py-2.5 rounded-2xl rounded-br-sm text-sm leading-relaxed text-gray-800"
+                  style={{
+                    background: '#f3f4f6',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                  }}
+                >
+                  <span dangerouslySetInnerHTML={{ __html: formatWidgetMessage(msg.content) }} />
+                </div>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <div className="flex items-center gap-2 p-3 border-t border-gray-200 shrink-0">
+      {/* Input area */}
+      <div className="flex items-center gap-2 px-4 py-3 border-t border-gray-200/80 bg-gray-50/80 shrink-0">
         <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-          placeholder="שאלו משהו..."
-          className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+          placeholder="כתבו הודעה..."
+          className="flex-1 px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl text-gray-800 bg-white focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20 transition-all"
           disabled={isLoading}
           autoFocus
         />
         <button
           onClick={handleSend}
           disabled={isLoading || !input.trim()}
-          className="p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg disabled:opacity-40 transition-colors"
+          className="w-[38px] h-[38px] rounded-full flex items-center justify-center text-white border-none cursor-pointer transition-all hover:scale-105 disabled:opacity-40 disabled:pointer-events-none shrink-0"
+          style={{ background: 'linear-gradient(135deg, #6366f1, #6366f1cc)' }}
         >
-          <Send className="w-4 h-4" />
+          <Send className="w-[18px] h-[18px] rotate-180" />
         </button>
       </div>
 
       {/* Powered by */}
-      <div className="text-center py-1 text-[10px] text-gray-400 shrink-0">
+      <div className="text-center py-1.5 text-[10px] text-gray-400 shrink-0">
         Powered by InfluencerBot
       </div>
     </div>
   );
 }
 
+// ============================================
+// Message Formatting (matches widget.js v2.0)
+// ============================================
+
 function formatInline(text: string): string {
   let safe = text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
-  // Markdown images ![alt](url) — must come BEFORE link replacement
+  // Markdown images
   safe = safe.replace(/!\[([^\]]*)\]\(([^)]+)\)/g,
-    '<div class="my-1.5"><img src="$2" alt="$1" class="max-w-full max-h-48 rounded-lg object-cover cursor-pointer" onerror="this.style.display=\'none\'" onclick="window.open(\'$2\',\'_blank\')" /></div>');
-  // Markdown links [text](url)
+    '<div class="my-2"><img src="$2" alt="$1" class="max-w-full max-h-44 rounded-xl object-cover cursor-pointer shadow-sm" onerror="this.style.display=\'none\'" onclick="window.open(\'$2\',\'_blank\')" /></div>');
+  // Markdown links
   safe = safe.replace(/\[([^\]]+)\]\(([^)]+)\)/g,
-    '<a href="$2" target="_blank" rel="noopener" class="text-indigo-600 underline hover:text-indigo-500 font-medium">$1</a>');
+    '<a href="$2" target="_blank" rel="noopener" class="text-indigo-600 font-medium" style="border-bottom:1px solid rgba(99,102,241,0.25);">$1</a>');
+  // Bold
   safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold">$1</strong>');
+  // Inline code
   safe = safe.replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1 rounded text-xs font-mono">$1</code>');
   return safe;
 }
@@ -282,8 +414,8 @@ function formatWidgetMessage(text: string): string {
 
     if (bulletMatch) {
       if (inOl) { html += '</ol>'; inOl = false; }
-      if (!inUl) { html += '<ul class="list-disc list-inside my-1 space-y-0.5">'; inUl = true; }
-      html += `<li class="leading-relaxed">${formatInline(bulletMatch[1] || trimmed.replace(/^[-•*]\s+/, ''))}</li>`;
+      if (!inUl) { html += '<ul class="my-1 space-y-0.5 list-none pr-3">'; inUl = true; }
+      html += `<li class="leading-relaxed relative pr-3"><span class="absolute right-0 text-indigo-500">•</span>${formatInline(bulletMatch[1] || trimmed.replace(/^[-•*]\s+/, ''))}</li>`;
     } else if (numMatch) {
       if (inUl) { html += '</ul>'; inUl = false; }
       if (!inOl) { html += '<ol class="list-decimal list-inside my-1 space-y-0.5">'; inOl = true; }
