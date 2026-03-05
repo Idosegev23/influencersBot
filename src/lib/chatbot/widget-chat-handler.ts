@@ -1,12 +1,13 @@
 /**
  * Widget Chat Handler
  * מטפל בהודעות צ'אט מהווידג'ט — משתמש באותו מנוע SandwichBot של הסושיאל
- * "אותו מוח, שני מקומות שונים"
+ * "אותו מוח, אותה איכות, שני מקומות שונים"
  */
 
 import { createClient } from '@/lib/supabase/server';
 import { processSandwichMessageWithMetadata } from './sandwichBot';
 import { buildPersonalityFromDB } from './personality-wrapper';
+import { updateRollingSummary, shouldUpdateSummary } from './conversation-memory';
 
 // ============================================
 // Type Definitions
@@ -34,7 +35,19 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
 
   // 1. Get or create session
   let sessionId = params.sessionId;
-  if (!sessionId) {
+  let session: any = null;
+
+  if (sessionId) {
+    // Load existing session with all context fields
+    const { data } = await supabase
+      .from('chat_sessions')
+      .select('*')
+      .eq('id', sessionId)
+      .single();
+    session = data;
+  }
+
+  if (!session) {
     sessionId = `widget_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     await supabase.from('chat_sessions').insert({
       id: sessionId,
@@ -43,7 +56,7 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
     });
   }
 
-  // 2. Load account info + conversation history
+  // 2. Load account info + conversation history + personality (all in parallel)
   const [accountData, historyData] = await Promise.all([
     supabase
       .from('accounts')
@@ -86,8 +99,18 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
   // 4. Load personality from the EFFECTIVE account (social, not website)
   const personalityConfig = await buildPersonalityFromDB(effectiveAccountId).catch(() => null);
 
-  // 5. Process through SandwichBot — same engine as social chatbot
+  // Prepend rolling summary if available (same as social chat)
+  if (session?.rolling_summary) {
+    conversationHistory.unshift({
+      role: 'assistant' as const,
+      content: `[סיכום שיחה קודמת: ${session.rolling_summary}]`,
+    });
+  }
+
+  // 5. Process through SandwichBot — SAME engine as social chatbot
+  //    Including previousResponseId for OpenAI context chaining (key quality feature)
   let fullText = '';
+  let responseId: string | null = null;
 
   try {
     const sandwichResult = await processSandwichMessageWithMetadata({
@@ -96,7 +119,9 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
       username,
       influencerName,
       conversationHistory,
+      rollingSummary: session?.rolling_summary || undefined,
       personalityConfig: personalityConfig || undefined,
+      previousResponseId: session?.last_response_id || null,
       mode: 'widget',
       onToken: (token: string) => {
         fullText += token;
@@ -110,6 +135,9 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
       fullText = sandwichResult.response;
     }
 
+    // Capture response ID for context chaining on next turn
+    responseId = sandwichResult.responseId || null;
+
     // Strip <<SUGGESTIONS>> tags — widget doesn't use suggestion chips
     fullText = stripSuggestions(fullText);
 
@@ -118,25 +146,46 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
       confidence: sandwichResult.metadata.confidence,
       personalityApplied: sandwichResult.metadata.personalityApplied,
       responseLength: fullText.length,
+      hasResponseId: !!responseId,
+      hasSummary: !!session?.rolling_summary,
     });
   } catch (error: any) {
     console.error('[WidgetChat] SandwichBot error:', error.message);
     fullText = 'מצטער, לא הצלחתי לעבד את הבקשה. נסו שוב.';
   }
 
-  // 5. Save messages (sequential to ensure correct created_at ordering)
-  await supabase.from('chat_messages').insert({
-    session_id: sessionId,
-    role: 'user',
-    content: message,
-  });
-  await supabase.from('chat_messages').insert({
-    session_id: sessionId,
-    role: 'assistant',
-    content: fullText,
-  });
+  // 6. Save messages + update session state (parallel)
+  const msgCount = (session?.message_count || 0) + 2;
+  await Promise.all([
+    supabase.from('chat_messages').insert({
+      session_id: sessionId,
+      role: 'user',
+      content: message,
+    }),
+    supabase.from('chat_messages').insert({
+      session_id: sessionId,
+      role: 'assistant',
+      content: fullText,
+    }),
+    // Save response_id for context chaining + increment message count
+    supabase
+      .from('chat_sessions')
+      .update({
+        ...(responseId ? { last_response_id: responseId } : {}),
+        message_count: msgCount,
+      })
+      .eq('id', sessionId),
+  ]);
 
-  return { response: fullText, sessionId };
+  // 7. Update rolling summary if threshold reached (fire-and-forget)
+  if (shouldUpdateSummary(msgCount)) {
+    updateRollingSummary(
+      sessionId!,
+      [...conversationHistory, { role: 'user', content: message }, { role: 'assistant', content: fullText }],
+    ).catch(err => console.error('[WidgetChat] Summary update failed:', err));
+  }
+
+  return { response: fullText, sessionId: sessionId! };
 }
 
 // ============================================
