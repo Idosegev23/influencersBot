@@ -205,8 +205,11 @@ export function compactKnowledgeContext(
       if (w.url) section += ` | URL: ${w.url}`;
       section += '\n';
       if (w.content) section += `   ${truncate(w.content, opts.maxWebsiteChars)}\n`;
-      if (w.image_urls?.length) {
-        section += `   🖼️ תמונות: ${w.image_urls.slice(0, 3).join(' , ')}\n`;
+      const productImages = (w.image_urls || []).filter(
+        (u: string) => !u.includes('butterfly-button') && !u.includes('favicon') && !u.includes('logo')
+      );
+      if (productImages.length) {
+        section += `   🖼️ תמונות: ${productImages.slice(0, 2).join(' , ')}\n`;
       }
     });
     context += section;
