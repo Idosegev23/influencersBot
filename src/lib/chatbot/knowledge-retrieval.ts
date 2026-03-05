@@ -77,6 +77,7 @@ export interface WebsiteContent {
   title: string;
   content: string;
   scraped_at: string;
+  image_urls?: string[];
 }
 
 // ============================================
@@ -419,6 +420,7 @@ function mapRAGSourcesToKnowledge(sources: RetrievedSource[]): {
           title: source.title,
           content: source.excerpt,
           scraped_at: source.updatedAt,
+          image_urls: (source.metadata.imageUrls as string[]) || [],
         });
         break;
       case 'document':
@@ -934,21 +936,22 @@ async function fetchRelevantWebsites(
     // ⚡ AI-First: Get all Linkis pages (coupons, links, etc.)
     const { data, error } = await supabase
       .from('instagram_bio_websites')
-      .select('url, page_title, page_content, scraped_at')
+      .select('url, page_title, page_content, scraped_at, image_urls')
       .eq('account_id', accountId)
       .order('scraped_at', { ascending: false })
       .limit(20); // Get all recent website data
-    
+
     if (error) {
       console.error('[fetchWebsites] Error:', error);
       return [];
     }
-    
+
     return (data || []).map((w: any) => ({
       url: w.url,
       title: w.page_title,
       content: w.page_content,
       scraped_at: w.scraped_at,
+      image_urls: w.image_urls || [],
     }));
   } catch (error) {
     console.error('[fetchWebsites] Exception:', error);

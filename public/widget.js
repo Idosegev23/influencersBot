@@ -299,9 +299,16 @@
     if (inOl) html += '</ol>';
     return html;
 
-    // Inline formatting: links, bold, inline code
+    // Inline formatting: images, links, bold, inline code
     function formatInline(text) {
       var safe = escapeHtml(text);
+      // Markdown images ![alt](url) — must come BEFORE link replacement
+      safe = safe.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, function (_, alt, src) {
+        return '<div style="margin:6px 0;"><img src="' + src + '" alt="' + alt + '" ' +
+          'style="max-width:100%;max-height:200px;border-radius:8px;object-fit:cover;cursor:pointer;" ' +
+          'onerror="this.style.display=\'none\'" ' +
+          'onclick="window.open(\'' + src + '\',\'_blank\')" /></div>';
+      });
       // Markdown links [text](url)
       safe = safe.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function (_, t, u) {
         return '<a href="' + u + '" target="_blank" rel="noopener" style="color:' + pc + ';text-decoration:underline;font-weight:500;">' + t + '</a>';

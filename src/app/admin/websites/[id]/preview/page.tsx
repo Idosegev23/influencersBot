@@ -257,6 +257,10 @@ function formatInline(text: string): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+  // Markdown images ![alt](url) — must come BEFORE link replacement
+  safe = safe.replace(/!\[([^\]]*)\]\(([^)]+)\)/g,
+    '<div class="my-1.5"><img src="$2" alt="$1" class="max-w-full max-h-48 rounded-lg object-cover cursor-pointer" onerror="this.style.display=\'none\'" onclick="window.open(\'$2\',\'_blank\')" /></div>');
+  // Markdown links [text](url)
   safe = safe.replace(/\[([^\]]+)\]\(([^)]+)\)/g,
     '<a href="$2" target="_blank" rel="noopener" class="text-indigo-600 underline hover:text-indigo-500 font-medium">$1</a>');
   safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold">$1</strong>');

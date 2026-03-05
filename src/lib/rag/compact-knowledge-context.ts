@@ -201,8 +201,13 @@ export function compactKnowledgeContext(
     const items = kb.websites.slice(0, opts.maxWebsites);
     let section = `\n🌐 **אתרים וקישורים (${kb.websites.length}):**\n`;
     items.forEach((w, i) => {
-      section += `${i + 1}. ${w.title || w.url}\n`;
+      section += `${i + 1}. ${w.title || w.url}`;
+      if (w.url) section += ` | URL: ${w.url}`;
+      section += '\n';
       if (w.content) section += `   ${truncate(w.content, opts.maxWebsiteChars)}\n`;
+      if (w.image_urls?.length) {
+        section += `   🖼️ תמונות: ${w.image_urls.slice(0, 3).join(' , ')}\n`;
+      }
     });
     context += section;
     sectionCounts.websites = items.length;
