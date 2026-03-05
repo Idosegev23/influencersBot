@@ -43,18 +43,14 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
     });
   }
 
-  // 2. Load account info + personality in parallel
-  const [accountData, personalityConfig, historyData] = await Promise.all([
-    // Account info (username, display name)
+  // 2. Load account info + conversation history
+  const [accountData, historyData] = await Promise.all([
     supabase
       .from('accounts')
       .select('username, display_name, account_type')
       .eq('id', accountId)
       .single()
       .then(r => r.data),
-    // Personality config
-    buildPersonalityFromDB(accountId).catch(() => null),
-    // Conversation history (last 10 messages)
     supabase
       .from('chat_messages')
       .select('role, content')
@@ -64,9 +60,6 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
       .then(r => r.data),
   ]);
 
-  const username = accountData?.username || 'website';
-  const influencerName = accountData?.display_name || accountData?.username || 'Website';
-
   const conversationHistory = (historyData || [])
     .reverse()
     .map((m: any) => ({
@@ -74,18 +67,26 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
       content: m.content,
     }));
 
-  // 3. If this is a website-only account (no social data), find the linked social account
-  //    so SandwichBot can access ALL knowledge (posts, transcriptions, website, coupons, etc.)
+  // 3. Resolve the effective account — for website accounts, find the linked social
+  //    so SandwichBot uses the SAME identity, personality, and knowledge as the social chatbot
   let effectiveAccountId = accountId;
+  let username = accountData?.username || 'website';
+  let influencerName = accountData?.display_name || accountData?.username || 'Website';
+
   if (accountData?.account_type === 'website') {
     const linkedSocial = await findLinkedSocialAccount(supabase, accountId);
     if (linkedSocial) {
       effectiveAccountId = linkedSocial.id;
+      username = linkedSocial.username;
+      influencerName = linkedSocial.display_name || linkedSocial.username;
       console.log(`[WidgetChat] Website account ${accountId} → linked social ${linkedSocial.id} (@${linkedSocial.username})`);
     }
   }
 
-  // 4. Process through SandwichBot — same engine as social chatbot
+  // 4. Load personality from the EFFECTIVE account (social, not website)
+  const personalityConfig = await buildPersonalityFromDB(effectiveAccountId).catch(() => null);
+
+  // 5. Process through SandwichBot — same engine as social chatbot
   let fullText = '';
 
   try {
@@ -148,7 +149,7 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
 async function findLinkedSocialAccount(
   supabase: any,
   websiteAccountId: string,
-): Promise<{ id: string; username: string } | null> {
+): Promise<{ id: string; username: string; display_name?: string } | null> {
   try {
     // Get the website URL from the website account
     const { data: websiteAccount } = await supabase
@@ -173,7 +174,7 @@ async function findLinkedSocialAccount(
     if (linkedPages?.[0]) {
       const { data: socialAccount } = await supabase
         .from('accounts')
-        .select('id, username')
+        .select('id, username, display_name')
         .eq('id', linkedPages[0].account_id)
         .single();
       return socialAccount || null;
