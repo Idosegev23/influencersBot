@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { ArrowRight, Zap, Instagram, User, Lock, Phone } from 'lucide-react';
+import { ArrowRight, Zap, Instagram, User, Lock, Phone, Building2 } from 'lucide-react';
 
 type WizardStep = 'username' | 'scraping' | 'processing' | 'settings' | 'complete' | 'resume-choice';
 
@@ -19,6 +19,7 @@ interface WizardState {
   password: string;
   phoneNumber: string;
   whatsappEnabled: boolean;
+  accountType: 'creator' | 'brand';
   error: string | null;
   isLoading: boolean;
   // For resume functionality
@@ -41,6 +42,7 @@ export default function AddInfluencerPage() {
     password: '',
     phoneNumber: '',
     whatsappEnabled: false,
+    accountType: 'creator',
     error: null,
     isLoading: false,
   });
@@ -291,7 +293,7 @@ export default function AddInfluencerPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           username,
-          type: 'influencer',
+          type: state.accountType,
         }),
       });
 
@@ -374,10 +376,12 @@ export default function AddInfluencerPage() {
         jobId: null,
         accountId: null,
         scrapingComplete: false,
+        processingComplete: false,
         subdomain: '',
         password: '',
         phoneNumber: '',
         whatsappEnabled: false,
+        accountType: 'creator',
         error: null,
         isLoading: false,
       });
@@ -474,7 +478,7 @@ export default function AddInfluencerPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           username,
-          type: 'influencer',
+          type: state.accountType,
         }),
       });
 
@@ -705,6 +709,39 @@ export default function AddInfluencerPage() {
                 <p className="mt-2 text-sm text-gray-500">
                   אפשר להזין עם או בלי @
                 </p>
+              </div>
+
+              {/* Account Type Selector */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  סוג חשבון
+                </label>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setState(prev => ({ ...prev, accountType: 'creator' }))}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border transition-all ${
+                      state.accountType === 'creator'
+                        ? 'border-indigo-500 bg-indigo-500/10 text-white'
+                        : 'border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600'
+                    }`}
+                  >
+                    <User className="w-5 h-5" />
+                    משפיען / יוצר תוכן
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setState(prev => ({ ...prev, accountType: 'brand' }))}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border transition-all ${
+                      state.accountType === 'brand'
+                        ? 'border-indigo-500 bg-indigo-500/10 text-white'
+                        : 'border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600'
+                    }`}
+                  >
+                    <Building2 className="w-5 h-5" />
+                    מותג
+                  </button>
+                </div>
               </div>
 
               <button

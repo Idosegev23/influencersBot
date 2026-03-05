@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
@@ -16,10 +16,28 @@ import {
   LogOut,
   Check,
   Trash2,
+  Globe,
+  FileText,
+  Building2,
 } from 'lucide-react';
 import type { Influencer } from '@/types';
 import { formatNumber, formatDateTime } from '@/lib/utils';
 import { getProxiedImageUrl } from '@/lib/image-utils';
+
+type ActiveTab = 'social' | 'websites';
+type AccountFilter = 'all' | 'creator' | 'brand';
+
+interface WebsiteAccount {
+  id: string;
+  domain: string;
+  url: string;
+  status: string;
+  pagesCount: number;
+  totalWords: number;
+  totalImages: number;
+  lastScanAt: string;
+  jobId: string;
+}
 
 function DashboardContent() {
   const router = useRouter();
@@ -28,6 +46,15 @@ function DashboardContent() {
   const [loading, setLoading] = useState(true);
   const [showCreatedNotification, setShowCreatedNotification] = useState(false);
   const createdSubdomain = searchParams.get('created');
+
+  // Tab & filter state
+  const [activeTab, setActiveTab] = useState<ActiveTab>('social');
+  const [accountFilter, setAccountFilter] = useState<AccountFilter>('all');
+
+  // Websites state
+  const [websites, setWebsites] = useState<WebsiteAccount[]>([]);
+  const [websitesLoading, setWebsitesLoading] = useState(false);
+  const [websitesFetched, setWebsitesFetched] = useState(false);
 
   useEffect(() => {
     if (createdSubdomain) {
@@ -39,6 +66,30 @@ function DashboardContent() {
   useEffect(() => {
     fetchInfluencers();
   }, []);
+
+  // Fetch websites when tab first activated
+  const fetchWebsites = useCallback(async () => {
+    if (websitesFetched) return;
+    setWebsitesLoading(true);
+    try {
+      const res = await fetch('/api/admin/websites');
+      if (res.ok) {
+        const data = await res.json();
+        setWebsites(data.websites || []);
+      }
+    } catch (err) {
+      console.error('Error fetching websites:', err);
+    } finally {
+      setWebsitesLoading(false);
+      setWebsitesFetched(true);
+    }
+  }, [websitesFetched]);
+
+  useEffect(() => {
+    if (activeTab === 'websites') {
+      fetchWebsites();
+    }
+  }, [activeTab, fetchWebsites]);
 
   const fetchInfluencers = async () => {
     try {
@@ -97,7 +148,6 @@ function DashboardContent() {
       });
 
       if (res.ok) {
-        // Refresh list
         await fetchInfluencers();
       } else {
         const error = await res.json();
@@ -110,6 +160,12 @@ function DashboardContent() {
       setLoading(false);
     }
   };
+
+  // Filtered influencers based on account type
+  const filteredInfluencers = influencers.filter((i) => {
+    if (accountFilter === 'all') return true;
+    return i.type === accountFilter;
+  });
 
   if (loading) {
     return (
@@ -133,7 +189,7 @@ function DashboardContent() {
           className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 bg-green-500 text-white rounded-xl shadow-lg"
         >
           <Check className="w-5 h-5" />
-          צ'אטבוט נוצר בהצלחה! - /chat/{createdSubdomain}
+          צ&apos;אטבוט נוצר בהצלחה! - /chat/{createdSubdomain}
         </motion.div>
       )}
 
@@ -162,179 +218,397 @@ function DashboardContent() {
       </header>
 
       <main className="relative z-10 p-6 max-w-6xl mx-auto">
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="admin-card p-6"
+        {/* Tab Bar */}
+        <div className="flex items-center gap-2 mb-6">
+          <button
+            onClick={() => setActiveTab('social')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${
+              activeTab === 'social'
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/25'
+                : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+            }`}
           >
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-indigo-500/20 flex items-center justify-center">
-                <Users className="w-6 h-6 text-indigo-400" />
-              </div>
-              <div>
-                <p className="text-3xl font-bold text-white">{influencers.length}</p>
-                <p className="text-sm text-gray-400">משפיענים</p>
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="admin-card p-6"
+            <Users className="w-4 h-4" />
+            חשבונות סושיאל
+          </button>
+          <button
+            onClick={() => setActiveTab('websites')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${
+              activeTab === 'websites'
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/25'
+                : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+            }`}
           >
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center">
-                <MessageCircle className="w-6 h-6 text-green-400" />
-              </div>
-              <div>
-                <p className="text-3xl font-bold text-white">
-                  {influencers.filter((i) => i.is_active).length}
-                </p>
-                <p className="text-sm text-gray-400">פעילים</p>
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="admin-card p-6"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                <BarChart3 className="w-6 h-6 text-purple-400" />
-              </div>
-              <div>
-                <p className="text-3xl font-bold text-white">
-                  {formatNumber(influencers.reduce((sum, i) => sum + (i.followers_count || 0), 0))}
-                </p>
-                <p className="text-sm text-gray-400">עוקבים כולל</p>
-              </div>
-            </div>
-          </motion.div>
+            <Globe className="w-4 h-4" />
+            אתרים
+          </button>
         </div>
 
-        {/* Add New Button */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold text-white">משפיענים</h2>
-          <div className="flex gap-3">
-            <Link
-              href="/admin/influencers"
-              className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-xl transition-all"
-            >
-              <Users className="w-5 h-5" />
-              תצוגה מפורטת
-            </Link>
-            <Link
-              href="/admin/add"
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-indigo-500/25"
-            >
-              <Plus className="w-5 h-5" />
-              הוסף משפיען
-            </Link>
-          </div>
-        </div>
-
-        {/* Influencers Grid */}
-        {influencers.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {influencers.map((influencer, index) => (
+        {/* ===== Social Tab ===== */}
+        {activeTab === 'social' && (
+          <>
+            {/* Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
               <motion.div
-                key={influencer.id}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-                className="admin-card p-4 hover:border-indigo-500/50 transition-all"
+                className="admin-card p-6"
               >
-                <div className="flex items-start gap-3">
-                  {influencer.profile_pic_url ? (
-                    <div className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 ring-2 ring-indigo-500/20">
-                      <Image
-                        src={getProxiedImageUrl(influencer.profile_pic_url || '')}
-                        alt={influencer.display_name}
-                        fill
-                        className="object-cover"
-                        sizes="56px"
-                        unoptimized
-                      />
-                    </div>
-                  ) : (
-                    <div className="w-14 h-14 rounded-xl bg-gray-700 flex items-center justify-center text-2xl font-bold text-gray-400 flex-shrink-0">
-                      {influencer.display_name.charAt(0)}
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-white truncate">
-                      {influencer.display_name}
-                    </h3>
-                    <p className="text-sm text-gray-400">@{influencer.username}</p>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-                      <span>{formatNumber(influencer.followers_count)} עוקבים</span>
-                      <span
-                        className={`px-2 py-0.5 rounded-full ${
-                          influencer.is_active
-                            ? 'bg-green-500/20 text-green-400'
-                            : 'bg-gray-500/20 text-gray-400'
-                        }`}
-                      >
-                        {influencer.is_active ? 'פעיל' : 'לא פעיל'}
-                      </span>
-                    </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-indigo-500/20 flex items-center justify-center">
+                    <Users className="w-6 h-6 text-indigo-400" />
+                  </div>
+                  <div>
+                    <p className="text-3xl font-bold text-white">{filteredInfluencers.length}</p>
+                    <p className="text-sm text-gray-400">חשבונות</p>
                   </div>
                 </div>
+              </motion.div>
 
-                <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-700">
-                  <a
-                    href={`/chat/${influencer.username}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 flex items-center justify-center gap-1 py-2 text-sm text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    צפייה
-                  </a>
-                  <Link
-                    href={`/admin/influencers/${influencer.id}`}
-                    className="flex-1 flex items-center justify-center gap-1 py-2 text-sm text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
-                  >
-                    <Settings className="w-4 h-4" />
-                    ניהול
-                  </Link>
-                  <button
-                    onClick={() => handleDelete(influencer)}
-                    className="flex items-center justify-center gap-1 px-3 py-2 text-sm text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition-colors"
-                    title="מחק משפיען"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="admin-card p-6"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center">
+                    <MessageCircle className="w-6 h-6 text-green-400" />
+                  </div>
+                  <div>
+                    <p className="text-3xl font-bold text-white">
+                      {filteredInfluencers.filter((i) => i.is_active).length}
+                    </p>
+                    <p className="text-sm text-gray-400">פעילים</p>
+                  </div>
                 </div>
               </motion.div>
-            ))}
-          </div>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="admin-card p-12 text-center"
-          >
-            <div className="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center mx-auto mb-4">
-              <Users className="w-8 h-8 text-gray-600" />
+
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="admin-card p-6"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                    <BarChart3 className="w-6 h-6 text-purple-400" />
+                  </div>
+                  <div>
+                    <p className="text-3xl font-bold text-white">
+                      {formatNumber(filteredInfluencers.reduce((sum, i) => sum + (i.followers_count || 0), 0))}
+                    </p>
+                    <p className="text-sm text-gray-400">עוקבים כולל</p>
+                  </div>
+                </div>
+              </motion.div>
             </div>
-            <h3 className="text-lg font-medium text-white mb-2">אין עדיין משפיענים</h3>
-            <p className="text-gray-400 mb-6">התחילו על ידי הוספת המשפיען הראשון</p>
-            <Link
-              href="/admin/add"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-indigo-500/25"
-            >
-              <Plus className="w-5 h-5" />
-              הוסף משפיען
-            </Link>
-          </motion.div>
+
+            {/* Action bar with sub-filter */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl font-semibold text-white">חשבונות</h2>
+                {/* Sub-filter pills */}
+                <div className="flex items-center gap-1 bg-gray-800/50 rounded-lg p-1">
+                  {([
+                    { key: 'all' as AccountFilter, label: 'הכל' },
+                    { key: 'creator' as AccountFilter, label: 'משפיענים' },
+                    { key: 'brand' as AccountFilter, label: 'מותגים' },
+                  ]).map(({ key, label }) => (
+                    <button
+                      key={key}
+                      onClick={() => setAccountFilter(key)}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                        accountFilter === key
+                          ? 'bg-gray-700 text-white'
+                          : 'text-gray-500 hover:text-gray-300'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <Link
+                  href="/admin/influencers"
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-xl transition-all"
+                >
+                  <Users className="w-5 h-5" />
+                  תצוגה מפורטת
+                </Link>
+                <Link
+                  href="/admin/add"
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-indigo-500/25"
+                >
+                  <Plus className="w-5 h-5" />
+                  הוסף חשבון
+                </Link>
+              </div>
+            </div>
+
+            {/* Influencers Grid */}
+            {filteredInfluencers.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredInfluencers.map((influencer, index) => (
+                  <motion.div
+                    key={influencer.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className="admin-card p-4 hover:border-indigo-500/50 transition-all"
+                  >
+                    <div className="flex items-start gap-3">
+                      {influencer.profile_pic_url ? (
+                        <div className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 ring-2 ring-indigo-500/20">
+                          <Image
+                            src={getProxiedImageUrl(influencer.profile_pic_url || '')}
+                            alt={influencer.display_name}
+                            fill
+                            className="object-cover"
+                            sizes="56px"
+                            unoptimized
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-14 h-14 rounded-xl bg-gray-700 flex items-center justify-center text-2xl font-bold text-gray-400 flex-shrink-0">
+                          {influencer.display_name.charAt(0)}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-white truncate">
+                          {influencer.display_name}
+                        </h3>
+                        <p className="text-sm text-gray-400">@{influencer.username}</p>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                          <span>{formatNumber(influencer.followers_count)} עוקבים</span>
+                          <span
+                            className={`px-2 py-0.5 rounded-full ${
+                              influencer.is_active
+                                ? 'bg-green-500/20 text-green-400'
+                                : 'bg-gray-500/20 text-gray-400'
+                            }`}
+                          >
+                            {influencer.is_active ? 'פעיל' : 'לא פעיל'}
+                          </span>
+                          {influencer.type === 'brand' && (
+                            <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400">
+                              מותג
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-700">
+                      <a
+                        href={`/chat/${influencer.username}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 flex items-center justify-center gap-1 py-2 text-sm text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        צפייה
+                      </a>
+                      <Link
+                        href={`/admin/influencers/${influencer.id}`}
+                        className="flex-1 flex items-center justify-center gap-1 py-2 text-sm text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+                      >
+                        <Settings className="w-4 h-4" />
+                        ניהול
+                      </Link>
+                      <button
+                        onClick={() => handleDelete(influencer)}
+                        className="flex items-center justify-center gap-1 px-3 py-2 text-sm text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition-colors"
+                        title="מחק"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="admin-card p-12 text-center"
+              >
+                <div className="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center mx-auto mb-4">
+                  <Users className="w-8 h-8 text-gray-600" />
+                </div>
+                <h3 className="text-lg font-medium text-white mb-2">
+                  {accountFilter === 'all' ? 'אין עדיין חשבונות' : accountFilter === 'creator' ? 'אין משפיענים' : 'אין מותגים'}
+                </h3>
+                <p className="text-gray-400 mb-6">
+                  {accountFilter === 'all' ? 'התחילו על ידי הוספת חשבון ראשון' : 'לא נמצאו חשבונות מסוג זה'}
+                </p>
+                <Link
+                  href="/admin/add"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-indigo-500/25"
+                >
+                  <Plus className="w-5 h-5" />
+                  הוסף חשבון
+                </Link>
+              </motion.div>
+            )}
+          </>
+        )}
+
+        {/* ===== Websites Tab ===== */}
+        {activeTab === 'websites' && (
+          <>
+            {websitesLoading ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : (
+              <>
+                {/* Website Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="admin-card p-6"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-xl bg-indigo-500/20 flex items-center justify-center">
+                        <Globe className="w-6 h-6 text-indigo-400" />
+                      </div>
+                      <div>
+                        <p className="text-3xl font-bold text-white">{websites.length}</p>
+                        <p className="text-sm text-gray-400">אתרים</p>
+                      </div>
+                    </div>
+                  </motion.div>
+
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 }}
+                    className="admin-card p-6"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center">
+                        <FileText className="w-6 h-6 text-green-400" />
+                      </div>
+                      <div>
+                        <p className="text-3xl font-bold text-white">
+                          {websites.reduce((sum, w) => sum + w.pagesCount, 0)}
+                        </p>
+                        <p className="text-sm text-gray-400">עמודים נסרקו</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                </div>
+
+                {/* Action bar */}
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-semibold text-white">אתרים</h2>
+                  <Link
+                    href="/admin/websites/add"
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-indigo-500/25"
+                  >
+                    <Plus className="w-5 h-5" />
+                    הוספת אתר
+                  </Link>
+                </div>
+
+                {/* Websites Grid */}
+                {websites.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {websites.map((website, index) => (
+                      <motion.div
+                        key={website.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="admin-card p-4 hover:border-indigo-500/50 transition-all"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="w-14 h-14 rounded-xl bg-indigo-500/10 flex items-center justify-center flex-shrink-0 ring-2 ring-indigo-500/20">
+                            <Globe className="w-7 h-7 text-indigo-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-white truncate">
+                              {website.domain}
+                            </h3>
+                            <a
+                              href={website.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-indigo-400 hover:text-indigo-300 truncate block"
+                            >
+                              {website.url}
+                            </a>
+                            <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                              <span>{website.pagesCount} עמודים</span>
+                              <span>{formatNumber(website.totalWords)} מילים</span>
+                              <span
+                                className={`px-2 py-0.5 rounded-full ${
+                                  website.status === 'completed'
+                                    ? 'bg-green-500/20 text-green-400'
+                                    : website.status === 'running'
+                                    ? 'bg-yellow-500/20 text-yellow-400'
+                                    : 'bg-gray-500/20 text-gray-400'
+                                }`}
+                              >
+                                {website.status === 'completed' ? 'הושלם' : website.status === 'running' ? 'סורק...' : website.status}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-700">
+                          <Link
+                            href={`/admin/websites/${website.id}/preview`}
+                            className="flex-1 flex items-center justify-center gap-1 py-2 text-sm text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                            צפייה
+                          </Link>
+                          <a
+                            href={website.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 flex items-center justify-center gap-1 py-2 text-sm text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+                          >
+                            <Globe className="w-4 h-4" />
+                            לאתר
+                          </a>
+                        </div>
+
+                        {website.lastScanAt && (
+                          <p className="text-xs text-gray-600 mt-2 text-center">
+                            סריקה אחרונה: {formatDateTime(website.lastScanAt)}
+                          </p>
+                        )}
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="admin-card p-12 text-center"
+                  >
+                    <div className="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center mx-auto mb-4">
+                      <Globe className="w-8 h-8 text-gray-600" />
+                    </div>
+                    <h3 className="text-lg font-medium text-white mb-2">אין עדיין אתרים</h3>
+                    <p className="text-gray-400 mb-6">הוסיפו אתר לסריקה ויצירת בוט חכם</p>
+                    <Link
+                      href="/admin/websites/add"
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-indigo-500/25"
+                    >
+                      <Plus className="w-5 h-5" />
+                      הוספת אתר
+                    </Link>
+                  </motion.div>
+                )}
+              </>
+            )}
+          </>
         )}
       </main>
     </div>
@@ -352,4 +626,3 @@ export default function AdminDashboard() {
     </Suspense>
   );
 }
-
