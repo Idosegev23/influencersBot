@@ -29,16 +29,16 @@ export interface CompactOptions {
 }
 
 const DEFAULTS: CompactOptions = {
-  maxTotalChars: 20_000,
+  maxTotalChars: 30_000,
   maxPosts: 8,
   maxTranscriptions: 8,
   maxHighlights: 6,
   maxPartnerships: 5,
-  maxWebsites: 4,
+  maxWebsites: 10,
   maxPostChars: 1500,
   maxTranscriptionChars: 1500,
   maxHighlightChars: 600,
-  maxWebsiteChars: 500,
+  maxWebsiteChars: 2000,
 };
 
 // ============================================
@@ -215,7 +215,7 @@ export function compactKnowledgeContext(
 
   // Prepend header
   const header = context.trim()
-    ? '📚 **בסיס הידע שלי (השתמש בתוכן המלא, לא להפנות!):**\n'
+    ? '📚 **בסיס הידע שלי (עכל את המידע והסבר בשפה שלך — אל תצטט ואל תקריא, אלא הסבר בטבעיות כאילו את/ה מדבר/ת מהידע שלך):**\n'
     : '📚 **בסיס ידע:** אין מידע זמין כרגע.';
   context = header + context;
 

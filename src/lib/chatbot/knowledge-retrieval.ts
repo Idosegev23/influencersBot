@@ -173,77 +173,77 @@ export async function retrieveKnowledge(
   console.log(`[Knowledge Retrieval] Query: ${userMessage.substring(0, 50)}...`);
 
   // ============================================
-  // Try Vector Search (RAG) first — semantic search via embeddings
-  // Falls back to FTS if no RAG data available
+  // Combined Retrieval: Direct DB queries ALWAYS run
+  // + RAG vector search when available, FTS fallback otherwise
   // ============================================
   const ragAvailable = await isRAGAvailable(supabase, accountId);
-
-  if (ragAvailable) {
-    console.log(`[Knowledge Retrieval] 🧠 VECTOR SEARCH mode`);
-    getMetrics()?.set('retrievalPath', 'rag');
-    try {
-      // Run RAG + coupons + insights in parallel (coupons/insights don't depend on RAG)
-      const [ragResult, coupons, insights] = await Promise.all([
-        retrieveContext({
-          accountId,
-          query: userMessage,
-          topK: 12,
-          conversationSummary: rollingSummary,
-        }),
-        fetchRelevantCoupons(supabase, accountId, [], archetype, userMessage),
-        fetchRelevantInsights(supabase, accountId, archetype, 3),
-      ]);
-
-      const { sources } = ragResult;
-      console.log(`[Knowledge Retrieval] Vector search returned ${sources.length} sources`);
-      const ragKnowledge = mapRAGSourcesToKnowledge(sources);
-
-      console.log(`[Knowledge Retrieval] ✅ RAG Found:`);
-      console.log(`  - Posts: ${ragKnowledge.posts.length}`);
-      console.log(`  - Transcriptions: ${ragKnowledge.transcriptions.length}`);
-      console.log(`  - Highlights: ${ragKnowledge.highlights.length}`);
-      console.log(`  - Partnerships: ${ragKnowledge.partnerships.length}`);
-      console.log(`  - Websites: ${ragKnowledge.websites.length}`);
-      console.log(`  - Coupons: ${coupons.length} (direct query)`);
-      console.log(`  - Insights: ${insights.length} (direct query)`);
-
-      return {
-        posts: ragKnowledge.posts,
-        highlights: ragKnowledge.highlights,
-        coupons,
-        partnerships: ragKnowledge.partnerships,
-        insights,
-        websites: ragKnowledge.websites,
-        transcriptions: ragKnowledge.transcriptions,
-      };
-    } catch (ragError) {
-      console.error(`[Knowledge Retrieval] RAG failed, falling back to FTS:`, ragError);
-      // Fall through to FTS below
-    }
-  }
-
-  // ============================================
-  // Fallback: Full Text Search (FTS)
-  // ============================================
-  console.log(`[Knowledge Retrieval] 🔍 FTS FALLBACK mode`);
-  getMetrics()?.set('retrievalPath', 'fts');
-
   const normalizedQuery = normalizeHebrewQuery(userMessage);
 
-  const [posts, highlights, coupons, partnerships, insights, websites, transcriptions] = await Promise.all([
-    fetchRelevantPostsIndexed(supabase, accountId, normalizedQuery, 5),
-    fetchRelevantHighlights(supabase, accountId, [], 20),
-    fetchRelevantCoupons(supabase, accountId, [], archetype, userMessage),
-    fetchRelevantPartnerships(supabase, accountId, [], userMessage),
-    fetchRelevantInsights(supabase, accountId, archetype, 3),
-    fetchRelevantWebsites(supabase, accountId, [], 3),
-    fetchRelevantTranscriptionsIndexed(supabase, accountId, normalizedQuery, 5),
-  ]);
+  console.log(`[Knowledge Retrieval] Mode: ${ragAvailable ? 'RAG + Direct DB' : 'FTS + Direct DB'}`);
+  getMetrics()?.set('retrievalPath', ragAvailable ? 'rag+direct' : 'fts');
 
-  console.log(`[Knowledge Retrieval] ✅ FTS Found:`);
+  // Direct DB queries — ALWAYS run regardless of RAG availability
+  const directPromises = {
+    websites: fetchRelevantWebsites(supabase, accountId, [], 3),
+    coupons: fetchRelevantCoupons(supabase, accountId, [], archetype, userMessage),
+    partnerships: fetchRelevantPartnerships(supabase, accountId, [], userMessage),
+    insights: fetchRelevantInsights(supabase, accountId, archetype, 3),
+  };
+
+  // Content search — RAG vector search OR FTS fallback
+  const contentPromises: Record<string, Promise<any>> = {};
+  if (ragAvailable) {
+    contentPromises.rag = retrieveContext({
+      accountId,
+      query: userMessage,
+      topK: 12,
+      conversationSummary: rollingSummary,
+    });
+  } else {
+    contentPromises.posts = fetchRelevantPostsIndexed(supabase, accountId, normalizedQuery, 5);
+    contentPromises.highlights = fetchRelevantHighlights(supabase, accountId, [], 20);
+    contentPromises.transcriptions = fetchRelevantTranscriptionsIndexed(supabase, accountId, normalizedQuery, 5);
+  }
+
+  // Run ALL queries in parallel
+  const allPromises: Record<string, Promise<any>> = { ...directPromises, ...contentPromises };
+  const results: Record<string, any> = await promiseAllSettledObj(allPromises);
+
+  // Direct DB results (always available)
+  const directWebsites: WebsiteContent[] = results.websites || [];
+  const coupons: Coupon[] = results.coupons || [];
+  const partnerships: Partnership[] = results.partnerships || [];
+  const insights: ConversationInsight[] = results.insights || [];
+
+  let posts: InstagramPost[] = [];
+  let transcriptions: VideoTranscription[] = [];
+  let highlights: InstagramHighlight[] = [];
+  let ragWebsites: WebsiteContent[] = [];
+
+  if (ragAvailable && results.rag) {
+    const { sources } = results.rag;
+    console.log(`[Knowledge Retrieval] Vector search returned ${sources.length} sources`);
+    const ragKnowledge = mapRAGSourcesToKnowledge(sources);
+    posts = ragKnowledge.posts;
+    transcriptions = ragKnowledge.transcriptions;
+    highlights = ragKnowledge.highlights;
+    ragWebsites = ragKnowledge.websites;
+    // Merge RAG partnerships with direct DB partnerships
+    partnerships.push(...ragKnowledge.partnerships);
+  } else {
+    posts = results.posts || [];
+    transcriptions = results.transcriptions || [];
+    highlights = results.highlights || [];
+  }
+
+  // Merge websites: direct DB (full content) + RAG (semantic excerpts), deduplicate by URL
+  const mergedWebsites = mergeWebsites(directWebsites, ragWebsites);
+
+  console.log(`[Knowledge Retrieval] ✅ Combined retrieval (RAG=${ragAvailable}):`);
   console.log(`  - Posts: ${posts.length}, Highlights: ${highlights.length}`);
+  console.log(`  - Websites: ${mergedWebsites.length} (${directWebsites.length} direct + ${ragWebsites.length} RAG)`);
   console.log(`  - Coupons: ${coupons.length}, Partnerships: ${partnerships.length}`);
-  console.log(`  - Transcriptions: ${transcriptions.length}`);
+  console.log(`  - Transcriptions: ${transcriptions.length}, Insights: ${insights.length}`);
 
   return {
     posts,
@@ -251,7 +251,7 @@ export async function retrieveKnowledge(
     coupons,
     partnerships,
     insights,
-    websites,
+    websites: mergedWebsites,
     transcriptions,
   };
 }
@@ -259,6 +259,55 @@ export async function retrieveKnowledge(
 // ============================================
 // Helper Functions
 // ============================================
+
+/**
+ * Run a dict of promises in parallel, returning resolved values (null for rejected).
+ */
+async function promiseAllSettledObj<T extends Record<string, Promise<any>>>(
+  obj: T
+): Promise<{ [K in keyof T]: Awaited<T[K]> | null }> {
+  const keys = Object.keys(obj);
+  const results = await Promise.allSettled(Object.values(obj));
+  const out: any = {};
+  keys.forEach((key, i) => {
+    const r = results[i];
+    out[key] = r.status === 'fulfilled' ? r.value : null;
+    if (r.status === 'rejected') {
+      console.error(`[Knowledge Retrieval] ${key} failed:`, r.reason);
+    }
+  });
+  return out;
+}
+
+/**
+ * Merge websites from direct DB + RAG, deduplicate by URL.
+ * Direct DB data is preferred (full page_content vs RAG excerpts).
+ */
+function mergeWebsites(
+  directWebsites: WebsiteContent[],
+  ragWebsites: WebsiteContent[]
+): WebsiteContent[] {
+  const seen = new Set<string>();
+  const merged: WebsiteContent[] = [];
+
+  for (const w of directWebsites) {
+    const key = w.url || w.title;
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(w);
+    }
+  }
+
+  for (const w of ragWebsites) {
+    const key = w.url || w.title;
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(w);
+    }
+  }
+
+  return merged;
+}
 
 /**
  * Detect simple greetings that don't need full knowledge retrieval
@@ -370,6 +419,13 @@ function mapRAGSourcesToKnowledge(sources: RetrievedSource[]): {
           title: source.title,
           content: source.excerpt,
           scraped_at: source.updatedAt,
+        });
+        break;
+      case 'document':
+        partnerships.push({
+          brand_name: source.title,
+          partnership_type: 'document',
+          description: source.excerpt,
         });
         break;
     }
