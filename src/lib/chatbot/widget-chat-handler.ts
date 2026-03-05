@@ -97,6 +97,7 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
       influencerName,
       conversationHistory,
       personalityConfig: personalityConfig || undefined,
+      mode: 'widget',
       onToken: (token: string) => {
         fullText += token;
         onToken?.(token);

@@ -105,6 +105,7 @@ export interface ArchetypeInput {
   modelTier?: 'nano' | 'standard' | 'full'; // From decision engine modelStrategy
   personalityConfig?: any; // Pre-loaded personality config (avoids DB call in archetype)
   previousResponseId?: string | null; // OpenAI Responses API: chain context across turns
+  mode?: 'widget' | 'social'; // Widget = sales-oriented, Social = engagement-oriented
 }
 
 export interface ArchetypeOutput {

@@ -252,18 +252,49 @@ function WidgetPreview({ accountId }: { accountId: string }) {
   );
 }
 
-function formatWidgetMessage(text: string): string {
-  if (!text) return '';
+function formatInline(text: string): string {
   let safe = text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
-  // Markdown links [text](url) → <a>
   safe = safe.replace(/\[([^\]]+)\]\(([^)]+)\)/g,
-    '<a href="$2" target="_blank" rel="noopener" class="text-indigo-600 underline hover:text-indigo-500">$1</a>');
-  // **bold** → <strong>
-  safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-  // Newlines → <br>
-  safe = safe.replace(/\n/g, '<br>');
+    '<a href="$2" target="_blank" rel="noopener" class="text-indigo-600 underline hover:text-indigo-500 font-medium">$1</a>');
+  safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold">$1</strong>');
+  safe = safe.replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1 rounded text-xs font-mono">$1</code>');
   return safe;
+}
+
+function formatWidgetMessage(text: string): string {
+  if (!text) return '';
+  const lines = text.split('\n');
+  let html = '';
+  let inUl = false;
+  let inOl = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const bulletMatch = trimmed.match(/^[-•]\s+(.+)/) || (trimmed.match(/^\*\s+(.+)/) && !trimmed.match(/^\*\*[^*]/));
+    const numMatch = trimmed.match(/^\d+[.)]\s+(.+)/);
+
+    if (bulletMatch) {
+      if (inOl) { html += '</ol>'; inOl = false; }
+      if (!inUl) { html += '<ul class="list-disc list-inside my-1 space-y-0.5">'; inUl = true; }
+      html += `<li class="leading-relaxed">${formatInline(bulletMatch[1] || trimmed.replace(/^[-•*]\s+/, ''))}</li>`;
+    } else if (numMatch) {
+      if (inUl) { html += '</ul>'; inUl = false; }
+      if (!inOl) { html += '<ol class="list-decimal list-inside my-1 space-y-0.5">'; inOl = true; }
+      html += `<li class="leading-relaxed">${formatInline(numMatch[1])}</li>`;
+    } else {
+      if (inUl) { html += '</ul>'; inUl = false; }
+      if (inOl) { html += '</ol>'; inOl = false; }
+      if (trimmed === '') {
+        html += '<div class="h-1.5"></div>';
+      } else {
+        html += `<div class="mb-1 leading-relaxed">${formatInline(trimmed)}</div>`;
+      }
+    }
+  }
+  if (inUl) html += '</ul>';
+  if (inOl) html += '</ol>';
+  return html;
 }

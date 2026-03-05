@@ -125,6 +125,7 @@ export async function processWithArchetype(
     modelTier?: 'nano' | 'standard' | 'full';
     personalityConfig?: any;
     previousResponseId?: string | null;
+    mode?: 'widget' | 'social';
   }
 ) {
   console.log('\n' + '='.repeat(80));
@@ -171,6 +172,7 @@ export async function processWithArchetype(
     modelTier: context.modelTier,
     personalityConfig: context.personalityConfig,
     previousResponseId: context.previousResponseId,
+    mode: context.mode,
   });
   
   console.log('\n' + '='.repeat(80));

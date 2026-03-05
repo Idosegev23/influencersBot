@@ -261,16 +261,57 @@
 
   function formatMessage(str) {
     if (!str) return '';
-    var safe = escapeHtml(str);
-    // Convert markdown links [text](url) to clickable HTML links
-    safe = safe.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function (_, text, url) {
-      return '<a href="' + url + '" target="_blank" rel="noopener" style="color:' + config.primaryColor + ';text-decoration:underline;">' + text + '</a>';
-    });
-    // Convert **bold** to <strong>
-    safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-    // Convert newlines to <br>
-    safe = safe.replace(/\n/g, '<br>');
-    return safe;
+    var pc = config.primaryColor;
+    // Process line by line for lists and paragraphs
+    var lines = str.split('\n');
+    var html = '';
+    var inUl = false;
+    var inOl = false;
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      var trimmed = line.trim();
+
+      // Bullet list: "- item" or "• item" or "* item" (but not **bold**)
+      var bulletMatch = trimmed.match(/^[-•]\s+(.+)/) || (trimmed.match(/^\*\s+(.+)/) && !trimmed.match(/^\*\*[^*]/));
+      // Numbered list: "1. item" or "1) item"
+      var numMatch = trimmed.match(/^\d+[.)]\s+(.+)/);
+
+      if (bulletMatch) {
+        if (inOl) { html += '</ol>'; inOl = false; }
+        if (!inUl) { html += '<ul style="margin:4px 0;padding-right:16px;list-style:disc inside;">'; inUl = true; }
+        html += '<li style="margin-bottom:2px;line-height:1.6;color:#1f2937;">' + formatInline(bulletMatch[1] || trimmed.replace(/^[-•*]\s+/, '')) + '</li>';
+      } else if (numMatch) {
+        if (inUl) { html += '</ul>'; inUl = false; }
+        if (!inOl) { html += '<ol style="margin:4px 0;padding-right:16px;list-style:decimal inside;">'; inOl = true; }
+        html += '<li style="margin-bottom:2px;line-height:1.6;color:#1f2937;">' + formatInline(numMatch[1]) + '</li>';
+      } else {
+        if (inUl) { html += '</ul>'; inUl = false; }
+        if (inOl) { html += '</ol>'; inOl = false; }
+        if (trimmed === '') {
+          html += '<div style="height:6px;"></div>';
+        } else {
+          html += '<div style="margin-bottom:4px;line-height:1.6;">' + formatInline(trimmed) + '</div>';
+        }
+      }
+    }
+    if (inUl) html += '</ul>';
+    if (inOl) html += '</ol>';
+    return html;
+
+    // Inline formatting: links, bold, inline code
+    function formatInline(text) {
+      var safe = escapeHtml(text);
+      // Markdown links [text](url)
+      safe = safe.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function (_, t, u) {
+        return '<a href="' + u + '" target="_blank" rel="noopener" style="color:' + pc + ';text-decoration:underline;font-weight:500;">' + t + '</a>';
+      });
+      // **bold**
+      safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong style="font-weight:600;">$1</strong>');
+      // `inline code`
+      safe = safe.replace(/`([^`]+)`/g, '<code style="background:#f3f4f6;padding:1px 4px;border-radius:3px;font-size:0.9em;">$1</code>');
+      return safe;
+    }
   }
 
   // Initial render
