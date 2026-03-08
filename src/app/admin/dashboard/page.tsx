@@ -19,6 +19,7 @@ import {
   Globe,
   FileText,
   Building2,
+  ClipboardCheck,
 } from 'lucide-react';
 import type { Influencer } from '@/types';
 import { formatNumber, formatDateTime } from '@/lib/utils';
@@ -242,6 +243,16 @@ function DashboardContent() {
             <Globe className="w-4 h-4" />
             אתרים
           </button>
+
+          <div className="w-px h-6 bg-gray-700 mx-1" />
+
+          <Link
+            href="/admin/onboarding/brand"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white transition-all"
+          >
+            <ClipboardCheck className="w-4 h-4" />
+            אונבורדינג מותג
+          </Link>
         </div>
 
         {/* ===== Social Tab ===== */}
