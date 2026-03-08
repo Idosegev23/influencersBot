@@ -13,12 +13,41 @@
   --color-border: #e5e7eb;
   --font-heading: 'Heebo', sans-serif;
   --font-body: 'Heebo', sans-serif;
-  
+
   /* Semantic colors */
   --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-error: #ef4444;
   --color-info: #3b82f6;
+
+  /* Dashboard theme tokens – light */
+  --dash-bg: #ffffff;
+  --dash-surface: #f8f9fb;
+  --dash-surface-hover: #f1f3f5;
+  --dash-border: #e8eaed;
+  --dash-text: #1a1a1a;
+  --dash-text-2: #555;
+  --dash-text-3: #999;
+  --dash-bar: rgba(99, 102, 241, 0.18);
+  --dash-bar-hover: rgba(99, 102, 241, 0.35);
+  --dash-positive: #10b981;
+  --dash-negative: #ef4444;
+  --dash-muted: #f1f3f5;
+}
+
+.dark {
+  --dash-bg: #0a0a0f;
+  --dash-surface: rgba(255,255,255,0.03);
+  --dash-surface-hover: rgba(255,255,255,0.06);
+  --dash-border: rgba(255,255,255,0.06);
+  --dash-text: #e8eaed;
+  --dash-text-2: #94a3b8;
+  --dash-text-3: #555;
+  --dash-bar: rgba(255,255,255,0.08);
+  --dash-bar-hover: rgba(255,255,255,0.20);
+  --dash-positive: #34d399;
+  --dash-negative: #f87171;
+  --dash-muted: rgba(255,255,255,0.04);
 }
 
 /* ============================================

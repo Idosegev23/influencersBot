@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { NavigationMenu } from '@/components/NavigationMenu';
+import { ThemeProvider } from '@/components/ThemeProvider';
 
 export default function InfluencerLayout({
   children,
@@ -9,22 +10,12 @@ export default function InfluencerLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  
-  // Don't show navigation on login page
   const showNav = !pathname.endsWith('/login');
 
   return (
-    <>
+    <ThemeProvider>
       {showNav && <NavigationMenu />}
-      {children}
-    </>
+      <div className="sm:pb-0 pb-14">{children}</div>
+    </ThemeProvider>
   );
 }
-
-
-
-
-
-
-
-

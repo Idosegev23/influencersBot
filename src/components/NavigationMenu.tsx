@@ -2,104 +2,130 @@
 
 import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
+import { useTheme } from '@/components/ThemeProvider';
+import {
+  LayoutDashboard,
+  Briefcase,
+  Tag,
+  MessageCircle,
+  FileText,
+  Sparkles,
+  Sun,
+  Moon,
+  Menu,
+  X,
+} from 'lucide-react';
+import { useState } from 'react';
+
+const NAV_ITEMS = [
+  { key: 'dashboard', label: 'דשבורד', icon: LayoutDashboard },
+  { key: 'partnerships', label: 'שת״פים', icon: Briefcase },
+  { key: 'coupons', label: 'קופונים', icon: Tag },
+  { key: 'conversations', label: 'שיחות', icon: MessageCircle },
+  { key: 'documents', label: 'מסמכים', icon: FileText },
+  { key: 'chatbot-persona', label: 'הבוט שלי', icon: Sparkles },
+];
 
 export function NavigationMenu() {
   const params = useParams();
   const pathname = usePathname();
+  const { theme, toggle } = useTheme();
   const username = params.username as string;
-
-  const menuItems = [
-    {
-      label: 'דשבורד',
-      href: `/influencer/${username}/dashboard`,
-      icon: '🏠',
-    },
-    {
-      label: 'שת"פים',
-      href: `/influencer/${username}/partnerships`,
-      icon: '🤝',
-    },
-    {
-      label: 'משימות',
-      href: `/influencer/${username}/tasks`,
-      icon: '✅',
-    },
-    {
-      label: 'קופונים',
-      href: `/influencer/${username}/coupons`,
-      icon: '🎫',
-    },
-    {
-      label: 'תקשורת',
-      href: `/influencer/${username}/communications`,
-      icon: '💬',
-    },
-    {
-      label: 'קהל',
-      href: `/influencer/${username}/audience`,
-      icon: '👥',
-    },
-    {
-      label: 'מסמכים',
-      href: `/influencer/${username}/documents`,
-      icon: '📄',
-    },
-    {
-      label: 'הבוט שלי',
-      href: `/influencer/${username}/chatbot-persona`,
-      icon: '🤖',
-    },
-  ];
+  const [open, setOpen] = useState(false);
 
   return (
-    <nav className="bg-white border-b border-gray-200 sticky top-0 z-10">
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo/Brand */}
-          <Link
-            href={`/influencer/${username}/dashboard`}
-            className="text-xl font-bold text-gray-900"
-          >
-            InfluencerBot
-          </Link>
+    <>
+      {/* ── Desktop nav ── */}
+      <nav
+        className="sticky top-0 z-30 hidden sm:block border-b"
+        style={{
+          background: 'var(--dash-bg)',
+          borderColor: 'var(--dash-border)',
+        }}
+      >
+        <div className="max-w-6xl mx-auto px-6 h-11 flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            {NAV_ITEMS.map((item) => {
+              const href = `/influencer/${username}/${item.key}`;
+              const isActive =
+                pathname === href ||
+                (item.key !== 'dashboard' && pathname.startsWith(href + '/'));
 
-          {/* Navigation */}
-          <div className="flex gap-1">
-            {menuItems.map((item) => {
-              const isActive = pathname === item.href;
               return (
                 <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}
+                  key={item.key}
+                  href={href}
+                  className="px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5"
+                  style={{
+                    color: isActive ? 'var(--color-primary)' : 'var(--dash-text-2)',
+                    background: isActive ? 'var(--dash-muted)' : 'transparent',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) e.currentTarget.style.background = 'var(--dash-surface-hover)';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) e.currentTarget.style.background = 'transparent';
+                  }}
                 >
-                  <span className="mr-2">{item.icon}</span>
+                  <item.icon className="w-3.5 h-3.5" />
                   {item.label}
                 </Link>
               );
             })}
           </div>
 
-          {/* User Menu */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">@{username}</span>
-            <button
-              onClick={() => {
-                // Clear cookie and redirect to login
-                document.cookie = `influencer_session_${username}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
-                window.location.href = `/influencer/${username}/login`;
-              }}
-              className="text-sm text-gray-600 hover:text-gray-900"
-            >
-              התנתק
-            </button>
-          </div>
+          <button
+            onClick={toggle}
+            className="w-8 h-8 rounded-md flex items-center justify-center transition-colors"
+            style={{ color: 'var(--dash-text-3)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--dash-surface-hover)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            title={theme === 'dark' ? 'מצב בהיר' : 'מצב כהה'}
+          >
+            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
+        </div>
+      </nav>
+
+      {/* ── Mobile bottom tab bar ── */}
+      <div
+        className="sm:hidden fixed bottom-0 inset-x-0 z-30 border-t pb-safe"
+        style={{
+          background: 'var(--dash-bg)',
+          borderColor: 'var(--dash-border)',
+        }}
+      >
+        <div className="grid grid-cols-6 h-14">
+          {NAV_ITEMS.slice(0, 5).map((item) => {
+            const href = `/influencer/${username}/${item.key}`;
+            const isActive =
+              pathname === href ||
+              (item.key !== 'dashboard' && pathname.startsWith(href + '/'));
+
+            return (
+              <Link
+                key={item.key}
+                href={href}
+                className="flex flex-col items-center justify-center gap-0.5 transition-colors"
+                style={{ color: isActive ? 'var(--color-primary)' : 'var(--dash-text-3)' }}
+              >
+                <item.icon className="w-5 h-5" />
+                <span className="text-[10px]">{item.label}</span>
+              </Link>
+            );
+          })}
+
+          {/* More / theme toggle */}
+          <button
+            onClick={toggle}
+            className="flex flex-col items-center justify-center gap-0.5"
+            style={{ color: 'var(--dash-text-3)' }}
+          >
+            {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            <span className="text-[10px]">{theme === 'dark' ? 'בהיר' : 'כהה'}</span>
+          </button>
         </div>
       </div>
-    </nav>
+    </>
   );
 }
