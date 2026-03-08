@@ -828,7 +828,7 @@ export async function getSupportRequests(influencerId: string): Promise<SupportR
   const { data, error } = await supabase
     .from('support_requests')
     .select('*')
-    .eq('influencer_id', influencerId)
+    .eq('account_id', influencerId)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -927,7 +927,7 @@ export async function getAnalyticsSummary(
   const { data: sessions, error: sessionsError } = await supabase
     .from('chat_sessions')
     .select('id, message_count')
-    .eq('influencer_id', influencerId)
+    .eq('account_id', influencerId)
     .gte('created_at', startDate.toISOString())
     .lte('created_at', endDate.toISOString());
 
@@ -937,9 +937,9 @@ export async function getAnalyticsSummary(
 
   // Get analytics events in date range
   const { data: events, error: eventsError } = await supabase
-    .from('analytics_events')
-    .select('event_type, session_id')
-    .eq('influencer_id', influencerId)
+    .from('events')
+    .select('type, category, created_at')
+    .eq('account_id', influencerId)
     .gte('created_at', startDate.toISOString())
     .lte('created_at', endDate.toISOString());
 
@@ -952,10 +952,10 @@ export async function getAnalyticsSummary(
 
   const totalSessions = sessionsList.length;
   const totalMessages = sessionsList.reduce((sum, s) => sum + (s.message_count || 0), 0);
-  const totalCouponCopies = eventsList.filter(e => e.event_type === 'coupon_copied').length;
-  const totalProductClicks = eventsList.filter(e => e.event_type === 'product_clicked').length;
+  const totalCouponCopies = eventsList.filter(e => e.type === 'coupon_copied').length;
+  const totalProductClicks = eventsList.filter(e => e.type === 'product_clicked').length;
   const avgMessagesPerSession = totalSessions > 0 ? Math.round(totalMessages / totalSessions * 10) / 10 : 0;
-  const uniqueVisitors = new Set(eventsList.map(e => e.session_id).filter(Boolean)).size;
+  const uniqueVisitors = totalSessions;
 
   return {
     totalSessions,
@@ -976,15 +976,15 @@ export async function getDailyStats(
   const { data: sessions } = await supabase
     .from('chat_sessions')
     .select('created_at, message_count')
-    .eq('influencer_id', influencerId)
+    .eq('account_id', influencerId)
     .gte('created_at', startDate.toISOString())
     .lte('created_at', endDate.toISOString());
 
   // Get all events
   const { data: events } = await supabase
-    .from('analytics_events')
-    .select('created_at, event_type')
-    .eq('influencer_id', influencerId)
+    .from('events')
+    .select('created_at, type')
+    .eq('account_id', influencerId)
     .gte('created_at', startDate.toISOString())
     .lte('created_at', endDate.toISOString());
 
@@ -1020,9 +1020,9 @@ export async function getDailyStats(
     const dateKey = new Date(event.created_at).toISOString().split('T')[0];
     const stats = dateMap.get(dateKey);
     if (stats) {
-      if (event.event_type === 'coupon_copied') {
+      if (event.type === 'coupon_copied') {
         stats.couponCopies++;
-      } else if (event.event_type === 'product_clicked') {
+      } else if (event.type === 'product_clicked') {
         stats.productClicks++;
       }
     }
@@ -1088,7 +1088,7 @@ export async function getChatSessionsWithMessages(
   const { data: sessions, error } = await supabase
     .from('chat_sessions')
     .select('*')
-    .eq('influencer_id', influencerId)
+    .eq('account_id', influencerId)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
 
@@ -1116,7 +1116,7 @@ export async function searchChatSessions(
   const { data: sessions } = await supabase
     .from('chat_sessions')
     .select('*')
-    .eq('influencer_id', influencerId)
+    .eq('account_id', influencerId)
     .order('created_at', { ascending: false });
 
   if (!sessions || sessions.length === 0) return [];
