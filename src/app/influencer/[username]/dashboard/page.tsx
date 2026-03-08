@@ -3,34 +3,184 @@
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
 import {
   MessageCircle,
-  TrendingUp,
   Users,
   ExternalLink,
   LogOut,
-  Settings,
   Copy,
   Check,
-  BarChart3,
   Loader2,
-  FileText,
-  Headphones,
   RefreshCw,
-  Tag,
-  Briefcase,
-  CheckCircle2,
-  Calendar,
-  FileCheck,
-  DollarSign,
-  AlertCircle,
-  Sparkles,
+  Heart,
+  Eye,
+  MessageSquare,
+  Play,
+  Image as ImageIcon,
+  Layers,
+  ChevronLeft,
+  BadgeCheck,
+  ArrowUpRight,
+  TrendingUp,
+  TrendingDown,
+  Minus,
 } from 'lucide-react';
-import { getInfluencerByUsername, getChatSessions, getAnalytics, type Partnership } from '@/lib/supabase';
 import { formatNumber, formatRelativeTime } from '@/lib/utils';
-import type { Influencer, ChatSession } from '@/types';
-// import NotificationBell from '@/components/NotificationBell'; // ⚠️ Removed - notifications not implemented
+
+// ─── Types ──────────────────────────────────────────────
+
+interface DashboardData {
+  influencer: {
+    id: string;
+    username: string;
+    display_name: string;
+    avatar_url?: string;
+    bio?: string;
+    is_verified?: boolean;
+    category?: string;
+    plan?: string;
+  };
+  instagram: {
+    followers: number;
+    following: number;
+    totalPosts: number;
+    scrapedPosts: number;
+    totalLikes: number;
+    totalComments: number;
+    totalViews: number;
+    avgEngagement: number;
+    sponsoredPosts: number;
+    postsByType: Record<string, number>;
+    highlightsCount: number;
+    followersTrend: { date: string; followers: number }[];
+    followersGrowth: number;
+  };
+  recentPosts: {
+    id: string;
+    shortcode: string;
+    type: string;
+    caption: string;
+    likes: number;
+    comments: number;
+    views: number;
+    engagement: number;
+    postedAt: string;
+    thumbnail?: string;
+    isSponsored: boolean;
+  }[];
+  chat: {
+    totalSessions: number;
+    totalMessages: number;
+    avgMessagesPerSession: number;
+    recentSessions: {
+      id: string;
+      messageCount: number;
+      createdAt: string;
+      updatedAt: string;
+    }[];
+  };
+  partnerships: {
+    total: number;
+    active: number;
+    totalRevenue: number;
+    pendingRevenue: number;
+    list: {
+      id: string;
+      brandName: string;
+      status: string;
+      contractAmount: number;
+      category?: string;
+      couponCode?: string;
+      startDate?: string;
+      endDate?: string;
+    }[];
+  };
+  coupons: {
+    total: number;
+    active: number;
+    totalCopies: number;
+    list: {
+      id: string;
+      code: string;
+      brandName?: string;
+      discountType: string;
+      discountValue: number;
+      copyCount: number;
+      isActive: boolean;
+    }[];
+  };
+  botKnowledge: {
+    totalDocuments: number;
+    totalChunks: number;
+    docsByType: Record<string, number>;
+    hasPersona: boolean;
+    personaTone?: string;
+  };
+  analytics: {
+    messagesReceived: number;
+    responsesSent: number;
+    quickActions: number;
+    avgResponseTimeMs: number;
+    totalTokens: number;
+    dailyActivity: { date: string; messages: number; responses: number }[];
+  };
+}
+
+// ─── Small components ───────────────────────────────────
+
+function ActivityChart({ data }: { data: { date: string; messages: number }[] }) {
+  const recent = data.slice(-21);
+  if (recent.length === 0) return null;
+  const max = Math.max(...recent.map((d) => d.messages), 1);
+
+  return (
+    <div className="flex items-end gap-[3px] h-20 mt-1">
+      {recent.map((d) => {
+        const pct = (d.messages / max) * 100;
+        return (
+          <div key={d.date} className="group relative flex-1 flex items-end">
+            <div
+              className="w-full rounded-sm bg-white/[0.08] group-hover:bg-white/20 transition-colors"
+              style={{ height: `${Math.max(pct, 4)}%` }}
+            />
+            <div className="absolute bottom-full mb-2 right-1/2 translate-x-1/2 hidden group-hover:block z-10">
+              <div className="bg-gray-900 text-[11px] text-gray-300 px-2 py-1 rounded shadow-lg whitespace-nowrap border border-white/10">
+                {d.date.slice(5)} &middot; {d.messages}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const POST_ICON: Record<string, typeof ImageIcon> = {
+  image: ImageIcon,
+  video: Play,
+  reel: Play,
+  carousel: Layers,
+};
+
+const STATUS_MAP: Record<string, string> = {
+  active: 'text-emerald-400',
+  proposal: 'text-blue-400',
+  contract: 'text-violet-400',
+  negotiation: 'text-amber-400',
+  completed: 'text-gray-400',
+  lead: 'text-gray-500',
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  active: 'פעיל',
+  proposal: 'הצעה',
+  contract: 'חוזה',
+  negotiation: 'מו״מ',
+  completed: 'הושלם',
+  lead: 'ליד',
+};
+
+// ─── Page ───────────────────────────────────────────────
 
 export default function InfluencerDashboardPage({
   params,
@@ -41,120 +191,34 @@ export default function InfluencerDashboardPage({
   const username = resolvedParams.username;
   const router = useRouter();
 
-  const [influencer, setInfluencer] = useState<Influencer | null>(null);
-  const [brandsLegacy, setBrandsLegacy] = useState<Partnership[]>([]); // Renamed from brands
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [analytics, setAnalytics] = useState<Record<string, number>>({});
-  const [audienceAnalytics, setAudienceAnalytics] = useState<any>(null);
-  const [taskSummary, setTaskSummary] = useState<any>(null);
-  const [partnerships, setPartnerships] = useState<any[]>([]);
-  const [partnershipCoupons, setPartnershipCoupons] = useState<Record<string, any[]>>({});
-  const [totalCouponsCount, setTotalCouponsCount] = useState(0);
+  const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [rescanning, setRescanning] = useState(false);
-  const [rescanResult, setRescanResult] = useState<{ products: number; content: number } | null>(null);
-  const [calendarConnected, setCalendarConnected] = useState(false);
-  const [connectingCalendar, setConnectingCalendar] = useState(false);
+  const [rescanResult, setRescanResult] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
       try {
-        // Check authentication
         const authRes = await fetch(`/api/influencer/auth?username=${username}`);
         const authData = await authRes.json();
-
         if (!authData.authenticated) {
           router.push(`/influencer/${username}`);
           return;
         }
 
-        // Load influencer data
-        const inf = await getInfluencerByUsername(username);
-        if (!inf) {
+        const statsRes = await fetch(`/api/influencer/dashboard-stats?username=${username}`);
+        if (!statsRes.ok) {
           router.push(`/influencer/${username}`);
           return;
         }
-
-        setInfluencer(inf);
-
-        // Load related data
-        const [sess, events] = await Promise.all([
-          getChatSessions(inf.id),
-          getAnalytics(inf.id, 30),
-        ]);
-
-        // Load partnerships via API (handles auth correctly)
-        try {
-          const partnershipsRes = await fetch(`/api/influencer/partnerships?username=${username}&limit=100`);
-          if (partnershipsRes.ok) {
-            const partnershipsData = await partnershipsRes.json();
-            const loadedPartnerships = partnershipsData.partnerships || [];
-            setBrandsLegacy(loadedPartnerships);
-            
-            // Load coupons for each partnership
-            const couponsMap: Record<string, any[]> = {};
-            let totalCoupons = 0;
-            await Promise.all(
-              loadedPartnerships.map(async (p: any) => {
-                try {
-                  const couponsRes = await fetch(
-                    `/api/influencer/partnerships/${p.id}/coupons?username=${username}`
-                  );
-                  if (couponsRes.ok) {
-                    const couponsData = await couponsRes.json();
-                    couponsMap[p.id] = couponsData.coupons || [];
-                    totalCoupons += (couponsData.coupons || []).length;
-                  }
-                } catch (err) {
-                  console.error('Error loading coupons for partnership:', p.id, err);
-                  couponsMap[p.id] = [];
-                }
-              })
-            );
-            setPartnershipCoupons(couponsMap);
-            setTotalCouponsCount(totalCoupons);
-          }
-        } catch (err) {
-          console.error('Error loading partnerships:', err);
-          setBrandsLegacy([]);
-        }
-
-        setSessions(sess);
-
-        // Calculate analytics
-        const stats: Record<string, number> = {
-          totalChats: sess.length,
-          totalMessages: sess.reduce((sum, s) => sum + s.message_count, 0),
-          couponCopies: events.filter((e) => e.event_type === 'coupon_copied').length,
-          productClicks: events.filter((e) => e.event_type === 'product_clicked').length,
-        };
-        setAnalytics(stats);
-
-        // Load new Influencer OS data
-        try {
-          // ⚠️ Audience analytics endpoint removed
-          // TODO: Re-implement with new analytics architecture
-          
-          // ⚠️ Tasks summary endpoint removed
-          // TODO: Re-implement with new task management system
-
-          // Load partnerships
-          const partnershipsRes = await fetch(`/api/influencer/partnerships?username=${username}&limit=5`);
-          if (partnershipsRes.ok) {
-            const partnershipsData = await partnershipsRes.json();
-            setPartnerships(partnershipsData.partnerships || []);
-          }
-        } catch (err) {
-          console.error('Error loading new data:', err);
-        }
+        setData(await statsRes.json());
       } catch (error) {
-        console.error('Error loading data:', error);
+        console.error('Error loading dashboard:', error);
       } finally {
         setLoading(false);
       }
     }
-
     loadData();
   }, [username, router]);
 
@@ -168,665 +232,426 @@ export default function InfluencerDashboardPage({
   };
 
   const handleRescan = async () => {
-    if (!influencer) return;
-
     setRescanning(true);
     setRescanResult(null);
     try {
-      const response = await fetch('/api/influencer/rescan', {
+      const res = await fetch('/api/influencer/rescan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username }),
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        setRescanResult({
-          products: data.productsCount || 0,
-          content: data.contentCount || 0,
-        });
-        // Reload partnerships after rescan
-        if (influencer) {
-          try {
-            const partnershipsRes = await fetch(`/api/influencer/partnerships?username=${username}&limit=100`);
-            if (partnershipsRes.ok) {
-              const partnershipsData = await partnershipsRes.json();
-              setBrandsLegacy(partnershipsData.partnerships || []);
-            }
-          } catch (err) {
-            console.error('Error reloading partnerships:', err);
-          }
-        }
+      if (res.ok) {
+        const d = await res.json();
+        setRescanResult(`נמצאו ${d.productsCount || 0} מוצרים ו-${d.contentCount || 0} פריטי תוכן`);
       }
-    } catch (error) {
-      console.error('Error rescanning:', error);
+    } catch {
+      setRescanResult('שגיאה בסריקה');
     } finally {
       setRescanning(false);
     }
   };
 
-  const handleCopyLink = () => {
-    const link = `${window.location.origin}/chat/${username}`;
-    navigator.clipboard.writeText(link);
+  const copyLink = () => {
+    navigator.clipboard.writeText(`${window.location.origin}/chat/${username}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleConnectCalendar = async () => {
-    // ⚠️ Google Calendar integration was removed
-    alert('אינטגרציית יומן Google הוסרה זמנית. תתווסף בעתיד.');
-  };
-
-  useEffect(() => {
-    // ⚠️ Google Calendar integration was removed
-    // Check calendar status removed
-    
-    if (influencer) {
-      // Future: check calendar status when re-implemented
-    }
-  }, [influencer, username]);
+  // ─── Loading ────────────────────────────────────────
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center" dir="rtl">
-        <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
+        <Loader2 className="w-6 h-6 text-white/40 animate-spin" />
       </div>
     );
   }
 
-  if (!influencer) return null;
+  if (!data) return null;
 
-  const chatLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/chat/${username}`;
+  const { influencer, instagram, recentPosts, chat, partnerships, coupons, botKnowledge, analytics } = data;
+  const chatLink = typeof window !== 'undefined' ? `${window.location.origin}/chat/${username}` : '';
+  const avgResponseSec = analytics.avgResponseTimeMs > 0 ? (analytics.avgResponseTimeMs / 1000).toFixed(1) : null;
+
+  // ─── Render ─────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900" dir="rtl">
-      {/* Background Pattern */}
-      <div className="fixed inset-0 opacity-10">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,#6366f1_1px,transparent_0)] bg-[length:50px_50px]" />
-      </div>
+    <div className="min-h-screen bg-[#0a0a0f] text-gray-100" dir="rtl">
 
-      {/* Header */}
-      <header className="relative z-10 sticky top-0 bg-slate-900/80 backdrop-blur-xl border-b border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {influencer.avatar_url ? (
-                <img
-                  src={influencer.avatar_url}
-                  alt={influencer.display_name}
-                  className="w-10 h-10 rounded-xl object-cover"
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold">
-                  {influencer.display_name?.charAt(0) || '?'}
-                </div>
-              )}
-              <div>
-                <h1 className="font-semibold text-white">{influencer.display_name}</h1>
-                <p className="text-xs text-gray-400">@{username}</p>
+      {/* ── Header ─────────────────────────────────── */}
+      <header className="sticky top-0 z-20 bg-[#0a0a0f]/80 backdrop-blur-md border-b border-white/[0.06]">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            {influencer.avatar_url ? (
+              <img src={influencer.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-sm font-medium flex-shrink-0">
+                {influencer.display_name?.charAt(0)}
               </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {/* <NotificationBell username={username} accountId={influencer.id} /> */}
-              <a
-                href={chatLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hidden sm:flex items-center gap-2 px-3 py-2 text-sm text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
-              >
-                <ExternalLink className="w-4 h-4" />
-                צפייה בבוט
-              </a>
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
-              >
-                <LogOut className="w-4 h-4" />
-                <span className="hidden sm:inline">יציאה</span>
-              </button>
+            )}
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-white flex items-center gap-1 truncate">
+                {influencer.display_name}
+                {influencer.is_verified && <BadgeCheck className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />}
+              </span>
             </div>
           </div>
-        </div>
-      </header>
 
-      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        {/* Share Link */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8 p-4 bg-gradient-to-r from-indigo-600/20 to-purple-600/20 rounded-2xl border border-indigo-500/30"
-        >
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <h2 className="font-semibold text-white mb-1">הלינק לצ'אטבוט שלך</h2>
-              <p className="text-sm text-gray-400">שתפו את הלינק עם העוקבים שלכם</p>
-            </div>
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <div className="flex-1 sm:flex-initial px-4 py-2 bg-gray-800/50 rounded-lg text-sm text-gray-300 truncate max-w-xs">
-                {chatLink}
-              </div>
-              <button
-                onClick={handleCopyLink}
-                className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
-                  copied
-                    ? 'bg-green-500 text-white'
-                    : 'bg-indigo-600 hover:bg-indigo-500 text-white'
-                }`}
-              >
-                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                {copied ? 'הועתק!' : 'העתק'}
-              </button>
-              <Link
-                href={`/influencer/${username}/share`}
-                className="px-4 py-2 rounded-lg font-medium bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition-all"
-              >
-                QR + UTM
-              </Link>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Primary KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-5"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                <MessageCircle className="w-6 h-6 text-blue-400" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-white">{formatNumber(audienceAnalytics?.overview?.totalConversations || analytics.totalChats || 0)}</p>
-                <p className="text-sm text-gray-400">שיחות</p>
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-5"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center">
-                <Tag className="w-6 h-6 text-green-400" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-white">{formatNumber(totalCouponsCount)}</p>
-                <p className="text-sm text-gray-400">קופונים פעילים</p>
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-5"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                <Briefcase className="w-6 h-6 text-purple-400" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-white">{partnerships.length || 0}</p>
-                <p className="text-sm text-gray-400">שת"פים</p>
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25 }}
-            className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-5"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-orange-500/20 flex items-center justify-center">
-                <CheckCircle2 className="w-6 h-6 text-orange-400" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-white">{taskSummary?.summary?.statusCounts?.pending || 0}</p>
-                <p className="text-sm text-gray-400">משימות</p>
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-5"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-emerald-400" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-white">{audienceAnalytics?.overview?.conversionRate?.toFixed(1) || '0.0'}%</p>
-                <p className="text-sm text-gray-400">המרה</p>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Main Dashboard Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Upcoming Tasks */}
-          {taskSummary && (taskSummary.upcoming?.length > 0 || taskSummary.overdue?.length > 0) && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35 }}
-              className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-6"
+          <div className="flex items-center gap-1">
+            <button
+              onClick={copyLink}
+              className="h-8 px-3 text-xs text-gray-400 hover:text-white hover:bg-white/[0.06] rounded-md transition-colors flex items-center gap-1.5"
             >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-white flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-orange-400" />
-                  משימות קרובות
-                </h3>
-                <Link
-                  href={`/influencer/${username}/tasks`}
-                  className="text-sm text-orange-400 hover:text-orange-300"
-                >
-                  כל המשימות
-                </Link>
-              </div>
-
-              <div className="space-y-3">
-                {taskSummary.overdue?.slice(0, 2).map((task: any) => (
-                  <div
-                    key={task.id}
-                    className="flex items-start gap-3 p-3 bg-red-500/10 border border-red-500/30 rounded-xl"
-                  >
-                    <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">{task.title}</p>
-                      <p className="text-xs text-red-400">באיחור - {new Date(task.due_date).toLocaleDateString('he-IL')}</p>
-                      {task.partnership && (
-                        <p className="text-xs text-gray-400">{task.partnership.brand_name}</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-
-                {taskSummary.upcoming?.slice(0, 3).map((task: any) => (
-                  <div
-                    key={task.id}
-                    className="flex items-start gap-3 p-3 bg-gray-700/30 rounded-xl"
-                  >
-                    <CheckCircle2 className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">{task.title}</p>
-                      <p className="text-xs text-gray-400">{new Date(task.due_date).toLocaleDateString('he-IL')}</p>
-                      {task.partnership_name && (
-                        <p className="text-xs text-gray-500">{task.partnership_name}</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          {/* Active Partnerships */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-6"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-white flex items-center gap-2">
-                <Briefcase className="w-5 h-5 text-purple-400" />
-                שת"פים פעילים
-              </h3>
-              <Link
-                href={`/influencer/${username}/partnerships`}
-                className="text-sm text-purple-400 hover:text-purple-300"
-              >
-                ניהול מלא
-              </Link>
-            </div>
-
-            {partnerships.length > 0 ? (
-              <div className="space-y-3">
-                {partnerships.slice(0, 4).map((partnership) => (
-                  <Link
-                    key={partnership.id}
-                    href={`/influencer/${username}/partnerships/${partnership.id}`}
-                    className="flex items-center justify-between p-3 bg-gray-700/30 hover:bg-gray-700/50 rounded-xl transition-colors"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">{partnership.brand_name}</p>
-                      <p className="text-xs text-gray-400">
-                        {partnership.status === 'active' && '✓ פעיל'}
-                        {partnership.status === 'proposal' && '📋 הצעה'}
-                        {partnership.status === 'contract' && '📝 חוזה'}
-                        {partnership.status === 'negotiation' && '💬 משא ומתן'}
-                      </p>
-                    </div>
-                    {partnership.contract_amount && (
-                      <span className="text-sm font-bold text-green-400">
-                        ₪{formatNumber(partnership.contract_amount)}
-                      </span>
-                    )}
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <Briefcase className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                <p className="text-gray-400 mb-3">אין עדיין שת"פים</p>
-                <Link
-                  href={`/influencer/${username}/partnerships`}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-500 transition-colors"
-                >
-                  הוסף שת"פ
-                </Link>
-              </div>
-            )}
-          </motion.div>
-
-          {/* Brands/Coupons Section (from partnerships) */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.45 }}
-            className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-6"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-white flex items-center gap-2">
-                <Tag className="w-5 h-5 text-pink-400" />
-                מותגים וקופונים
-              </h3>
-              <Link
-                href={`/influencer/${username}/partnerships`}
-                className="text-sm text-pink-400 hover:text-pink-300"
-              >
-                ניהול מלא
-              </Link>
-            </div>
-
-            {brandsLegacy.length > 0 ? (
-              <div className="space-y-3">
-                {brandsLegacy.slice(0, 4).map((partnership) => (
-                  <Link
-                    key={partnership.id}
-                    href={`/influencer/${username}/partnerships/${partnership.id}`}
-                    className="flex items-center justify-between p-3 bg-gray-700/30 hover:bg-gray-700/50 rounded-xl transition-colors"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">{partnership.brand_name}</p>
-                      {partnership.category && <p className="text-xs text-gray-400">{partnership.category}</p>}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {partnershipCoupons[partnership.id]?.length > 0 ? (
-                        <>
-                          <span className="px-2 py-1 text-xs bg-green-500/20 text-green-400 rounded-lg font-mono">
-                            {partnershipCoupons[partnership.id][0].code}
-                          </span>
-                          {partnershipCoupons[partnership.id].length > 1 && (
-                            <span className="text-xs text-gray-400">
-                              +{partnershipCoupons[partnership.id].length - 1}
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-xs text-gray-500">ללא קופונים</span>
-                      )}
-                    </div>
-                  </Link>
-                ))}
-                {brandsLegacy.length > 4 && (
-                  <p className="text-sm text-gray-500 text-center">+{brandsLegacy.length - 4} נוספים</p>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <Tag className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                <p className="text-gray-400 mb-3">אין עדיין מותגים</p>
-                <Link
-                  href={`/influencer/${username}/partnerships`}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-pink-600 text-white text-sm rounded-lg hover:bg-pink-500 transition-colors"
-                >
-                  הוסף שת"פ
-                </Link>
-              </div>
-            )}
-          </motion.div>
-
-          {/* Recent Chats */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-6"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-white flex items-center gap-2">
-                <MessageCircle className="w-5 h-5 text-indigo-400" />
-                שיחות אחרונות
-              </h3>
-              <Link
-                href={`/influencer/${username}/conversations`}
-                className="text-sm text-indigo-400 hover:text-indigo-300"
-              >
-                כל השיחות
-              </Link>
-            </div>
-
-            {sessions.length > 0 ? (
-              <div className="space-y-3">
-                {sessions.slice(0, 5).map((session) => (
-                  <div
-                    key={session.id}
-                    className="flex items-center justify-between p-3 bg-gray-700/30 rounded-xl"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center">
-                        <Users className="w-5 h-5 text-gray-400" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-white">{session.message_count} הודעות</p>
-                        <p className="text-xs text-gray-500">{formatRelativeTime(session.created_at)}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <MessageCircle className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                <p className="text-gray-400">אין עדיין שיחות</p>
-                <p className="text-sm text-gray-500 mt-1">שתפו את הלינק כדי להתחיל</p>
-              </div>
-            )}
-          </motion.div>
-        </div>
-
-        {/* Bot Management - MAIN ACTION */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.55 }}
-          className="mb-6"
-        >
-          <Link
-            href={`/influencer/${username}/manage`}
-            className="block p-6 bg-gradient-to-r from-indigo-600/30 to-purple-600/30 hover:from-indigo-600/40 hover:to-purple-600/40 border-2 border-indigo-500/50 hover:border-indigo-400 rounded-2xl transition-all"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-                  <Sparkles className="w-7 h-7 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white mb-1">ניהול תוכן הבוט</h3>
-                  <p className="text-sm text-gray-300">מותגים, קופונים, מוצרים, תוכן והגדרות</p>
-                </div>
-              </div>
-              <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-white/10 rounded-lg">
-                <span className="text-white font-medium">כניסה לניהול</span>
-                <ExternalLink className="w-4 h-4 text-white" />
-              </div>
-            </div>
-          </Link>
-        </motion.div>
-
-        {/* Navigation */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="grid grid-cols-2 sm:grid-cols-4 gap-4"
-        >
-          <Link
-            href={`/influencer/${username}/partnerships`}
-            className="flex flex-col items-center gap-3 p-6 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-purple-500/50 rounded-2xl transition-all"
-          >
-            <Briefcase className="w-8 h-8 text-purple-400" />
-            <span className="text-white font-medium">שת"פים</span>
-          </Link>
-
-          <Link
-            href={`/influencer/${username}/tasks`}
-            className="flex flex-col items-center gap-3 p-6 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-orange-500/50 rounded-2xl transition-all"
-          >
-            <CheckCircle2 className="w-8 h-8 text-orange-400" />
-            <span className="text-white font-medium">משימות</span>
-          </Link>
-
-          <Link
-            href={`/influencer/${username}/analytics`}
-            className="flex flex-col items-center gap-3 p-6 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-indigo-500/50 rounded-2xl transition-all"
-          >
-            <BarChart3 className="w-8 h-8 text-indigo-400" />
-            <span className="text-white font-medium">אנליטיקס</span>
-          </Link>
-
-          <Link
-            href={`/influencer/${username}/partnerships`}
-            className="flex flex-col items-center gap-3 p-6 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-pink-500/50 rounded-2xl transition-all"
-          >
-            <Tag className="w-8 h-8 text-pink-400" />
-            <span className="text-white font-medium">מותגים וקופונים</span>
-          </Link>
-
-          <Link
-            href={`/influencer/${username}/conversations`}
-            className="flex flex-col items-center gap-3 p-6 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-blue-500/50 rounded-2xl transition-all"
-          >
-            <MessageCircle className="w-8 h-8 text-blue-400" />
-            <span className="text-white font-medium">שיחות</span>
-          </Link>
-
-          <Link
-            href={`/influencer/${username}/content`}
-            className="flex flex-col items-center gap-3 p-6 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-indigo-500/50 rounded-2xl transition-all"
-          >
-            <FileText className="w-8 h-8 text-orange-400" />
-            <span className="text-white font-medium">תוכן</span>
-          </Link>
-
-          <Link
-            href={`/influencer/${username}/support`}
-            className="flex flex-col items-center gap-3 p-6 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-green-500/50 rounded-2xl transition-all"
-          >
-            <Headphones className="w-8 h-8 text-green-400" />
-            <span className="text-white font-medium">תמיכה</span>
-          </Link>
-
-          <Link
-            href={`/influencer/${username}/settings`}
-            className="flex flex-col items-center gap-3 p-6 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-indigo-500/50 rounded-2xl transition-all"
-          >
-            <Settings className="w-8 h-8 text-gray-400" />
-            <span className="text-white font-medium">הגדרות</span>
-          </Link>
-        </motion.div>
-
-        {/* Quick Actions */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="mt-8 flex flex-col items-center gap-4"
-        >
-          <div className="flex flex-wrap justify-center gap-3">
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? 'הועתק' : 'לינק בוט'}
+            </button>
             <a
               href={chatLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl transition-all font-medium"
+              className="h-8 px-3 text-xs text-gray-400 hover:text-white hover:bg-white/[0.06] rounded-md transition-colors hidden sm:flex items-center gap-1.5"
             >
-              <ExternalLink className="w-5 h-5" />
-              צפייה בבוט
+              <ExternalLink className="w-3.5 h-3.5" />
+              בוט
             </a>
-            
             <button
               onClick={handleRescan}
               disabled={rescanning}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-500 hover:to-teal-500 disabled:opacity-50 text-white rounded-xl transition-all font-medium"
+              className="h-8 px-3 text-xs text-gray-400 hover:text-white hover:bg-white/[0.06] rounded-md transition-colors flex items-center gap-1.5 disabled:opacity-40"
             >
-              {rescanning ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  סורק מחדש...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="w-5 h-5" />
-                  סרוק מחדש מאינסטגרם
-                </>
-              )}
+              <RefreshCw className={`w-3.5 h-3.5 ${rescanning ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">סריקה</span>
             </button>
-
             <button
-              onClick={handleConnectCalendar}
-              disabled={connectingCalendar || calendarConnected}
-              className={`flex items-center gap-2 px-6 py-3 rounded-xl transition-all font-medium ${
-                calendarConnected
-                  ? 'bg-green-600/20 border border-green-500/30 text-green-300 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white'
-              } disabled:opacity-50`}
+              onClick={handleLogout}
+              className="h-8 px-3 text-xs text-gray-400 hover:text-white hover:bg-white/[0.06] rounded-md transition-colors flex items-center gap-1.5"
             >
-              {connectingCalendar ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  מתחבר...
-                </>
-              ) : calendarConnected ? (
-                <>
-                  <Check className="w-5 h-5" />
-                  יומן מחובר
-                </>
-              ) : (
-                <>
-                  <Calendar className="w-5 h-5" />
-                  חבר יומן גוגל
-                </>
-              )}
+              <LogOut className="w-3.5 h-3.5" />
             </button>
           </div>
-          
-          {rescanResult && (
-            <motion.div
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="px-4 py-2 bg-green-600/20 border border-green-500/30 rounded-xl"
-            >
-              <p className="text-sm text-green-300">
-                נמצאו {rescanResult.products} מוצרים ו-{rescanResult.content} פריטי תוכן 🎉
-              </p>
-            </motion.div>
-          )}
-        </motion.div>
+        </div>
+
+        {rescanResult && (
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-2">
+            <p className="text-xs text-emerald-400">{rescanResult}</p>
+          </div>
+        )}
+      </header>
+
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6 animate-in fade-in duration-300">
+
+        {/* ── Top metrics row ──────────────────────── */}
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-px bg-white/[0.04] rounded-xl overflow-hidden">
+          {[
+            {
+              label: 'עוקבים',
+              value: formatNumber(instagram.followers),
+              sub: instagram.followersGrowth !== 0 ? (
+                <span className={instagram.followersGrowth > 0 ? 'text-emerald-400' : 'text-red-400'}>
+                  {instagram.followersGrowth > 0 ? '+' : ''}{formatNumber(instagram.followersGrowth)}
+                </span>
+              ) : null,
+            },
+            {
+              label: 'שיחות',
+              value: formatNumber(chat.totalSessions),
+              sub: <span className="text-gray-500">{formatNumber(chat.totalMessages)} הודעות</span>,
+            },
+            {
+              label: 'שת״פים',
+              value: partnerships.active,
+              sub: partnerships.total > partnerships.active
+                ? <span className="text-gray-500">מתוך {partnerships.total}</span>
+                : null,
+            },
+            {
+              label: 'קופונים',
+              value: coupons.active,
+              sub: coupons.totalCopies > 0
+                ? <span className="text-gray-500">{formatNumber(coupons.totalCopies)} העתקות</span>
+                : null,
+            },
+            {
+              label: 'אנגייג׳מנט',
+              value: `${instagram.avgEngagement}%`,
+              sub: instagram.totalLikes > 0
+                ? <span className="text-gray-500">{formatNumber(instagram.totalLikes)} לייקים</span>
+                : null,
+            },
+            {
+              label: 'צפיות',
+              value: formatNumber(instagram.totalViews),
+              sub: instagram.scrapedPosts > 0
+                ? <span className="text-gray-500">{instagram.scrapedPosts} פוסטים</span>
+                : null,
+            },
+          ].map((m, i) => (
+            <div key={i} className="bg-[#0a0a0f] p-4 text-center">
+              <p className="text-xl sm:text-2xl font-semibold text-white tracking-tight">{m.value}</p>
+              <p className="text-[11px] text-gray-500 mt-1">{m.label}</p>
+              {m.sub && <p className="text-[11px] mt-0.5">{m.sub}</p>}
+            </div>
+          ))}
+        </div>
+
+        {/* ── Two-column layout ────────────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+
+          {/* ── Left column (wider) ── */}
+          <div className="lg:col-span-3 space-y-6">
+
+            {/* Chat activity */}
+            <section className="rounded-xl border border-white/[0.06] overflow-hidden">
+              <div className="px-5 pt-5 pb-4 flex items-center justify-between">
+                <h2 className="text-sm font-medium text-white">פעילות בוט <span className="text-gray-500 font-normal">30 יום</span></h2>
+                <Link href={`/influencer/${username}/analytics`} className="text-xs text-gray-500 hover:text-gray-300 transition-colors">
+                  אנליטיקס מלא
+                </Link>
+              </div>
+
+              <div className="px-5 grid grid-cols-3 gap-4 pb-4">
+                <div>
+                  <p className="text-lg font-semibold text-white">{formatNumber(analytics.messagesReceived)}</p>
+                  <p className="text-[11px] text-gray-500">הודעות נכנסות</p>
+                </div>
+                <div>
+                  <p className="text-lg font-semibold text-white">{formatNumber(analytics.responsesSent)}</p>
+                  <p className="text-[11px] text-gray-500">תגובות</p>
+                </div>
+                <div>
+                  <p className="text-lg font-semibold text-white">{avgResponseSec ? `${avgResponseSec}s` : '—'}</p>
+                  <p className="text-[11px] text-gray-500">זמן תגובה</p>
+                </div>
+              </div>
+
+              <div className="px-5 pb-5">
+                {analytics.dailyActivity.length > 0 ? (
+                  <ActivityChart data={analytics.dailyActivity} />
+                ) : (
+                  <p className="text-xs text-gray-600 text-center py-6">אין עדיין נתוני פעילות</p>
+                )}
+              </div>
+            </section>
+
+            {/* Recent posts */}
+            <section className="rounded-xl border border-white/[0.06] overflow-hidden">
+              <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+                <h2 className="text-sm font-medium text-white">פוסטים אחרונים</h2>
+                {Object.keys(instagram.postsByType).length > 0 && (
+                  <div className="flex gap-2">
+                    {Object.entries(instagram.postsByType).map(([type, count]) => (
+                      <span key={type} className="text-[11px] text-gray-500">{type} {count}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {recentPosts.length > 0 ? (
+                <div className="divide-y divide-white/[0.04]">
+                  {recentPosts.map((post) => {
+                    const Icon = POST_ICON[post.type] || ImageIcon;
+                    return (
+                      <div key={post.id} className="px-5 py-3 flex items-center gap-3 hover:bg-white/[0.02] transition-colors">
+                        <Icon className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-200 truncate">{post.caption || `${post.type} post`}</p>
+                          <p className="text-[11px] text-gray-600">{formatRelativeTime(post.postedAt)}</p>
+                        </div>
+                        <div className="flex items-center gap-3 text-[11px] text-gray-500 flex-shrink-0 tabular-nums">
+                          {post.likes > 0 && (
+                            <span className="flex items-center gap-1">
+                              <Heart className="w-3 h-3" />{formatNumber(post.likes)}
+                            </span>
+                          )}
+                          {post.comments > 0 && (
+                            <span className="flex items-center gap-1">
+                              <MessageSquare className="w-3 h-3" />{formatNumber(post.comments)}
+                            </span>
+                          )}
+                          {post.views > 0 && (
+                            <span className="flex items-center gap-1">
+                              <Eye className="w-3 h-3" />{formatNumber(post.views)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="px-5 pb-5 text-xs text-gray-600">אין פוסטים נסרקים</p>
+              )}
+            </section>
+
+            {/* Recent chats */}
+            <section className="rounded-xl border border-white/[0.06] overflow-hidden">
+              <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+                <h2 className="text-sm font-medium text-white">שיחות אחרונות</h2>
+                <Link href={`/influencer/${username}/conversations`} className="text-xs text-gray-500 hover:text-gray-300 transition-colors">
+                  הכל
+                </Link>
+              </div>
+
+              {chat.recentSessions.length > 0 ? (
+                <div className="divide-y divide-white/[0.04]">
+                  {chat.recentSessions.map((s) => (
+                    <div key={s.id} className="px-5 py-3 flex items-center justify-between hover:bg-white/[0.02] transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-full bg-white/[0.06] flex items-center justify-center">
+                          <Users className="w-3.5 h-3.5 text-gray-500" />
+                        </div>
+                        <span className="text-sm text-gray-300">{s.messageCount} הודעות</span>
+                      </div>
+                      <span className="text-[11px] text-gray-600">{formatRelativeTime(s.createdAt)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="px-5 pb-5 text-center">
+                  <p className="text-xs text-gray-600">אין עדיין שיחות</p>
+                  <p className="text-[11px] text-gray-700 mt-1">שתפו את הלינק כדי להתחיל</p>
+                </div>
+              )}
+            </section>
+          </div>
+
+          {/* ── Right column ── */}
+          <div className="lg:col-span-2 space-y-6">
+
+            {/* Partnerships */}
+            <section className="rounded-xl border border-white/[0.06] overflow-hidden">
+              <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+                <h2 className="text-sm font-medium text-white">שת״פים</h2>
+                <Link href={`/influencer/${username}/partnerships`} className="text-xs text-gray-500 hover:text-gray-300 transition-colors flex items-center gap-0.5">
+                  ניהול <ChevronLeft className="w-3 h-3" />
+                </Link>
+              </div>
+
+              {partnerships.totalRevenue > 0 && (
+                <div className="mx-5 mb-3 flex items-baseline gap-3">
+                  <span className="text-lg font-semibold text-white tabular-nums">₪{formatNumber(partnerships.totalRevenue)}</span>
+                  {partnerships.pendingRevenue > 0 && (
+                    <span className="text-xs text-gray-500">+ ₪{formatNumber(partnerships.pendingRevenue)} ממתין</span>
+                  )}
+                </div>
+              )}
+
+              {partnerships.list.length > 0 ? (
+                <div className="divide-y divide-white/[0.04]">
+                  {partnerships.list.map((p) => (
+                    <Link
+                      key={p.id}
+                      href={`/influencer/${username}/partnerships/${p.id}`}
+                      className="px-5 py-3 flex items-center justify-between hover:bg-white/[0.02] transition-colors"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm text-gray-200 truncate">{p.brandName}</p>
+                        <p className={`text-[11px] ${STATUS_MAP[p.status] || 'text-gray-500'}`}>
+                          {STATUS_LABEL[p.status] || p.status}
+                        </p>
+                      </div>
+                      {p.contractAmount > 0 && (
+                        <span className="text-sm text-gray-400 tabular-nums mr-3">₪{formatNumber(p.contractAmount)}</span>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="px-5 pb-5">
+                  <p className="text-xs text-gray-600">אין עדיין שת"פים</p>
+                  <Link
+                    href={`/influencer/${username}/partnerships`}
+                    className="inline-block mt-2 text-xs text-gray-400 hover:text-white transition-colors"
+                  >
+                    + הוסף שת"פ
+                  </Link>
+                </div>
+              )}
+            </section>
+
+            {/* Coupons */}
+            {coupons.list.length > 0 && (
+              <section className="rounded-xl border border-white/[0.06] overflow-hidden">
+                <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+                  <h2 className="text-sm font-medium text-white">קופונים</h2>
+                  <Link href={`/influencer/${username}/coupons`} className="text-xs text-gray-500 hover:text-gray-300 transition-colors flex items-center gap-0.5">
+                    הכל <ChevronLeft className="w-3 h-3" />
+                  </Link>
+                </div>
+                <div className="divide-y divide-white/[0.04]">
+                  {coupons.list.map((c) => (
+                    <div key={c.id} className="px-5 py-3 flex items-center justify-between">
+                      <div className="min-w-0">
+                        <code className="text-sm text-white font-mono">{c.code}</code>
+                        {c.brandName && <p className="text-[11px] text-gray-500 mt-0.5">{c.brandName}</p>}
+                      </div>
+                      <div className="text-left text-[11px] text-gray-500 tabular-nums">
+                        {c.discountValue > 0 && (
+                          <p>{c.discountType === 'percentage' ? `${c.discountValue}%` : `₪${c.discountValue}`}</p>
+                        )}
+                        {c.copyCount > 0 && <p>{c.copyCount} העתקות</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Bot knowledge */}
+            <section className="rounded-xl border border-white/[0.06] overflow-hidden">
+              <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+                <h2 className="text-sm font-medium text-white">סטטוס הבוט</h2>
+                <Link href={`/influencer/${username}/manage`} className="text-xs text-gray-500 hover:text-gray-300 transition-colors flex items-center gap-0.5">
+                  ניהול <ChevronLeft className="w-3 h-3" />
+                </Link>
+              </div>
+
+              <div className="px-5 pb-5 space-y-2.5">
+                {[
+                  { label: 'מסמכים', value: formatNumber(botKnowledge.totalDocuments) },
+                  { label: 'פרגמנטי ידע', value: formatNumber(botKnowledge.totalChunks) },
+                  { label: 'היילייטים', value: formatNumber(instagram.highlightsCount) },
+                  {
+                    label: 'פרסונה',
+                    value: botKnowledge.hasPersona ? (botKnowledge.personaTone || 'מוגדרת') : 'לא הוגדרה',
+                    highlight: !botKnowledge.hasPersona,
+                  },
+                ].map((row) => (
+                  <div key={row.label} className="flex items-center justify-between text-sm">
+                    <span className="text-gray-500">{row.label}</span>
+                    <span className={row.highlight ? 'text-amber-400' : 'text-gray-200 tabular-nums'}>{row.value}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Quick nav */}
+            <section className="rounded-xl border border-white/[0.06] overflow-hidden">
+              <div className="px-5 pt-5 pb-3">
+                <h2 className="text-sm font-medium text-white">ניווט מהיר</h2>
+              </div>
+              <div className="px-5 pb-5 grid grid-cols-2 gap-2">
+                {[
+                  { href: 'manage', label: 'ניהול תוכן' },
+                  { href: 'chatbot-persona', label: 'פרסונת הבוט' },
+                  { href: 'documents', label: 'מסמכים' },
+                  { href: 'share', label: 'QR + שיתוף' },
+                  { href: 'support', label: 'תמיכה' },
+                  { href: 'settings', label: 'הגדרות' },
+                ].map((item) => (
+                  <Link
+                    key={item.href}
+                    href={`/influencer/${username}/${item.href}`}
+                    className="px-3 py-2.5 text-xs text-gray-400 hover:text-white hover:bg-white/[0.04] rounded-lg transition-colors text-center"
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
+            </section>
+
+          </div>
+        </div>
       </main>
     </div>
   );
