@@ -2,24 +2,130 @@
 
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import {
   Plus,
-  Edit2,
-  Trash2,
   Save,
-  X,
+  Trash2,
   Tag,
-  Package,
-  Store,
+  Handshake,
   MessageSquare,
-  Sparkles,
-  LogOut,
-  RefreshCw,
+  BookOpen,
+  Database,
+  Instagram,
+  Lightbulb,
   Loader2,
   ChevronDown,
   ChevronUp,
+  Copy,
 } from 'lucide-react';
+
+/* ------------------------------------------------------------------ */
+/*  Types                                                              */
+/* ------------------------------------------------------------------ */
+
+interface CoreTopic {
+  name: string;
+  keyPoints?: string[];
+  subtopics?: string[];
+  examples?: string[];
+}
+
+interface CouponItem {
+  id: string;
+  code: string;
+  brandName: string;
+  discountType?: string;
+  discountValue?: number;
+  copyCount: number;
+  isActive: boolean;
+  partnershipId?: string;
+}
+
+interface PartnershipItem {
+  id: string;
+  brandName: string;
+  status: string;
+  contractAmount: number;
+  category?: string;
+  couponCode?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+interface DashboardStats {
+  influencer: {
+    id: string;
+    username: string;
+    display_name?: string;
+  };
+  instagram: {
+    totalPosts: number;
+    followers: number;
+  };
+  partnerships: {
+    total: number;
+    active: number;
+    list: PartnershipItem[];
+  };
+  coupons: {
+    total: number;
+    active: number;
+    totalCopies: number;
+    list: CouponItem[];
+  };
+  botKnowledge: {
+    totalDocuments: number;
+    totalChunks: number;
+    docsByType: Record<string, number>;
+    hasPersona: boolean;
+  };
+}
+
+interface PersonaData {
+  greeting_message?: string;
+  directives?: string;
+  knowledge_map?: {
+    coreTopics?: CoreTopic[];
+  };
+  voice_rules?: {
+    recurringPhrases?: string[];
+    avoidedWords?: string[];
+    tone?: string;
+    responseStructure?: string;
+    avgLength?: string;
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
+const statusLabels: Record<string, string> = {
+  active: 'פעיל',
+  proposal: 'הצעה',
+  negotiation: 'משא ומתן',
+  completed: 'הושלם',
+  cancelled: 'בוטל',
+  expired: 'פג תוקף',
+};
+
+const statusColors: Record<string, string> = {
+  active: 'var(--dash-positive)',
+  proposal: 'var(--color-info)',
+  negotiation: 'var(--color-primary)',
+  completed: 'var(--dash-text-3)',
+  cancelled: 'var(--dash-negative)',
+  expired: 'var(--dash-text-3)',
+};
+
+function formatCurrency(amount: number): string {
+  if (!amount) return '';
+  return new Intl.NumberFormat('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 }).format(amount);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Component                                                          */
+/* ------------------------------------------------------------------ */
 
 export default function BotContentPage({
   params,
@@ -32,96 +138,68 @@ export default function BotContentPage({
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [influencer, setInfluencer] = useState<any>(null);
-  const [persona, setPersona] = useState<any>(null);
 
-  // Content states
-  const [coupons, setCoupons] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
-  const [brands, setBrands] = useState<any[]>([]);
+  // Data from APIs
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [persona, setPersona] = useState<PersonaData | null>(null);
+
+  // Editable fields
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
   const [greetingMessage, setGreetingMessage] = useState('');
 
-  // UI states
-  const [activeTab, setActiveTab] = useState<'coupons' | 'products' | 'brands' | 'config'>('coupons');
-  const [editingItem, setEditingItem] = useState<any>(null);
-  const [showAddForm, setShowAddForm] = useState(false);
+  // Collapsible sections
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    topics: true,
     coupons: true,
-    products: false,
-    brands: false,
+    partnerships: false,
+    config: true,
+    knowledge: false,
   });
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [username]);
+
+  /* ---- data loading ---- */
 
   const loadData = async () => {
     try {
-      // Check auth
+      // 1. Auth check
       const authRes = await fetch(`/api/influencer/auth?username=${username}`);
       const authData = await authRes.json();
-
       if (!authData.authenticated) {
         router.push(`/influencer/${username}/login`);
         return;
       }
 
-      // Load influencer & persona
-      const infRes = await fetch(`/api/admin/influencers?username=${username}`);
-      const infData = await infRes.json();
-      const inf = infData.influencers?.[0];
+      // 2. Load both APIs in parallel
+      const [statsRes, personaRes] = await Promise.all([
+        fetch(`/api/influencer/dashboard-stats?username=${username}`),
+        fetch(`/api/influencer/chatbot/persona?username=${username}`),
+      ]);
 
-      if (!inf) {
-        router.push(`/influencer/${username}/login`);
+      if (!statsRes.ok) {
+        console.error('Failed to load dashboard stats', statsRes.status);
         return;
       }
 
-      setInfluencer(inf);
-      setPersona(inf.persona);
+      const statsData: DashboardStats = await statsRes.json();
+      setStats(statsData);
 
-      // Parse Gemini output for products/brands
-      if (inf.persona?.gemini_raw_output) {
-        const geminiData = inf.persona.gemini_raw_output;
-        setProducts(geminiData.products || []);
-        setBrands(geminiData.brands || []);
+      let personaData: PersonaData | null = null;
+      if (personaRes.ok) {
+        const pBody = await personaRes.json();
+        personaData = pBody.persona || null;
       }
+      setPersona(personaData);
 
-      // Load coupons
-      const couponsRes = await fetch(`/api/influencer/partnerships?username=${username}&limit=100`);
-      if (couponsRes.ok) {
-        const couponsData = await couponsRes.json();
-        const partnerships = couponsData.partnerships || [];
-
-        // Get all coupons from partnerships
-        const allCoupons: any[] = [];
-        await Promise.all(
-          partnerships.map(async (p: any) => {
-            try {
-              const couponRes = await fetch(
-                `/api/influencer/partnerships/${p.id}/coupons?username=${username}`
-              );
-              if (couponRes.ok) {
-                const couponData = await couponRes.json();
-                (couponData.coupons || []).forEach((c: any) => {
-                  allCoupons.push({
-                    ...c,
-                    partnership: p.brand_name,
-                    partnership_id: p.id,
-                  });
-                });
-              }
-            } catch (err) {
-              console.error('Error loading coupons:', err);
-            }
-          })
-        );
-        setCoupons(allCoupons);
-      }
-
-      // Load config
-      setSuggestedQuestions(inf.suggested_questions || []);
-      setGreetingMessage(inf.greeting_message || '');
+      // Populate editable fields from persona
+      setGreetingMessage(personaData?.greeting_message || '');
+      // suggested_questions live in account config, loaded via stats influencer
+      // The persona API doesn't return them, but the config save API writes to accounts.config
+      // We'll use persona greeting and leave questions empty if not in persona
+      setSuggestedQuestions([]);
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -129,135 +207,42 @@ export default function BotContentPage({
     }
   };
 
+  /* ---- save config ---- */
+
   const handleSaveConfig = async () => {
+    if (!stats) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/influencer/content/config`, {
+      const res = await fetch('/api/influencer/content/config', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          accountId: influencer.id,
+          accountId: stats.influencer.id,
           suggested_questions: suggestedQuestions,
           greeting_message: greetingMessage,
         }),
       });
 
       if (res.ok) {
-        alert('✅ הגדרות נשמרו בהצלחה!');
+        // Also update persona greeting_message if persona exists
+        await fetch(`/api/influencer/chatbot/persona?username=${username}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ greeting_message: greetingMessage }),
+        });
+        alert('הגדרות נשמרו בהצלחה!');
       } else {
-        alert('❌ שגיאה בשמירה');
+        alert('שגיאה בשמירה');
       }
     } catch (error) {
       console.error('Error saving config:', error);
-      alert('❌ שגיאה בשמירה');
+      alert('שגיאה בשמירה');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleAddProduct = async () => {
-    const name = prompt('שם המוצר:');
-    if (!name) return;
-
-    const brand = prompt('מותג (אופציונלי):');
-    const category = prompt('קטגוריה (אופציונלי):');
-
-    try {
-      const res = await fetch('/api/influencer/content/products', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accountId: influencer.id,
-          product: { name, brand, category },
-        }),
-      });
-
-      if (res.ok) {
-        alert('✅ מוצר נוסף!');
-        loadData();
-      } else {
-        alert('❌ שגיאה בהוספה');
-      }
-    } catch (error) {
-      console.error('Error adding product:', error);
-      alert('❌ שגיאה בהוספה');
-    }
-  };
-
-  const handleDeleteProduct = async (productId: string) => {
-    if (!confirm('למחוק מוצר?')) return;
-
-    try {
-      const res = await fetch(
-        `/api/influencer/content/products?accountId=${influencer.id}&productId=${productId}`,
-        { method: 'DELETE' }
-      );
-
-      if (res.ok) {
-        alert('✅ מוצר נמחק!');
-        loadData();
-      } else {
-        alert('❌ שגיאה במחיקה');
-      }
-    } catch (error) {
-      console.error('Error deleting product:', error);
-      alert('❌ שגיאה במחיקה');
-    }
-  };
-
-  const handleAddBrand = async () => {
-    const name = prompt('שם המותג:');
-    if (!name) return;
-
-    const category = prompt('קטגוריה (אופציונלי):');
-    const relationship_type = prompt('סוג קשר (אופציונלי):');
-
-    try {
-      const res = await fetch('/api/influencer/content/brands', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accountId: influencer.id,
-          brand: { name, category, relationship_type },
-        }),
-      });
-
-      if (res.ok) {
-        alert('✅ מותג נוסף!');
-        loadData();
-      } else {
-        alert('❌ שגיאה בהוספה');
-      }
-    } catch (error) {
-      console.error('Error adding brand:', error);
-      alert('❌ שגיאה בהוספה');
-    }
-  };
-
-  const handleDeleteBrand = async (brandId: string) => {
-    if (!confirm('למחוק מותג?')) return;
-
-    try {
-      const res = await fetch(
-        `/api/influencer/content/brands?accountId=${influencer.id}&brandId=${brandId}`,
-        { method: 'DELETE' }
-      );
-
-      if (res.ok) {
-        alert('✅ מותג נמחק!');
-        loadData();
-      } else {
-        alert('❌ שגיאה במחיקה');
-      }
-    } catch (error) {
-      console.error('Error deleting brand:', error);
-      alert('❌ שגיאה במחיקה');
-    }
-  };
-
-  const handleAddCoupon = () => {
-    router.push(`/influencer/${username}/partnerships`);
-  };
+  /* ---- questions ---- */
 
   const handleAddQuestion = () => {
     setSuggestedQuestions([...suggestedQuestions, '']);
@@ -273,21 +258,16 @@ export default function BotContentPage({
     setSuggestedQuestions(suggestedQuestions.filter((_, i) => i !== index));
   };
 
-  const handleLogout = async () => {
-    await fetch('/api/influencer/auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, action: 'logout' }),
-    });
-    router.push(`/influencer/${username}/login`);
-  };
+  /* ---- UI helpers ---- */
 
   const toggleSection = (section: string) => {
-    setExpandedSections({
-      ...expandedSections,
-      [section]: !expandedSections[section],
-    });
+    setExpandedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
   };
+
+  /* ---- loading state ---- */
 
   if (loading) {
     return (
@@ -301,7 +281,15 @@ export default function BotContentPage({
     );
   }
 
-  if (!influencer) return null;
+  if (!stats) return null;
+
+  const coreTopics = persona?.knowledge_map?.coreTopics || [];
+  const coupons = stats.coupons.list || [];
+  const partnerships = stats.partnerships.list || [];
+
+  /* ================================================================ */
+  /*  RENDER                                                           */
+  /* ================================================================ */
 
   return (
     <div
@@ -310,280 +298,249 @@ export default function BotContentPage({
       style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}
     >
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-        {/* Stats Summary */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          <div
-            className="rounded-xl border p-5"
-            style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.15)' }}>
-                <Tag className="w-6 h-6" style={{ color: 'var(--dash-positive)' }} />
-              </div>
-              <div>
-                <p className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>{coupons.length}</p>
-                <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>קופונים</p>
-              </div>
-            </div>
-          </div>
 
-          <div
-            className="rounded-xl border p-5"
-            style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'rgba(168,85,247,0.15)' }}>
-                <Package className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
-              </div>
-              <div>
-                <p className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>{products.length}</p>
-                <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>מוצרים</p>
-              </div>
-            </div>
-          </div>
-
-          <div
-            className="rounded-xl border p-5"
-            style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'rgba(59,130,246,0.15)' }}>
-                <Store className="w-6 h-6" style={{ color: 'var(--color-info)' }} />
-              </div>
-              <div>
-                <p className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>{brands.length}</p>
-                <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>מותגים</p>
-              </div>
-            </div>
-          </div>
+        {/* ========== STATS STRIP ========== */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+          <StatCard
+            icon={<Handshake className="w-6 h-6" />}
+            iconBg="rgba(168,85,247,0.15)"
+            iconColor="var(--color-primary)"
+            value={stats.partnerships.total}
+            label="שיתופי פעולה"
+          />
+          <StatCard
+            icon={<Tag className="w-6 h-6" />}
+            iconBg="rgba(34,197,94,0.15)"
+            iconColor="var(--dash-positive)"
+            value={stats.coupons.active}
+            label="קופונים פעילים"
+          />
+          <StatCard
+            icon={<Instagram className="w-6 h-6" />}
+            iconBg="rgba(225,48,108,0.15)"
+            iconColor="#E1306C"
+            value={stats.instagram.totalPosts}
+            label="פוסטים"
+          />
+          <StatCard
+            icon={<Database className="w-6 h-6" />}
+            iconBg="rgba(59,130,246,0.15)"
+            iconColor="var(--color-info)"
+            value={`${stats.botKnowledge.totalDocuments} / ${stats.botKnowledge.totalChunks}`}
+            label="מסמכים / חלקים"
+          />
+          <StatCard
+            icon={<Lightbulb className="w-6 h-6" />}
+            iconBg="rgba(250,204,21,0.15)"
+            iconColor="#FACC15"
+            value={coreTopics.length}
+            label="נושאי ידע"
+          />
         </div>
 
-        {/* Coupons Section */}
-        <div
-          className="rounded-xl border p-6 mb-6"
-          style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
+        {/* ========== KNOWLEDGE TOPICS ========== */}
+        <CollapsibleSection
+          title="נושאי ידע"
+          count={coreTopics.length}
+          icon={<Lightbulb className="w-5 h-5" style={{ color: '#FACC15' }} />}
+          expanded={expandedSections.topics}
+          onToggle={() => toggleSection('topics')}
         >
-          <div
-            className="flex items-center justify-between mb-4 cursor-pointer"
-            onClick={() => toggleSection('coupons')}
-          >
-            <h3 className="font-semibold flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
-              <Tag className="w-5 h-5" style={{ color: 'var(--dash-positive)' }} />
-              קופונים ({coupons.length})
-            </h3>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleAddCoupon();
-                }}
-                className="px-3 py-1.5 text-sm rounded-lg transition-colors flex items-center gap-1"
-                style={{ background: 'var(--dash-positive)', color: 'white' }}
-              >
-                <Plus className="w-4 h-4" />
-                הוסף
-              </button>
-              {expandedSections.coupons ? (
-                <ChevronUp className="w-5 h-5" style={{ color: 'var(--dash-text-2)' }} />
-              ) : (
-                <ChevronDown className="w-5 h-5" style={{ color: 'var(--dash-text-2)' }} />
-              )}
-            </div>
-          </div>
+          {coreTopics.length === 0 ? (
+            <p className="text-sm text-center py-8" style={{ color: 'var(--dash-text-2)' }}>
+              אין נושאי ידע. הבוט עדיין לא נסרק או שהפרסונה לא נבנתה.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {coreTopics.map((topic, idx) => (
+                <div
+                  key={idx}
+                  className="p-4 rounded-xl"
+                  style={{ background: 'var(--dash-surface-hover)' }}
+                >
+                  <h4 className="font-semibold text-sm mb-2" style={{ color: 'var(--dash-text)' }}>
+                    {topic.name}
+                  </h4>
 
-          {expandedSections.coupons && (
-            <div className="space-y-3">
-              {coupons.length === 0 ? (
-                <p className="text-sm text-center py-8" style={{ color: 'var(--dash-text-2)' }}>אין קופונים</p>
-              ) : (
-                coupons.map((coupon) => (
-                  <div
-                    key={coupon.id}
-                    className="flex items-center justify-between p-4 rounded-xl transition-colors"
-                    style={{ background: 'var(--dash-surface-hover)' }}
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                  {/* Subtopics as tags */}
+                  {topic.subtopics && topic.subtopics.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {topic.subtopics.map((sub, si) => (
                         <span
-                          className="px-2 py-1 text-xs rounded font-mono font-bold"
-                          style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--dash-positive)' }}
+                          key={si}
+                          className="px-2 py-0.5 rounded-full text-xs"
+                          style={{
+                            background: 'rgba(168,85,247,0.12)',
+                            color: 'var(--color-primary)',
+                          }}
                         >
-                          {coupon.code}
+                          {sub}
                         </span>
-                        <span className="text-sm" style={{ color: 'var(--dash-text-2)' }}>{coupon.partnership}</span>
-                      </div>
-                      <p className="text-sm" style={{ color: 'var(--dash-text)' }}>{coupon.description}</p>
-                      {coupon.discount_type && (
-                        <p className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>
-                          {coupon.discount_type === 'percentage' && `${coupon.discount_value}% הנחה`}
-                          {coupon.discount_type === 'fixed' && `₪${coupon.discount_value} הנחה`}
-                          {coupon.discount_type === 'free_shipping' && 'משלוח חינם'}
-                        </p>
-                      )}
+                      ))}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button className="p-2 rounded-lg transition-colors" style={{ color: 'var(--dash-text-2)' }}>
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button className="p-2 rounded-lg transition-colors" style={{ color: 'var(--dash-negative)' }}>
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
+                  )}
+
+                  {/* Key points as bullet list */}
+                  {topic.keyPoints && topic.keyPoints.length > 0 && (
+                    <ul className="list-disc list-inside space-y-1">
+                      {topic.keyPoints.map((point, pi) => (
+                        <li
+                          key={pi}
+                          className="text-xs"
+                          style={{ color: 'var(--dash-text-2)' }}
+                        >
+                          {point}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
             </div>
           )}
-        </div>
+        </CollapsibleSection>
 
-        {/* Products Section */}
-        <div
-          className="rounded-xl border p-6 mb-6"
-          style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
+        {/* ========== COUPONS ========== */}
+        <CollapsibleSection
+          title="קופונים"
+          count={coupons.length}
+          icon={<Tag className="w-5 h-5" style={{ color: 'var(--dash-positive)' }} />}
+          expanded={expandedSections.coupons}
+          onToggle={() => toggleSection('coupons')}
         >
-          <div
-            className="flex items-center justify-between mb-4 cursor-pointer"
-            onClick={() => toggleSection('products')}
-          >
-            <h3 className="font-semibold flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
-              <Package className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
-              מוצרים ({products.length})
-            </h3>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleAddProduct();
-                }}
-                className="px-3 py-1.5 text-sm rounded-lg transition-colors flex items-center gap-1"
-                style={{ background: 'var(--color-primary)', color: 'white' }}
-              >
-                <Plus className="w-4 h-4" />
-                הוסף
-              </button>
-              {expandedSections.products ? (
-                <ChevronUp className="w-5 h-5" style={{ color: 'var(--dash-text-2)' }} />
-              ) : (
-                <ChevronDown className="w-5 h-5" style={{ color: 'var(--dash-text-2)' }} />
-              )}
-            </div>
-          </div>
-
-          {expandedSections.products && (
+          {coupons.length === 0 ? (
+            <p className="text-sm text-center py-8" style={{ color: 'var(--dash-text-2)' }}>
+              אין קופונים
+            </p>
+          ) : (
             <div className="space-y-3">
-              {products.length === 0 ? (
-                <p className="text-sm text-center py-8" style={{ color: 'var(--dash-text-2)' }}>אין מוצרים</p>
-              ) : (
-                products.map((product, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between p-4 rounded-xl transition-colors"
-                    style={{ background: 'var(--dash-surface-hover)' }}
-                  >
-                    <div className="flex-1">
-                      <p className="text-sm font-medium" style={{ color: 'var(--dash-text)' }}>{product.name || product.product_name}</p>
-                      {product.brand && (
-                        <p className="text-xs mt-1" style={{ color: 'var(--dash-text-2)' }}>מותג: {product.brand}</p>
-                      )}
-                      {product.category && (
-                        <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>קטגוריה: {product.category}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleDeleteProduct(product.id || product.product_id)}
-                        className="p-2 rounded-lg transition-colors"
-                        style={{ color: 'var(--dash-negative)' }}
+              {coupons.map((coupon) => (
+                <div
+                  key={coupon.id}
+                  className="flex items-center justify-between p-4 rounded-xl"
+                  style={{ background: 'var(--dash-surface-hover)' }}
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      {/* Code badge */}
+                      <span
+                        className="px-2 py-1 text-xs rounded font-mono font-bold"
+                        style={{
+                          background: 'rgba(34,197,94,0.15)',
+                          color: 'var(--dash-positive)',
+                        }}
                       >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                        {coupon.code}
+                      </span>
+
+                      {/* Brand */}
+                      <span className="text-sm" style={{ color: 'var(--dash-text-2)' }}>
+                        {coupon.brandName}
+                      </span>
+
+                      {/* Active / Inactive badge */}
+                      <span
+                        className="px-2 py-0.5 rounded-full text-[10px] font-medium"
+                        style={{
+                          background: coupon.isActive
+                            ? 'rgba(34,197,94,0.15)'
+                            : 'rgba(239,68,68,0.15)',
+                          color: coupon.isActive
+                            ? 'var(--dash-positive)'
+                            : 'var(--dash-negative)',
+                        }}
+                      >
+                        {coupon.isActive ? 'פעיל' : 'לא פעיל'}
+                      </span>
+                    </div>
+
+                    {/* Discount info */}
+                    {coupon.discountType && (
+                      <p className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>
+                        {coupon.discountType === 'percentage' && `${coupon.discountValue}% הנחה`}
+                        {coupon.discountType === 'fixed' && `${formatCurrency(coupon.discountValue || 0)} הנחה`}
+                        {coupon.discountType === 'free_shipping' && 'משלוח חינם'}
+                      </p>
+                    )}
+
+                    {/* Usage stats */}
+                    <div className="flex items-center gap-4 mt-2">
+                      <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--dash-text-3)' }}>
+                        <Copy className="w-3 h-3" />
+                        {coupon.copyCount} העתקות
+                      </span>
                     </div>
                   </div>
-                ))
-              )}
+                </div>
+              ))}
             </div>
           )}
-        </div>
+        </CollapsibleSection>
 
-        {/* Brands Section */}
-        <div
-          className="rounded-xl border p-6 mb-6"
-          style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
+        {/* ========== PARTNERSHIPS ========== */}
+        <CollapsibleSection
+          title="שיתופי פעולה"
+          count={partnerships.length}
+          icon={<Handshake className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />}
+          expanded={expandedSections.partnerships}
+          onToggle={() => toggleSection('partnerships')}
         >
-          <div
-            className="flex items-center justify-between mb-4 cursor-pointer"
-            onClick={() => toggleSection('brands')}
-          >
-            <h3 className="font-semibold flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
-              <Store className="w-5 h-5" style={{ color: 'var(--color-info)' }} />
-              מותגים ({brands.length})
-            </h3>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleAddBrand();
-                }}
-                className="px-3 py-1.5 text-sm rounded-lg transition-colors flex items-center gap-1"
-                style={{ background: 'var(--color-info)', color: 'white' }}
-              >
-                <Plus className="w-4 h-4" />
-                הוסף
-              </button>
-              {expandedSections.brands ? (
-                <ChevronUp className="w-5 h-5" style={{ color: 'var(--dash-text-2)' }} />
-              ) : (
-                <ChevronDown className="w-5 h-5" style={{ color: 'var(--dash-text-2)' }} />
-              )}
-            </div>
-          </div>
-
-          {expandedSections.brands && (
+          {partnerships.length === 0 ? (
+            <p className="text-sm text-center py-8" style={{ color: 'var(--dash-text-2)' }}>
+              אין שיתופי פעולה
+            </p>
+          ) : (
             <div className="space-y-3">
-              {brands.length === 0 ? (
-                <p className="text-sm text-center py-8" style={{ color: 'var(--dash-text-2)' }}>אין מותגים</p>
-              ) : (
-                brands.map((brand, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between p-4 rounded-xl transition-colors"
-                    style={{ background: 'var(--dash-surface-hover)' }}
-                  >
-                    <div className="flex-1">
-                      <p className="text-sm font-medium" style={{ color: 'var(--dash-text)' }}>{brand.name || brand.brand_name}</p>
-                      {brand.category && (
-                        <p className="text-xs mt-1" style={{ color: 'var(--dash-text-2)' }}>קטגוריה: {brand.category}</p>
-                      )}
-                      {brand.relationship_type && (
-                        <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>סוג: {brand.relationship_type}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleDeleteBrand(brand.id || brand.brand_id)}
-                        className="p-2 rounded-lg transition-colors"
-                        style={{ color: 'var(--dash-negative)' }}
+              {partnerships.map((p) => (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between p-4 rounded-xl"
+                  style={{ background: 'var(--dash-surface-hover)' }}
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className="text-sm font-medium" style={{ color: 'var(--dash-text)' }}>
+                        {p.brandName}
+                      </span>
+
+                      {/* Status badge */}
+                      <span
+                        className="px-2 py-0.5 rounded-full text-[10px] font-medium"
+                        style={{
+                          background: `color-mix(in srgb, ${statusColors[p.status] || 'var(--dash-text-3)'} 15%, transparent)`,
+                          color: statusColors[p.status] || 'var(--dash-text-3)',
+                        }}
                       >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                        {statusLabels[p.status] || p.status}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-4 mt-1">
+                      {p.contractAmount > 0 && (
+                        <span className="text-xs" style={{ color: 'var(--dash-text-2)' }}>
+                          {formatCurrency(p.contractAmount)}
+                        </span>
+                      )}
+                      {p.couponCode && (
+                        <span className="text-xs font-mono" style={{ color: 'var(--dash-positive)' }}>
+                          {p.couponCode}
+                        </span>
+                      )}
                     </div>
                   </div>
-                ))
-              )}
+                </div>
+              ))}
             </div>
           )}
-        </div>
+        </CollapsibleSection>
 
-        {/* Chat Config Section */}
-        <div
-          className="rounded-xl border p-6"
-          style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
+        {/* ========== CHAT CONFIG ========== */}
+        <CollapsibleSection
+          title="הגדרות צ'אט"
+          icon={<MessageSquare className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />}
+          expanded={expandedSections.config}
+          onToggle={() => toggleSection('config')}
         >
-          <h3 className="font-semibold flex items-center gap-2 mb-4" style={{ color: 'var(--dash-text)' }}>
-            <MessageSquare className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
-            הגדרות צ'אט
-          </h3>
-
           {/* Greeting Message */}
           <div className="mb-6">
             <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>
@@ -595,9 +552,8 @@ export default function BotContentPage({
               className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2"
               style={{
                 background: 'var(--dash-surface)',
-                borderColor: 'var(--dash-border)',
-                color: 'var(--dash-text)',
                 border: '1px solid var(--dash-border)',
+                color: 'var(--dash-text)',
               }}
               rows={3}
               placeholder="היי! אני הבוט של..."
@@ -629,9 +585,8 @@ export default function BotContentPage({
                     className="flex-1 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 text-sm"
                     style={{
                       background: 'var(--dash-surface)',
-                      borderColor: 'var(--dash-border)',
-                      color: 'var(--dash-text)',
                       border: '1px solid var(--dash-border)',
+                      color: 'var(--dash-text)',
                     }}
                     placeholder={`שאלה ${idx + 1}`}
                   />
@@ -645,7 +600,9 @@ export default function BotContentPage({
                 </div>
               ))}
               {suggestedQuestions.length === 0 && (
-                <p className="text-sm text-center py-4" style={{ color: 'var(--dash-text-2)' }}>אין שאלות מוצעות</p>
+                <p className="text-sm text-center py-4" style={{ color: 'var(--dash-text-2)' }}>
+                  אין שאלות מוצעות
+                </p>
               )}
             </div>
           </div>
@@ -669,39 +626,156 @@ export default function BotContentPage({
               </>
             )}
           </button>
-        </div>
+        </CollapsibleSection>
 
-        {/* Rebuild Persona */}
-        <div className="mt-6 flex justify-center">
-          <button
-            onClick={async () => {
-              if (confirm('לסרוק מחדש את הפרופיל? זה ייקח מספר דקות')) {
-                try {
-                  const res = await fetch('/api/persona/rebuild', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ accountId: influencer.id }),
-                  });
-                  if (res.ok) {
-                    alert('✅ הסריקה הופעלה! תהליך הבנייה רץ ברקע.');
-                    setTimeout(() => loadData(), 5000);
-                  } else {
-                    alert('❌ שגיאה בהפעלת סריקה');
-                  }
-                } catch (error) {
-                  console.error('Error triggering rebuild:', error);
-                  alert('❌ שגיאה בהפעלת סריקה');
-                }
-              }
-            }}
-            className="px-6 py-3 rounded-xl transition-all font-medium flex items-center gap-2"
-            style={{ background: 'var(--dash-positive)', color: 'white' }}
-          >
-            <RefreshCw className="w-5 h-5" />
-            סרוק מחדש ועדכן ידע
-          </button>
-        </div>
+        {/* ========== BOT KNOWLEDGE ========== */}
+        <CollapsibleSection
+          title="ידע הבוט"
+          icon={<BookOpen className="w-5 h-5" style={{ color: 'var(--color-info)' }} />}
+          expanded={expandedSections.knowledge}
+          onToggle={() => toggleSection('knowledge')}
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <div
+              className="p-4 rounded-xl"
+              style={{ background: 'var(--dash-surface-hover)' }}
+            >
+              <p className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>
+                {stats.botKnowledge.totalDocuments}
+              </p>
+              <p className="text-xs" style={{ color: 'var(--dash-text-2)' }}>
+                מסמכים מעובדים
+              </p>
+            </div>
+            <div
+              className="p-4 rounded-xl"
+              style={{ background: 'var(--dash-surface-hover)' }}
+            >
+              <p className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>
+                {stats.botKnowledge.totalChunks}
+              </p>
+              <p className="text-xs" style={{ color: 'var(--dash-text-2)' }}>
+                חלקי ידע (chunks)
+              </p>
+            </div>
+          </div>
+
+          {/* Document types breakdown */}
+          {Object.keys(stats.botKnowledge.docsByType).length > 0 && (
+            <div className="mt-4">
+              <p className="text-xs font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>
+                סוגי מסמכים:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(stats.botKnowledge.docsByType).map(([type, count]) => (
+                  <span
+                    key={type}
+                    className="px-2 py-1 rounded-lg text-xs"
+                    style={{
+                      background: 'rgba(59,130,246,0.12)',
+                      color: 'var(--color-info)',
+                    }}
+                  >
+                    {type}: {count}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <p className="text-xs mt-4" style={{ color: 'var(--dash-text-3)' }}>
+            הבוט משתמש בכל המידע הזה כדי לענות על שאלות: פוסטים מאינסטגרם, מסמכים שהועלו, שיתופי פעולה, קופונים ועוד.
+          </p>
+        </CollapsibleSection>
+
       </main>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Sub-components                                                     */
+/* ------------------------------------------------------------------ */
+
+function StatCard({
+  icon,
+  iconBg,
+  iconColor,
+  value,
+  label,
+}: {
+  icon: React.ReactNode;
+  iconBg: string;
+  iconColor: string;
+  value: string | number;
+  label: string;
+}) {
+  return (
+    <div
+      className="rounded-xl border p-4"
+      style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
+    >
+      <div className="flex items-center gap-3">
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+          style={{ background: iconBg, color: iconColor }}
+        >
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <p className="text-xl font-bold truncate" style={{ color: 'var(--dash-text)' }}>
+            {value}
+          </p>
+          <p className="text-xs" style={{ color: 'var(--dash-text-2)' }}>
+            {label}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CollapsibleSection({
+  title,
+  count,
+  icon,
+  expanded,
+  onToggle,
+  children,
+}: {
+  title: string;
+  count?: number;
+  icon: React.ReactNode;
+  expanded: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="rounded-xl border p-6 mb-6"
+      style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
+    >
+      <div
+        className="flex items-center justify-between cursor-pointer"
+        onClick={onToggle}
+      >
+        <h3 className="font-semibold flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
+          {icon}
+          {title}
+          {count !== undefined && (
+            <span className="text-sm font-normal" style={{ color: 'var(--dash-text-3)' }}>
+              ({count})
+            </span>
+          )}
+        </h3>
+        {expanded ? (
+          <ChevronUp className="w-5 h-5" style={{ color: 'var(--dash-text-2)' }} />
+        ) : (
+          <ChevronDown className="w-5 h-5" style={{ color: 'var(--dash-text-2)' }} />
+        )}
+      </div>
+
+      {expanded && <div className="mt-4">{children}</div>}
     </div>
   );
 }

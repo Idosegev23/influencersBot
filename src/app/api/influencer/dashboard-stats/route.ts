@@ -266,7 +266,7 @@ export async function GET(req: NextRequest) {
         active: activePartnerships.length,
         totalRevenue,
         pendingRevenue,
-        list: partnerships.slice(0, 6).map((p) => ({
+        list: partnerships.map((p) => ({
           id: p.id,
           brandName: p.brand_name,
           status: p.status,
