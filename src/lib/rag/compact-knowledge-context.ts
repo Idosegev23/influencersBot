@@ -33,7 +33,7 @@ const DEFAULTS: CompactOptions = {
   maxPosts: 8,
   maxTranscriptions: 8,
   maxHighlights: 6,
-  maxPartnerships: 5,
+  maxPartnerships: 15,
   maxWebsites: 10,
   maxPostChars: 1500,
   maxTranscriptionChars: 1500,
@@ -171,18 +171,37 @@ export function compactKnowledgeContext(
     sectionCounts.highlights = count;
   }
 
-  // 5. Partnerships
+  // 5. Partnerships — split into "with coupons" (critical!) and "without"
   if (kb.partnerships?.length > 0) {
-    const items = kb.partnerships.slice(0, opts.maxPartnerships);
-    let section = `\n🤝 **שיתופי פעולה (${kb.partnerships.length}):**\n`;
-    items.forEach((p, i) => {
-      section += `${i + 1}. ${p.brand_name || (p as any).brandName}`;
-      const brief = (p as any).brief || p.description;
-      if (brief) section += ` - ${truncate(brief, 80)}`;
-      section += '\n';
-    });
-    context += section;
-    sectionCounts.partnerships = items.length;
+    const withCoupons = kb.partnerships.filter(p => p.coupon_code);
+    const withoutCoupons = kb.partnerships.filter(p => !p.coupon_code);
+
+    if (withCoupons.length > 0) {
+      let section = `\n🎟️ **קופונים מתוך שותפויות (${withCoupons.length}) - CRITICAL:**\n`;
+      section += `⚠️ התאם שמות מותגים בגמישות: "fre"="FRÉ", "קליניק"="Clinique", "לוריאל"="L'Oréal", כתיב חלקי/עברית/אנגלית — הכל תואם!\n`;
+      withCoupons.forEach((p, i) => {
+        section += `${i + 1}. 🏷️ ${p.brand_name || (p as any).brandName} → קוד: "${p.coupon_code}"`;
+        if (p.link) section += ` | LINK: ${p.link}`;
+        const brief = (p as any).brief || p.description;
+        if (brief) section += ` (${truncate(brief, 60)})`;
+        section += '\n';
+      });
+      context += section;
+    }
+
+    if (withoutCoupons.length > 0) {
+      let section = `\n🤝 **שותפויות נוספות (${withoutCoupons.length}):**\n`;
+      withoutCoupons.forEach((p, i) => {
+        section += `${i + 1}. ${p.brand_name || (p as any).brandName}`;
+        if (p.link) section += ` | ${p.link}`;
+        const brief = (p as any).brief || p.description;
+        if (brief) section += ` - ${truncate(brief, 80)}`;
+        section += '\n';
+      });
+      context += section;
+    }
+
+    sectionCounts.partnerships = kb.partnerships.length;
   }
 
   // 6. Insights
