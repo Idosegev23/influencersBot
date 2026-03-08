@@ -1066,15 +1066,31 @@ export function formatKnowledgeForPrompt(kb: KnowledgeBase, maxLength: number = 
 
   // Add partnerships (brands + coupon codes)
   if (kb.partnerships.length > 0) {
-    context += '## שותפויות ומותגים:\n';
-    kb.partnerships.forEach(p => {
-      context += `- ${p.brand_name}`;
-      if (p.coupon_code) context += ` | קוד קופון: "${p.coupon_code}"`;
-      if (p.link) context += ` | ${p.link}`;
-      if (p.description) context += ` (${p.description})`;
+    const withCoupons = kb.partnerships.filter(p => p.coupon_code);
+    const withoutCoupons = kb.partnerships.filter(p => !p.coupon_code);
+
+    if (withCoupons.length > 0) {
+      context += '## 🎟️ קופונים ושותפויות פעילות:\n';
+      context += '⚠️ חשוב: התאם שמות מותגים בצורה גמישה — "fre"="FRÉ", "לוריאל"="L\'Oréal", "קליניק"="Clinique" וכו\'. אם המשתמש מזכיר מותג בכתיב קרוב — תתאים!\n';
+      withCoupons.forEach(p => {
+        context += `- 🏷️ ${p.brand_name} → קוד: "${p.coupon_code}"`;
+        if (p.link) context += ` | לינק: ${p.link}`;
+        if (p.description) context += ` (${p.description})`;
+        context += '\n';
+      });
       context += '\n';
-    });
-    context += '\n';
+    }
+
+    if (withoutCoupons.length > 0) {
+      context += '## שותפויות נוספות (ללא קופון):\n';
+      withoutCoupons.forEach(p => {
+        context += `- ${p.brand_name}`;
+        if (p.link) context += ` | ${p.link}`;
+        if (p.description) context += ` (${p.description})`;
+        context += '\n';
+      });
+      context += '\n';
+    }
   }
 
   // Add insights
