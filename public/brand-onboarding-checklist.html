@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>צ'קליסט קליטת מותג — צ'אט + וידג'ט</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+    background: #f0f2f5;
+    color: #1a1a2e;
+    padding: 30px 20px;
+    direction: rtl;
+    min-height: 100vh;
+  }
+  .container { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 24px; font-weight: 700; margin-bottom: 6px; }
+  .subtitle { font-size: 13px; color: #6b7280; margin-bottom: 20px; }
+
+  /* Top bar: select existing or create new */
+  .top-bar {
+    background: #fff;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    border: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .top-bar label { font-size: 13px; font-weight: 600; color: #374151; white-space: nowrap; }
+  .top-bar select {
+    flex: 1;
+    min-width: 180px;
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: inherit;
+    direction: rtl;
+    background: #fff;
+    cursor: pointer;
+  }
+  .top-bar button {
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .btn-new { background: #6366f1; color: #fff; }
+  .btn-new:hover { background: #4f46e5; }
+  .btn-delete { background: #fee2e2; color: #991b1b; }
+  .btn-delete:hover { background: #fecaca; }
+
+  .name-section {
+    background: linear-gradient(135deg, #0ea5e9, #6366f1);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+    color: #fff;
+  }
+  .name-row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .name-field { flex: 1; min-width: 200px; }
+  .name-label { font-size: 12px; font-weight: 500; opacity: 0.8; margin-bottom: 6px; }
+  .name-input {
+    width: 100%;
+    background: rgba(255,255,255,0.15);
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    outline: none;
+    direction: rtl;
+    font-family: inherit;
+    transition: border-color 0.2s;
+  }
+  .name-input::placeholder { color: rgba(255,255,255,0.5); }
+  .name-input:focus { border-color: rgba(255,255,255,0.7); }
+  .name-input.ltr { direction: ltr; font-size: 15px; font-weight: 600; }
+
+  .progress-text { font-size: 13px; color: #6b7280; margin-bottom: 8px; font-weight: 500; }
+  .progress-bar-wrapper {
+    background: #e5e7eb; border-radius: 10px; height: 8px;
+    margin-bottom: 28px; overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%; background: linear-gradient(90deg, #0ea5e9, #6366f1);
+    border-radius: 10px; transition: width 0.4s ease; width: 0%;
+  }
+
+  .section-header {
+    font-size: 13px;
+    font-weight: 700;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 24px 0 10px 0;
+    padding: 0 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-header::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #e5e7eb;
+  }
+
+  .task {
+    background: #fff; border-radius: 10px; padding: 14px 18px;
+    margin-bottom: 8px; display: flex; align-items: flex-start; gap: 14px;
+    border: 1px solid #e5e7eb; transition: all 0.2s; cursor: pointer;
+  }
+  .task:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .task.checked { opacity: 0.55; background: #f9fafb; }
+  .task.checked .title { text-decoration: line-through; color: #9ca3af; }
+  .cb {
+    width: 20px; height: 20px; border-radius: 5px; border: 2px solid #d1d5db;
+    cursor: pointer; appearance: none; -webkit-appearance: none;
+    flex-shrink: 0; position: relative; transition: all 0.15s;
+    margin-top: 2px;
+  }
+  .cb:checked { background: #6366f1; border-color: #6366f1; }
+  .cb:checked::after {
+    content: '\2713'; position: absolute; color: #fff; font-size: 13px;
+    font-weight: 700; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  }
+  .info { flex: 1; }
+  .title { font-size: 14px; font-weight: 600; color: #1f2937; line-height: 1.4; }
+  .badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  .badge {
+    font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 12px;
+    display: inline-block; white-space: nowrap;
+  }
+  .b-data { background: #dbeafe; color: #1d4ed8; }
+  .b-scan { background: #d1fae5; color: #065f46; }
+  .b-ai { background: #ede9fe; color: #5b21b6; }
+  .b-design { background: #fce7f3; color: #9d174d; }
+  .b-test { background: #fef3c7; color: #92400e; }
+  .b-deploy { background: #ffedd5; color: #9a3412; }
+  .b-admin { background: #fee2e2; color: #991b1b; }
+  .b-content { background: #e0f2fe; color: #0369a1; }
+  .b-local { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+  .note { font-size: 11px; color: #9ca3af; margin-top: 3px; line-height: 1.4; }
+
+  /* Completion info under each task */
+  .completion-info {
+    font-size: 11px;
+    color: #6366f1;
+    margin-top: 5px;
+    font-weight: 500;
+    display: none;
+  }
+  .task.checked .completion-info { display: block; }
+
+  .num { font-size: 12px; font-weight: 700; color: #d1d5db; min-width: 22px; text-align: center; flex-shrink: 0; margin-top: 2px; }
+
+  .notes-section {
+    margin-top: 28px;
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid #e5e7eb;
+  }
+  .notes-title { font-size: 15px; font-weight: 700; margin-bottom: 10px; color: #1f2937; }
+  .notes-area {
+    width: 100%;
+    min-height: 80px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 13px;
+    font-family: inherit;
+    direction: rtl;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.2s;
+    color: #374151;
+  }
+  .notes-area:focus { border-color: #6366f1; }
+  .notes-area::placeholder { color: #d1d5db; }
+
+  .send-section {
+    margin-top: 20px;
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid #e5e7eb;
+  }
+  .send-title { font-size: 15px; font-weight: 700; margin-bottom: 14px; color: #1f2937; }
+  .send-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+  .send-btn {
+    flex: 1;
+    min-width: 120px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: transform 0.15s, box-shadow 0.15s;
+    font-family: inherit;
+    color: #fff;
+  }
+  .send-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+  .send-btn:active { transform: translateY(0); }
+  .btn-email { background: linear-gradient(135deg, #6366f1, #4f46e5); }
+  .btn-whatsapp { background: linear-gradient(135deg, #25d366, #128c7e); }
+  .btn-copy { background: linear-gradient(135deg, #6b7280, #4b5563); }
+
+  /* Modal overlay */
+  .modal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+    display: none; align-items: center; justify-content: center;
+    z-index: 200;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: #fff; border-radius: 16px; padding: 28px;
+    width: 90%; max-width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    direction: rtl;
+  }
+  .modal h3 { font-size: 18px; font-weight: 700; margin-bottom: 6px; color: #1f2937; }
+  .modal .modal-task-name { font-size: 13px; color: #6366f1; font-weight: 600; margin-bottom: 16px; }
+  .modal label { font-size: 13px; font-weight: 600; color: #374151; display: block; margin-bottom: 6px; }
+  .modal input[type="text"] {
+    width: 100%; padding: 10px 14px; border: 2px solid #e5e7eb; border-radius: 8px;
+    font-size: 15px; font-family: inherit; direction: rtl; outline: none;
+    transition: border-color 0.2s;
+  }
+  .modal input[type="text"]:focus { border-color: #6366f1; }
+  .modal .datetime {
+    margin-top: 12px; padding: 10px 14px; background: #f3f4f6; border-radius: 8px;
+    font-size: 13px; color: #6b7280; direction: rtl;
+  }
+  .modal .datetime strong { color: #374151; }
+  .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
+  .modal-btn {
+    flex: 1; padding: 10px; border-radius: 8px; border: none;
+    font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
+    transition: all 0.15s;
+  }
+  .modal-btn-confirm { background: #6366f1; color: #fff; }
+  .modal-btn-confirm:hover { background: #4f46e5; }
+  .modal-btn-cancel { background: #f3f4f6; color: #6b7280; }
+  .modal-btn-cancel:hover { background: #e5e7eb; }
+
+  /* Loading state */
+  .loading-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(255,255,255,0.8); display: flex;
+    align-items: center; justify-content: center; z-index: 300;
+  }
+  .loading-overlay.hidden { display: none; }
+  .spinner {
+    width: 40px; height: 40px; border: 4px solid #e5e7eb;
+    border-top-color: #6366f1; border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .toast {
+    position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: #1f2937; color: #fff; padding: 12px 24px; border-radius: 10px;
+    font-size: 14px; font-weight: 500; opacity: 0; transition: all 0.3s ease;
+    z-index: 100; white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .status-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-right: 8px;
+  }
+  .status-in_progress { background: #fef3c7; color: #92400e; }
+  .status-completed { background: #d1fae5; color: #065f46; }
+
+  @media (max-width: 500px) {
+    .name-row { flex-direction: column; }
+    .send-buttons { flex-direction: column; }
+    .send-btn { min-width: unset; }
+    .top-bar { flex-direction: column; align-items: stretch; }
+  }
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+</div>
+
+<div class="container">
+  <h1>צ'קליסט קליטת מותג</h1>
+  <p class="subtitle">תהליך הקמת צ'אט + וידג'ט לאתר — סריקה מקומית, הגדרה ו-Go Live</p>
+
+  <!-- Select / Create checklist -->
+  <div class="top-bar">
+    <label>צ'קליסט:</label>
+    <select id="checklistSelect" onchange="loadChecklist()">
+      <option value="">בחר צ'קליסט קיים...</option>
+    </select>
+    <button class="btn-new" onclick="createNew()">+ חדש</button>
+    <button class="btn-delete" onclick="deleteChecklist()" id="btnDelete" style="display:none">מחק</button>
+  </div>
+
+  <div id="checklistContent" style="display:none">
+
+    <div class="name-section">
+      <div class="name-row">
+        <div class="name-field">
+          <div class="name-label">שם המותג</div>
+          <input type="text" class="name-input" id="brandName" placeholder="למשל: ארגניה" onchange="saveBrandInfo()">
+        </div>
+        <div class="name-field">
+          <div class="name-label">דומיין / אתר</div>
+          <input type="text" class="name-input ltr" id="brandDomain" placeholder="example.co.il" onchange="saveBrandInfo()">
+        </div>
+      </div>
+    </div>
+
+    <p class="progress-text" id="pt">0 / 20</p>
+    <div class="progress-bar-wrapper"><div class="progress-bar" id="pb"></div></div>
+
+    <!-- ═══════ PHASE A ═══════ -->
+    <div class="section-header"><span>A</span> הכנה ואיסוף מידע</div>
+
+    <div class="task" data-task="1" onclick="handleTaskClick(this)">
+      <span class="num">1</span>
+      <input type="checkbox" class="cb" onclick="event.stopPropagation()">
+      <div class="info">
+        <div class="title">יצירת חשבון (account) מסוג brand בסופאבייס</div>
+        <div class="badges">
+          <span class="badge b-data">דאטה</span>
+          <span class="badge b-admin">אדמין</span>
+        </div>
+        <div class="note">POST /api/admin/accounts עם type: 'brand' — או ישירות ב-DB</div>
+        <div class="completion-info"></div>
+      </div>
+    </div>
+
+    <div class="task" data-task="2" onclick="handleTaskClick(this)">
+      <span class="num">2</span>
+      <input type="checkbox" class="cb" onclick="event.stopPropagation()">
+      <div class="info">
+        <div class="title">מילוי פרטי מותג: שם, דומיין, שפה, סוג עסק, לוגו</div>
+        <div class="badges">
+          <span class="badge b-data">דאטה</span>
+        </div>
+        <div class="note">config: { username (domain), display_name, language, logo_url }</div>
+        <div class="completion-info"></div>
+      </div>
+    </div>
+
+    <div class="task" data-task="3" onclick="handleTaskClick(this)">
+      <span class="num">3</span>
+      <input type="checkbox" class="cb" onclick="event.stopPropagation()">
+      <div class="info">
+        <div class="title">קבלת חומרי רקע מהלקוח (PDF, מסמכים, שאלות נפוצות)</div>
+        <div class="badges">
+          <span class="badge b-content">תוכן</span>
+        </div>
+        <div class="note">לבקש: קטלוג, FAQ, מדריכי שימוש, מדיניות החזרות, מידע על החברה</div>
+        <div class="completion-info"></div>
+      </div>
+    </div>
+
+    <!-- ═══════ PHASE B ═══════ -->
+    <div class="section-header"><span>B</span> סריקה מקומית של האתר</div>
+
+    <div class="task" data-task="4" onclick="handleTaskClick(this)">
+      <span class="num">4</span>
+      <input type="checkbox" class="cb" onclick="event.stopPropagation()">
+      <div class="info">
+        <div class="title">הרצת סקריפט סריקה מקומי (deep-scrape-local / deep-scrape-website)</div>
+        <div class="badges">
+          <span class="badge b-scan">סריקה</span>
+          <span class="badge b-local">לוקאלי</span>
+        </div>
+        <div class="note">node scripts/deep-scrape-website.mjs --url https://domain.com --account-id UUID</div>
+        <div class="completion-info"></div>
+      </div>
+    </div>
+
+    <div class="task" data-task="5" onclick="handleTaskClick(this)">
+      <span class="num">5</span>
+      <input type="checkbox" class="cb" onclick="event.stopPropagation()">
+      <div class="info">
+        <div class="title">וידוא שכל העמודים נסרקו ונשמרו ב-DB (website_pages)</div>
+        <div class="badges">
+          <span class="badge b-data">דאטה</span>
+          <span class="badge b-scan">סריקה</span>
+        </div>
+        <div class="note">בדיקה: SELECT count(*) FROM website_pages WHERE account_id = 'UUID'</div>
+        <div class="completion-info"></div>
+      </div>
+    </div>
+
+    <div class="task" data-task="6" onclick="handleTaskClick(this)">
+      <span class="num">6</span>
+      <input type="checkbox" class="cb" onclick="event.stopPropagation()">
+      <div class="info">
+        <div class="title">יצירת RAG chunks מתוכן האתר (וקטורים)</div>
+        <div class="badges">
+          <span class="badge b-ai">AI / RAG</span>
+          <span class="badge b-local">לוקאלי</span>
+        </div>
+        <div class="note">בדיקה: SELECT count(*) FROM rag_chunks WHERE account_id = 'UUID'</div>
+        <div class="completion-info"></div>
+      </div>
+    </div>
+
+    <div class="task" data-task="7" onclick="handleTaskClick(this)">
+      <span class="num">7</span>
+      <input type="checkbox" class="cb" onclick="event.stopPropagation()">
+      <div class="info">
+        <div class="title">העלאה ופרסור מסמכי לקוח (PDF/DOCX) דרך AI Parser</div>
+        <div class="badges">
+          <span class="badge b-ai">AI</span>
+          <span class="badge b-content">תוכן</span>
+        </div>
+        <div class="note">GPT-5.2 → Gemini 3 fallback. בדיקת confidence > 0.7</div>
+        <div class="completion-info"></div>
+      </div>
+    </div>
+
+    <!-- ═══════ PHASE C ═══════ -->
+    <div class="section-header"><span>C</span> הגדרת הצ'אטבוט (פרסונה)</div>
+
+    <div class="task" data-task="8" onclick="handleTaskClick(this)">
+      <span class="num">8</span>
+      <input type="checkbox" class="cb" onclick="event.stopPropagation()">
+      <div class="info">
+        <div class="title">הגדרת פרסונה: טון דיבור, סגנון, שפה, אימוג'י</div>
+        <div class="badges">
+          <span class="badge b-ai">AI</span>
+          <span class="badge b-design">פרסונה</span>
+        </div>
+        <div class="note">/admin/chatbot-persona/[accountId] — או ישירות בטבלת chatbot_persona</div>
+        <div class="completion-info"></div>
+      </div>
+    </div>
+
+    <div class="task" data-task="9" onclick="handleTaskClick(this)">
+      <span class="num">9</span>
+      <input type="checkbox" class="cb" onclick="event.stopPropagation()">
+      <div class="info">
+        <div class="title">הגדרת גבולות: מה הבוט לא עונה, הפניות לנציג, נושאים חסומים</div>
+        <div class="badges">
+          <span class="badge b-ai">AI</span>
+          <span class="badge b-admin">מדיניות</span>
+        </div>
+        <div class="note">למשל: לא לתת מחירים, לא להבטיח זמני משלוח, להפנות לטלפון במקרי חירום</div>
+        <div class="completion-info"></div>
+      </div>
+    </div>
+
+    <div class="task" data-task="10" onclick="handleTaskClick(this)">
+      <span class="num">10</span>
+      <input type="checkbox" class="cb" onclick="event.stopPropagation()">
+      <div class="info">
+        <div class="title">הגדרת הודעת פתיחה + שאלות מהירות (Quick Actions)</div>
+        <div class="badges">
+          <span class="badge b-content">תוכן</span>
+          <span class="badge b-design">UX</span>
+        </div>
+        <div class="note">welcomeMessage + suggested actions (למשל: "מה שעות הפעילות?", "איך מזמינים?")</div>
+        <div class="completion-info"></div>
+      </div>
+    </div>
+
+    <!-- ═══════ PHASE D ═══════ -->
+    <div class="section-header"><span>D</span> הגדרת וידג'ט (עיצוב)</div>
+
+    <div class="task" data-task="11" onclick="handleTaskClick(this)">
+      <span class="num">11</span>
+      <input type="checkbox" class="cb" onclick="event.stopPropagation()">
+      <div class="info">
+        <div class="title">הגדרת צבעים: primaryColor לפי מיתוג הלקוח</div>
+        <div class="badges">
+          <span class="badge b-design">עיצוב</span>
+        </div>
+        <div class="note">config.widget.primaryColor — צבע ראשי של הבועה, כפתורים ואלמנטים</div>
+        <div class="completion-info"></div>
+      </div>
+    </div>
+
+    <div class="task" data-task="12" onclick="handleTaskClick(this)">
+      <span class="num">12</span>
+      <input type="checkbox" class="cb" onclick="event.stopPropagation()">
+      <div class="info">
+        <div class="title">הגדרת פונט, מיקום (bottom-right/left), מצב כהה/בהיר</div>
+        <div class="badges">
+          <span class="badge b-design">עיצוב</span>
+        </div>
+        <div class="note">fontFamily, position, darkMode — בהתאם לעיצוב האתר של הלקוח</div>
+        <div class="completion-info"></div>
+      </div>
+    </div>
+
+    <div class="task" data-task="13" onclick="handleTaskClick(this)">
+      <span class="num">13</span>
+      <input type="checkbox" class="cb" onclick="event.stopPropagation()">
+      <div class="info">
+        <div class="title">העלאת לוגו / אוואטר לבועת הצ'אט</div>
+        <div class="badges">
+          <span class="badge b-design">עיצוב</span>
+          <span class="badge b-data">דאטה</span>
+        </div>
+        <div class="note">config.logo_url — מוצג בחלון הצ'אט ובבועה</div>
+        <div class="completion-info"></div>
+      </div>
+    </div>
+
+    <!-- ═══════ PHASE E ═══════ -->
+    <div class="section-header"><span>E</span> בדיקות ואימות</div>
+
+    <div class="task" data-task="14" onclick="handleTaskClick(this)">
+      <span class="num">14</span>
+      <input type="checkbox" class="cb" onclick="event.stopPropagation()">
+      <div class="info">
+        <div class="title">בדיקת צ'אט בסיסית: שאלה כללית + תשובה רלוונטית מ-RAG</div>
+        <div class="badges">
+          <span class="badge b-test">בדיקה</span>
+          <span class="badge b-ai">AI</span>
+        </div>
+        <div class="note">לשאול לפחות 3 שאלות שונות ולוודא שהתשובות מבוססות על תוכן האתר</div>
+        <div class="completion-info"></div>
+      </div>
+    </div>
+
+    <div class="task" data-task="15" onclick="handleTaskClick(this)">
+      <span class="num">15</span>
+      <input type="checkbox" class="cb" onclick="event.stopPropagation()">
+      <div class="info">
+        <div class="title">בדיקת גבולות: שאלה מחוץ לתחום — תגובה מתאימה (לא "ממציא")</div>
+        <div class="badges">
+          <span class="badge b-test">בדיקה</span>
+          <span class="badge b-admin">מדיניות</span>
+        </div>
+        <div class="note">לשאול משהו שלא קיים באתר — הבוט צריך להגיד שהוא לא יודע או להפנות</div>
+        <div class="completion-info"></div>
+      </div>
+    </div>
+
+    <div class="task" data-task="16" onclick="handleTaskClick(this)">
+      <span class="num">16</span>
+      <input type="checkbox" class="cb" onclick="event.stopPropagation()">
+      <div class="info">
+        <div class="title">בדיקת עיצוב הוידג'ט: צבעים, RTL, מובייל, דסקטופ</div>
+        <div class="badges">
+          <span class="badge b-test">בדיקה</span>
+          <span class="badge b-design">עיצוב</span>
+        </div>
+        <div class="note">לבדוק ב-Preview page + ישירות על האתר של הלקוח (אם אפשר)</div>
+        <div class="completion-info"></div>
+      </div>
+    </div>
+
+    <div class="task" data-task="17" onclick="handleTaskClick(this)">
+      <span class="num">17</span>
+      <input type="checkbox" class="cb" onclick="event.stopPropagation()">
+      <div class="info">
+        <div class="title">בדיקת streaming: תגובות זורמות, typing indicator, ללא שגיאות</div>
+        <div class="badges">
+          <span class="badge b-test">בדיקה</span>
+        </div>
+        <div class="note">לפתוח Network tab ולוודא NDJSON events: meta → delta → done</div>
+        <div class="completion-info"></div>
+      </div>
+    </div>
+
+    <!-- ═══════ PHASE F ═══════ -->
+    <div class="section-header"><span>F</span> הטמעה והפעלה (Go Live)</div>
+
+    <div class="task" data-task="18" onclick="handleTaskClick(this)">
+      <span class="num">18</span>
+      <input type="checkbox" class="cb" onclick="event.stopPropagation()">
+      <div class="info">
+        <div class="title">הוספת דומיין הלקוח ל-CORS whitelist (אם נדרש)</div>
+        <div class="badges">
+          <span class="badge b-deploy">הטמעה</span>
+        </div>
+        <div class="note">widget config API + chat API — Access-Control-Allow-Origin</div>
+        <div class="completion-info"></div>
+      </div>
+    </div>
+
+    <div class="task" data-task="19" onclick="handleTaskClick(this)">
+      <span class="num">19</span>
+      <input type="checkbox" class="cb" onclick="event.stopPropagation()">
+      <div class="info">
+        <div class="title">שליחת קוד הטמעה ללקוח + הוראות התקנה</div>
+        <div class="badges">
+          <span class="badge b-deploy">הטמעה</span>
+          <span class="badge b-content">תוכן</span>
+        </div>
+        <div class="note">&lt;script src=".../widget.js" data-account-id="UUID"&gt;&lt;/script&gt; — WordPress / Shopify / Wix / קוד</div>
+        <div class="completion-info"></div>
+      </div>
+    </div>
+
+    <div class="task" data-task="20" onclick="handleTaskClick(this)">
+      <span class="num">20</span>
+      <input type="checkbox" class="cb" onclick="event.stopPropagation()">
+      <div class="info">
+        <div class="title">אימות סופי: הוידג'ט עובד על האתר החי של הלקוח</div>
+        <div class="badges">
+          <span class="badge b-deploy">הטמעה</span>
+          <span class="badge b-admin">אישור סופי</span>
+        </div>
+        <div class="note">לפתוח את האתר, לראות את הבועה, לשלוח הודעה, לוודא תשובה תקינה</div>
+        <div class="completion-info"></div>
+      </div>
+    </div>
+
+    <!-- Notes -->
+    <div class="notes-section">
+      <div class="notes-title">הערות ופרטים נוספים</div>
+      <textarea class="notes-area" id="notesArea" placeholder="רשום כאן הערות, בעיות שנתקלת בהן, דברים לזכור..." onchange="saveBrandInfo()"></textarea>
+    </div>
+
+    <!-- Send section -->
+    <div class="send-section">
+      <div class="send-title">שליחת סטטוס הצ'קליסט</div>
+      <div class="send-buttons">
+        <button class="send-btn btn-email" onclick="sendEmail()">
+          <span>&#9993;</span> שלח במייל
+        </button>
+        <button class="send-btn btn-whatsapp" onclick="sendWhatsApp()">
+          <span>&#9742;</span> שלח בוואטסאפ
+        </button>
+        <button class="send-btn btn-copy" onclick="copyToClipboard()">
+          <span>&#128203;</span> העתק טקסט
+        </button>
+      </div>
+    </div>
+  </div><!-- /checklistContent -->
+</div>
+
+<!-- Popup modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3 id="modalTitle">סימון משימה</h3>
+    <div class="modal-task-name" id="modalTaskName"></div>
+    <label for="personName">מי ביצע?</label>
+    <input type="text" id="personName" placeholder="הקלד את שמך...">
+    <div class="datetime" id="modalDatetime">
+      <strong>תאריך ושעה:</strong> <span id="modalDatetimeValue"></span>
+    </div>
+    <div class="modal-buttons">
+      <button class="modal-btn modal-btn-confirm" onclick="confirmTask()">אישור</button>
+      <button class="modal-btn modal-btn-cancel" onclick="cancelTask()">ביטול</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── Supabase config ───
+const SUPABASE_URL = 'https://zwmlqlzfjiminrokzcse.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3bWxxbHpmamltaW5yb2t6Y3NlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2NTE1NTQsImV4cCI6MjA4MTIyNzU1NH0.Y6jatZ0A7DxeHzWafLXYZKrb9LaIGyqzUvq7r4iisgg';
+
+async function supaFetch(path, opts = {}) {
+  const res = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': opts.prefer || 'return=representation',
+      ...opts.headers
+    },
+    method: opts.method || 'GET',
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+// ─── State ───
+let currentChecklistId = null;
+let pendingTaskEl = null;
+
+const TASK_TITLES = {};
+document.querySelectorAll('.task').forEach(el => {
+  const num = parseInt(el.dataset.task);
+  const title = el.querySelector('.title').textContent;
+  TASK_TITLES[num] = title;
+});
+
+// ─── Init ───
+async function init() {
+  // Restore last used name
+  const savedName = localStorage.getItem('onboarding-user-name');
+  if (savedName) document.getElementById('personName').value = savedName;
+
+  await loadChecklistList();
+  hideLoading();
+}
+
+function showLoading() { document.getElementById('loadingOverlay').classList.remove('hidden'); }
+function hideLoading() { document.getElementById('loadingOverlay').classList.add('hidden'); }
+
+// ─── Load dropdown ───
+async function loadChecklistList() {
+  try {
+    const data = await supaFetch('brand_onboarding?select=id,brand_name,brand_domain,status,created_at&order=created_at.desc');
+    const sel = document.getElementById('checklistSelect');
+    // Keep first option
+    sel.innerHTML = '<option value="">בחר צ\'קליסט קיים...</option>';
+    (data || []).forEach(item => {
+      const date = new Date(item.created_at).toLocaleDateString('he-IL');
+      const statusText = item.status === 'completed' ? ' [הושלם]' : '';
+      const opt = document.createElement('option');
+      opt.value = item.id;
+      opt.textContent = (item.brand_name || 'ללא שם') + ' — ' + (item.brand_domain || '') + ' (' + date + ')' + statusText;
+      sel.appendChild(opt);
+    });
+
+    // Auto-load last used
+    const lastId = localStorage.getItem('onboarding-last-id');
+    if (lastId) {
+      sel.value = lastId;
+      if (sel.value) await loadChecklist();
+    }
+  } catch (e) {
+    console.error('Failed to load checklists:', e);
+    showToast('שגיאה בטעינת רשימה');
+  }
+}
+
+// ─── Create new ───
+async function createNew() {
+  showLoading();
+  try {
+    const data = await supaFetch('brand_onboarding', {
+      method: 'POST',
+      body: { brand_name: 'מותג חדש', brand_domain: '', notes: '', status: 'in_progress' }
+    });
+    const newId = data[0].id;
+
+    // Create all 20 tasks
+    const tasks = [];
+    for (let i = 1; i <= 20; i++) {
+      tasks.push({
+        onboarding_id: newId,
+        task_number: i,
+        task_title: TASK_TITLES[i] || 'משימה ' + i,
+        completed: false
+      });
+    }
+    await supaFetch('brand_onboarding_tasks', { method: 'POST', body: tasks });
+
+    await loadChecklistList();
+    document.getElementById('checklistSelect').value = newId;
+    await loadChecklist();
+    showToast('נוצר צ\'קליסט חדש');
+  } catch (e) {
+    console.error(e);
+    showToast('שגיאה ביצירה');
+  }
+  hideLoading();
+}
+
+// ─── Load checklist ───
+async function loadChecklist() {
+  const id = document.getElementById('checklistSelect').value;
+  if (!id) {
+    document.getElementById('checklistContent').style.display = 'none';
+    document.getElementById('btnDelete').style.display = 'none';
+    currentChecklistId = null;
+    return;
+  }
+
+  showLoading();
+  currentChecklistId = id;
+  localStorage.setItem('onboarding-last-id', id);
+
+  try {
+    // Load main record
+    const records = await supaFetch('brand_onboarding?id=eq.' + id);
+    const record = records[0];
+
+    document.getElementById('brandName').value = record.brand_name || '';
+    document.getElementById('brandDomain').value = record.brand_domain || '';
+    document.getElementById('notesArea').value = record.notes || '';
+
+    // Load tasks
+    const tasks = await supaFetch('brand_onboarding_tasks?onboarding_id=eq.' + id + '&order=task_number.asc');
+
+    // Reset all tasks
+    document.querySelectorAll('.task').forEach(el => {
+      const cb = el.querySelector('.cb');
+      cb.checked = false;
+      el.classList.remove('checked');
+      el.querySelector('.completion-info').textContent = '';
+      el.querySelector('.completion-info').style.display = 'none';
+    });
+
+    // Apply saved state
+    (tasks || []).forEach(t => {
+      const el = document.querySelector('.task[data-task="' + t.task_number + '"]');
+      if (!el) return;
+      const cb = el.querySelector('.cb');
+      const infoEl = el.querySelector('.completion-info');
+
+      if (t.completed) {
+        cb.checked = true;
+        el.classList.add('checked');
+        const when = t.completed_at ? formatDateTime(new Date(t.completed_at)) : '';
+        infoEl.textContent = (t.completed_by || '') + (when ? ' — ' + when : '');
+        infoEl.style.display = 'block';
+      }
+    });
+
+    document.getElementById('checklistContent').style.display = 'block';
+    document.getElementById('btnDelete').style.display = 'inline-block';
+    updateProgress();
+  } catch (e) {
+    console.error(e);
+    showToast('שגיאה בטעינה');
+  }
+  hideLoading();
+}
+
+// ─── Delete checklist ───
+async function deleteChecklist() {
+  if (!currentChecklistId) return;
+  if (!confirm('למחוק את הצ\'קליסט הזה? הפעולה בלתי הפיכה.')) return;
+
+  showLoading();
+  try {
+    await supaFetch('brand_onboarding?id=eq.' + currentChecklistId, { method: 'DELETE', prefer: 'return=minimal' });
+    currentChecklistId = null;
+    localStorage.removeItem('onboarding-last-id');
+    document.getElementById('checklistContent').style.display = 'none';
+    document.getElementById('btnDelete').style.display = 'none';
+    await loadChecklistList();
+    showToast('נמחק');
+  } catch (e) {
+    console.error(e);
+    showToast('שגיאה במחיקה');
+  }
+  hideLoading();
+}
+
+// ─── Save brand info ───
+let saveTimeout;
+async function saveBrandInfo() {
+  if (!currentChecklistId) return;
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(async () => {
+    try {
+      await supaFetch('brand_onboarding?id=eq.' + currentChecklistId, {
+        method: 'PATCH',
+        body: {
+          brand_name: document.getElementById('brandName').value.trim(),
+          brand_domain: document.getElementById('brandDomain').value.trim(),
+          notes: document.getElementById('notesArea').value.trim(),
+          updated_at: new Date().toISOString()
+        },
+        prefer: 'return=minimal'
+      });
+      // Update dropdown text
+      const sel = document.getElementById('checklistSelect');
+      const opt = sel.querySelector('option[value="' + currentChecklistId + '"]');
+      if (opt) {
+        const name = document.getElementById('brandName').value.trim() || 'ללא שם';
+        const domain = document.getElementById('brandDomain').value.trim();
+        opt.textContent = name + ' — ' + domain + ' (' + opt.textContent.split('(').pop();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, 800);
+}
+
+// ─── Handle task click → open modal ───
+function handleTaskClick(taskEl) {
+  if (!currentChecklistId) return;
+
+  const cb = taskEl.querySelector('.cb');
+  const isCurrentlyChecked = cb.checked;
+
+  if (isCurrentlyChecked) {
+    // Unchecking — confirm and remove
+    if (confirm('לבטל את הסימון של משימה זו?')) {
+      cb.checked = false;
+      taskEl.classList.remove('checked');
+      const infoEl = taskEl.querySelector('.completion-info');
+      infoEl.textContent = '';
+      infoEl.style.display = 'none';
+      updateProgress();
+      saveTaskToDb(parseInt(taskEl.dataset.task), false, null, null);
+    }
+    return;
+  }
+
+  // Checking — open modal
+  pendingTaskEl = taskEl;
+  const taskNum = taskEl.dataset.task;
+  const taskTitle = taskEl.querySelector('.title').textContent;
+  const now = new Date();
+
+  document.getElementById('modalTitle').textContent = 'סימון משימה #' + taskNum;
+  document.getElementById('modalTaskName').textContent = taskTitle;
+  document.getElementById('modalDatetimeValue').textContent = formatDateTime(now);
+
+  // Focus name input
+  const nameInput = document.getElementById('personName');
+  const savedName = localStorage.getItem('onboarding-user-name');
+  if (savedName) nameInput.value = savedName;
+
+  document.getElementById('modalOverlay').classList.add('show');
+  setTimeout(() => nameInput.focus(), 100);
+}
+
+function confirmTask() {
+  const name = document.getElementById('personName').value.trim();
+  if (!name) {
+    document.getElementById('personName').style.borderColor = '#ef4444';
+    document.getElementById('personName').placeholder = 'חובה למלא שם!';
+    return;
+  }
+
+  document.getElementById('personName').style.borderColor = '#e5e7eb';
+  localStorage.setItem('onboarding-user-name', name);
+
+  const now = new Date();
+  const taskEl = pendingTaskEl;
+  const cb = taskEl.querySelector('.cb');
+  const infoEl = taskEl.querySelector('.completion-info');
+
+  cb.checked = true;
+  taskEl.classList.add('checked');
+  infoEl.textContent = name + ' — ' + formatDateTime(now);
+  infoEl.style.display = 'block';
+
+  document.getElementById('modalOverlay').classList.remove('show');
+  updateProgress();
+
+  saveTaskToDb(parseInt(taskEl.dataset.task), true, name, now.toISOString());
+  pendingTaskEl = null;
+}
+
+function cancelTask() {
+  document.getElementById('modalOverlay').classList.remove('show');
+  document.getElementById('personName').style.borderColor = '#e5e7eb';
+  pendingTaskEl = null;
+}
+
+// Close modal on overlay click
+document.getElementById('modalOverlay').addEventListener('click', function(e) {
+  if (e.target === this) cancelTask();
+});
+
+// Enter key confirms
+document.getElementById('personName').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') confirmTask();
+});
+
+// ─── Save task to DB ───
+async function saveTaskToDb(taskNum, completed, completedBy, completedAt) {
+  if (!currentChecklistId) return;
+  try {
+    await supaFetch(
+      'brand_onboarding_tasks?onboarding_id=eq.' + currentChecklistId + '&task_number=eq.' + taskNum,
+      {
+        method: 'PATCH',
+        body: {
+          completed: completed,
+          completed_by: completedBy,
+          completed_at: completedAt
+        },
+        prefer: 'return=minimal'
+      }
+    );
+
+    // Check if all done → update status
+    const allCbs = document.querySelectorAll('.cb');
+    const allChecked = Array.from(allCbs).every(c => c.checked);
+    if (allChecked) {
+      await supaFetch('brand_onboarding?id=eq.' + currentChecklistId, {
+        method: 'PATCH',
+        body: { status: 'completed', updated_at: new Date().toISOString() },
+        prefer: 'return=minimal'
+      });
+      showToast('כל המשימות הושלמו!');
+    }
+  } catch (e) {
+    console.error('Failed to save task:', e);
+    showToast('שגיאה בשמירה');
+  }
+}
+
+// ─── Progress bar ───
+function updateProgress() {
+  const t = document.querySelectorAll('.cb').length;
+  const d = document.querySelectorAll('.cb:checked').length;
+  document.getElementById('pb').style.width = Math.round((d / t) * 100) + '%';
+  document.getElementById('pt').textContent = d + ' / ' + t;
+}
+
+// ─── Formatting ───
+function formatDateTime(date) {
+  return date.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    + ' ' + date.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+}
+
+// ─── Summary builder ───
+function buildSummary() {
+  const brand = document.getElementById('brandName').value.trim() || 'לא צוין';
+  const domain = document.getElementById('brandDomain').value.trim() || '';
+  const notes = document.getElementById('notesArea').value.trim();
+  let lines = [];
+
+  lines.push('צ׳קליסט קליטת מותג: ' + brand + (domain ? ' (' + domain + ')' : ''));
+  lines.push('═'.repeat(35));
+
+  const allElements = document.querySelectorAll('.section-header, .task');
+  allElements.forEach(el => {
+    if (el.classList.contains('section-header')) {
+      lines.push('');
+      lines.push('[ ' + el.textContent.trim() + ' ]');
+    } else {
+      const done = el.querySelector('.cb').checked;
+      const title = el.querySelector('.title').textContent;
+      const num = el.querySelector('.num').textContent;
+      const info = el.querySelector('.completion-info').textContent;
+      let line = (done ? '\u2705' : '\u2B1C') + ' ' + num + '. ' + title;
+      if (done && info) line += '\n     \u2514 ' + info;
+      lines.push(line);
+    }
+  });
+
+  const total = document.querySelectorAll('.cb').length;
+  const completed = document.querySelectorAll('.cb:checked').length;
+  lines.push('');
+  lines.push('═'.repeat(35));
+  lines.push('\u05E1\u05D4\u05F4\u05DB: ' + completed + ' / ' + total + ' \u05D4\u05D5\u05E9\u05DC\u05DE\u05D5 (' + Math.round((completed / total) * 100) + '%)');
+
+  if (notes) {
+    lines.push('');
+    lines.push('\u05D4\u05E2\u05E8\u05D5\u05EA: ' + notes);
+  }
+
+  return lines.join('\n');
+}
+
+function sendEmail() {
+  const brand = document.getElementById('brandName').value.trim() || 'מותג';
+  const subject = encodeURIComponent('סטטוס קליטת מותג - ' + brand);
+  const body = encodeURIComponent(buildSummary());
+  const to = 'cto@ldrsgroup.com,yoav@ldrsgroup.com';
+  window.open('mailto:' + to + '?subject=' + subject + '&body=' + body, '_blank');
+  showToast('נפתח חלון מייל...');
+}
+
+function sendWhatsApp() {
+  const text = encodeURIComponent(buildSummary());
+  window.open('https://wa.me/?text=' + text, '_blank');
+  showToast('נפתח וואטסאפ...');
+}
+
+function copyToClipboard() {
+  navigator.clipboard.writeText(buildSummary()).then(() => {
+    showToast('הועתק ללוח!');
+  }).catch(() => {
+    showToast('שגיאה בהעתקה');
+  });
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ─── Start ───
+init();
+</script>
+</body>
+</html>
