@@ -2,16 +2,12 @@
 
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   MessageCircle,
-  ArrowLeft,
   Search,
   Star,
   Clock,
   ChevronRight,
-  ChevronDown,
   User,
   Bot,
   Loader2,
@@ -23,7 +19,6 @@ import {
   getInfluencerByUsername,
   getChatSessionsWithMessages,
   searchChatSessions,
-  supabase,
 } from '@/lib/supabase';
 import { formatRelativeTime } from '@/lib/utils';
 import type { Influencer, ChatSession, ChatMessage } from '@/types';
@@ -149,8 +144,8 @@ export default function ConversationsPage({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center" dir="rtl">
-        <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+      <div className="min-h-screen flex items-center justify-center" dir="rtl" style={{ background: 'var(--dash-bg)' }}>
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--dash-text-3)' }} />
       </div>
     );
   }
@@ -158,65 +153,47 @@ export default function ConversationsPage({
   if (!influencer) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900" dir="rtl">
-      {/* Background Pattern */}
-      <div className="fixed inset-0 opacity-10">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,#6366f1_1px,transparent_0)] bg-[length:50px_50px]" />
-      </div>
-
-      {/* Header */}
-      <header className="relative z-10 sticky top-0 bg-slate-900/80 backdrop-blur-xl border-b border-gray-800">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link
-                href={`/influencer/${username}/dashboard`}
-                className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5" />
-                <span className="hidden sm:inline">חזרה</span>
-              </Link>
-              <div className="h-6 w-px bg-gray-700" />
-              <h1 className="text-xl font-bold text-white flex items-center gap-2">
-                <MessageCircle className="w-6 h-6 text-blue-400" />
-                היסטוריית שיחות
-              </h1>
-            </div>
-
-            <div className="text-sm text-gray-400">
-              {sessions.length} שיחות
-            </div>
+    <div className="min-h-screen" dir="rtl" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
+      <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-8">
+        {/* Page Title */}
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
+            <MessageCircle className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
+            היסטוריית שיחות
+          </h1>
+          <div className="text-sm" style={{ color: 'var(--dash-text-2)' }}>
+            {sessions.length} שיחות
           </div>
         </div>
-      </header>
 
-      <main className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 py-8">
         {/* Search and Filters */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6 space-y-4"
-        >
+        <div className="mb-6 space-y-4">
           {/* Search */}
           <div className="relative">
-            <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5" style={{ color: 'var(--dash-text-3)' }} />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="חיפוש בשיחות..."
-              className="w-full bg-gray-800/50 border border-gray-700 rounded-xl pr-12 pl-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full rounded-xl pr-12 pl-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+              style={{
+                background: 'var(--dash-surface)',
+                border: '1px solid var(--dash-border)',
+                color: 'var(--dash-text)',
+              }}
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                className="absolute left-4 top-1/2 -translate-y-1/2"
+                style={{ color: 'var(--dash-text-3)' }}
               >
                 <X className="w-5 h-5" />
               </button>
             )}
             {isSearching && (
-              <Loader2 className="absolute left-12 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-400 animate-spin" />
+              <Loader2 className="absolute left-12 top-1/2 -translate-y-1/2 w-5 h-5 animate-spin" style={{ color: 'var(--color-primary)' }} />
             )}
           </div>
 
@@ -224,61 +201,63 @@ export default function ConversationsPage({
           <div className="flex gap-2">
             <button
               onClick={() => setFilter('all')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                filter === 'all'
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-800 text-gray-400 hover:text-white'
-              }`}
+              className="px-4 py-2 rounded-lg text-sm font-medium transition-all"
+              style={{
+                background: filter === 'all' ? 'var(--color-primary)' : 'var(--dash-surface)',
+                color: filter === 'all' ? '#fff' : 'var(--dash-text-2)',
+              }}
             >
               הכל
             </button>
             <button
               onClick={() => setFilter('starred')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                filter === 'starred'
-                  ? 'bg-yellow-600 text-white'
-                  : 'bg-gray-800 text-gray-400 hover:text-white'
-              }`}
+              className="px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2"
+              style={{
+                background: filter === 'starred' ? '#ca8a04' : 'var(--dash-surface)',
+                color: filter === 'starred' ? '#fff' : 'var(--dash-text-2)',
+              }}
             >
               <Star className="w-4 h-4" />
               מסומנות בכוכב
             </button>
             <button
               onClick={() => setFilter('flagged')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                filter === 'flagged'
-                  ? 'bg-red-600 text-white'
-                  : 'bg-gray-800 text-gray-400 hover:text-white'
-              }`}
+              className="px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2"
+              style={{
+                background: filter === 'flagged' ? '#dc2626' : 'var(--dash-surface)',
+                color: filter === 'flagged' ? '#fff' : 'var(--dash-text-2)',
+              }}
             >
               <Flag className="w-4 h-4" />
               מסומנות לטיפול
             </button>
           </div>
-        </motion.div>
+        </div>
 
         {/* Sessions List */}
         <div className="space-y-4">
           {filteredSessions.length > 0 ? (
-            filteredSessions.map((session, index) => {
+            filteredSessions.map((session) => {
               const isExpanded = expandedSession === session.id;
               const isFlagged = flaggedSessions.has(session.id);
               const isStarred = starredSessions.has(session.id);
               const firstUserMessage = session.messages.find(m => m.role === 'user');
 
               return (
-                <motion.div
+                <div
                   key={session.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className={`bg-gray-800/50 backdrop-blur border rounded-2xl overflow-hidden transition-all ${
-                    isFlagged ? 'border-red-500/50' : isStarred ? 'border-yellow-500/50' : 'border-gray-700'
-                  }`}
+                  className="rounded-xl overflow-hidden transition-all"
+                  style={{
+                    border: `1px solid ${isFlagged ? 'rgba(239,68,68,0.5)' : isStarred ? 'rgba(234,179,8,0.5)' : 'var(--dash-border)'}`,
+                    background: 'var(--dash-surface)',
+                  }}
                 >
                   {/* Session Header */}
                   <div
-                    className="p-4 cursor-pointer hover:bg-gray-700/30 transition-colors"
+                    className="p-4 cursor-pointer transition-colors"
+                    style={{ background: 'var(--dash-surface)' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--dash-surface-hover)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--dash-surface)'; }}
                     onClick={() => setExpandedSession(isExpanded ? null : session.id)}
                   >
                     <div className="flex items-center justify-between">
@@ -288,13 +267,13 @@ export default function ConversationsPage({
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <p className="font-medium text-white">
+                            <p className="font-medium" style={{ color: 'var(--dash-text)' }}>
                               {session.message_count} הודעות
                             </p>
                             {isStarred && <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />}
                             {isFlagged && <Flag className="w-4 h-4 text-red-400 fill-red-400" />}
                           </div>
-                          <p className="text-sm text-gray-400 flex items-center gap-1">
+                          <p className="text-sm flex items-center gap-1" style={{ color: 'var(--dash-text-2)' }}>
                             <Clock className="w-3 h-3" />
                             {formatRelativeTime(session.created_at)}
                           </p>
@@ -311,8 +290,9 @@ export default function ConversationsPage({
                           className={`p-2 rounded-lg transition-colors ${
                             isStarred
                               ? 'text-yellow-400 bg-yellow-400/10'
-                              : 'text-gray-500 hover:text-yellow-400 hover:bg-gray-700'
+                              : 'hover:bg-[var(--dash-surface-hover)]'
                           }`}
+                          style={{ color: isStarred ? undefined : 'var(--dash-text-3)' }}
                         >
                           {isStarred ? <Star className="w-5 h-5 fill-current" /> : <StarOff className="w-5 h-5" />}
                         </button>
@@ -324,98 +304,91 @@ export default function ConversationsPage({
                           className={`p-2 rounded-lg transition-colors ${
                             isFlagged
                               ? 'text-red-400 bg-red-400/10'
-                              : 'text-gray-500 hover:text-red-400 hover:bg-gray-700'
+                              : 'hover:bg-[var(--dash-surface-hover)]'
                           }`}
+                          style={{ color: isFlagged ? undefined : 'var(--dash-text-3)' }}
                         >
                           <Flag className={`w-5 h-5 ${isFlagged ? 'fill-current' : ''}`} />
                         </button>
 
-                        <motion.div
-                          animate={{ rotate: isExpanded ? 90 : 0 }}
-                          className="text-gray-400"
+                        <div
+                          className="transition-transform"
+                          style={{
+                            color: 'var(--dash-text-3)',
+                            transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                          }}
                         >
                           <ChevronRight className="w-5 h-5" />
-                        </motion.div>
+                        </div>
                       </div>
                     </div>
 
                     {/* Preview of first message */}
                     {firstUserMessage && !isExpanded && (
-                      <p className="mt-3 text-sm text-gray-400 line-clamp-2 pr-16">
+                      <p className="mt-3 text-sm line-clamp-2 pr-16" style={{ color: 'var(--dash-text-2)' }}>
                         &quot;{firstUserMessage.content}&quot;
                       </p>
                     )}
                   </div>
 
                   {/* Expanded Messages */}
-                  <AnimatePresence>
-                    {isExpanded && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="border-t border-gray-700 p-4 space-y-3 max-h-96 overflow-y-auto">
-                          {session.messages.map((message) => (
+                  {isExpanded && (
+                    <div>
+                      <div className="p-4 space-y-3 max-h-96 overflow-y-auto" style={{ borderTop: '1px solid var(--dash-border)' }}>
+                        {session.messages.map((message) => (
+                          <div
+                            key={message.id}
+                            className={`flex gap-3 ${message.role === 'user' ? 'flex-row' : 'flex-row-reverse'}`}
+                          >
                             <div
-                              key={message.id}
-                              className={`flex gap-3 ${message.role === 'user' ? 'flex-row' : 'flex-row-reverse'}`}
+                              className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                message.role === 'user'
+                                  ? 'bg-indigo-500/20'
+                                  : 'bg-green-500/20'
+                              }`}
                             >
-                              <div
-                                className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                  message.role === 'user'
-                                    ? 'bg-indigo-500/20'
-                                    : 'bg-green-500/20'
-                                }`}
-                              >
-                                {message.role === 'user' ? (
-                                  <User className="w-4 h-4 text-indigo-400" />
-                                ) : (
-                                  <Bot className="w-4 h-4 text-green-400" />
-                                )}
-                              </div>
-                              <div
-                                className={`max-w-[80%] p-3 rounded-2xl ${
-                                  message.role === 'user'
-                                    ? 'bg-indigo-600 text-white rounded-tr-sm'
-                                    : 'bg-gray-700 text-gray-100 rounded-tl-sm'
-                                }`}
-                              >
-                                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                                <p className="text-xs opacity-50 mt-1">
-                                  {new Date(message.created_at).toLocaleTimeString('he-IL', {
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                  })}
-                                </p>
-                              </div>
+                              {message.role === 'user' ? (
+                                <User className="w-4 h-4 text-indigo-400" />
+                              ) : (
+                                <Bot className="w-4 h-4 text-green-400" />
+                              )}
                             </div>
-                          ))}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
+                            <div
+                              className={`max-w-[80%] p-3 rounded-2xl ${
+                                message.role === 'user'
+                                  ? 'bg-indigo-600 text-white rounded-tr-sm'
+                                  : 'rounded-tl-sm'
+                              }`}
+                              style={message.role !== 'user' ? { background: 'var(--dash-muted)', color: 'var(--dash-text)' } : undefined}
+                            >
+                              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                              <p className="text-xs opacity-50 mt-1">
+                                {new Date(message.created_at).toLocaleTimeString('he-IL', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               );
             })
           ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-center py-16"
-            >
-              <MessageCircle className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-white mb-2">
+            <div className="text-center py-16">
+              <MessageCircle className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--dash-text-3)' }} />
+              <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--dash-text)' }}>
                 {searchQuery ? 'לא נמצאו תוצאות' : 'אין שיחות עדיין'}
               </h3>
-              <p className="text-gray-400">
+              <p style={{ color: 'var(--dash-text-2)' }}>
                 {searchQuery
                   ? 'נסה לחפש מילים אחרות'
                   : 'שיחות חדשות יופיעו כאן כשהמבקרים ישתמשו בבוט'}
               </p>
-            </motion.div>
+            </div>
           )}
         </div>
 
@@ -428,7 +401,14 @@ export default function ConversationsPage({
                 const more = await getChatSessionsWithMessages(influencer.id, 50, sessions.length);
                 setSessions([...sessions, ...more]);
               }}
-              className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl transition-colors"
+              className="px-6 py-3 rounded-xl transition-colors"
+              style={{
+                background: 'var(--dash-surface)',
+                color: 'var(--dash-text)',
+                border: '1px solid var(--dash-border)',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--dash-surface-hover)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--dash-surface)'; }}
             >
               טען עוד שיחות
             </button>
@@ -438,11 +418,3 @@ export default function ConversationsPage({
     </div>
   );
 }
-
-
-
-
-
-
-
-

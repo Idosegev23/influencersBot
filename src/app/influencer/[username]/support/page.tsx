@@ -3,7 +3,6 @@
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
   MessageSquare,
@@ -131,7 +130,7 @@ export default function SupportPage({
     }
   };
 
-  const filteredRequests = requests.filter(r => 
+  const filteredRequests = requests.filter(r =>
     filter === 'all' || r.status === filter
   );
 
@@ -150,45 +149,33 @@ export default function SupportPage({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center" dir="rtl">
-        <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+      <div className="min-h-screen flex items-center justify-center" dir="rtl" style={{ background: 'var(--dash-bg)' }}>
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--color-primary)' }} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white" dir="rtl">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-gray-900/80 backdrop-blur border-b border-gray-800">
-        <div className="max-w-6xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Link
-                href={`/influencer/${username}/dashboard`}
-                className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Link>
-              <div>
-                <h1 className="text-xl font-bold">פניות תמיכה</h1>
-                <p className="text-sm text-gray-400">
-                  {requests.filter(r => r.status === 'new').length} פניות חדשות
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
-        </div>
-      </header>
-
+    <div className="min-h-screen" dir="rtl" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
       <div className="max-w-6xl mx-auto p-4">
+        {/* Page Title + Refresh */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-xl font-bold" style={{ color: 'var(--dash-text)' }}>פניות תמיכה</h1>
+            <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>
+              {requests.filter(r => r.status === 'new').length} פניות חדשות
+            </p>
+          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="p-2 rounded-lg transition-colors"
+            style={{ color: 'var(--dash-text-2)' }}
+          >
+            <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+
         {/* Filter Tabs */}
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
           {[
@@ -200,16 +187,19 @@ export default function SupportPage({
             <button
               key={tab.key}
               onClick={() => setFilter(tab.key as typeof filter)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-2 ${
-                filter === tab.key
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-              }`}
+              className="px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-2"
+              style={{
+                background: filter === tab.key ? 'var(--color-primary)' : 'var(--dash-surface)',
+                color: filter === tab.key ? 'white' : 'var(--dash-text-2)',
+              }}
             >
               {tab.label}
-              <span className={`px-2 py-0.5 rounded-full text-xs ${
-                filter === tab.key ? 'bg-purple-500' : 'bg-gray-700'
-              }`}>
+              <span
+                className="px-2 py-0.5 rounded-full text-xs"
+                style={{
+                  background: filter === tab.key ? 'rgba(255,255,255,0.2)' : 'var(--dash-surface-hover)',
+                }}
+              >
                 {tab.count}
               </span>
             </button>
@@ -218,9 +208,9 @@ export default function SupportPage({
 
         {filteredRequests.length === 0 ? (
           <div className="text-center py-16">
-            <MessageSquare className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-400 mb-2">אין פניות</h2>
-            <p className="text-gray-500">
+            <MessageSquare className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--dash-text-3)' }} />
+            <h2 className="text-xl font-semibold mb-2" style={{ color: 'var(--dash-text-2)' }}>אין פניות</h2>
+            <p style={{ color: 'var(--dash-text-3)' }}>
               {filter === 'all' ? 'עדיין לא התקבלו פניות תמיכה' : 'אין פניות בסטטוס זה'}
             </p>
           </div>
@@ -231,33 +221,31 @@ export default function SupportPage({
               {filteredRequests.map((request) => {
                 const StatusIcon = statusConfig[request.status].icon;
                 return (
-                  <motion.div
+                  <div
                     key={request.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`p-4 bg-gray-800/50 border rounded-xl cursor-pointer transition-all ${
-                      selectedRequest?.id === request.id
-                        ? 'border-purple-500 bg-purple-900/20'
-                        : 'border-gray-700 hover:border-gray-600'
-                    }`}
+                    className="p-4 rounded-xl cursor-pointer transition-all border"
+                    style={{
+                      borderColor: selectedRequest?.id === request.id ? 'var(--color-primary)' : 'var(--dash-border)',
+                      background: selectedRequest?.id === request.id ? 'color-mix(in srgb, var(--color-primary) 10%, transparent)' : 'transparent',
+                    }}
                     onClick={() => setSelectedRequest(request)}
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-gray-400" />
-                        <span className="font-medium">{request.customer_name}</span>
+                        <User className="w-4 h-4" style={{ color: 'var(--dash-text-2)' }} />
+                        <span className="font-medium" style={{ color: 'var(--dash-text)' }}>{request.customer_name}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className={`w-2 h-2 rounded-full ${statusConfig[request.status].color}`} />
-                        <span className="text-xs text-gray-400">
+                        <span className="text-xs" style={{ color: 'var(--dash-text-2)' }}>
                           {statusConfig[request.status].label}
                         </span>
                       </div>
                     </div>
 
-                    <p className="text-sm text-gray-300 line-clamp-2 mb-3">{request.message}</p>
+                    <p className="text-sm line-clamp-2 mb-3" style={{ color: 'var(--dash-text-2)' }}>{request.message}</p>
 
-                    <div className="flex items-center justify-between text-xs text-gray-500">
+                    <div className="flex items-center justify-between text-xs" style={{ color: 'var(--dash-text-3)' }}>
                       <span>{formatDate(request.created_at)}</span>
                       {request.customer_phone && (
                         <div className="flex items-center gap-1">
@@ -266,118 +254,116 @@ export default function SupportPage({
                         </div>
                       )}
                     </div>
-                  </motion.div>
+                  </div>
                 );
               })}
             </div>
 
             {/* Request Detail */}
-            <AnimatePresence mode="wait">
-              {selectedRequest ? (
-                <motion.div
-                  key={selectedRequest.id}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  className="sticky top-24 p-6 bg-gray-800/50 border border-gray-700 rounded-xl"
-                >
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-semibold">פרטי הפנייה</h3>
-                    <button
-                      onClick={() => setSelectedRequest(null)}
-                      className="text-gray-400 hover:text-white"
-                    >
-                      ✕
-                    </button>
+            {selectedRequest ? (
+              <div
+                key={selectedRequest.id}
+                className="sticky top-24 p-6 rounded-xl border"
+                style={{ borderColor: 'var(--dash-border)' }}
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-semibold" style={{ color: 'var(--dash-text)' }}>פרטי הפנייה</h3>
+                  <button
+                    onClick={() => setSelectedRequest(null)}
+                    style={{ color: 'var(--dash-text-2)' }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Customer Info */}
+                  <div className="p-4 rounded-xl" style={{ background: 'var(--dash-surface)' }}>
+                    <div className="flex items-center gap-3 mb-2">
+                      <User className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
+                      <span className="font-medium" style={{ color: 'var(--dash-text)' }}>{selectedRequest.customer_name}</span>
+                    </div>
+                    {selectedRequest.customer_phone && (
+                      <a
+                        href={`https://wa.me/${selectedRequest.customer_phone.replace(/\D/g, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-green-400 hover:text-green-300 text-sm"
+                      >
+                        <Phone className="w-4 h-4" />
+                        <span dir="ltr">{selectedRequest.customer_phone}</span>
+                        <span className="text-xs">(פתח ב-WhatsApp)</span>
+                      </a>
+                    )}
                   </div>
 
-                  <div className="space-y-4">
-                    {/* Customer Info */}
-                    <div className="p-4 bg-gray-700/30 rounded-xl">
-                      <div className="flex items-center gap-3 mb-2">
-                        <User className="w-5 h-5 text-purple-400" />
-                        <span className="font-medium">{selectedRequest.customer_name}</span>
+                  {/* Product Info */}
+                  {selectedRequest.products && (
+                    <div className="p-4 rounded-xl" style={{ background: 'var(--dash-surface)' }}>
+                      <div className="flex items-center gap-2 text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>
+                        <Package className="w-4 h-4" />
+                        <span>מוצר קשור</span>
                       </div>
-                      {selectedRequest.customer_phone && (
-                        <a
-                          href={`https://wa.me/${selectedRequest.customer_phone.replace(/\D/g, '')}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 text-green-400 hover:text-green-300 text-sm"
-                        >
-                          <Phone className="w-4 h-4" />
-                          <span dir="ltr">{selectedRequest.customer_phone}</span>
-                          <span className="text-xs">(פתח ב-WhatsApp)</span>
-                        </a>
+                      <p className="font-medium" style={{ color: 'var(--dash-text)' }}>{selectedRequest.products.name}</p>
+                      {selectedRequest.products.coupon_code && (
+                        <span className="inline-block mt-1 px-2 py-0.5 bg-green-600/20 text-green-400 text-xs rounded">
+                          {selectedRequest.products.coupon_code}
+                        </span>
                       )}
                     </div>
+                  )}
 
-                    {/* Product Info */}
-                    {selectedRequest.products && (
-                      <div className="p-4 bg-gray-700/30 rounded-xl">
-                        <div className="flex items-center gap-2 text-sm text-gray-400 mb-1">
-                          <Package className="w-4 h-4" />
-                          <span>מוצר קשור</span>
-                        </div>
-                        <p className="font-medium">{selectedRequest.products.name}</p>
-                        {selectedRequest.products.coupon_code && (
-                          <span className="inline-block mt-1 px-2 py-0.5 bg-green-600/20 text-green-400 text-xs rounded">
-                            {selectedRequest.products.coupon_code}
-                          </span>
-                        )}
-                      </div>
-                    )}
+                  {/* Message */}
+                  <div>
+                    <p className="text-sm mb-2" style={{ color: 'var(--dash-text-2)' }}>הודעה:</p>
+                    <p className="whitespace-pre-wrap p-4 rounded-xl" style={{ background: 'var(--dash-surface)', color: 'var(--dash-text)' }}>
+                      {selectedRequest.message}
+                    </p>
+                  </div>
 
-                    {/* Message */}
-                    <div>
-                      <p className="text-sm text-gray-400 mb-2">הודעה:</p>
-                      <p className="text-gray-200 whitespace-pre-wrap bg-gray-700/30 p-4 rounded-xl">
-                        {selectedRequest.message}
-                      </p>
-                    </div>
+                  {/* Timestamp */}
+                  <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--dash-text-3)' }}>
+                    <Clock className="w-4 h-4" />
+                    <span>{new Date(selectedRequest.created_at).toLocaleString('he-IL')}</span>
+                  </div>
 
-                    {/* Timestamp */}
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                      <Clock className="w-4 h-4" />
-                      <span>{new Date(selectedRequest.created_at).toLocaleString('he-IL')}</span>
-                    </div>
-
-                    {/* Status Actions */}
-                    <div className="pt-4 border-t border-gray-700">
-                      <p className="text-sm text-gray-400 mb-3">שנה סטטוס:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {(['new', 'in_progress', 'resolved', 'closed'] as const).map((status) => (
-                          <button
-                            key={status}
-                            onClick={() => handleStatusChange(selectedRequest.id, status)}
-                            disabled={updating || selectedRequest.status === status}
-                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all disabled:opacity-50 ${
-                              selectedRequest.status === status
-                                ? `${statusConfig[status].color} text-white`
-                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                            }`}
-                          >
-                            {statusConfig[status].label}
-                          </button>
-                        ))}
-                      </div>
+                  {/* Status Actions */}
+                  <div className="pt-4" style={{ borderTop: '1px solid var(--dash-border)' }}>
+                    <p className="text-sm mb-3" style={{ color: 'var(--dash-text-2)' }}>שנה סטטוס:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {(['new', 'in_progress', 'resolved', 'closed'] as const).map((status) => (
+                        <button
+                          key={status}
+                          onClick={() => handleStatusChange(selectedRequest.id, status)}
+                          disabled={updating || selectedRequest.status === status}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all disabled:opacity-50 ${
+                            selectedRequest.status === status
+                              ? `${statusConfig[status].color} text-white`
+                              : ''
+                          }`}
+                          style={selectedRequest.status !== status ? {
+                            background: 'var(--dash-surface)',
+                            color: 'var(--dash-text-2)',
+                          } : undefined}
+                        >
+                          {statusConfig[status].label}
+                        </button>
+                      ))}
                     </div>
                   </div>
-                </motion.div>
-              ) : (
-                <div className="hidden md:flex items-center justify-center p-12 bg-gray-800/30 border border-gray-700 rounded-xl">
-                  <p className="text-gray-500">בחר פנייה לצפייה בפרטים</p>
                 </div>
-              )}
-            </AnimatePresence>
+              </div>
+            ) : (
+              <div
+                className="hidden md:flex items-center justify-center p-12 rounded-xl border"
+                style={{ borderColor: 'var(--dash-border)' }}
+              >
+                <p style={{ color: 'var(--dash-text-3)' }}>בחר פנייה לצפייה בפרטים</p>
+              </div>
+            )}
           </div>
         )}
       </div>
     </div>
   );
 }
-
-
-
-
-

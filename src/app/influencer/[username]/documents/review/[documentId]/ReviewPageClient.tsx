@@ -151,20 +151,24 @@ export function ReviewPageClient({
 
   if (showManualForm) {
     return (
-      <div className="max-w-4xl mx-auto py-8 px-4">
+      <div
+        className="max-w-6xl mx-auto py-8 px-4"
+        style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}
+      >
         <div className="mb-6">
           <button
             onClick={() => setShowManualForm(false)}
-            className="text-blue-600 hover:text-blue-700 text-sm"
+            className="text-sm"
+            style={{ color: 'var(--color-info)' }}
           >
             ← חזור למצב עריכה
           </button>
         </div>
 
-        <h1 className="text-2xl font-bold text-gray-900 mb-2 text-right">
+        <h1 className="text-2xl font-bold mb-2 text-right" style={{ color: 'var(--dash-text)' }}>
           מילוי ידני - שת"פ חדש
         </h1>
-        <p className="text-gray-600 mb-8 text-right">
+        <p className="mb-8 text-right" style={{ color: 'var(--dash-text-2)' }}>
           מלא את כל הפרטים באופן ידני
         </p>
 
@@ -179,15 +183,18 @@ export function ReviewPageClient({
   }
 
   return (
-    <div className="max-w-6xl mx-auto py-8 px-4">
+    <div
+      className="max-w-6xl mx-auto py-8 px-4"
+      style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}
+    >
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
           <div className="text-right">
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>
               סקירת מסמך ואישור
             </h1>
-            <p className="text-gray-600">בדוק ותקן את הנתונים שזוהו אוטומטית</p>
+            <p style={{ color: 'var(--dash-text-2)' }}>בדוק ותקן את הנתונים שזוהו אוטומטית</p>
           </div>
           <ConfidenceIndicator
             confidence={overallConfidence}
@@ -196,26 +203,32 @@ export function ReviewPageClient({
         </div>
 
         {/* Document Info */}
-        <div className="bg-gray-50 rounded-lg p-4 flex items-center justify-between">
+        <div
+          className="rounded-lg p-4 flex items-center justify-between"
+          style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}
+        >
           <div className="text-right">
-            <div className="text-sm text-gray-600">קובץ</div>
-            <div className="font-medium">{document.file_name}</div>
+            <div className="text-sm" style={{ color: 'var(--dash-text-2)' }}>קובץ</div>
+            <div className="font-medium" style={{ color: 'var(--dash-text)' }}>{document.file_name}</div>
           </div>
-          <div className="text-sm text-gray-500">
+          <div className="text-sm" style={{ color: 'var(--dash-text-3)' }}>
             {new Date(document.created_at).toLocaleDateString('he-IL')}
           </div>
         </div>
 
         {/* Warnings */}
         {parsingLog?.warnings && parsingLog.warnings.length > 0 && (
-          <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div
+            className="mt-4 rounded-lg p-4"
+            style={{ background: 'var(--dash-surface)', border: '1px solid var(--color-warning)' }}
+          >
             <div className="flex items-start gap-2">
-              <span className="text-yellow-600">⚠</span>
+              <span style={{ color: 'var(--color-warning)' }}>⚠</span>
               <div className="flex-1 text-right">
-                <div className="font-medium text-yellow-800 mb-2">
+                <div className="font-medium mb-2" style={{ color: 'var(--color-warning)' }}>
                   שים לב לשדות הבאים:
                 </div>
-                <ul className="text-sm text-yellow-700 space-y-1">
+                <ul className="text-sm space-y-1" style={{ color: 'var(--dash-text-2)' }}>
                   {parsingLog.warnings.map((warning, i) => (
                     <li key={i}>• {warning}</li>
                   ))}
@@ -230,11 +243,14 @@ export function ReviewPageClient({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Preview */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-lg border border-gray-200 p-4 sticky top-4">
-            <h3 className="font-semibold text-gray-900 mb-4 text-right">
+          <div
+            className="rounded-xl border p-4 sticky top-4"
+            style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
+          >
+            <h3 className="font-semibold mb-4 text-right" style={{ color: 'var(--dash-text)' }}>
               תצוגה מקדימה
             </h3>
-            <div className="text-sm text-gray-600 space-y-2 text-right">
+            <div className="text-sm space-y-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
               <div>
                 <span className="font-medium">מותג:</span>{' '}
                 {parsedData.brand_name || '—'}
@@ -260,7 +276,7 @@ export function ReviewPageClient({
             </div>
 
             {/* Overall Confidence */}
-            <div className="mt-6 pt-4 border-t border-gray-200">
+            <div className="mt-6 pt-4" style={{ borderTop: '1px solid var(--dash-border)' }}>
               <ConfidenceBar confidence={overallConfidence} />
             </div>
           </div>
@@ -269,8 +285,11 @@ export function ReviewPageClient({
         {/* Right Column - Editable Fields */}
         <div className="lg:col-span-2 space-y-6">
           {/* Basic Information */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 text-right">
+          <div
+            className="rounded-xl border p-6"
+            style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
+          >
+            <h3 className="text-lg font-semibold mb-4 text-right" style={{ color: 'var(--dash-text)' }}>
               פרטים בסיסיים
             </h3>
 
@@ -362,8 +381,11 @@ export function ReviewPageClient({
           </div>
 
           {/* Contact Information */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 text-right">
+          <div
+            className="rounded-xl border p-6"
+            style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
+          >
+            <h3 className="text-lg font-semibold mb-4 text-right" style={{ color: 'var(--dash-text)' }}>
               פרטי קשר
             </h3>
 
@@ -393,8 +415,11 @@ export function ReviewPageClient({
           </div>
 
           {/* Notes */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 text-right">
+          <div
+            className="rounded-xl border p-6"
+            style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
+          >
+            <h3 className="text-lg font-semibold mb-4 text-right" style={{ color: 'var(--dash-text)' }}>
               הערות
             </h3>
             <InlineEdit
@@ -409,14 +434,16 @@ export function ReviewPageClient({
           <div className="flex gap-3 justify-end">
             <button
               onClick={() => setShowManualForm(true)}
-              className="px-6 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50"
+              className="px-6 py-2.5 rounded-lg"
+              style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text-2)' }}
             >
               מילוי ידני מלא
             </button>
             <button
               onClick={handleCreatePartnership}
               disabled={isCreating || !parsedData.brand_name}
-              className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-2.5 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ background: 'var(--color-primary)', color: 'white' }}
             >
               {isCreating ? 'יוצר...' : 'צור שת"פ'}
             </button>

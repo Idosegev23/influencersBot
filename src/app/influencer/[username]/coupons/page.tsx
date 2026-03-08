@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import CouponPerformanceTable from '@/components/analytics/CouponPerformanceTable';
 import TopProducts from '@/components/analytics/TopProducts';
+import { Loader2 } from 'lucide-react';
 
 // API response format
 interface ApiCouponData {
@@ -99,14 +100,14 @@ export default function CouponsAnalyticsPage() {
       }
 
       const apiResult: ApiCouponData = await response.json();
-      
+
       // Debug: Check what API returns
-      console.log('🔍 API Result:', apiResult);
-      console.log('🔍 Brand Performance:', apiResult?.brandPerformance);
+      console.log('API Result:', apiResult);
+      console.log('Brand Performance:', apiResult?.brandPerformance);
       if (apiResult?.brandPerformance?.[0]) {
-        console.log('🔍 First Coupon:', apiResult.brandPerformance[0]);
+        console.log('First Coupon:', apiResult.brandPerformance[0]);
       }
-      
+
       // Transform API format to frontend format with null safety
       const transformedData: CouponData = {
         overview: {
@@ -114,8 +115,8 @@ export default function CouponsAnalyticsPage() {
           total_copied: apiResult?.totals?.totalCopies || 0,
           total_used: 0, // Not available from current API
           total_revenue: 0, // Not available from current API
-          avg_conversion_rate: (apiResult?.totals?.totalCopies || 0) > 0 
-            ? ((apiResult?.totals?.totalLinkClicks || 0) / (apiResult?.totals?.totalCopies || 1)) * 100 
+          avg_conversion_rate: (apiResult?.totals?.totalCopies || 0) > 0
+            ? ((apiResult?.totals?.totalLinkClicks || 0) / (apiResult?.totals?.totalCopies || 1)) * 100
             : 0,
           followers_vs_non: {
             followers: 0, // Not available from current API
@@ -141,7 +142,7 @@ export default function CouponsAnalyticsPage() {
           average_price: 0, // Not available
         })),
       };
-      
+
       setData(transformedData);
     } catch (err) {
       console.error('Error loading coupon analytics:', err);
@@ -153,27 +154,30 @@ export default function CouponsAnalyticsPage() {
 
   if (isLoading) {
     return (
-      <div className="max-w-7xl mx-auto py-8 px-4">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/4" />
-          <div className="grid grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-24 bg-gray-200 rounded" />
-            ))}
-          </div>
-        </div>
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ background: 'var(--dash-bg)' }}
+      >
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--dash-text-3)' }} />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="max-w-7xl mx-auto py-8 px-4">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-          <p className="text-red-600">{error}</p>
+      <div className="max-w-6xl mx-auto py-8 px-4" style={{ background: 'var(--dash-bg)' }}>
+        <div
+          className="rounded-xl p-6 text-center"
+          style={{
+            background: 'var(--dash-surface)',
+            border: '1px solid var(--dash-negative)',
+          }}
+        >
+          <p style={{ color: 'var(--dash-negative)' }}>{error}</p>
           <button
             onClick={loadData}
-            className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+            className="mt-4 px-4 py-2 rounded-lg text-white"
+            style={{ background: 'var(--dash-negative)' }}
           >
             נסה שוב
           </button>
@@ -187,78 +191,72 @@ export default function CouponsAnalyticsPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-8 px-4 space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">אנליטיקס קופונים</h1>
-        <p className="text-gray-600 mt-2">ביצועי קופונים ומכירות</p>
+    <div className="min-h-screen" dir="rtl" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
+      <div className="max-w-6xl mx-auto py-8 px-4 space-y-8">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>אנליטיקס קופונים</h1>
+          <p className="mt-2" style={{ color: 'var(--dash-text-2)' }}>ביצועי קופונים ומכירות</p>
+        </div>
+
+        {/* Overview Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {[
+            { label: 'סה"כ קופונים', value: data?.overview?.total_coupons || 0, color: 'var(--dash-text)' },
+            { label: 'הועתקו', value: data?.overview?.total_copied || 0, color: 'var(--color-info)' },
+            { label: 'נוצלו', value: data?.overview?.total_used || 0, color: 'var(--dash-positive)' },
+            { label: 'הכנסות', value: `₪${(data?.overview?.total_revenue || 0).toLocaleString('he-IL')}`, color: '#a855f7' },
+            { label: 'אחוז המרה', value: `${(data?.overview?.avg_conversion_rate || 0).toFixed(1)}%`, color: 'var(--color-warning)' },
+            { label: 'עוקבים / לא', value: `${data?.overview?.followers_vs_non?.followers || 0} / ${data?.overview?.followers_vs_non?.non_followers || 0}`, color: 'var(--dash-positive)' },
+          ].map((card, i) => (
+            <div
+              key={i}
+              className="rounded-xl p-4"
+              style={{
+                background: 'var(--dash-surface)',
+                border: '1px solid var(--dash-border)',
+              }}
+            >
+              <div className="text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>{card.label}</div>
+              <div className="text-2xl font-bold" style={{ color: card.color }}>
+                {card.value}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Coupons Table */}
+        {data?.coupons && data.coupons.length > 0 ? (
+          <CouponPerformanceTable coupons={data.coupons} />
+        ) : (
+          <div
+            className="rounded-xl p-6"
+            style={{
+              background: 'var(--dash-surface)',
+              border: '1px solid var(--dash-border)',
+            }}
+          >
+            <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--dash-text)' }}>ביצועי קופונים מפורטים</h3>
+            <p className="text-center py-8" style={{ color: 'var(--dash-text-3)' }}>אין עדיין נתוני קופונים</p>
+          </div>
+        )}
+
+        {/* Top Products */}
+        {data?.top_products && data.top_products.length > 0 ? (
+          <TopProducts products={data.top_products} />
+        ) : (
+          <div
+            className="rounded-xl p-6"
+            style={{
+              background: 'var(--dash-surface)',
+              border: '1px solid var(--dash-border)',
+            }}
+          >
+            <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--dash-text)' }}>מוצרים פופולריים</h3>
+            <p className="text-center py-8" style={{ color: 'var(--dash-text-3)' }}>אין עדיין נתוני מוצרים</p>
+          </div>
+        )}
       </div>
-
-      {/* Overview Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">סה"כ קופונים</div>
-          <div className="text-2xl font-bold text-gray-900">
-            {data?.overview?.total_coupons || 0}
-          </div>
-        </div>
-
-        <div className="bg-white border border-blue-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">הועתקו</div>
-          <div className="text-2xl font-bold text-blue-600">
-            {data?.overview?.total_copied || 0}
-          </div>
-        </div>
-
-        <div className="bg-white border border-green-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">נוצלו</div>
-          <div className="text-2xl font-bold text-green-600">
-            {data?.overview?.total_used || 0}
-          </div>
-        </div>
-
-        <div className="bg-white border border-purple-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">הכנסות</div>
-          <div className="text-2xl font-bold text-purple-600">
-            ₪{(data?.overview?.total_revenue || 0).toLocaleString('he-IL')}
-          </div>
-        </div>
-
-        <div className="bg-white border border-orange-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">אחוז המרה</div>
-          <div className="text-2xl font-bold text-orange-600">
-            {(data?.overview?.avg_conversion_rate || 0).toFixed(1)}%
-          </div>
-        </div>
-
-        <div className="bg-white border border-emerald-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">עוקבים / לא</div>
-          <div className="text-lg font-bold text-emerald-600">
-            {data?.overview?.followers_vs_non?.followers || 0} /{' '}
-            {data?.overview?.followers_vs_non?.non_followers || 0}
-          </div>
-        </div>
-      </div>
-
-      {/* Coupons Table */}
-      {data?.coupons && data.coupons.length > 0 ? (
-        <CouponPerformanceTable coupons={data.coupons} />
-      ) : (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">ביצועי קופונים מפורטים</h3>
-          <p className="text-gray-500 text-center py-8">אין עדיין נתוני קופונים</p>
-        </div>
-      )}
-
-      {/* Top Products */}
-      {data?.top_products && data.top_products.length > 0 ? (
-        <TopProducts products={data.top_products} />
-      ) : (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">מוצרים פופולריים</h3>
-          <p className="text-gray-500 text-center py-8">אין עדיין נתוני מוצרים</p>
-        </div>
-      )}
     </div>
   );
 }

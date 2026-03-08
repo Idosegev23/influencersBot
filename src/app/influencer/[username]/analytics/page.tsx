@@ -2,11 +2,7 @@
 
 import { useState, useEffect, use, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { motion } from 'framer-motion';
 import {
-  LineChart,
-  Line,
   AreaChart,
   Area,
   BarChart,
@@ -23,7 +19,6 @@ import {
   Package,
   TrendingUp,
   Users,
-  ArrowLeft,
   Calendar,
   Copy,
   MousePointer,
@@ -74,20 +69,20 @@ export default function AnalyticsPage({
   const { startDate, endDate, prevStartDate, prevEndDate } = useMemo(() => {
     const now = new Date();
     now.setHours(23, 59, 59, 999);
-    
+
     const days = parseInt(dateRange);
     const start = new Date(now);
     start.setDate(start.getDate() - days);
     start.setHours(0, 0, 0, 0);
-    
+
     const prevEnd = new Date(start);
     prevEnd.setDate(prevEnd.getDate() - 1);
     prevEnd.setHours(23, 59, 59, 999);
-    
+
     const prevStart = new Date(prevEnd);
     prevStart.setDate(prevStart.getDate() - days);
     prevStart.setHours(0, 0, 0, 0);
-    
+
     return {
       startDate: start,
       endDate: now,
@@ -148,8 +143,8 @@ export default function AnalyticsPage({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center" dir="rtl">
-        <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+      <div className="min-h-screen flex items-center justify-center" dir="rtl" style={{ background: 'var(--dash-bg)' }}>
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--dash-text-3)' }} />
       </div>
     );
   }
@@ -173,166 +168,122 @@ export default function AnalyticsPage({
   }));
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900" dir="rtl">
-      {/* Background Pattern */}
-      <div className="fixed inset-0 opacity-10">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,#6366f1_1px,transparent_0)] bg-[length:50px_50px]" />
-      </div>
+    <div className="min-h-screen" dir="rtl" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
+      {/* Sub-header with date range selector */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-2">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
+            <BarChart3 className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
+            אנליטיקס
+          </h1>
 
-      {/* Header */}
-      <header className="relative z-10 sticky top-0 bg-slate-900/80 backdrop-blur-xl border-b border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link
-                href={`/influencer/${username}/dashboard`}
-                className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5" />
-                <span className="hidden sm:inline">חזרה לדאשבורד</span>
-              </Link>
-              <div className="h-6 w-px bg-gray-700" />
-              <h1 className="text-xl font-bold text-white flex items-center gap-2">
-                <BarChart3 className="w-6 h-6 text-indigo-400" />
-                אנליטיקס
-              </h1>
-            </div>
-
-            {/* Date Range Selector */}
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-gray-400" />
-              <select
-                value={dateRange}
-                onChange={(e) => setDateRange(e.target.value as DateRange)}
-                className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                {dateRangeOptions.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-            </div>
+          {/* Date Range Selector */}
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4" style={{ color: 'var(--dash-text-3)' }} />
+            <select
+              value={dateRange}
+              onChange={(e) => setDateRange(e.target.value as DateRange)}
+              className="rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+              style={{
+                background: 'var(--dash-surface)',
+                border: '1px solid var(--dash-border)',
+                color: 'var(--dash-text)',
+              }}
+            >
+              {dateRangeOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
           </div>
         </div>
-      </header>
+      </div>
 
-      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-6">
         {/* Summary Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-5"
-          >
-            <div className="flex items-start justify-between mb-3">
-              <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                <MessageCircle className="w-6 h-6 text-blue-400" />
+          {[
+            {
+              icon: <MessageCircle className="w-6 h-6 text-blue-400" />,
+              iconBg: 'rgba(59,130,246,0.15)',
+              change: sessionsChange,
+              value: formatNumber(summary.totalSessions),
+              label: 'שיחות',
+            },
+            {
+              icon: <TrendingUp className="w-6 h-6 text-green-400" />,
+              iconBg: 'rgba(34,197,94,0.15)',
+              change: messagesChange,
+              value: formatNumber(summary.totalMessages),
+              label: 'הודעות',
+              sub: `ממוצע ${summary.avgMessagesPerSession} לשיחה`,
+            },
+            {
+              icon: <Copy className="w-6 h-6 text-purple-400" />,
+              iconBg: 'rgba(168,85,247,0.15)',
+              change: couponsChange,
+              value: formatNumber(summary.totalCouponCopies),
+              label: 'קופונים הועתקו',
+            },
+            {
+              icon: <MousePointer className="w-6 h-6 text-orange-400" />,
+              iconBg: 'rgba(249,115,22,0.15)',
+              change: clicksChange,
+              value: formatNumber(summary.totalProductClicks),
+              label: 'קליקים על מוצרים',
+            },
+          ].map((card, i) => (
+            <div
+              key={i}
+              className="rounded-xl p-5"
+              style={{
+                background: 'var(--dash-surface)',
+                border: '1px solid var(--dash-border)',
+              }}
+            >
+              <div className="flex items-start justify-between mb-3">
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center"
+                  style={{ background: card.iconBg }}
+                >
+                  {card.icon}
+                </div>
+                <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full`}
+                  style={{
+                    background: card.change.isPositive ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+                    color: card.change.isPositive ? 'var(--dash-positive)' : 'var(--dash-negative)',
+                  }}
+                >
+                  {card.change.isPositive ? (
+                    <ArrowUpRight className="w-3 h-3" />
+                  ) : (
+                    <ArrowDownRight className="w-3 h-3" />
+                  )}
+                  {card.change.value}%
+                </div>
               </div>
-              <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full ${
-                sessionsChange.isPositive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-              }`}>
-                {sessionsChange.isPositive ? (
-                  <ArrowUpRight className="w-3 h-3" />
-                ) : (
-                  <ArrowDownRight className="w-3 h-3" />
-                )}
-                {sessionsChange.value}%
-              </div>
+              <p className="text-3xl font-bold mb-1" style={{ color: 'var(--dash-text)' }}>{card.value}</p>
+              <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>{card.label}</p>
+              {card.sub && (
+                <p className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>
+                  {card.sub}
+                </p>
+              )}
             </div>
-            <p className="text-3xl font-bold text-white mb-1">{formatNumber(summary.totalSessions)}</p>
-            <p className="text-sm text-gray-400">שיחות</p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-5"
-          >
-            <div className="flex items-start justify-between mb-3">
-              <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-green-400" />
-              </div>
-              <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full ${
-                messagesChange.isPositive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-              }`}>
-                {messagesChange.isPositive ? (
-                  <ArrowUpRight className="w-3 h-3" />
-                ) : (
-                  <ArrowDownRight className="w-3 h-3" />
-                )}
-                {messagesChange.value}%
-              </div>
-            </div>
-            <p className="text-3xl font-bold text-white mb-1">{formatNumber(summary.totalMessages)}</p>
-            <p className="text-sm text-gray-400">הודעות</p>
-            <p className="text-xs text-gray-500 mt-1">
-              ממוצע {summary.avgMessagesPerSession} לשיחה
-            </p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-5"
-          >
-            <div className="flex items-start justify-between mb-3">
-              <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                <Copy className="w-6 h-6 text-purple-400" />
-              </div>
-              <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full ${
-                couponsChange.isPositive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-              }`}>
-                {couponsChange.isPositive ? (
-                  <ArrowUpRight className="w-3 h-3" />
-                ) : (
-                  <ArrowDownRight className="w-3 h-3" />
-                )}
-                {couponsChange.value}%
-              </div>
-            </div>
-            <p className="text-3xl font-bold text-white mb-1">{formatNumber(summary.totalCouponCopies)}</p>
-            <p className="text-sm text-gray-400">קופונים הועתקו</p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25 }}
-            className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-5"
-          >
-            <div className="flex items-start justify-between mb-3">
-              <div className="w-12 h-12 rounded-xl bg-orange-500/20 flex items-center justify-center">
-                <MousePointer className="w-6 h-6 text-orange-400" />
-              </div>
-              <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full ${
-                clicksChange.isPositive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-              }`}>
-                {clicksChange.isPositive ? (
-                  <ArrowUpRight className="w-3 h-3" />
-                ) : (
-                  <ArrowDownRight className="w-3 h-3" />
-                )}
-                {clicksChange.value}%
-              </div>
-            </div>
-            <p className="text-3xl font-bold text-white mb-1">{formatNumber(summary.totalProductClicks)}</p>
-            <p className="text-sm text-gray-400">קליקים על מוצרים</p>
-          </motion.div>
+          ))}
         </div>
 
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* Sessions & Messages Chart */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-6"
+          <div
+            className="rounded-xl p-6"
+            style={{
+              background: 'var(--dash-surface)',
+              border: '1px solid var(--dash-border)',
+            }}
           >
-            <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-indigo-400" />
+            <h3 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
+              <TrendingUp className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
               שיחות והודעות
             </h3>
             <div className="h-72">
@@ -348,17 +299,18 @@ export default function AnalyticsPage({
                       <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="date" stroke="#9ca3af" fontSize={12} />
-                  <YAxis stroke="#9ca3af" fontSize={12} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--dash-border)" />
+                  <XAxis dataKey="date" stroke="var(--dash-text-3)" fontSize={12} />
+                  <YAxis stroke="var(--dash-text-3)" fontSize={12} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: '#1f2937',
-                      border: '1px solid #374151',
+                      backgroundColor: 'var(--dash-surface)',
+                      border: '1px solid var(--dash-border)',
                       borderRadius: '8px',
                       direction: 'rtl',
+                      color: 'var(--dash-text)',
                     }}
-                    labelStyle={{ color: '#fff' }}
+                    labelStyle={{ color: 'var(--dash-text)' }}
                   />
                   <Legend />
                   <Area
@@ -380,33 +332,35 @@ export default function AnalyticsPage({
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-          </motion.div>
+          </div>
 
           {/* Conversions Chart */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35 }}
-            className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-6"
+          <div
+            className="rounded-xl p-6"
+            style={{
+              background: 'var(--dash-surface)',
+              border: '1px solid var(--dash-border)',
+            }}
           >
-            <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-              <Package className="w-5 h-5 text-indigo-400" />
+            <h3 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
+              <Package className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
               קופונים וקליקים
             </h3>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="date" stroke="#9ca3af" fontSize={12} />
-                  <YAxis stroke="#9ca3af" fontSize={12} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--dash-border)" />
+                  <XAxis dataKey="date" stroke="var(--dash-text-3)" fontSize={12} />
+                  <YAxis stroke="var(--dash-text-3)" fontSize={12} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: '#1f2937',
-                      border: '1px solid #374151',
+                      backgroundColor: 'var(--dash-surface)',
+                      border: '1px solid var(--dash-border)',
                       borderRadius: '8px',
                       direction: 'rtl',
+                      color: 'var(--dash-text)',
                     }}
-                    labelStyle={{ color: '#fff' }}
+                    labelStyle={{ color: 'var(--dash-text)' }}
                   />
                   <Legend />
                   <Bar dataKey="couponCopies" name="קופונים הועתקו" fill="#a855f7" radius={[4, 4, 0, 0]} />
@@ -414,18 +368,19 @@ export default function AnalyticsPage({
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          </motion.div>
+          </div>
         </div>
 
         {/* Top Products */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-6"
+        <div
+          className="rounded-xl p-6"
+          style={{
+            background: 'var(--dash-surface)',
+            border: '1px solid var(--dash-border)',
+          }}
         >
-          <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-            <Package className="w-5 h-5 text-indigo-400" />
+          <h3 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
+            <Package className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
             מוצרים מובילים
           </h3>
 
@@ -433,7 +388,7 @@ export default function AnalyticsPage({
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="text-gray-400 text-sm border-b border-gray-700">
+                  <tr className="text-sm" style={{ borderBottom: '1px solid var(--dash-border)', color: 'var(--dash-text-2)' }}>
                     <th className="text-right py-3 px-4">#</th>
                     <th className="text-right py-3 px-4">מוצר</th>
                     <th className="text-right py-3 px-4">מותג</th>
@@ -444,19 +399,27 @@ export default function AnalyticsPage({
                 </thead>
                 <tbody>
                   {topProducts.map((product, index) => (
-                    <tr key={product.id} className="border-b border-gray-700/50 hover:bg-gray-700/30 transition-colors">
+                    <tr
+                      key={product.id}
+                      className="transition-colors"
+                      style={{ borderBottom: '1px solid var(--dash-border)' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--dash-surface-hover)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                    >
                       <td className="py-4 px-4">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
                           index === 0 ? 'bg-yellow-500/20 text-yellow-400' :
                           index === 1 ? 'bg-gray-400/20 text-gray-300' :
                           index === 2 ? 'bg-orange-500/20 text-orange-400' :
-                          'bg-gray-600/20 text-gray-400'
-                        }`}>
+                          ''
+                        }`}
+                          style={index > 2 ? { background: 'var(--dash-muted)', color: 'var(--dash-text-3)' } : undefined}
+                        >
                           {index + 1}
                         </div>
                       </td>
-                      <td className="py-4 px-4 text-white font-medium">{product.name}</td>
-                      <td className="py-4 px-4 text-gray-400">{product.brand || '-'}</td>
+                      <td className="py-4 px-4 font-medium" style={{ color: 'var(--dash-text)' }}>{product.name}</td>
+                      <td className="py-4 px-4" style={{ color: 'var(--dash-text-2)' }}>{product.brand || '-'}</td>
                       <td className="py-4 px-4 text-center">
                         <span className="inline-flex items-center gap-1 text-orange-400">
                           <MousePointer className="w-4 h-4" />
@@ -481,57 +444,62 @@ export default function AnalyticsPage({
             </div>
           ) : (
             <div className="text-center py-12">
-              <Package className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-              <p className="text-gray-400">אין נתונים על מוצרים בתקופה זו</p>
+              <Package className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--dash-text-3)' }} />
+              <p style={{ color: 'var(--dash-text-2)' }}>אין נתונים על מוצרים בתקופה זו</p>
             </div>
           )}
-        </motion.div>
+        </div>
 
         {/* Additional Stats Cards */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.45 }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8"
-        >
-          <div className="bg-gradient-to-br from-indigo-600/20 to-purple-600/20 border border-indigo-500/30 rounded-2xl p-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+          <div
+            className="rounded-xl p-6"
+            style={{
+              background: 'var(--dash-surface)',
+              border: '1px solid var(--dash-border)',
+            }}
+          >
             <div className="flex items-center gap-3 mb-2">
-              <Users className="w-6 h-6 text-indigo-400" />
-              <span className="text-gray-400">מבקרים ייחודיים</span>
+              <Users className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
+              <span style={{ color: 'var(--dash-text-2)' }}>מבקרים ייחודיים</span>
             </div>
-            <p className="text-3xl font-bold text-white">{formatNumber(summary.uniqueVisitors)}</p>
+            <p className="text-3xl font-bold" style={{ color: 'var(--dash-text)' }}>{formatNumber(summary.uniqueVisitors)}</p>
           </div>
 
-          <div className="bg-gradient-to-br from-green-600/20 to-emerald-600/20 border border-green-500/30 rounded-2xl p-6">
+          <div
+            className="rounded-xl p-6"
+            style={{
+              background: 'var(--dash-surface)',
+              border: '1px solid var(--dash-border)',
+            }}
+          >
             <div className="flex items-center gap-3 mb-2">
-              <MessageCircle className="w-6 h-6 text-green-400" />
-              <span className="text-gray-400">ממוצע הודעות לשיחה</span>
+              <MessageCircle className="w-6 h-6" style={{ color: 'var(--dash-positive)' }} />
+              <span style={{ color: 'var(--dash-text-2)' }}>ממוצע הודעות לשיחה</span>
             </div>
-            <p className="text-3xl font-bold text-white">{summary.avgMessagesPerSession}</p>
+            <p className="text-3xl font-bold" style={{ color: 'var(--dash-text)' }}>{summary.avgMessagesPerSession}</p>
           </div>
 
-          <div className="bg-gradient-to-br from-orange-600/20 to-red-600/20 border border-orange-500/30 rounded-2xl p-6">
+          <div
+            className="rounded-xl p-6"
+            style={{
+              background: 'var(--dash-surface)',
+              border: '1px solid var(--dash-border)',
+            }}
+          >
             <div className="flex items-center gap-3 mb-2">
               <TrendingUp className="w-6 h-6 text-orange-400" />
-              <span className="text-gray-400">שיעור המרה</span>
+              <span style={{ color: 'var(--dash-text-2)' }}>שיעור המרה</span>
             </div>
-            <p className="text-3xl font-bold text-white">
-              {summary.totalSessions > 0 
+            <p className="text-3xl font-bold" style={{ color: 'var(--dash-text)' }}>
+              {summary.totalSessions > 0
                 ? Math.round((summary.totalCouponCopies / summary.totalSessions) * 100)
                 : 0}%
             </p>
-            <p className="text-xs text-gray-500 mt-1">קופונים / שיחות</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>קופונים / שיחות</p>
           </div>
-        </motion.div>
+        </div>
       </main>
     </div>
   );
 }
-
-
-
-
-
-
-
-

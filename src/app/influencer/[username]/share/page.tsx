@@ -3,7 +3,6 @@
 import { useState, useEffect, use, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
 import {
   Share2,
   ArrowLeft,
@@ -58,12 +57,12 @@ function QRCodeSVG({ value, size = 200, bgColor = '#ffffff', fgColor = '#000000'
 function generateQRPattern(data: string): boolean[][] {
   const size = 25;
   const pattern: boolean[][] = Array(size).fill(null).map(() => Array(size).fill(false));
-  
+
   // Position detection patterns (corners)
   const addFinderPattern = (startX: number, startY: number) => {
     for (let y = 0; y < 7; y++) {
       for (let x = 0; x < 7; x++) {
-        if (y === 0 || y === 6 || x === 0 || x === 6 || 
+        if (y === 0 || y === 6 || x === 0 || x === 6 ||
             (y >= 2 && y <= 4 && x >= 2 && x <= 4)) {
           pattern[startY + y][startX + x] = true;
         }
@@ -221,8 +220,8 @@ export default function SharePage({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center" dir="rtl">
-        <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+      <div className="min-h-screen flex items-center justify-center" dir="rtl" style={{ background: 'var(--dash-bg)' }}>
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--color-primary)' }} />
       </div>
     );
   }
@@ -230,42 +229,16 @@ export default function SharePage({
   if (!influencer) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900" dir="rtl">
-      {/* Background Pattern */}
-      <div className="fixed inset-0 opacity-10">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,#6366f1_1px,transparent_0)] bg-[length:50px_50px]" />
-      </div>
-
-      {/* Header */}
-      <header className="relative z-10 sticky top-0 bg-slate-900/80 backdrop-blur-xl border-b border-gray-800">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4">
-          <div className="flex items-center gap-4">
-            <Link
-              href={`/influencer/${username}/dashboard`}
-              className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              <span className="hidden sm:inline">חזרה</span>
-            </Link>
-            <div className="h-6 w-px bg-gray-700" />
-            <h1 className="text-xl font-bold text-white flex items-center gap-2">
-              <Share2 className="w-6 h-6 text-indigo-400" />
-              שיתוף
-            </h1>
-          </div>
-        </div>
-      </header>
-
-      <main className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 py-8">
+    <div className="min-h-screen" dir="rtl" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* QR Code Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-6"
+          <div
+            className="rounded-xl border p-6"
+            style={{ borderColor: 'var(--dash-border)' }}
           >
-            <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-              <QrCode className="w-5 h-5 text-indigo-400" />
+            <h2 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
+              <QrCode className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
               QR Code
             </h2>
 
@@ -282,46 +255,48 @@ export default function SharePage({
                 />
               </div>
 
-              <p className="text-sm text-gray-400 mb-4 text-center">
+              <p className="text-sm mb-4 text-center" style={{ color: 'var(--dash-text-2)' }}>
                 סרקו את הקוד כדי לגשת ישירות לצ'אטבוט
               </p>
 
               <button
                 onClick={handleDownloadQR}
-                className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition-colors"
+                className="flex items-center gap-2 px-6 py-3 rounded-xl transition-colors"
+                style={{ background: 'var(--color-primary)', color: 'white' }}
               >
                 <Download className="w-5 h-5" />
                 הורד QR Code
               </button>
             </div>
-          </motion.div>
+          </div>
 
           {/* Links Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-6"
+          <div
+            className="rounded-xl border p-6"
+            style={{ borderColor: 'var(--dash-border)' }}
           >
-            <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-              <Link2 className="w-5 h-5 text-indigo-400" />
+            <h2 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
+              <Link2 className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
               לינקים
             </h2>
 
             {/* Basic Link */}
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-400 mb-2">לינק בסיסי</label>
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>לינק בסיסי</label>
               <div className="flex items-center gap-2">
-                <div className="flex-1 px-4 py-3 bg-gray-700 rounded-lg text-sm text-gray-300 truncate">
+                <div
+                  className="flex-1 px-4 py-3 rounded-lg text-sm truncate"
+                  style={{ background: 'var(--dash-surface)', color: 'var(--dash-text-2)' }}
+                >
                   {chatLink}
                 </div>
                 <button
                   onClick={() => handleCopy(chatLink, 'basic')}
-                  className={`p-3 rounded-lg transition-colors ${
-                    copied === 'basic'
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-700 text-gray-400 hover:text-white hover:bg-gray-600'
-                  }`}
+                  className="p-3 rounded-lg transition-colors"
+                  style={{
+                    background: copied === 'basic' ? 'var(--dash-positive)' : 'var(--dash-surface)',
+                    color: copied === 'basic' ? 'white' : 'var(--dash-text-2)',
+                  }}
                 >
                   {copied === 'basic' ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
                 </button>
@@ -329,7 +304,8 @@ export default function SharePage({
                   href={chatLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-3 bg-gray-700 text-gray-400 hover:text-white hover:bg-gray-600 rounded-lg transition-colors"
+                  className="p-3 rounded-lg transition-colors"
+                  style={{ background: 'var(--dash-surface)', color: 'var(--dash-text-2)' }}
                 >
                   <ExternalLink className="w-5 h-5" />
                 </a>
@@ -337,9 +313,9 @@ export default function SharePage({
             </div>
 
             {/* UTM Link Builder */}
-            <div className="border-t border-gray-700 pt-6">
-              <label className="block text-sm font-medium text-gray-400 mb-3">לינק עם מעקב (UTM)</label>
-              
+            <div className="pt-6" style={{ borderTop: '1px solid var(--dash-border)' }}>
+              <label className="block text-sm font-medium mb-3" style={{ color: 'var(--dash-text-2)' }}>לינק עם מעקב (UTM)</label>
+
               {/* Source Selection */}
               <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-4">
                 {utmSources.map((source) => {
@@ -348,11 +324,12 @@ export default function SharePage({
                     <button
                       key={source.id}
                       onClick={() => setSelectedSource(source.id)}
-                      className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${
-                        selectedSource === source.id
-                          ? 'border-indigo-500 bg-indigo-500/10 text-white'
-                          : 'border-gray-700 text-gray-400 hover:border-gray-600 hover:text-white'
-                      }`}
+                      className="flex flex-col items-center gap-2 p-3 rounded-xl border transition-all"
+                      style={{
+                        borderColor: selectedSource === source.id ? 'var(--color-primary)' : 'var(--dash-border)',
+                        background: selectedSource === source.id ? 'color-mix(in srgb, var(--color-primary) 10%, transparent)' : 'transparent',
+                        color: selectedSource === source.id ? 'var(--dash-text)' : 'var(--dash-text-2)',
+                      }}
                     >
                       <Icon className="w-5 h-5" />
                       <span className="text-xs">{source.label}</span>
@@ -369,14 +346,16 @@ export default function SharePage({
                     value={customSource}
                     onChange={(e) => setCustomSource(e.target.value)}
                     placeholder="מקור (source)"
-                    className="bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
                   />
                   <input
                     type="text"
                     value={customMedium}
                     onChange={(e) => setCustomMedium(e.target.value)}
                     placeholder="אמצעי (medium)"
-                    className="bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
                   />
                 </div>
               )}
@@ -387,65 +366,59 @@ export default function SharePage({
                 value={customCampaign}
                 onChange={(e) => setCustomCampaign(e.target.value)}
                 placeholder="שם הקמפיין (אופציונלי)"
-                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-sm text-white mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full rounded-lg px-4 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
               />
 
               {/* Generated UTM Link */}
               <div className="flex items-center gap-2">
-                <div className="flex-1 px-4 py-3 bg-gray-700 rounded-lg text-sm text-gray-300 truncate">
+                <div
+                  className="flex-1 px-4 py-3 rounded-lg text-sm truncate"
+                  style={{ background: 'var(--dash-surface)', color: 'var(--dash-text-2)' }}
+                >
                   {utmLink}
                 </div>
                 <button
                   onClick={() => handleCopy(utmLink, 'utm')}
-                  className={`p-3 rounded-lg transition-colors ${
-                    copied === 'utm'
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-700 text-gray-400 hover:text-white hover:bg-gray-600'
-                  }`}
+                  className="p-3 rounded-lg transition-colors"
+                  style={{
+                    background: copied === 'utm' ? 'var(--dash-positive)' : 'var(--dash-surface)',
+                    color: copied === 'utm' ? 'white' : 'var(--dash-text-2)',
+                  }}
                 >
                   {copied === 'utm' ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
                 </button>
               </div>
             </div>
-          </motion.div>
+          </div>
         </div>
 
         {/* Tips */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="mt-8 bg-gradient-to-r from-indigo-600/20 to-purple-600/20 border border-indigo-500/30 rounded-2xl p-6"
+        <div
+          className="mt-8 rounded-xl border p-6"
+          style={{ borderColor: 'color-mix(in srgb, var(--color-primary) 30%, transparent)', background: 'color-mix(in srgb, var(--color-primary) 5%, transparent)' }}
         >
-          <h3 className="font-semibold text-white mb-4">💡 טיפים לשיתוף</h3>
-          <ul className="space-y-2 text-sm text-gray-300">
+          <h3 className="font-semibold mb-4" style={{ color: 'var(--dash-text)' }}>💡 טיפים לשיתוף</h3>
+          <ul className="space-y-2 text-sm" style={{ color: 'var(--dash-text-2)' }}>
             <li className="flex items-start gap-2">
-              <span className="text-indigo-400">•</span>
+              <span style={{ color: 'var(--color-primary)' }}>•</span>
               הוסיפו את הלינק לביו באינסטגרם או ב-Linktree
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-indigo-400">•</span>
+              <span style={{ color: 'var(--color-primary)' }}>•</span>
               השתמשו ב-QR Code בסטוריז או בפוסטים
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-indigo-400">•</span>
+              <span style={{ color: 'var(--color-primary)' }}>•</span>
               לינקים עם UTM יעזרו לכם לעקוב מאיפה מגיעים המבקרים
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-indigo-400">•</span>
+              <span style={{ color: 'var(--color-primary)' }}>•</span>
               שנו את שם הקמפיין לכל פרסום שונה למעקב מדויק
             </li>
           </ul>
-        </motion.div>
+        </div>
       </main>
     </div>
   );
 }
-
-
-
-
-
-
-
-

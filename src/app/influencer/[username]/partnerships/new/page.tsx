@@ -88,7 +88,7 @@ export default function NewPartnershipPage() {
       });
 
       if (!metadataResponse.ok) throw new Error('Failed to save document metadata');
-      
+
       const { document } = await metadataResponse.json();
       setUploadedDocumentId(document.id);
       setIsUploading(false);
@@ -96,7 +96,7 @@ export default function NewPartnershipPage() {
       // 4. Parse document with AI
       setIsParsing(true);
       console.log('[Partnership Creation] 🔄 Calling parse API for document:', document.id);
-      
+
       const parseResponse = await fetch('/api/influencer/documents/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -118,22 +118,22 @@ export default function NewPartnershipPage() {
       console.log('🔍 parseResult keys:', Object.keys(parseResult));
       console.log('🔍 parseResult.results:', parseResult.results);
       console.log('🔍 parseResult.results[0]:', parseResult.results?.[0]);
-      
+
       // 5. Get parsed data from API response
       const data = parseResult.results?.[0]?.data;
       console.log('🔍 data extracted:', data);
       console.log('🔍 data.parties:', data?.parties);
       console.log('🔍 data.parties.brand:', data?.parties?.brand);
-      
+
       if (!data) {
         throw new Error('לא נמצאו נתונים מנותחים');
       }
-      
+
       // Save raw data for review screen
       console.log('💾 Saving to parsedRawData:', JSON.stringify(data, null, 2));
       setParsedRawData(data);
       console.log('✅ parsedRawData saved');
-      
+
       // Map to form fields - SIMPLE AND DIRECT
       // Keep deliverables as text for form display
       const deliverablesText = Array.isArray(data.deliverables)
@@ -147,7 +147,7 @@ export default function NewPartnershipPage() {
             })
             .join('\n')
         : '';
-      
+
       setFormData({
         brand_name: data.parties?.brand || '',
         campaign_name: data.scope || '',
@@ -158,7 +158,7 @@ export default function NewPartnershipPage() {
         deliverables: deliverablesText, // Text for editing
         notes: '',
       });
-      
+
       console.log('[Partnership Creation] ✅ Form data set:', {
         brand_name: data.parties?.brand,
         amount: data.paymentTerms?.totalAmount,
@@ -197,7 +197,7 @@ export default function NewPartnershipPage() {
       // Add full parsed contract data if available (from AI parsing)
       if (parsedRawData) {
         console.log('[Partnership Creation] 💾 Saving full parsed data to partnership');
-        
+
         partnershipData.payment_schedule = parsedRawData.paymentTerms?.schedule || [];
         partnershipData.exclusivity = parsedRawData.exclusivity || null;
         partnershipData.termination_clauses = parsedRawData.terminationClauses || [];
@@ -207,7 +207,7 @@ export default function NewPartnershipPage() {
         partnershipData.contract_scope = parsedRawData.scope || null;
         partnershipData.auto_renewal = parsedRawData.autoRenewal || false;
         partnershipData.parsed_contract_data = parsedRawData; // Full backup
-        
+
         // Save deliverables as structured JSONB array (not text!)
         if (Array.isArray(parsedRawData.deliverables)) {
           partnershipData.deliverables = parsedRawData.deliverables;
@@ -237,7 +237,7 @@ export default function NewPartnershipPage() {
       if (uploadedDocumentId) {
         try {
           console.log('[Partnership Creation] 🔗 Linking document to partnership:', uploadedDocumentId, '→', partnershipId);
-          
+
           await fetch(`/api/influencer/documents/${uploadedDocumentId}/update-parsed`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -245,7 +245,7 @@ export default function NewPartnershipPage() {
               partnership_id: partnershipId,
             }),
           });
-          
+
           console.log('[Partnership Creation] ✅ Document linked to partnership');
         } catch (linkError) {
           console.error('[Partnership Creation] ⚠️ Failed to link document:', linkError);
@@ -256,7 +256,7 @@ export default function NewPartnershipPage() {
       // Upload documents if any - DIRECT to Supabase Storage (bypasses Vercel 4.5MB limit)
       if (uploadedFiles.length > 0) {
         const accountId = result.partnership.account_id;
-        
+
         for (const file of uploadedFiles) {
           try {
             // Check file size (max 10MB)
@@ -316,12 +316,13 @@ export default function NewPartnershipPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4">
+    <div className="max-w-4xl mx-auto py-8 px-4" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
       {/* Back Button */}
       <div className="mb-6">
         <button
           onClick={() => router.back()}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+          className="flex items-center gap-2 transition-colors"
+          style={{ color: 'var(--dash-text-2)' }}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -332,15 +333,15 @@ export default function NewPartnershipPage() {
 
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">שת"פ חדש</h1>
-        <p className="text-gray-600 mt-2">
+        <h1 className="text-3xl font-bold" style={{ color: 'var(--dash-text)' }}>שת"פ חדש</h1>
+        <p className="mt-2" style={{ color: 'var(--dash-text-2)' }}>
           {creationMode === 'select' ? 'בחר אופן יצירה' : 'הוסף שת"פ חדש עם מותג'}
         </p>
       </div>
 
       {/* Error Message */}
       {error && (
-        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 text-red-600">
+        <div className="mb-6 rounded-xl border p-4" style={{ borderColor: 'var(--dash-negative)', background: 'var(--dash-surface)', color: 'var(--dash-negative)' }}>
           {error}
         </div>
       )}
@@ -351,20 +352,23 @@ export default function NewPartnershipPage() {
           {/* Option 1: Upload + AI */}
           <button
             onClick={() => setCreationMode('upload')}
-            className="bg-white rounded-lg border-2 border-gray-200 hover:border-blue-500 p-8 text-center transition-all group"
+            className="rounded-xl border-2 p-8 text-center transition-all group"
+            style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-primary)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--dash-border)'; }}
           >
             <div className="flex justify-center mb-4">
-              <div className="h-16 w-16 rounded-full bg-blue-100 flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                <Upload className="h-8 w-8 text-blue-600" />
+              <div className="h-16 w-16 rounded-full flex items-center justify-center" style={{ background: 'var(--dash-surface-hover)' }}>
+                <Upload className="h-8 w-8" style={{ color: 'var(--color-primary)' }} />
               </div>
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">
+            <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--dash-text)' }}>
               העלה מסמך + AI
             </h3>
-            <p className="text-gray-600 text-sm">
+            <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>
               העלה חוזה או ברייף והמערכת תמלא את הפרטים אוטומטית
             </p>
-            <div className="mt-4 inline-flex items-center gap-2 text-sm text-blue-600 font-medium">
+            <div className="mt-4 inline-flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--color-primary)' }}>
               <span>מומלץ</span>
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -375,20 +379,23 @@ export default function NewPartnershipPage() {
           {/* Option 2: Manual */}
           <button
             onClick={() => setCreationMode('manual')}
-            className="bg-white rounded-lg border-2 border-gray-200 hover:border-blue-500 p-8 text-center transition-all group"
+            className="rounded-xl border-2 p-8 text-center transition-all group"
+            style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-primary)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--dash-border)'; }}
           >
             <div className="flex justify-center mb-4">
-              <div className="h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-gray-200 transition-colors">
-                <FileText className="h-8 w-8 text-gray-600" />
+              <div className="h-16 w-16 rounded-full flex items-center justify-center" style={{ background: 'var(--dash-surface-hover)' }}>
+                <FileText className="h-8 w-8" style={{ color: 'var(--dash-text-2)' }} />
               </div>
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">
+            <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--dash-text)' }}>
               צור ידנית
             </h3>
-            <p className="text-gray-600 text-sm">
+            <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>
               מלא את כל הפרטים באופן ידני
             </p>
-            <div className="mt-4 inline-flex items-center gap-2 text-sm text-gray-600 font-medium">
+            <div className="mt-4 inline-flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--dash-text-3)' }}>
               <span>מתאים לשת"פ ללא מסמך</span>
             </div>
           </button>
@@ -397,21 +404,21 @@ export default function NewPartnershipPage() {
 
       {/* UPLOAD MODE */}
       {creationMode === 'upload' && (
-        <div className="bg-white rounded-lg border border-gray-200 p-8">
+        <div className="rounded-xl border p-8" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
           <div className="max-w-xl mx-auto">
             {!isUploading && !isParsing && (
               <>
                 <div className="text-center mb-6">
-                  <Upload className="h-16 w-16 text-blue-600 mx-auto mb-4" />
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">
+                  <Upload className="h-16 w-16 mx-auto mb-4" style={{ color: 'var(--color-primary)' }} />
+                  <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--dash-text)' }}>
                     העלה מסמך חוזה או ברייף
                   </h3>
-                  <p className="text-gray-600">
+                  <p style={{ color: 'var(--dash-text-2)' }}>
                     ה-AI ינתח את המסמך וימלא את הפרטים אוטומטית
                   </p>
                 </div>
 
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                <div className="border-2 border-dashed rounded-lg p-8 text-center" style={{ borderColor: 'var(--dash-border)' }}>
                   <input
                     type="file"
                     accept=".pdf,.doc,.docx"
@@ -426,11 +433,11 @@ export default function NewPartnershipPage() {
                     htmlFor="document-upload"
                     className="cursor-pointer inline-flex flex-col items-center"
                   >
-                    <Upload className="h-12 w-12 text-gray-400 mb-3" />
-                    <span className="text-lg font-medium text-gray-700 mb-1">
+                    <Upload className="h-12 w-12 mb-3" style={{ color: 'var(--dash-text-3)' }} />
+                    <span className="text-lg font-medium mb-1" style={{ color: 'var(--dash-text-2)' }}>
                       לחץ להעלאת מסמך
                     </span>
-                    <span className="text-sm text-gray-500">
+                    <span className="text-sm" style={{ color: 'var(--dash-text-3)' }}>
                       PDF, Word (עד 10MB)
                     </span>
                   </label>
@@ -438,7 +445,8 @@ export default function NewPartnershipPage() {
 
                 <button
                   onClick={() => setCreationMode('select')}
-                  className="mt-6 w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="mt-6 w-full px-4 py-2 border rounded-lg transition-colors"
+                  style={{ borderColor: 'var(--dash-border)', color: 'var(--dash-text-2)' }}
                 >
                   חזור לבחירת שיטה
                 </button>
@@ -446,22 +454,22 @@ export default function NewPartnershipPage() {
             )}
 
             {isUploading && (
-              <div className="text-center py-12">
-                <Loader2 className="h-12 w-12 text-blue-600 animate-spin mx-auto mb-4" />
-                <p className="text-lg font-medium text-gray-900">מעלה מסמך...</p>
-                <p className="text-sm text-gray-600 mt-2">אנא המתן</p>
+              <div className="text-center py-12" style={{ background: 'var(--dash-bg)' }}>
+                <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4" style={{ color: 'var(--color-primary)' }} />
+                <p className="text-lg font-medium" style={{ color: 'var(--dash-text)' }}>מעלה מסמך...</p>
+                <p className="text-sm mt-2" style={{ color: 'var(--dash-text-3)' }}>אנא המתן</p>
               </div>
             )}
 
             {isParsing && (
-              <div className="text-center py-12">
-                <Loader2 className="h-12 w-12 text-blue-600 animate-spin mx-auto mb-4" />
-                <p className="text-lg font-medium text-gray-900">מנתח את החוזה...</p>
-                <p className="text-sm text-gray-600 mt-2">זה עשוי לקחת 30 שניות - 8 דקות</p>
+              <div className="text-center py-12" style={{ background: 'var(--dash-bg)' }}>
+                <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4" style={{ color: 'var(--color-primary)' }} />
+                <p className="text-lg font-medium" style={{ color: 'var(--dash-text)' }}>מנתח את החוזה...</p>
+                <p className="text-sm mt-2" style={{ color: 'var(--dash-text-3)' }}>זה עשוי לקחת 30 שניות - 8 דקות</p>
                 <div className="mt-6 max-w-md mx-auto text-right">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <p className="text-xs font-medium text-blue-900 mb-2">מחלץ מהמסמך:</p>
-                    <ul className="text-xs text-blue-700 space-y-1">
+                  <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--color-info)' }}>
+                    <p className="text-xs font-medium mb-2" style={{ color: 'var(--color-info)' }}>מחלץ מהמסמך:</p>
+                    <ul className="text-xs space-y-1" style={{ color: 'var(--dash-text-2)' }}>
                       <li>✓ שמות הצדדים (מותג, משפיען, סוכן)</li>
                       <li>✓ תאריכים (תחילה, סיום, שנתי)</li>
                       <li>✓ סכום החוזה (בטבלאות ורשימות)</li>
@@ -478,50 +486,50 @@ export default function NewPartnershipPage() {
 
       {/* REVIEW MODE - Show what AI found */}
       {creationMode === 'review' && parsedRawData && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="rounded-xl border p-6" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
           <div className="mb-6">
             <div className="flex items-center gap-3 mb-4">
-              <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
-                <svg className="h-6 w-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+              <div className="h-12 w-12 rounded-full flex items-center justify-center" style={{ background: 'var(--dash-positive)', opacity: 0.15 }}>
+                <svg className="h-6 w-6" style={{ color: 'var(--dash-positive)' }} fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
               </div>
               <div>
-                <h3 className="text-xl font-bold text-gray-900">✅ החוזה נותח בהצלחה!</h3>
-                <p className="text-sm text-gray-600">המערכת זיהתה את הפרטים הבאים:</p>
+                <h3 className="text-xl font-bold" style={{ color: 'var(--dash-text)' }}>החוזה נותח בהצלחה!</h3>
+                <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>המערכת זיהתה את הפרטים הבאים:</p>
               </div>
             </div>
 
             {/* Extracted Data Summary */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               {/* Brand */}
-              <div className="bg-blue-50 rounded-lg p-4">
-                <p className="text-xs font-medium text-blue-900 mb-1">מותג</p>
-                <p className="text-lg font-bold text-blue-700">{parsedRawData.parties?.brand || '—'}</p>
+              <div className="rounded-lg p-4" style={{ background: 'var(--dash-surface-hover)' }}>
+                <p className="text-xs font-medium mb-1" style={{ color: 'var(--color-primary)' }}>מותג</p>
+                <p className="text-lg font-bold" style={{ color: 'var(--dash-text)' }}>{parsedRawData.parties?.brand || '—'}</p>
               </div>
 
               {/* Amount */}
-              <div className="bg-green-50 rounded-lg p-4">
-                <p className="text-xs font-medium text-green-900 mb-1">סכום</p>
-                <p className="text-lg font-bold text-green-700">
-                  {parsedRawData.paymentTerms?.totalAmount 
+              <div className="rounded-lg p-4" style={{ background: 'var(--dash-surface-hover)' }}>
+                <p className="text-xs font-medium mb-1" style={{ color: 'var(--dash-positive)' }}>סכום</p>
+                <p className="text-lg font-bold" style={{ color: 'var(--dash-text)' }}>
+                  {parsedRawData.paymentTerms?.totalAmount
                     ? `₪${parsedRawData.paymentTerms.totalAmount.toLocaleString()}`
                     : '—'}
                 </p>
               </div>
 
               {/* Dates */}
-              <div className="bg-purple-50 rounded-lg p-4">
-                <p className="text-xs font-medium text-purple-900 mb-1">תאריכים</p>
-                <p className="text-sm font-bold text-purple-700">
+              <div className="rounded-lg p-4" style={{ background: 'var(--dash-surface-hover)' }}>
+                <p className="text-xs font-medium mb-1" style={{ color: 'var(--color-info)' }}>תאריכים</p>
+                <p className="text-sm font-bold" style={{ color: 'var(--dash-text)' }}>
                   {parsedRawData.effectiveDate || '—'} → {parsedRawData.expiryDate || '—'}
                 </p>
               </div>
 
               {/* Deliverables */}
-              <div className="bg-orange-50 rounded-lg p-4">
-                <p className="text-xs font-medium text-orange-900 mb-1">דליברבלס</p>
-                <p className="text-lg font-bold text-orange-700">
+              <div className="rounded-lg p-4" style={{ background: 'var(--dash-surface-hover)' }}>
+                <p className="text-xs font-medium mb-1" style={{ color: 'var(--color-warning)' }}>דליברבלס</p>
+                <p className="text-lg font-bold" style={{ color: 'var(--dash-text)' }}>
                   {parsedRawData.deliverables?.length || 0} פריטים
                 </p>
               </div>
@@ -530,19 +538,19 @@ export default function NewPartnershipPage() {
             {/* Payment Schedule */}
             {parsedRawData.paymentTerms?.schedule?.length > 0 && (
               <div className="mb-6">
-                <p className="text-sm font-medium text-gray-700 mb-3 text-right">💰 מועדי תשלום שזוהו:</p>
+                <p className="text-sm font-medium mb-3 text-right" style={{ color: 'var(--dash-text-2)' }}>מועדי תשלום שזוהו:</p>
                 <div className="space-y-2">
                   {parsedRawData.paymentTerms.schedule.map((payment: any, i: number) => (
-                    <div key={i} className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3">
+                    <div key={i} className="flex items-center justify-between rounded-lg border p-3" style={{ background: 'var(--dash-surface-hover)', borderColor: 'var(--dash-border)' }}>
                       <div className="text-right flex-1">
-                        <p className="font-bold text-green-900">
+                        <p className="font-bold" style={{ color: 'var(--dash-positive)' }}>
                           ₪{payment.amount?.toLocaleString()} ({payment.percentage}%)
                         </p>
-                        <p className="text-xs text-green-700">{payment.trigger}</p>
+                        <p className="text-xs" style={{ color: 'var(--dash-text-2)' }}>{payment.trigger}</p>
                       </div>
                       {payment.dueDate && (
-                        <span className="text-sm font-medium text-green-700">
-                          📅 {new Date(payment.dueDate).toLocaleDateString('he-IL')}
+                        <span className="text-sm font-medium" style={{ color: 'var(--dash-text-2)' }}>
+                          {new Date(payment.dueDate).toLocaleDateString('he-IL')}
                         </span>
                       )}
                     </div>
@@ -554,19 +562,19 @@ export default function NewPartnershipPage() {
             {/* Deliverables Details */}
             {parsedRawData.deliverables?.length > 0 && (
               <div className="mb-6">
-                <p className="text-sm font-medium text-gray-700 mb-3 text-right">📋 דליברבלס שזוהו:</p>
+                <p className="text-sm font-medium mb-3 text-right" style={{ color: 'var(--dash-text-2)' }}>דליברבלס שזוהו:</p>
                 <ul className="space-y-2">
                   {parsedRawData.deliverables.map((d: any, i: number) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-gray-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <span className="font-bold text-blue-600">{i + 1}.</span>
+                    <li key={i} className="flex items-start gap-2 text-sm rounded-lg border p-3" style={{ background: 'var(--dash-surface-hover)', borderColor: 'var(--dash-border)', color: 'var(--dash-text-2)' }}>
+                      <span className="font-bold" style={{ color: 'var(--color-primary)' }}>{i + 1}.</span>
                       <span className="flex-1 text-right">
                         {d.quantity && <strong>{d.quantity}x </strong>}
                         {d.type && <span className="font-medium">{d.type}</span>}
                         {d.description && <> - {d.description}</>}
-                        {d.platform && <span className="text-xs text-gray-500"> ({d.platform})</span>}
+                        {d.platform && <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}> ({d.platform})</span>}
                         {d.dueDate && (
-                          <span className="block text-xs text-blue-600 mt-1">
-                            📅 {new Date(d.dueDate).toLocaleDateString('he-IL')}
+                          <span className="block text-xs mt-1" style={{ color: 'var(--color-primary)' }}>
+                            {new Date(d.dueDate).toLocaleDateString('he-IL')}
                           </span>
                         )}
                       </span>
@@ -578,35 +586,34 @@ export default function NewPartnershipPage() {
 
             {/* Important Terms Preview */}
             <div className="mb-6">
-              <p className="text-sm font-medium text-gray-700 mb-3 text-right">⚖️ תנאים חשובים:</p>
+              <p className="text-sm font-medium mb-3 text-right" style={{ color: 'var(--dash-text-2)' }}>תנאים חשובים:</p>
               <div className="space-y-2">
                 {parsedRawData.exclusivity?.isExclusive && (
-                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-right">
-                    <p className="text-sm font-bold text-purple-900">🔒 חוזה אקסקלוסיבי</p>
+                  <div className="rounded-lg border p-3 text-right" style={{ background: 'var(--dash-surface-hover)', borderColor: 'var(--dash-border)' }}>
+                    <p className="text-sm font-bold" style={{ color: 'var(--color-warning)' }}>חוזה אקסקלוסיבי</p>
                     {parsedRawData.exclusivity.categories?.length > 0 && (
-                      <p className="text-xs text-purple-700 mt-1">
+                      <p className="text-xs mt-1" style={{ color: 'var(--dash-text-2)' }}>
                         {parsedRawData.exclusivity.categories.join(', ')}
                       </p>
                     )}
                   </div>
                 )}
-                
+
                 {parsedRawData.terminationClauses?.[0] && (
-                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-right">
-                    <p className="text-xs text-orange-700">{parsedRawData.terminationClauses[0]}</p>
+                  <div className="rounded-lg border p-3 text-right" style={{ background: 'var(--dash-surface-hover)', borderColor: 'var(--dash-border)' }}>
+                    <p className="text-xs" style={{ color: 'var(--dash-text-2)' }}>{parsedRawData.terminationClauses[0]}</p>
                   </div>
                 )}
               </div>
             </div>
-
-            {/* Confidence - Removed as per user request */}
           </div>
 
           {/* Actions */}
           <div className="flex gap-3">
             <button
               onClick={() => setCreationMode('select')}
-              className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              className="flex-1 px-6 py-3 border rounded-lg transition-colors"
+              style={{ borderColor: 'var(--dash-border)', color: 'var(--dash-text-2)' }}
             >
               התחל מחדש
             </button>
@@ -615,9 +622,10 @@ export default function NewPartnershipPage() {
                 console.log('[Partnership Creation] 🎯 Moving to form edit mode');
                 setCreationMode('manual');
               }}
-              className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              className="flex-1 px-6 py-3 rounded-lg transition-colors font-medium"
+              style={{ background: 'var(--color-primary)', color: '#fff' }}
             >
-              המשך לעריכה ←
+              המשך לעריכה
             </button>
           </div>
         </div>
@@ -628,16 +636,16 @@ export default function NewPartnershipPage() {
         <>
           {/* AI Parsing Success Notice */}
           {uploadedDocumentId && (
-            <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="mb-6 rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--color-info)' }}>
               <div className="flex items-start gap-3">
-                <svg className="h-5 w-5 text-blue-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="h-5 w-5 mt-0.5" style={{ color: 'var(--color-info)' }} fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-blue-900">
-                    💡 הטופס מולא אוטומטית מהחוזה
+                  <p className="text-sm font-medium" style={{ color: 'var(--dash-text)' }}>
+                    הטופס מולא אוטומטית מהחוזה
                   </p>
-                  <p className="text-sm text-blue-700 mt-1">
+                  <p className="text-sm mt-1" style={{ color: 'var(--dash-text-2)' }}>
                     בדוק את הפרטים, ערוך והשלם את החסר לפי הצורך.
                   </p>
                 </div>
@@ -645,45 +653,48 @@ export default function NewPartnershipPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
+          <form onSubmit={handleSubmit} className="rounded-xl border p-6 space-y-6" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
         {/* Brand Name */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
-            שם המותג <span className="text-red-500">*</span>
+          <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
+            שם המותג <span style={{ color: 'var(--dash-negative)' }}>*</span>
           </label>
           <input
             type="text"
             required
             value={formData.brand_name}
             onChange={(e) => setFormData({ ...formData, brand_name: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 border rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
             placeholder="לדוגמה: Nike, Adidas"
           />
         </div>
 
         {/* Campaign Name */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+          <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
             שם הקמפיין
           </label>
           <input
             type="text"
             value={formData.campaign_name}
             onChange={(e) => setFormData({ ...formData, campaign_name: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 border rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
             placeholder="לדוגמה: Summer Collection 2024"
           />
         </div>
 
         {/* Status */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+          <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
             סטטוס
           </label>
           <select
             value={formData.status}
             onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 border rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
           >
             <option value="lead">Lead</option>
             <option value="negotiation">משא ומתן</option>
@@ -697,32 +708,34 @@ export default function NewPartnershipPage() {
         {/* Dates */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+            <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
               תאריך התחלה
             </label>
             <input
               type="date"
               value={formData.start_date}
               onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+            <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
               תאריך סיום
             </label>
             <input
               type="date"
               value={formData.end_date}
               onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
             />
           </div>
         </div>
 
         {/* Contract Amount */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+          <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
             סכום החוזה (₪)
           </label>
           <input
@@ -730,42 +743,45 @@ export default function NewPartnershipPage() {
             step="0.01"
             value={formData.contract_amount}
             onChange={(e) => setFormData({ ...formData, contract_amount: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 border rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
             placeholder="0.00"
           />
         </div>
 
         {/* Deliverables */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+          <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
             דליברבלס
           </label>
           <textarea
             value={formData.deliverables}
             onChange={(e) => setFormData({ ...formData, deliverables: e.target.value })}
             rows={3}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 border rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
             placeholder="לדוגמה: 3 פוסטים באינסטגרם, 2 סטוריז, 1 ריל"
           />
         </div>
 
         {/* Notes */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+          <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
             הערות
           </label>
           <textarea
             value={formData.notes}
             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
             rows={3}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 border rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
             placeholder="הערות נוספות..."
           />
         </div>
 
         {/* Document Upload */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+          <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
             העלה מסמכים (חוזה, ברייף, וכו')
           </label>
           <input
@@ -773,20 +789,21 @@ export default function NewPartnershipPage() {
             multiple
             accept=".pdf,.doc,.docx,.txt"
             onChange={handleFileChange}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 border rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
           />
           {uploadedFiles.length > 0 && (
-            <div className="mt-2 text-sm text-gray-600">
+            <div className="mt-2 text-sm" style={{ color: 'var(--dash-text-2)' }}>
               {uploadedFiles.length} קובץ/ים נבחרו: {uploadedFiles.map(f => f.name).join(', ')}
             </div>
           )}
-          <p className="mt-1 text-xs text-gray-500 text-right">
+          <p className="mt-1 text-xs text-right" style={{ color: 'var(--dash-text-3)' }}>
             גודל מקסימלי: 10MB לכל קובץ
           </p>
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3 justify-end pt-4 border-t border-gray-200">
+        <div className="flex gap-3 justify-end pt-4 border-t" style={{ borderColor: 'var(--dash-border)' }}>
           <button
             type="button"
             onClick={() => {
@@ -796,14 +813,16 @@ export default function NewPartnershipPage() {
                 router.back();
               }
             }}
-            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            className="px-6 py-2 border rounded-lg transition-colors"
+            style={{ borderColor: 'var(--dash-border)', color: 'var(--dash-text-2)' }}
           >
             {uploadedDocumentId ? 'חזור לבחירת שיטה' : 'ביטול'}
           </button>
           <button
             type="submit"
             disabled={isSubmitting}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-6 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ background: 'var(--color-primary)', color: '#fff' }}
           >
             {isSubmitting ? 'שומר...' : 'צור שת"פ'}
           </button>

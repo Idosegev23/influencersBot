@@ -4,7 +4,6 @@ import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
   Plus,
@@ -58,14 +57,14 @@ export default function ManagePage({
   const [activeTab, setActiveTab] = useState<TabType>('brands');
   const [influencer, setInfluencer] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // Data states
   const [brands, setBrands] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [contentItems, setContentItems] = useState<any[]>([]);
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
   const [greetingMessage, setGreetingMessage] = useState('');
-  
+
   // UI states
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
@@ -89,7 +88,7 @@ export default function ManagePage({
     try {
       const authRes = await fetch(`/api/influencer/auth?username=${username}`);
       const authData = await authRes.json();
-      
+
       if (!authData.authenticated) {
         router.push(`/influencer/${username}/login`);
         return;
@@ -99,20 +98,20 @@ export default function ManagePage({
       const infRes = await fetch(`/api/admin/influencers?username=${username}`);
       const infData = await infRes.json();
       const inf = infData.influencers?.[0];
-      
+
       if (!inf) {
         router.push(`/influencer/${username}/login`);
         return;
       }
 
       setInfluencer(inf);
-      
+
       // Load brands from partnerships
       const brandsRes = await fetch(`/api/influencer/partnerships?username=${username}&limit=100`);
       if (brandsRes.ok) {
         const brandsData = await brandsRes.json();
         const partnerships = brandsData.partnerships || [];
-        
+
         // Load coupons for each partnership
         const brandsWithCoupons = await Promise.all(
           partnerships.map(async (p: any) => {
@@ -166,7 +165,7 @@ export default function ManagePage({
       // Load settings
       setSuggestedQuestions(inf.suggested_questions || []);
       setGreetingMessage(inf.greeting_message || '');
-      
+
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -207,10 +206,10 @@ export default function ManagePage({
   const handleAddProduct = async () => {
     const name = prompt('שם המוצר:');
     if (!name) return;
-    
+
     const brand = prompt('מותג (אופציונלי):');
     const category = prompt('קטגוריה (אופציונלי):');
-    
+
     try {
       const res = await fetch('/api/influencer/content/products', {
         method: 'POST',
@@ -220,7 +219,7 @@ export default function ManagePage({
           product: { name, brand, category },
         }),
       });
-      
+
       if (res.ok) {
         alert('✅ מוצר נוסף!');
         loadData();
@@ -235,13 +234,13 @@ export default function ManagePage({
 
   const handleDeleteProduct = async (productId: string) => {
     if (!confirm('למחוק מוצר?')) return;
-    
+
     try {
       const res = await fetch(
         `/api/influencer/content/products?accountId=${influencer.id}&productId=${productId}`,
         { method: 'DELETE' }
       );
-      
+
       if (res.ok) {
         alert('✅ מוצר נמחק!');
         loadData();
@@ -262,7 +261,7 @@ export default function ManagePage({
 
   const handleRescan = async () => {
     if (!confirm('לסרוק מחדש? זה ייקח מספר דקות')) return;
-    
+
     setRescanning(true);
     try {
       const res = await fetch('/api/persona/rebuild', {
@@ -302,19 +301,19 @@ export default function ManagePage({
   const filteredBrands = brands.filter(b =>
     b.brand_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
-  
+
   const filteredProducts = products.filter(p =>
     (p.name || p.product_name || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
-  
+
   const filteredContent = contentItems.filter(c =>
     c.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center" dir="rtl">
-        <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+      <div className="min-h-screen flex items-center justify-center" dir="rtl" style={{ background: 'var(--dash-bg)' }}>
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--color-primary)' }} />
       </div>
     );
   }
@@ -322,99 +321,54 @@ export default function ManagePage({
   if (!influencer) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900" dir="rtl">
-      {/* Background */}
-      <div className="fixed inset-0 opacity-10">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,#6366f1_1px,transparent_0)] bg-[length:50px_50px]" />
-      </div>
-
-      {/* Header */}
-      <header className="relative z-10 sticky top-0 bg-slate-900/80 backdrop-blur-xl border-b border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Link
-                href={`/influencer/${username}/dashboard`}
-                className="p-2 text-gray-400 hover:text-white transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Link>
-              {influencer.avatar_url ? (
-                <img
-                  src={influencer.avatar_url}
-                  alt={influencer.display_name}
-                  className="w-10 h-10 rounded-xl object-cover"
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold">
-                  {influencer.display_name?.charAt(0) || '?'}
-                </div>
-              )}
-              <div>
-                <h1 className="font-semibold text-white">ניהול תוכן הבוט</h1>
-                <p className="text-xs text-gray-400">@{username}</p>
-              </div>
-            </div>
-
-            <button
-              onClick={handleRescan}
-              disabled={rescanning}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white rounded-lg transition-colors text-sm"
-            >
-              {rescanning ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <RefreshCw className="w-4 h-4" />
-              )}
-              {rescanning ? 'סורק...' : 'סריקה מחדש'}
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-8">
+    <div className="min-h-screen" dir="rtl" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
+      <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-8">
         {/* Tabs */}
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
           <button
             onClick={() => setActiveTab('brands')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors"
+            style={
               activeTab === 'brands'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-800/50 text-gray-400 hover:text-white'
-            }`}
+                ? { background: 'var(--color-primary)', color: 'white' }
+                : { background: 'var(--dash-surface)', color: 'var(--dash-text-2)' }
+            }
           >
             <Store className="w-4 h-4" />
             מותגים וקופונים ({brands.length})
           </button>
           <button
             onClick={() => setActiveTab('products')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors"
+            style={
               activeTab === 'products'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-800/50 text-gray-400 hover:text-white'
-            }`}
+                ? { background: 'var(--color-primary)', color: 'white' }
+                : { background: 'var(--dash-surface)', color: 'var(--dash-text-2)' }
+            }
           >
             <Package className="w-4 h-4" />
             מוצרים ({products.length})
           </button>
           <button
             onClick={() => setActiveTab('content')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors"
+            style={
               activeTab === 'content'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-800/50 text-gray-400 hover:text-white'
-            }`}
+                ? { background: 'var(--color-primary)', color: 'white' }
+                : { background: 'var(--dash-surface)', color: 'var(--dash-text-2)' }
+            }
           >
             <FileText className="w-4 h-4" />
             תוכן מפוסטים ({contentItems.length})
           </button>
           <button
             onClick={() => setActiveTab('settings')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors"
+            style={
               activeTab === 'settings'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-800/50 text-gray-400 hover:text-white'
-            }`}
+                ? { background: 'var(--color-primary)', color: 'white' }
+                : { background: 'var(--dash-surface)', color: 'var(--dash-text-2)' }
+            }
           >
             <Settings className="w-4 h-4" />
             הגדרות צ'אט
@@ -424,13 +378,14 @@ export default function ManagePage({
         {/* Search */}
         {(activeTab === 'brands' || activeTab === 'products' || activeTab === 'content') && (
           <div className="relative mb-6">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5" style={{ color: 'var(--dash-text-2)' }} />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="חיפוש..."
-              className="w-full pr-10 pl-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full pr-10 pl-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid var(--dash-border)' }}
             />
           </div>
         )}
@@ -439,10 +394,11 @@ export default function ManagePage({
         {activeTab === 'brands' && (
           <div>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">מותגים וקופונים</h2>
+              <h2 className="text-xl font-bold" style={{ color: 'var(--dash-text)' }}>מותגים וקופונים</h2>
               <button
                 onClick={handleAddBrand}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors"
+                style={{ background: 'var(--color-primary)', color: 'white' }}
               >
                 <Plus className="w-4 h-4" />
                 הוסף מותג
@@ -450,13 +406,14 @@ export default function ManagePage({
             </div>
 
             {filteredBrands.length === 0 ? (
-              <div className="text-center py-16 bg-gray-800/30 rounded-2xl">
-                <Store className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-white mb-2">אין מותגים עדיין</h3>
-                <p className="text-gray-400 mb-6">הוסיפי מותגים וקופונים שהבוט יכיר</p>
+              <div className="text-center py-16 rounded-xl" style={{ background: 'var(--dash-surface)' }}>
+                <Store className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--dash-text-3)' }} />
+                <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--dash-text)' }}>אין מותגים עדיין</h3>
+                <p className="mb-6" style={{ color: 'var(--dash-text-2)' }}>הוסיפי מותגים וקופונים שהבוט יכיר</p>
                 <button
                   onClick={handleAddBrand}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-lg transition-colors"
+                  style={{ background: 'var(--color-primary)', color: 'white' }}
                 >
                   <Plus className="w-5 h-5" />
                   הוסף מותג ראשון
@@ -465,31 +422,31 @@ export default function ManagePage({
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredBrands.map((brand) => (
-                  <motion.div
+                  <div
                     key={brand.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="p-5 bg-gray-800/50 backdrop-blur border border-gray-700 rounded-xl hover:border-indigo-500/50 transition-all"
+                    className="p-5 rounded-xl border transition-all"
+                    style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
-                        <h3 className="font-semibold text-white text-lg mb-1">
+                        <h3 className="font-semibold text-lg mb-1" style={{ color: 'var(--dash-text)' }}>
                           {brand.brand_name}
                         </h3>
                         {brand.category && (
-                          <span className="text-xs text-gray-500">{brand.category}</span>
+                          <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>{brand.category}</span>
                         )}
                       </div>
                       <Link
                         href={`/influencer/${username}/partnerships/${brand.id}`}
-                        className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+                        className="p-2 rounded-lg transition-colors"
+                        style={{ color: 'var(--dash-text-2)' }}
                       >
                         <Edit2 className="w-4 h-4" />
                       </Link>
                     </div>
 
                     {brand.description && (
-                      <p className="text-sm text-gray-400 mb-4">{brand.description}</p>
+                      <p className="text-sm mb-4" style={{ color: 'var(--dash-text-2)' }}>{brand.description}</p>
                     )}
 
                     {brand.coupons && brand.coupons.length > 0 ? (
@@ -510,7 +467,7 @@ export default function ManagePage({
                         ))}
                       </div>
                     ) : (
-                      <div className="text-center py-3 text-sm text-gray-500">
+                      <div className="text-center py-3 text-sm" style={{ color: 'var(--dash-text-3)' }}>
                         ללא קופונים
                       </div>
                     )}
@@ -520,13 +477,14 @@ export default function ManagePage({
                         href={brand.link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-2 mt-3 px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+                        className="flex items-center justify-center gap-2 mt-3 px-3 py-2 text-sm rounded-lg transition-colors"
+                        style={{ color: 'var(--dash-text-2)' }}
                       >
                         <ExternalLink className="w-4 h-4" />
                         קישור למותג
                       </a>
                     )}
-                  </motion.div>
+                  </div>
                 ))}
               </div>
             )}
@@ -537,10 +495,11 @@ export default function ManagePage({
         {activeTab === 'products' && (
           <div>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">מוצרים</h2>
+              <h2 className="text-xl font-bold" style={{ color: 'var(--dash-text)' }}>מוצרים</h2>
               <button
                 onClick={handleAddProduct}
-                className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors"
+                style={{ background: 'var(--color-primary)', color: 'white' }}
               >
                 <Plus className="w-4 h-4" />
                 הוסף מוצר
@@ -548,13 +507,14 @@ export default function ManagePage({
             </div>
 
             {filteredProducts.length === 0 ? (
-              <div className="text-center py-16 bg-gray-800/30 rounded-2xl">
-                <Package className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-white mb-2">אין מוצרים עדיין</h3>
-                <p className="text-gray-400 mb-6">הוסיפי מוצרים שהבוט ידבר עליהם</p>
+              <div className="text-center py-16 rounded-xl" style={{ background: 'var(--dash-surface)' }}>
+                <Package className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--dash-text-3)' }} />
+                <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--dash-text)' }}>אין מוצרים עדיין</h3>
+                <p className="mb-6" style={{ color: 'var(--dash-text-2)' }}>הוסיפי מוצרים שהבוט ידבר עליהם</p>
                 <button
                   onClick={handleAddProduct}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-lg transition-colors"
+                  style={{ background: 'var(--color-primary)', color: 'white' }}
                 >
                   <Plus className="w-5 h-5" />
                   הוסף מוצר ראשון
@@ -563,22 +523,21 @@ export default function ManagePage({
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredProducts.map((product, idx) => (
-                  <motion.div
+                  <div
                     key={product.id || idx}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="p-4 bg-gray-800/50 backdrop-blur border border-gray-700 rounded-xl hover:border-purple-500/50 transition-all"
+                    className="p-4 rounded-xl border transition-all"
+                    style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
-                        <h3 className="font-semibold text-white">
+                        <h3 className="font-semibold" style={{ color: 'var(--dash-text)' }}>
                           {product.name || product.product_name}
                         </h3>
                         {product.brand && (
-                          <p className="text-sm text-gray-400 mt-1">מותג: {product.brand}</p>
+                          <p className="text-sm mt-1" style={{ color: 'var(--dash-text-2)' }}>מותג: {product.brand}</p>
                         )}
                         {product.category && (
-                          <p className="text-xs text-gray-500 mt-1">קטגוריה: {product.category}</p>
+                          <p className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>קטגוריה: {product.category}</p>
                         )}
                       </div>
                       <button
@@ -588,7 +547,7 @@ export default function ManagePage({
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
-                  </motion.div>
+                  </div>
                 ))}
               </div>
             )}
@@ -598,13 +557,13 @@ export default function ManagePage({
         {/* Content Tab */}
         {activeTab === 'content' && (
           <div>
-            <h2 className="text-xl font-bold text-white mb-6">תוכן מפוסטים</h2>
+            <h2 className="text-xl font-bold mb-6" style={{ color: 'var(--dash-text)' }}>תוכן מפוסטים</h2>
 
             {filteredContent.length === 0 ? (
-              <div className="text-center py-16 bg-gray-800/30 rounded-2xl">
-                <FileText className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-white mb-2">אין תוכן עדיין</h3>
-                <p className="text-gray-400">התוכן נסרק אוטומטית מהפוסטים שלך באינסטגרם</p>
+              <div className="text-center py-16 rounded-xl" style={{ background: 'var(--dash-surface)' }}>
+                <FileText className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--dash-text-3)' }} />
+                <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--dash-text)' }}>אין תוכן עדיין</h3>
+                <p style={{ color: 'var(--dash-text-2)' }}>התוכן נסרק אוטומטית מהפוסטים שלך באינסטגרם</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -613,14 +572,13 @@ export default function ManagePage({
                   const TypeIcon = typeInfo.icon;
 
                   return (
-                    <motion.div
+                    <div
                       key={item.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-xl overflow-hidden hover:border-indigo-500/50 transition-all"
+                      className="rounded-xl border overflow-hidden transition-all"
+                      style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
                     >
                       {item.image_url && (
-                        <div className="relative h-40 bg-gray-900">
+                        <div className="relative h-40" style={{ background: 'var(--dash-bg)' }}>
                           <Image
                             src={item.image_url}
                             alt={item.title}
@@ -634,20 +592,20 @@ export default function ManagePage({
                       <div className="p-4">
                         <div className="flex items-center gap-2 mb-2">
                           <TypeIcon className={`w-4 h-4 ${typeInfo.color}`} />
-                          <span className="text-xs text-gray-400">{typeInfo.label}</span>
+                          <span className="text-xs" style={{ color: 'var(--dash-text-2)' }}>{typeInfo.label}</span>
                         </div>
 
-                        <h3 className="font-semibold text-white mb-2 line-clamp-2">
+                        <h3 className="font-semibold mb-2 line-clamp-2" style={{ color: 'var(--dash-text)' }}>
                           {item.title}
                         </h3>
-                        
+
                         {item.description && (
-                          <p className="text-sm text-gray-400 line-clamp-3">
+                          <p className="text-sm line-clamp-3" style={{ color: 'var(--dash-text-2)' }}>
                             {item.description}
                           </p>
                         )}
                       </div>
-                    </motion.div>
+                    </div>
                   );
                 })}
               </div>
@@ -658,38 +616,40 @@ export default function ManagePage({
         {/* Settings Tab */}
         {activeTab === 'settings' && (
           <div className="max-w-3xl mx-auto">
-            <h2 className="text-xl font-bold text-white mb-6">הגדרות צ'אט</h2>
+            <h2 className="text-xl font-bold mb-6" style={{ color: 'var(--dash-text)' }}>הגדרות צ'אט</h2>
 
             <div className="space-y-6">
               {/* Greeting Message */}
-              <div className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-xl p-6">
-                <label className="block text-sm font-medium text-gray-300 mb-3">
+              <div className="rounded-xl border p-6" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+                <label className="block text-sm font-medium mb-3" style={{ color: 'var(--dash-text-2)' }}>
                   הודעת ברכה
                 </label>
                 <textarea
                   value={greetingMessage}
                   onChange={(e) => setGreetingMessage(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   rows={4}
                   placeholder="היי! אני הבוט של..."
+                  style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid var(--dash-border)' }}
                 />
               </div>
 
               {/* Suggested Questions */}
-              <div className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-xl p-6">
+              <div className="rounded-xl border p-6" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
                 <div className="flex items-center justify-between mb-4">
-                  <label className="block text-sm font-medium text-gray-300">
+                  <label className="block text-sm font-medium" style={{ color: 'var(--dash-text-2)' }}>
                     שאלות מוצעות
                   </label>
                   <button
                     onClick={handleAddQuestion}
-                    className="px-3 py-1.5 text-xs bg-indigo-600 hover:bg-indigo-500 text-white rounded transition-colors flex items-center gap-1"
+                    className="px-3 py-1.5 text-xs rounded transition-colors flex items-center gap-1"
+                    style={{ background: 'var(--color-primary)', color: 'white' }}
                   >
                     <Plus className="w-3 h-3" />
                     הוסף שאלה
                   </button>
                 </div>
-                
+
                 <div className="space-y-3">
                   {suggestedQuestions.map((question, idx) => (
                     <div key={idx} className="flex items-center gap-2">
@@ -697,8 +657,9 @@ export default function ManagePage({
                         type="text"
                         value={question}
                         onChange={(e) => handleUpdateQuestion(idx, e.target.value)}
-                        className="flex-1 px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                        className="flex-1 px-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         placeholder={`שאלה ${idx + 1}`}
+                        style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid var(--dash-border)' }}
                       />
                       <button
                         onClick={() => handleDeleteQuestion(idx)}
@@ -709,7 +670,7 @@ export default function ManagePage({
                     </div>
                   ))}
                   {suggestedQuestions.length === 0 && (
-                    <p className="text-gray-400 text-sm text-center py-4">אין שאלות מוצעות</p>
+                    <p className="text-sm text-center py-4" style={{ color: 'var(--dash-text-2)' }}>אין שאלות מוצעות</p>
                   )}
                 </div>
               </div>
@@ -718,7 +679,8 @@ export default function ManagePage({
               <button
                 onClick={handleSaveSettings}
                 disabled={saving}
-                className="w-full px-6 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 text-white rounded-xl transition-all font-medium flex items-center justify-center gap-2 text-lg"
+                className="w-full px-6 py-4 disabled:opacity-50 rounded-xl transition-all font-medium flex items-center justify-center gap-2 text-lg"
+                style={{ background: 'var(--color-primary)', color: 'white' }}
               >
                 {saving ? (
                   <>

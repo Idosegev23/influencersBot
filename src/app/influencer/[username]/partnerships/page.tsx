@@ -61,13 +61,13 @@ export default function PartnershipsDashboardPage() {
       }
 
       const result = await response.json();
-      
+
       // Transform data to match expected structure
       const partnerships = result.partnerships || [];
-      const totalRevenue = partnerships.reduce((sum: number, p: any) => 
+      const totalRevenue = partnerships.reduce((sum: number, p: any) =>
         sum + (p.contract_amount || 0), 0);
       const activeCount = partnerships.filter((p: any) => p.status === 'active').length;
-      
+
       setData({
         overview: {
           total_partnerships: partnerships.length,
@@ -93,15 +93,15 @@ export default function PartnershipsDashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="max-w-7xl mx-auto py-8 px-4">
+      <div className="max-w-6xl mx-auto py-8 px-4" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
         <div className="animate-pulse space-y-8">
-          <div className="h-8 bg-gray-200 rounded w-1/4" />
+          <div className="h-8 rounded w-1/4" style={{ background: 'var(--dash-surface)' }} />
           <div className="grid grid-cols-3 gap-4">
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-24 bg-gray-200 rounded" />
+              <div key={i} className="h-24 rounded" style={{ background: 'var(--dash-surface)' }} />
             ))}
           </div>
-          <div className="h-80 bg-gray-200 rounded" />
+          <div className="h-80 rounded" style={{ background: 'var(--dash-surface)' }} />
         </div>
       </div>
     );
@@ -109,12 +109,13 @@ export default function PartnershipsDashboardPage() {
 
   if (error) {
     return (
-      <div className="max-w-7xl mx-auto py-8 px-4">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-          <p className="text-red-600">{error}</p>
+      <div className="max-w-6xl mx-auto py-8 px-4" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
+        <div className="rounded-xl border p-6 text-center" style={{ borderColor: 'var(--dash-border)', background: 'var(--dash-surface)' }}>
+          <p style={{ color: 'var(--dash-negative)' }}>{error}</p>
           <button
             onClick={loadData}
-            className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+            className="mt-4 px-4 py-2 rounded-lg"
+            style={{ background: 'var(--dash-negative)', color: '#fff' }}
           >
             נסה שוב
           </button>
@@ -128,12 +129,13 @@ export default function PartnershipsDashboardPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-8 px-4 space-y-8">
+    <div className="max-w-6xl mx-auto py-8 px-4 space-y-8" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
       {/* Back Button */}
       <div className="flex items-center gap-4 mb-4">
         <button
           onClick={() => router.push(`/influencer/${username}/dashboard`)}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+          className="flex items-center gap-2 transition-colors"
+          style={{ color: 'var(--dash-text-2)' }}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -145,10 +147,11 @@ export default function PartnershipsDashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <h1 className="text-3xl font-bold text-gray-900">לוח מחוונים - שת"פים</h1>
+          <h1 className="text-3xl font-bold" style={{ color: 'var(--dash-text)' }}>לוח מחוונים - שת"פים</h1>
           <button
             onClick={() => router.push(`/influencer/${username}/partnerships/new`)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+            className="px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+            style={{ background: 'var(--color-primary)', color: '#fff' }}
           >
             + הוסף שת"פ חדש
           </button>
@@ -158,31 +161,31 @@ export default function PartnershipsDashboardPage() {
         <div className="flex gap-2">
           <button
             onClick={() => setView('overview')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              view === 'overview'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
+            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            style={{
+              background: view === 'overview' ? 'var(--color-primary)' : 'var(--dash-surface)',
+              color: view === 'overview' ? '#fff' : 'var(--dash-text-2)',
+            }}
           >
             סקירה כללית
           </button>
           <button
             onClick={() => setView('library')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              view === 'library'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
+            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            style={{
+              background: view === 'library' ? 'var(--color-primary)' : 'var(--dash-surface)',
+              color: view === 'library' ? '#fff' : 'var(--dash-text-2)',
+            }}
           >
             ספרייה
           </button>
           <button
             onClick={() => setView('calendar')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              view === 'calendar'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
+            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            style={{
+              background: view === 'calendar' ? 'var(--color-primary)' : 'var(--dash-surface)',
+              color: view === 'calendar' ? '#fff' : 'var(--dash-text-2)',
+            }}
           >
             לוח שנה
           </button>
@@ -191,44 +194,44 @@ export default function PartnershipsDashboardPage() {
 
       {/* Overview Cards - Always visible */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">סה"כ שת"פים</div>
-          <div className="text-2xl font-bold text-gray-900">
+        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+          <div className="text-sm mb-1" style={{ color: 'var(--dash-text-3)' }}>סה"כ שת"פים</div>
+          <div className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>
             {data.overview.total_partnerships}
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">שת"פים פעילים</div>
-          <div className="text-2xl font-bold text-green-600">
+        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+          <div className="text-sm mb-1" style={{ color: 'var(--dash-text-3)' }}>שת"פים פעילים</div>
+          <div className="text-2xl font-bold" style={{ color: 'var(--dash-positive)' }}>
             {data.overview.active_partnerships}
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">הכנסות כוללות</div>
-          <div className="text-2xl font-bold text-blue-600">
+        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+          <div className="text-sm mb-1" style={{ color: 'var(--dash-text-3)' }}>הכנסות כוללות</div>
+          <div className="text-2xl font-bold" style={{ color: 'var(--color-primary)' }}>
             ₪{data.overview.total_revenue.toLocaleString('he-IL')}
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">הכנסות צפויות</div>
-          <div className="text-2xl font-bold text-purple-600">
+        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+          <div className="text-sm mb-1" style={{ color: 'var(--dash-text-3)' }}>הכנסות צפויות</div>
+          <div className="text-2xl font-bold" style={{ color: 'var(--color-info)' }}>
             ₪{data.overview.pending_revenue.toLocaleString('he-IL')}
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">ממוצע עסקה</div>
-          <div className="text-2xl font-bold text-orange-600">
+        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+          <div className="text-sm mb-1" style={{ color: 'var(--dash-text-3)' }}>ממוצע עסקה</div>
+          <div className="text-2xl font-bold" style={{ color: 'var(--color-warning)' }}>
             ₪{data.overview.avg_deal_size.toLocaleString('he-IL')}
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">שיעור השלמה</div>
-          <div className="text-2xl font-bold text-emerald-600">
+        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+          <div className="text-sm mb-1" style={{ color: 'var(--dash-text-3)' }}>שיעור השלמה</div>
+          <div className="text-2xl font-bold" style={{ color: 'var(--dash-positive)' }}>
             {data.overview.completion_rate.toFixed(1)}%
           </div>
         </div>
@@ -244,23 +247,24 @@ export default function PartnershipsDashboardPage() {
 
           {/* Upcoming Deadlines */}
           {data.upcoming_deadlines.length > 0 && (
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 text-right">
+            <div className="rounded-xl border p-6" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+              <h3 className="text-lg font-semibold mb-4 text-right" style={{ color: 'var(--dash-text)' }}>
                 דדליינים קרובים
               </h3>
               <div className="space-y-3">
                 {data.upcoming_deadlines.slice(0, 5).map((task: any) => (
                   <div
                     key={task.id}
-                    className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
+                    className="flex items-center justify-between p-3 border rounded-lg"
+                    style={{ borderColor: 'var(--dash-border)' }}
                   >
                     <div className="text-right flex-1">
-                      <div className="font-medium text-gray-900">{task.title}</div>
-                      <div className="text-sm text-gray-500">
+                      <div className="font-medium" style={{ color: 'var(--dash-text)' }}>{task.title}</div>
+                      <div className="text-sm" style={{ color: 'var(--dash-text-3)' }}>
                         {task.partnerships?.brand_name}
                       </div>
                     </div>
-                    <div className="text-sm text-gray-600">
+                    <div className="text-sm" style={{ color: 'var(--dash-text-2)' }}>
                       {new Date(task.due_date).toLocaleDateString('he-IL')}
                     </div>
                   </div>

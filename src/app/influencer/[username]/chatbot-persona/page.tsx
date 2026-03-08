@@ -142,7 +142,7 @@ export default function ChatbotPersonaPage({
       setSyncing(true);
       setError(null);
       setSuccess(false);
-      
+
       // Show progress modal
       setShowProgressModal(true);
 
@@ -171,7 +171,7 @@ export default function ChatbotPersonaPage({
   const handleSyncComplete = async (success: boolean) => {
     setShowProgressModal(false);
     setSyncing(false);
-    
+
     if (success) {
       // Reload persona after successful sync
       await loadPersona();
@@ -184,29 +184,30 @@ export default function ChatbotPersonaPage({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--dash-bg)' }}>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: 'var(--color-primary)' }}></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 py-8 px-4">
-      <div className="max-w-5xl mx-auto">
+    <div className="min-h-screen py-8 px-4" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <button
             onClick={() => router.back()}
-            className="flex items-center gap-2 text-gray-400 hover:text-white mb-4 transition-colors"
+            className="flex items-center gap-2 mb-4 transition-colors"
+            style={{ color: 'var(--dash-text-2)' }}
           >
             <ArrowRight className="w-5 h-5" />
             חזרה
           </button>
           <div className="flex items-center gap-3 mb-2">
             <Sparkles className="w-10 h-10 text-purple-400" />
-            <h1 className="text-4xl font-bold text-white">הפרסונה של הצ'אטבוט שלי</h1>
+            <h1 className="text-4xl font-bold" style={{ color: 'var(--dash-text)' }}>הפרסונה של הצ'אטבוט שלי</h1>
           </div>
-          <p className="text-gray-400">הגדר איך הבוט שלך מדבר ומתנהג - תהיה אותנטי!</p>
+          <p style={{ color: 'var(--dash-text-2)' }}>הגדר איך הבוט שלך מדבר ומתנהג - תהיה אותנטי!</p>
         </div>
 
         {/* Messages */}
@@ -223,12 +224,12 @@ export default function ChatbotPersonaPage({
 
         <div className="space-y-6">
           {/* Legal Notice */}
-          <div className="bg-blue-500/10 border border-blue-500/50 rounded-xl p-6">
+          <div className="rounded-xl p-6" style={{ background: 'color-mix(in srgb, var(--color-info) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-info) 50%, transparent)' }}>
             <div className="flex items-start gap-3">
               <div className="text-3xl">⚖️</div>
               <div className="flex-1 text-right">
-                <h3 className="text-xl font-bold text-blue-300 mb-2">דרישה חוקית חשובה</h3>
-                <p className="text-gray-300 leading-relaxed">
+                <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--color-info)' }}>דרישה חוקית חשובה</h3>
+                <p className="leading-relaxed" style={{ color: 'var(--dash-text-2)' }}>
                   על פי החוק (כמו קליפורניה AB 2655 ואירופה AI Act), הבוט <strong>חייב לגלות</strong> שהוא בוט בהתחלת השיחה.
                   <br />
                   <strong>אבל!</strong> אפשר (ומומלץ!) לעשות את זה בצורה חמה ונעימה בשפה שלך:
@@ -252,19 +253,20 @@ export default function ChatbotPersonaPage({
           </div>
 
           {/* Basic Info */}
-          <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
-            <h2 className="text-2xl font-bold text-white mb-4 text-right">מידע בסיסי</h2>
-            
+          <div className="rounded-xl p-6 border" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+            <h2 className="text-2xl font-bold mb-4 text-right" style={{ color: 'var(--dash-text)' }}>מידע בסיסי</h2>
+
             <div className="space-y-4">
               {/* Tone */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2 text-right">
+                <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
                   טון דיבור
                 </label>
                 <select
                   value={persona.tone}
                   onChange={(e) => setPersona({ ...persona, tone: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:outline-none text-right"
+                  className="w-full px-4 py-3 rounded-lg focus:outline-none text-right"
+                  style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid var(--dash-border)' }}
                 >
                   <option value="friendly">ידידותי וחם</option>
                   <option value="professional">מקצועי</option>
@@ -276,13 +278,14 @@ export default function ChatbotPersonaPage({
 
               {/* Emoji Usage */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2 text-right">
+                <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
                   שימוש באימוג'ים
                 </label>
                 <select
                   value={persona.emoji_usage}
                   onChange={(e) => setPersona({ ...persona, emoji_usage: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:outline-none text-right"
+                  className="w-full px-4 py-3 rounded-lg focus:outline-none text-right"
+                  style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid var(--dash-border)' }}
                 >
                   <option value="none">בלי בכלל</option>
                   <option value="minimal">מינימלי</option>
@@ -293,7 +296,7 @@ export default function ChatbotPersonaPage({
 
               {/* Greeting */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2 text-right">
+                <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
                   הודעת ברוכים הבאים
                 </label>
                 <textarea
@@ -301,7 +304,8 @@ export default function ChatbotPersonaPage({
                   onChange={(e) => setPersona({ ...persona, greeting_message: e.target.value })}
                   rows={3}
                   placeholder="היי! אני הבוט של ירדן, פה לעזור לך עם כל שאלה 😊"
-                  className="w-full px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none text-right"
+                  className="w-full px-4 py-3 rounded-lg focus:outline-none text-right"
+                  style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid var(--dash-border)' }}
                 />
                 <p className="mt-2 text-xs text-yellow-400 text-right flex items-center gap-2 justify-end">
                   <span>⚠️</span>
@@ -311,7 +315,7 @@ export default function ChatbotPersonaPage({
 
               {/* Bio */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2 text-right">
+                <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
                   קצת עליי (הבוט ישתמש בזה כהקשר)
                 </label>
                 <textarea
@@ -319,16 +323,17 @@ export default function ChatbotPersonaPage({
                   onChange={(e) => setPersona({ ...persona, bio: e.target.value })}
                   rows={4}
                   placeholder="אני ירדן, בלוגרית אופנה וטיולים. גרה בתל אביב, אוהבת קפה, ספורט וברצלונה..."
-                  className="w-full px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none text-right"
+                  className="w-full px-4 py-3 rounded-lg focus:outline-none text-right"
+                  style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid var(--dash-border)' }}
                 />
               </div>
             </div>
           </div>
 
           {/* Interests */}
-          <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
-            <h2 className="text-2xl font-bold text-white mb-4 text-right">תחומי עניין ותחביבים</h2>
-            <p className="text-gray-400 mb-4 text-right text-sm">
+          <div className="rounded-xl p-6 border" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+            <h2 className="text-2xl font-bold mb-4 text-right" style={{ color: 'var(--dash-text)' }}>תחומי עניין ותחביבים</h2>
+            <p className="mb-4 text-right text-sm" style={{ color: 'var(--dash-text-2)' }}>
               הבוט ישתמש בזה כדי להיות אותנטי יותר בתשובות
             </p>
 
@@ -339,11 +344,13 @@ export default function ChatbotPersonaPage({
                 onChange={(e) => setNewInterest(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && addInterest()}
                 placeholder="לדוגמה: ברצלונה, קפה, צילום"
-                className="flex-1 px-4 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none text-right"
+                className="flex-1 px-4 py-2 rounded-lg focus:outline-none text-right"
+                style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid var(--dash-border)' }}
               />
               <button
                 onClick={addInterest}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-500 transition-colors"
+                className="px-4 py-2 rounded-lg transition-colors"
+                style={{ background: 'var(--color-primary)', color: 'white' }}
               >
                 הוסף
               </button>
@@ -368,22 +375,22 @@ export default function ChatbotPersonaPage({
           </div>
 
           {/* Directives */}
-          <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
-            <h2 className="text-2xl font-bold text-white mb-4 text-right">הנחיות והתנהגות 🎯</h2>
-            <p className="text-gray-400 mb-4 text-right text-sm">
+          <div className="rounded-xl p-6 border" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+            <h2 className="text-2xl font-bold mb-4 text-right" style={{ color: 'var(--dash-text)' }}>הנחיות והתנהגות 🎯</h2>
+            <p className="mb-4 text-right text-sm" style={{ color: 'var(--dash-text-2)' }}>
               תגיד ל-AI איך להתנהג ולענות - <strong>לא סקריפטים מוכנים, רק כללים!</strong>
             </p>
-            
+
             <div className="mb-4 space-y-2">
-              <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-right">
-                <p className="text-xs text-blue-300">
+              <div className="p-3 rounded-lg text-right" style={{ background: 'color-mix(in srgb, var(--color-info) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-info) 30%, transparent)' }}>
+                <p className="text-xs" style={{ color: 'var(--color-info)' }}>
                   💡 <strong>טיפ:</strong> הבוט כבר מוגדר לגלות שהוא בוט (דרישה חוקית), אבל בצורה חמה ונעימה בשפה שלך
                 </p>
               </div>
-              
-              <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg text-right space-y-1">
-                <p className="text-xs font-semibold text-green-300">דוגמאות להנחיות טובות:</p>
-                <div className="text-xs text-gray-300 space-y-1 pr-2">
+
+              <div className="p-3 rounded-lg text-right space-y-1" style={{ background: 'color-mix(in srgb, var(--dash-positive) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--dash-positive) 30%, transparent)' }}>
+                <p className="text-xs font-semibold" style={{ color: 'var(--dash-positive)' }}>דוגמאות להנחיות טובות:</p>
+                <div className="text-xs space-y-1 pr-2" style={{ color: 'var(--dash-text-2)' }}>
                   <p>✅ "כששואלים על דברים אישיים שלא ציינתי - תענה בעדינות שזה פרטי"</p>
                   <p>✅ "כששואלים על מקומות - השתמש במה שכתוב בביו ובתחומי העניין"</p>
                   <p>✅ "תמיד הצע מוצרים או שת\"פים רלוונטיים כשמתאים"</p>
@@ -400,11 +407,13 @@ export default function ChatbotPersonaPage({
                 onChange={(e) => setNewDirective(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && addDirective()}
                 placeholder='לדוגמה: "כששואלים על נושאים אישיים - תענה בעדינות שזה פרטי"'
-                className="flex-1 px-4 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none text-right"
+                className="flex-1 px-4 py-2 rounded-lg focus:outline-none text-right"
+                style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid var(--dash-border)' }}
               />
               <button
                 onClick={addDirective}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-500 transition-colors"
+                className="px-4 py-2 rounded-lg transition-colors"
+                style={{ background: 'var(--color-primary)', color: 'white' }}
               >
                 הוסף
               </button>
@@ -414,9 +423,10 @@ export default function ChatbotPersonaPage({
               {persona.directives.map((directive, index) => (
                 <div
                   key={index}
-                  className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg"
+                  className="flex items-center justify-between p-3 rounded-lg"
+                  style={{ background: 'var(--dash-surface)' }}
                 >
-                  <span className="text-white text-right flex-1">{directive}</span>
+                  <span className="text-right flex-1" style={{ color: 'var(--dash-text)' }}>{directive}</span>
                   <button
                     onClick={() => removeDirective(index)}
                     className="text-red-400 hover:text-red-300 px-2"
@@ -434,7 +444,8 @@ export default function ChatbotPersonaPage({
             <button
               onClick={syncFromInstagram}
               disabled={syncing || saving}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 flex items-center justify-center gap-2 px-6 py-4 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ background: 'var(--color-primary)', color: 'white' }}
             >
               {syncing ? (
                 <>
@@ -453,7 +464,8 @@ export default function ChatbotPersonaPage({
             <button
               onClick={handleSave}
               disabled={saving || syncing}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 flex items-center justify-center gap-2 px-6 py-4 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ background: 'var(--color-primary)', color: 'white' }}
             >
               {saving ? (
                 <>
@@ -470,11 +482,11 @@ export default function ChatbotPersonaPage({
           </div>
 
           {/* Info about sync */}
-          <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg text-right">
-            <p className="text-sm text-blue-300">
+          <div className="p-4 rounded-lg text-right" style={{ background: 'color-mix(in srgb, var(--color-info) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-info) 30%, transparent)' }}>
+            <p className="text-sm" style={{ color: 'var(--color-info)' }}>
               💡 <strong>מה קורה בסנכרון מאינסטגרם?</strong>
             </p>
-            <ol className="text-xs text-gray-300 space-y-1 mt-2 pr-4">
+            <ol className="text-xs space-y-1 mt-2 pr-4" style={{ color: 'var(--dash-text-2)' }}>
               <li>1️⃣ סורקים 50 פוסטים אחרונים מהאינסטגרם שלך (Apify)</li>
               <li>2️⃣ מנתחים את התוכן, הטון, תחומי עניין, hashtags</li>
               <li>3️⃣ <strong>Gemini 3 Pro</strong> בונה פרסונה מעמיקה מכל התוכן</li>

@@ -3,10 +3,10 @@
 import { useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 
-export default function InfluencerLoginPage({ 
-  params 
-}: { 
-  params: Promise<{ username: string }> 
+export default function InfluencerLoginPage({
+  params
+}: {
+  params: Promise<{ username: string }>
 }) {
   const { username } = use(params);
   const [password, setPassword] = useState('');
@@ -21,13 +21,13 @@ export default function InfluencerLoginPage({
 
     try {
       console.log('[Login] Attempting login for:', username);
-      
+
       const res = await fetch('/api/influencer/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          username, 
-          password 
+        body: JSON.stringify({
+          username,
+          password
         }),
       });
 
@@ -51,170 +51,93 @@ export default function InfluencerLoginPage({
   };
 
   return (
-    <>
-      <style jsx>{`
-        .login-container {
-          min-height: 100vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: #f3f4f6;
-          padding: 16px;
-        }
-        .login-card {
-          width: 100%;
-          max-width: 400px;
-          background: white;
-          border-radius: 16px;
-          padding: 32px;
-          box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        }
-        .avatar {
-          width: 80px;
-          height: 80px;
-          border-radius: 16px;
-          background: linear-gradient(135deg, #ec4899, #8b5cf6);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: white;
-          font-size: 32px;
-          font-weight: bold;
-          margin: 0 auto 16px;
-        }
-        h1 {
-          font-size: 24px;
-          font-weight: bold;
-          color: #111827;
-          text-align: center;
-          margin: 0 0 8px;
-        }
-        .subtitle {
-          font-size: 14px;
-          color: #6b7280;
-          text-align: center;
-          margin-bottom: 24px;
-        }
-        label {
-          display: block;
-          font-size: 14px;
-          font-weight: 500;
-          color: #374151;
-          margin-bottom: 8px;
-        }
-        input {
-          width: 100%;
-          padding: 12px;
-          border-radius: 12px;
-          border: 1px solid #d1d5db;
-          font-size: 14px;
-          margin-bottom: 16px;
-          font-family: inherit;
-          background: white;
-          color: #111827;
-        }
-        input::placeholder {
-          color: #9ca3af;
-        }
-        input:focus {
-          outline: none;
-          border-color: #ec4899;
-          box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.1);
-        }
-        button {
-          width: 100%;
-          padding: 12px;
-          border-radius: 12px;
-          background: linear-gradient(135deg, #ec4899, #8b5cf6);
-          color: white !important;
-          font-size: 16px;
-          font-weight: 600;
-          border: none;
-          cursor: pointer;
-          font-family: inherit;
-        }
-        button:hover:not(:disabled) {
-          opacity: 0.9;
-        }
-        button:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-        .error {
-          background: #fef2f2;
-          border: 1px solid #fecaca;
-          color: #991b1b;
-          padding: 12px;
-          border-radius: 8px;
-          font-size: 14px;
-          margin-bottom: 16px;
-        }
-        .footer {
-          font-size: 12px;
-          color: #9ca3af;
-          text-align: center;
-          margin-top: 16px;
-        }
-        .back-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          color: #6b7280;
-          font-size: 14px;
-          margin-bottom: 24px;
-          cursor: pointer;
-          background: none;
-          border: none;
-          padding: 0;
-          width: auto;
-        }
-        .back-btn:hover {
-          color: #111827;
-        }
-      `}</style>
+    <div
+      className="min-h-screen flex items-center justify-center p-4"
+      dir="rtl"
+      style={{ background: 'var(--dash-bg)' }}
+    >
+      <div style={{ width: '100%', maxWidth: '400px' }}>
+        <button
+          onClick={() => router.push(`/chat/${username}`)}
+          className="inline-flex items-center gap-2 text-sm mb-6 cursor-pointer bg-transparent border-none p-0"
+          style={{ color: 'var(--dash-text-2)' }}
+        >
+          ← חזרה לצ'אט
+        </button>
 
-      <div className="login-container" dir="rtl">
-        <div style={{ width: '100%', maxWidth: '400px' }}>
-          <button 
-            className="back-btn"
-            onClick={() => router.push(`/chat/${username}`)}
+        <div
+          className="w-full rounded-2xl p-8"
+          style={{
+            background: 'var(--dash-surface)',
+            border: '1px solid var(--dash-border)',
+          }}
+        >
+          <div
+            className="w-20 h-20 rounded-2xl flex items-center justify-center text-3xl font-bold mx-auto mb-4"
+            style={{ background: 'var(--color-primary)', color: 'white' }}
           >
-            ← חזרה לצ'אט
-          </button>
-
-          <div className="login-card">
-            <div className="avatar">
-              {username.charAt(0).toUpperCase()}
-            </div>
-            
-            <h1>כניסה לפאנל ניהול</h1>
-            <div className="subtitle">@{username}</div>
-            
-            <form onSubmit={handleSubmit}>
-              {error && <div className="error">{error}</div>}
-              
-              <label htmlFor="password">סיסמה</label>
-              <input 
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="הזן את הסיסמה שלך"
-                disabled={loading}
-                autoFocus
-              />
-              
-              <button type="submit" disabled={loading || !password}>
-                {loading ? 'מתחבר...' : 'התחבר'}
-              </button>
-            </form>
-            
-            <div className="footer">
-              יש בעיה? צור קשר עם התמיכה
-            </div>
+            {username.charAt(0).toUpperCase()}
           </div>
+
+          <h1 className="text-2xl font-bold text-center mb-2" style={{ color: 'var(--dash-text)' }}>
+            כניסה לפאנל ניהול
+          </h1>
+          <p className="text-sm text-center mb-6" style={{ color: 'var(--dash-text-2)' }}>
+            @{username}
+          </p>
+
+          <form onSubmit={handleSubmit}>
+            {error && (
+              <div
+                className="p-3 rounded-lg text-sm mb-4"
+                style={{
+                  background: 'color-mix(in srgb, var(--dash-negative) 10%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--dash-negative) 30%, transparent)',
+                  color: 'var(--dash-negative)',
+                }}
+              >
+                {error}
+              </div>
+            )}
+
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>
+              סיסמה
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="הזן את הסיסמה שלך"
+              disabled={loading}
+              autoFocus
+              className="w-full px-4 py-3 rounded-xl text-sm mb-4 focus:outline-none focus:ring-2"
+              style={{
+                background: 'var(--dash-bg)',
+                border: '1px solid var(--dash-border)',
+                color: 'var(--dash-text)',
+                fontFamily: 'inherit',
+              }}
+            />
+
+            <button
+              type="submit"
+              disabled={loading || !password}
+              className="w-full py-3 rounded-xl text-base font-semibold border-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+              style={{
+                background: 'var(--color-primary)',
+                color: 'white',
+                fontFamily: 'inherit',
+              }}
+            >
+              {loading ? 'מתחבר...' : 'התחבר'}
+            </button>
+          </form>
+
+          <p className="text-xs text-center mt-4" style={{ color: 'var(--dash-text-3)' }}>
+            יש בעיה? צור קשר עם התמיכה
+          </p>
         </div>
       </div>
-    </>
+    </div>
   );
 }

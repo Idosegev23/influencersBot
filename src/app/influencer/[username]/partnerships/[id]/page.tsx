@@ -80,10 +80,10 @@ export default function PartnershipDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<Partnership>>({});
   const [activeTab, setActiveTab] = useState<'details' | 'payments' | 'deliverables' | 'terms' | 'documents' | 'coupons'>('details');
-  
+
   // Document upload state
   const [selectedDocumentType, setSelectedDocumentType] = useState<'contract' | 'quote' | 'brief' | 'invoice' | 'receipt' | 'other'>('contract');
-  
+
   // Coupons state
   const [coupons, setCoupons] = useState<any[]>([]);
   const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
@@ -118,7 +118,7 @@ export default function PartnershipDetailPage() {
     } catch (err) {
       console.error('Error loading influencer:', err);
     }
-    
+
     await Promise.all([loadPartnership(), loadDocuments()]);
   };
 
@@ -138,7 +138,7 @@ export default function PartnershipDetailPage() {
       const result = await response.json();
       setPartnership(result.partnership);
       setEditData(result.partnership);
-      
+
       // Get account_id from partnership
       if (result.partnership.account_id) {
         setAccountId(result.partnership.account_id);
@@ -215,7 +215,7 @@ export default function PartnershipDetailPage() {
 
       const result = await response.json();
       console.log('✅ Coupon created:', result.coupon);
-      
+
       // Reset form and reload coupons
       setNewCoupon({
         code: '',
@@ -230,11 +230,11 @@ export default function PartnershipDetailPage() {
         tracking_url: '',
       });
       setShowCouponForm(false);
-      
+
       console.log('🔄 Reloading coupons after creation...');
       await loadCoupons();
-      
-      alert('✅ הקופון נוצר בהצלחה!');
+
+      alert('הקופון נוצר בהצלחה!');
     } catch (err) {
       console.error('Error creating coupon:', err);
       alert('שגיאה ביצירת הקופון');
@@ -246,7 +246,7 @@ export default function PartnershipDetailPage() {
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      alert('✓ הועתק ללוח!');
+      alert('הועתק ללוח!');
     } catch (err) {
       console.error('Failed to copy:', err);
     }
@@ -326,7 +326,7 @@ export default function PartnershipDetailPage() {
       // 3. Auto-parse uploaded documents
       if (uploadedDocumentIds.length > 0) {
         console.log(`📄 מנתח ${uploadedDocumentIds.length} מסמכים...`);
-        
+
         try {
           const parseResponse = await fetch('/api/influencer/documents/parse', {
             method: 'POST',
@@ -416,10 +416,10 @@ export default function PartnershipDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="max-w-4xl mx-auto py-8 px-4">
+      <div className="max-w-6xl mx-auto py-8 px-4" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/4" />
-          <div className="h-64 bg-gray-200 rounded" />
+          <div className="h-8 rounded w-1/4" style={{ background: 'var(--dash-surface)' }} />
+          <div className="h-64 rounded" style={{ background: 'var(--dash-surface)' }} />
         </div>
       </div>
     );
@@ -427,12 +427,13 @@ export default function PartnershipDetailPage() {
 
   if (error && !partnership) {
     return (
-      <div className="max-w-4xl mx-auto py-8 px-4">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-          <p className="text-red-600">{error}</p>
+      <div className="max-w-6xl mx-auto py-8 px-4" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
+        <div className="rounded-xl border p-6 text-center" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+          <p style={{ color: 'var(--dash-negative)' }}>{error}</p>
           <button
             onClick={() => router.back()}
-            className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+            className="mt-4 px-4 py-2 rounded-lg"
+            style={{ background: 'var(--dash-negative)', color: '#fff' }}
           >
             חזור
           </button>
@@ -446,12 +447,13 @@ export default function PartnershipDetailPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4">
+    <div className="max-w-6xl mx-auto py-8 px-4" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
       {/* Back Button */}
       <div className="mb-6">
         <button
           onClick={() => router.push(`/influencer/${username}/partnerships`)}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+          className="flex items-center gap-2 transition-colors"
+          style={{ color: 'var(--dash-text-2)' }}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -463,9 +465,9 @@ export default function PartnershipDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">{partnership.brand_name}</h1>
+          <h1 className="text-3xl font-bold" style={{ color: 'var(--dash-text)' }}>{partnership.brand_name}</h1>
           {partnership.campaign_name && (
-            <p className="text-gray-600 mt-1">{partnership.campaign_name}</p>
+            <p className="mt-1" style={{ color: 'var(--dash-text-2)' }}>{partnership.campaign_name}</p>
           )}
         </div>
         <div className="flex gap-2">
@@ -473,13 +475,15 @@ export default function PartnershipDetailPage() {
             <>
               <button
                 onClick={() => setIsEditing(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="px-4 py-2 rounded-lg transition-colors"
+                style={{ background: 'var(--color-primary)', color: '#fff' }}
               >
                 ערוך
               </button>
               <button
                 onClick={handleDelete}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                className="px-4 py-2 rounded-lg transition-colors"
+                style={{ background: 'var(--dash-negative)', color: '#fff' }}
               >
                 מחק
               </button>
@@ -491,14 +495,16 @@ export default function PartnershipDetailPage() {
                   setIsEditing(false);
                   setEditData(partnership);
                 }}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                className="px-4 py-2 border rounded-lg"
+                style={{ borderColor: 'var(--dash-border)', color: 'var(--dash-text-2)' }}
               >
                 ביטול
               </button>
               <button
                 onClick={handleSave}
                 disabled={isSaving}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 rounded-lg disabled:opacity-50"
+                style={{ background: 'var(--color-primary)', color: '#fff' }}
               >
                 {isSaving ? 'שומר...' : 'שמור'}
               </button>
@@ -509,93 +515,57 @@ export default function PartnershipDetailPage() {
 
       {/* Error Message */}
       {error && (
-        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 text-red-600">
+        <div className="mb-6 rounded-xl border p-4" style={{ borderColor: 'var(--dash-negative)', background: 'var(--dash-surface)', color: 'var(--dash-negative)' }}>
           {error}
         </div>
       )}
 
       {/* Tabs */}
-      <div className="mb-6 border-b border-gray-200">
+      <div className="mb-6 border-b" style={{ borderColor: 'var(--dash-border)' }}>
         <div className="flex gap-6">
-          <button
-            onClick={() => setActiveTab('details')}
-            className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 ${
-              activeTab === 'details'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            פרטי השת"פ
-          </button>
-          <button
-            onClick={() => setActiveTab('payments')}
-            className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 ${
-              activeTab === 'payments'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            💰 מועדי תשלום
-          </button>
-          <button
-            onClick={() => setActiveTab('deliverables')}
-            className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 ${
-              activeTab === 'deliverables'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            📋 משימות
-          </button>
-          <button
-            onClick={() => setActiveTab('terms')}
-            className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 ${
-              activeTab === 'terms'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            ⚖️ תנאים
-          </button>
-          <button
-            onClick={() => setActiveTab('documents')}
-            className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 ${
-              activeTab === 'documents'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            📄 מסמכים ({documents.length})
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab('coupons');
-              loadCoupons();
-            }}
-            className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 ${
-              activeTab === 'coupons'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            🎟️ קופונים ({coupons.length})
-          </button>
+          {(['details', 'payments', 'deliverables', 'terms', 'documents', 'coupons'] as const).map((tab) => {
+            const labels: Record<string, string> = {
+              details: 'פרטי השת"פ',
+              payments: 'מועדי תשלום',
+              deliverables: 'משימות',
+              terms: 'תנאים',
+              documents: `מסמכים (${documents.length})`,
+              coupons: `קופונים (${coupons.length})`,
+            };
+            return (
+              <button
+                key={tab}
+                onClick={() => {
+                  if (tab === 'coupons') loadCoupons();
+                  setActiveTab(tab);
+                }}
+                className="pb-3 px-2 text-sm font-medium transition-colors border-b-2"
+                style={{
+                  borderColor: activeTab === tab ? 'var(--color-primary)' : 'transparent',
+                  color: activeTab === tab ? 'var(--color-primary)' : 'var(--dash-text-3)',
+                }}
+              >
+                {labels[tab]}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* Content */}
       {activeTab === 'details' && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
+        <div className="rounded-xl border p-6 space-y-6" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
         {/* Status */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+          <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
             סטטוס
           </label>
           {isEditing ? (
             <select
               value={editData.status || partnership.status}
               onChange={(e) => setEditData({ ...editData, status: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+              className="w-full px-4 py-2 border rounded-lg text-right"
+              style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
             >
               <option value="lead">Lead</option>
               <option value="negotiation">משא ומתן</option>
@@ -605,13 +575,13 @@ export default function PartnershipDetailPage() {
               <option value="cancelled">בוטל</option>
             </select>
           ) : (
-            <p className="text-gray-900">{STATUS_LABELS[partnership.status] || partnership.status}</p>
+            <p style={{ color: 'var(--dash-text)' }}>{STATUS_LABELS[partnership.status] || partnership.status}</p>
           )}
         </div>
 
         {/* Campaign Name */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+          <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
             שם הקמפיין
           </label>
           {isEditing ? (
@@ -619,17 +589,18 @@ export default function PartnershipDetailPage() {
               type="text"
               value={editData.campaign_name ?? partnership.campaign_name ?? ''}
               onChange={(e) => setEditData({ ...editData, campaign_name: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+              className="w-full px-4 py-2 border rounded-lg text-right"
+              style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
             />
           ) : (
-            <p className="text-gray-900">{partnership.campaign_name || '—'}</p>
+            <p style={{ color: 'var(--dash-text)' }}>{partnership.campaign_name || '—'}</p>
           )}
         </div>
 
         {/* Dates */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+            <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
               תאריך התחלה
             </label>
             {isEditing ? (
@@ -637,10 +608,11 @@ export default function PartnershipDetailPage() {
                 type="date"
                 value={editData.start_date ?? partnership.start_date ?? ''}
                 onChange={(e) => setEditData({ ...editData, start_date: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+                className="w-full px-4 py-2 border rounded-lg text-right"
+                style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
               />
             ) : (
-              <p className="text-gray-900">
+              <p style={{ color: 'var(--dash-text)' }}>
                 {partnership.start_date
                   ? new Date(partnership.start_date).toLocaleDateString('he-IL')
                   : '—'}
@@ -648,7 +620,7 @@ export default function PartnershipDetailPage() {
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+            <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
               תאריך סיום
             </label>
             {isEditing ? (
@@ -656,10 +628,11 @@ export default function PartnershipDetailPage() {
                 type="date"
                 value={editData.end_date ?? partnership.end_date ?? ''}
                 onChange={(e) => setEditData({ ...editData, end_date: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+                className="w-full px-4 py-2 border rounded-lg text-right"
+                style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
               />
             ) : (
-              <p className="text-gray-900">
+              <p style={{ color: 'var(--dash-text)' }}>
                 {partnership.end_date
                   ? new Date(partnership.end_date).toLocaleDateString('he-IL')
                   : '—'}
@@ -670,7 +643,7 @@ export default function PartnershipDetailPage() {
 
         {/* Contract Amount */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+          <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
             סכום החוזה (₪)
           </label>
           {isEditing ? (
@@ -681,10 +654,11 @@ export default function PartnershipDetailPage() {
               onChange={(e) =>
                 setEditData({ ...editData, contract_amount: parseFloat(e.target.value) })
               }
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+              className="w-full px-4 py-2 border rounded-lg text-right"
+              style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
             />
           ) : (
-            <p className="text-gray-900 font-medium">
+            <p className="font-medium" style={{ color: 'var(--dash-text)' }}>
               {partnership.contract_amount
                 ? `₪${partnership.contract_amount.toLocaleString('he-IL')}`
                 : '—'}
@@ -694,14 +668,14 @@ export default function PartnershipDetailPage() {
 
         {/* Deliverables */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+          <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
             דליברבלס
           </label>
           {isEditing ? (
             <textarea
               value={
-                typeof editData.deliverables === 'string' 
-                  ? editData.deliverables 
+                typeof editData.deliverables === 'string'
+                  ? editData.deliverables
                   : typeof partnership.deliverables === 'string'
                   ? partnership.deliverables
                   : Array.isArray(partnership.deliverables)
@@ -710,16 +684,17 @@ export default function PartnershipDetailPage() {
               }
               onChange={(e) => setEditData({ ...editData, deliverables: e.target.value })}
               rows={3}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+              className="w-full px-4 py-2 border rounded-lg text-right"
+              style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
             />
           ) : (
-            <div className="text-gray-900">
+            <div style={{ color: 'var(--dash-text)' }}>
               {typeof partnership.deliverables === 'string' ? (
                 <p className="whitespace-pre-wrap">{partnership.deliverables}</p>
               ) : Array.isArray(partnership.deliverables) && partnership.deliverables.length > 0 ? (
                 <div className="space-y-2">
                   {partnership.deliverables.map((d, i) => (
-                    <div key={i} className="text-sm bg-gray-50 p-2 rounded">
+                    <div key={i} className="text-sm p-2 rounded" style={{ background: 'var(--dash-surface-hover)' }}>
                       {d.quantity && <strong>{d.quantity}x </strong>}
                       {d.type}
                       {d.description && <> - {d.description}</>}
@@ -735,7 +710,7 @@ export default function PartnershipDetailPage() {
 
         {/* Notes */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+          <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
             הערות
           </label>
           {isEditing ? (
@@ -743,15 +718,16 @@ export default function PartnershipDetailPage() {
               value={editData.notes ?? partnership.notes ?? ''}
               onChange={(e) => setEditData({ ...editData, notes: e.target.value })}
               rows={3}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+              className="w-full px-4 py-2 border rounded-lg text-right"
+              style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
             />
           ) : (
-            <p className="text-gray-900 whitespace-pre-wrap">{partnership.notes || '—'}</p>
+            <p className="whitespace-pre-wrap" style={{ color: 'var(--dash-text)' }}>{partnership.notes || '—'}</p>
           )}
         </div>
 
         {/* Metadata */}
-        <div className="pt-4 border-t border-gray-200 text-sm text-gray-500 text-right">
+        <div className="pt-4 border-t text-sm text-right" style={{ borderColor: 'var(--dash-border)', color: 'var(--dash-text-3)' }}>
           <p>נוצר: {new Date(partnership.created_at).toLocaleString('he-IL')}</p>
           <p>עודכן: {new Date(partnership.updated_at).toLocaleString('he-IL')}</p>
         </div>
@@ -760,25 +736,25 @@ export default function PartnershipDetailPage() {
 
       {/* Payments Tab */}
       {activeTab === 'payments' && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 text-right">💰 מועדי תשלום</h2>
-          
+        <div className="rounded-xl border p-6" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+          <h2 className="text-2xl font-bold mb-6 text-right" style={{ color: 'var(--dash-text)' }}>מועדי תשלום</h2>
+
           {partnership?.payment_schedule && partnership.payment_schedule.length > 0 ? (
             <div className="space-y-4">
               {/* Total Amount Summary */}
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-6 mb-6">
+              <div className="rounded-xl border p-6 mb-6" style={{ background: 'var(--dash-surface-hover)', borderColor: 'var(--dash-positive)' }}>
                 <div className="flex items-center justify-between">
                   <div className="text-right">
-                    <p className="text-sm text-green-700 mb-1">סכום כולל</p>
-                    <p className="text-4xl font-bold text-green-900">
+                    <p className="text-sm mb-1" style={{ color: 'var(--dash-positive)' }}>סכום כולל</p>
+                    <p className="text-4xl font-bold" style={{ color: 'var(--dash-text)' }}>
                       ₪{partnership.contract_amount?.toLocaleString() || '—'}
                     </p>
-                    <p className="text-xs text-green-600 mt-1">
+                    <p className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>
                       {partnership.payment_schedule.length} תשלומים מתוכננים
                     </p>
                   </div>
-                  <div className="h-16 w-16 rounded-full bg-green-200 flex items-center justify-center">
-                    <svg className="h-8 w-8 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="h-16 w-16 rounded-full flex items-center justify-center" style={{ background: 'var(--dash-surface)' }}>
+                    <svg className="h-8 w-8" style={{ color: 'var(--dash-positive)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
@@ -791,33 +767,33 @@ export default function PartnershipDetailPage() {
                   <div key={index} className="flex gap-4 mb-6 last:mb-0">
                     {/* Timeline Line */}
                     <div className="flex flex-col items-center">
-                      <div className="h-10 w-10 rounded-full bg-blue-100 border-2 border-blue-600 flex items-center justify-center font-bold text-blue-600">
+                      <div className="h-10 w-10 rounded-full border-2 flex items-center justify-center font-bold" style={{ background: 'var(--dash-surface-hover)', borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}>
                         {index + 1}
                       </div>
                       {index < partnership.payment_schedule.length - 1 && (
-                        <div className="w-0.5 h-full bg-blue-200 mt-2" style={{ minHeight: '60px' }} />
+                        <div className="w-0.5 h-full mt-2" style={{ minHeight: '60px', background: 'var(--dash-border)' }} />
                       )}
                     </div>
 
                     {/* Payment Card */}
-                    <div className="flex-1 bg-white border-2 border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
+                    <div className="flex-1 border-2 rounded-lg p-4 transition-colors" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
                       <div className="flex items-start justify-between mb-3">
                         <div className="text-right flex-1">
-                          <p className="text-lg font-bold text-gray-900">
+                          <p className="text-lg font-bold" style={{ color: 'var(--dash-text)' }}>
                             ₪{milestone.amount.toLocaleString()}
                           </p>
-                          <p className="text-sm text-gray-600">{milestone.percentage}% מהסכום</p>
+                          <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>{milestone.percentage}% מהסכום</p>
                         </div>
                         {milestone.dueDate && (
-                          <div className="bg-blue-50 px-3 py-1 rounded-full">
-                            <p className="text-xs font-medium text-blue-700">
-                              📅 {new Date(milestone.dueDate).toLocaleDateString('he-IL')}
+                          <div className="px-3 py-1 rounded-full" style={{ background: 'var(--dash-surface-hover)' }}>
+                            <p className="text-xs font-medium" style={{ color: 'var(--color-primary)' }}>
+                              {new Date(milestone.dueDate).toLocaleDateString('he-IL')}
                             </p>
                           </div>
                         )}
                       </div>
-                      
-                      <p className="text-sm text-gray-700 mb-3 text-right">
+
+                      <p className="text-sm mb-3 text-right" style={{ color: 'var(--dash-text-2)' }}>
                         <strong>תנאי:</strong> {milestone.trigger}
                       </p>
 
@@ -825,21 +801,21 @@ export default function PartnershipDetailPage() {
                       <div className="flex gap-2 justify-end">
                         <button
                           onClick={() => {
-                            // TODO: Add to Google Calendar
                             alert('הוספה ליומן - בקרוב!');
                           }}
-                          className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                          className="px-4 py-2 text-sm rounded-lg transition-colors"
+                          style={{ background: 'var(--color-primary)', color: '#fff' }}
                         >
-                          📅 הוסף ליומן
+                          הוסף ליומן
                         </button>
                         <button
                           onClick={() => {
-                            // TODO: Set reminder
                             alert('תזכורת - בקרוב!');
                           }}
-                          className="px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors"
+                          className="px-4 py-2 border text-sm rounded-lg transition-colors"
+                          style={{ borderColor: 'var(--dash-border)', color: 'var(--dash-text-2)' }}
                         >
-                          🔔 תזכורת
+                          תזכורת
                         </button>
                       </div>
                     </div>
@@ -848,8 +824,8 @@ export default function PartnershipDetailPage() {
               </div>
             </div>
           ) : (
-            <div className="text-center py-12 text-gray-500">
-              <svg className="h-16 w-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="text-center py-12" style={{ color: 'var(--dash-text-3)' }}>
+              <svg className="h-16 w-16 mx-auto mb-4" style={{ color: 'var(--dash-muted)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <p className="text-lg mb-2">אין מועדי תשלום</p>
@@ -861,53 +837,52 @@ export default function PartnershipDetailPage() {
 
       {/* Deliverables Tab */}
       {activeTab === 'deliverables' && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 text-right">📋 דליברבלס ומשימות</h2>
-          
+        <div className="rounded-xl border p-6" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+          <h2 className="text-2xl font-bold mb-6 text-right" style={{ color: 'var(--dash-text)' }}>דליברבלס ומשימות</h2>
+
           {partnership?.deliverables && Array.isArray(partnership.deliverables) && partnership.deliverables.length > 0 ? (
             <div className="space-y-3">
               {partnership.deliverables.map((item, index) => {
                 // Handle both string and object deliverables
                 if (typeof item === 'string') {
                   return (
-                    <div key={`del-${index}`} className="border-2 border-gray-200 rounded-lg p-4">
-                      <p className="text-sm text-gray-700 text-right">{item}</p>
+                    <div key={`del-${index}`} className="border-2 rounded-lg p-4" style={{ borderColor: 'var(--dash-border)' }}>
+                      <p className="text-sm text-right" style={{ color: 'var(--dash-text-2)' }}>{item}</p>
                     </div>
                   );
                 }
-                
+
                 return (
-                <div key={`del-${index}-${item.type}`} className="border-2 border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
+                <div key={`del-${index}-${item.type}`} className="border-2 rounded-lg p-4 transition-colors" style={{ borderColor: 'var(--dash-border)' }}>
                   <div className="flex items-start gap-4">
                     <input
                       type="checkbox"
                       checked={item.completed || false}
                       onChange={() => {
-                        // TODO: Toggle completion
                         alert('סימון השלמה - בקרוב!');
                       }}
-                      className="mt-1 h-5 w-5 text-blue-600 rounded"
+                      className="mt-1 h-5 w-5 rounded"
                     />
-                    
+
                     <div className="flex-1 text-right">
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex-1">
-                          <h3 className="text-lg font-bold text-gray-900">
+                          <h3 className="text-lg font-bold" style={{ color: 'var(--dash-text)' }}>
                             {item.quantity && `${item.quantity}x `}
                             {item.type}
                           </h3>
-                          <p className="text-sm text-gray-600 mt-1">{item.description}</p>
+                          <p className="text-sm mt-1" style={{ color: 'var(--dash-text-2)' }}>{item.description}</p>
                         </div>
                         {item.platform && (
-                          <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs font-medium">
+                          <span className="px-2 py-1 rounded text-xs font-medium" style={{ background: 'var(--dash-surface-hover)', color: 'var(--color-info)' }}>
                             {item.platform}
                           </span>
                         )}
                       </div>
 
                       {item.dueDate && (
-                        <p className="text-sm text-gray-500 mb-3">
-                          📅 מועד: {new Date(item.dueDate).toLocaleDateString('he-IL')}
+                        <p className="text-sm mb-3" style={{ color: 'var(--dash-text-3)' }}>
+                          מועד: {new Date(item.dueDate).toLocaleDateString('he-IL')}
                         </p>
                       )}
 
@@ -915,21 +890,21 @@ export default function PartnershipDetailPage() {
                       <div className="flex gap-2 justify-end">
                         <button
                           onClick={() => {
-                            // TODO: Create task
                             alert('יצירת משימה - בקרוב!');
                           }}
-                          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+                          className="px-3 py-1.5 text-sm rounded transition-colors"
+                          style={{ background: 'var(--color-primary)', color: '#fff' }}
                         >
-                          ➕ צור משימה
+                          צור משימה
                         </button>
                         <button
                           onClick={() => {
-                            // TODO: Add to calendar
                             alert('הוספה ליומן - בקרוב!');
                           }}
-                          className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded hover:bg-gray-50 transition-colors"
+                          className="px-3 py-1.5 border text-sm rounded transition-colors"
+                          style={{ borderColor: 'var(--dash-border)', color: 'var(--dash-text-2)' }}
                         >
-                          📅 ליומן
+                          ליומן
                         </button>
                       </div>
                     </div>
@@ -938,8 +913,8 @@ export default function PartnershipDetailPage() {
               )})}
             </div>
           ) : (
-            <div className="text-center py-12 text-gray-500">
-              <svg className="h-16 w-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="text-center py-12" style={{ color: 'var(--dash-text-3)' }}>
+              <svg className="h-16 w-16 mx-auto mb-4" style={{ color: 'var(--dash-muted)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
               <p className="text-lg mb-2">אין דליברבלס</p>
@@ -951,27 +926,27 @@ export default function PartnershipDetailPage() {
 
       {/* Terms Tab */}
       {activeTab === 'terms' && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 text-right">⚖️ תנאי החוזה</h2>
-          
+        <div className="rounded-xl border p-6" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+          <h2 className="text-2xl font-bold mb-6 text-right" style={{ color: 'var(--dash-text)' }}>תנאי החוזה</h2>
+
           <div className="space-y-6">
             {/* Scope */}
             {partnership?.contract_scope && (
-              <div className="border-l-4 border-blue-500 bg-blue-50 p-4">
-                <h3 className="font-bold text-gray-900 mb-2 text-right">📌 תחום החוזה</h3>
-                <p className="text-sm text-gray-700 text-right">{partnership.contract_scope}</p>
+              <div className="border-r-4 p-4 rounded-lg" style={{ borderColor: 'var(--color-primary)', background: 'var(--dash-surface-hover)' }}>
+                <h3 className="font-bold mb-2 text-right" style={{ color: 'var(--dash-text)' }}>תחום החוזה</h3>
+                <p className="text-sm text-right" style={{ color: 'var(--dash-text-2)' }}>{partnership.contract_scope}</p>
               </div>
             )}
 
             {/* Exclusivity */}
             {partnership?.exclusivity?.isExclusive && (
-              <div className="border-l-4 border-purple-500 bg-purple-50 p-4">
-                <h3 className="font-bold text-gray-900 mb-2 text-right">🔒 אקסקלוסיביות</h3>
-                <p className="text-sm text-purple-700 mb-2 text-right font-medium">חוזה אקסקלוסיבי</p>
+              <div className="border-r-4 p-4 rounded-lg" style={{ borderColor: 'var(--color-warning)', background: 'var(--dash-surface-hover)' }}>
+                <h3 className="font-bold mb-2 text-right" style={{ color: 'var(--dash-text)' }}>אקסקלוסיביות</h3>
+                <p className="text-sm mb-2 text-right font-medium" style={{ color: 'var(--color-warning)' }}>חוזה אקסקלוסיבי</p>
                 {partnership.exclusivity.categories && partnership.exclusivity.categories.length > 0 && (
-                  <ul className="text-sm text-gray-700 space-y-1">
+                  <ul className="text-sm space-y-1" style={{ color: 'var(--dash-text-2)' }}>
                     {partnership.exclusivity.categories.map((cat, i) => (
-                      <li key={i} className="text-right">• {cat}</li>
+                      <li key={i} className="text-right">{cat}</li>
                     ))}
                   </ul>
                 )}
@@ -980,11 +955,11 @@ export default function PartnershipDetailPage() {
 
             {/* Termination Clauses */}
             {partnership?.termination_clauses && partnership.termination_clauses.length > 0 && (
-              <div className="border-l-4 border-orange-500 bg-orange-50 p-4">
-                <h3 className="font-bold text-gray-900 mb-3 text-right">⚠️ תנאי ביטול</h3>
-                <ul className="text-sm text-gray-700 space-y-2">
+              <div className="border-r-4 p-4 rounded-lg" style={{ borderColor: 'var(--color-warning)', background: 'var(--dash-surface-hover)' }}>
+                <h3 className="font-bold mb-3 text-right" style={{ color: 'var(--dash-text)' }}>תנאי ביטול</h3>
+                <ul className="text-sm space-y-2" style={{ color: 'var(--dash-text-2)' }}>
                   {partnership.termination_clauses.map((clause, i) => (
-                    <li key={i} className="text-right border-b border-orange-200 pb-2 last:border-0">• {clause}</li>
+                    <li key={i} className="text-right border-b pb-2 last:border-0" style={{ borderColor: 'var(--dash-border)' }}>{clause}</li>
                   ))}
                 </ul>
               </div>
@@ -992,11 +967,11 @@ export default function PartnershipDetailPage() {
 
             {/* Liability Clauses */}
             {partnership?.liability_clauses && partnership.liability_clauses.length > 0 && (
-              <div className="border-l-4 border-red-500 bg-red-50 p-4">
-                <h3 className="font-bold text-gray-900 mb-3 text-right">⚡ אחריות ונזיקין</h3>
-                <ul className="text-sm text-gray-700 space-y-2">
+              <div className="border-r-4 p-4 rounded-lg" style={{ borderColor: 'var(--dash-negative)', background: 'var(--dash-surface-hover)' }}>
+                <h3 className="font-bold mb-3 text-right" style={{ color: 'var(--dash-text)' }}>אחריות ונזיקין</h3>
+                <ul className="text-sm space-y-2" style={{ color: 'var(--dash-text-2)' }}>
                   {partnership.liability_clauses.map((clause, i) => (
-                    <li key={i} className="text-right border-b border-red-200 pb-2 last:border-0">• {clause}</li>
+                    <li key={i} className="text-right border-b pb-2 last:border-0" style={{ borderColor: 'var(--dash-border)' }}>{clause}</li>
                   ))}
                 </ul>
               </div>
@@ -1004,29 +979,29 @@ export default function PartnershipDetailPage() {
 
             {/* Confidentiality */}
             {partnership?.confidentiality && (
-              <div className="border-l-4 border-gray-500 bg-gray-50 p-4">
-                <h3 className="font-bold text-gray-900 mb-2 text-right">🔐 סודיות</h3>
-                <p className="text-sm text-gray-700 text-right">{partnership.confidentiality}</p>
+              <div className="border-r-4 p-4 rounded-lg" style={{ borderColor: 'var(--dash-text-3)', background: 'var(--dash-surface-hover)' }}>
+                <h3 className="font-bold mb-2 text-right" style={{ color: 'var(--dash-text)' }}>סודיות</h3>
+                <p className="text-sm text-right" style={{ color: 'var(--dash-text-2)' }}>{partnership.confidentiality}</p>
               </div>
             )}
 
             {/* Auto Renewal */}
             {partnership?.auto_renewal && (
-              <div className="border-l-4 border-green-500 bg-green-50 p-4">
-                <h3 className="font-bold text-gray-900 mb-2 text-right">🔄 חידוש אוטומטי</h3>
-                <p className="text-sm text-green-700 text-right">החוזה מתחדש אוטומטית בתום התקופה</p>
+              <div className="border-r-4 p-4 rounded-lg" style={{ borderColor: 'var(--dash-positive)', background: 'var(--dash-surface-hover)' }}>
+                <h3 className="font-bold mb-2 text-right" style={{ color: 'var(--dash-text)' }}>חידוש אוטומטי</h3>
+                <p className="text-sm text-right" style={{ color: 'var(--dash-positive)' }}>החוזה מתחדש אוטומטית בתום התקופה</p>
               </div>
             )}
 
             {/* Key Dates */}
             {partnership?.key_dates && partnership.key_dates.length > 0 && (
-              <div className="border-l-4 border-indigo-500 bg-indigo-50 p-4">
-                <h3 className="font-bold text-gray-900 mb-3 text-right">📆 תאריכים חשובים</h3>
-                <ul className="text-sm text-gray-700 space-y-2">
+              <div className="border-r-4 p-4 rounded-lg" style={{ borderColor: 'var(--color-info)', background: 'var(--dash-surface-hover)' }}>
+                <h3 className="font-bold mb-3 text-right" style={{ color: 'var(--dash-text)' }}>תאריכים חשובים</h3>
+                <ul className="text-sm space-y-2" style={{ color: 'var(--dash-text-2)' }}>
                   {partnership.key_dates.map((kd, i) => (
-                    <li key={i} className="flex items-center justify-between text-right border-b border-indigo-200 pb-2 last:border-0">
+                    <li key={i} className="flex items-center justify-between text-right border-b pb-2 last:border-0" style={{ borderColor: 'var(--dash-border)' }}>
                       <span>{kd.event}</span>
-                      <span className="font-medium text-indigo-700">
+                      <span className="font-medium" style={{ color: 'var(--color-info)' }}>
                         {new Date(kd.date).toLocaleDateString('he-IL')}
                       </span>
                     </li>
@@ -1042,8 +1017,8 @@ export default function PartnershipDetailPage() {
            !partnership?.termination_clauses?.length &&
            !partnership?.liability_clauses?.length &&
            !partnership?.confidentiality && (
-            <div className="text-center py-12 text-gray-500">
-              <svg className="h-16 w-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="text-center py-12" style={{ color: 'var(--dash-text-3)' }}>
+              <svg className="h-16 w-16 mx-auto mb-4" style={{ color: 'var(--dash-muted)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               <p className="text-lg mb-2">אין תנאי חוזה</p>
@@ -1055,32 +1030,33 @@ export default function PartnershipDetailPage() {
 
       {/* Documents Tab */}
       {activeTab === 'documents' && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="rounded-xl border p-6" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
           {/* Upload Section */}
           <div className="mb-8">
-            <h3 className="text-xl font-bold text-gray-900 mb-6 text-right">
-              📤 העלאת מסמכים
+            <h3 className="text-xl font-bold mb-6 text-right" style={{ color: 'var(--dash-text)' }}>
+              העלאת מסמכים
             </h3>
-            
-            {/* Document Type Selector - Bigger and Clearer */}
-            <div className="mb-6 bg-gray-50 rounded-lg p-4 border border-gray-200">
-              <label className="block text-sm font-semibold text-gray-900 mb-3 text-right">
-                1️⃣ בחר סוג מסמך
+
+            {/* Document Type Selector */}
+            <div className="mb-6 rounded-lg p-4 border" style={{ background: 'var(--dash-surface-hover)', borderColor: 'var(--dash-border)' }}>
+              <label className="block text-sm font-semibold mb-3 text-right" style={{ color: 'var(--dash-text)' }}>
+                בחר סוג מסמך
               </label>
               <select
                 value={selectedDocumentType}
                 onChange={(e) => setSelectedDocumentType(e.target.value as any)}
                 disabled={isUploading}
-                className="w-full px-4 py-3 text-base border-2 border-gray-300 rounded-lg text-right focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed bg-white"
+                className="w-full px-4 py-3 text-base border-2 rounded-lg text-right focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
               >
-                <option value="contract">📄 חוזה שת"פ</option>
-                <option value="brief">📋 בריף קמפיין</option>
-                <option value="quote">💰 הצעת מחיר</option>
-                <option value="invoice">🧾 חשבונית</option>
-                <option value="receipt">🧾 קבלה</option>
-                <option value="other">📁 אחר</option>
+                <option value="contract">חוזה שת"פ</option>
+                <option value="brief">בריף קמפיין</option>
+                <option value="quote">הצעת מחיר</option>
+                <option value="invoice">חשבונית</option>
+                <option value="receipt">קבלה</option>
+                <option value="other">אחר</option>
               </select>
-              <p className="text-xs text-gray-600 mt-2 text-right">
+              <p className="text-xs mt-2 text-right" style={{ color: 'var(--dash-text-3)' }}>
                 {selectedDocumentType === 'contract' && 'הסכם שיתוף פעולה עם מותג'}
                 {selectedDocumentType === 'brief' && 'דרישות תוכן והנחיות לקמפיין'}
                 {selectedDocumentType === 'quote' && 'הצעה מסחרית או הצעת שת"פ'}
@@ -1090,11 +1066,11 @@ export default function PartnershipDetailPage() {
               </p>
             </div>
 
-            {/* Upload Area - Drag & Drop Style */}
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-8 border-2 border-dashed border-blue-300">
+            {/* Upload Area */}
+            <div className="rounded-lg p-8 border-2 border-dashed" style={{ borderColor: 'var(--color-primary)', background: 'var(--dash-surface-hover)' }}>
               <label className="flex flex-col items-center cursor-pointer group">
-                <div className="mb-4 h-20 w-20 rounded-full bg-blue-100 flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                  <svg className="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="mb-4 h-20 w-20 rounded-full flex items-center justify-center" style={{ background: 'var(--dash-surface)' }}>
+                  <svg className="w-10 h-10" style={{ color: 'var(--color-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -1103,13 +1079,13 @@ export default function PartnershipDetailPage() {
                     />
                   </svg>
                 </div>
-                <p className="text-lg font-semibold text-gray-900 mb-2">
-                  {isUploading ? '⏳ מעלה ומנתח...' : '2️⃣ לחץ להעלאת קבצים או גרור לכאן'}
+                <p className="text-lg font-semibold mb-2" style={{ color: 'var(--dash-text)' }}>
+                  {isUploading ? 'מעלה ומנתח...' : 'לחץ להעלאת קבצים או גרור לכאן'}
                 </p>
-                <p className="text-sm text-gray-600 mb-4">
-                  PDF, Word, תמונות • עד 10MB לקובץ
+                <p className="text-sm mb-4" style={{ color: 'var(--dash-text-2)' }}>
+                  PDF, Word, תמונות - עד 10MB לקובץ
                 </p>
-                <div className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium group-hover:bg-blue-700 transition-colors">
+                <div className="inline-flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors" style={{ background: 'var(--color-primary)', color: '#fff' }}>
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                   </svg>
@@ -1127,18 +1103,18 @@ export default function PartnershipDetailPage() {
             </div>
 
             {/* AI Processing Info */}
-            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="mt-4 rounded-xl border p-4" style={{ background: 'var(--dash-surface-hover)', borderColor: 'var(--color-info)' }}>
               <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 h-6 w-6 rounded-full bg-blue-100 flex items-center justify-center">
-                  <svg className="h-4 w-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                <div className="flex-shrink-0 h-6 w-6 rounded-full flex items-center justify-center" style={{ background: 'var(--dash-surface)' }}>
+                  <svg className="h-4 w-4" style={{ color: 'var(--color-info)' }} fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                   </svg>
                 </div>
                 <div className="text-right flex-1">
-                  <p className="text-sm font-medium text-blue-900 mb-1">
-                    🤖 ה-AI ינתח את המסמך אוטומטית
+                  <p className="text-sm font-medium mb-1" style={{ color: 'var(--dash-text)' }}>
+                    ה-AI ינתח את המסמך אוטומטית
                   </p>
-                  <p className="text-xs text-blue-700">
+                  <p className="text-xs" style={{ color: 'var(--dash-text-2)' }}>
                     המערכת תחלץ: שמות, תאריכים, סכומים, דליברבלס, תנאים ועוד. התהליך לוקח 30 שניות - 8 דקות.
                   </p>
                 </div>
@@ -1146,17 +1122,18 @@ export default function PartnershipDetailPage() {
             </div>
           </div>
 
-          <div className="border-t border-gray-200 pt-6"></div>
+          <div className="border-t pt-6" style={{ borderColor: 'var(--dash-border)' }}></div>
 
           {/* Documents List */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 text-right">
+            <h3 className="text-lg font-semibold mb-4 text-right" style={{ color: 'var(--dash-text)' }}>
               מסמכים קיימים
             </h3>
             {documents.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">
+              <div className="text-center py-12" style={{ color: 'var(--dash-text-3)' }}>
                 <svg
-                  className="w-16 h-16 mx-auto mb-4 text-gray-300"
+                  className="w-16 h-16 mx-auto mb-4"
+                  style={{ color: 'var(--dash-muted)' }}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -1176,13 +1153,17 @@ export default function PartnershipDetailPage() {
                 {documents.map((doc) => (
                   <div
                     key={doc.id}
-                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    className="flex items-center justify-between p-4 border rounded-lg transition-colors"
+                    style={{ borderColor: 'var(--dash-border)' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--dash-surface-hover)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                   >
                     <div className="flex items-center gap-4 flex-1">
                       {/* File Icon */}
                       <div className="flex-shrink-0">
                         <svg
-                          className="w-10 h-10 text-blue-600"
+                          className="w-10 h-10"
+                          style={{ color: 'var(--color-primary)' }}
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -1198,15 +1179,15 @@ export default function PartnershipDetailPage() {
 
                       {/* File Info */}
                       <div className="flex-1 text-right">
-                        <div className="font-medium text-gray-900">{doc.file_name}</div>
-                        <div className="text-sm text-gray-500 flex items-center gap-2 justify-end mt-1">
+                        <div className="font-medium" style={{ color: 'var(--dash-text)' }}>{doc.file_name}</div>
+                        <div className="text-sm flex items-center gap-2 justify-end mt-1" style={{ color: 'var(--dash-text-3)' }}>
                           <span>{(doc.file_size / 1024 / 1024).toFixed(2)} MB</span>
-                          <span>•</span>
+                          <span>-</span>
                           <span>{doc.document_type}</span>
                           {doc.confidence_score && (
                             <>
-                              <span>•</span>
-                              <span className="text-green-600">
+                              <span>-</span>
+                              <span style={{ color: 'var(--dash-positive)' }}>
                                 AI: {(doc.confidence_score * 100).toFixed(0)}%
                               </span>
                             </>
@@ -1217,14 +1198,15 @@ export default function PartnershipDetailPage() {
 
                     {/* Actions */}
                     <div className="flex gap-2">
-                      {doc.parsed_data && doc.parsing_status === 'completed' && (
+                      {doc.parsed_data && (doc as any).parsing_status === 'completed' && (
                         <button
                           onClick={() =>
                             router.push(
                               `/influencer/${username}/documents/${doc.id}/review`
                             )
                           }
-                          className="text-sm text-blue-600 hover:text-blue-700"
+                          className="text-sm"
+                          style={{ color: 'var(--color-primary)' }}
                         >
                           סקור נתונים
                         </button>
@@ -1239,7 +1221,8 @@ export default function PartnershipDetailPage() {
                             window.open(document.download_url, '_blank');
                           }
                         }}
-                        className="text-sm text-gray-600 hover:text-gray-700"
+                        className="text-sm"
+                        style={{ color: 'var(--dash-text-2)' }}
                       >
                         הורד
                       </button>
@@ -1254,12 +1237,13 @@ export default function PartnershipDetailPage() {
 
       {/* Coupons Tab */}
       {activeTab === 'coupons' && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="rounded-xl border p-6" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
           <div className="mb-6 flex justify-between items-center">
-            <h2 className="text-2xl font-bold text-gray-900 text-right">🎟️ קופונים ומעקב ROI</h2>
+            <h2 className="text-2xl font-bold text-right" style={{ color: 'var(--dash-text)' }}>קופונים ומעקב ROI</h2>
             <button
               onClick={() => setShowCouponForm(!showCouponForm)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="px-4 py-2 rounded-lg transition-colors"
+              style={{ background: 'var(--color-primary)', color: '#fff' }}
             >
               {showCouponForm ? 'ביטול' : '+ קופון חדש'}
             </button>
@@ -1267,13 +1251,13 @@ export default function PartnershipDetailPage() {
 
           {/* Create Coupon Form */}
           {showCouponForm && (
-            <form onSubmit={handleCreateCoupon} className="mb-8 p-6 bg-gray-50 rounded-lg border border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 text-right">צור קופון חדש</h3>
-              
+            <form onSubmit={handleCreateCoupon} className="mb-8 p-6 rounded-lg border" style={{ background: 'var(--dash-surface-hover)', borderColor: 'var(--dash-border)' }}>
+              <h3 className="text-lg font-semibold mb-4 text-right" style={{ color: 'var(--dash-text)' }}>צור קופון חדש</h3>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Coupon Code */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                  <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
                     קוד קופון *
                   </label>
                   <input
@@ -1282,19 +1266,21 @@ export default function PartnershipDetailPage() {
                     value={newCoupon.code}
                     onChange={(e) => setNewCoupon({ ...newCoupon, code: e.target.value.toUpperCase() })}
                     placeholder="SUMMER2026"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+                    className="w-full px-4 py-2 border rounded-lg text-right"
+                    style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
                   />
                 </div>
 
                 {/* Discount Type */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                  <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
                     סוג הנחה *
                   </label>
                   <select
                     value={newCoupon.discount_type}
                     onChange={(e) => setNewCoupon({ ...newCoupon, discount_type: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+                    className="w-full px-4 py-2 border rounded-lg text-right"
+                    style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
                   >
                     <option value="percentage">אחוז (%)</option>
                     <option value="fixed">סכום קבוע (₪)</option>
@@ -1304,7 +1290,7 @@ export default function PartnershipDetailPage() {
 
                 {/* Discount Value */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                  <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
                     ערך ההנחה *
                   </label>
                   <input
@@ -1315,13 +1301,14 @@ export default function PartnershipDetailPage() {
                     value={newCoupon.discount_value}
                     onChange={(e) => setNewCoupon({ ...newCoupon, discount_value: parseFloat(e.target.value) })}
                     placeholder={newCoupon.discount_type === 'percentage' ? '10' : '50'}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+                    className="w-full px-4 py-2 border rounded-lg text-right"
+                    style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
                   />
                 </div>
 
                 {/* Usage Limit */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                  <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
                     מגבלת שימושים
                   </label>
                   <input
@@ -1330,39 +1317,42 @@ export default function PartnershipDetailPage() {
                     value={newCoupon.usage_limit || ''}
                     onChange={(e) => setNewCoupon({ ...newCoupon, usage_limit: e.target.value ? parseInt(e.target.value) : null })}
                     placeholder="100 (או השאר ריק ללא הגבלה)"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+                    className="w-full px-4 py-2 border rounded-lg text-right"
+                    style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
                   />
                 </div>
 
                 {/* Start Date */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                  <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
                     תאריך התחלה
                   </label>
                   <input
                     type="date"
                     value={newCoupon.start_date}
                     onChange={(e) => setNewCoupon({ ...newCoupon, start_date: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+                    className="w-full px-4 py-2 border rounded-lg text-right"
+                    style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
                   />
                 </div>
 
                 {/* End Date */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                  <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
                     תאריך סיום
                   </label>
                   <input
                     type="date"
                     value={newCoupon.end_date}
                     onChange={(e) => setNewCoupon({ ...newCoupon, end_date: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+                    className="w-full px-4 py-2 border rounded-lg text-right"
+                    style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
                   />
                 </div>
 
                 {/* Min Purchase */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                  <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
                     סכום קנייה מינימלי (₪)
                   </label>
                   <input
@@ -1372,13 +1362,14 @@ export default function PartnershipDetailPage() {
                     value={newCoupon.min_purchase_amount || ''}
                     onChange={(e) => setNewCoupon({ ...newCoupon, min_purchase_amount: e.target.value ? parseFloat(e.target.value) : null })}
                     placeholder="0"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+                    className="w-full px-4 py-2 border rounded-lg text-right"
+                    style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
                   />
                 </div>
 
                 {/* Max Discount */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                  <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
                     הנחה מקסימלית (₪)
                   </label>
                   <input
@@ -1388,14 +1379,15 @@ export default function PartnershipDetailPage() {
                     value={newCoupon.max_discount_amount || ''}
                     onChange={(e) => setNewCoupon({ ...newCoupon, max_discount_amount: e.target.value ? parseFloat(e.target.value) : null })}
                     placeholder="לא מוגבל"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+                    className="w-full px-4 py-2 border rounded-lg text-right"
+                    style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
                   />
                 </div>
               </div>
 
               {/* Description */}
               <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
                   תיאור
                 </label>
                 <textarea
@@ -1403,13 +1395,14 @@ export default function PartnershipDetailPage() {
                   onChange={(e) => setNewCoupon({ ...newCoupon, description: e.target.value })}
                   rows={2}
                   placeholder="קופון מיוחד למשפיעני Summer 2026"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+                  className="w-full px-4 py-2 border rounded-lg text-right"
+                  style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
                 />
               </div>
 
               {/* Tracking URL */}
               <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
                   URL מעקב (עם UTM)
                 </label>
                 <input
@@ -1417,7 +1410,8 @@ export default function PartnershipDetailPage() {
                   value={newCoupon.tracking_url}
                   onChange={(e) => setNewCoupon({ ...newCoupon, tracking_url: e.target.value })}
                   placeholder="https://example.com?utm_source=instagram&utm_campaign=summer"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-right"
+                  className="w-full px-4 py-2 border rounded-lg text-right"
+                  style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
                 />
               </div>
 
@@ -1426,14 +1420,16 @@ export default function PartnershipDetailPage() {
                 <button
                   type="submit"
                   disabled={isCreatingCoupon}
-                  className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  className="flex-1 px-6 py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  style={{ background: 'var(--color-primary)', color: '#fff' }}
                 >
-                  {isCreatingCoupon ? 'יוצר קופון...' : '✓ צור קופון'}
+                  {isCreatingCoupon ? 'יוצר קופון...' : 'צור קופון'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowCouponForm(false)}
-                  className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                  className="px-6 py-3 rounded-lg"
+                  style={{ background: 'var(--dash-surface)', color: 'var(--dash-text-2)' }}
                 >
                   ביטול
                 </button>
@@ -1443,18 +1439,18 @@ export default function PartnershipDetailPage() {
 
           {/* Coupons List */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 text-right">
+            <h3 className="text-lg font-semibold mb-4 text-right" style={{ color: 'var(--dash-text)' }}>
               קופונים קיימים
             </h3>
 
             {isLoadingCoupons ? (
-              <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-                <p className="mt-4 text-gray-600">טוען קופונים...</p>
+              <div className="text-center py-12" style={{ background: 'var(--dash-bg)' }}>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto" style={{ borderColor: 'var(--color-primary)' }}></div>
+                <p className="mt-4" style={{ color: 'var(--dash-text-3)' }}>טוען קופונים...</p>
               </div>
             ) : coupons.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">
-                <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="text-center py-12" style={{ color: 'var(--dash-text-3)' }}>
+                <svg className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--dash-muted)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
                 </svg>
                 <p className="text-lg mb-2">אין קופונים עדיין</p>
@@ -1465,42 +1461,44 @@ export default function PartnershipDetailPage() {
                 {coupons.map((coupon) => (
                   <div
                     key={coupon.id}
-                    className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
+                    className="border rounded-lg p-6 transition-shadow"
+                    style={{ borderColor: 'var(--dash-border)' }}
                   >
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex-1 text-right">
                         <div className="flex items-center gap-3 justify-end mb-2">
-                          <h4 className="text-xl font-bold text-gray-900 font-mono">
+                          <h4 className="text-xl font-bold font-mono" style={{ color: 'var(--dash-text)' }}>
                             {coupon.code}
                           </h4>
                           {coupon.is_active ? (
-                            <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
+                            <span className="px-2 py-1 text-xs rounded-full" style={{ background: 'var(--dash-surface-hover)', color: 'var(--dash-positive)' }}>
                               פעיל
                             </span>
                           ) : (
-                            <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">
+                            <span className="px-2 py-1 text-xs rounded-full" style={{ background: 'var(--dash-surface-hover)', color: 'var(--dash-text-3)' }}>
                               לא פעיל
                             </span>
                           )}
                         </div>
                         {coupon.description && (
-                          <p className="text-gray-600 text-sm">{coupon.description}</p>
+                          <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>{coupon.description}</p>
                         )}
                       </div>
                       <button
                         onClick={() => copyToClipboard(coupon.code)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                        className="px-4 py-2 rounded-lg transition-colors text-sm"
+                        style={{ background: 'var(--color-primary)', color: '#fff' }}
                       >
-                        📋 העתק
+                        העתק
                       </button>
                     </div>
 
                     {/* Coupon Details */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                       <div className="text-right">
-                        <div className="text-sm text-gray-500">הנחה</div>
-                        <div className="text-lg font-semibold text-gray-900">
-                          {coupon.discount_type === 'percentage' 
+                        <div className="text-sm" style={{ color: 'var(--dash-text-3)' }}>הנחה</div>
+                        <div className="text-lg font-semibold" style={{ color: 'var(--dash-text)' }}>
+                          {coupon.discount_type === 'percentage'
                             ? `${coupon.discount_value}%`
                             : coupon.discount_type === 'fixed'
                             ? `₪${coupon.discount_value}`
@@ -1508,24 +1506,24 @@ export default function PartnershipDetailPage() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-sm text-gray-500">שימושים</div>
-                        <div className="text-lg font-semibold text-gray-900">
+                        <div className="text-sm" style={{ color: 'var(--dash-text-3)' }}>שימושים</div>
+                        <div className="text-lg font-semibold" style={{ color: 'var(--dash-text)' }}>
                           {coupon.usage_count || 0}
                           {coupon.usage_limit && ` / ${coupon.usage_limit}`}
                         </div>
                       </div>
                       {coupon.start_date && (
                         <div className="text-right">
-                          <div className="text-sm text-gray-500">תחילה</div>
-                          <div className="text-sm font-medium text-gray-900">
+                          <div className="text-sm" style={{ color: 'var(--dash-text-3)' }}>תחילה</div>
+                          <div className="text-sm font-medium" style={{ color: 'var(--dash-text)' }}>
                             {new Date(coupon.start_date).toLocaleDateString('he-IL')}
                           </div>
                         </div>
                       )}
                       {coupon.end_date && (
                         <div className="text-right">
-                          <div className="text-sm text-gray-500">סיום</div>
-                          <div className="text-sm font-medium text-gray-900">
+                          <div className="text-sm" style={{ color: 'var(--dash-text-3)' }}>סיום</div>
+                          <div className="text-sm font-medium" style={{ color: 'var(--dash-text)' }}>
                             {new Date(coupon.end_date).toLocaleDateString('he-IL')}
                           </div>
                         </div>
@@ -1534,25 +1532,26 @@ export default function PartnershipDetailPage() {
 
                     {/* Additional Info */}
                     {(coupon.min_purchase_amount || coupon.max_discount_amount) && (
-                      <div className="text-sm text-gray-600 space-y-1 text-right">
+                      <div className="text-sm space-y-1 text-right" style={{ color: 'var(--dash-text-2)' }}>
                         {coupon.min_purchase_amount && (
-                          <div>✓ קנייה מינימלית: ₪{coupon.min_purchase_amount}</div>
+                          <div>קנייה מינימלית: ₪{coupon.min_purchase_amount}</div>
                         )}
                         {coupon.max_discount_amount && (
-                          <div>✓ הנחה מקסימלית: ₪{coupon.max_discount_amount}</div>
+                          <div>הנחה מקסימלית: ₪{coupon.max_discount_amount}</div>
                         )}
                       </div>
                     )}
 
                     {/* Tracking URL */}
                     {coupon.tracking_url && (
-                      <div className="mt-3 pt-3 border-t border-gray-200">
-                        <div className="text-sm text-gray-500 mb-1 text-right">קישור מעקב:</div>
+                      <div className="mt-3 pt-3 border-t" style={{ borderColor: 'var(--dash-border)' }}>
+                        <div className="text-sm mb-1 text-right" style={{ color: 'var(--dash-text-3)' }}>קישור מעקב:</div>
                         <a
                           href={coupon.tracking_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-sm text-blue-600 hover:text-blue-700 truncate block text-right"
+                          className="text-sm truncate block text-right"
+                          style={{ color: 'var(--color-primary)' }}
                         >
                           {coupon.tracking_url}
                         </a>

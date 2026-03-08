@@ -88,11 +88,11 @@ export default function NewCommunicationPage({
       }
 
       const { communication } = await response.json();
-      
+
       if (!communication || !communication.id) {
         throw new Error('התקשורת נוצרה אך לא התקבל מזהה');
       }
-      
+
       // Redirect to the new communication
       router.push(`/influencer/${username}/communications/${communication.id}`);
     } catch (err: any) {
@@ -104,41 +104,53 @@ export default function NewCommunicationPage({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--dash-bg)' }}>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: 'var(--color-primary)' }}></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 py-8 px-4">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen py-8 px-4" dir="rtl" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <button
             onClick={() => router.back()}
-            className="flex items-center gap-2 text-gray-400 hover:text-white mb-4 transition-colors"
+            className="flex items-center gap-2 mb-4 transition-colors"
+            style={{ color: 'var(--dash-text-2)' }}
           >
             <ArrowRight className="w-5 h-5" />
             חזרה
           </button>
-          <h1 className="text-4xl font-bold text-white mb-2">תקשורת חדשה עם מותג</h1>
-          <p className="text-gray-400">צור שיחה חדשה עם מותג או גורם עסקי</p>
+          <h1 className="text-4xl font-bold mb-2" style={{ color: 'var(--dash-text)' }}>תקשורת חדשה עם מותג</h1>
+          <p style={{ color: 'var(--dash-text-2)' }}>צור שיחה חדשה עם מותג או גורם עסקי</p>
         </div>
 
         {/* Error Message */}
         {error && (
-          <div className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300">
+          <div
+            className="mb-6 p-4 rounded-lg"
+            style={{
+              background: 'color-mix(in srgb, var(--dash-negative) 10%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--dash-negative) 30%, transparent)',
+              color: 'var(--dash-negative)',
+            }}
+          >
             {error}
           </div>
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="bg-gray-800/50 rounded-xl p-8 border border-gray-700">
+        <form
+          onSubmit={handleSubmit}
+          className="rounded-xl p-8 border"
+          style={{ borderColor: 'var(--dash-border)' }}
+        >
           <div className="space-y-6">
             {/* Brand Name */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2 text-right">
+              <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
                 שם המותג *
               </label>
               <input
@@ -147,13 +159,14 @@ export default function NewCommunicationPage({
                 value={formData.brand_name}
                 onChange={(e) => setFormData({ ...formData, brand_name: e.target.value })}
                 placeholder="לדוגמה: Nike Israel"
-                className="w-full px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:border-orange-500 focus:outline-none text-right"
+                className="w-full px-4 py-3 rounded-lg placeholder-gray-500 focus:outline-none text-right"
+                style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
               />
             </div>
 
             {/* Subject */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2 text-right">
+              <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
                 נושא השיחה *
               </label>
               <input
@@ -162,20 +175,22 @@ export default function NewCommunicationPage({
                 value={formData.subject}
                 onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                 placeholder="לדוגמה: בירור לגבי תשלום חסר"
-                className="w-full px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:border-orange-500 focus:outline-none text-right"
+                className="w-full px-4 py-3 rounded-lg placeholder-gray-500 focus:outline-none text-right"
+                style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
               />
             </div>
 
             {/* Category & Priority */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2 text-right">
+                <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
                   קטגוריה
                 </label>
                 <select
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg text-white focus:border-orange-500 focus:outline-none text-right"
+                  className="w-full px-4 py-3 rounded-lg focus:outline-none text-right"
+                  style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
                 >
                   <option value="general">כללי</option>
                   <option value="financial">פיננסי</option>
@@ -185,13 +200,14 @@ export default function NewCommunicationPage({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2 text-right">
+                <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
                   עדיפות
                 </label>
                 <select
                   value={formData.priority}
                   onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg text-white focus:border-orange-500 focus:outline-none text-right"
+                  className="w-full px-4 py-3 rounded-lg focus:outline-none text-right"
+                  style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
                 >
                   <option value="low">נמוך</option>
                   <option value="normal">בינוני</option>
@@ -203,13 +219,14 @@ export default function NewCommunicationPage({
 
             {/* Partnership (optional) */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2 text-right">
+              <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
                 שת"פ קשור (אופציונלי)
               </label>
               <select
                 value={formData.partnership_id}
                 onChange={(e) => setFormData({ ...formData, partnership_id: e.target.value })}
-                className="w-full px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg text-white focus:border-orange-500 focus:outline-none text-right"
+                className="w-full px-4 py-3 rounded-lg focus:outline-none text-right"
+                style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
               >
                 <option value="">ללא שת"פ</option>
                 {partnerships.map((p) => (
@@ -223,7 +240,7 @@ export default function NewCommunicationPage({
             {/* Contact Details */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2 text-right">
+                <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
                   שם איש קשר
                 </label>
                 <input
@@ -231,11 +248,12 @@ export default function NewCommunicationPage({
                   value={formData.brand_contact_name}
                   onChange={(e) => setFormData({ ...formData, brand_contact_name: e.target.value })}
                   placeholder="יוסי כהן"
-                  className="w-full px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:border-orange-500 focus:outline-none text-right"
+                  className="w-full px-4 py-3 rounded-lg placeholder-gray-500 focus:outline-none text-right"
+                  style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2 text-right">
+                <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
                   אימייל
                 </label>
                 <input
@@ -243,11 +261,12 @@ export default function NewCommunicationPage({
                   value={formData.brand_contact_email}
                   onChange={(e) => setFormData({ ...formData, brand_contact_email: e.target.value })}
                   placeholder="yossi@brand.com"
-                  className="w-full px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:border-orange-500 focus:outline-none text-right"
+                  className="w-full px-4 py-3 rounded-lg placeholder-gray-500 focus:outline-none text-right"
+                  style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2 text-right">
+                <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
                   טלפון
                 </label>
                 <input
@@ -255,14 +274,15 @@ export default function NewCommunicationPage({
                   value={formData.brand_contact_phone}
                   onChange={(e) => setFormData({ ...formData, brand_contact_phone: e.target.value })}
                   placeholder="050-1234567"
-                  className="w-full px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:border-orange-500 focus:outline-none text-right"
+                  className="w-full px-4 py-3 rounded-lg placeholder-gray-500 focus:outline-none text-right"
+                  style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
                 />
               </div>
             </div>
 
             {/* Initial Message */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2 text-right">
+              <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
                 הודעה ראשונית *
               </label>
               <textarea
@@ -271,26 +291,35 @@ export default function NewCommunicationPage({
                 onChange={(e) => setFormData({ ...formData, initial_message: e.target.value })}
                 rows={6}
                 placeholder="שלום,&#10;&#10;אני פונה אליכם בנוגע ל..."
-                className="w-full px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:border-orange-500 focus:outline-none text-right"
+                className="w-full px-4 py-3 rounded-lg placeholder-gray-500 focus:outline-none text-right"
+                style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
               />
             </div>
 
             {/* Due Date */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2 text-right">
+              <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
                 תאריך יעד לתגובה
               </label>
               <input
                 type="date"
                 value={formData.due_date}
                 onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                className="w-full px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg text-white focus:border-orange-500 focus:outline-none text-right"
+                className="w-full px-4 py-3 rounded-lg focus:outline-none text-right"
+                style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
               />
             </div>
 
             {/* Validation Message */}
             {(!formData.brand_name || !formData.subject || !formData.initial_message) && (
-              <div className="p-4 bg-yellow-500/20 border border-yellow-500/50 rounded-lg text-yellow-300 text-sm text-right">
+              <div
+                className="p-4 rounded-lg text-sm text-right"
+                style={{
+                  background: 'color-mix(in srgb, var(--color-warning) 10%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--color-warning) 30%, transparent)',
+                  color: 'var(--color-warning)',
+                }}
+              >
                 <p className="font-medium mb-1">שדות חובה חסרים:</p>
                 <ul className="list-disc list-inside mr-4">
                   {!formData.brand_name && <li>שם המותג</li>}
@@ -305,7 +334,8 @@ export default function NewCommunicationPage({
               <button
                 type="submit"
                 disabled={creating || !formData.brand_name || !formData.subject || !formData.initial_message}
-                className="flex-1 px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-6 py-3 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: 'var(--color-primary)', color: 'white' }}
               >
                 {creating ? (
                   <span className="flex items-center justify-center gap-2">
@@ -319,7 +349,8 @@ export default function NewCommunicationPage({
               <button
                 type="button"
                 onClick={() => router.back()}
-                className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
+                className="px-6 py-3 rounded-lg font-medium transition-colors"
+                style={{ background: 'var(--dash-surface)', color: 'var(--dash-text)' }}
               >
                 ביטול
               </button>

@@ -45,19 +45,18 @@ export default function InfluencerLandingPage({
 
   // Show loading spinner while checking auth
   return (
-    <div className="min-h-screen flex items-center justify-center" dir="rtl">
+    <div
+      className="min-h-screen flex items-center justify-center"
+      dir="rtl"
+      style={{ background: 'var(--dash-bg)' }}
+    >
       <div className="text-center">
-        <Loader2 className="w-8 h-8 text-purple-500 animate-spin mx-auto mb-4" />
-        <p className="text-gray-600 text-sm">מפנה...</p>
+        <Loader2
+          className="w-8 h-8 animate-spin mx-auto mb-4"
+          style={{ color: 'var(--color-primary)' }}
+        />
+        <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>מפנה...</p>
       </div>
     </div>
   );
 }
-
-
-
-
-
-
-
-

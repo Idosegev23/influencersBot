@@ -64,12 +64,15 @@ export default function AudiencePage() {
 
   if (isLoading) {
     return (
-      <div className="max-w-7xl mx-auto py-8 px-4">
+      <div
+        className="max-w-6xl mx-auto py-8 px-4"
+        style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}
+      >
         <div className="animate-pulse space-y-8">
-          <div className="h-8 bg-gray-200 rounded w-1/4" />
+          <div className="h-8 rounded w-1/4" style={{ background: 'var(--dash-surface)' }} />
           <div className="grid grid-cols-4 gap-4">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-24 bg-gray-200 rounded" />
+              <div key={i} className="h-24 rounded" style={{ background: 'var(--dash-surface)' }} />
             ))}
           </div>
         </div>
@@ -79,12 +82,19 @@ export default function AudiencePage() {
 
   if (error) {
     return (
-      <div className="max-w-7xl mx-auto py-8 px-4">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-          <p className="text-red-600">{error}</p>
+      <div
+        className="max-w-6xl mx-auto py-8 px-4"
+        style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}
+      >
+        <div
+          className="rounded-lg p-6 text-center"
+          style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-negative)' }}
+        >
+          <p style={{ color: 'var(--dash-negative)' }}>{error}</p>
           <button
             onClick={loadData}
-            className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+            className="mt-4 px-4 py-2 rounded-lg"
+            style={{ background: 'var(--dash-negative)', color: 'white' }}
           >
             נסה שוב
           </button>
@@ -98,12 +108,16 @@ export default function AudiencePage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-8 px-4 space-y-8">
+    <div
+      className="max-w-6xl mx-auto py-8 px-4 space-y-8"
+      style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}
+    >
       {/* Back Button */}
       <div className="mb-4">
         <button
           onClick={() => router.push(`/influencer/${username}/dashboard`)}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+          className="flex items-center gap-2 transition-colors"
+          style={{ color: 'var(--dash-text-2)' }}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -114,64 +128,64 @@ export default function AudiencePage() {
 
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">דשבורד התנהגות קהל</h1>
-        <p className="text-gray-600 mt-2">נתוני פעילות ואנליטיקס של הקהל שלך</p>
+        <h1 className="text-3xl font-bold" style={{ color: 'var(--dash-text)' }}>דשבורד התנהגות קהל</h1>
+        <p className="mt-2" style={{ color: 'var(--dash-text-2)' }}>נתוני פעילות ואנליטיקס של הקהל שלך</p>
       </div>
 
       {/* Overview Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">סה"כ שיחות</div>
-          <div className="text-2xl font-bold text-gray-900">
+        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+          <div className="text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>סה"כ שיחות</div>
+          <div className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>
             {data.overview.totalConversations}
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">הודעות ממוצע לשיחה</div>
-          <div className="text-2xl font-bold text-blue-600">
+        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+          <div className="text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>הודעות ממוצע לשיחה</div>
+          <div className="text-2xl font-bold" style={{ color: 'var(--color-info)' }}>
             {data.overview.avgMessagesPerSession}
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">קופונים הועתקו</div>
-          <div className="text-2xl font-bold text-purple-600">
+        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+          <div className="text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>קופונים הועתקו</div>
+          <div className="text-2xl font-bold" style={{ color: 'var(--color-primary)' }}>
             {data.overview.couponCopiedCount}
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">אחוז המרה</div>
-          <div className="text-2xl font-bold text-green-600">
+        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+          <div className="text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>אחוז המרה</div>
+          <div className="text-2xl font-bold" style={{ color: 'var(--dash-positive)' }}>
             {data.overview.conversionRate}%
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">משתמשים ייחודיים</div>
-          <div className="text-2xl font-bold text-orange-600">
+        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+          <div className="text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>משתמשים ייחודיים</div>
+          <div className="text-2xl font-bold" style={{ color: 'var(--color-warning)' }}>
             {data.overview.uniqueCouponUsers}
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">פניות תמיכה</div>
-          <div className="text-2xl font-bold text-yellow-600">
+        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+          <div className="text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>פניות תמיכה</div>
+          <div className="text-2xl font-bold" style={{ color: 'var(--color-warning)' }}>
             {data.overview.supportRequests}
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">שביעות רצון</div>
-          <div className="text-2xl font-bold text-emerald-600">
+        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+          <div className="text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>שביעות רצון</div>
+          <div className="text-2xl font-bold" style={{ color: 'var(--dash-positive)' }}>
             {data.overview.satisfactionRate}%
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">מרוצים / לא מרוצים</div>
-          <div className="text-lg font-bold text-gray-900">
+        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+          <div className="text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>מרוצים / לא מרוצים</div>
+          <div className="text-lg font-bold" style={{ color: 'var(--dash-text)' }}>
             {data.overview.satisfiedCount} / {data.overview.unsatisfiedCount}
           </div>
         </div>

@@ -3,7 +3,6 @@
 import { useState, useEffect, use, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
 import {
   Settings,
   ArrowLeft,
@@ -100,11 +99,11 @@ export default function SettingsPage({
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
   const [hideBranding, setHideBranding] = useState(false);
   const [customLogoUrl, setCustomLogoUrl] = useState('');
-  
+
   // Phone & WhatsApp state
   const [phoneNumber, setPhoneNumber] = useState('');
   const [whatsappEnabled, setWhatsappEnabled] = useState(false);
-  
+
   // Scrape settings state
   const [scrapeSettings, setScrapeSettings] = useState<ScrapeSettings>(DEFAULT_SCRAPE_SETTINGS);
 
@@ -285,8 +284,8 @@ export default function SettingsPage({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center" dir="rtl">
-        <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+      <div className="min-h-screen flex items-center justify-center" dir="rtl" style={{ background: 'var(--dash-bg)' }}>
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--color-primary)' }} />
       </div>
     );
   }
@@ -294,90 +293,64 @@ export default function SettingsPage({
   if (!influencer) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900" dir="rtl">
-      {/* Background Pattern */}
-      <div className="fixed inset-0 opacity-10">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,#6366f1_1px,transparent_0)] bg-[length:50px_50px]" />
-      </div>
-
-      {/* Header */}
-      <header className="relative z-10 sticky top-0 bg-slate-900/80 backdrop-blur-xl border-b border-gray-800">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link
-                href={`/influencer/${username}/dashboard`}
-                className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5" />
-                <span className="hidden sm:inline">חזרה</span>
-              </Link>
-              <div className="h-6 w-px bg-gray-700" />
-              <h1 className="text-xl font-bold text-white flex items-center gap-2">
-                <Settings className="w-6 h-6 text-gray-400" />
-                הגדרות
-              </h1>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowPreview(!showPreview)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  showPreview
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-800 text-gray-400 hover:text-white'
-                }`}
-              >
-                <Eye className="w-4 h-4" />
-                תצוגה מקדימה
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  saved
-                    ? 'bg-green-600 text-white'
-                    : 'bg-indigo-600 hover:bg-indigo-500 text-white'
-                }`}
-              >
-                {saving ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : saved ? (
-                  <Check className="w-4 h-4" />
-                ) : (
-                  <Save className="w-4 h-4" />
-                )}
-                {saved ? 'נשמר!' : 'שמור'}
-              </button>
-            </div>
-          </div>
+    <div className="min-h-screen" dir="rtl" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+        {/* Top Actions */}
+        <div className="flex items-center justify-end gap-2 mb-8">
+          <button
+            onClick={() => setShowPreview(!showPreview)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
+            style={{
+              background: showPreview ? 'var(--color-primary)' : 'var(--dash-surface)',
+              color: showPreview ? 'white' : 'var(--dash-text-2)',
+            }}
+          >
+            <Eye className="w-4 h-4" />
+            תצוגה מקדימה
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
+            style={{
+              background: saved ? 'var(--dash-positive)' : 'var(--color-primary)',
+              color: 'white',
+            }}
+          >
+            {saving ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : saved ? (
+              <Check className="w-4 h-4" />
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
+            {saved ? 'נשמר!' : 'שמור'}
+          </button>
         </div>
-      </header>
 
-      <main className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 py-8">
         <div className={`grid ${showPreview ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'} gap-8`}>
           {/* Settings Panel */}
           <div className="space-y-8">
             {/* Theme Settings */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-6"
+            <div
+              className="rounded-xl border p-6"
+              style={{ borderColor: 'var(--dash-border)' }}
             >
-              <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-                <Palette className="w-5 h-5 text-indigo-400" />
+              <h2 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
+                <Palette className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
                 עיצוב וצבעים
               </h2>
 
               {/* Color Presets */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-400 mb-3">ערכות צבעים מוכנות</label>
+                <label className="block text-sm font-medium mb-3" style={{ color: 'var(--dash-text-2)' }}>ערכות צבעים מוכנות</label>
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
                   {colorPresets.map((preset) => (
                     <button
                       key={preset.name}
                       onClick={() => applyPreset(preset)}
-                      className="group flex flex-col items-center gap-2 p-3 rounded-xl border border-gray-700 hover:border-indigo-500 transition-all"
+                      className="group flex flex-col items-center gap-2 p-3 rounded-xl border transition-all"
+                      style={{ borderColor: 'var(--dash-border)' }}
                     >
                       <div
                         className="w-8 h-8 rounded-full"
@@ -385,7 +358,7 @@ export default function SettingsPage({
                           background: `linear-gradient(135deg, ${preset.primary}, ${preset.accent})`,
                         }}
                       />
-                      <span className="text-xs text-gray-400 group-hover:text-white transition-colors">
+                      <span className="text-xs transition-colors" style={{ color: 'var(--dash-text-2)' }}>
                         {preset.name}
                       </span>
                     </button>
@@ -396,7 +369,7 @@ export default function SettingsPage({
               {/* Custom Colors */}
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">צבע ראשי</label>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>צבע ראשי</label>
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
@@ -408,12 +381,13 @@ export default function SettingsPage({
                       type="text"
                       value={theme.colors.primary}
                       onChange={(e) => setTheme({ ...theme, colors: { ...theme.colors, primary: e.target.value } })}
-                      className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"
+                      className="flex-1 rounded-lg px-3 py-2 text-sm"
+                      style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">צבע משני</label>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>צבע משני</label>
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
@@ -425,12 +399,13 @@ export default function SettingsPage({
                       type="text"
                       value={theme.colors.accent}
                       onChange={(e) => setTheme({ ...theme, colors: { ...theme.colors, accent: e.target.value } })}
-                      className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"
+                      className="flex-1 rounded-lg px-3 py-2 text-sm"
+                      style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">צבע רקע</label>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>צבע רקע</label>
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
@@ -442,12 +417,13 @@ export default function SettingsPage({
                       type="text"
                       value={theme.colors.background}
                       onChange={(e) => setTheme({ ...theme, colors: { ...theme.colors, background: e.target.value } })}
-                      className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"
+                      className="flex-1 rounded-lg px-3 py-2 text-sm"
+                      style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">צבע טקסט</label>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>צבע טקסט</label>
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
@@ -459,7 +435,8 @@ export default function SettingsPage({
                       type="text"
                       value={theme.colors.text}
                       onChange={(e) => setTheme({ ...theme, colors: { ...theme.colors, text: e.target.value } })}
-                      className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"
+                      className="flex-1 rounded-lg px-3 py-2 text-sm"
+                      style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
                     />
                   </div>
                 </div>
@@ -467,38 +444,38 @@ export default function SettingsPage({
 
               {/* Font */}
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
+                <label className="block text-sm font-medium mb-2 flex items-center gap-2" style={{ color: 'var(--dash-text-2)' }}>
                   <Type className="w-4 h-4" />
                   גופן
                 </label>
                 <select
                   value={theme.fonts.heading}
                   onChange={(e) => setTheme({ ...theme, fonts: { heading: e.target.value, body: e.target.value } })}
-                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
                 >
                   {fontOptions.map((font) => (
                     <option key={font.value} value={font.value}>{font.label}</option>
                   ))}
                 </select>
               </div>
-            </motion.div>
+            </div>
 
             {/* Greeting & Questions */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-6"
+            <div
+              className="rounded-xl border p-6"
+              style={{ borderColor: 'var(--dash-border)' }}
             >
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                  <MessageCircle className="w-5 h-5 text-blue-400" />
+                <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
+                  <MessageCircle className="w-5 h-5" style={{ color: 'var(--color-info)' }} />
                   הודעת פתיחה ושאלות מוצעות
                 </h2>
                 <button
                   onClick={handleRegenerateAI}
                   disabled={regenerating}
-                  className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-sm rounded-lg transition-all"
+                  className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-all"
+                  style={{ background: 'var(--color-primary)', color: 'white' }}
                 >
                   {regenerating ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -511,19 +488,20 @@ export default function SettingsPage({
 
               {/* Greeting Message */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-400 mb-2">הודעת פתיחה</label>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>הודעת פתיחה</label>
                 <textarea
                   value={greetingMessage}
                   onChange={(e) => setGreetingMessage(e.target.value)}
                   rows={3}
-                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                  className="w-full rounded-lg px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                  style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
                   placeholder="היי! אני העוזר שלך..."
                 />
               </div>
 
               {/* Suggested Questions */}
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">שאלות מוצעות</label>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>שאלות מוצעות</label>
                 <div className="space-y-2">
                   {suggestedQuestions.map((question, index) => (
                     <div key={index} className="flex items-center gap-2">
@@ -531,7 +509,8 @@ export default function SettingsPage({
                         type="text"
                         value={question}
                         onChange={(e) => updateQuestion(index, e.target.value)}
-                        className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="flex-1 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
                         placeholder={`שאלה ${index + 1}`}
                       />
                       <button
@@ -546,30 +525,29 @@ export default function SettingsPage({
                 {suggestedQuestions.length < 6 && (
                   <button
                     onClick={addQuestion}
-                    className="mt-3 text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
+                    className="mt-3 text-sm transition-colors"
+                    style={{ color: 'var(--color-primary)' }}
                   >
                     + הוסף שאלה
                   </button>
                 )}
               </div>
-            </motion.div>
+            </div>
 
-            {/* Persona Settings - NEW */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 }}
-              className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-6"
+            {/* Persona Settings */}
+            <div
+              className="rounded-xl border p-6"
+              style={{ borderColor: 'var(--dash-border)' }}
             >
-              <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-                <User className="w-5 h-5 text-purple-400" />
+              <h2 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
+                <User className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
                 פרסונה וטון הצ&apos;אטבוט
               </h2>
 
               <div className="space-y-6">
                 {/* Tone */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
+                  <label className="block text-sm font-medium mb-2 flex items-center gap-2" style={{ color: 'var(--dash-text-2)' }}>
                     <Heart className="w-4 h-4 text-pink-400" />
                     טון השיחה
                   </label>
@@ -577,15 +555,16 @@ export default function SettingsPage({
                     type="text"
                     value={personaTone}
                     onChange={(e) => setPersonaTone(e.target.value)}
-                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full rounded-lg px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
                     placeholder="לדוגמה: חם, ידידותי ומעודד"
                   />
-                  <p className="mt-1 text-xs text-gray-500">תאר איך הצ&apos;אטבוט צריך לדבר - האם הוא רשמי, חברותי, הומוריסטי?</p>
+                  <p className="mt-1 text-xs" style={{ color: 'var(--dash-text-3)' }}>תאר איך הצ&apos;אטבוט צריך לדבר - האם הוא רשמי, חברותי, הומוריסטי?</p>
                 </div>
 
                 {/* Style */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
+                  <label className="block text-sm font-medium mb-2 flex items-center gap-2" style={{ color: 'var(--dash-text-2)' }}>
                     <Zap className="w-4 h-4 text-yellow-400" />
                     סגנון תוכן
                   </label>
@@ -593,15 +572,16 @@ export default function SettingsPage({
                     value={personaStyle}
                     onChange={(e) => setPersonaStyle(e.target.value)}
                     rows={2}
-                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                    className="w-full rounded-lg px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                    style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
                     placeholder="לדוגמה: שיחתי, קליל, עם הרבה הדגשות ודוגמאות"
                   />
                 </div>
 
                 {/* Language */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
-                    <Globe className="w-4 h-4 text-blue-400" />
+                  <label className="block text-sm font-medium mb-2 flex items-center gap-2" style={{ color: 'var(--dash-text-2)' }}>
+                    <Globe className="w-4 h-4" style={{ color: 'var(--color-info)' }} />
                     שפה
                   </label>
                   <div className="grid grid-cols-3 gap-2">
@@ -614,11 +594,12 @@ export default function SettingsPage({
                         key={lang.value}
                         type="button"
                         onClick={() => setPersonaLanguage(lang.value as 'he' | 'en' | 'mixed')}
-                        className={`flex items-center justify-center gap-2 p-3 rounded-xl border transition-all ${
-                          personaLanguage === lang.value
-                            ? 'bg-purple-600/20 border-purple-500/50 text-white'
-                            : 'bg-gray-700/30 border-gray-600 text-gray-400 hover:border-gray-500'
-                        }`}
+                        className="flex items-center justify-center gap-2 p-3 rounded-xl border transition-all"
+                        style={{
+                          background: personaLanguage === lang.value ? 'color-mix(in srgb, var(--color-primary) 20%, transparent)' : 'var(--dash-surface)',
+                          borderColor: personaLanguage === lang.value ? 'var(--color-primary)' : 'var(--dash-border)',
+                          color: personaLanguage === lang.value ? 'var(--dash-text)' : 'var(--dash-text-2)',
+                        }}
                       >
                         <span>{lang.icon}</span>
                         <span className="text-sm">{lang.label}</span>
@@ -629,7 +610,7 @@ export default function SettingsPage({
 
                 {/* Emoji Style */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
+                  <label className="block text-sm font-medium mb-2 flex items-center gap-2" style={{ color: 'var(--dash-text-2)' }}>
                     <Smile className="w-4 h-4 text-yellow-400" />
                     שימוש באימוג&apos;ים
                   </label>
@@ -643,11 +624,12 @@ export default function SettingsPage({
                         key={style.value}
                         type="button"
                         onClick={() => setPersonaEmojiStyle(style.value as 'none' | 'minimal' | 'frequent')}
-                        className={`flex flex-col items-center gap-1 p-3 rounded-xl border transition-all ${
-                          personaEmojiStyle === style.value
-                            ? 'bg-yellow-600/20 border-yellow-500/50 text-white'
-                            : 'bg-gray-700/30 border-gray-600 text-gray-400 hover:border-gray-500'
-                        }`}
+                        className="flex flex-col items-center gap-1 p-3 rounded-xl border transition-all"
+                        style={{
+                          background: personaEmojiStyle === style.value ? 'color-mix(in srgb, var(--color-warning) 20%, transparent)' : 'var(--dash-surface)',
+                          borderColor: personaEmojiStyle === style.value ? 'var(--color-warning)' : 'var(--dash-border)',
+                          color: personaEmojiStyle === style.value ? 'var(--dash-text)' : 'var(--dash-text-2)',
+                        }}
                       >
                         <span className="text-sm font-medium">{style.label}</span>
                         <span className="text-xs opacity-60">{style.example}</span>
@@ -658,7 +640,7 @@ export default function SettingsPage({
 
                 {/* Interests */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
+                  <label className="block text-sm font-medium mb-2 flex items-center gap-2" style={{ color: 'var(--dash-text-2)' }}>
                     <Star className="w-4 h-4 text-amber-400" />
                     תחומי עניין (נושאים שהצ&apos;אטבוט יודע עליהם)
                   </label>
@@ -673,7 +655,8 @@ export default function SettingsPage({
                             updated[index] = e.target.value;
                             setPersonaInterests(updated);
                           }}
-                          className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          className="flex-1 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
                           placeholder={`תחום עניין ${index + 1}`}
                         />
                         <button
@@ -690,7 +673,8 @@ export default function SettingsPage({
                     <button
                       type="button"
                       onClick={() => setPersonaInterests([...personaInterests, ''])}
-                      className="mt-3 text-sm text-purple-400 hover:text-purple-300 transition-colors"
+                      className="mt-3 text-sm transition-colors"
+                      style={{ color: 'var(--color-primary)' }}
                     >
                       + הוסף תחום עניין
                     </button>
@@ -699,7 +683,7 @@ export default function SettingsPage({
 
                 {/* Signature Phrases */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
+                  <label className="block text-sm font-medium mb-2 flex items-center gap-2" style={{ color: 'var(--dash-text-2)' }}>
                     <Coffee className="w-4 h-4 text-orange-400" />
                     ביטויים ייחודיים (משפטי חתימה)
                   </label>
@@ -714,7 +698,8 @@ export default function SettingsPage({
                             updated[index] = e.target.value;
                             setPersonaPhrases(updated);
                           }}
-                          className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          className="flex-1 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
                           placeholder={`ביטוי ${index + 1}`}
                         />
                         <button
@@ -731,7 +716,8 @@ export default function SettingsPage({
                     <button
                       type="button"
                       onClick={() => setPersonaPhrases([...personaPhrases, ''])}
-                      className="mt-3 text-sm text-purple-400 hover:text-purple-300 transition-colors"
+                      className="mt-3 text-sm transition-colors"
+                      style={{ color: 'var(--color-primary)' }}
                     >
                       + הוסף ביטוי
                     </button>
@@ -739,32 +725,30 @@ export default function SettingsPage({
                 </div>
 
                 {/* Info box */}
-                <div className="p-4 bg-purple-600/10 border border-purple-500/30 rounded-xl">
-                  <p className="text-sm text-purple-300">
-                    <strong>💡 טיפ:</strong> הגדרות אלה משפיעות על איך הצ&apos;אטבוט מדבר עם המבקרים. 
+                <div className="p-4 rounded-xl" style={{ background: 'color-mix(in srgb, var(--color-primary) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 30%, transparent)' }}>
+                  <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>
+                    <strong>💡 טיפ:</strong> הגדרות אלה משפיעות על איך הצ&apos;אטבוט מדבר עם המבקרים.
                     ככל שתתאימו יותר לסגנון האישי שלכם, ככה התגובות יהיו אותנטיות יותר.
                   </p>
                 </div>
               </div>
-            </motion.div>
+            </div>
 
             {/* Scrape Settings */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-6"
+            <div
+              className="rounded-xl border p-6"
+              style={{ borderColor: 'var(--dash-border)' }}
             >
-              <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-                <Database className="w-5 h-5 text-green-400" />
+              <h2 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
+                <Database className="w-5 h-5" style={{ color: 'var(--dash-positive)' }} />
                 הגדרות סריקת אינסטגרם
               </h2>
 
               <div className="space-y-6">
                 {/* Posts Limit Slider */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-3">
-                    כמות פוסטים לסריקה: <span className="text-white font-bold">{scrapeSettings.posts_limit}</span>
+                  <label className="block text-sm font-medium mb-3" style={{ color: 'var(--dash-text-2)' }}>
+                    כמות פוסטים לסריקה: <span className="font-bold" style={{ color: 'var(--dash-text)' }}>{scrapeSettings.posts_limit}</span>
                   </label>
                   <input
                     type="range"
@@ -773,9 +757,10 @@ export default function SettingsPage({
                     step="10"
                     value={scrapeSettings.posts_limit}
                     onChange={(e) => setScrapeSettings({ ...scrapeSettings, posts_limit: parseInt(e.target.value) })}
-                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-green-500"
+                    className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-green-500"
+                    style={{ background: 'var(--dash-surface)' }}
                   />
-                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <div className="flex justify-between text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>
                     <span>10</span>
                     <span>50</span>
                     <span>100</span>
@@ -784,7 +769,7 @@ export default function SettingsPage({
 
                 {/* Content Types */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-3">סוגי תוכן לסריקה</label>
+                  <label className="block text-sm font-medium mb-3" style={{ color: 'var(--dash-text-2)' }}>סוגי תוכן לסריקה</label>
                   <div className="grid grid-cols-2 gap-3">
                     {[
                       { type: 'image' as PostType, label: 'תמונות', icon: Image },
@@ -798,7 +783,6 @@ export default function SettingsPage({
                           key={type}
                           onClick={() => {
                             if (isSelected) {
-                              // Don't allow removing last type
                               if (scrapeSettings.content_types.length > 1) {
                                 setScrapeSettings({
                                   ...scrapeSettings,
@@ -812,15 +796,16 @@ export default function SettingsPage({
                               });
                             }
                           }}
-                          className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
-                            isSelected
-                              ? 'bg-green-600/20 border-green-500/50 text-white'
-                              : 'bg-gray-700/30 border-gray-600 text-gray-400 hover:border-gray-500'
-                          }`}
+                          className="flex items-center gap-3 p-3 rounded-xl border transition-all"
+                          style={{
+                            background: isSelected ? 'color-mix(in srgb, var(--dash-positive) 20%, transparent)' : 'var(--dash-surface)',
+                            borderColor: isSelected ? 'var(--dash-positive)' : 'var(--dash-border)',
+                            color: isSelected ? 'var(--dash-text)' : 'var(--dash-text-2)',
+                          }}
                         >
-                          <Icon className={`w-5 h-5 ${isSelected ? 'text-green-400' : ''}`} />
+                          <Icon className="w-5 h-5" style={isSelected ? { color: 'var(--dash-positive)' } : undefined} />
                           <span className="text-sm font-medium">{label}</span>
-                          {isSelected && <Check className="w-4 h-4 mr-auto text-green-400" />}
+                          {isSelected && <Check className="w-4 h-4 mr-auto" style={{ color: 'var(--dash-positive)' }} />}
                         </button>
                       );
                     })}
@@ -830,12 +815,12 @@ export default function SettingsPage({
                 {/* Additional Options */}
                 <div className="space-y-3">
                   {/* Include Hashtags */}
-                  <div className="flex items-center justify-between p-4 bg-gray-700/30 rounded-xl">
+                  <div className="flex items-center justify-between p-4 rounded-xl" style={{ background: 'var(--dash-surface)' }}>
                     <div className="flex items-center gap-3">
-                      <Hash className="w-5 h-5 text-blue-400" />
+                      <Hash className="w-5 h-5" style={{ color: 'var(--color-info)' }} />
                       <div>
-                        <h4 className="font-medium text-white">חילוץ האשטגים</h4>
-                        <p className="text-xs text-gray-400">שמירת האשטגים מהפוסטים</p>
+                        <h4 className="font-medium" style={{ color: 'var(--dash-text)' }}>חילוץ האשטגים</h4>
+                        <p className="text-xs" style={{ color: 'var(--dash-text-2)' }}>שמירת האשטגים מהפוסטים</p>
                       </div>
                     </div>
                     <button
@@ -853,12 +838,12 @@ export default function SettingsPage({
                   </div>
 
                   {/* Include Comments */}
-                  <div className="flex items-center justify-between p-4 bg-gray-700/30 rounded-xl">
+                  <div className="flex items-center justify-between p-4 rounded-xl" style={{ background: 'var(--dash-surface)' }}>
                     <div className="flex items-center gap-3">
-                      <MessageSquare className="w-5 h-5 text-purple-400" />
+                      <MessageSquare className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
                       <div>
-                        <h4 className="font-medium text-white">שליפת תגובות</h4>
-                        <p className="text-xs text-gray-400">יאט את הסריקה אך יספק יותר מידע</p>
+                        <h4 className="font-medium" style={{ color: 'var(--dash-text)' }}>שליפת תגובות</h4>
+                        <p className="text-xs" style={{ color: 'var(--dash-text-2)' }}>יאט את הסריקה אך יספק יותר מידע</p>
                       </div>
                     </div>
                     <button
@@ -876,18 +861,19 @@ export default function SettingsPage({
                   </div>
                 </div>
 
-                <div className="p-4 bg-blue-600/10 border border-blue-500/30 rounded-xl">
-                  <p className="text-sm text-blue-300">
+                <div className="p-4 rounded-xl" style={{ background: 'color-mix(in srgb, var(--color-info) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-info) 30%, transparent)' }}>
+                  <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>
                     <strong>שימו לב:</strong> Highlights ו-Stories לא נתמכים על ידי הסריקה (דורשים התחברות לאינסטגרם).
                   </p>
                 </div>
 
                 {/* Rescan Button */}
-                <div className="pt-4 border-t border-gray-700">
+                <div className="pt-4" style={{ borderTop: '1px solid var(--dash-border)' }}>
                   <button
                     onClick={handleRescan}
                     disabled={rescanning}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-500 hover:to-teal-500 disabled:opacity-50 text-white font-medium rounded-xl transition-all"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 disabled:opacity-50 text-white font-medium rounded-xl transition-all"
+                    style={{ background: 'var(--dash-positive)' }}
                   >
                     {rescanning ? (
                       <>
@@ -902,59 +888,57 @@ export default function SettingsPage({
                     )}
                   </button>
                   {rescanResult && (
-                    <div className="mt-3 p-3 bg-green-600/20 border border-green-500/30 rounded-xl">
-                      <p className="text-sm text-green-300 text-center">
+                    <div className="mt-3 p-3 rounded-xl" style={{ background: 'color-mix(in srgb, var(--dash-positive) 20%, transparent)', border: '1px solid color-mix(in srgb, var(--dash-positive) 30%, transparent)' }}>
+                      <p className="text-sm text-center" style={{ color: 'var(--dash-positive)' }}>
                         נמצאו {rescanResult.products} מוצרים ו-{rescanResult.content} פריטי תוכן
                       </p>
                     </div>
                   )}
                 </div>
               </div>
-            </motion.div>
+            </div>
 
             {/* WhatsApp & Phone Settings */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.25 }}
-              className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-6"
+            <div
+              className="rounded-xl border p-6"
+              style={{ borderColor: 'var(--dash-border)' }}
             >
-              <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-                <Phone className="w-5 h-5 text-green-400" />
+              <h2 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
+                <Phone className="w-5 h-5" style={{ color: 'var(--dash-positive)' }} />
                 טלפון והתראות WhatsApp
               </h2>
 
               <div className="space-y-6">
                 {/* Phone Number */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">מספר טלפון</label>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>מספר טלפון</label>
                   <div className="relative">
                     <input
                       type="tel"
                       value={phoneNumber}
                       onChange={(e) => {
-                        // Allow only digits
                         const value = e.target.value.replace(/\D/g, '');
                         setPhoneNumber(value);
                       }}
                       placeholder="0541234567"
                       dir="ltr"
-                      className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 text-left"
+                      className="w-full rounded-lg px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 text-left"
+                      style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
                     />
-                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
+                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" style={{ color: 'var(--dash-text-3)' }} />
                   </div>
-                  <p className="mt-2 text-xs text-gray-500">
+                  <p className="mt-2 text-xs" style={{ color: 'var(--dash-text-3)' }}>
                     מספר לקבלת התראות על פניות תמיכה ושאלות מלקוחות
                   </p>
                 </div>
 
                 {/* WhatsApp Notifications Toggle */}
-                <div className="flex items-center justify-between p-4 bg-gray-700/30 rounded-xl">
+                <div className="flex items-center justify-between p-4 rounded-xl" style={{ background: 'var(--dash-surface)' }}>
                   <div className="flex items-center gap-3">
-                    <Bell className="w-5 h-5 text-green-400" />
+                    <Bell className="w-5 h-5" style={{ color: 'var(--dash-positive)' }} />
                     <div>
-                      <h4 className="font-medium text-white">התראות WhatsApp</h4>
-                      <p className="text-xs text-gray-400">קבלת התראות בזמן אמת על פניות חדשות</p>
+                      <h4 className="font-medium" style={{ color: 'var(--dash-text)' }}>התראות WhatsApp</h4>
+                      <p className="text-xs" style={{ color: 'var(--dash-text-2)' }}>קבלת התראות בזמן אמת על פניות חדשות</p>
                     </div>
                   </div>
                   <button
@@ -973,32 +957,30 @@ export default function SettingsPage({
                 </div>
 
                 {!phoneNumber && whatsappEnabled && (
-                  <div className="p-4 bg-yellow-600/10 border border-yellow-500/30 rounded-xl">
-                    <p className="text-sm text-yellow-400">
+                  <div className="p-4 rounded-xl" style={{ background: 'color-mix(in srgb, var(--color-warning) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-warning) 30%, transparent)' }}>
+                    <p className="text-sm" style={{ color: 'var(--color-warning)' }}>
                       יש להזין מספר טלפון כדי להפעיל התראות WhatsApp
                     </p>
                   </div>
                 )}
 
                 {phoneNumber && whatsappEnabled && (
-                  <div className="p-4 bg-green-600/10 border border-green-500/30 rounded-xl">
-                    <p className="text-sm text-green-300">
+                  <div className="p-4 rounded-xl" style={{ background: 'color-mix(in srgb, var(--dash-positive) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--dash-positive) 30%, transparent)' }}>
+                    <p className="text-sm" style={{ color: 'var(--dash-positive)' }}>
                       התראות WhatsApp פעילות - תקבלו הודעה בכל פנייה חדשה
                     </p>
                   </div>
                 )}
               </div>
-            </motion.div>
+            </div>
 
             {/* White Label Settings */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl p-6"
+            <div
+              className="rounded-xl border p-6"
+              style={{ borderColor: 'var(--dash-border)' }}
             >
-              <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-                <svg className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <h2 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
+                <svg className="w-5 h-5" style={{ color: 'var(--color-primary)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
                 </svg>
                 White Label (מיתוג עצמי)
@@ -1006,10 +988,10 @@ export default function SettingsPage({
 
               <div className="space-y-4">
                 {/* Hide Branding Toggle */}
-                <div className="flex items-center justify-between p-4 bg-gray-700/30 rounded-xl">
+                <div className="flex items-center justify-between p-4 rounded-xl" style={{ background: 'var(--dash-surface)' }}>
                   <div>
-                    <h4 className="font-medium text-white">הסתר מיתוג המערכת</h4>
-                    <p className="text-sm text-gray-400">הסתר את הלוגו והקרדיט של InfluencerBot</p>
+                    <h4 className="font-medium" style={{ color: 'var(--dash-text)' }}>הסתר מיתוג המערכת</h4>
+                    <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>הסתר את הלוגו והקרדיט של InfluencerBot</p>
                   </div>
                   <button
                     onClick={() => setHideBranding(!hideBranding)}
@@ -1027,40 +1009,37 @@ export default function SettingsPage({
 
                 {/* Custom Logo URL */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">לוגו מותאם (URL)</label>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>לוגו מותאם (URL)</label>
                   <input
                     type="url"
                     value={customLogoUrl}
                     onChange={(e) => setCustomLogoUrl(e.target.value)}
                     placeholder="https://example.com/logo.png"
-                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full rounded-lg px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
                   />
-                  <p className="mt-2 text-xs text-gray-500">
+                  <p className="mt-2 text-xs" style={{ color: 'var(--dash-text-3)' }}>
                     השאירו ריק להצגת תמונת הפרופיל שלכם
                   </p>
                 </div>
 
                 {hideBranding && (
-                  <div className="p-4 bg-gradient-to-r from-yellow-600/20 to-orange-600/20 border border-yellow-500/30 rounded-xl">
-                    <p className="text-sm text-yellow-400">
+                  <div className="p-4 rounded-xl" style={{ background: 'color-mix(in srgb, var(--color-warning) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-warning) 30%, transparent)' }}>
+                    <p className="text-sm" style={{ color: 'var(--color-warning)' }}>
                       💡 אפשרות זו זמינה בחבילות Premium. צרו קשר לשדרוג.
                     </p>
                   </div>
                 )}
               </div>
-            </motion.div>
+            </div>
           </div>
 
           {/* Preview Panel */}
           {showPreview && (
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="lg:sticky lg:top-24 h-fit"
-            >
-              <div className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl overflow-hidden">
-                <div className="p-4 border-b border-gray-700 flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-400">תצוגה מקדימה</span>
+            <div className="lg:sticky lg:top-24 h-fit">
+              <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--dash-border)' }}>
+                <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--dash-border)' }}>
+                  <span className="text-sm font-medium" style={{ color: 'var(--dash-text-2)' }}>תצוגה מקדימה</span>
                   <div className="flex gap-1.5">
                     <div className="w-3 h-3 rounded-full bg-red-500" />
                     <div className="w-3 h-3 rounded-full bg-yellow-500" />
@@ -1145,11 +1124,10 @@ export default function SettingsPage({
                   </div>
                 </div>
               </div>
-            </motion.div>
+            </div>
           )}
         </div>
       </main>
     </div>
   );
 }
-

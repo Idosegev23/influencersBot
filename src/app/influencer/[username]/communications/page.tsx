@@ -79,12 +79,12 @@ export default function CommunicationsPage() {
 
   if (isLoading) {
     return (
-      <div className="max-w-7xl mx-auto py-8 px-4">
+      <div className="max-w-6xl mx-auto py-8 px-4" style={{ background: 'var(--dash-bg)' }}>
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/4" />
+          <div className="h-8 rounded w-1/4" style={{ background: 'var(--dash-surface)' }} />
           <div className="grid grid-cols-3 gap-4">
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-24 bg-gray-200 rounded" />
+              <div key={i} className="h-24 rounded" style={{ background: 'var(--dash-surface)' }} />
             ))}
           </div>
         </div>
@@ -93,133 +93,127 @@ export default function CommunicationsPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-8 px-4 space-y-8">
-      {/* Back Button */}
-      <div className="mb-4">
-        <button
-          onClick={() => router.push(`/influencer/${username}/dashboard`)}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          <span>חזור לדשבורד</span>
-        </button>
-      </div>
-
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">תקשורת מותגים</h1>
-          <p className="text-gray-600 mt-2">ניהול כל התקשורת עם המותגים שלך</p>
-        </div>
-        <button
-          onClick={() => router.push(`/influencer/${username}/communications/new`)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          + תקשורת חדשה
-        </button>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">סה"כ</div>
-          <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
-        </div>
-
-        <div className="bg-white border border-green-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">פתוח</div>
-          <div className="text-2xl font-bold text-green-600">{stats.open}</div>
-        </div>
-
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">סגור</div>
-          <div className="text-2xl font-bold text-gray-600">{stats.closed}</div>
-        </div>
-
-        <div className="bg-white border border-blue-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">פיננסי</div>
-          <div className="text-2xl font-bold text-blue-600">{stats.financial}</div>
-        </div>
-
-        <div className="bg-white border border-purple-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">משפטי</div>
-          <div className="text-2xl font-bold text-purple-600">{stats.legal}</div>
-        </div>
-
-        <div className="bg-white border border-red-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">בעיות</div>
-          <div className="text-2xl font-bold text-red-600">{stats.issues}</div>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <div className="flex gap-4">
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-right"
-          >
-            <option value="all">כל הקטגוריות</option>
-            <option value="financial">פיננסי</option>
-            <option value="legal">משפטי</option>
-            <option value="partnership_issue">בעיות שת"פ</option>
-            <option value="general">כללי</option>
-          </select>
-
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-right"
-          >
-            <option value="all">כל הסטטוסים</option>
-            <option value="open">פתוח</option>
-            <option value="closed">סגור</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Error State */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-          <p className="text-red-600 mb-4">{error}</p>
-          <button
-            onClick={loadData}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-          >
-            נסה שוב
-          </button>
-        </div>
-      )}
-
-      {/* Empty State */}
-      {!error && communications.length === 0 && (
-        <div className="bg-white border border-gray-200 rounded-lg p-12 text-center">
-          <div className="text-6xl mb-4">💬</div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">
-            אין תקשורת עם מותגים עדיין
-          </h3>
-          <p className="text-gray-600 mb-6">
-            התחל לתקשר עם מותגים כדי לנהל את כל השיחות במקום אחד
-          </p>
+    <div className="min-h-screen" dir="rtl" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
+      <div className="max-w-6xl mx-auto py-8 px-4 space-y-8">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold" style={{ color: 'var(--dash-text)' }}>תקשורת מותגים</h1>
+            <p className="mt-2" style={{ color: 'var(--dash-text-2)' }}>ניהול כל התקשורת עם המותגים שלך</p>
+          </div>
           <button
             onClick={() => router.push(`/influencer/${username}/communications/new`)}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="px-4 py-2 rounded-lg transition-colors"
+            style={{ background: 'var(--color-primary)', color: 'white' }}
           >
-            צור תקשורת ראשונה
+            + תקשורת חדשה
           </button>
         </div>
-      )}
 
-      {/* Communications List */}
-      {!error && communications.length > 0 && (
-        <CommunicationsList
-          communications={filteredCommunications}
-          username={username}
-        />
-      )}
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="rounded-xl border p-4" style={{ borderColor: 'var(--dash-border)' }}>
+            <div className="text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>סה"כ</div>
+            <div className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>{stats.total}</div>
+          </div>
+
+          <div className="rounded-xl border p-4" style={{ borderColor: 'var(--dash-positive)' }}>
+            <div className="text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>פתוח</div>
+            <div className="text-2xl font-bold" style={{ color: 'var(--dash-positive)' }}>{stats.open}</div>
+          </div>
+
+          <div className="rounded-xl border p-4" style={{ borderColor: 'var(--dash-border)' }}>
+            <div className="text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>סגור</div>
+            <div className="text-2xl font-bold" style={{ color: 'var(--dash-text-3)' }}>{stats.closed}</div>
+          </div>
+
+          <div className="rounded-xl border p-4" style={{ borderColor: 'var(--color-info)' }}>
+            <div className="text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>פיננסי</div>
+            <div className="text-2xl font-bold" style={{ color: 'var(--color-info)' }}>{stats.financial}</div>
+          </div>
+
+          <div className="rounded-xl border p-4" style={{ borderColor: 'var(--color-primary)' }}>
+            <div className="text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>משפטי</div>
+            <div className="text-2xl font-bold" style={{ color: 'var(--color-primary)' }}>{stats.legal}</div>
+          </div>
+
+          <div className="rounded-xl border p-4" style={{ borderColor: 'var(--dash-negative)' }}>
+            <div className="text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>בעיות</div>
+            <div className="text-2xl font-bold" style={{ color: 'var(--dash-negative)' }}>{stats.issues}</div>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="rounded-xl border p-4" style={{ borderColor: 'var(--dash-border)' }}>
+          <div className="flex gap-4">
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="px-4 py-2 rounded-lg text-right"
+              style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
+            >
+              <option value="all">כל הקטגוריות</option>
+              <option value="financial">פיננסי</option>
+              <option value="legal">משפטי</option>
+              <option value="partnership_issue">בעיות שת"פ</option>
+              <option value="general">כללי</option>
+            </select>
+
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-4 py-2 rounded-lg text-right"
+              style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
+            >
+              <option value="all">כל הסטטוסים</option>
+              <option value="open">פתוח</option>
+              <option value="closed">סגור</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Error State */}
+        {error && (
+          <div className="rounded-xl border p-6 text-center" style={{ borderColor: 'var(--dash-negative)', background: 'color-mix(in srgb, var(--dash-negative) 10%, transparent)' }}>
+            <p className="mb-4" style={{ color: 'var(--dash-negative)' }}>{error}</p>
+            <button
+              onClick={loadData}
+              className="px-4 py-2 rounded-lg"
+              style={{ background: 'var(--dash-negative)', color: 'white' }}
+            >
+              נסה שוב
+            </button>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!error && communications.length === 0 && (
+          <div className="rounded-xl border p-12 text-center" style={{ borderColor: 'var(--dash-border)' }}>
+            <div className="text-6xl mb-4">💬</div>
+            <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--dash-text)' }}>
+              אין תקשורת עם מותגים עדיין
+            </h3>
+            <p className="mb-6" style={{ color: 'var(--dash-text-2)' }}>
+              התחל לתקשר עם מותגים כדי לנהל את כל השיחות במקום אחד
+            </p>
+            <button
+              onClick={() => router.push(`/influencer/${username}/communications/new`)}
+              className="px-6 py-3 rounded-lg transition-colors"
+              style={{ background: 'var(--color-primary)', color: 'white' }}
+            >
+              צור תקשורת ראשונה
+            </button>
+          </div>
+        )}
+
+        {/* Communications List */}
+        {!error && communications.length > 0 && (
+          <CommunicationsList
+            communications={filteredCommunications}
+            username={username}
+          />
+        )}
+      </div>
     </div>
   );
 }
