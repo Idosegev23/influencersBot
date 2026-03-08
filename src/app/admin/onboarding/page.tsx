@@ -55,7 +55,9 @@ interface TaskRecord {
   task_number: number;
   task_title: string;
   section: string | null;
+  section_title: string | null;
   note: string | null;
+  badges: { label: string; color: string }[] | null;
   completed: boolean;
   completed_by: string | null;
   completed_at: string | null;
@@ -495,7 +497,9 @@ export default function OnboardingChecklistPage() {
       task_number: i + 1,
       task_title: t.title,
       section: t.section,
+      section_title: t.sectionTitle,
       note: t.note,
+      badges: t.badges,
       completed: false,
     }));
     await supabase.from('brand_onboarding_tasks').insert(rows);
@@ -580,23 +584,26 @@ export default function OnboardingChecklistPage() {
   const totalCount = tasks.length;
   const progressPct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
-  // ─── Group tasks by section ───
+  // ─── Group tasks by section (from DB, not templates) ───
   const sections: { key: string; title: string; tasks: TaskRecord[] }[] = [];
   const sectionMap = new Map<string, TaskRecord[]>();
   const sectionTitles = new Map<string, string>();
 
-  if (currentRecord) {
-    const tpls = buildTaskList(currentRecord.digital_assets || DEFAULT_ASSETS, currentRecord.wants_widget);
-    tpls.forEach(t => { if (!sectionTitles.has(t.section)) sectionTitles.set(t.section, t.sectionTitle); });
-  }
   tasks.forEach(t => {
     const s = t.section || '?';
     if (!sectionMap.has(s)) sectionMap.set(s, []);
     sectionMap.get(s)!.push(t);
+    // Use section_title from DB if available
+    if (t.section_title && !sectionTitles.has(s)) sectionTitles.set(s, t.section_title);
   });
-  sectionMap.forEach((st, key) => sections.push({ key, title: sectionTitles.get(key) || key, tasks: st }));
 
-  const templateList = currentRecord ? buildTaskList(currentRecord.digital_assets || DEFAULT_ASSETS, currentRecord.wants_widget) : [];
+  // Fallback: if old tasks don't have section_title, try from templates
+  if (currentRecord && sectionTitles.size === 0) {
+    const tpls = buildTaskList(currentRecord.digital_assets || DEFAULT_ASSETS, currentRecord.wants_widget);
+    tpls.forEach(t => { if (!sectionTitles.has(t.section)) sectionTitles.set(t.section, t.sectionTitle); });
+  }
+
+  sectionMap.forEach((st, key) => sections.push({ key, title: sectionTitles.get(key) || key, tasks: st }));
 
   // ─── Asset tags display ───
   function assetTags(assets: DigitalAssets) {
@@ -739,8 +746,7 @@ export default function OnboardingChecklistPage() {
                 </div>
                 <div className="space-y-2">
                   {sec.tasks.map(task => {
-                    const tpl = templateList.find(t => t.title === task.task_title);
-                    const badges = tpl?.badges || [];
+                    const badges = task.badges || [];
                     return (
                       <div key={task.task_number} onClick={() => handleTaskClick(task.task_number)} className={`admin-card p-4 cursor-pointer transition-all hover:border-indigo-500/40 ${task.completed ? 'opacity-50' : ''}`}>
                         <div className="flex items-start gap-3">
