@@ -62,6 +62,8 @@ export interface Partnership {
   brand_name: string;
   partnership_type: string;
   description: string;
+  coupon_code?: string;
+  link?: string;
 }
 
 export interface ConversationInsight {
@@ -875,6 +877,8 @@ async function fetchRelevantPartnerships(
           brand_name: p.brand_name,
           partnership_type: p.category || 'collaboration',
           description: p.brief || '',
+          coupon_code: p.coupon_code || undefined,
+          link: p.link || undefined,
         }));
       } else {
         console.log('[fetchPartnerships] ℹ️ No partnerships match search query');
@@ -884,12 +888,12 @@ async function fetchRelevantPartnerships(
     // Fallback: Get active partnerships
     const { data, error } = await supabase
       .from('partnerships')
-      .select('brand_name, status, brief, category')
+      .select('brand_name, status, brief, category, coupon_code, link')
       .eq('account_id', accountId)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
       .limit(15);
-    
+
     if (error) {
       console.error('[fetchPartnerships] Error:', error);
       return [];
@@ -901,6 +905,8 @@ async function fetchRelevantPartnerships(
       brand_name: p.brand_name,
       partnership_type: 'collaboration',
       description: p.brief || p.category || '',
+      coupon_code: p.coupon_code || undefined,
+      link: p.link || undefined,
     }));
   } catch (error) {
     console.error('[fetchPartnerships] Exception:', error);
@@ -1058,6 +1064,19 @@ export function formatKnowledgeForPrompt(kb: KnowledgeBase, maxLength: number = 
     context += '\n';
   }
 
+  // Add partnerships (brands + coupon codes)
+  if (kb.partnerships.length > 0) {
+    context += '## שותפויות ומותגים:\n';
+    kb.partnerships.forEach(p => {
+      context += `- ${p.brand_name}`;
+      if (p.coupon_code) context += ` | קוד קופון: "${p.coupon_code}"`;
+      if (p.link) context += ` | ${p.link}`;
+      if (p.description) context += ` (${p.description})`;
+      context += '\n';
+    });
+    context += '\n';
+  }
+
   // Add insights
   if (kb.insights.length > 0) {
     context += '## תובנות מהשיחות:\n';
@@ -1099,6 +1118,7 @@ export function hasRelevantKnowledge(kb: KnowledgeBase): boolean {
     kb.posts.length > 0 ||
     kb.highlights.length > 0 ||
     kb.coupons.length > 0 ||
+    kb.partnerships.length > 0 ||
     kb.insights.length > 0 ||
     kb.websites.length > 0 ||
     kb.transcriptions.length > 0
