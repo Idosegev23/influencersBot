@@ -117,6 +117,52 @@ export async function POST(request: NextRequest) {
           duration_ms: result.duration_ms || 0,
         });
 
+        // Auto-route parsed data to coupons/partnerships/knowledge base
+        if (result.success && result.data && doc.account_id) {
+          import('@/lib/ai-parser/document-router').then(({ routeParsedDocument }) => {
+            routeParsedDocument({
+              accountId: doc.account_id,
+              documentId: doc.id,
+              documentType: doc.document_type,
+              parsedData: result.data,
+              confidence: result.confidence,
+            }).then(routeResult => {
+              console.log(`[Parse API] Auto-routing complete for ${doc.id}:`, routeResult);
+            }).catch(err => {
+              console.error(`[Parse API] Auto-routing failed for ${doc.id}:`, err);
+            });
+          }).catch(err => console.error('[Parse API] Failed to import document-router:', err));
+        }
+
+        // Fire-and-forget RAG ingestion so chatbot can reference document content
+        if (result.success && result.data && doc.account_id) {
+          import('@/lib/rag/ingest').then(({ ingestDocument, buildDocumentText }) => {
+            const text = buildDocumentText({
+              filename: doc.filename,
+              document_type: doc.document_type,
+              parsed_data: result.data,
+            });
+            if (text.trim()) {
+              ingestDocument({
+                accountId: doc.account_id,
+                entityType: 'document',
+                sourceId: doc.id,
+                title: `Document: ${doc.filename} (${doc.document_type})`,
+                text,
+                metadata: {
+                  filename: doc.filename,
+                  documentType: doc.document_type,
+                  parsingConfidence: result.confidence,
+                },
+              }).then(res => {
+                console.log(`[Parse API] RAG ingestion complete for ${doc.id}: ${res.chunksCreated} chunks`);
+              }).catch(err => {
+                console.error(`[Parse API] RAG ingestion failed for ${doc.id}:`, err);
+              });
+            }
+          }).catch(err => console.error('[Parse API] Failed to import RAG ingest:', err));
+        }
+
       } catch (error: any) {
         console.error(`[Parse API] Error parsing ${doc.filename}:`, error);
         console.error(`[Parse API] Error details:`, {

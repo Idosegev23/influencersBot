@@ -37,6 +37,7 @@ export interface FileUploaderProps {
   accountId: string;
   username: string; // Required for auth
   partnershipId?: string;
+  documentType?: string; // Passed to metadata route for AI parsing
   onUploadComplete: (files: UploadedFile[]) => void;
   onError?: (error: string) => void;
   acceptedTypes?: string[];
@@ -85,6 +86,7 @@ export function FileUploader({
   accountId,
   username,
   partnershipId,
+  documentType = 'other',
   onUploadComplete,
   onError,
   acceptedTypes = DEFAULT_ACCEPTED_TYPES,
@@ -194,7 +196,7 @@ export function FileUploader({
             fileSize: file.size,
             mimeType: file.type,
             storagePath,
-            documentType: 'other', // Can be customized
+            documentType,
           }),
         });
 

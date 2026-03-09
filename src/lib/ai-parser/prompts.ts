@@ -55,7 +55,16 @@ const PROMPTS_BY_LANGUAGE: Record<string, Record<DocumentType, string>> = {
     "name": "שם איש קשר (string או null)",
     "email": "אימייל (string או null)",
     "phone": "טלפון (string או null)"
-  }
+  },
+  "coupon_codes": [
+    {
+      "code": "קוד הקופון (string)",
+      "brand_name": "שם המותג (string או null)",
+      "discount_type": "percentage/fixed/free_shipping (string או null)",
+      "discount_value": "ערך ההנחה (number או null)",
+      "description": "תיאור הקופון (string או null)"
+    }
+  ]
 }
 
 הנחיות חשובות:
@@ -64,6 +73,7 @@ const PROMPTS_BY_LANGUAGE: Record<string, Record<DocumentType, string>> = {
 3. מספרים ללא סימנים (₪, $, ,)
 4. היה מדויק ככל האפשר
 5. אם יש ספק, העדף null על ניחוש
+6. אם יש קודי קופון/הנחה/הטבה במסמך - חלץ אותם ל-coupon_codes. אם אין, החזר מערך ריק.
 
 החזר רק JSON תקין, ללא טקסט נוסף.`,
 
@@ -142,6 +152,15 @@ const PROMPTS_BY_LANGUAGE: Record<string, Record<DocumentType, string>> = {
   "terminationClauses": ["סעיפי ביטול/הפסקת הסכם - חפש 'ביטול', 'הפסקה', 'סיום מוקדם'"],
   "liabilityClauses": ["סעיפי אחריות/נזיקין - חפש 'אחריות', 'נזק', 'פיצוי'"],
   "confidentiality": "תקופת סודיות/חיסיון - כמה זמן (string או null)",
+  "coupon_codes": [
+    {
+      "code": "קוד קופון/הנחה/הטבה שמופיע בחוזה (string)",
+      "brand_name": "שם המותג (string או null)",
+      "discount_type": "percentage/fixed/free_shipping (string או null)",
+      "discount_value": "ערך ההנחה (number או null)",
+      "description": "תיאור הקופון/ההטבה (string או null)"
+    }
+  ],
   "keyDates": [
     {
       "event": "שם האירוע/מועד חשוב (string)",
@@ -301,7 +320,9 @@ const PROMPTS_BY_LANGUAGE: Record<string, Record<DocumentType, string>> = {
 
 החזר רק JSON תקין.`,
 
-    other: `אתה עוזר AI שמנתח מסמכים.
+    other: `אתה עוזר AI שמנתח מסמכים כלליים.
+
+המשימה שלך היא לחלץ מידע שימושי מהמסמך - כולל תוכן כללי, שאלות נפוצות, קופונים, ומידע על מותגים.
 
 חלץ את התוכן המובנה:
 
@@ -322,8 +343,32 @@ const PROMPTS_BY_LANGUAGE: Record<string, Record<DocumentType, string>> = {
       "email": "אימייל (string או null)",
       "phone": "טלפון (string או null)"
     }
+  ],
+  "coupon_codes": [
+    {
+      "code": "קוד קופון/הנחה שמופיע במסמך (string)",
+      "brand_name": "שם המותג (string או null)",
+      "discount_type": "percentage/fixed/free_shipping (string או null)",
+      "discount_value": "ערך ההנחה (number או null)",
+      "description": "תיאור הקופון (string או null)"
+    }
+  ],
+  "knowledge_entries": [
+    {
+      "title": "כותרת קצרה לפריט ידע (string)",
+      "content": "התוכן המלא שהבוט צריך לדעת (string)",
+      "knowledge_type": "faq/custom/brand_info (string)",
+      "keywords": ["מילות חיפוש רלוונטיות"]
+    }
   ]
 }
+
+הנחיות:
+1. אם יש שאלות ותשובות (FAQ) - חלץ כל שאלה/תשובה כ-knowledge_entry עם type=faq
+2. אם יש מידע על מותגים/מוצרים - חלץ כ-knowledge_entry עם type=brand_info
+3. אם יש מידע כללי שימושי (שעות פעילות, מחירון, מדיניות וכו') - חלץ כ-knowledge_entry עם type=custom
+4. אם יש קודי קופון/הנחה - חלץ ל-coupon_codes
+5. אם אין פריטים מסוג מסוים, החזר מערך ריק []
 
 החזר רק JSON תקין.`,
   },

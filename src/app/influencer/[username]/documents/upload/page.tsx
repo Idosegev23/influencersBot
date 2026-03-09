@@ -41,6 +41,18 @@ import {
   type DocumentType,
 } from '@/components/documents/DocumentTypeSelector';
 
+/** Map UI document types to AI parser document types */
+function mapDocumentType(uiType: DocumentType): string {
+  const map: Record<string, string> = {
+    partnership_agreement: 'contract',
+    invoice: 'invoice',
+    brief: 'brief',
+    proposal: 'quote',
+    general: 'other',
+  };
+  return map[uiType] || 'other';
+}
+
 export default function DocumentUploadPage({
   params,
 }: {
@@ -242,6 +254,7 @@ export default function DocumentUploadPage({
             <FileUploader
               accountId={accountId || ''}
               username={username}
+              documentType={mapDocumentType(documentType)}
               onUploadComplete={handleUploadComplete}
               onError={handleUploadError}
               multiple={true}
