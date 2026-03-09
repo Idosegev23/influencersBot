@@ -494,6 +494,7 @@ export interface Brand {
   short_link: string | null;
   category: string | null;
   whatsapp_phone: string | null;
+  image_url: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -536,6 +537,7 @@ export async function getBrandsByInfluencer(influencerId: string): Promise<Brand
       short_link: p.short_link,
       category: p.category,
       whatsapp_phone: p.whatsapp_phone,
+      image_url: p.brand_logo_url || null,
       is_active: p.is_active || false,
       created_at: p.created_at,
       updated_at: p.updated_at,
@@ -566,6 +568,7 @@ export async function getBrandsByInfluencer(influencerId: string): Promise<Brand
     short_link: null,
     category: c.brand_category,
     whatsapp_phone: null,
+    image_url: null,
     is_active: c.is_active || false,
     created_at: c.created_at,
     updated_at: c.updated_at,
@@ -633,6 +636,8 @@ export interface Partnership {
   category: string | null;
   is_active: boolean;
   whatsapp_phone: string | null;
+  brand_logo_id: string | null;
+  brand_logo_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -653,6 +658,11 @@ export async function getPartnershipsByInfluencer(influencerId: string): Promise
           discount_value,
           description,
           is_active
+        ),
+        brand_logo:brand_logos!brand_logo_id(
+          id,
+          logo_url,
+          display_name
         )
       `)
       .in('account_id', accountIds)
@@ -668,12 +678,14 @@ export async function getPartnershipsByInfluencer(influencerId: string): Promise
       return [];
     }
     
-    // Map partnerships with coupons to include coupon_code
+    // Map partnerships with coupons and brand logo
     return (data || []).map(p => ({
       ...p,
       // First try coupons table, then fallback to partnership's coupon_code field
       coupon_code: p.coupons?.find((c: any) => c.is_active)?.code || p.coupon_code || null,
+      brand_logo_url: p.brand_logo?.logo_url || null,
       coupons: undefined, // Remove nested array from final result
+      brand_logo: undefined, // Remove nested object from final result
     }));
   } catch (err) {
     console.error('Exception fetching partnerships:', err);

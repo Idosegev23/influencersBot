@@ -54,6 +54,7 @@ interface BrandInfo {
   description: string | null;
   coupon_code: string | null;
   category: string | null;
+  image_url: string | null;
 }
 
 interface Message {
@@ -874,9 +875,16 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                               <button
                                 key={brand.id}
                                 onClick={() => brand.coupon_code && handleCopyCode(brand.coupon_code, brand.id)}
-                                className="flex-shrink-0 w-32 p-3.5 rounded-2xl text-right transition-all hover:shadow-md"
+                                className="flex-shrink-0 w-32 p-3.5 rounded-2xl text-center transition-all hover:shadow-md"
                                 style={{ backgroundColor: '#ffffff', border: '1px solid var(--color-border)' }}
                               >
+                                {brand.image_url ? (
+                                  <img src={brand.image_url} alt={brand.brand_name} className="w-10 h-10 mx-auto mb-2 rounded-lg object-contain" />
+                                ) : (
+                                  <div className="w-10 h-10 mx-auto mb-2 rounded-lg flex items-center justify-center text-sm font-bold" style={{ backgroundColor: 'color-mix(in srgb, var(--color-primary) 12%, #f0f0f2)', color: 'var(--color-primary)' }}>
+                                    {brand.brand_name.charAt(0).toUpperCase()}
+                                  </div>
+                                )}
                                 <p className="font-medium text-sm truncate" style={{ color: 'var(--color-text)' }}>
                                   {brand.brand_name}
                                 </p>
@@ -1339,9 +1347,17 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           <button
                             key={brand.id}
                             onClick={() => brand.coupon_code && handleCopyCode(brand.coupon_code, brand.id)}
-                            className="p-4 rounded-xl text-right transition-all hover:shadow-md"
+                            className="p-4 rounded-xl text-right transition-all hover:shadow-md flex gap-3 items-start"
                             style={{ backgroundColor: '#ffffff', border: '1px solid var(--color-border)' }}
                           >
+                            {brand.image_url ? (
+                              <img src={brand.image_url} alt={brand.brand_name} className="w-10 h-10 rounded-lg object-contain flex-shrink-0" />
+                            ) : (
+                              <div className="w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0" style={{ backgroundColor: 'color-mix(in srgb, var(--color-primary) 12%, #f0f0f2)', color: 'var(--color-primary)' }}>
+                                {brand.brand_name.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
                             <p className="font-semibold text-base" style={{ color: 'var(--color-text)' }}>{brand.brand_name}</p>
                             {brand.description && (
                               <p className="text-xs mt-1 line-clamp-2" style={{ color: 'var(--color-text)', opacity: 0.6 }}>{brand.description}</p>
@@ -1364,6 +1380,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             ) : (
                               <p className="text-xs mt-2" style={{ color: 'var(--color-text)', opacity: 0.4 }}>ללא קופון כרגע</p>
                             )}
+                            </div>
                           </button>
                         ))}
                       </div>

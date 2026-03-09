@@ -190,6 +190,12 @@ function buildTaskList(assets: DigitalAssets, wantsWidget: boolean): TaskTemplat
       note: 'טבלת coupons + partnerships',
       section: B, sectionTitle: BT,
     });
+    tasks.push({
+      title: 'הוספת לוגו למותגים שהתגלו בסריקה',
+      badges: [{ label: 'מותגים', color: 'brands' }, { label: 'גרפיקה', color: 'graphic' }],
+      note: 'טבלת brand_logos — לבדוק אם הלוגו כבר קיים לפני הוספה',
+      section: B, sectionTitle: BT,
+    });
   }
 
   if (assets.website) {
