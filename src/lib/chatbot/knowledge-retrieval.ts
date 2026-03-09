@@ -13,6 +13,13 @@ import { getMetrics } from '@/lib/metrics/pipeline-metrics';
 // Type Definitions
 // ============================================
 
+export interface ManualKnowledgeEntry {
+  id: string;
+  knowledge_type: string;
+  title: string;
+  content: string;
+}
+
 export interface KnowledgeBase {
   posts: InstagramPost[];
   highlights: InstagramHighlight[];
@@ -21,6 +28,7 @@ export interface KnowledgeBase {
   insights: ConversationInsight[];
   websites: WebsiteContent[];
   transcriptions: VideoTranscription[];
+  manualKnowledge?: ManualKnowledgeEntry[];
 }
 
 export interface VideoTranscription {
@@ -28,6 +36,7 @@ export interface VideoTranscription {
   text: string;
   media_id: string;
   created_at: string;
+  on_screen_text?: string[];
 }
 
 export interface InstagramPost {
@@ -39,6 +48,9 @@ export interface InstagramPost {
   likes_count: number;
   engagement_rate: number;
   media_urls: string[];
+  post_url?: string;
+  comments_count?: number;
+  is_sponsored?: boolean;
 }
 
 export interface InstagramHighlight {
@@ -56,6 +68,8 @@ export interface Coupon {
   discount: string;
   category: string;
   link?: string;
+  start_date?: string;
+  end_date?: string;
 }
 
 export interface Partnership {
@@ -191,6 +205,7 @@ export async function retrieveKnowledge(
     coupons: fetchRelevantCoupons(supabase, accountId, [], archetype, userMessage),
     partnerships: fetchRelevantPartnerships(supabase, accountId, [], userMessage),
     insights: fetchRelevantInsights(supabase, accountId, archetype, 3),
+    manualKnowledge: fetchManualKnowledge(supabase, accountId),
   };
 
   // Content search — RAG vector search OR FTS fallback
@@ -217,6 +232,7 @@ export async function retrieveKnowledge(
   const coupons: Coupon[] = results.coupons || [];
   const partnerships: Partnership[] = results.partnerships || [];
   const insights: ConversationInsight[] = results.insights || [];
+  const manualKnowledge: ManualKnowledgeEntry[] = results.manualKnowledge || [];
 
   let posts: InstagramPost[] = [];
   let transcriptions: VideoTranscription[] = [];
@@ -247,6 +263,9 @@ export async function retrieveKnowledge(
   console.log(`  - Websites: ${mergedWebsites.length} (${directWebsites.length} direct + ${ragWebsites.length} RAG)`);
   console.log(`  - Coupons: ${coupons.length}, Partnerships: ${partnerships.length}`);
   console.log(`  - Transcriptions: ${transcriptions.length}, Insights: ${insights.length}`);
+  if (manualKnowledge.length > 0) {
+    console.log(`  - Manual knowledge: ${manualKnowledge.length}`);
+  }
 
   return {
     posts,
@@ -256,6 +275,7 @@ export async function retrieveKnowledge(
     insights,
     websites: mergedWebsites,
     transcriptions,
+    manualKnowledge,
   };
 }
 
@@ -561,11 +581,11 @@ async function fetchRelevantPostsIndexed(
       console.warn('[fetchPostsIndexed] Using fallback query');
       const { data: fallbackData } = await supabase
         .from('instagram_posts')
-        .select('id, caption, hashtags, type, posted_at, likes_count, engagement_rate, media_urls')
+        .select('id, caption, hashtags, type, posted_at, likes_count, comments_count, engagement_rate, media_urls, post_url, is_sponsored')
         .eq('account_id', accountId)
         .order('posted_at', { ascending: false })
         .limit(limit);
-      
+
       return fallbackData || [];
     }
     
@@ -579,7 +599,7 @@ async function fetchRelevantPostsIndexed(
     // Add missing fields to indexed results
     const fullPosts = await supabase
       .from('instagram_posts')
-      .select('id, caption, hashtags, type, posted_at, likes_count, engagement_rate, media_urls')
+      .select('id, caption, hashtags, type, posted_at, likes_count, comments_count, engagement_rate, media_urls, post_url, is_sponsored')
       .eq('account_id', accountId)
       .in('id', data.map((p: any) => p.id));
 
@@ -753,6 +773,8 @@ async function fetchRelevantCoupons(
               discount: discount,
               category: 'general',
               link: cleanLink,
+              start_date: c.start_date || undefined,
+              end_date: c.end_date || undefined,
             });
           }
           return allCoupons;
@@ -778,7 +800,7 @@ async function fetchRelevantCoupons(
       
       const { data: fallbackData, error: fallbackError } = await supabase
         .from('coupons')
-        .select('id, code, description, discount_type, discount_value, partnership_id')
+        .select('id, code, description, discount_type, discount_value, partnership_id, start_date, end_date')
         .eq('account_id', accountId)
         .eq('is_active', true)
         .order('created_at', { ascending: false })
@@ -814,6 +836,8 @@ async function fetchRelevantCoupons(
             discount: discount,
             category: partnership?.category || 'general',
             link: partnership?.link,
+            start_date: c.start_date || undefined,
+            end_date: c.end_date || undefined,
           });
         }
       }
@@ -821,7 +845,7 @@ async function fetchRelevantCoupons(
       // RPC worked, use the data directly
       for (const c of couponsData) {
         let discount = c.description || 'הנחה';
-        
+
         if (c.discount_type === 'percentage' && c.discount_value) {
           discount = `${c.discount_value}% הנחה`;
         } else if (c.discount_type === 'fixed' && c.discount_value) {
@@ -829,13 +853,15 @@ async function fetchRelevantCoupons(
         } else if (c.discount_type === 'free_shipping') {
           discount = 'משלוח חינם';
         }
-        
+
         allCoupons.push({
           brand: c.brand_name || 'מותג',
           code: c.code,
           discount: discount,
           category: c.category || 'general',
           link: c.link,
+          start_date: c.start_date || undefined,
+          end_date: c.end_date || undefined,
         });
       }
     }
@@ -922,7 +948,7 @@ async function fetchRelevantInsights(
 ): Promise<ConversationInsight[]> {
   const { data } = await supabase
     .from('conversation_insights')
-    .select('insight_type, title, content, occurrence_count, confidence_score')
+    .select('insight_type, title, content, occurrence_count, confidence_score, suggested_response')
     .eq('account_id', accountId)
     .eq('is_active', true)
     .eq('archetype', archetype)
@@ -987,16 +1013,17 @@ async function fetchRelevantTranscriptionsIndexed(
       console.warn('[fetchTranscriptionsIndexed] Using fallback query');
       const { data: fallbackData } = await supabase
         .from('instagram_transcriptions')
-        .select('id, transcription_text, source_id, created_at')
+        .select('id, transcription_text, on_screen_text, source_id, created_at')
         .eq('account_id', accountId)
         .order('created_at', { ascending: false })
         .limit(limit);
-      
+
       return (fallbackData || []).map((t: any) => ({
         id: t.id,
         text: t.transcription_text,
         media_id: t.source_id,
         created_at: t.created_at,
+        on_screen_text: t.on_screen_text,
       }));
     }
     
@@ -1007,16 +1034,44 @@ async function fetchRelevantTranscriptionsIndexed(
     }
 
     console.log(`[fetchTranscriptionsIndexed] ✅ Found ${data.length} transcriptions via INDEX`);
-    
+
     return data.map((t: any) => ({
       id: t.id,
       text: t.transcription_text,
       media_id: t.source_id,
       created_at: t.created_at,
+      on_screen_text: t.on_screen_text,
     }));
     
   } catch (error) {
     console.error('[fetchTranscriptionsIndexed] Exception:', error);
+    return [];
+  }
+}
+
+/**
+ * Fetch active manual knowledge entries from chatbot_knowledge_base
+ */
+async function fetchManualKnowledge(
+  supabase: any,
+  accountId: string
+): Promise<ManualKnowledgeEntry[]> {
+  try {
+    const { data, error } = await supabase
+      .from('chatbot_knowledge_base')
+      .select('id, knowledge_type, title, content')
+      .eq('account_id', accountId)
+      .eq('is_active', true)
+      .order('priority', { ascending: false })
+      .limit(20);
+
+    if (error) {
+      console.error('[fetchManualKnowledge] Error:', error.message);
+      return [];
+    }
+    return data || [];
+  } catch (error) {
+    console.error('[fetchManualKnowledge] Exception:', error);
     return [];
   }
 }
@@ -1112,6 +1167,15 @@ export function formatKnowledgeForPrompt(kb: KnowledgeBase, maxLength: number = 
     context += '\n';
   }
 
+  // Add manual knowledge entries (FAQ, custom content added by influencer)
+  if (kb.manualKnowledge && kb.manualKnowledge.length > 0) {
+    context += '## מידע נוסף מהמשפיען:\n';
+    kb.manualKnowledge.forEach(entry => {
+      context += `- ${entry.title}: ${entry.content}\n`;
+    });
+    context += '\n';
+  }
+
   // Truncate if too long
   if (context.length > maxLength) {
     context = context.substring(0, maxLength) + '\n...(קטע נוסף)';
@@ -1137,6 +1201,7 @@ export function hasRelevantKnowledge(kb: KnowledgeBase): boolean {
     kb.partnerships.length > 0 ||
     kb.insights.length > 0 ||
     kb.websites.length > 0 ||
-    kb.transcriptions.length > 0
+    kb.transcriptions.length > 0 ||
+    (kb.manualKnowledge?.length ?? 0) > 0
   );
 }

@@ -11,35 +11,41 @@ export interface PersonalityConfig {
   // Narrative Perspective
   narrativePerspective: 'sidekick-professional' | 'sidekick-personal' | 'direct';
   // "היא אומרת...", "אנחנו ממליצות..." vs "אני ממליצה..."
-  
+
   // Sass & Spice
   sassLevel: number; // 0-10, where 0=very formal, 10=very sassy
-  
+
   // Life Context
   lifeContextInjection: boolean; // האם להזריק "עוגני מציאות" מסטוריז
   currentLocation?: string; // "היא עכשיו בפריז"
   currentActivity?: string; // "היא בדיוק מצלמת"
-  
+
   // Storytelling
   storytellingMode: 'anecdotal' | 'concise' | 'balanced';
   // anecdotal = סיפורי ומפורט, concise = קצר ותכליתי
-  
+
   // Slang Map
   slangMap: Record<string, string>; // { "amazing": "מדהים", "love": "אוהבת" }
-  
+
   // Emoji Strategy
   emojiUsage: 'none' | 'minimal' | 'moderate' | 'heavy';
   emojiTypes: string[]; // Preferred emojis: ["✨", "💕", "🔥"]
-  
+
   // Message Structure
   messageStructure: 'whatsapp' | 'formal' | 'chat';
   // whatsapp = short paragraphs with line breaks
   // formal = longer structured response
   // chat = conversational back-and-forth
-  
+
   // Linguistic DNA
   commonPhrases: string[]; // "בדיוק כמו שהיא תמיד אומרת..."
   signatureStyle: string; // "זה הסוד שלה..."
+
+  // Persona content fields (from chatbot_persona table)
+  directives?: string;       // Custom instructions for the bot
+  bio?: string;              // Influencer bio / about text
+  interests?: string[];      // Topics the influencer covers
+  greetingMessage?: string;  // Custom greeting for first message
 }
 
 export interface ResponseWrapperInput {
@@ -338,6 +344,11 @@ export async function buildPersonalityFromDB(accountId: string): Promise<Persona
     messageStructure: persona.message_structure || 'whatsapp',
     commonPhrases: persona.common_phrases || DEFAULT_PERSONALITY.commonPhrases,
     signatureStyle: persona.signature_style || '',
+    // Persona content fields
+    directives: persona.directives || undefined,
+    bio: persona.bio || undefined,
+    interests: persona.interests || undefined,
+    greetingMessage: persona.greeting_message || undefined,
   };
 
   return config;

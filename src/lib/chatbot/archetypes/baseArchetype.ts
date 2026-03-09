@@ -226,6 +226,28 @@ export abstract class BaseArchetype {
   }
 
   /**
+   * Build persona context block (bio, directives, interests) for the system prompt.
+   * These come from the chatbot_persona table and give the bot domain-specific identity.
+   */
+  private buildPersonaContextPrompt(config: PersonalityConfig, name: string): string {
+    const sections: string[] = [];
+
+    if (config.bio) {
+      sections.push(`📋 ביוגרפיה של ${name}:\n${config.bio}`);
+    }
+
+    if (config.interests && config.interests.length > 0) {
+      sections.push(`🎯 תחומי עניין: ${config.interests.join(', ')}`);
+    }
+
+    if (config.directives) {
+      sections.push(`📌 הנחיות מיוחדות:\n${config.directives}`);
+    }
+
+    return sections.length > 0 ? '\n' + sections.join('\n\n') : '';
+  }
+
+  /**
    * Generate AI response using OpenAI Responses API (GPT-5.2)
    * Uses previous_response_id for server-side context chaining.
    * Supports real-time streaming via onToken callback.
@@ -242,10 +264,12 @@ export abstract class BaseArchetype {
 
       // Build personality prompt (use pre-loaded config if available, else load from DB)
       let personalityBlock = '';
+      let personaContextBlock = '';
       if (input.onToken) {
         try {
           const personalityConfig = input.personalityConfig || await buildPersonalityFromDB(input.accountContext.accountId);
           personalityBlock = `\n🎭 סגנון אישיות:\n${this.buildPersonalityPrompt(personalityConfig, influencerName)}`;
+          personaContextBlock = this.buildPersonaContextPrompt(personalityConfig, influencerName);
         } catch (e) {
           console.warn('[BaseArchetype] Failed to load personality, using defaults');
         }
@@ -264,7 +288,27 @@ export abstract class BaseArchetype {
 📝 ${this.definition.description}
 
 ${this.definition.logic.responseTemplates?.length ? '📋 איך לענות:\n' + this.definition.logic.responseTemplates.map(t => `• ${t.situation}: ${t.template}`).join('\n') : ''}
-${personalityBlock}
+${personalityBlock}${personaContextBlock}
+${input.mode === 'dm' ? `
+📱 מצב DM באינסטגרם — שיחה אישית וטבעית:
+
+📏 פורמט הודעה:
+• ⚠️ **חשוב מאוד**: אינסטגרם DM לא תומך ב-markdown! אין bold, italic, headers, או bullet points.
+• כתוב טקסט רגיל בלבד — ללא כוכביות, ללא תחתיות, ללא סוגריים מרובעים.
+• השתמש באימוג'ים כסימני נקודות: ✅, 📌, 💡, 🔥, ✨ במקום bullets.
+• הפרד בין נושאים עם שורה ריקה.
+• מספור ידני (1. 2. 3.) במקום רשימות.
+• שמור הודעות קצרות וקריאות — עד 800 תווים מועדפים (המערכת תפצל אוטומטית אם צריך).
+
+🔗 לינקים ותמונות:
+• 🚫 אל תשתמש בפורמט markdown ללינקים [טקסט](URL).
+• במקום זאת כתוב: "הלינק: https://example.com" או "תבדקי כאן 👉 https://example.com"
+• 🚫 אל תשלב תמונות — DM לא מציג תמונות inline.
+
+💬 סגנון:
+• דבר כאילו אתה שולח הודעה ישירה לחבר — חם, אישי, וקצר.
+• פסקאות קצרות כמו בווטסאפ.
+• אל תהיה פורמלי מדי — זו שיחת DM, לא אתר.` : ''}
 ${input.mode === 'widget' ? `
 🛒 מצב ווידג'ט — מכירתי וקצר:
 
@@ -294,7 +338,7 @@ ${input.mode === 'widget' ? `
 • **אחרי כל תשובה**: הציע/י בקצרה המשך טבעי אחד בתוך הטקסט.
 • 1-2 אימוג'ים מקסימום לכל תשובה.
 
-${input.mode === 'widget' ? `📌 בווידג'ט — 🚫 אל תוסיף <<SUGGESTIONS>>. אין כפתורי המשך בווידג'ט. סיים את התשובה ב-CTA טבעי בתוך הטקסט.` : `📌 המלצות המשך:
+${(input.mode === 'widget' || input.mode === 'dm') ? `📌 ${input.mode === 'widget' ? 'בווידג\'ט' : 'ב-DM'} — 🚫 אל תוסיף <<SUGGESTIONS>>. ${input.mode === 'widget' ? 'אין כפתורי המשך בווידג\'ט.' : 'אין כפתורי המשך ב-DM.'} סיים את התשובה ב-CTA טבעי בתוך הטקסט.` : `📌 המלצות המשך:
 בסוף **כל** תשובה, הוסף שורה אחרונה בפורמט הזה בדיוק:
 <<SUGGESTIONS>>הצעה 1|הצעה 2|הצעה 3<</SUGGESTIONS>>
 • 2-3 הצעות קצרות (עד 6 מילים כל אחת) שקשורות **ישירות** למה שדיברנו עליו.

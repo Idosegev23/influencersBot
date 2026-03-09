@@ -17,6 +17,7 @@ import {
   ChevronDown,
   ChevronUp,
   Copy,
+  PenLine,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -81,6 +82,18 @@ interface DashboardStats {
   };
 }
 
+interface KnowledgeEntry {
+  id: string;
+  knowledge_type: string;
+  title: string;
+  content: string;
+  keywords: string[];
+  priority: number;
+  source_type: string;
+  is_active: boolean;
+  created_at: string;
+}
+
 interface PersonaData {
   greeting_message?: string;
   directives?: string;
@@ -118,6 +131,15 @@ const statusColors: Record<string, string> = {
   expired: 'var(--dash-text-3)',
 };
 
+const knowledgeTypeLabels: Record<string, string> = {
+  faq: 'שאלה נפוצה',
+  custom: 'מידע כללי',
+  product: 'מוצר',
+  coupon: 'קופון',
+  active_partnership: 'שיתוף פעולה',
+  manual: 'ידני',
+};
+
 function formatCurrency(amount: number): string {
   if (!amount) return '';
   return new Intl.NumberFormat('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 }).format(amount);
@@ -147,6 +169,12 @@ export default function BotContentPage({
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
   const [greetingMessage, setGreetingMessage] = useState('');
 
+  // Knowledge entries (manual)
+  const [knowledgeEntries, setKnowledgeEntries] = useState<KnowledgeEntry[]>([]);
+  const [newEntry, setNewEntry] = useState({ knowledge_type: 'faq', title: '', content: '' });
+  const [addingEntry, setAddingEntry] = useState(false);
+  const [deletingEntryId, setDeletingEntryId] = useState<string | null>(null);
+
   // Collapsible sections
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     topics: true,
@@ -154,6 +182,7 @@ export default function BotContentPage({
     partnerships: false,
     config: true,
     knowledge: false,
+    manualKnowledge: true,
   });
 
   useEffect(() => {
@@ -173,10 +202,11 @@ export default function BotContentPage({
         return;
       }
 
-      // 2. Load both APIs in parallel
-      const [statsRes, personaRes] = await Promise.all([
+      // 2. Load all APIs in parallel
+      const [statsRes, personaRes, knowledgeRes] = await Promise.all([
         fetch(`/api/influencer/dashboard-stats?username=${username}`),
         fetch(`/api/influencer/chatbot/persona?username=${username}`),
+        fetch(`/api/influencer/chatbot/knowledge?username=${username}`),
       ]);
 
       if (!statsRes.ok) {
@@ -193,6 +223,12 @@ export default function BotContentPage({
         personaData = pBody.persona || null;
       }
       setPersona(personaData);
+
+      // Load knowledge entries
+      if (knowledgeRes.ok) {
+        const kBody = await knowledgeRes.json();
+        setKnowledgeEntries(kBody.knowledge || []);
+      }
 
       // Populate editable fields from persona
       setGreetingMessage(personaData?.greeting_message || '');
@@ -256,6 +292,58 @@ export default function BotContentPage({
 
   const handleDeleteQuestion = (index: number) => {
     setSuggestedQuestions(suggestedQuestions.filter((_, i) => i !== index));
+  };
+
+  /* ---- knowledge CRUD ---- */
+
+  const handleAddKnowledgeEntry = async () => {
+    if (!newEntry.title.trim() || !newEntry.content.trim()) {
+      alert('יש למלא כותרת ותוכן');
+      return;
+    }
+    setAddingEntry(true);
+    try {
+      const res = await fetch(`/api/influencer/chatbot/knowledge?username=${username}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          knowledge_type: newEntry.knowledge_type,
+          title: newEntry.title,
+          content: newEntry.content,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setKnowledgeEntries((prev) => [data.knowledge, ...prev]);
+        setNewEntry({ knowledge_type: 'faq', title: '', content: '' });
+      } else {
+        alert('שגיאה בהוספת תוכן');
+      }
+    } catch {
+      alert('שגיאה בהוספת תוכן');
+    } finally {
+      setAddingEntry(false);
+    }
+  };
+
+  const handleDeleteKnowledgeEntry = async (entryId: string) => {
+    if (!confirm('למחוק את הערך הזה?')) return;
+    setDeletingEntryId(entryId);
+    try {
+      const res = await fetch(
+        `/api/influencer/chatbot/knowledge?username=${username}&id=${entryId}`,
+        { method: 'DELETE' }
+      );
+      if (res.ok) {
+        setKnowledgeEntries((prev) => prev.filter((e) => e.id !== entryId));
+      } else {
+        alert('שגיאה במחיקה');
+      }
+    } catch {
+      alert('שגיאה במחיקה');
+    } finally {
+      setDeletingEntryId(null);
+    }
   };
 
   /* ---- UI helpers ---- */
@@ -685,6 +773,154 @@ export default function BotContentPage({
 
           <p className="text-xs mt-4" style={{ color: 'var(--dash-text-3)' }}>
             הבוט משתמש בכל המידע הזה כדי לענות על שאלות: פוסטים מאינסטגרם, מסמכים שהועלו, שיתופי פעולה, קופונים ועוד.
+          </p>
+        </CollapsibleSection>
+
+        {/* ========== MANUAL KNOWLEDGE ========== */}
+        <CollapsibleSection
+          title="הוספת תוכן ידני"
+          count={knowledgeEntries.length}
+          icon={<PenLine className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />}
+          expanded={expandedSections.manualKnowledge}
+          onToggle={() => toggleSection('manualKnowledge')}
+        >
+          {/* Add form */}
+          <div
+            className="p-4 rounded-xl mb-4"
+            style={{ background: 'var(--dash-surface-hover)' }}
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--dash-text-2)' }}>
+                  סוג
+                </label>
+                <select
+                  value={newEntry.knowledge_type}
+                  onChange={(e) => setNewEntry({ ...newEntry, knowledge_type: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2"
+                  style={{
+                    background: 'var(--dash-surface)',
+                    border: '1px solid var(--dash-border)',
+                    color: 'var(--dash-text)',
+                  }}
+                >
+                  <option value="faq">שאלה נפוצה (FAQ)</option>
+                  <option value="custom">מידע כללי</option>
+                  <option value="product">מוצר</option>
+                  <option value="coupon">קופון</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--dash-text-2)' }}>
+                  כותרת
+                </label>
+                <input
+                  type="text"
+                  value={newEntry.title}
+                  onChange={(e) => setNewEntry({ ...newEntry, title: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2"
+                  style={{
+                    background: 'var(--dash-surface)',
+                    border: '1px solid var(--dash-border)',
+                    color: 'var(--dash-text)',
+                  }}
+                  placeholder="לדוגמה: מהן שעות הפעילות?"
+                />
+              </div>
+            </div>
+            <div className="mb-3">
+              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--dash-text-2)' }}>
+                תוכן
+              </label>
+              <textarea
+                value={newEntry.content}
+                onChange={(e) => setNewEntry({ ...newEntry, content: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2"
+                style={{
+                  background: 'var(--dash-surface)',
+                  border: '1px solid var(--dash-border)',
+                  color: 'var(--dash-text)',
+                }}
+                rows={3}
+                placeholder="התשובה או המידע שהבוט ישתמש בו..."
+              />
+            </div>
+            <button
+              onClick={handleAddKnowledgeEntry}
+              disabled={addingEntry}
+              className="px-4 py-2 text-sm rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
+              style={{ background: 'var(--color-primary)', color: 'white' }}
+            >
+              {addingEntry ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Plus className="w-4 h-4" />
+              )}
+              הוסף לידע הבוט
+            </button>
+          </div>
+
+          {/* Existing entries list */}
+          {knowledgeEntries.length === 0 ? (
+            <p className="text-sm text-center py-6" style={{ color: 'var(--dash-text-2)' }}>
+              עדיין לא הוספת תוכן ידני. הבוט ישתמש רק במידע שנאסף אוטומטית.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {knowledgeEntries.map((entry) => (
+                <div
+                  key={entry.id}
+                  className="flex items-start justify-between p-4 rounded-xl gap-3"
+                  style={{ background: 'var(--dash-surface-hover)' }}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className="text-sm font-medium" style={{ color: 'var(--dash-text)' }}>
+                        {entry.title}
+                      </span>
+                      <span
+                        className="px-2 py-0.5 rounded-full text-[10px] font-medium"
+                        style={{
+                          background: 'rgba(168,85,247,0.12)',
+                          color: 'var(--color-primary)',
+                        }}
+                      >
+                        {knowledgeTypeLabels[entry.knowledge_type] || entry.knowledge_type}
+                      </span>
+                      {entry.source_type === 'manual' && (
+                        <span
+                          className="px-2 py-0.5 rounded-full text-[10px]"
+                          style={{ background: 'rgba(59,130,246,0.12)', color: 'var(--color-info)' }}
+                        >
+                          ידני
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs mt-1 line-clamp-2" style={{ color: 'var(--dash-text-2)' }}>
+                      {entry.content}
+                    </p>
+                  </div>
+                  {entry.source_type === 'manual' && (
+                    <button
+                      onClick={() => handleDeleteKnowledgeEntry(entry.id)}
+                      disabled={deletingEntryId === entry.id}
+                      className="p-2 rounded-lg transition-colors shrink-0"
+                      style={{ color: 'var(--dash-negative)' }}
+                    >
+                      {deletingEntryId === entry.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <p className="text-xs mt-4" style={{ color: 'var(--dash-text-3)' }}>
+            תוכן ידני שתוסיף יהיה זמין לבוט ישירות. הוא יופיע בתשובות כשמישהו ישאל שאלה רלוונטית.
           </p>
         </CollapsibleSection>
 
