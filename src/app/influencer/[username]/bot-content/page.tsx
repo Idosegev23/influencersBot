@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   Plus,
   Save,
@@ -18,6 +19,7 @@ import {
   ChevronUp,
   Copy,
   PenLine,
+  Upload,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -771,9 +773,19 @@ export default function BotContentPage({
             </div>
           )}
 
-          <p className="text-xs mt-4" style={{ color: 'var(--dash-text-3)' }}>
-            הבוט משתמש בכל המידע הזה כדי לענות על שאלות: פוסטים מאינסטגרם, מסמכים שהועלו, שיתופי פעולה, קופונים ועוד.
-          </p>
+          <div className="flex items-center justify-between mt-4">
+            <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
+              הבוט משתמש בכל המידע הזה כדי לענות על שאלות: פוסטים מאינסטגרם, מסמכים שהועלו, שיתופי פעולה, קופונים ועוד.
+            </p>
+            <Link
+              href={`/influencer/${username}/documents/upload`}
+              className="shrink-0 px-4 py-2 text-sm rounded-lg font-medium transition-colors flex items-center gap-2"
+              style={{ background: 'var(--color-primary)', color: 'white' }}
+            >
+              <Upload className="w-4 h-4" />
+              העלאת מסמך
+            </Link>
+          </div>
         </CollapsibleSection>
 
         {/* ========== MANUAL KNOWLEDGE ========== */}
