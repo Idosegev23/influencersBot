@@ -258,24 +258,43 @@ export async function streamChatWithGemini(input: {
 function buildSystemInstructions(persona: any): string {
   const instructions = [];
 
-  // Base identity - use new structure if available
+  // Base identity - use voice_rules.identity (v2) or fallback
   if (persona.voice_rules?.identity?.who) {
     instructions.push(`אתה ${persona.voice_rules.identity.who}`);
   } else {
     instructions.push(`אתה ${persona.name || 'המשפיען/ית'}.`);
   }
-  
+
   // Enhanced voice and tone from voice_rules
   if (persona.voice_rules) {
     instructions.push(`\n🎭 סגנון דיבור ותשובה:`);
-    instructions.push(`- טון: ${persona.voice_rules.tone}`);
+    instructions.push(`- טון ראשי: ${persona.voice_rules.tone}`);
+
+    // v2: secondary tones
+    if (persona.voice_rules.toneSecondary?.length > 0) {
+      instructions.push(`- טונים משניים: ${persona.voice_rules.toneSecondary.join(', ')}`);
+    }
+
     instructions.push(`- מבנה תשובה: ${persona.voice_rules.responseStructure}`);
     instructions.push(`- אורך ממוצע: ${persona.voice_rules.avgLength}`);
-    
+
+    // v2: answer examples
+    if (persona.voice_rules.answerExamples?.length > 0) {
+      instructions.push(`- דוגמאות תבנית: ${persona.voice_rules.answerExamples.slice(0, 2).join(' | ')}`);
+    }
+
+    // v2: first person usage
+    if (typeof persona.voice_rules.firstPerson === 'string') {
+      instructions.push(`- גוף דיבור: ${persona.voice_rules.firstPerson}`);
+    }
+    if (persona.voice_rules.firstPersonExamples?.length > 0) {
+      instructions.push(`- דוגמאות: "${persona.voice_rules.firstPersonExamples.slice(0, 3).join('", "')}"`);
+    }
+
     if (persona.voice_rules.recurringPhrases?.length > 0) {
       instructions.push(`- ביטויים מאפיינים: ${persona.voice_rules.recurringPhrases.slice(0, 5).join(', ')}`);
     }
-    
+
     if (persona.voice_rules.avoidedWords?.length > 0) {
       instructions.push(`- מילים להימנע מהן: ${persona.voice_rules.avoidedWords.slice(0, 5).join(', ')}`);
     }
@@ -331,6 +350,11 @@ function buildSystemInstructions(persona: any): string {
     
     if (persona.response_policy.refuse?.length > 0) {
       instructions.push(`- סרב לענות על: ${persona.response_policy.refuse.slice(0, 3).join(', ')}`);
+    }
+
+    // v2: refusal style
+    if (persona.response_policy.refusalStyle) {
+      instructions.push(`- סגנון סירוב: ${persona.response_policy.refusalStyle}`);
     }
   }
 

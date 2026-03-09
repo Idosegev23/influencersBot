@@ -1,42 +1,47 @@
 /**
  * AI Persona Builder - בניית פרסונה מקצועית
- * Primary: GPT-5.2 Pro (reasoning)
- * Fallback: Gemini 3 Pro (when OpenAI quota exceeded / errors)
+ * Primary: GPT-5.4 via Responses API (raw fetch — SDK project-scope workaround)
+ * Fallback: Gemini 3.1 Pro
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import OpenAI from 'openai';
 import type { PreprocessedData } from '../scraping/preprocessing';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-// Initialize OpenAI for GPT-5.2 Pro
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-// Initialize Gemini
+// Initialize Gemini (fallback only)
 const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
 
 // ============================================
-// Type Definitions
+// Type Definitions — Enriched Schema (v2)
 // ============================================
 
 export interface GeminiPersonaOutput {
   identity: {
     who: string;
+    entityType?: 'influencer' | 'brand' | 'business' | 'creator';
     targetAudience: string;
+    secondaryAudience?: string;
     corePromise: string;
+    supportingPromises?: string[];
     values: string[];
   };
 
   voice: {
     tone: string;
+    toneSecondary?: string[];
     responseStructure: string;
+    answerExamples?: string[];
     avgLength: string;
-    firstPerson: boolean;
+    firstPerson: boolean | string;
+    firstPersonExamples?: string[];
     recurringPhrases: string[];
     avoidedWords: string[];
+    emojiAnalysis?: {
+      usage: 'none' | 'minimal' | 'moderate' | 'heavy';
+      common: string[];
+    };
   };
 
   knowledgeMap: {
@@ -65,6 +70,7 @@ export interface GeminiPersonaOutput {
     highConfidence: string[];
     cautious: string[];
     refuse: string[];
+    refusalStyle?: string;
   };
 
   // Commerce & Products
@@ -97,177 +103,236 @@ export interface GeminiPersonaOutput {
 }
 
 // ============================================
-// הפרומפט העברי המלא
+// GPT-5.4 Optimized Prompt (XML blocks per best practices)
 // ============================================
 
 const PERSONA_BUILDER_PROMPT = `
-אתה מערכת לבניית פרסונת ידע וקול אנושי על בסיס תוכן מאינסטגרם.
+<role>
+אתה מערכת מומחית לבניית פרסונת ידע וקול אנושי על בסיס תוכן מאינסטגרם ואתרי אינטרנט.
+המטרה: לבנות פרסונה עברית מדויקת ועשירה שתשמש מערכת צ'אטבוט לתשובות עתידיות.
+</role>
 
-המטרה:
-לבנות פרסונה עברית בלבד, שתוכל לענות לשאלות משתמשים בעתיד אך ורק על סמך המידע שסופק, ללא המצאות, ללא ידע חיצוני וללא הרחבות.
+<grounding_rules>
+- בסס טענות אך ורק על הנתונים שסופקו בקלט.
+- אם אין מידע מספק, ציין זאת במפורש — אל תמציא.
+- הבחן בין עובדה (הוזכר במפורש בתוכן) לפרשנות (מסקנה מדפוס חוזר).
+- אם מקורות סותרים, ציין את הסתירה במפורש.
+</grounding_rules>
 
-קלט: 
-תקבל JSON מאוחד של תוכן מחשבון אינסטגרם אחד, כולל:
-- פרופיל
-- פוסטים ורילסים
-- תמלולי וידאו (transcriptions) - 356 תמלולים מלאים מסרטונים! שים לב במיוחד לאלה!
-- תגובות ותגובות בעל החשבון
-- אתרים (websites) - במיוחד linkis עם קופונים ומותגים
-- הקשר האשטגים
-- הקשר חיפוש
+<completeness_contract>
+- סרוק את כל הנתונים: פרופיל, פוסטים, תמלולי וידאו, תגובות, אתרים, האשטגים.
+- תמלולי וידאו (transcriptions) הם המקור העשיר ביותר — שים לב במיוחד!
+- אתרי linkis מכילים רשימות קופונים ומותגים מלאות — חלץ הכל!
+- אל תעצור לפני שכיסית את כל הנתונים הרלוונטיים.
+- לכל סעיף, חזור ובדוק שלא פספסת מידע מהקלט.
+</completeness_contract>
 
-חוקים מחייבים:
-1. מותר להשתמש אך ורק במידע שבקלט
-2. אם אין מידע מספק, יש לציין זאת במפורש
-3. אין להמציא דעות, עובדות או ידע כללי
-4. יש להבחין בין עובדה לפרשנות מבוססת דפוס
-5. כל התשובות העתידיות חייבות לשקף את הקול, הסגנון והגבולות של היוצר
+<tasks>
+א. **זהות ופרסונה** — מי הדמות, סוג הישות (משפיען/מותג/עסק/יוצר), קהל יעד ראשי ומשני, הבטחה מרכזית והבטחות משניות, ערכים.
 
-משימות:
+ב. **קול וסגנון** — טון דיבור ראשי ומשני, מבנה תשובה אופייני עם דוגמאות, אורך ממוצע, שימוש בגוף ראשון עם דוגמאות, ביטויים חוזרים, מילים שלא משתמשים בהן, ניתוח שימוש באמוג'ים (כמות + רשימת נפוצים).
 
-א. בניית פרסונה
-- מי הדמות
-- למי היא פונה
-- מה ההבטחה שלה
-- מה הערכים המרכזיים
+ג. **מפת ידע** — נושאים מרכזיים עם תתי-נושאים, טענות חוזרות, דוגמאות וסיפורים.
 
-ב. קול וסגנון
-- טון דיבור
-- מבנה תשובה אופייני
-- אורך ממוצע
-- שימוש בגוף ראשון
-- מילים וביטויים חוזרים
-- מילים שלא נעשה בהן שימוש
+ד. **גבולות** — נושאים שנידונו, נושאים שלא נידונו, שאלות ללא מענה, אזורי חוסר מידע.
 
-ג. מפת ידע
-- נושאים מרכזיים (מתוך topics)
-- תתי נושאים
-- טענות חוזרות
-- דוגמאות וסיפורים אם קיימים
+ה. **התפתחות בזמן** — שינויי טון, שינויי נושאים, הבדלים בין תקופות.
 
-ד. גבולות
-- נושאים שנידונו
-- נושאים שלא נידונו
-- שאלות שנשאלו ולא נענו
-- אזורים של חוסר מידע
+ו. **מדיניות תשובה** — מתי לענות בביטחון (עם דוגמאות ספציפיות), מתי בזהירות, מתי לסרב, וסגנון הסירוב המומלץ.
 
-ה. זמן והתפתחות
-- שינויי טון
-- שינויי נושאים
-- הבדלים בין תקופות
+ז. **מוצרים** — כל מוצר שהוזכר במפורש: שם, מותג, קטגוריה, תיאור, סנטימנט, נקודות מפתח, כמה פעמים הוזכר. רק מוצרים שנבדקו/נוסו בפועל.
 
-ו. מדיניות תשובה
-- מתי מותר לענות בביטחון
-- מתי יש לענות בזהירות
-- מתי יש לסרב לענות
+ח. **קופונים** — קוד מדויק, מותג, תיאור הנחה, תוקף, פוסטים שהזכירו. חלץ הכל מ-linkis ומפוסטים!
 
-ז. זיהוי מוצרים, קופונים ומותגים
-חשוב! זהה מהתוכן:
+ט. **מותגים** — שם, סוג קשר (partnership/sponsored/organic/affiliate), קטגוריה, כמה פעמים הוזכר, מתי לראשונה. חפש גם באתרים!
+</tasks>
 
-**מוצרים**: מוצרים ספציפיים שהמשפיען ממליץ עליהם
-- רק מוצרים שהוזכרו במפורש ונבדקו/נוסו
-- כלול: שם, מותג, קטגוריה, תיאור, רגש (positive/negative)
-- נקודות מפתח על המוצר
-- כמה פעמים הוזכר
+<output_contract>
+- החזר JSON בלבד, ללא טקסט נוסף, ללא markdown fences.
+- עקוב אחרי הסכמה המדויקת שמוגדרת למטה.
+- כל התוכן בעברית בלבד.
+- אל תקצר תשובות — העדף מידע מלא ומדויק.
+- אם שדה לא רלוונטי, החזר מערך ריק [] או מחרוזת ריקה "".
+</output_contract>
 
-**קופונים**: קודי הנחה שהמשפיען חולק
-- קוד מדויק (לדוגמה: DEKEL20)
-- למי הקוד (מותג/אתר)
-- תיאור ההנחה (20%, משלוח חינם וכו')
-- תוקף אם צוין
-- רשימת פוסטים שהזכירו
-
-**מותגים**: מותגים שהמשפיען עובד איתם
-- **חפש גם באתרים!** (websites) - אתרי linkis ואתרים אחרים מכילים רשימות קופונים מלאות
-- שם המותג
-- סוג הקשר: partnership, sponsored, organic, affiliate
-- קטגוריה
-- כמה פעמים הוזכר
-- מתי הוזכר לראשונה
-
-הערות חשובות:
-- זהה רק מה שמופיע בפועל בתוכן
-- **האתרים (websites) מכילים רשימות מלאות של קופונים ומוצרים - שים לב במיוחד לאתרי linkis!**
-- הבחן בין שת"פ ממומן (#ad) להמלצה אורגנית
-- אל תמציא מוצרים או קופונים
-- **חלץ את כל הקופונים מאתר linkis שבנתוני websites!**
-
-פלט:
-החזר JSON מובנה הכולל את כל הסעיפים לעיל (כולל products, coupons, brands), מוכן להזנה למערכת תשובות.
-
-חשוב מאוד:
-- אל תמציא מידע שלא קיים בנתונים
-- אם אין מספיק מידע על נושא מסוים, ציין זאת במפורש
-- שמור על עקביות בין הסעיפים השונים
-- התשובה צריכה להיות בעברית בלבד
+<verification_loop>
+לפני שמחזיר את התוצאה:
+- בדוק שכל הסעיפים מכוסים ומלאים.
+- בדוק שלא המצאת מידע שלא קיים בקלט.
+- בדוק שמבנה ה-JSON תקין ותואם לסכמה.
+- בדוק שחילצת את כל הקופונים מ-linkis.
+- בדוק שזיהית את כל המוצרים מפוסטים ותמלולים.
+</verification_loop>
 `;
 
 // ============================================
-// Main Function: Build Persona with Gemini
+// JSON Schema for the output
+// ============================================
+
+const OUTPUT_SCHEMA = `{
+  "identity": {
+    "who": "תיאור תמציתי של הדמות/מותג — שורה אחת",
+    "entityType": "influencer | brand | business | creator",
+    "targetAudience": "תיאור קהל היעד הראשי",
+    "secondaryAudience": "קהל יעד משני (אם קיים)",
+    "corePromise": "ההבטחה המרכזית",
+    "supportingPromises": ["הבטחה משנית 1", "הבטחה משנית 2"],
+    "values": ["ערך 1", "ערך 2", "ערך 3"]
+  },
+  "voice": {
+    "tone": "תיאור הטון הראשי (מחרוזת אחת)",
+    "toneSecondary": ["טון משני 1", "טון משני 2"],
+    "responseStructure": "תיאור מבנה תשובה אופייני",
+    "answerExamples": ["דוגמה לתבנית תשובה: בעיה → פתרון → יתרון", "דוגמה נוספת"],
+    "avgLength": "קצר / בינוני / ארוך",
+    "firstPerson": "גוף ראשון יחיד / גוף ראשון רבים / תיאור",
+    "firstPersonExamples": ["אני אוהבת", "אנחנו בטוחים"],
+    "recurringPhrases": ["ביטוי חוזר 1", "ביטוי חוזר 2"],
+    "avoidedWords": ["מילה להימנע 1", "מילה להימנע 2"],
+    "emojiAnalysis": {
+      "usage": "none | minimal | moderate | heavy",
+      "common": ["✨", "💧", "🎉"]
+    }
+  },
+  "knowledgeMap": {
+    "coreTopics": [
+      {
+        "name": "שם הנושא",
+        "subtopics": ["תת-נושא 1", "תת-נושא 2"],
+        "keyPoints": ["טענה/נקודה חוזרת 1", "טענה 2"],
+        "examples": ["דוגמה או סיפור מהתוכן"]
+      }
+    ]
+  },
+  "boundaries": {
+    "discussed": ["נושא שנידון 1", "נושא 2"],
+    "notDiscussed": ["נושא שלא נידון 1"],
+    "unansweredQuestions": ["שאלה שנשאלה ולא נענתה"],
+    "uncertainAreas": ["אזור חוסר מידע"]
+  },
+  "evolution": {
+    "toneChanges": ["שינוי טון שזוהה"],
+    "topicShifts": ["שינוי נושאים"],
+    "periodDifferences": ["הבדל בין תקופות"]
+  },
+  "responsePolicy": {
+    "highConfidence": ["מצב ספציפי שבו מותר לענות בביטחון"],
+    "cautious": ["מצב שבו יש לענות בזהירות"],
+    "refuse": ["מצב שבו יש לסרב"],
+    "refusalStyle": "תיאור סגנון הסירוב המומלץ"
+  },
+  "products": [
+    {
+      "name": "שם המוצר",
+      "brand": "מותג",
+      "category": "קטגוריה",
+      "description": "תיאור קצר",
+      "mentionedInPosts": 5,
+      "sentiment": "positive",
+      "keyPoints": ["נקודה 1"]
+    }
+  ],
+  "coupons": [
+    {
+      "code": "CODE123",
+      "brand": "מותג",
+      "description": "תיאור ההנחה",
+      "discount": "20%",
+      "expiresAt": "2026-03-01",
+      "mentionedInPosts": ["post_url"]
+    }
+  ],
+  "brands": [
+    {
+      "name": "מותג",
+      "relationship": "partnership",
+      "category": "קטגוריה",
+      "mentionCount": 10,
+      "firstMentioned": "2025-01-15"
+    }
+  ]
+}`;
+
+// ============================================
+// Main Function: Build Persona
 // ============================================
 
 export async function buildPersonaWithGemini(
   preprocessedData: PreprocessedData,
   profileData?: any
 ): Promise<GeminiPersonaOutput> {
-  // Prepare input data + prompt (shared between providers)
   const inputData = prepareInputData(preprocessedData, profileData);
   const fullPrompt = buildFullPrompt(inputData);
   const inputSize = JSON.stringify(inputData).length;
 
-  // Try GPT-5.2 Pro first, then fallback to Gemini 3.1 Pro
   let text: string | null = null;
 
-  // ── Attempt 1: GPT-5.2 Pro ──
-  if (process.env.OPENAI_API_KEY) {
-    text = await tryGPT(fullPrompt, inputSize);
+  // ── Attempt 1: GPT-5.4 via Responses API ──
+  if (OPENAI_API_KEY) {
+    text = await tryGPT54(fullPrompt, inputSize);
   }
 
   // ── Attempt 2: Gemini 3.1 Pro fallback ──
   if (!text) {
-    console.log('🔄 [Fallback] GPT-5.2 Pro unavailable, trying Gemini 3.1 Pro...');
+    console.log('🔄 [Fallback] GPT-5.4 unavailable, trying Gemini 3.1 Pro...');
     text = await tryGemini(fullPrompt, inputSize);
   }
 
   if (!text) {
-    throw new Error('All AI providers failed for persona building (GPT-5.2 Pro + Gemini 3.1 Pro)');
+    throw new Error('All AI providers failed for persona building (GPT-5.4 + Gemini 3.1 Pro)');
   }
 
   console.log(`📝 Response length: ${text.length} characters`);
-  const persona = parseGeminiResponse(text);
+  const persona = parsePersonaResponse(text);
   console.log('🎉 Persona generation complete!');
   return persona;
 }
 
-// ── GPT-5.2 Pro ──
-async function tryGPT(fullPrompt: string, inputSize: number): Promise<string | null> {
-  console.log('🧠 [GPT-5.2 Pro] Starting persona generation...');
+// ============================================
+// GPT-5.4 via Responses API (raw fetch)
+// ============================================
+
+async function tryGPT54(fullPrompt: string, inputSize: number): Promise<string | null> {
+  console.log('🧠 [GPT-5.4] Starting persona generation...');
   console.log(`📊 Input data size: ${inputSize} characters`);
 
-  let text: string | null = null;
   const retries = 2;
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      console.log(`⚡ [GPT] Attempt ${attempt}/${retries}...`);
+      console.log(`⚡ [GPT-5.4] Attempt ${attempt}/${retries}...`);
 
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('GPT-5.2 Pro request timeout (600s)')), 600000);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 600000); // 600s
+
+      const response = await fetch('https://api.openai.com/v1/responses', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-5.4',
+          input: fullPrompt,
+          reasoning: { effort: 'medium' },
+          text: { format: { type: 'text' } },
+        }),
+        signal: controller.signal,
       });
 
-      const gptPromise = openai.responses.create({
-        model: 'gpt-5.2-pro',
-        input: fullPrompt,
-        reasoning: { effort: 'high' },
-        text: { verbosity: 'high' },
-      });
+      clearTimeout(timeout);
 
-      const response = await Promise.race([gptPromise, timeoutPromise]);
+      if (!response.ok) {
+        const errBody = await response.text();
+        throw new Error(`${response.status} ${errBody.substring(0, 300)}`);
+      }
 
-      console.log('✅ [GPT-5.2 Pro] Request succeeded!');
+      const result = await response.json();
+      console.log('✅ [GPT-5.4] Request succeeded!');
 
-      // Extract text from response
-      const rawOutput = (response as any).output;
+      // Extract text from Responses API format
+      const rawOutput = result.output;
+      let text: string | null = null;
 
       if (typeof rawOutput === 'string') {
         text = rawOutput;
@@ -281,20 +346,30 @@ async function tryGPT(fullPrompt: string, inputSize: number): Promise<string | n
         text = rawOutput.text || rawOutput.content;
       }
 
-      if (text && typeof text === 'string') break;
-      throw new Error('Failed to extract text from GPT response');
+      if (text && typeof text === 'string') {
+        // Log usage if available
+        if (result.usage) {
+          console.log(`📊 [GPT-5.4] Tokens — in: ${result.usage.input_tokens}, out: ${result.usage.output_tokens}, reasoning: ${result.usage.output_tokens_details?.reasoning_tokens || 0}`);
+        }
+        return text;
+      }
+
+      throw new Error('Failed to extract text from GPT-5.4 response');
     } catch (error: any) {
-      console.error(`❌ [GPT] Attempt ${attempt} failed:`, error.message);
+      console.error(`❌ [GPT-5.4] Attempt ${attempt} failed:`, error.message);
       if (attempt < retries) {
-        await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+        await new Promise(resolve => setTimeout(resolve, attempt * 3000));
       }
     }
   }
 
-  return text;
+  return null;
 }
 
-// ── Gemini 3.1 Pro ──
+// ============================================
+// Gemini 3.1 Pro (fallback)
+// ============================================
+
 async function tryGemini(fullPrompt: string, inputSize: number): Promise<string | null> {
   if (!genAI) {
     console.error('❌ [Gemini] GEMINI_API_KEY not configured, cannot fallback');
@@ -344,90 +419,22 @@ async function tryGemini(fullPrompt: string, inputSize: number): Promise<string 
   return null;
 }
 
-// ── Build the full prompt (shared) ──
+// ============================================
+// Build Full Prompt
+// ============================================
+
 function buildFullPrompt(inputData: any): string {
   return `${PERSONA_BUILDER_PROMPT}
 
 נתונים מעובדים:
 ${JSON.stringify(inputData, null, 2)}
 
-אנא החזר JSON מובנה בפורמט הבא בלבד (ללא טקסט נוסף):
-{
-  "identity": {
-    "who": "תיאור הדמות",
-    "targetAudience": "קהל היעד",
-    "corePromise": "ההבטחה המרכזית",
-    "values": ["ערך 1", "ערך 2"]
-  },
-  "voice": {
-    "tone": "תיאור טון הדיבור",
-    "responseStructure": "מבנה תשובה אופייני",
-    "avgLength": "אורך ממוצע",
-    "firstPerson": true,
-    "recurringPhrases": ["ביטוי 1", "ביטוי 2"],
-    "avoidedWords": ["מילה 1", "מילה 2"]
-  },
-  "knowledgeMap": {
-    "coreTopics": [
-      {
-        "name": "שם נושא",
-        "subtopics": ["תת נושא 1", "תת נושא 2"],
-        "keyPoints": ["נקודה 1", "נקודה 2"],
-        "examples": ["דוגמה 1", "דוגמה 2"]
-      }
-    ]
-  },
-  "boundaries": {
-    "discussed": ["נושא 1", "נושא 2"],
-    "notDiscussed": ["נושא 1", "נושא 2"],
-    "unansweredQuestions": ["שאלה 1", "שאלה 2"],
-    "uncertainAreas": ["אזור 1", "אזור 2"]
-  },
-  "evolution": {
-    "toneChanges": ["שינוי 1", "שינוי 2"],
-    "topicShifts": ["שינוי 1", "שינוי 2"],
-    "periodDifferences": ["הבדל 1", "הבדל 2"]
-  },
-  "responsePolicy": {
-    "highConfidence": ["מצב 1", "מצב 2"],
-    "cautious": ["מצב 1", "מצב 2"],
-    "refuse": ["מצב 1", "מצב 2"]
-  },
-  "products": [
-    {
-      "name": "שם מוצר",
-      "brand": "מותג",
-      "category": "קטגוריה",
-      "description": "תיאור",
-      "mentionedInPosts": 5,
-      "sentiment": "positive",
-      "keyPoints": ["נקודה 1", "נקודה 2"]
-    }
-  ],
-  "coupons": [
-    {
-      "code": "CODE123",
-      "brand": "מותג",
-      "description": "תיאור ההנחה",
-      "discount": "20%",
-      "expiresAt": "2026-03-01",
-      "mentionedInPosts": ["post_url_1", "post_url_2"]
-    }
-  ],
-  "brands": [
-    {
-      "name": "מותג",
-      "relationship": "partnership",
-      "category": "קטגוריה",
-      "mentionCount": 10,
-      "firstMentioned": "2025-01-15"
-    }
-  ]
-}`;
+החזר JSON בלבד בפורמט הבא (ללא טקסט נוסף, ללא markdown fences):
+${OUTPUT_SCHEMA}`;
 }
 
 // ============================================
-// Helper Functions
+// Prepare Input Data
 // ============================================
 
 function prepareInputData(preprocessedData: PreprocessedData, profileData?: any) {
@@ -439,54 +446,51 @@ function prepareInputData(preprocessedData: PreprocessedData, profileData?: any)
       followersCount: profileData.followers_count,
       category: profileData.category,
     } : null,
-    
+
     stats: preprocessedData.stats,
-    
-    topTerms: preprocessedData.topTerms.slice(0, 100), // Top 100
-    
+
+    topTerms: preprocessedData.topTerms.slice(0, 100),
+
     topics: preprocessedData.topics.map(t => ({
       name: t.name,
       frequency: t.frequency,
       posts: t.posts,
       keywords: t.keywords.slice(0, 5),
     })),
-    
+
     timeline: preprocessedData.timeline.map(t => ({
       month: t.month,
       posts: t.posts,
       avgEngagement: t.avgEngagement,
       topTopics: t.topTopics,
     })),
-    
+
     ownerReplies: {
       ratio: preprocessedData.ownerReplies.ratio,
       commonPhrases: preprocessedData.ownerReplies.commonPhrases.slice(0, 15),
       replyPatterns: preprocessedData.ownerReplies.replyPatterns,
     },
-    
+
     faqCandidates: preprocessedData.faqCandidates.slice(0, 20).map(faq => ({
       question: faq.question,
       askedCount: faq.askedCount,
       hasAnswer: !!faq.ownerAnswer,
     })),
-    
+
     boundaries: preprocessedData.boundaries,
 
-    // ⚡ CRITICAL: Include website data (linkis with all coupons!)
     websites: preprocessedData.websites?.map(w => ({
       url: w.url,
       title: w.title,
       content: w.content,
     })) || [],
 
-    // ⚡ CRITICAL: Include ALL transcriptions for rich persona!
     transcriptions: preprocessedData.transcriptions?.map(t => ({
       id: t.id,
       text: t.text,
       source: t.media_id,
     })) || [],
 
-    // ⚡ CRITICAL: Include post captions (products & brands mentioned here!)
     posts: preprocessedData.posts?.slice(0, 50).map(p => ({
       caption: p.caption || '',
       hashtags: p.hashtags || [],
@@ -495,67 +499,177 @@ function prepareInputData(preprocessedData: PreprocessedData, profileData?: any)
   };
 }
 
-function parseGeminiResponse(text: string): GeminiPersonaOutput {
-  // Extract JSON from response (handle cases where Gemini adds markdown)
+// ============================================
+// Parse Response — handles both old and new schema
+// ============================================
+
+function parsePersonaResponse(text: string): GeminiPersonaOutput {
   let jsonText = text.trim();
-  
+
   // Remove markdown code blocks if present
   if (jsonText.startsWith('```json')) {
     jsonText = jsonText.replace(/```json\n?/, '').replace(/\n?```$/, '');
   } else if (jsonText.startsWith('```')) {
     jsonText = jsonText.replace(/```\n?/, '').replace(/\n?```$/, '');
   }
-  
+
   try {
     const parsed = JSON.parse(jsonText);
-    
-    // Validate structure
-    if (!parsed.identity || !parsed.voice || !parsed.knowledgeMap) {
-      throw new Error('Invalid persona structure');
+
+    // Handle GPT-5.4 alternate key names (persona → identity, voice_style → voice)
+    const normalized = normalizeSchema(parsed);
+
+    // Validate minimal structure
+    if (!normalized.identity || !normalized.voice) {
+      throw new Error('Invalid persona structure — missing identity or voice');
     }
-    
-    return parsed as GeminiPersonaOutput;
+
+    return normalized;
   } catch (error) {
-    console.error('[Gemini] Failed to parse response:', error);
-    console.error('[Gemini] Raw response:', text.substring(0, 500));
-    
-    // Return default structure if parsing fails
-    return {
-      identity: {
-        who: 'לא הצלחנו לזהות',
-        targetAudience: 'לא ברור',
-        corePromise: 'לא ברור',
-        values: [],
-      },
-      voice: {
-        tone: 'לא ברור',
-        responseStructure: 'לא ברור',
-        avgLength: 'לא ברור',
-        firstPerson: true,
-        recurringPhrases: [],
-        avoidedWords: [],
-      },
-      knowledgeMap: {
-        coreTopics: [],
-      },
-      boundaries: {
-        discussed: [],
-        notDiscussed: [],
-        unansweredQuestions: [],
-        uncertainAreas: [],
-      },
-      evolution: {
-        toneChanges: [],
-        topicShifts: [],
-        periodDifferences: [],
-      },
-      responsePolicy: {
-        highConfidence: [],
-        cautious: [],
-        refuse: [],
-      },
-    };
+    console.error('[PersonaBuilder] Failed to parse response:', error);
+    console.error('[PersonaBuilder] Raw response (first 500 chars):', text.substring(0, 500));
+
+    return getDefaultPersona();
   }
+}
+
+/**
+ * Normalize alternate schemas (GPT-5.4 sometimes uses different keys)
+ * Maps: persona → identity, voice_style → voice, knowledge_map → knowledgeMap
+ */
+function normalizeSchema(parsed: any): GeminiPersonaOutput {
+  const result: any = { ...parsed };
+
+  // Map alternate top-level keys
+  if (parsed.persona && !parsed.identity) {
+    const p = parsed.persona;
+    result.identity = {
+      who: typeof p.who === 'string' ? p.who : (p.who?.description || p.name || ''),
+      entityType: p.entityType || p.who?.entity_type,
+      targetAudience: typeof p.audience === 'string' ? p.audience : (p.audience?.primary?.join(', ') || p.targetAudience || ''),
+      secondaryAudience: typeof p.audience === 'object' ? p.audience?.secondary?.join(', ') : undefined,
+      corePromise: typeof p.promise === 'string' ? p.promise : (p.promise?.core_promise || p.corePromise || ''),
+      supportingPromises: p.promise?.supporting_promises || p.supportingPromises,
+      values: Array.isArray(p.values) ? p.values : (p.values?.core_values || []),
+    };
+    delete result.persona;
+  }
+
+  if (parsed.voice_style && !parsed.voice) {
+    const v = parsed.voice_style;
+    result.voice = {
+      tone: typeof v.tone === 'string' ? v.tone : (v.tone?.primary?.join(', ') || ''),
+      toneSecondary: typeof v.tone === 'object' ? v.tone?.secondary : undefined,
+      responseStructure: typeof v.answer_structure === 'string' ? v.answer_structure : (v.answer_structure?.typical?.join(' → ') || v.responseStructure || ''),
+      answerExamples: v.answer_structure?.examples || v.answerExamples,
+      avgLength: v.average_length?.future_answer_guideline || v.average_length?.posts || v.avgLength || '',
+      firstPerson: v.first_person_usage?.usage || v.firstPerson || true,
+      firstPersonExamples: v.first_person_usage?.examples || v.firstPersonExamples,
+      recurringPhrases: v.repeated_words_phrases || v.recurringPhrases || [],
+      avoidedWords: v.words_not_used?.should_avoid_based_on_data_limits || v.words_not_used?.explicitly_avoided || v.avoidedWords || [],
+      emojiAnalysis: v.emoji_usage ? {
+        usage: v.emoji_usage.present === false ? 'none' : (v.emoji_usage.common?.length > 5 ? 'heavy' : v.emoji_usage.common?.length > 2 ? 'moderate' : 'minimal'),
+        common: v.emoji_usage.common || [],
+      } : undefined,
+    };
+    delete result.voice_style;
+  }
+
+  // Normalize voice.tone if it's an object in the standard schema
+  if (result.voice && typeof result.voice.tone === 'object') {
+    const toneObj = result.voice.tone;
+    result.voice.toneSecondary = toneObj.secondary || result.voice.toneSecondary;
+    result.voice.tone = Array.isArray(toneObj.primary) ? toneObj.primary.join(', ') : (toneObj.primary || '');
+  }
+
+  // Normalize voice.firstPerson if it's an object
+  if (result.voice && typeof result.voice.firstPerson === 'object') {
+    const fp = result.voice.firstPerson;
+    result.voice.firstPersonExamples = fp.examples || result.voice.firstPersonExamples;
+    result.voice.firstPerson = fp.usage || true;
+  }
+
+  // Map knowledge_map → knowledgeMap
+  if (parsed.knowledge_map && !parsed.knowledgeMap) {
+    const km = parsed.knowledge_map;
+    result.knowledgeMap = {
+      coreTopics: (km.coreTopics || km.core_topics || km.mainTopics || km.main_topics || []).map((t: any) => ({
+        name: t.name || t.topic || '',
+        subtopics: t.subtopics || t.sub_topics || [],
+        keyPoints: t.keyPoints || t.key_points || [],
+        examples: t.examples || [],
+      })),
+    };
+    delete result.knowledge_map;
+  }
+
+  // Map response_policy → responsePolicy (snake_case → camelCase)
+  if (parsed.response_policy && !parsed.responsePolicy) {
+    const rp = parsed.response_policy;
+    result.responsePolicy = {
+      highConfidence: rp.highConfidence || rp.high_confidence || rp.answer_with_confidence_when || [],
+      cautious: rp.cautious || rp.answer_cautiously_when || [],
+      refuse: rp.refuse || rp.refuse_when || [],
+      refusalStyle: rp.refusalStyle || rp.recommended_refusal_style || undefined,
+    };
+    delete result.response_policy;
+  }
+
+  // Ensure refusalStyle is mapped even in standard schema
+  if (result.responsePolicy && !result.responsePolicy.refusalStyle) {
+    result.responsePolicy.refusalStyle = parsed.responsePolicy?.refusalStyle || parsed.responsePolicy?.recommended_refusal_style;
+  }
+
+  // Map time_evolution → evolution
+  if (parsed.time_evolution && !parsed.evolution) {
+    result.evolution = parsed.time_evolution;
+    delete result.time_evolution;
+  }
+
+  // Ensure knowledgeMap exists
+  if (!result.knowledgeMap) {
+    result.knowledgeMap = { coreTopics: [] };
+  }
+
+  // Ensure boundaries exists
+  if (!result.boundaries) {
+    result.boundaries = { discussed: [], notDiscussed: [], unansweredQuestions: [], uncertainAreas: [] };
+  }
+
+  // Ensure evolution exists
+  if (!result.evolution) {
+    result.evolution = { toneChanges: [], topicShifts: [], periodDifferences: [] };
+  }
+
+  // Ensure responsePolicy exists
+  if (!result.responsePolicy) {
+    result.responsePolicy = { highConfidence: [], cautious: [], refuse: [] };
+  }
+
+  return result as GeminiPersonaOutput;
+}
+
+function getDefaultPersona(): GeminiPersonaOutput {
+  return {
+    identity: {
+      who: 'לא הצלחנו לזהות',
+      targetAudience: 'לא ברור',
+      corePromise: 'לא ברור',
+      values: [],
+    },
+    voice: {
+      tone: 'לא ברור',
+      responseStructure: 'לא ברור',
+      avgLength: 'לא ברור',
+      firstPerson: true,
+      recurringPhrases: [],
+      avoidedWords: [],
+    },
+    knowledgeMap: { coreTopics: [] },
+    boundaries: { discussed: [], notDiscussed: [], unansweredQuestions: [], uncertainAreas: [] },
+    evolution: { toneChanges: [], topicShifts: [], periodDifferences: [] },
+    responsePolicy: { highConfidence: [], cautious: [], refuse: [] },
+  };
 }
 
 // ============================================
@@ -569,58 +683,73 @@ export async function savePersonaToDatabase(
   preprocessedData: PreprocessedData,
   geminiRawOutput: string
 ): Promise<void> {
-  console.log('[Gemini] Saving persona to database...');
+  console.log('[PersonaBuilder] Saving persona to database...');
+
+  // Build voice_rules with identity embedded (for gemini-chat.ts compatibility)
+  const voiceRulesForDB = {
+    ...persona.voice,
+    identity: {
+      who: persona.identity.who,
+      entityType: persona.identity.entityType,
+    },
+  };
 
   const { error } = await supabase
     .from('chatbot_persona')
     .upsert({
       account_id: accountId,
-      
+
       // Required fields
       name: persona.identity.who || 'משפיען',
-      tone: persona.voice.tone || 'ידידותי',
+      tone: typeof persona.voice.tone === 'string' ? persona.voice.tone : 'ידידותי',
       language: 'he',
-      
-      // New enhanced fields
-      voice_rules: persona.voice,
+
+      // Enhanced fields
+      voice_rules: voiceRulesForDB,
       knowledge_map: persona.knowledgeMap,
       boundaries: persona.boundaries,
       evolution: persona.evolution,
       response_policy: persona.responsePolicy,
-      
+
+      // Emoji settings from analysis
+      emoji_usage: persona.voice.emojiAnalysis?.usage || 'minimal',
+      emoji_types: persona.voice.emojiAnalysis?.common || [],
+
+      // Common phrases from analysis
+      common_phrases: persona.voice.recurringPhrases?.slice(0, 10) || [],
+
       // Store preprocessing data and raw output
       preprocessing_data: preprocessedData,
-      gemini_raw_output: { raw: geminiRawOutput, parsed: persona },
-      
-      // Update timestamps
+      gemini_raw_output: { raw: geminiRawOutput, parsed: persona, model: 'gpt-5.4', version: 'v2' },
+
+      // Timestamps
       last_full_scrape_at: new Date().toISOString(),
       instagram_last_synced: new Date().toISOString(),
-      
-      // Store stats
+
+      // Stats
       scrape_stats: {
         postsScraped: preprocessedData.stats.totalPosts,
         topicsIdentified: preprocessedData.topics.length,
         faqCandidates: preprocessedData.faqCandidates.length,
         timeRange: preprocessedData.stats.timeRange,
       },
-      
+
       updated_at: new Date().toISOString(),
     }, {
       onConflict: 'account_id',
     });
 
   if (error) {
-    console.error('[Gemini] Error saving persona:', error);
+    console.error('[PersonaBuilder] Error saving persona:', error);
     throw new Error(`Failed to save persona: ${error.message}`);
   }
 
-  console.log('[Gemini] Persona saved successfully');
+  console.log('[PersonaBuilder] Persona saved successfully');
 
-  // Store products/coupons/brands in persona metadata for now
-  // (They will be manually added to proper tables later or via separate process)
+  // Store commerce data in metadata
   if (persona.products || persona.coupons || persona.brands) {
-    console.log('[Gemini] Storing commerce data in persona metadata...');
-    
+    console.log('[PersonaBuilder] Storing commerce data...');
+
     const commerceData = {
       products: persona.products || [],
       coupons: persona.coupons || [],
@@ -630,22 +759,17 @@ export async function savePersonaToDatabase(
 
     const { error: commerceError } = await supabase
       .from('chatbot_persona')
-      .update({
-        metadata: commerceData,
-      })
+      .update({ metadata: commerceData })
       .eq('account_id', accountId);
 
     if (commerceError) {
-      console.error('[Gemini] Error saving commerce data:', commerceError);
+      console.error('[PersonaBuilder] Error saving commerce data:', commerceError);
     } else {
-      console.log('[Gemini] Commerce data stored successfully');
-      console.log(`[Gemini] - ${persona.products?.length || 0} products`);
-      console.log(`[Gemini] - ${persona.coupons?.length || 0} coupons`);
-      console.log(`[Gemini] - ${persona.brands?.length || 0} brands`);
+      console.log(`[PersonaBuilder] Commerce: ${persona.products?.length || 0} products, ${persona.coupons?.length || 0} coupons, ${persona.brands?.length || 0} brands`);
     }
   }
 
-  console.log('[Gemini] All data saved successfully');
+  console.log('[PersonaBuilder] All data saved successfully');
 }
 
 // ============================================

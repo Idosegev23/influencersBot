@@ -20,8 +20,8 @@ const openai = new OpenAI({
 });
 
 // Model Configuration
-const CHAT_MODEL = 'gpt-5.2-2025-12-11'; // ⚡ Newest and strongest model
-const FALLBACK_MODEL = 'gpt-4o'; // ⚡ Reliable fallback
+const CHAT_MODEL = 'gpt-5.4'; // ⚡ GPT-5.4 — strongest model with better persona adherence
+const FALLBACK_MODEL = 'gpt-5.2'; // ⚡ Reliable fallback
 const NANO_MODEL = 'gpt-5-nano'; // ⚡ Fastest + cheapest for simple queries
 const MAX_TOKENS = 2048; // Enough for full Hebrew recipes, routines, and detailed content
 
@@ -444,6 +444,7 @@ ${(input.mode === 'widget' || input.mode === 'dm') ? `📌 ${input.mode === 'wid
           input: inputMessages,
           ...(previousResponseId ? { previous_response_id: previousResponseId } : {}),
           max_output_tokens: MAX_TOKENS,
+          reasoning: { effort: 'low' },
         });
 
         if (response.output_text) {
@@ -462,6 +463,7 @@ ${(input.mode === 'widget' || input.mode === 'dm') ? `📌 ${input.mode === 'wid
           instructions,
           input: inputMessages,
           max_output_tokens: MAX_TOKENS,
+          reasoning: { effort: 'low' },
         });
 
         if (fallbackResponse.output_text) {
@@ -498,6 +500,7 @@ ${(input.mode === 'widget' || input.mode === 'dm') ? `📌 ${input.mode === 'wid
       input: params.input,
       ...(params.previousResponseId ? { previous_response_id: params.previousResponseId } : {}),
       max_output_tokens: MAX_TOKENS,
+      reasoning: { effort: 'low' },
       stream: true,
     });
 

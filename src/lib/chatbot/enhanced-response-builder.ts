@@ -43,18 +43,29 @@ export function buildContextFromKnowledgeMap(
   // Add voice guidelines
   if (persona.voice_rules) {
     context += `## קול וסגנון תשובה:\n`;
-    context += `טון: ${persona.voice_rules.tone}\n`;
+    context += `טון ראשי: ${persona.voice_rules.tone}\n`;
+
+    // v2: secondary tones
+    if (persona.voice_rules.toneSecondary?.length) {
+      context += `טונים משניים: ${persona.voice_rules.toneSecondary.join(', ')}\n`;
+    }
+
     context += `מבנה: ${persona.voice_rules.responseStructure}\n`;
     context += `אורך: ${persona.voice_rules.avgLength}\n`;
-    
-    if (persona.voice_rules.recurringPhrases && persona.voice_rules.recurringPhrases.length > 0) {
+
+    // v2: answer examples
+    if (persona.voice_rules.answerExamples?.length) {
+      context += `דוגמאות מבנה: ${persona.voice_rules.answerExamples.slice(0, 2).join(' | ')}\n`;
+    }
+
+    if (persona.voice_rules.recurringPhrases?.length > 0) {
       context += `ביטויים לשימוש: ${persona.voice_rules.recurringPhrases.slice(0, 5).join(', ')}\n`;
     }
-    
-    if (persona.voice_rules.avoidedWords && persona.voice_rules.avoidedWords.length > 0) {
+
+    if (persona.voice_rules.avoidedWords?.length > 0) {
       context += `מילים להימנע מהן: ${persona.voice_rules.avoidedWords.slice(0, 5).join(', ')}\n`;
     }
-    
+
     context += '\n';
   }
 
