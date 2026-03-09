@@ -6,31 +6,39 @@ import { useRouter } from 'next/navigation';
 interface Partnership {
   id: string;
   brand_name: string;
-  campaign_name: string;
   status: string;
-  start_date: string;
-  end_date: string;
-  total_amount: number;
+  start_date: string | null;
+  end_date: string | null;
+  proposal_amount: number | null;
+  contract_amount: number | null;
   created_at: string;
   whatsapp_phone?: string | null;
+  brand_logo_url?: string | null;
+  coupon_code?: string | null;
+  category?: string | null;
+  brief?: string | null;
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  lead: 'Lead',
+  lead: 'ליד',
+  proposal: 'הצעה',
   negotiation: 'משא ומתן',
+  contract: 'חוזה',
   active: 'פעיל',
   in_progress: 'בעבודה',
   completed: 'הושלם',
   cancelled: 'בוטל',
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  lead: 'bg-gray-100 text-gray-700',
-  negotiation: 'bg-orange-100 text-orange-700',
-  active: 'bg-blue-100 text-blue-700',
-  in_progress: 'bg-green-100 text-green-700',
-  completed: 'bg-emerald-100 text-emerald-700',
-  cancelled: 'bg-red-100 text-red-700',
+const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
+  lead: { bg: 'rgba(156,163,175,0.15)', text: 'var(--dash-text-2)', dot: '#9ca3af' },
+  proposal: { bg: 'rgba(168,85,247,0.15)', text: '#a855f7', dot: '#a855f7' },
+  negotiation: { bg: 'rgba(249,115,22,0.15)', text: '#f97316', dot: '#f97316' },
+  contract: { bg: 'rgba(59,130,246,0.15)', text: '#3b82f6', dot: '#3b82f6' },
+  active: { bg: 'rgba(34,197,94,0.15)', text: '#22c55e', dot: '#22c55e' },
+  in_progress: { bg: 'rgba(34,197,94,0.15)', text: '#22c55e', dot: '#22c55e' },
+  completed: { bg: 'rgba(16,185,129,0.15)', text: '#10b981', dot: '#10b981' },
+  cancelled: { bg: 'rgba(239,68,68,0.15)', text: '#ef4444', dot: '#ef4444' },
 };
 
 export function PartnershipLibrary({
@@ -44,29 +52,21 @@ export function PartnershipLibrary({
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'date' | 'amount' | 'brand'>('date');
-  const [editingPhone, setEditingPhone] = useState<string | null>(null);
-  const [phoneValues, setPhoneValues] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState<string | null>(null);
 
-  // Filter & Sort
-  let filteredPartnerships = partnerships.filter((p) => {
+  let filtered = partnerships.filter((p) => {
     const matchesSearch =
       p.brand_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.campaign_name?.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesStatus =
-      statusFilter === 'all' || p.status === statusFilter;
-
+      p.brief?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
-  // Sort
-  filteredPartnerships.sort((a, b) => {
+  filtered.sort((a, b) => {
     switch (sortBy) {
       case 'date':
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       case 'amount':
-        return (b.total_amount || 0) - (a.total_amount || 0);
+        return (b.contract_amount || b.proposal_amount || 0) - (a.contract_amount || a.proposal_amount || 0);
       case 'brand':
         return a.brand_name.localeCompare(b.brand_name, 'he');
       default:
@@ -74,201 +74,158 @@ export function PartnershipLibrary({
     }
   });
 
-  const handleSavePhone = async (partnershipId: string) => {
-    setSaving(partnershipId);
-    try {
-      const phone = phoneValues[partnershipId];
-      const response = await fetch(`/api/influencer/partnerships/${partnershipId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          username,
-          whatsapp_phone: phone || null,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update phone');
-      }
-
-      setEditingPhone(null);
-      // Refresh data
-      window.location.reload();
-    } catch (err) {
-      console.error('Error saving phone:', err);
-      alert('שגיאה בשמירת המספר');
-    } finally {
-      setSaving(null);
-    }
-  };
+  const statuses = Array.from(new Set(partnerships.map(p => p.status)));
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200">
+    <div className="space-y-4">
       {/* Toolbar */}
-      <div className="p-4 border-b border-gray-200 space-y-3">
-        <div className="flex flex-col md:flex-row gap-3">
-          {/* Search */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <svg className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--dash-text-3)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
           <input
             type="text"
-            placeholder="חיפוש לפי מותג או קמפיין..."
+            placeholder="חיפוש מותג..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-right"
+            className="w-full pr-10 pl-4 py-2.5 rounded-xl text-sm text-right focus:outline-none"
+            style={{
+              background: 'var(--dash-surface)',
+              border: '1px solid var(--dash-border)',
+              color: 'var(--dash-text)',
+            }}
           />
-
-          {/* Status Filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-right"
-          >
-            <option value="all">כל הסטטוסים</option>
-            <option value="lead">Lead</option>
-            <option value="negotiation">משא ומתן</option>
-            <option value="active">פעיל</option>
-            <option value="in_progress">בעבודה</option>
-            <option value="completed">הושלם</option>
-            <option value="cancelled">בוטל</option>
-          </select>
-
-          {/* Sort */}
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-right"
-          >
-            <option value="date">תאריך יצירה</option>
-            <option value="amount">סכום</option>
-            <option value="brand">מותג (א-ת)</option>
-          </select>
         </div>
+
+        <div className="flex gap-2 flex-wrap">
+          {['all', ...statuses].map(s => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className="px-3 py-2 rounded-lg text-xs font-medium transition-colors"
+              style={{
+                background: statusFilter === s ? 'var(--color-primary)' : 'var(--dash-surface)',
+                color: statusFilter === s ? '#fff' : 'var(--dash-text-2)',
+                border: `1px solid ${statusFilter === s ? 'var(--color-primary)' : 'var(--dash-border)'}`,
+              }}
+            >
+              {s === 'all' ? 'הכל' : STATUS_LABELS[s] || s}
+              {s !== 'all' && (
+                <span className="mr-1 opacity-60">
+                  ({partnerships.filter(p => p.status === s).length})
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as any)}
+          className="px-3 py-2.5 rounded-xl text-xs text-right"
+          style={{
+            background: 'var(--dash-surface)',
+            border: '1px solid var(--dash-border)',
+            color: 'var(--dash-text-2)',
+          }}
+        >
+          <option value="date">לפי תאריך</option>
+          <option value="amount">לפי סכום</option>
+          <option value="brand">לפי מותג</option>
+        </select>
       </div>
 
-      {/* Table */}
-      {filteredPartnerships.length === 0 ? (
-        <div className="p-8 text-center text-gray-500">
-          <p>לא נמצאו שת"פים</p>
+      {/* Cards Grid */}
+      {filtered.length === 0 ? (
+        <div className="py-16 text-center rounded-2xl" style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}>
+          <p style={{ color: 'var(--dash-text-3)' }}>לא נמצאו שת״פים</p>
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">
-                  מותג
-                </th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">
-                  WhatsApp
-                </th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">
-                  סטטוס
-                </th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">
-                  תאריכים
-                </th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">
-                  סכום
-                </th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">
-                  פעולות
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredPartnerships.map((partnership) => (
-                <tr
-                  key={partnership.id}
-                  className="hover:bg-gray-50 transition-colors"
-                >
-                  <td className="px-4 py-3 text-right">
-                    <div className="font-medium text-gray-900">
-                      {partnership.brand_name}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {filtered.map((p) => {
+            const style = STATUS_STYLES[p.status] || STATUS_STYLES.lead;
+            const amount = p.contract_amount || p.proposal_amount || 0;
+
+            return (
+              <button
+                key={p.id}
+                onClick={() => router.push(`/influencer/${username}/partnerships/${p.id}`)}
+                className="rounded-2xl p-5 text-right transition-all hover:scale-[1.01] hover:shadow-lg"
+                style={{
+                  background: 'var(--dash-surface)',
+                  border: '1px solid var(--dash-border)',
+                }}
+              >
+                {/* Top: Logo + Name + Status */}
+                <div className="flex items-start gap-3 mb-3">
+                  {p.brand_logo_url ? (
+                    <img
+                      src={p.brand_logo_url}
+                      alt={p.brand_name}
+                      className="w-12 h-12 rounded-xl object-contain flex-shrink-0"
+                      style={{ background: 'rgba(255,255,255,0.05)', padding: '4px' }}
+                    />
+                  ) : (
+                    <div
+                      className="w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold flex-shrink-0"
+                      style={{ background: style.bg, color: style.text }}
+                    >
+                      {p.brand_name.charAt(0).toUpperCase()}
                     </div>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {editingPhone === partnership.id ? (
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="tel"
-                          value={phoneValues[partnership.id] || partnership.whatsapp_phone || ''}
-                          onChange={(e) => setPhoneValues({ ...phoneValues, [partnership.id]: e.target.value.replace(/[^\d+]/g, '') })}
-                          placeholder="05X-XXX-XXXX"
-                          className="px-2 py-1 text-sm border border-gray-300 rounded w-32"
-                          dir="ltr"
-                        />
-                        <button
-                          onClick={() => handleSavePhone(partnership.id)}
-                          disabled={saving === partnership.id}
-                          className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-                        >
-                          {saving === partnership.id ? '...' : 'שמור'}
-                        </button>
-                        <button
-                          onClick={() => setEditingPhone(null)}
-                          className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-                        >
-                          ביטול
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-600" dir="ltr">
-                          {partnership.whatsapp_phone || '—'}
-                        </span>
-                        <button
-                          onClick={() => {
-                            setEditingPhone(partnership.id);
-                            setPhoneValues({ ...phoneValues, [partnership.id]: partnership.whatsapp_phone || '' });
-                          }}
-                          className="text-xs text-blue-600 hover:text-blue-700"
-                        >
-                          ערוך
-                        </button>
-                      </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-base truncate" style={{ color: 'var(--dash-text)' }}>
+                      {p.brand_name}
+                    </h3>
+                    {p.category && (
+                      <p className="text-xs truncate" style={{ color: 'var(--dash-text-3)' }}>
+                        {p.category}
+                      </p>
                     )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <span
-                      className={`inline-block px-2 py-1 text-xs font-medium rounded ${
-                        STATUS_COLORS[partnership.status] ||
-                        'bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      {STATUS_LABELS[partnership.status] || partnership.status}
+                  </div>
+                  <span
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium flex-shrink-0"
+                    style={{ background: style.bg, color: style.text }}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: style.dot }} />
+                    {STATUS_LABELS[p.status] || p.status}
+                  </span>
+                </div>
+
+                {/* Brief */}
+                {p.brief && (
+                  <p className="text-xs line-clamp-2 mb-3" style={{ color: 'var(--dash-text-3)' }}>
+                    {p.brief}
+                  </p>
+                )}
+
+                {/* Bottom: Details */}
+                <div className="flex items-center justify-between pt-3" style={{ borderTop: '1px solid var(--dash-border)' }}>
+                  <div className="flex items-center gap-3">
+                    {amount > 0 && (
+                      <span className="text-sm font-semibold" style={{ color: 'var(--color-primary)' }}>
+                        ₪{amount.toLocaleString('he-IL')}
+                      </span>
+                    )}
+                    {p.coupon_code && (
+                      <span
+                        className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold"
+                        style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981' }}
+                      >
+                        {p.coupon_code}
+                      </span>
+                    )}
+                  </div>
+                  {p.start_date && (
+                    <span className="text-[11px]" style={{ color: 'var(--dash-text-3)' }}>
+                      {new Date(p.start_date).toLocaleDateString('he-IL', { month: 'short', year: 'numeric' })}
                     </span>
-                  </td>
-                  <td className="px-4 py-3 text-right text-sm text-gray-600">
-                    {partnership.start_date && partnership.end_date ? (
-                      <>
-                        {new Date(partnership.start_date).toLocaleDateString('he-IL')}
-                        {' - '}
-                        {new Date(partnership.end_date).toLocaleDateString('he-IL')}
-                      </>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right font-medium text-gray-900">
-                    {partnership.total_amount
-                      ? `₪${partnership.total_amount.toLocaleString('he-IL')}`
-                      : '—'}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() =>
-                        router.push(
-                          `/influencer/${username}/partnerships/${partnership.id}`
-                        )
-                      }
-                      className="text-sm text-blue-600 hover:text-blue-700"
-                    >
-                      צפה
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  )}
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

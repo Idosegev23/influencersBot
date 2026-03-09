@@ -87,6 +87,36 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ success: true, logo_url: urlData.publicUrl });
 }
 
+// PATCH - update brand contact info (phone, email, website)
+export async function PATCH(req: NextRequest) {
+  if (!(await isAdmin())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const sb = getSupabase();
+  const { brandId, whatsapp_phone, email, website } = await req.json();
+
+  if (!brandId) {
+    return NextResponse.json({ error: 'brandId required' }, { status: 400 });
+  }
+
+  const updates: Record<string, any> = { updated_at: new Date().toISOString() };
+  if (whatsapp_phone !== undefined) updates.whatsapp_phone = whatsapp_phone || null;
+  if (email !== undefined) updates.email = email || null;
+  if (website !== undefined) updates.website = website || null;
+
+  const { error } = await sb
+    .from('brand_logos')
+    .update(updates)
+    .eq('id', brandId);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
+}
+
 // DELETE - remove logo from a brand
 export async function DELETE(req: NextRequest) {
   if (!(await isAdmin())) {

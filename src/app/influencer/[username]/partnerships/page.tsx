@@ -40,7 +40,7 @@ export default function PartnershipsDashboardPage() {
   const [data, setData] = useState<PartnershipDashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<'overview' | 'library' | 'calendar'>('overview');
+  const [view, setView] = useState<'overview' | 'library' | 'calendar'>('library');
 
   useEffect(() => {
     loadData();
@@ -66,19 +66,54 @@ export default function PartnershipsDashboardPage() {
       const partnerships = result.partnerships || [];
       const totalRevenue = partnerships.reduce((sum: number, p: any) =>
         sum + (p.contract_amount || 0), 0);
-      const activeCount = partnerships.filter((p: any) => p.status === 'active').length;
+      const activeCount = partnerships.filter((p: any) => p.status === 'active' || p.status === 'in_progress').length;
+      const completedCount = partnerships.filter((p: any) => p.status === 'completed').length;
+
+      // Build pipeline from actual data
+      const statusCounts: Record<string, { count: number; total_value: number }> = {};
+      partnerships.forEach((p: any) => {
+        if (!statusCounts[p.status]) statusCounts[p.status] = { count: 0, total_value: 0 };
+        statusCounts[p.status].count++;
+        statusCounts[p.status].total_value += p.contract_amount || p.proposal_amount || 0;
+      });
+      const pipeline = Object.entries(statusCounts).map(([status, data]) => ({
+        status,
+        count: data.count,
+        total_value: data.total_value,
+        percentage: partnerships.length > 0 ? Math.round((data.count / partnerships.length) * 100) : 0,
+      }));
+
+      // Build monthly revenue from partnerships with start_date
+      const monthlyMap: Record<string, { revenue: number; count: number }> = {};
+      partnerships.forEach((p: any) => {
+        const date = p.start_date || p.created_at;
+        if (!date) return;
+        const month = date.substring(0, 7); // YYYY-MM
+        if (!monthlyMap[month]) monthlyMap[month] = { revenue: 0, count: 0 };
+        monthlyMap[month].revenue += p.contract_amount || 0;
+        monthlyMap[month].count++;
+      });
+      const monthly_revenue = Object.entries(monthlyMap)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .slice(-12)
+        .map(([month, data]) => ({ month, revenue: data.revenue, count: data.count }));
+
+      // Pending = proposal + negotiation amounts
+      const pendingRevenue = partnerships
+        .filter((p: any) => ['proposal', 'negotiation', 'contract'].includes(p.status))
+        .reduce((sum: number, p: any) => sum + (p.contract_amount || p.proposal_amount || 0), 0);
 
       setData({
         overview: {
           total_partnerships: partnerships.length,
           active_partnerships: activeCount,
           total_revenue: totalRevenue,
-          pending_revenue: 0,
-          avg_deal_size: partnerships.length > 0 ? totalRevenue / partnerships.length : 0,
-          completion_rate: 0,
+          pending_revenue: pendingRevenue,
+          avg_deal_size: partnerships.length > 0 ? Math.round(totalRevenue / partnerships.length) : 0,
+          completion_rate: partnerships.length > 0 ? Math.round((completedCount / partnerships.length) * 100) : 0,
         },
-        pipeline: [],
-        monthly_revenue: [],
+        pipeline,
+        monthly_revenue,
         upcoming_deadlines: [],
         partnerships: partnerships,
         calendar_events: [],
@@ -145,105 +180,70 @@ export default function PartnershipsDashboardPage() {
       </div>
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h1 className="text-3xl font-bold" style={{ color: 'var(--dash-text)' }}>לוח מחוונים - שת"פים</h1>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>שיתופי פעולה</h1>
           <button
             onClick={() => router.push(`/influencer/${username}/partnerships/new`)}
-            className="px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+            className="px-3.5 py-1.5 rounded-lg transition-colors text-sm font-medium"
             style={{ background: 'var(--color-primary)', color: '#fff' }}
           >
-            + הוסף שת"פ חדש
+            + חדש
           </button>
         </div>
 
         {/* View Selector */}
-        <div className="flex gap-2">
-          <button
-            onClick={() => setView('overview')}
-            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            style={{
-              background: view === 'overview' ? 'var(--color-primary)' : 'var(--dash-surface)',
-              color: view === 'overview' ? '#fff' : 'var(--dash-text-2)',
-            }}
-          >
-            סקירה כללית
-          </button>
-          <button
-            onClick={() => setView('library')}
-            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            style={{
-              background: view === 'library' ? 'var(--color-primary)' : 'var(--dash-surface)',
-              color: view === 'library' ? '#fff' : 'var(--dash-text-2)',
-            }}
-          >
-            ספרייה
-          </button>
-          <button
-            onClick={() => setView('calendar')}
-            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            style={{
-              background: view === 'calendar' ? 'var(--color-primary)' : 'var(--dash-surface)',
-              color: view === 'calendar' ? '#fff' : 'var(--dash-text-2)',
-            }}
-          >
-            לוח שנה
-          </button>
+        <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid var(--dash-border)' }}>
+          {[
+            { key: 'library' as const, label: 'ספרייה' },
+            { key: 'overview' as const, label: 'סקירה' },
+            { key: 'calendar' as const, label: 'לוח שנה' },
+          ].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setView(tab.key)}
+              className="px-4 py-2 text-sm font-medium transition-colors"
+              style={{
+                background: view === tab.key ? 'var(--color-primary)' : 'transparent',
+                color: view === tab.key ? '#fff' : 'var(--dash-text-2)',
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Overview Cards - Always visible */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
-          <div className="text-sm mb-1" style={{ color: 'var(--dash-text-3)' }}>סה"כ שת"פים</div>
-          <div className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>
-            {data.overview.total_partnerships}
+      {/* Stats Row — compact */}
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+        {[
+          { label: 'סה״כ', value: String(data.overview.total_partnerships), color: 'var(--dash-text)' },
+          { label: 'פעילים', value: String(data.overview.active_partnerships), color: 'var(--dash-positive)' },
+          { label: 'הכנסות', value: `₪${data.overview.total_revenue.toLocaleString('he-IL')}`, color: 'var(--color-primary)' },
+          { label: 'צפוי', value: `₪${data.overview.pending_revenue.toLocaleString('he-IL')}`, color: 'var(--color-info, var(--dash-text-2))' },
+          { label: 'ממוצע', value: `₪${data.overview.avg_deal_size.toLocaleString('he-IL')}`, color: 'var(--color-warning, var(--dash-text-2))' },
+          { label: 'השלמה', value: `${data.overview.completion_rate}%`, color: 'var(--dash-positive)' },
+        ].map(stat => (
+          <div key={stat.label} className="rounded-xl border px-3 py-3 text-center" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+            <div className="text-[11px] mb-0.5" style={{ color: 'var(--dash-text-3)' }}>{stat.label}</div>
+            <div className="text-lg font-bold truncate" style={{ color: stat.color }}>{stat.value}</div>
           </div>
-        </div>
-
-        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
-          <div className="text-sm mb-1" style={{ color: 'var(--dash-text-3)' }}>שת"פים פעילים</div>
-          <div className="text-2xl font-bold" style={{ color: 'var(--dash-positive)' }}>
-            {data.overview.active_partnerships}
-          </div>
-        </div>
-
-        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
-          <div className="text-sm mb-1" style={{ color: 'var(--dash-text-3)' }}>הכנסות כוללות</div>
-          <div className="text-2xl font-bold" style={{ color: 'var(--color-primary)' }}>
-            ₪{data.overview.total_revenue.toLocaleString('he-IL')}
-          </div>
-        </div>
-
-        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
-          <div className="text-sm mb-1" style={{ color: 'var(--dash-text-3)' }}>הכנסות צפויות</div>
-          <div className="text-2xl font-bold" style={{ color: 'var(--color-info)' }}>
-            ₪{data.overview.pending_revenue.toLocaleString('he-IL')}
-          </div>
-        </div>
-
-        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
-          <div className="text-sm mb-1" style={{ color: 'var(--dash-text-3)' }}>ממוצע עסקה</div>
-          <div className="text-2xl font-bold" style={{ color: 'var(--color-warning)' }}>
-            ₪{data.overview.avg_deal_size.toLocaleString('he-IL')}
-          </div>
-        </div>
-
-        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
-          <div className="text-sm mb-1" style={{ color: 'var(--dash-text-3)' }}>שיעור השלמה</div>
-          <div className="text-2xl font-bold" style={{ color: 'var(--dash-positive)' }}>
-            {data.overview.completion_rate.toFixed(1)}%
-          </div>
-        </div>
+        ))}
       </div>
 
       {/* Dynamic Content Based on View */}
       {view === 'overview' && (
         <>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <PipelineChart data={data.pipeline} />
-            <RevenueChart data={data.monthly_revenue} />
-          </div>
+          {data.pipeline.length > 0 || data.monthly_revenue.length > 0 ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <PipelineChart data={data.pipeline} />
+              <RevenueChart data={data.monthly_revenue} />
+            </div>
+          ) : (
+            <div className="py-12 text-center rounded-2xl" style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}>
+              <p className="text-sm" style={{ color: 'var(--dash-text-3)' }}>אין מספיק נתונים להצגת גרפים</p>
+            </div>
+          )}
 
           {/* Upcoming Deadlines */}
           {data.upcoming_deadlines.length > 0 && (

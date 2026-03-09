@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowRight, Upload, Trash2, Check, X, Image, Search, ExternalLink } from 'lucide-react';
+import { ArrowRight, Upload, Trash2, Check, X, Image, Search, ExternalLink, Phone, Mail, Save } from 'lucide-react';
 
 interface BrandLogo {
   id: string;
@@ -13,6 +13,8 @@ interface BrandLogo {
   aliases: string[];
   website: string | null;
   category: string | null;
+  whatsapp_phone: string | null;
+  email: string | null;
   partnerships: { id: string; brand_name: string; account_id: string }[];
 }
 
@@ -25,6 +27,10 @@ export default function BrandLogosPage() {
   const [toast, setToast] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
+  const [editingBrand, setEditingBrand] = useState<string | null>(null);
+  const [editPhone, setEditPhone] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [saving, setSaving] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -74,6 +80,30 @@ export default function BrandLogosPage() {
       setBrands(prev => prev.map(b => b.id === brandId ? { ...b, logo_url: null } : b));
       showToast('הלוגו נמחק');
     }
+  }
+
+  function startEditing(brand: BrandLogo) {
+    setEditingBrand(brand.id);
+    setEditPhone(brand.whatsapp_phone || '');
+    setEditEmail(brand.email || '');
+  }
+
+  async function handleSaveContact(brandId: string) {
+    setSaving(true);
+    const res = await fetch('/api/admin/brand-logos', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brandId, whatsapp_phone: editPhone, email: editEmail }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      setBrands(prev => prev.map(b => b.id === brandId ? { ...b, whatsapp_phone: editPhone || null, email: editEmail || null } : b));
+      showToast('פרטי קשר עודכנו');
+      setEditingBrand(null);
+    } else {
+      showToast('שגיאה: ' + data.error);
+    }
+    setSaving(false);
   }
 
   function triggerUpload(brandId: string) {
@@ -130,7 +160,7 @@ export default function BrandLogosPage() {
 
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold">ניהול לוגואים למותגים</h1>
+            <h1 className="text-2xl font-bold">ניהול מותגים</h1>
             <p className="text-white/50 text-sm mt-1">
               {withLogo} עם לוגו · {withoutLogo} ללא לוגו · {brands.length} סה״כ
             </p>
@@ -203,6 +233,68 @@ export default function BrandLogosPage() {
                 {brand.partnerships?.length || 0} משפיענים
               </p>
 
+              {/* Contact info */}
+              {editingBrand === brand.id ? (
+                <div className="mt-3 space-y-2">
+                  <div className="relative">
+                    <Phone className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-white/30" />
+                    <input
+                      type="tel"
+                      value={editPhone}
+                      onChange={e => setEditPhone(e.target.value)}
+                      placeholder="972501234567"
+                      className="w-full bg-white/5 border border-white/10 rounded-lg pr-8 pl-3 py-1.5 text-xs focus:outline-none focus:border-purple-500 text-left dir-ltr"
+                      dir="ltr"
+                    />
+                  </div>
+                  <div className="relative">
+                    <Mail className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-white/30" />
+                    <input
+                      type="email"
+                      value={editEmail}
+                      onChange={e => setEditEmail(e.target.value)}
+                      placeholder="contact@brand.com"
+                      className="w-full bg-white/5 border border-white/10 rounded-lg pr-8 pl-3 py-1.5 text-xs focus:outline-none focus:border-purple-500 text-left dir-ltr"
+                      dir="ltr"
+                    />
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => handleSaveContact(brand.id)}
+                      disabled={saving}
+                      className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-medium bg-green-600 hover:bg-green-500 transition-colors disabled:opacity-50"
+                    >
+                      <Save className="w-3 h-3" />
+                      שמור
+                    </button>
+                    <button
+                      onClick={() => setEditingBrand(null)}
+                      className="px-2 py-1.5 rounded-lg text-[11px] bg-white/5 text-white/50 hover:bg-white/10 transition-colors"
+                    >
+                      ביטול
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-2 space-y-1">
+                  {brand.whatsapp_phone && (
+                    <div className="flex items-center gap-1.5 text-[10px] text-white/40">
+                      <Phone className="w-2.5 h-2.5" />
+                      <span dir="ltr">{brand.whatsapp_phone}</span>
+                    </div>
+                  )}
+                  {brand.email && (
+                    <div className="flex items-center gap-1.5 text-[10px] text-white/40">
+                      <Mail className="w-2.5 h-2.5" />
+                      <span>{brand.email}</span>
+                    </div>
+                  )}
+                  {!brand.whatsapp_phone && !brand.email && (
+                    <p className="text-[10px] text-orange-400/60">חסר פרטי קשר</p>
+                  )}
+                </div>
+              )}
+
               {/* Actions */}
               <div className="flex gap-2 mt-3">
                 <button
@@ -217,6 +309,15 @@ export default function BrandLogosPage() {
                   )}
                   {brand.logo_url ? 'החלף' : 'העלה'}
                 </button>
+                {editingBrand !== brand.id && (
+                  <button
+                    onClick={() => startEditing(brand)}
+                    className="px-3 py-2 rounded-lg text-xs bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-colors"
+                    title="ערוך פרטי קשר"
+                  >
+                    <Mail className="w-3.5 h-3.5" />
+                  </button>
+                )}
                 {brand.logo_url && (
                   <button
                     onClick={() => handleDelete(brand.id)}

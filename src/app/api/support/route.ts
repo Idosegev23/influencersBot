@@ -55,21 +55,47 @@ export async function POST(req: NextRequest) {
       product = products.find(p => p.id === productId);
     }
 
-    // Get brand partnership details for WhatsApp phone
+    // Get brand contact details — check partnership first, then brand_logos as fallback
     let brandPhone: string | undefined;
+    let brandEmail: string | undefined;
     if (sanitizedBrand) {
       console.log('[Support] Looking up partnership for brand:', sanitizedBrand, 'account:', influencer.id);
-      const { data: partnership, error: partnershipError } = await supabase
+      const { data: partnership } = await supabase
         .from('partnerships')
-        .select('whatsapp_phone, brand_name')
+        .select('whatsapp_phone, brand_name, brand_logo_id')
         .eq('account_id', influencer.id)
         .ilike('brand_name', sanitizedBrand)
         .single();
-      
-      console.log('[Support] Partnership found:', partnership);
-      console.log('[Support] Partnership error:', partnershipError);
+
       brandPhone = partnership?.whatsapp_phone || undefined;
-      console.log('[Support] Brand phone extracted:', brandPhone);
+
+      // Fallback: check brand_logos table for contact info
+      if ((!brandPhone || !brandEmail) && partnership?.brand_logo_id) {
+        const { data: brandLogo } = await supabase
+          .from('brand_logos')
+          .select('whatsapp_phone, email')
+          .eq('id', partnership.brand_logo_id)
+          .single();
+
+        if (!brandPhone && brandLogo?.whatsapp_phone) {
+          brandPhone = brandLogo.whatsapp_phone;
+        }
+        brandEmail = brandLogo?.email || undefined;
+      }
+
+      // If no brand_logo_id, try matching by name
+      if (!brandPhone) {
+        const { data: brandLogo } = await supabase
+          .from('brand_logos')
+          .select('whatsapp_phone, email')
+          .ilike('display_name', sanitizedBrand)
+          .single();
+
+        if (brandLogo?.whatsapp_phone) brandPhone = brandLogo.whatsapp_phone;
+        if (!brandEmail && brandLogo?.email) brandEmail = brandLogo.email;
+      }
+
+      console.log('[Support] Brand phone:', brandPhone, 'Brand email:', brandEmail);
     }
 
     // Build enhanced message with brand and order info
@@ -127,6 +153,26 @@ export async function POST(req: NextRequest) {
       }
     } else {
       console.log('[Support] Skipping brand notification - no WhatsApp phone configured for brand:', sanitizedBrand);
+    }
+
+    // Send email notification to brand if email available (fire-and-forget)
+    let emailSent = false;
+    if (brandEmail && sanitizedBrand) {
+      console.log('[Support] Brand email available:', brandEmail, '— email sending not yet implemented');
+      // TODO: Integrate email sending (e.g., Resend, SendGrid)
+      // For now, store the email so it's visible in the support request
+    }
+
+    // Update support request with notification statuses
+    if (supportRequest) {
+      await supabase
+        .from('support_requests')
+        .update({
+          whatsapp_sent: whatsappSent,
+          brand_email: brandEmail || null,
+        })
+        .eq('id', supportRequest.id)
+        .catch(() => {}); // non-blocking
     }
 
     // Send confirmation to CUSTOMER if they provided phone

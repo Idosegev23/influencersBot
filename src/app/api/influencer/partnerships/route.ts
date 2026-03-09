@@ -71,10 +71,17 @@ export async function GET(req: NextRequest) {
     }
     // Cookie auth users can only see their own data (verified by checkAuth)
 
-    // Build query
+    // Build query — join brand_logos for logo URL
     let query = supabase
       .from('partnerships')
-      .select('*', { count: 'exact' })
+      .select(`
+        *,
+        brand_logo:brand_logos!brand_logo_id(
+          id,
+          logo_url,
+          display_name
+        )
+      `, { count: 'exact' })
       .eq('account_id', accountId);
 
     // Apply filters
@@ -89,7 +96,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Apply pagination and ordering
-    const { data: partnerships, error, count } = await query
+    const { data: rawPartnerships, error, count } = await query
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -98,8 +105,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch partnerships' }, { status: 500 });
     }
 
-    return NextResponse.json({ 
-      partnerships: partnerships || [], 
+    // Map brand_logo_url from joined data
+    const partnerships = (rawPartnerships || []).map((p: any) => ({
+      ...p,
+      brand_logo_url: p.brand_logo?.logo_url || null,
+      brand_logo: undefined,
+    }));
+
+    return NextResponse.json({
+      partnerships,
       total: count || 0,
       limit,
       offset
