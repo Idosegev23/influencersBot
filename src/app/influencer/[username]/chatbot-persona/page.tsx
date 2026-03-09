@@ -9,7 +9,6 @@ import {
   Instagram,
   MessageSquare,
   Brain,
-  BookOpen,
   Settings,
   Quote,
   Ban,
@@ -27,12 +26,24 @@ import ScrapeProgressModal from '@/components/ScrapeProgressModal';
 /* ------------------------------------------------------------------ */
 
 interface VoiceRules {
-  tone?: string;
+  tone?: string | { primary?: string[]; evidence?: unknown[] };
   avgLength?: string;
   firstPerson?: boolean;
   avoidedWords?: string[];
   recurringPhrases?: string[];
   responseStructure?: string;
+  language?: string;
+  styleMarkers?: {
+    humorAndSlang?: string[];
+    formatPreferences?: string[];
+    commonPhrasingPatterns?: string[];
+  };
+  stanceSignals?: {
+    evidenceFirst?: boolean;
+    consumerAdvocacy?: boolean;
+    ingredientLiteracy?: boolean;
+    antiCelebrityHypeBias?: string;
+  };
 }
 
 interface CoreTopic {
@@ -42,8 +53,19 @@ interface CoreTopic {
   subtopics?: string[];
 }
 
+interface KnowledgeDomain {
+  domain: string;
+  whatSheCovers?: string[];
+  brandsAndLinesExplicitlyCovered?: string[];
+  notableIngredientsMentioned?: string[];
+  examples?: Array<{ topic?: string; whatIncluded?: string }>;
+  format?: string;
+  [key: string]: unknown;
+}
+
 interface KnowledgeMap {
   coreTopics?: CoreTopic[];
+  domains?: KnowledgeDomain[];
 }
 
 interface PersonaFull {
@@ -227,6 +249,25 @@ function humanize(value: string | null | undefined, map: Record<string, string>)
   return map[value] || value;
 }
 
+/** Safely convert any value to a renderable string */
+function safeString(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value)) return value.filter(v => typeof v === 'string').join(', ');
+  return null;
+}
+
+/** Extract tone text from voice_rules.tone which can be a string or {primary, evidence} object */
+function extractToneText(tone: VoiceRules['tone']): string[] {
+  if (!tone) return [];
+  if (typeof tone === 'string') return [tone];
+  if (typeof tone === 'object' && 'primary' in tone && Array.isArray(tone.primary)) {
+    return tone.primary.filter((t): t is string => typeof t === 'string');
+  }
+  return [];
+}
+
 /* ------------------------------------------------------------------ */
 /*  Main page                                                          */
 /* ------------------------------------------------------------------ */
@@ -393,11 +434,16 @@ export default function ChatbotPersonaPage({
   const voiceRules = persona.voice_rules;
   const knowledgeMap = persona.knowledge_map;
   const hasRichData =
-    !!voiceRules || !!knowledgeMap || !!persona.common_phrases?.length || persona.sass_level !== null;
+    !!voiceRules || !!knowledgeMap?.coreTopics?.length || !!knowledgeMap?.domains?.length ||
+    !!persona.common_phrases?.length || persona.sass_level !== null;
 
-  // Merge recurring phrases + common_phrases into one list, deduplicated
+  // Merge recurring phrases + common_phrases + commonPhrasingPatterns into one list, deduplicated
   const allPhrases = Array.from(
-    new Set([...(voiceRules?.recurringPhrases || []), ...(persona.common_phrases || [])]),
+    new Set([
+      ...(voiceRules?.recurringPhrases || []),
+      ...(voiceRules?.styleMarkers?.commonPhrasingPatterns || []),
+      ...(persona.common_phrases || []),
+    ]),
   );
 
   const slangEntries = persona.slang_map ? Object.entries(persona.slang_map) : [];
@@ -533,13 +579,35 @@ export default function ChatbotPersonaPage({
         {hasRichData && (
           <SectionCard icon={MessageSquare} title="קול וסגנון" collapsible defaultOpen>
             {/* Voice Rules Tone */}
-            {voiceRules?.tone && (
+            {voiceRules?.tone && extractToneText(voiceRules.tone).length > 0 && (
               <div>
                 <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--dash-text-2)' }}>
                   טון מפורט
                 </h3>
-                <p className="text-sm leading-relaxed" style={{ color: 'var(--dash-text)' }}>
-                  {voiceRules.tone}
+                {extractToneText(voiceRules.tone).length === 1 ? (
+                  <p className="text-sm leading-relaxed" style={{ color: 'var(--dash-text)' }}>
+                    {extractToneText(voiceRules.tone)[0]}
+                  </p>
+                ) : (
+                  <ul className="list-disc pr-5 space-y-1">
+                    {extractToneText(voiceRules.tone).map((t, i) => (
+                      <li key={i} className="text-sm leading-relaxed" style={{ color: 'var(--dash-text)' }}>
+                        {t}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {/* Language */}
+            {voiceRules?.language && (
+              <div>
+                <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--dash-text-2)' }}>
+                  שפה
+                </h3>
+                <p className="text-sm" style={{ color: 'var(--dash-text)' }}>
+                  {voiceRules.language}
                 </p>
               </div>
             )}
@@ -556,18 +624,6 @@ export default function ChatbotPersonaPage({
               </div>
             )}
 
-            {/* First Person */}
-            {voiceRules?.firstPerson !== undefined && (
-              <div>
-                <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--dash-text-2)' }}>
-                  דיבור בגוף ראשון
-                </h3>
-                <p className="text-sm" style={{ color: 'var(--dash-text)' }}>
-                  {voiceRules.firstPerson ? 'כן' : 'לא'}
-                </p>
-              </div>
-            )}
-
             {/* Response Structure */}
             {voiceRules?.responseStructure && (
               <div>
@@ -575,8 +631,51 @@ export default function ChatbotPersonaPage({
                   מבנה תגובה
                 </h3>
                 <p className="text-sm leading-relaxed" style={{ color: 'var(--dash-text)' }}>
-                  {voiceRules.responseStructure}
+                  {safeString(voiceRules.responseStructure)}
                 </p>
+              </div>
+            )}
+
+            {/* Format Preferences */}
+            {voiceRules?.styleMarkers?.formatPreferences && voiceRules.styleMarkers.formatPreferences.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--dash-text-2)' }}>
+                  העדפות פורמט
+                </h3>
+                <ul className="list-disc pr-5 space-y-1">
+                  {voiceRules.styleMarkers.formatPreferences.map((pref, i) => (
+                    <li key={i} className="text-sm" style={{ color: 'var(--dash-text)' }}>
+                      {pref}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Humor & Slang */}
+            {voiceRules?.styleMarkers?.humorAndSlang && voiceRules.styleMarkers.humorAndSlang.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Layers className="w-4 h-4" style={{ color: 'var(--color-info)' }} />
+                  <h3 className="text-sm font-semibold" style={{ color: 'var(--dash-text-2)' }}>
+                    הומור וסלנג
+                  </h3>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {voiceRules.styleMarkers.humorAndSlang.map((item, i) => (
+                    <span
+                      key={i}
+                      className="px-3 py-1 rounded-full text-sm"
+                      style={{
+                        background: 'color-mix(in srgb, var(--color-info) 10%, transparent)',
+                        color: 'var(--color-info)',
+                        border: '1px solid color-mix(in srgb, var(--color-info) 20%, transparent)',
+                      }}
+                    >
+                      {item}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -668,20 +767,19 @@ export default function ChatbotPersonaPage({
         {/*  3. KNOWLEDGE MAP (read-only)                                 */}
         {/* ============================================================ */}
 
-        {knowledgeMap?.coreTopics && knowledgeMap.coreTopics.length > 0 && (
+        {/* Knowledge Map — supports both coreTopics and domains formats */}
+        {(knowledgeMap?.coreTopics?.length || knowledgeMap?.domains?.length) ? (
           <SectionCard icon={Brain} title="מפת ידע" collapsible defaultOpen>
             <div className="space-y-5">
-              {knowledgeMap.coreTopics.map((topic, ti) => (
-                <div key={ti}>
-                  {/* Topic header */}
+              {/* Format A: coreTopics (simple) */}
+              {knowledgeMap.coreTopics?.map((topic, ti) => (
+                <div key={`ct-${ti}`}>
                   <div className="flex items-center gap-2 mb-2">
                     <Map className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
                     <h3 className="font-bold text-sm" style={{ color: 'var(--dash-text)' }}>
                       {topic.name}
                     </h3>
                   </div>
-
-                  {/* Key points */}
                   {topic.keyPoints && topic.keyPoints.length > 0 && (
                     <ul className="list-disc pr-5 space-y-1 mb-2">
                       {topic.keyPoints.map((point, pi) => (
@@ -691,52 +789,100 @@ export default function ChatbotPersonaPage({
                       ))}
                     </ul>
                   )}
-
-                  {/* Subtopics */}
                   {topic.subtopics && topic.subtopics.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mb-2">
                       {topic.subtopics.map((sub, si) => (
-                        <span
-                          key={si}
-                          className="px-2 py-0.5 rounded text-xs"
-                          style={{
-                            background: 'color-mix(in srgb, var(--color-info) 12%, transparent)',
-                            color: 'var(--color-info)',
-                          }}
-                        >
+                        <span key={si} className="px-2 py-0.5 rounded text-xs" style={{ background: 'color-mix(in srgb, var(--color-info) 12%, transparent)', color: 'var(--color-info)' }}>
                           {sub}
                         </span>
                       ))}
                     </div>
                   )}
-
-                  {/* Examples */}
                   {topic.examples && topic.examples.length > 0 && (
                     <div className="space-y-1 mr-3">
                       {topic.examples.map((ex, ei) => (
-                        <p
-                          key={ei}
-                          className="text-xs pr-3 leading-relaxed"
-                          style={{
-                            color: 'var(--dash-text-3)',
-                            borderRight: '2px solid var(--dash-border)',
-                          }}
-                        >
+                        <p key={ei} className="text-xs pr-3 leading-relaxed" style={{ color: 'var(--dash-text-3)', borderRight: '2px solid var(--dash-border)' }}>
                           {ex}
                         </p>
                       ))}
                     </div>
                   )}
+                  {ti < (knowledgeMap.coreTopics?.length ?? 0) - 1 && (
+                    <hr className="mt-4" style={{ borderColor: 'var(--dash-border)' }} />
+                  )}
+                </div>
+              ))}
 
-                  {/* Separator between topics (except last) */}
-                  {ti < knowledgeMap.coreTopics!.length - 1 && (
+              {/* Format B: domains (rich AI-generated) */}
+              {knowledgeMap.domains?.map((domain, di) => (
+                <div key={`dm-${di}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Map className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
+                    <h3 className="font-bold text-sm" style={{ color: 'var(--dash-text)' }}>
+                      {domain.domain}
+                    </h3>
+                  </div>
+
+                  {/* What she covers */}
+                  {domain.whatSheCovers && domain.whatSheCovers.length > 0 && (
+                    <ul className="list-disc pr-5 space-y-1 mb-2">
+                      {domain.whatSheCovers.map((item, wi) => (
+                        <li key={wi} className="text-sm" style={{ color: 'var(--dash-text-2)' }}>
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  {/* Brands covered */}
+                  {domain.brandsAndLinesExplicitlyCovered && domain.brandsAndLinesExplicitlyCovered.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {domain.brandsAndLinesExplicitlyCovered.map((brand, bi) => (
+                        <span key={bi} className="px-2 py-0.5 rounded text-xs" style={{ background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)', color: 'var(--color-primary)' }}>
+                          {brand}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Notable ingredients */}
+                  {domain.notableIngredientsMentioned && domain.notableIngredientsMentioned.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {domain.notableIngredientsMentioned.map((ing, ii) => (
+                        <span key={ii} className="px-2 py-0.5 rounded text-xs" style={{ background: 'color-mix(in srgb, var(--color-info) 12%, transparent)', color: 'var(--color-info)' }}>
+                          {ing}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Practical examples */}
+                  {domain.examples && domain.examples.length > 0 && (
+                    <div className="space-y-1 mr-3">
+                      {domain.examples.map((ex, ei) => (
+                        <p key={ei} className="text-xs pr-3 leading-relaxed" style={{ color: 'var(--dash-text-3)', borderRight: '2px solid var(--dash-border)' }}>
+                          {typeof ex === 'string' ? ex : ex.topic || ''}
+                          {typeof ex === 'object' && ex.whatIncluded ? ` — ${ex.whatIncluded}` : ''}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Format note */}
+                  {domain.format && (
+                    <p className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>
+                      {domain.format}
+                    </p>
+                  )}
+
+                  {di < (knowledgeMap.domains?.length ?? 0) - 1 && (
                     <hr className="mt-4" style={{ borderColor: 'var(--dash-border)' }} />
                   )}
                 </div>
               ))}
             </div>
           </SectionCard>
-        )}
+        ) : null}
 
         {/* ============================================================ */}
         {/*  4. EDITABLE SETTINGS                                         */}
