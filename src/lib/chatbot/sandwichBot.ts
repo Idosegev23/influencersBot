@@ -43,7 +43,7 @@ export interface SandwichBotInput {
   onToken?: (token: string) => void; // Real-time streaming callback
   personalityConfig?: any; // Pre-loaded personality (avoids DB call)
   previousResponseId?: string | null; // OpenAI Responses API: chain context
-  mode?: 'widget' | 'social'; // Widget = sales-oriented, Social = engagement-oriented
+  mode?: 'widget' | 'social' | 'dm'; // Widget = sales-oriented, Social = engagement, DM = Instagram direct messages
 }
 
 export interface SandwichBotOutput {

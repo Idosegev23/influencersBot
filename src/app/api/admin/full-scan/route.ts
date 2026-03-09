@@ -10,6 +10,7 @@ import { getScanJobsRepo } from '@/lib/db/repositories/scanJobsRepo';
 import { runScanJob } from '@/lib/scraping/runScanJob';
 import { processAccountContent } from '@/lib/processing/content-processor-orchestrator';
 import { DEFAULT_SCAN_CONFIG } from '@/lib/scraping/newScanOrchestrator';
+import { hashPassword } from '@/lib/utils';
 
 export const maxDuration = 600;
 
@@ -31,6 +32,28 @@ export async function POST(req: NextRequest) {
     console.log(`\n${'='.repeat(60)}`);
     console.log(`🚀 [Full Scan] Starting for @${username}`);
     console.log(`${'='.repeat(60)}\n`);
+
+    // Step 0: Ensure account has a login password for dashboard access
+    const supabaseInit = await createClient();
+    const { data: acct } = await supabaseInit
+      .from('accounts')
+      .select('security_config')
+      .eq('id', accountId)
+      .single();
+
+    if (!acct?.security_config?.admin_password_hash) {
+      const defaultHash = await hashPassword('123456');
+      await supabaseInit
+        .from('accounts')
+        .update({
+          security_config: {
+            ...(acct?.security_config || {}),
+            admin_password_hash: defaultHash,
+          },
+        })
+        .eq('id', accountId);
+      console.log(`[Full Scan] Set default dashboard password for @${username}`);
+    }
 
     // Step 1: Create scan job with FULL config
     const repo = getScanJobsRepo();

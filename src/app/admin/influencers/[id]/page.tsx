@@ -1,17 +1,34 @@
 'use client';
 
-import { use, useState, useEffect } from 'react';
+import { use, useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { 
-  ArrowRight, 
-  MessageCircle, 
-  Settings, 
+import {
+  ArrowRight,
+  MessageCircle,
+  Settings,
   BarChart3,
   CheckCircle,
   AlertCircle,
   RefreshCw,
-  Eye
+  Eye,
+  FileText,
+  Upload,
+  Trash2,
+  Loader2,
 } from 'lucide-react';
+
+interface AdminDocument {
+  id: string;
+  filename: string;
+  file_size: number;
+  mime_type: string;
+  document_type: string;
+  parsing_status: string;
+  parsing_confidence: number | null;
+  ai_model_used: string | null;
+  uploaded_at: string;
+  parsed_at: string | null;
+}
 
 interface InfluencerDetails {
   id: string;
@@ -52,10 +69,79 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
   const [influencer, setInfluencer] = useState<InfluencerDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [rebuilding, setRebuilding] = useState(false);
+  const [documents, setDocuments] = useState<AdminDocument[]>([]);
+  const [docsLoading, setDocsLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadInfluencer();
+    loadDocuments();
   }, [id]);
+
+  async function loadDocuments() {
+    setDocsLoading(true);
+    try {
+      const res = await fetch(`/api/admin/documents?accountId=${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setDocuments(data.documents || []);
+      }
+    } catch (error) {
+      console.error('Error loading documents:', error);
+    } finally {
+      setDocsLoading(false);
+    }
+  }
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      for (const file of Array.from(files)) {
+        formData.append('files', file);
+      }
+      formData.append('accountId', id);
+      formData.append('documentType', 'other');
+
+      const res = await fetch('/api/influencer/documents/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (res.ok) {
+        // Reload documents list after upload
+        setTimeout(() => loadDocuments(), 2000);
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Upload failed');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Upload failed');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
+  async function deleteDocument(docId: string) {
+    if (!confirm('למחוק מסמך זה?')) return;
+
+    try {
+      const res = await fetch(`/api/admin/documents?documentId=${docId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setDocuments(prev => prev.filter(d => d.id !== docId));
+      } else {
+        alert('Failed to delete');
+      }
+    } catch (error) {
+      alert('Failed to delete');
+    }
+  }
 
   async function loadInfluencer() {
     try {
@@ -240,6 +326,91 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
                   <div className="text-white text-2xl font-bold">{influencer.stats.partnerships}</div>
                 </div>
               </div>
+            </div>
+
+            {/* Documents */}
+            <div className="admin-card p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  מסמכים ({documents.length})
+                </h2>
+                <div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept=".pdf,.docx,.pptx,.doc,.ppt,.xlsx,.xls,.jpg,.jpeg,.png,.webp"
+                    className="hidden"
+                    onChange={handleFileUpload}
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-700 text-white rounded-lg transition-colors flex items-center gap-2 text-sm"
+                  >
+                    {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    {uploading ? 'מעלה...' : 'העלאת מסמך'}
+                  </button>
+                </div>
+              </div>
+
+              {docsLoading ? (
+                <div className="text-gray-400 text-center py-4">טוען מסמכים...</div>
+              ) : documents.length === 0 ? (
+                <div className="text-gray-500 text-center py-8">
+                  <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p>אין מסמכים עדיין</p>
+                  <p className="text-sm mt-1">העלה PDF, מצגות, או מסמכים שייכנסו למאגר הידע של הבוט</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {documents.map((doc) => (
+                    <div key={doc.id} className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-lg">
+                      <FileText className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-white text-sm truncate">{doc.filename}</div>
+                        <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
+                          <span>{doc.document_type}</span>
+                          <span>·</span>
+                          <span>{(doc.file_size / 1024).toFixed(0)} KB</span>
+                          <span>·</span>
+                          <span className={
+                            doc.parsing_status === 'completed' ? 'text-green-400' :
+                            doc.parsing_status === 'failed' ? 'text-red-400' :
+                            doc.parsing_status === 'processing' ? 'text-yellow-400' :
+                            'text-gray-400'
+                          }>
+                            {doc.parsing_status === 'completed' ? 'נותח' :
+                             doc.parsing_status === 'failed' ? 'נכשל' :
+                             doc.parsing_status === 'processing' ? 'מנתח...' :
+                             'ממתין'}
+                          </span>
+                          {doc.parsing_confidence != null && doc.parsing_confidence > 0 && (
+                            <>
+                              <span>·</span>
+                              <span>{(doc.parsing_confidence * 100).toFixed(0)}%</span>
+                            </>
+                          )}
+                          {doc.ai_model_used && (
+                            <>
+                              <span>·</span>
+                              <span>{doc.ai_model_used}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => deleteDocument(doc.id)}
+                        className="p-1.5 text-gray-500 hover:text-red-400 transition-colors"
+                        title="מחק"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

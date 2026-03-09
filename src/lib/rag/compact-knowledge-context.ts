@@ -111,19 +111,32 @@ export function compactKnowledgeContext(
 
   // 1. Coupons (never truncated, never deduped — they're small and critical)
   if (kb.coupons?.length > 0) {
-    let section = `\n💰 **קופונים זמינים (${kb.coupons.length}) - CRITICAL: שמות המותגים יכולים להיות באנגלית או בעברית:**\n`;
-    kb.coupons.forEach((c, i) => {
+    const now = new Date();
+    const activeCoupons = kb.coupons.filter(c => {
+      if (c.end_date) {
+        return new Date(c.end_date) >= now;
+      }
+      return true;
+    });
+    const expiredCount = kb.coupons.length - activeCoupons.length;
+
+    let section = `\n💰 **קופונים זמינים (${activeCoupons.length}) - CRITICAL: שמות המותגים יכולים להיות באנגלית או בעברית:**\n`;
+    activeCoupons.forEach((c, i) => {
       section += `${i + 1}. מותג: ${c.brand || c.code}`;
       if (c.discount && !c.discount.includes('לחץ על הקישור')) {
         section += ` | הנחה: ${c.discount}`;
       }
       if (c.code) section += ` | קוד: ${c.code}`;
       if (c.link) section += ` | LINK: ${c.link}`;
+      if (c.end_date) section += ` | בתוקף עד: ${c.end_date}`;
       section += '\n';
     });
+    if (expiredCount > 0) {
+      section += `(${expiredCount} קופונים נוספים פגו תוקף ולא מוצגים)\n`;
+    }
     section += `⚠️ חפש מותגים גם בעברית וגם באנגלית (ספרינג=Spring, ארגניה=Argania, ליבס=Leaves, רנואר=Renuar). אם יש LINK — הצג כ-[לחצי כאן](LINK).\n`;
     context += section;
-    sectionCounts.coupons = kb.coupons.length;
+    sectionCounts.coupons = activeCoupons.length;
   }
 
   // 2. Posts
@@ -134,7 +147,15 @@ export function compactKnowledgeContext(
     for (const p of items) {
       const caption = p.caption || 'ללא כיתוב';
       if (isDuplicate(caption)) continue;
-      section += `${++count}. ${truncate(caption, opts.maxPostChars)}\n\n`;
+      let line = `${++count}. ${truncate(caption, opts.maxPostChars)}`;
+      // Add engagement info if available
+      const meta: string[] = [];
+      if (p.post_url) meta.push(`URL: ${p.post_url}`);
+      if (p.likes_count > 0) meta.push(`❤️ ${p.likes_count}`);
+      if (p.comments_count && p.comments_count > 0) meta.push(`💬 ${p.comments_count}`);
+      if (p.is_sponsored) meta.push('📢 ממומן');
+      if (meta.length > 0) line += `\n   [${meta.join(' | ')}]`;
+      section += line + '\n\n';
     }
     if (count > 0) context += section;
     sectionCounts.posts = count;
@@ -147,7 +168,15 @@ export function compactKnowledgeContext(
     let section = `\n🎥 **תמלולים (${kb.transcriptions.length}):**\n`;
     for (const t of items) {
       if (isDuplicate(t.text)) continue;
-      section += `${++count}. ${truncate(t.text, opts.maxTranscriptionChars)}\n\n`;
+      let line = `${++count}. ${truncate(t.text, opts.maxTranscriptionChars)}`;
+      // Include on-screen text (OCR) if available
+      if (t.on_screen_text && Array.isArray(t.on_screen_text) && t.on_screen_text.length > 0) {
+        const ocrText = t.on_screen_text.join(' | ');
+        if (ocrText.trim()) {
+          line += `\n   📝 טקסט על המסך: ${truncate(ocrText, 300)}`;
+        }
+      }
+      section += line + '\n\n';
     }
     if (count > 0) context += section;
     sectionCounts.transcriptions = count;
@@ -209,7 +238,11 @@ export function compactKnowledgeContext(
     const items = kb.insights.slice(0, 3);
     let section = `\n💡 **תובנות (${kb.insights.length}):**\n`;
     items.forEach((ins, i) => {
-      section += `${i + 1}. ${truncate((ins as any).insight || ins.content, 150)}\n`;
+      let line = `${i + 1}. ${truncate((ins as any).insight || ins.content, 150)}`;
+      if (ins.occurrence_count > 1) line += ` (נשאל ${ins.occurrence_count} פעמים)`;
+      const suggested = (ins as any).suggested_response;
+      if (suggested) line += `\n   💬 תשובה מומלצת: ${truncate(suggested, 200)}`;
+      section += line + '\n';
     });
     context += section;
     sectionCounts.insights = items.length;

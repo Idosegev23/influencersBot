@@ -125,7 +125,7 @@ export async function processWithArchetype(
     modelTier?: 'nano' | 'standard' | 'full';
     personalityConfig?: any;
     previousResponseId?: string | null;
-    mode?: 'widget' | 'social';
+    mode?: 'widget' | 'social' | 'dm';
   }
 ) {
   console.log('\n' + '='.repeat(80));

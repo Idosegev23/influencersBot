@@ -109,9 +109,35 @@ export class IncrementalScanOrchestrator {
           profile_pic_url: profile.profile_pic_url,
         });
 
+        // Persist avatar to Supabase Storage so it never expires
+        if (profile.profile_pic_url) {
+          try {
+            const picRes = await fetch(profile.profile_pic_url);
+            if (picRes.ok) {
+              const picBuffer = Buffer.from(await picRes.arrayBuffer());
+              const picType = picRes.headers.get('content-type') || 'image/jpeg';
+              const picExt = picType.includes('png') ? 'png' : 'jpg';
+              await this.supabase.storage.from('avatars').upload(
+                `${accountId}/profile.${picExt}`, picBuffer,
+                { contentType: picType, upsert: true }
+              );
+              const { data: urlData } = this.supabase.storage.from('avatars').getPublicUrl(`${accountId}/profile.${picExt}`);
+              if (urlData?.publicUrl) {
+                const { data: acct } = await this.supabase.from('accounts').select('config').eq('id', accountId).single();
+                if (acct) {
+                  await this.supabase.from('accounts').update({ config: { ...acct.config, avatar_url: urlData.publicUrl } }).eq('id', accountId);
+                }
+              }
+              console.log('[Step 2] ✓ Avatar saved to storage');
+            }
+          } catch (avatarErr) {
+            console.warn('[Step 2] Avatar persist failed:', avatarErr);
+          }
+        }
+
         stats.profileUpdated = true;
         console.log(`[Step 2] ✓ Profile updated`);
-        
+
         await this.rateLimiter.waitRandom('after profile');
       }
 

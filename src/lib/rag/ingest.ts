@@ -175,7 +175,7 @@ export async function ingestAllForAccount(
 ): Promise<{ total: number; byType: Record<string, number>; errors: string[] }> {
   const supabase = createClient();
   const types = options?.entityTypes || [
-    'post', 'transcription', 'partnership', 'coupon', 'knowledge_base', 'website',
+    'post', 'transcription', 'partnership', 'coupon', 'knowledge_base', 'website', 'document',
   ];
 
   const result = { total: 0, byType: {} as Record<string, number>, errors: [] as string[] };
@@ -419,6 +419,36 @@ async function ingestEntityType(
       }
       break;
     }
+
+    case 'document': {
+      const { data: docs } = await supabase
+        .from('partnership_documents')
+        .select('id, filename, document_type, parsed_data, parsing_status, account_id')
+        .eq('account_id', accountId)
+        .eq('parsing_status', 'completed')
+        .not('parsed_data', 'is', null);
+
+      if (docs) {
+        for (const doc of docs) {
+          const text = buildDocumentText(doc);
+          if (!text.trim()) continue;
+          try {
+            await ingestDocument({
+              accountId,
+              entityType: 'document',
+              sourceId: doc.id,
+              title: `Document: ${doc.filename} (${doc.document_type})`,
+              text,
+              metadata: { filename: doc.filename, documentType: doc.document_type },
+            });
+            count++;
+          } catch (err) {
+            log.warn(`Skipping document ${doc.id}: ${err instanceof Error ? err.message : String(err)}`, { accountId, documentId: doc.id }, accountId);
+          }
+        }
+      }
+      break;
+    }
   }
 
   log.info(`Ingested ${count} ${entityType} documents`, { accountId, entityType, count }, accountId);
@@ -484,6 +514,38 @@ function buildCouponText(c: {
   parts.push(`Discount: ${c.discount_value}${c.discount_type === 'percentage' ? '%' : ` ${c.currency || 'ILS'}`} (${c.discount_type})`);
   if (c.description) parts.push(`Description: ${c.description}`);
   if (c.brand_link) parts.push(`Link: ${c.brand_link}`);
+  return parts.join('\n');
+}
+
+export function buildDocumentText(doc: {
+  filename: string;
+  document_type: string;
+  parsed_data: any;
+}): string {
+  const parts = [`Document: ${doc.filename}`, `Type: ${doc.document_type}`];
+  const data = doc.parsed_data;
+  if (!data) return parts.join('\n');
+
+  const extractText = (obj: any, prefix = ''): string[] => {
+    const lines: string[] = [];
+    for (const [key, value] of Object.entries(obj)) {
+      if (typeof value === 'string' && value.trim()) {
+        lines.push(`${prefix}${key}: ${value}`);
+      } else if (typeof value === 'number') {
+        lines.push(`${prefix}${key}: ${value}`);
+      } else if (Array.isArray(value)) {
+        for (const item of value) {
+          if (typeof item === 'string') lines.push(`${prefix}${key}: ${item}`);
+          else if (typeof item === 'object' && item !== null) lines.push(...extractText(item, `${prefix}  `));
+        }
+      } else if (typeof value === 'object' && value !== null) {
+        lines.push(...extractText(value, `${prefix}${key}.`));
+      }
+    }
+    return lines;
+  };
+
+  parts.push(...extractText(data));
   return parts.join('\n');
 }
 

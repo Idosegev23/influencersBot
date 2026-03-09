@@ -644,7 +644,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       {/* Google Fonts */}
       <link href={getGoogleFontsUrl(influencer.theme)} rel="stylesheet" />
       
-      <main className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--color-background)' }}>
+      <main className="chat-page min-h-screen flex flex-col" style={{ backgroundColor: 'var(--color-background)' }}>
         {/* Header */}
         <header className="sticky top-0 z-50 glass header-border px-4 py-3">
           <div className="max-w-2xl mx-auto flex items-center justify-between">
@@ -697,7 +697,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
 
             {/* Left side - Tabs + New Chat */}
             <div className="flex items-center gap-2">
-              <div className="flex gap-1 p-1 rounded-full" style={{ backgroundColor: 'var(--color-surface)' }}>
+              <div className="flex gap-1 p-1 rounded-full" style={{ backgroundColor: '#f0f0f2' }}>
                 <button
                   onClick={() => setActiveTab('chat')}
                   className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
@@ -759,7 +759,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 className="h-full flex flex-col relative"
               >
                 {/* Chat Messages */}
-                <div className="flex-1 overflow-y-auto px-4 py-6 pb-28 space-y-5 chat-bg chat-messages-scroll">
+                <div className="flex-1 overflow-y-auto px-4 py-6 pb-32 space-y-4 chat-bg chat-messages-scroll">
                   {messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center text-center px-4 pt-10">
                       {/* Avatar with decorative ring */}
@@ -823,7 +823,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           <button
                             onClick={() => setActiveTab('search')}
                             className="px-5 py-2.5 rounded-full text-sm font-medium transition-all hover:shadow-md"
-                            style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+                            style={{ backgroundColor: '#ffffff', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
                           >
                             🛍️ קופונים ומותגים
                           </button>
@@ -831,7 +831,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         <button
                           onClick={() => setShowSupportModal(true)}
                           className="px-5 py-2.5 rounded-full text-sm font-medium transition-all hover:shadow-md"
-                          style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+                          style={{ backgroundColor: '#ffffff', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
                         >
                           💬 בעיה בהזמנה
                         </button>
@@ -875,7 +875,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                 key={brand.id}
                                 onClick={() => brand.coupon_code && handleCopyCode(brand.coupon_code, brand.id)}
                                 className="flex-shrink-0 w-32 p-3.5 rounded-2xl text-right transition-all hover:shadow-md"
-                                style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+                                style={{ backgroundColor: '#ffffff', border: '1px solid var(--color-border)' }}
                               >
                                 <p className="font-medium text-sm truncate" style={{ color: 'var(--color-text)' }}>
                                   {brand.brand_name}
@@ -943,7 +943,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                               </div>
                             )}
                             <div>
-                              <div className={`max-w-[85%] px-5 py-3.5 ${msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-assistant'}`}>
+                              <div className={`max-w-[80%] px-4 py-3 ${msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-assistant'}`}>
                                 {msg.role === 'user' ? (
                                   <p className="text-sm whitespace-pre-wrap">{displayContent}</p>
                                 ) : (
@@ -1223,7 +1223,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 {/* Chat Input */}
                 <div
                   className="absolute bottom-0 left-0 right-0 px-4 pt-3 pb-safe"
-                  style={{ background: `linear-gradient(to top, var(--color-background) 70%, transparent)` }}
+                  style={{ background: 'linear-gradient(to top, #ffffff 60%, rgba(255,255,255,0))' }}
                 >
                   <div className="max-w-2xl mx-auto">
                     {/* Quick action buttons above input */}
@@ -1233,7 +1233,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           <button
                             onClick={() => setActiveTab('search')}
                             className="px-3 py-1.5 rounded-full text-xs font-medium transition-all"
-                            style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+                            style={{ backgroundColor: '#ffffff', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
                           >
                             🛍️ קופונים
                           </button>
@@ -1241,7 +1241,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         <button
                           onClick={() => setShowSupportModal(true)}
                           className="px-3 py-1.5 rounded-full text-xs font-medium transition-all"
-                          style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+                          style={{ backgroundColor: '#ffffff', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
                         >
                           💬 בעיה בהזמנה
                         </button>
@@ -1287,7 +1287,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 className="h-full overflow-y-auto"
               >
                 {/* Search Header */}
-                <div className="sticky top-0 z-40 px-4 py-4 border-b" style={{ backgroundColor: 'var(--color-background)', borderColor: 'var(--color-border)' }}>
+                <div className="sticky top-0 z-40 px-4 py-4 border-b" style={{ backgroundColor: '#ffffff', borderColor: 'var(--color-border)' }}>
                   <div className="max-w-2xl mx-auto">
                     <div className="relative">
                       <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5" style={{ color: 'var(--color-text)', opacity: 0.4 }} />
@@ -1315,7 +1315,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                               key={brand.id}
                               onClick={() => handleCopyCode(brand.coupon_code!, brand.id)}
                               className="p-4 rounded-xl text-right transition-all"
-                              style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+                              style={{ backgroundColor: '#ffffff', border: '1px solid var(--color-border)' }}
                             >
                               <div className="flex items-center justify-between mb-2">
                                 <span className="text-xs" style={{ color: 'var(--color-text)', opacity: 0.6 }}>{brand.category || 'מותג'}</span>
@@ -1339,8 +1339,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           <button
                             key={brand.id}
                             onClick={() => brand.coupon_code && handleCopyCode(brand.coupon_code, brand.id)}
-                            className="p-4 rounded-xl text-right transition-all hover:shadow-lg"
-                            style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+                            className="p-4 rounded-xl text-right transition-all hover:shadow-md"
+                            style={{ backgroundColor: '#ffffff', border: '1px solid var(--color-border)' }}
                           >
                             <p className="font-semibold text-base" style={{ color: 'var(--color-text)' }}>{brand.brand_name}</p>
                             {brand.description && (

@@ -1,6 +1,7 @@
 // AI Parser Main Entry Point
 // Handles multi-model fallback strategy
 
+import { parseWithOpenAI } from './openai';
 import { parseWithGemini } from './gemini';
 import { CONFIDENCE_THRESHOLD } from './types';
 import type { ParseOptions, ParseResult } from './types';
@@ -19,9 +20,8 @@ export async function parseDocument(options: ParseOptions): Promise<ParseResult>
   console.log(`[AI Parser] Type: ${options.documentType}, Language: ${options.language || 'auto'}`);
 
   const parsers = [
-    { name: 'gemini', fn: parseWithGemini },
-    // { name: 'claude', fn: parseWithClaude }, // TODO: Add when needed
-    // { name: 'openai', fn: parseWithOpenAI }, // TODO: Add when needed
+    { name: 'openai', fn: parseWithOpenAI },   // Primary: GPT-5.2
+    { name: 'gemini', fn: parseWithGemini },    // Fallback: Gemini 3 Pro
   ];
 
   for (let i = 0; i < parsers.length; i++) {
@@ -201,5 +201,5 @@ function deduplicateArray(arr: any[], key: string): any[] {
 // Re-export types and utils
 export * from './types';
 export * from './utils';
-export { parseWithGemini };
+export { parseWithOpenAI, parseWithGemini };
 

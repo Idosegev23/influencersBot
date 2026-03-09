@@ -165,9 +165,34 @@ export class NewScanOrchestrator {
         profile_pic_url: profile.profile_pic_url,
       });
 
+      // Persist avatar to Supabase Storage so it never expires
+      if (profile.profile_pic_url) {
+        try {
+          const picRes = await fetch(profile.profile_pic_url);
+          if (picRes.ok) {
+            const picBuffer = Buffer.from(await picRes.arrayBuffer());
+            const picType = picRes.headers.get('content-type') || 'image/jpeg';
+            const picExt = picType.includes('png') ? 'png' : 'jpg';
+            await supabase.storage.from('avatars').upload(
+              `${accountId}/profile.${picExt}`, picBuffer,
+              { contentType: picType, upsert: true }
+            );
+            const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(`${accountId}/profile.${picExt}`);
+            if (urlData?.publicUrl) {
+              const { data: acct } = await supabase.from('accounts').select('config').eq('id', accountId).single();
+              if (acct) {
+                await supabase.from('accounts').update({ config: { ...acct.config, avatar_url: urlData.publicUrl } }).eq('id', accountId);
+              }
+            }
+          }
+        } catch (avatarErr) {
+          console.warn('[NewScan] Avatar persist failed:', avatarErr);
+        }
+      }
+
       stats.profileScraped = true;
-      const followersText = profile.followers_count 
-        ? profile.followers_count.toLocaleString() 
+      const followersText = profile.followers_count
+        ? profile.followers_count.toLocaleString()
         : '?';
       report('profile', 'completed', 10, `✓ פרופיל: ${followersText} עוקבים`);
 
