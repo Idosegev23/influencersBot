@@ -18,6 +18,9 @@ import {
   ChevronUp,
   X,
   Plus,
+  RotateCcw,
+  AlertTriangle,
+  Sliders,
 } from 'lucide-react';
 import ScrapeProgressModal from '@/components/ScrapeProgressModal';
 
@@ -87,6 +90,9 @@ interface PersonaFull {
   directives: string[];
   bio: string;
   interests: string[];
+
+  /* Snapshot tracking */
+  ai_snapshot: Record<string, unknown> | null;
 }
 
 const EMPTY_PERSONA: PersonaFull = {
@@ -105,6 +111,14 @@ const EMPTY_PERSONA: PersonaFull = {
   directives: [],
   bio: '',
   interests: [],
+  ai_snapshot: null,
+};
+
+const EMOJI_LABELS: Record<string, string> = {
+  none: 'ללא',
+  minimal: 'מעט',
+  moderate: 'מתון',
+  heavy: 'הרבה',
 };
 
 /* ------------------------------------------------------------------ */
@@ -290,8 +304,11 @@ export default function ChatbotPersonaPage({
 
   const [persona, setPersona] = useState<PersonaFull>(EMPTY_PERSONA);
 
+  const [restoring, setRestoring] = useState(false);
+
   const [newDirective, setNewDirective] = useState('');
   const [newInterest, setNewInterest] = useState('');
+  const [newPhrase, setNewPhrase] = useState('');
 
   /* ---- data loading ---- */
 
@@ -322,6 +339,7 @@ export default function ChatbotPersonaPage({
           directives: data.persona.directives || [],
           bio: data.persona.bio || '',
           interests: data.persona.interests || [],
+          ai_snapshot: data.persona.ai_snapshot || null,
         });
       }
     } catch (err) {
@@ -332,7 +350,7 @@ export default function ChatbotPersonaPage({
     }
   };
 
-  /* ---- save (editable fields only) ---- */
+  /* ---- save ALL editable fields ---- */
 
   const handleSave = async () => {
     setSaving(true);
@@ -350,10 +368,20 @@ export default function ChatbotPersonaPage({
           greeting_message: persona.greeting_message,
           bio: persona.bio,
           interests: persona.interests,
+          narrative_perspective: persona.narrative_perspective,
+          sass_level: persona.sass_level,
+          storytelling_mode: persona.storytelling_mode,
+          message_structure: persona.message_structure,
+          common_phrases: persona.common_phrases,
         }),
       });
 
       if (!response.ok) throw new Error('Failed to save persona');
+
+      const data = await response.json();
+      if (data.persona) {
+        setPersona(prev => ({ ...prev, ai_snapshot: data.persona.ai_snapshot || prev.ai_snapshot }));
+      }
 
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
@@ -362,6 +390,37 @@ export default function ChatbotPersonaPage({
       setError('שגיאה בשמירת הפרסונה');
     } finally {
       setSaving(false);
+    }
+  };
+
+  /* ---- restore from AI snapshot ---- */
+
+  const handleRestore = async () => {
+    if (!confirm('לשחזר את כל ההגדרות לערכים המקוריים שה-AI יצר? שינויים ידניים יימחקו.')) return;
+
+    setRestoring(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/influencer/chatbot/persona?username=${username}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restore: true }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to restore');
+      }
+
+      await loadPersona();
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      console.error('Error restoring persona:', err);
+      setError(err instanceof Error ? err.message : 'שגיאה בשחזור הפרסונה');
+    } finally {
+      setRestoring(false);
     }
   };
 
@@ -389,6 +448,25 @@ export default function ChatbotPersonaPage({
 
   const removeInterest = (index: number) => {
     setPersona({ ...persona, interests: persona.interests.filter((_, i) => i !== index) });
+  };
+
+  /* ---- common phrases helpers ---- */
+
+  const addPhrase = () => {
+    if (newPhrase.trim()) {
+      setPersona({
+        ...persona,
+        common_phrases: [...(persona.common_phrases || []), newPhrase.trim()],
+      });
+      setNewPhrase('');
+    }
+  };
+
+  const removePhrase = (index: number) => {
+    setPersona({
+      ...persona,
+      common_phrases: (persona.common_phrases || []).filter((_, i) => i !== index),
+    });
   };
 
   /* ---- sync from Instagram ---- */
@@ -516,61 +594,175 @@ export default function ChatbotPersonaPage({
         )}
 
         {/* ============================================================ */}
-        {/*  1. PERSONA IDENTITY CARD                                     */}
+        {/*  1. PERSONA IDENTITY + PERSONALITY CONTROLS                    */}
         {/* ============================================================ */}
 
-        <div
-          className="rounded-xl border p-6"
-          style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
-        >
-          <div className="flex items-start gap-4">
+        <SectionCard icon={Sliders} title="בקרת אישיות הבוט">
+          {/* Warning banner */}
+          <div
+            className="rounded-lg p-3 flex items-start gap-2"
+            style={{
+              background: 'color-mix(in srgb, var(--dash-warning, #f59e0b) 10%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--dash-warning, #f59e0b) 30%, transparent)',
+            }}
+          >
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: 'var(--dash-warning, #f59e0b)' }} />
+            <p className="text-xs leading-relaxed" style={{ color: 'var(--dash-warning, #f59e0b)' }}>
+              <strong>שים לב:</strong> שדות אלו נוצרו אוטומטית ע&quot;י AI מניתוח הפוסטים שלך. שינויים ידניים ישפיעו על אופי התשובות של הבוט.
+              {persona.ai_snapshot && ' ניתן לשחזר למקור בכל עת.'}
+            </p>
+          </div>
+
+          {/* Identity header */}
+          <div className="flex items-center gap-3 pb-2">
             <div
-              className="w-12 h-12 rounded-full flex items-center justify-center shrink-0"
+              className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
               style={{ background: 'color-mix(in srgb, var(--color-primary) 15%, transparent)' }}
             >
-              <Sparkles className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
+              <Sparkles className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
             </div>
-
-            <div className="flex-1 min-w-0 space-y-3">
-              {/* Name / title */}
-              <div>
-                <h2 className="text-xl font-bold leading-snug" style={{ color: 'var(--dash-text)' }}>
-                  {persona.name || username}
-                </h2>
-                {persona.tone && (
-                  <p className="text-sm mt-1 leading-relaxed" style={{ color: 'var(--dash-text-2)' }}>
-                    {persona.tone}
-                  </p>
-                )}
-              </div>
-
-              {/* Badges row */}
-              <div className="flex flex-wrap gap-2">
-                {persona.narrative_perspective && (
-                  <Badge>{humanize(persona.narrative_perspective, NARRATIVE_LABELS)}</Badge>
-                )}
-                {persona.storytelling_mode && (
-                  <Badge color="var(--color-info)">
-                    {humanize(persona.storytelling_mode, STORYTELLING_LABELS)}
-                  </Badge>
-                )}
-                {persona.message_structure && (
-                  <Badge color="var(--dash-text-2)">
-                    {humanize(persona.message_structure, MESSAGE_STRUCTURE_LABELS)}
-                  </Badge>
-                )}
-                {persona.emoji_usage && (
-                  <Badge color="var(--dash-positive)">
-                    אימוג׳י: {persona.emoji_usage}
-                  </Badge>
-                )}
-              </div>
-
-              {/* Sass level */}
-              {persona.sass_level !== null && <SassIndicator level={persona.sass_level} />}
+            <div>
+              <h3 className="font-bold" style={{ color: 'var(--dash-text)' }}>
+                {persona.name || username}
+              </h3>
+              {persona.tone && (
+                <p className="text-xs leading-relaxed" style={{ color: 'var(--dash-text-2)' }}>
+                  {persona.tone}
+                </p>
+              )}
             </div>
           </div>
-        </div>
+
+          {/* Personality dropdowns grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Narrative Perspective */}
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--dash-text-2)' }}>
+                סגנון דיבור
+              </label>
+              <select
+                value={persona.narrative_perspective || 'sidekick-professional'}
+                onChange={(e) => setPersona({ ...persona, narrative_perspective: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none"
+                style={{ background: 'var(--dash-bg)', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
+              >
+                {Object.entries(NARRATIVE_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Storytelling Mode */}
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--dash-text-2)' }}>
+                סגנון סיפור
+              </label>
+              <select
+                value={persona.storytelling_mode || 'balanced'}
+                onChange={(e) => setPersona({ ...persona, storytelling_mode: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none"
+                style={{ background: 'var(--dash-bg)', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
+              >
+                {Object.entries(STORYTELLING_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Message Structure */}
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--dash-text-2)' }}>
+                מבנה הודעות
+              </label>
+              <select
+                value={persona.message_structure || 'whatsapp'}
+                onChange={(e) => setPersona({ ...persona, message_structure: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none"
+                style={{ background: 'var(--dash-bg)', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
+              >
+                {Object.entries(MESSAGE_STRUCTURE_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Emoji Usage */}
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--dash-text-2)' }}>
+                שימוש באימוג&apos;י
+              </label>
+              <select
+                value={persona.emoji_usage || 'moderate'}
+                onChange={(e) => setPersona({ ...persona, emoji_usage: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none"
+                style={{ background: 'var(--dash-bg)', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
+              >
+                {Object.entries(EMOJI_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Sass Level Slider */}
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--dash-text-2)' }}>
+              רמת סאס (חוצפה/שנינות)
+            </label>
+            <div className="flex items-center gap-3">
+              <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>0</span>
+              <input
+                type="range"
+                min={0}
+                max={10}
+                step={1}
+                value={persona.sass_level ?? 5}
+                onChange={(e) => setPersona({ ...persona, sass_level: parseInt(e.target.value) })}
+                className="flex-1 accent-[var(--color-primary)]"
+              />
+              <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>10</span>
+              <span className="text-sm font-bold min-w-[2.5rem] text-center" style={{ color: 'var(--color-primary)' }}>
+                {persona.sass_level ?? 5}/10
+              </span>
+            </div>
+          </div>
+
+          {/* Common Phrases (editable chips) */}
+          <div>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--dash-text-2)' }}>
+              ביטויים חוזרים (הבוט ישתמש בהם בתגובות)
+            </label>
+            <div className="flex gap-2 mb-3">
+              <input
+                type="text"
+                value={newPhrase}
+                onChange={(e) => setNewPhrase(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addPhrase()}
+                placeholder={'למשל: "בדיוק כמו שאני תמיד אומרת"'}
+                className="flex-1 px-3 py-2 rounded-lg text-sm focus:outline-none"
+                style={{ background: 'var(--dash-bg)', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
+              />
+              <button
+                onClick={addPhrase}
+                className="px-3 py-2 rounded-lg transition-colors flex items-center gap-1 text-sm"
+                style={{ background: 'var(--color-primary)', color: 'white' }}
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+            {(persona.common_phrases || []).length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {(persona.common_phrases || []).map((phrase, index) => (
+                  <Chip key={index} onRemove={() => removePhrase(index)}>
+                    &ldquo;{phrase}&rdquo;
+                  </Chip>
+                ))}
+              </div>
+            ) : (
+              <EmptyLabel text="אין ביטויים חוזרים" />
+            )}
+          </div>
+        </SectionCard>
 
         {/* ============================================================ */}
         {/*  2. VOICE & STYLE (read-only)                                 */}
@@ -1078,9 +1270,10 @@ export default function ChatbotPersonaPage({
         {/* ============================================================ */}
 
         <div
-          className="rounded-xl border p-5"
+          className="rounded-xl border p-5 space-y-4"
           style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
         >
+          {/* Sync from Instagram */}
           <div className="flex flex-col sm:flex-row items-center gap-4">
             <div className="flex-1 text-center sm:text-right">
               <h3 className="font-bold text-sm mb-1" style={{ color: 'var(--dash-text)' }}>
@@ -1092,7 +1285,7 @@ export default function ChatbotPersonaPage({
             </div>
             <button
               onClick={syncFromInstagram}
-              disabled={syncing || saving}
+              disabled={syncing || saving || restoring}
               className="shrink-0 flex items-center gap-2 px-5 py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
               style={{ background: 'var(--color-primary)', color: 'white' }}
             >
@@ -1109,6 +1302,41 @@ export default function ChatbotPersonaPage({
               )}
             </button>
           </div>
+
+          {/* Restore from AI snapshot */}
+          {persona.ai_snapshot && (
+            <>
+              <hr style={{ borderColor: 'var(--dash-border)' }} />
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                <div className="flex-1 text-center sm:text-right">
+                  <h3 className="font-bold text-sm mb-1" style={{ color: 'var(--dash-text)' }}>
+                    שחזור למקור
+                  </h3>
+                  <p className="text-xs leading-relaxed" style={{ color: 'var(--dash-text-3)' }}>
+                    מחזיר את כל ההגדרות לערכים המקוריים שה-AI יצר לפני שביצעת שינויים ידניים.
+                  </p>
+                </div>
+                <button
+                  onClick={handleRestore}
+                  disabled={restoring || syncing || saving}
+                  className="shrink-0 flex items-center gap-2 px-5 py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm border"
+                  style={{ borderColor: 'var(--dash-negative)', color: 'var(--dash-negative)' }}
+                >
+                  {restoring ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2" style={{ borderColor: 'var(--dash-negative)' }} />
+                      משחזר...
+                    </>
+                  ) : (
+                    <>
+                      <RotateCcw className="w-4 h-4" />
+                      שחזר למקור AI
+                    </>
+                  )}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
 

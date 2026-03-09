@@ -90,9 +90,19 @@ export async function POST(req: NextRequest) {
   }
 }
 
+/** Fields that the AI generates and we snapshot before first manual edit */
+const AI_SNAPSHOT_FIELDS = [
+  'narrative_perspective', 'sass_level', 'storytelling_mode',
+  'message_structure', 'emoji_usage', 'common_phrases',
+  'voice_rules', 'knowledge_map', 'slang_map',
+  'tone', 'bio', 'interests', 'directives', 'greeting_message',
+];
+
 /**
  * PATCH /api/influencer/chatbot/persona
- * Update persona directives manually
+ * Update persona fields manually.
+ * On first manual edit, saves a snapshot of all AI-generated values.
+ * Pass { restore: true } to restore from snapshot.
  */
 export async function PATCH(req: NextRequest) {
   try {
@@ -102,12 +112,53 @@ export async function PATCH(req: NextRequest) {
     }
 
     const accountId = auth.accountId;
-
-    // Parse request body
     const body = await req.json();
-    const { directives, tone, emoji_usage, greeting_message, bio, interests } = body;
 
-    // Build update object (NO custom_responses - AI only!)
+    // ---------- RESTORE MODE ----------
+    if (body.restore === true) {
+      const { data: existing } = await supabase
+        .from('chatbot_persona')
+        .select('ai_snapshot')
+        .eq('account_id', accountId)
+        .single();
+
+      if (!existing?.ai_snapshot) {
+        return NextResponse.json({ error: 'No AI snapshot to restore from' }, { status: 404 });
+      }
+
+      const restoreData: any = { updated_at: new Date().toISOString() };
+      for (const field of AI_SNAPSHOT_FIELDS) {
+        if (existing.ai_snapshot[field] !== undefined) {
+          restoreData[field] = existing.ai_snapshot[field];
+        }
+      }
+
+      const { data: restored, error: restoreError } = await supabase
+        .from('chatbot_persona')
+        .update(restoreData)
+        .eq('account_id', accountId)
+        .select()
+        .single();
+
+      if (restoreError) {
+        console.error('Failed to restore persona:', restoreError);
+        return NextResponse.json({ error: 'Failed to restore persona' }, { status: 500 });
+      }
+
+      return NextResponse.json({
+        success: true,
+        persona: restored,
+        message: 'Persona restored from AI snapshot',
+      });
+    }
+
+    // ---------- NORMAL UPDATE ----------
+    const {
+      directives, tone, emoji_usage, greeting_message, bio, interests,
+      narrative_perspective, sass_level, storytelling_mode, message_structure,
+      common_phrases,
+    } = body;
+
     const updates: any = {
       updated_at: new Date().toISOString(),
     };
@@ -118,18 +169,32 @@ export async function PATCH(req: NextRequest) {
     if (greeting_message !== undefined) updates.greeting_message = greeting_message;
     if (bio !== undefined) updates.bio = bio;
     if (interests !== undefined) updates.interests = interests;
-    // Note: custom_responses intentionally removed - AI should use behavioral guidelines only!
+    if (narrative_perspective !== undefined) updates.narrative_perspective = narrative_perspective;
+    if (sass_level !== undefined) updates.sass_level = sass_level;
+    if (storytelling_mode !== undefined) updates.storytelling_mode = storytelling_mode;
+    if (message_structure !== undefined) updates.message_structure = message_structure;
+    if (common_phrases !== undefined) updates.common_phrases = common_phrases;
 
     // Check if persona exists
     const { data: existingPersona } = await supabase
       .from('chatbot_persona')
-      .select('id')
+      .select('*')
       .eq('account_id', accountId)
       .single();
 
     let persona;
     if (existingPersona) {
-      // Update existing
+      // Save AI snapshot on first manual edit (only once)
+      if (!existingPersona.ai_snapshot) {
+        const snapshot: any = {};
+        for (const field of AI_SNAPSHOT_FIELDS) {
+          if ((existingPersona as any)[field] !== undefined) {
+            snapshot[field] = (existingPersona as any)[field];
+          }
+        }
+        updates.ai_snapshot = snapshot;
+      }
+
       const { data, error: updateError } = await supabase
         .from('chatbot_persona')
         .update(updates)
@@ -143,7 +208,6 @@ export async function PATCH(req: NextRequest) {
       }
       persona = data;
     } else {
-      // Create new
       const { data, error: insertError } = await supabase
         .from('chatbot_persona')
         .insert({
@@ -161,7 +225,7 @@ export async function PATCH(req: NextRequest) {
       persona = data;
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
       persona,
       message: 'Persona updated successfully',
