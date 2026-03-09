@@ -438,6 +438,33 @@ ${OUTPUT_SCHEMA}`;
 // ============================================
 
 function prepareInputData(preprocessedData: PreprocessedData, profileData?: any) {
+  // Budget: keep total under ~500K chars to fit GPT-5.4 context
+  const MAX_WEBSITE_CHARS = 200_000; // 200K budget for websites
+  const MAX_CONTENT_PER_PAGE = 1500; // truncate long pages
+
+  // Smart website trimming: prioritize pages with most content
+  let websites = (preprocessedData.websites || []).map(w => ({
+    url: w.url,
+    title: w.title,
+    content: (w.content || '').substring(0, MAX_CONTENT_PER_PAGE),
+  }));
+
+  // If total website content exceeds budget, keep most content-rich pages
+  const totalWebsiteChars = websites.reduce((sum, w) => sum + (w.content?.length || 0), 0);
+  if (totalWebsiteChars > MAX_WEBSITE_CHARS) {
+    // Sort by content length descending, keep richest pages within budget
+    websites.sort((a, b) => (b.content?.length || 0) - (a.content?.length || 0));
+    let charsSoFar = 0;
+    const kept: typeof websites = [];
+    for (const w of websites) {
+      charsSoFar += (w.content?.length || 0);
+      if (charsSoFar > MAX_WEBSITE_CHARS) break;
+      kept.push(w);
+    }
+    console.log(`📊 [prepareInputData] Websites trimmed: ${websites.length} → ${kept.length} pages (${(charsSoFar / 1000).toFixed(0)}K chars)`);
+    websites = kept;
+  }
+
   return {
     profile: profileData ? {
       username: profileData.username,
@@ -479,20 +506,16 @@ function prepareInputData(preprocessedData: PreprocessedData, profileData?: any)
 
     boundaries: preprocessedData.boundaries,
 
-    websites: preprocessedData.websites?.map(w => ({
-      url: w.url,
-      title: w.title,
-      content: w.content,
-    })) || [],
+    websites,
 
     transcriptions: preprocessedData.transcriptions?.map(t => ({
       id: t.id,
-      text: t.text,
+      text: (t.text || '').substring(0, 2000), // cap individual transcriptions
       source: t.media_id,
     })) || [],
 
     posts: preprocessedData.posts?.slice(0, 50).map(p => ({
-      caption: p.caption || '',
+      caption: (p.caption || '').substring(0, 1000), // cap long captions
       hashtags: p.hashtags || [],
       likes: p.likes_count,
     })) || [],
