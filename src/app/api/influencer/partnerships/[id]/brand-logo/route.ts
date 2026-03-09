@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { createClient } from '@supabase/supabase-js';
-import { getInfluencerByUsername } from '@/lib/supabase';
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-}
+import { supabase, getInfluencerByUsername } from '@/lib/supabase';
 
 async function checkAuth(username: string): Promise<boolean> {
   const cookieStore = await cookies();
@@ -23,13 +15,23 @@ export async function POST(
 ) {
   try {
     const { id: partnershipId } = await params;
-    const formData = await req.formData();
+
+    let formData: FormData;
+    try {
+      formData = await req.formData();
+    } catch (e) {
+      console.error('FormData parse error:', e);
+      return NextResponse.json({ error: 'Invalid form data' }, { status: 400 });
+    }
+
     const username = formData.get('username') as string;
     const file = formData.get('logo') as File;
 
     if (!username || !file) {
       return NextResponse.json({ error: 'username and logo file required' }, { status: 400 });
     }
+
+    console.log('[brand-logo] Upload request:', { partnershipId, username, fileName: file.name, fileSize: file.size });
 
     const isAuth = await checkAuth(username);
     if (!isAuth) {
@@ -41,73 +43,94 @@ export async function POST(
       return NextResponse.json({ error: 'Influencer not found' }, { status: 404 });
     }
 
-    const sb = getSupabase();
-
     // Verify partnership belongs to this account
-    const { data: partnership } = await sb
+    const { data: partnership, error: partnershipErr } = await supabase
       .from('partnerships')
       .select('id, account_id, brand_name, brand_logo_id')
       .eq('id', partnershipId)
       .eq('account_id', influencer.id)
       .single();
 
-    if (!partnership) {
+    if (partnershipErr || !partnership) {
+      console.error('[brand-logo] Partnership lookup error:', partnershipErr);
       return NextResponse.json({ error: 'Partnership not found' }, { status: 404 });
     }
 
     let brandLogoId = partnership.brand_logo_id;
 
-    // If no brand_logo record exists yet, create one
+    // If no brand_logo record linked yet, find or create one
     if (!brandLogoId) {
       const normalized = partnership.brand_name.toLowerCase().replace(/[^a-z0-9א-ת]/g, '-').replace(/-+/g, '-');
-      const { data: newBrand, error: createErr } = await sb
+
+      // First check if a brand_logos record already exists with this normalized name
+      const { data: existingBrand } = await supabase
         .from('brand_logos')
-        .insert({
-          brand_name_normalized: normalized,
-          display_name: partnership.brand_name,
-        })
         .select('id')
+        .eq('brand_name_normalized', normalized)
         .single();
 
-      if (createErr || !newBrand) {
-        return NextResponse.json({ error: 'Failed to create brand record' }, { status: 500 });
+      if (existingBrand) {
+        brandLogoId = existingBrand.id;
+      } else {
+        const { data: newBrand, error: createErr } = await supabase
+          .from('brand_logos')
+          .insert({
+            brand_name_normalized: normalized,
+            display_name: partnership.brand_name,
+          })
+          .select('id')
+          .single();
+
+        if (createErr || !newBrand) {
+          console.error('[brand-logo] Failed to create brand_logos record:', createErr);
+          return NextResponse.json({ error: 'Failed to create brand record: ' + (createErr?.message || 'unknown') }, { status: 500 });
+        }
+
+        brandLogoId = newBrand.id;
       }
 
-      brandLogoId = newBrand.id;
-
-      // Link partnership to the new brand_logo
-      await sb
+      // Link partnership to the brand_logo
+      await supabase
         .from('partnerships')
         .update({ brand_logo_id: brandLogoId })
         .eq('id', partnershipId);
     }
 
+    console.log('[brand-logo] Using brandLogoId:', brandLogoId);
+
     // Upload to Supabase Storage
     const ext = file.name.split('.').pop() || 'png';
     const fileName = `${brandLogoId}.${ext}`;
-    const buffer = Buffer.from(await file.arrayBuffer());
+    const arrayBuffer = await file.arrayBuffer();
 
-    const { error: uploadError } = await sb.storage
+    const { error: uploadError } = await supabase.storage
       .from('brand-logos')
-      .upload(fileName, buffer, {
+      .upload(fileName, arrayBuffer, {
         contentType: file.type,
         upsert: true,
       });
 
     if (uploadError) {
-      return NextResponse.json({ error: uploadError.message }, { status: 500 });
+      console.error('[brand-logo] Storage upload error:', uploadError);
+      return NextResponse.json({ error: 'Storage upload failed: ' + uploadError.message }, { status: 500 });
     }
 
     // Get public URL
-    const { data: urlData } = sb.storage
+    const { data: urlData } = supabase.storage
       .from('brand-logos')
       .getPublicUrl(fileName);
 
+    console.log('[brand-logo] Public URL:', urlData.publicUrl);
+
     // Update brand_logos table
-    await sb
+    const { error: updateErr } = await supabase
       .from('brand_logos')
       .update({ logo_url: urlData.publicUrl, updated_at: new Date().toISOString() })
       .eq('id', brandLogoId);
+
+    if (updateErr) {
+      console.error('[brand-logo] brand_logos update error:', updateErr);
+    }
 
     return NextResponse.json({
       success: true,
@@ -115,7 +138,7 @@ export async function POST(
       brand_logo_id: brandLogoId,
     });
   } catch (error) {
-    console.error('Brand logo upload error:', error);
-    return NextResponse.json({ error: 'Failed to upload logo' }, { status: 500 });
+    console.error('[brand-logo] Unexpected error:', error);
+    return NextResponse.json({ error: 'Failed to upload logo: ' + (error instanceof Error ? error.message : 'unknown') }, { status: 500 });
   }
 }
