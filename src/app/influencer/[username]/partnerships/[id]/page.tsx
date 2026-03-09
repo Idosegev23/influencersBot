@@ -4,36 +4,30 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabaseClient } from '@/lib/supabase-client';
 
-interface PaymentMilestone {
-  percentage: number;
-  amount: number;
-  trigger: string;
-  dueDate: string | null;
-}
-
-interface Deliverable {
-  type: string;
-  quantity: number;
-  platform: string;
-  dueDate: string | null;
-  description: string;
-  completed?: boolean;
-}
-
 interface Partnership {
   id: string;
+  account_id?: string;
   brand_name: string;
   campaign_name: string | null;
   status: string;
   start_date: string | null;
   end_date: string | null;
   contract_amount: number | null;
-  deliverables: Deliverable[] | string | null;
+  proposal_amount?: number | null;
+  brief: string | null;
+  deliverables: any;
   notes: string | null;
   created_at: string;
   updated_at: string;
-  // Full parsed contract data
-  payment_schedule?: PaymentMilestone[];
+  coupon_code?: string | null;
+  whatsapp_phone?: string | null;
+  brand_contact_name?: string | null;
+  brand_contact_email?: string | null;
+  brand_contact_phone?: string | null;
+  brand_logo_url?: string | null;
+  category?: string | null;
+  // Parsed contract data
+  payment_schedule?: Array<{ percentage: number; amount: number; trigger: string; dueDate: string | null }>;
   exclusivity?: { isExclusive: boolean; categories: string[] } | null;
   termination_clauses?: string[];
   liability_clauses?: string[];
@@ -41,7 +35,6 @@ interface Partnership {
   key_dates?: Array<{ event: string; date: string }>;
   contract_scope?: string | null;
   auto_renewal?: boolean;
-  parsed_contract_data?: any;
 }
 
 interface Document {
@@ -53,15 +46,18 @@ interface Document {
   uploaded_at: string;
   parsed_data: any;
   confidence_score: number | null;
+  parsing_status?: string;
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  lead: 'Lead',
-  negotiation: 'משא ומתן',
-  active: 'פעיל',
-  in_progress: 'בעבודה',
-  completed: 'הושלם',
-  cancelled: 'בוטל',
+const STATUS_MAP: Record<string, { label: string; bg: string; text: string; dot: string }> = {
+  lead: { label: 'ליד', bg: 'rgba(156,163,175,0.15)', text: 'var(--dash-text-2)', dot: '#9ca3af' },
+  proposal: { label: 'הצעה', bg: 'rgba(168,85,247,0.15)', text: '#a855f7', dot: '#a855f7' },
+  negotiation: { label: 'משא ומתן', bg: 'rgba(249,115,22,0.15)', text: '#f97316', dot: '#f97316' },
+  contract: { label: 'חוזה', bg: 'rgba(59,130,246,0.15)', text: '#3b82f6', dot: '#3b82f6' },
+  active: { label: 'פעיל', bg: 'rgba(34,197,94,0.15)', text: '#22c55e', dot: '#22c55e' },
+  in_progress: { label: 'בעבודה', bg: 'rgba(34,197,94,0.15)', text: '#22c55e', dot: '#22c55e' },
+  completed: { label: 'הושלם', bg: 'rgba(16,185,129,0.15)', text: '#10b981', dot: '#10b981' },
+  cancelled: { label: 'בוטל', bg: 'rgba(239,68,68,0.15)', text: '#ef4444', dot: '#ef4444' },
 };
 
 export default function PartnershipDetailPage() {
@@ -72,79 +68,38 @@ export default function PartnershipDetailPage() {
 
   const [partnership, setPartnership] = useState<Partnership | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
-  const [accountId, setAccountId] = useState<string>('');
+  const [coupons, setCoupons] = useState<any[]>([]);
+  const [accountId, setAccountId] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<Partnership>>({});
-  const [activeTab, setActiveTab] = useState<'details' | 'payments' | 'deliverables' | 'terms' | 'documents' | 'coupons'>('details');
+  const [selectedDocType, setSelectedDocType] = useState<string>('contract');
+  const [showContractDetails, setShowContractDetails] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
 
-  // Document upload state
-  const [selectedDocumentType, setSelectedDocumentType] = useState<'contract' | 'quote' | 'brief' | 'invoice' | 'receipt' | 'other'>('contract');
-
-  // Coupons state
-  const [coupons, setCoupons] = useState<any[]>([]);
-  const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
-  const [showCouponForm, setShowCouponForm] = useState(false);
-  const [isCreatingCoupon, setIsCreatingCoupon] = useState(false);
-  const [newCoupon, setNewCoupon] = useState({
-    code: '',
-    description: '',
-    discount_type: 'percentage',
-    discount_value: 0,
-    min_purchase_amount: null as number | null,
-    max_discount_amount: null as number | null,
-    usage_limit: null as number | null,
-    start_date: '',
-    end_date: '',
-    tracking_url: '',
-  });
+  // ─── Data Loading ───
 
   useEffect(() => {
-    loadInfluencerAndData();
+    loadAll();
   }, [partnershipId]);
 
-  const loadInfluencerAndData = async () => {
-    try {
-      // Get influencer first to get account_id
-      const influencerRes = await fetch(`/api/influencer/partnerships?username=${username}&limit=1`);
-      if (influencerRes.ok) {
-        const influencerData = await influencerRes.json();
-        // For simplicity, we'll use a helper API or derive account_id
-        // For now, let's just fetch the partnership which should have account_id
-      }
-    } catch (err) {
-      console.error('Error loading influencer:', err);
-    }
-
+  const loadAll = async () => {
     await Promise.all([loadPartnership(), loadDocuments()]);
   };
 
   const loadPartnership = async () => {
     setIsLoading(true);
-    setError(null);
-
     try {
-      const response = await fetch(
-        `/api/influencer/partnerships/${partnershipId}?username=${username}`
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to load partnership');
-      }
-
-      const result = await response.json();
-      setPartnership(result.partnership);
-      setEditData(result.partnership);
-
-      // Get account_id from partnership
-      if (result.partnership.account_id) {
-        setAccountId(result.partnership.account_id);
-      }
-    } catch (err) {
-      console.error('Error loading partnership:', err);
+      const res = await fetch(`/api/influencer/partnerships/${partnershipId}?username=${username}`);
+      if (!res.ok) throw new Error('Failed');
+      const { partnership: p } = await res.json();
+      setPartnership(p);
+      setEditData(p);
+      if (p.account_id) setAccountId(p.account_id);
+    } catch {
       setError('שגיאה בטעינת השת"פ');
     } finally {
       setIsLoading(false);
@@ -153,1417 +108,631 @@ export default function PartnershipDetailPage() {
 
   const loadDocuments = async () => {
     try {
-      const response = await fetch(
-        `/api/influencer/partnerships/${partnershipId}/documents?username=${username}`
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to load documents');
+      const res = await fetch(`/api/influencer/partnerships/${partnershipId}/documents?username=${username}`);
+      if (res.ok) {
+        const { documents: docs } = await res.json();
+        setDocuments(docs || []);
       }
-
-      const result = await response.json();
-      setDocuments(result.documents || []);
-    } catch (err) {
-      console.error('Error loading documents:', err);
-      setDocuments([]);
-    }
+    } catch { setDocuments([]); }
   };
 
   const loadCoupons = async () => {
-    setIsLoadingCoupons(true);
     try {
-      console.log('🎟️ Loading coupons for partnership:', partnershipId);
-      const response = await fetch(
-        `/api/influencer/partnerships/${partnershipId}/coupons?username=${username}`
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('❌ Failed to load coupons:', response.status, errorData);
-        throw new Error('Failed to load coupons');
+      const res = await fetch(`/api/influencer/partnerships/${partnershipId}/coupons?username=${username}`);
+      if (res.ok) {
+        const { coupons: c } = await res.json();
+        setCoupons(c || []);
       }
-
-      const result = await response.json();
-      console.log('✅ Loaded coupons:', result.coupons);
-      console.log('📊 Coupons count:', result.coupons?.length || 0);
-      setCoupons(result.coupons || []);
-    } catch (err) {
-      console.error('Error loading coupons:', err);
-      setCoupons([]);
-    } finally {
-      setIsLoadingCoupons(false);
-    }
+    } catch { setCoupons([]); }
   };
 
-  const handleCreateCoupon = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsCreatingCoupon(true);
+  useEffect(() => {
+    if (partnership) loadCoupons();
+  }, [partnership?.id]);
 
-    try {
-      const response = await fetch(
-        `/api/influencer/partnerships/${partnershipId}/coupons?username=${username}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newCoupon),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to create coupon');
-      }
-
-      const result = await response.json();
-      console.log('✅ Coupon created:', result.coupon);
-
-      // Reset form and reload coupons
-      setNewCoupon({
-        code: '',
-        description: '',
-        discount_type: 'percentage',
-        discount_value: 0,
-        min_purchase_amount: null,
-        max_discount_amount: null,
-        usage_limit: null,
-        start_date: '',
-        end_date: '',
-        tracking_url: '',
-      });
-      setShowCouponForm(false);
-
-      console.log('🔄 Reloading coupons after creation...');
-      await loadCoupons();
-
-      alert('הקופון נוצר בהצלחה!');
-    } catch (err) {
-      console.error('Error creating coupon:', err);
-      alert('שגיאה ביצירת הקופון');
-    } finally {
-      setIsCreatingCoupon(false);
-    }
-  };
-
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      alert('הועתק ללוח!');
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  };
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    if (!accountId) {
-      setError('לא נמצא account ID');
-      return;
-    }
-
-    setIsUploading(true);
-    setError(null);
-
-    const uploadedDocumentIds: string[] = [];
-
-    try {
-      // Upload files directly to Supabase Storage (bypasses Vercel 4.5MB limit)
-      for (const file of Array.from(files)) {
-        // Check file size (max 10MB)
-        const MAX_SIZE = 10 * 1024 * 1024;
-        if (file.size > MAX_SIZE) {
-          setError(`${file.name} גדול מדי (${(file.size / 1024 / 1024).toFixed(2)}MB). מקסימום 10MB.`);
-          continue;
-        }
-
-        // 1. Upload directly to Supabase Storage (client-side)
-        const timestamp = Date.now();
-        const cleanFilename = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-        const storagePath = `${accountId}/partnerships/${partnershipId}/${timestamp}_${cleanFilename}`;
-
-        const { data: uploadData, error: uploadError } = await supabaseClient.storage
-          .from('partnership-documents')
-          .upload(storagePath, file, {
-            contentType: file.type,
-            upsert: false,
-          });
-
-        if (uploadError) {
-          console.error(`Failed to upload ${file.name}:`, uploadError);
-          setError(`העלאת ${file.name} נכשלה`);
-          continue;
-        }
-
-        // 2. Save metadata to DB via lightweight API (only JSON, no file payload)
-        const metadataResponse = await fetch('/api/influencer/documents/metadata', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            username,
-            accountId,
-            partnershipId,
-            filename: file.name,
-            fileSize: file.size,
-            mimeType: file.type,
-            storagePath,
-            documentType: selectedDocumentType,
-          }),
-        });
-
-        if (!metadataResponse.ok) {
-          const error = await metadataResponse.json();
-          console.error(`Failed to save metadata for ${file.name}:`, error);
-          setError(`שמירת ${file.name} נכשלה`);
-          continue;
-        }
-
-        const metadataResult = await metadataResponse.json();
-        uploadedDocumentIds.push(metadataResult.document.id);
-
-        console.log(`✓ Uploaded ${file.name}`);
-      }
-
-      // 3. Auto-parse uploaded documents
-      if (uploadedDocumentIds.length > 0) {
-        console.log(`📄 מנתח ${uploadedDocumentIds.length} מסמכים...`);
-
-        try {
-          const parseResponse = await fetch('/api/influencer/documents/parse', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              documentIds: uploadedDocumentIds,
-              documentType: selectedDocumentType,
-            }),
-          });
-
-          if (parseResponse.ok) {
-            console.log('✅ ניתוח הושלם בהצלחה');
-          } else {
-            const parseError = await parseResponse.json();
-            console.warn('⚠️ ניתוח נכשל:', parseError.error);
-            // Don't show error to user - document is uploaded, parsing is optional
-          }
-        } catch (parseErr) {
-          console.warn('⚠️ שגיאה בניתוח:', parseErr);
-          // Continue - document is uploaded
-        }
-      }
-
-      // Reload documents
-      await loadDocuments();
-      setError(null); // Clear any errors on success
-    } catch (err) {
-      console.error('Error uploading documents:', err);
-      setError('שגיאה בהעלאת המסמכים');
-    } finally {
-      setIsUploading(false);
-    }
-  };
+  // ─── Actions ───
 
   const handleSave = async () => {
     setIsSaving(true);
     setError(null);
-
     try {
-      const response = await fetch(`/api/influencer/partnerships/${partnershipId}`, {
+      const res = await fetch(`/api/influencer/partnerships/${partnershipId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username,
-          ...editData,
-        }),
+        body: JSON.stringify({ username, ...editData }),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to update partnership');
-      }
-
-      const result = await response.json();
-      setPartnership(result.partnership);
+      if (!res.ok) throw new Error('Failed');
+      const { partnership: p } = await res.json();
+      setPartnership(p);
       setIsEditing(false);
-    } catch (err) {
-      console.error('Error updating partnership:', err);
-      setError('שגיאה בעדכון השת"פ');
+    } catch {
+      setError('שגיאה בשמירה');
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!confirm('האם אתה בטוח שברצונך למחוק את השת"פ?')) {
-      return;
-    }
-
+    if (!confirm('למחוק את השת"פ?')) return;
     try {
-      const response = await fetch(
-        `/api/influencer/partnerships/${partnershipId}?username=${username}`,
-        {
-          method: 'DELETE',
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to delete partnership');
-      }
-
+      await fetch(`/api/influencer/partnerships/${partnershipId}?username=${username}`, { method: 'DELETE' });
       router.push(`/influencer/${username}/partnerships`);
-    } catch (err) {
-      console.error('Error deleting partnership:', err);
-      setError('שגיאה במחיקת השת"פ');
+    } catch {
+      setError('שגיאה במחיקה');
     }
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length || !accountId) return;
+    setIsUploading(true);
+    setError(null);
+    const uploadedIds: string[] = [];
+
+    try {
+      for (const file of Array.from(files)) {
+        if (file.size > 10 * 1024 * 1024) { setError(`${file.name} גדול מדי (מקס 10MB)`); continue; }
+
+        const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const path = `${accountId}/partnerships/${partnershipId}/${Date.now()}_${cleanName}`;
+
+        const { error: upErr } = await supabaseClient.storage
+          .from('partnership-documents')
+          .upload(path, file, { contentType: file.type, upsert: false });
+        if (upErr) { setError(`העלאת ${file.name} נכשלה`); continue; }
+
+        const metaRes = await fetch('/api/influencer/documents/metadata', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, accountId, partnershipId, filename: file.name, fileSize: file.size, mimeType: file.type, storagePath: path, documentType: selectedDocType }),
+        });
+        if (metaRes.ok) {
+          const { document: doc } = await metaRes.json();
+          uploadedIds.push(doc.id);
+        }
+      }
+
+      if (uploadedIds.length > 0) {
+        fetch('/api/influencer/documents/parse', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ documentIds: uploadedIds, documentType: selectedDocType }),
+        }).catch(() => {});
+      }
+      await loadDocuments();
+      setError(null);
+    } catch {
+      setError('שגיאה בהעלאה');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try { await navigator.clipboard.writeText(text); } catch {}
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingLogo(true);
+    setError(null);
+    try {
+      const form = new FormData();
+      form.append('username', username);
+      form.append('logo', file);
+      const res = await fetch(`/api/influencer/partnerships/${partnershipId}/brand-logo`, { method: 'POST', body: form });
+      const data = await res.json();
+      if (data.success) {
+        setPartnership(prev => prev ? { ...prev, brand_logo_url: data.logo_url } : prev);
+      } else {
+        setError(data.error || 'שגיאה בהעלאת לוגו');
+      }
+    } catch {
+      setError('שגיאה בהעלאת לוגו');
+    } finally {
+      setIsUploadingLogo(false);
+      e.target.value = '';
+    }
+  };
+
+  // ─── Render helpers ───
+
+  const hasContractDetails = partnership && (
+    (partnership.payment_schedule?.length ?? 0) > 0 ||
+    partnership.exclusivity?.isExclusive ||
+    (partnership.termination_clauses?.length ?? 0) > 0 ||
+    (partnership.liability_clauses?.length ?? 0) > 0 ||
+    partnership.confidentiality ||
+    (partnership.key_dates?.length ?? 0) > 0 ||
+    partnership.contract_scope ||
+    partnership.auto_renewal
+  );
+
+  // ─── Loading & Error states ───
+
   if (isLoading) {
     return (
-      <div className="max-w-6xl mx-auto py-8 px-4" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
+      <div className="max-w-3xl mx-auto py-8 px-4">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 rounded w-1/4" style={{ background: 'var(--dash-surface)' }} />
-          <div className="h-64 rounded" style={{ background: 'var(--dash-surface)' }} />
-        </div>
-      </div>
-    );
-  }
-
-  if (error && !partnership) {
-    return (
-      <div className="max-w-6xl mx-auto py-8 px-4" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
-        <div className="rounded-xl border p-6 text-center" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
-          <p style={{ color: 'var(--dash-negative)' }}>{error}</p>
-          <button
-            onClick={() => router.back()}
-            className="mt-4 px-4 py-2 rounded-lg"
-            style={{ background: 'var(--dash-negative)', color: '#fff' }}
-          >
-            חזור
-          </button>
+          <div className="h-8 rounded w-1/3" style={{ background: 'var(--dash-surface)' }} />
+          <div className="h-48 rounded" style={{ background: 'var(--dash-surface)' }} />
         </div>
       </div>
     );
   }
 
   if (!partnership) {
-    return null;
+    return (
+      <div className="max-w-3xl mx-auto py-8 px-4 text-center">
+        <p style={{ color: 'var(--dash-negative)' }}>{error || 'לא נמצא'}</p>
+        <button onClick={() => router.back()} className="mt-4 px-4 py-2 rounded-lg" style={{ background: 'var(--dash-surface)', color: 'var(--dash-text-2)' }}>חזור</button>
+      </div>
+    );
   }
 
+  const st = STATUS_MAP[partnership.status] || STATUS_MAP.lead;
+  const amount = partnership.contract_amount || partnership.proposal_amount || 0;
+
+  // ─── Main Render ───
+
   return (
-    <div className="max-w-6xl mx-auto py-8 px-4" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
-      {/* Back Button */}
-      <div className="mb-6">
-        <button
-          onClick={() => router.push(`/influencer/${username}/partnerships`)}
-          className="flex items-center gap-2 transition-colors"
-          style={{ color: 'var(--dash-text-2)' }}
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          <span>חזור לשת"פים</span>
-        </button>
-      </div>
+    <div className="max-w-3xl mx-auto py-6 px-4 space-y-6" style={{ color: 'var(--dash-text)' }}>
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold" style={{ color: 'var(--dash-text)' }}>{partnership.brand_name}</h1>
-          {partnership.campaign_name && (
-            <p className="mt-1" style={{ color: 'var(--dash-text-2)' }}>{partnership.campaign_name}</p>
-          )}
-        </div>
-        <div className="flex gap-2">
-          {!isEditing ? (
-            <>
-              <button
-                onClick={() => setIsEditing(true)}
-                className="px-4 py-2 rounded-lg transition-colors"
-                style={{ background: 'var(--color-primary)', color: '#fff' }}
-              >
-                ערוך
-              </button>
-              <button
-                onClick={handleDelete}
-                className="px-4 py-2 rounded-lg transition-colors"
-                style={{ background: 'var(--dash-negative)', color: '#fff' }}
-              >
-                מחק
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={() => {
-                  setIsEditing(false);
-                  setEditData(partnership);
-                }}
-                className="px-4 py-2 border rounded-lg"
-                style={{ borderColor: 'var(--dash-border)', color: 'var(--dash-text-2)' }}
-              >
-                ביטול
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="px-4 py-2 rounded-lg disabled:opacity-50"
-                style={{ background: 'var(--color-primary)', color: '#fff' }}
-              >
-                {isSaving ? 'שומר...' : 'שמור'}
-              </button>
-            </>
-          )}
-        </div>
-      </div>
+      {/* Back */}
+      <button
+        onClick={() => router.push(`/influencer/${username}/partnerships`)}
+        className="flex items-center gap-2 text-sm transition-colors"
+        style={{ color: 'var(--dash-text-3)' }}
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+        חזור לשת"פים
+      </button>
 
-      {/* Error Message */}
+      {/* Error */}
       {error && (
-        <div className="mb-6 rounded-xl border p-4" style={{ borderColor: 'var(--dash-negative)', background: 'var(--dash-surface)', color: 'var(--dash-negative)' }}>
+        <div className="rounded-xl p-3 text-sm" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}>
           {error}
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="mb-6 border-b" style={{ borderColor: 'var(--dash-border)' }}>
-        <div className="flex gap-6">
-          {(['details', 'payments', 'deliverables', 'terms', 'documents', 'coupons'] as const).map((tab) => {
-            const labels: Record<string, string> = {
-              details: 'פרטי השת"פ',
-              payments: 'מועדי תשלום',
-              deliverables: 'משימות',
-              terms: 'תנאים',
-              documents: `מסמכים (${documents.length})`,
-              coupons: `קופונים (${coupons.length})`,
-            };
-            return (
-              <button
-                key={tab}
-                onClick={() => {
-                  if (tab === 'coupons') loadCoupons();
-                  setActiveTab(tab);
-                }}
-                className="pb-3 px-2 text-sm font-medium transition-colors border-b-2"
-                style={{
-                  borderColor: activeTab === tab ? 'var(--color-primary)' : 'transparent',
-                  color: activeTab === tab ? 'var(--color-primary)' : 'var(--dash-text-3)',
-                }}
-              >
-                {labels[tab]}
+      {/* ═══ Header Card ═══ */}
+      <div className="rounded-2xl p-6" style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}>
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            {partnership.brand_logo_url ? (
+              <img src={partnership.brand_logo_url} alt={partnership.brand_name} className="w-14 h-14 rounded-xl object-contain flex-shrink-0" style={{ background: 'rgba(255,255,255,0.05)', padding: '4px' }} />
+            ) : (
+              <div className="w-14 h-14 rounded-xl flex items-center justify-center text-xl font-bold flex-shrink-0" style={{ background: st.bg, color: st.text }}>
+                {partnership.brand_name.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold truncate">{partnership.brand_name}</h1>
+              {partnership.campaign_name && (
+                <p className="text-sm truncate" style={{ color: 'var(--dash-text-2)' }}>{partnership.campaign_name}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium" style={{ background: st.bg, color: st.text }}>
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: st.dot }} />
+              {st.label}
+            </span>
+          </div>
+        </div>
+
+        {/* Key metrics row */}
+        <div className="flex flex-wrap gap-4 text-sm">
+          {amount > 0 && (
+            <div>
+              <span style={{ color: 'var(--dash-text-3)' }}>סכום: </span>
+              <span className="font-semibold" style={{ color: 'var(--color-primary)' }}>₪{amount.toLocaleString('he-IL')}</span>
+            </div>
+          )}
+          {partnership.start_date && (
+            <div>
+              <span style={{ color: 'var(--dash-text-3)' }}>התחלה: </span>
+              <span>{new Date(partnership.start_date).toLocaleDateString('he-IL')}</span>
+            </div>
+          )}
+          {partnership.end_date && (
+            <div>
+              <span style={{ color: 'var(--dash-text-3)' }}>סיום: </span>
+              <span>{new Date(partnership.end_date).toLocaleDateString('he-IL')}</span>
+            </div>
+          )}
+          {partnership.category && (
+            <div>
+              <span style={{ color: 'var(--dash-text-3)' }}>קטגוריה: </span>
+              <span>{partnership.category}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Contact info */}
+        {(partnership.whatsapp_phone || partnership.brand_contact_email || partnership.brand_contact_name) && (
+          <div className="flex flex-wrap gap-4 text-sm mt-2">
+            {partnership.brand_contact_name && (
+              <div className="flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5" style={{ color: 'var(--dash-text-3)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                <span style={{ color: 'var(--dash-text-2)' }}>{partnership.brand_contact_name}</span>
+              </div>
+            )}
+            {partnership.whatsapp_phone && (
+              <a href={`https://wa.me/${partnership.whatsapp_phone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener" className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
+                <svg className="w-3.5 h-3.5" style={{ color: '#25D366' }} fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" /></svg>
+                <span dir="ltr" style={{ color: 'var(--dash-text-2)' }}>{partnership.whatsapp_phone}</span>
+              </a>
+            )}
+            {partnership.brand_contact_email && (
+              <a href={`mailto:${partnership.brand_contact_email}`} className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
+                <svg className="w-3.5 h-3.5" style={{ color: 'var(--dash-text-3)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                <span dir="ltr" style={{ color: 'var(--dash-text-2)' }}>{partnership.brand_contact_email}</span>
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex gap-2 mt-4 pt-4" style={{ borderTop: '1px solid var(--dash-border)' }}>
+          {!isEditing ? (
+            <>
+              <button onClick={() => setIsEditing(true)} className="px-4 py-2 rounded-lg text-sm font-medium transition-colors" style={{ background: 'var(--color-primary)', color: '#fff' }}>
+                ערוך
               </button>
-            );
-          })}
+              <button onClick={handleDelete} className="px-4 py-2 rounded-lg text-sm transition-colors" style={{ color: 'var(--dash-text-3)' }}>
+                מחק
+              </button>
+              <button
+                onClick={() => router.push(`/influencer/${username}/partnerships/${partnershipId}/summary`)}
+                className="px-4 py-2 rounded-lg text-sm transition-colors mr-auto"
+                style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)', color: 'var(--dash-text-2)' }}
+              >
+                סיכום AI
+              </button>
+            </>
+          ) : (
+            <>
+              <button onClick={handleSave} disabled={isSaving} className="px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50" style={{ background: 'var(--color-primary)', color: '#fff' }}>
+                {isSaving ? 'שומר...' : 'שמור'}
+              </button>
+              <button onClick={() => { setIsEditing(false); setEditData(partnership); }} className="px-4 py-2 rounded-lg text-sm" style={{ color: 'var(--dash-text-3)' }}>
+                ביטול
+              </button>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Content */}
-      {activeTab === 'details' && (
-        <div className="rounded-xl border p-6 space-y-6" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
-        {/* Status */}
-        <div>
-          <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
-            סטטוס
-          </label>
-          {isEditing ? (
-            <select
-              value={editData.status || partnership.status}
-              onChange={(e) => setEditData({ ...editData, status: e.target.value })}
-              className="w-full px-4 py-2 border rounded-lg text-right"
-              style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
-            >
-              <option value="lead">Lead</option>
-              <option value="negotiation">משא ומתן</option>
-              <option value="active">פעיל</option>
-              <option value="in_progress">בעבודה</option>
-              <option value="completed">הושלם</option>
-              <option value="cancelled">בוטל</option>
-            </select>
-          ) : (
-            <p style={{ color: 'var(--dash-text)' }}>{STATUS_LABELS[partnership.status] || partnership.status}</p>
-          )}
-        </div>
+      {/* ═══ Edit Form (shown only when editing) ═══ */}
+      {isEditing && (
+        <div className="rounded-2xl p-5 space-y-5" style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}>
+          <h3 className="font-semibold text-sm" style={{ color: 'var(--dash-text-2)' }}>עריכת פרטים</h3>
 
-        {/* Campaign Name */}
-        <div>
-          <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
-            שם הקמפיין
-          </label>
-          {isEditing ? (
-            <input
-              type="text"
-              value={editData.campaign_name ?? partnership.campaign_name ?? ''}
-              onChange={(e) => setEditData({ ...editData, campaign_name: e.target.value })}
-              className="w-full px-4 py-2 border rounded-lg text-right"
-              style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
-            />
-          ) : (
-            <p style={{ color: 'var(--dash-text)' }}>{partnership.campaign_name || '—'}</p>
-          )}
-        </div>
-
-        {/* Dates */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
-              תאריך התחלה
-            </label>
-            {isEditing ? (
-              <input
-                type="date"
-                value={editData.start_date ?? partnership.start_date ?? ''}
-                onChange={(e) => setEditData({ ...editData, start_date: e.target.value })}
-                className="w-full px-4 py-2 border rounded-lg text-right"
-                style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
-              />
-            ) : (
-              <p style={{ color: 'var(--dash-text)' }}>
-                {partnership.start_date
-                  ? new Date(partnership.start_date).toLocaleDateString('he-IL')
-                  : '—'}
-              </p>
-            )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>סטטוס</label>
+              <select value={editData.status || ''} onChange={e => setEditData({ ...editData, status: e.target.value })} className="w-full px-3 py-2 rounded-lg text-sm text-right" style={{ background: 'var(--dash-bg)', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}>
+                {Object.entries(STATUS_MAP).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>סכום (₪)</label>
+              <input type="number" value={editData.contract_amount ?? ''} onChange={e => setEditData({ ...editData, contract_amount: parseFloat(e.target.value) || null })} className="w-full px-3 py-2 rounded-lg text-sm text-right" style={{ background: 'var(--dash-bg)', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }} />
+            </div>
+            <div>
+              <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>תאריך התחלה</label>
+              <input type="date" value={editData.start_date ?? ''} onChange={e => setEditData({ ...editData, start_date: e.target.value })} className="w-full px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--dash-bg)', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }} />
+            </div>
+            <div>
+              <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>תאריך סיום</label>
+              <input type="date" value={editData.end_date ?? ''} onChange={e => setEditData({ ...editData, end_date: e.target.value })} className="w-full px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--dash-bg)', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }} />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>שם קמפיין</label>
+              <input type="text" value={editData.campaign_name ?? ''} onChange={e => setEditData({ ...editData, campaign_name: e.target.value })} className="w-full px-3 py-2 rounded-lg text-sm text-right" style={{ background: 'var(--dash-bg)', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }} />
+            </div>
           </div>
+
+          {/* Brand Contact Info */}
           <div>
-            <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
-              תאריך סיום
-            </label>
-            {isEditing ? (
-              <input
-                type="date"
-                value={editData.end_date ?? partnership.end_date ?? ''}
-                onChange={(e) => setEditData({ ...editData, end_date: e.target.value })}
-                className="w-full px-4 py-2 border rounded-lg text-right"
-                style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
-              />
-            ) : (
-              <p style={{ color: 'var(--dash-text)' }}>
-                {partnership.end_date
-                  ? new Date(partnership.end_date).toLocaleDateString('he-IL')
-                  : '—'}
-              </p>
-            )}
+            <h4 className="text-xs font-medium mb-3 flex items-center gap-2" style={{ color: 'var(--dash-text-3)' }}>
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+              פרטי קשר מותג (פר שת"פ)
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>שם איש קשר</label>
+                <input type="text" value={editData.brand_contact_name ?? ''} onChange={e => setEditData({ ...editData, brand_contact_name: e.target.value })} placeholder="למשל: יוסי כהן" className="w-full px-3 py-2 rounded-lg text-sm text-right" style={{ background: 'var(--dash-bg)', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }} />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>וואטסאפ מותג</label>
+                <input type="tel" dir="ltr" value={editData.whatsapp_phone ?? ''} onChange={e => setEditData({ ...editData, whatsapp_phone: e.target.value })} placeholder="972501234567" className="w-full px-3 py-2 rounded-lg text-sm text-left" style={{ background: 'var(--dash-bg)', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }} />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>מייל מותג</label>
+                <input type="email" dir="ltr" value={editData.brand_contact_email ?? ''} onChange={e => setEditData({ ...editData, brand_contact_email: e.target.value })} placeholder="contact@brand.com" className="w-full px-3 py-2 rounded-lg text-sm text-left" style={{ background: 'var(--dash-bg)', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }} />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>טלפון מותג</label>
+                <input type="tel" dir="ltr" value={editData.brand_contact_phone ?? ''} onChange={e => setEditData({ ...editData, brand_contact_phone: e.target.value })} placeholder="03-1234567" className="w-full px-3 py-2 rounded-lg text-sm text-left" style={{ background: 'var(--dash-bg)', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }} />
+              </div>
+            </div>
           </div>
-        </div>
 
-        {/* Contract Amount */}
-        <div>
-          <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
-            סכום החוזה (₪)
-          </label>
-          {isEditing ? (
-            <input
-              type="number"
-              step="0.01"
-              value={editData.contract_amount ?? partnership.contract_amount ?? ''}
-              onChange={(e) =>
-                setEditData({ ...editData, contract_amount: parseFloat(e.target.value) })
-              }
-              className="w-full px-4 py-2 border rounded-lg text-right"
-              style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
-            />
-          ) : (
-            <p className="font-medium" style={{ color: 'var(--dash-text)' }}>
-              {partnership.contract_amount
-                ? `₪${partnership.contract_amount.toLocaleString('he-IL')}`
-                : '—'}
-            </p>
-          )}
-        </div>
-
-        {/* Deliverables */}
-        <div>
-          <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
-            דליברבלס
-          </label>
-          {isEditing ? (
-            <textarea
-              value={
-                typeof editData.deliverables === 'string'
-                  ? editData.deliverables
-                  : typeof partnership.deliverables === 'string'
-                  ? partnership.deliverables
-                  : Array.isArray(partnership.deliverables)
-                  ? partnership.deliverables.map(d => `${d.quantity || ''}x ${d.type} - ${d.description}`).join('\n')
-                  : ''
-              }
-              onChange={(e) => setEditData({ ...editData, deliverables: e.target.value })}
-              rows={3}
-              className="w-full px-4 py-2 border rounded-lg text-right"
-              style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
-            />
-          ) : (
-            <div style={{ color: 'var(--dash-text)' }}>
-              {typeof partnership.deliverables === 'string' ? (
-                <p className="whitespace-pre-wrap">{partnership.deliverables}</p>
-              ) : Array.isArray(partnership.deliverables) && partnership.deliverables.length > 0 ? (
-                <div className="space-y-2">
-                  {partnership.deliverables.map((d, i) => (
-                    <div key={i} className="text-sm p-2 rounded" style={{ background: 'var(--dash-surface-hover)' }}>
-                      {d.quantity && <strong>{d.quantity}x </strong>}
-                      {d.type}
-                      {d.description && <> - {d.description}</>}
-                    </div>
-                  ))}
-                </div>
+          {/* Brand Logo Upload (global) */}
+          <div>
+            <h4 className="text-xs font-medium mb-3 flex items-center gap-2" style={{ color: 'var(--dash-text-3)' }}>
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+              לוגו מותג (משותף לכל המשפיענים)
+            </h4>
+            <div className="flex items-center gap-4">
+              {partnership.brand_logo_url ? (
+                <img src={partnership.brand_logo_url} alt={partnership.brand_name} className="w-16 h-16 rounded-xl object-contain" style={{ background: 'rgba(255,255,255,0.05)', padding: '4px' }} />
               ) : (
-                <p>—</p>
+                <div className="w-16 h-16 rounded-xl flex items-center justify-center" style={{ background: 'var(--dash-bg)', border: '1px dashed var(--dash-border)' }}>
+                  <svg className="w-6 h-6" style={{ color: 'var(--dash-text-3)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                </div>
+              )}
+              <label className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium cursor-pointer transition-colors" style={{ background: 'var(--color-primary)', color: '#fff', opacity: isUploadingLogo ? 0.5 : 1 }}>
+                {isUploadingLogo ? (
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                )}
+                {isUploadingLogo ? 'מעלה...' : partnership.brand_logo_url ? 'החלף לוגו' : 'העלה לוגו'}
+                <input type="file" accept="image/*" onChange={handleLogoUpload} disabled={isUploadingLogo} className="hidden" />
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>הערות</label>
+            <textarea value={editData.notes ?? ''} onChange={e => setEditData({ ...editData, notes: e.target.value })} rows={3} className="w-full px-3 py-2 rounded-lg text-sm text-right" style={{ background: 'var(--dash-bg)', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }} />
+          </div>
+        </div>
+      )}
+
+      {/* ═══ Brief / Notes ═══ */}
+      {!isEditing && (partnership.brief || partnership.notes) && (
+        <div className="rounded-2xl p-5" style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}>
+          {partnership.brief && (
+            <div className="mb-3">
+              <h3 className="text-xs font-medium mb-1" style={{ color: 'var(--dash-text-3)' }}>בריף</h3>
+              <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--dash-text)' }}>{partnership.brief}</p>
+            </div>
+          )}
+          {partnership.notes && (
+            <div>
+              <h3 className="text-xs font-medium mb-1" style={{ color: 'var(--dash-text-3)' }}>הערות</h3>
+              <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--dash-text-2)' }}>{partnership.notes}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══ Coupons (inline, compact) ═══ */}
+      {coupons.length > 0 && (
+        <div className="rounded-2xl p-5" style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}>
+          <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--dash-text-2)' }}>קופונים</h3>
+          <div className="space-y-2">
+            {coupons.map(c => (
+              <div key={c.id} className="flex items-center justify-between p-3 rounded-xl" style={{ background: 'var(--dash-bg)', border: '1px solid var(--dash-border)' }}>
+                <div className="flex items-center gap-3">
+                  <span className="font-mono font-bold text-sm" style={{ color: 'var(--color-primary)' }}>{c.code}</span>
+                  <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
+                    {c.discount_type === 'percentage' ? `${c.discount_value}%` : c.discount_type === 'fixed' ? `₪${c.discount_value}` : 'משלוח חינם'}
+                  </span>
+                  {c.is_active ? (
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                  ) : (
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>{c.usage_count || 0} שימושים</span>
+                  <button onClick={() => copyToClipboard(c.code)} className="px-2.5 py-1 rounded-lg text-xs transition-colors" style={{ background: 'var(--color-primary)', color: '#fff' }}>
+                    העתק
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ═══ Deliverables (only if exist) ═══ */}
+      {partnership.deliverables && (
+        Array.isArray(partnership.deliverables) ? partnership.deliverables.length > 0 : typeof partnership.deliverables === 'string' && partnership.deliverables.trim()
+      ) && (
+        <div className="rounded-2xl p-5" style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}>
+          <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--dash-text-2)' }}>דליברבלס</h3>
+          {typeof partnership.deliverables === 'string' ? (
+            <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--dash-text)' }}>{partnership.deliverables}</p>
+          ) : (
+            <div className="space-y-2">
+              {(partnership.deliverables as any[]).map((d, i) => (
+                <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg text-sm" style={{ background: 'var(--dash-bg)' }}>
+                  <input type="checkbox" checked={d.completed || false} readOnly className="rounded" />
+                  <span style={{ color: 'var(--dash-text)' }}>
+                    {d.quantity && <strong>{d.quantity}x </strong>}{d.type}{d.description && ` — ${d.description}`}
+                  </span>
+                  {d.platform && <span className="text-xs px-1.5 py-0.5 rounded ml-auto" style={{ background: 'var(--dash-surface)', color: 'var(--dash-text-3)' }}>{d.platform}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══ Documents (compact) ═══ */}
+      <div className="rounded-2xl p-5" style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold" style={{ color: 'var(--dash-text-2)' }}>מסמכים ({documents.length})</h3>
+          <label className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors" style={{ background: 'var(--color-primary)', color: '#fff' }}>
+            {isUploading ? (
+              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+            )}
+            {isUploading ? 'מעלה...' : 'העלה'}
+            <input type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={handleFileUpload} disabled={isUploading} className="hidden" />
+          </label>
+        </div>
+
+        {/* Doc type selector */}
+        <div className="flex gap-1.5 mb-3 flex-wrap">
+          {[
+            { v: 'contract', l: 'חוזה' },
+            { v: 'brief', l: 'בריף' },
+            { v: 'invoice', l: 'חשבונית' },
+            { v: 'other', l: 'אחר' },
+          ].map(t => (
+            <button key={t.v} onClick={() => setSelectedDocType(t.v)} className="px-2.5 py-1 rounded-lg text-[11px] transition-colors" style={{ background: selectedDocType === t.v ? 'var(--color-primary)' : 'var(--dash-bg)', color: selectedDocType === t.v ? '#fff' : 'var(--dash-text-3)', border: '1px solid var(--dash-border)' }}>
+              {t.l}
+            </button>
+          ))}
+        </div>
+
+        {documents.length === 0 ? (
+          <p className="text-xs text-center py-6" style={{ color: 'var(--dash-text-3)' }}>אין מסמכים. העלה חוזה, בריף או חשבונית.</p>
+        ) : (
+          <div className="space-y-2">
+            {documents.map(doc => (
+              <div key={doc.id} className="flex items-center justify-between p-3 rounded-xl" style={{ background: 'var(--dash-bg)', border: '1px solid var(--dash-border)' }}>
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <svg className="w-5 h-5 flex-shrink-0" style={{ color: 'var(--color-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                  <div className="min-w-0">
+                    <p className="text-sm truncate" style={{ color: 'var(--dash-text)' }}>{doc.file_name}</p>
+                    <p className="text-[10px]" style={{ color: 'var(--dash-text-3)' }}>
+                      {doc.document_type} · {(doc.file_size / 1024 / 1024).toFixed(1)}MB
+                      {doc.confidence_score && <span style={{ color: 'var(--dash-positive)' }}> · AI {(doc.confidence_score * 100).toFixed(0)}%</span>}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                  {doc.parsing_status === 'completed' && (
+                    <button onClick={() => router.push(`/influencer/${username}/documents/${doc.id}/review`)} className="text-xs" style={{ color: 'var(--color-primary)' }}>סקור</button>
+                  )}
+                  <button onClick={async () => {
+                    const r = await fetch(`/api/influencer/documents/${doc.id}?username=${username}`);
+                    const { document: d } = await r.json();
+                    if (d?.download_url) window.open(d.download_url, '_blank');
+                  }} className="text-xs" style={{ color: 'var(--dash-text-3)' }}>הורד</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ═══ Contract Details (collapsible, only if data exists) ═══ */}
+      {hasContractDetails && (
+        <div className="rounded-2xl" style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}>
+          <button
+            onClick={() => setShowContractDetails(!showContractDetails)}
+            className="w-full flex items-center justify-between p-5 text-sm font-semibold"
+            style={{ color: 'var(--dash-text-2)' }}
+          >
+            <span>פרטי חוזה</span>
+            <svg className={`w-4 h-4 transition-transform ${showContractDetails ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {showContractDetails && (
+            <div className="px-5 pb-5 space-y-4">
+              {/* Payment Schedule */}
+              {partnership.payment_schedule && partnership.payment_schedule.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-medium mb-2" style={{ color: 'var(--dash-text-3)' }}>מועדי תשלום</h4>
+                  <div className="space-y-2">
+                    {partnership.payment_schedule.map((m, i) => (
+                      <div key={i} className="flex items-center justify-between p-2.5 rounded-lg text-sm" style={{ background: 'var(--dash-bg)' }}>
+                        <div>
+                          <span className="font-semibold">₪{m.amount.toLocaleString()}</span>
+                          <span className="text-xs mr-2" style={{ color: 'var(--dash-text-3)' }}>({m.percentage}%)</span>
+                        </div>
+                        <div className="text-xs text-left" style={{ color: 'var(--dash-text-2)' }}>
+                          {m.trigger}
+                          {m.dueDate && <span className="mr-2" style={{ color: 'var(--dash-text-3)' }}>{new Date(m.dueDate).toLocaleDateString('he-IL')}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Contract Scope */}
+              {partnership.contract_scope && (
+                <div>
+                  <h4 className="text-xs font-medium mb-1" style={{ color: 'var(--dash-text-3)' }}>תחום החוזה</h4>
+                  <p className="text-sm" style={{ color: 'var(--dash-text)' }}>{partnership.contract_scope}</p>
+                </div>
+              )}
+
+              {/* Exclusivity */}
+              {partnership.exclusivity?.isExclusive && (
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-1 rounded text-xs font-medium" style={{ background: 'rgba(249,115,22,0.12)', color: '#f97316' }}>אקסקלוסיבי</span>
+                  {partnership.exclusivity.categories?.length > 0 && (
+                    <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>{partnership.exclusivity.categories.join(', ')}</span>
+                  )}
+                </div>
+              )}
+
+              {/* Termination */}
+              {partnership.termination_clauses && partnership.termination_clauses.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-medium mb-1" style={{ color: 'var(--dash-text-3)' }}>תנאי ביטול</h4>
+                  <ul className="text-sm space-y-1" style={{ color: 'var(--dash-text-2)' }}>
+                    {partnership.termination_clauses.map((c, i) => <li key={i}>• {c}</li>)}
+                  </ul>
+                </div>
+              )}
+
+              {/* Key Dates */}
+              {partnership.key_dates && partnership.key_dates.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-medium mb-1" style={{ color: 'var(--dash-text-3)' }}>תאריכים חשובים</h4>
+                  <div className="space-y-1">
+                    {partnership.key_dates.map((kd, i) => (
+                      <div key={i} className="flex justify-between text-sm">
+                        <span style={{ color: 'var(--dash-text-2)' }}>{kd.event}</span>
+                        <span style={{ color: 'var(--dash-text-3)' }}>{new Date(kd.date).toLocaleDateString('he-IL')}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Confidentiality */}
+              {partnership.confidentiality && (
+                <div>
+                  <h4 className="text-xs font-medium mb-1" style={{ color: 'var(--dash-text-3)' }}>סודיות</h4>
+                  <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>{partnership.confidentiality}</p>
+                </div>
+              )}
+
+              {/* Auto Renewal */}
+              {partnership.auto_renewal && (
+                <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium" style={{ background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}>
+                  חידוש אוטומטי
+                </span>
               )}
             </div>
           )}
         </div>
-
-        {/* Notes */}
-        <div>
-          <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
-            הערות
-          </label>
-          {isEditing ? (
-            <textarea
-              value={editData.notes ?? partnership.notes ?? ''}
-              onChange={(e) => setEditData({ ...editData, notes: e.target.value })}
-              rows={3}
-              className="w-full px-4 py-2 border rounded-lg text-right"
-              style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
-            />
-          ) : (
-            <p className="whitespace-pre-wrap" style={{ color: 'var(--dash-text)' }}>{partnership.notes || '—'}</p>
-          )}
-        </div>
-
-        {/* Metadata */}
-        <div className="pt-4 border-t text-sm text-right" style={{ borderColor: 'var(--dash-border)', color: 'var(--dash-text-3)' }}>
-          <p>נוצר: {new Date(partnership.created_at).toLocaleString('he-IL')}</p>
-          <p>עודכן: {new Date(partnership.updated_at).toLocaleString('he-IL')}</p>
-        </div>
-        </div>
       )}
 
-      {/* Payments Tab */}
-      {activeTab === 'payments' && (
-        <div className="rounded-xl border p-6" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
-          <h2 className="text-2xl font-bold mb-6 text-right" style={{ color: 'var(--dash-text)' }}>מועדי תשלום</h2>
-
-          {partnership?.payment_schedule && partnership.payment_schedule.length > 0 ? (
-            <div className="space-y-4">
-              {/* Total Amount Summary */}
-              <div className="rounded-xl border p-6 mb-6" style={{ background: 'var(--dash-surface-hover)', borderColor: 'var(--dash-positive)' }}>
-                <div className="flex items-center justify-between">
-                  <div className="text-right">
-                    <p className="text-sm mb-1" style={{ color: 'var(--dash-positive)' }}>סכום כולל</p>
-                    <p className="text-4xl font-bold" style={{ color: 'var(--dash-text)' }}>
-                      ₪{partnership.contract_amount?.toLocaleString() || '—'}
-                    </p>
-                    <p className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>
-                      {partnership.payment_schedule.length} תשלומים מתוכננים
-                    </p>
-                  </div>
-                  <div className="h-16 w-16 rounded-full flex items-center justify-center" style={{ background: 'var(--dash-surface)' }}>
-                    <svg className="h-8 w-8" style={{ color: 'var(--dash-positive)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-
-              {/* Payment Timeline */}
-              <div className="relative">
-                {partnership.payment_schedule.map((milestone, index) => (
-                  <div key={index} className="flex gap-4 mb-6 last:mb-0">
-                    {/* Timeline Line */}
-                    <div className="flex flex-col items-center">
-                      <div className="h-10 w-10 rounded-full border-2 flex items-center justify-center font-bold" style={{ background: 'var(--dash-surface-hover)', borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}>
-                        {index + 1}
-                      </div>
-                      {index < partnership.payment_schedule.length - 1 && (
-                        <div className="w-0.5 h-full mt-2" style={{ minHeight: '60px', background: 'var(--dash-border)' }} />
-                      )}
-                    </div>
-
-                    {/* Payment Card */}
-                    <div className="flex-1 border-2 rounded-lg p-4 transition-colors" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="text-right flex-1">
-                          <p className="text-lg font-bold" style={{ color: 'var(--dash-text)' }}>
-                            ₪{milestone.amount.toLocaleString()}
-                          </p>
-                          <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>{milestone.percentage}% מהסכום</p>
-                        </div>
-                        {milestone.dueDate && (
-                          <div className="px-3 py-1 rounded-full" style={{ background: 'var(--dash-surface-hover)' }}>
-                            <p className="text-xs font-medium" style={{ color: 'var(--color-primary)' }}>
-                              {new Date(milestone.dueDate).toLocaleDateString('he-IL')}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-
-                      <p className="text-sm mb-3 text-right" style={{ color: 'var(--dash-text-2)' }}>
-                        <strong>תנאי:</strong> {milestone.trigger}
-                      </p>
-
-                      {/* Action Buttons */}
-                      <div className="flex gap-2 justify-end">
-                        <button
-                          onClick={() => {
-                            alert('הוספה ליומן - בקרוב!');
-                          }}
-                          className="px-4 py-2 text-sm rounded-lg transition-colors"
-                          style={{ background: 'var(--color-primary)', color: '#fff' }}
-                        >
-                          הוסף ליומן
-                        </button>
-                        <button
-                          onClick={() => {
-                            alert('תזכורת - בקרוב!');
-                          }}
-                          className="px-4 py-2 border text-sm rounded-lg transition-colors"
-                          style={{ borderColor: 'var(--dash-border)', color: 'var(--dash-text-2)' }}
-                        >
-                          תזכורת
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-12" style={{ color: 'var(--dash-text-3)' }}>
-              <svg className="h-16 w-16 mx-auto mb-4" style={{ color: 'var(--dash-muted)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p className="text-lg mb-2">אין מועדי תשלום</p>
-              <p className="text-sm">העלה חוזה עם פירוט תשלומים או הוסף ידנית</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Deliverables Tab */}
-      {activeTab === 'deliverables' && (
-        <div className="rounded-xl border p-6" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
-          <h2 className="text-2xl font-bold mb-6 text-right" style={{ color: 'var(--dash-text)' }}>דליברבלס ומשימות</h2>
-
-          {partnership?.deliverables && Array.isArray(partnership.deliverables) && partnership.deliverables.length > 0 ? (
-            <div className="space-y-3">
-              {partnership.deliverables.map((item, index) => {
-                // Handle both string and object deliverables
-                if (typeof item === 'string') {
-                  return (
-                    <div key={`del-${index}`} className="border-2 rounded-lg p-4" style={{ borderColor: 'var(--dash-border)' }}>
-                      <p className="text-sm text-right" style={{ color: 'var(--dash-text-2)' }}>{item}</p>
-                    </div>
-                  );
-                }
-
-                return (
-                <div key={`del-${index}-${item.type}`} className="border-2 rounded-lg p-4 transition-colors" style={{ borderColor: 'var(--dash-border)' }}>
-                  <div className="flex items-start gap-4">
-                    <input
-                      type="checkbox"
-                      checked={item.completed || false}
-                      onChange={() => {
-                        alert('סימון השלמה - בקרוב!');
-                      }}
-                      className="mt-1 h-5 w-5 rounded"
-                    />
-
-                    <div className="flex-1 text-right">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <h3 className="text-lg font-bold" style={{ color: 'var(--dash-text)' }}>
-                            {item.quantity && `${item.quantity}x `}
-                            {item.type}
-                          </h3>
-                          <p className="text-sm mt-1" style={{ color: 'var(--dash-text-2)' }}>{item.description}</p>
-                        </div>
-                        {item.platform && (
-                          <span className="px-2 py-1 rounded text-xs font-medium" style={{ background: 'var(--dash-surface-hover)', color: 'var(--color-info)' }}>
-                            {item.platform}
-                          </span>
-                        )}
-                      </div>
-
-                      {item.dueDate && (
-                        <p className="text-sm mb-3" style={{ color: 'var(--dash-text-3)' }}>
-                          מועד: {new Date(item.dueDate).toLocaleDateString('he-IL')}
-                        </p>
-                      )}
-
-                      {/* Action Buttons */}
-                      <div className="flex gap-2 justify-end">
-                        <button
-                          onClick={() => {
-                            alert('יצירת משימה - בקרוב!');
-                          }}
-                          className="px-3 py-1.5 text-sm rounded transition-colors"
-                          style={{ background: 'var(--color-primary)', color: '#fff' }}
-                        >
-                          צור משימה
-                        </button>
-                        <button
-                          onClick={() => {
-                            alert('הוספה ליומן - בקרוב!');
-                          }}
-                          className="px-3 py-1.5 border text-sm rounded transition-colors"
-                          style={{ borderColor: 'var(--dash-border)', color: 'var(--dash-text-2)' }}
-                        >
-                          ליומן
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )})}
-            </div>
-          ) : (
-            <div className="text-center py-12" style={{ color: 'var(--dash-text-3)' }}>
-              <svg className="h-16 w-16 mx-auto mb-4" style={{ color: 'var(--dash-muted)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              <p className="text-lg mb-2">אין דליברבלס</p>
-              <p className="text-sm">העלה חוזה או הוסף דליברבלס ידנית</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Terms Tab */}
-      {activeTab === 'terms' && (
-        <div className="rounded-xl border p-6" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
-          <h2 className="text-2xl font-bold mb-6 text-right" style={{ color: 'var(--dash-text)' }}>תנאי החוזה</h2>
-
-          <div className="space-y-6">
-            {/* Scope */}
-            {partnership?.contract_scope && (
-              <div className="border-r-4 p-4 rounded-lg" style={{ borderColor: 'var(--color-primary)', background: 'var(--dash-surface-hover)' }}>
-                <h3 className="font-bold mb-2 text-right" style={{ color: 'var(--dash-text)' }}>תחום החוזה</h3>
-                <p className="text-sm text-right" style={{ color: 'var(--dash-text-2)' }}>{partnership.contract_scope}</p>
-              </div>
-            )}
-
-            {/* Exclusivity */}
-            {partnership?.exclusivity?.isExclusive && (
-              <div className="border-r-4 p-4 rounded-lg" style={{ borderColor: 'var(--color-warning)', background: 'var(--dash-surface-hover)' }}>
-                <h3 className="font-bold mb-2 text-right" style={{ color: 'var(--dash-text)' }}>אקסקלוסיביות</h3>
-                <p className="text-sm mb-2 text-right font-medium" style={{ color: 'var(--color-warning)' }}>חוזה אקסקלוסיבי</p>
-                {partnership.exclusivity.categories && partnership.exclusivity.categories.length > 0 && (
-                  <ul className="text-sm space-y-1" style={{ color: 'var(--dash-text-2)' }}>
-                    {partnership.exclusivity.categories.map((cat, i) => (
-                      <li key={i} className="text-right">{cat}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-
-            {/* Termination Clauses */}
-            {partnership?.termination_clauses && partnership.termination_clauses.length > 0 && (
-              <div className="border-r-4 p-4 rounded-lg" style={{ borderColor: 'var(--color-warning)', background: 'var(--dash-surface-hover)' }}>
-                <h3 className="font-bold mb-3 text-right" style={{ color: 'var(--dash-text)' }}>תנאי ביטול</h3>
-                <ul className="text-sm space-y-2" style={{ color: 'var(--dash-text-2)' }}>
-                  {partnership.termination_clauses.map((clause, i) => (
-                    <li key={i} className="text-right border-b pb-2 last:border-0" style={{ borderColor: 'var(--dash-border)' }}>{clause}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Liability Clauses */}
-            {partnership?.liability_clauses && partnership.liability_clauses.length > 0 && (
-              <div className="border-r-4 p-4 rounded-lg" style={{ borderColor: 'var(--dash-negative)', background: 'var(--dash-surface-hover)' }}>
-                <h3 className="font-bold mb-3 text-right" style={{ color: 'var(--dash-text)' }}>אחריות ונזיקין</h3>
-                <ul className="text-sm space-y-2" style={{ color: 'var(--dash-text-2)' }}>
-                  {partnership.liability_clauses.map((clause, i) => (
-                    <li key={i} className="text-right border-b pb-2 last:border-0" style={{ borderColor: 'var(--dash-border)' }}>{clause}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Confidentiality */}
-            {partnership?.confidentiality && (
-              <div className="border-r-4 p-4 rounded-lg" style={{ borderColor: 'var(--dash-text-3)', background: 'var(--dash-surface-hover)' }}>
-                <h3 className="font-bold mb-2 text-right" style={{ color: 'var(--dash-text)' }}>סודיות</h3>
-                <p className="text-sm text-right" style={{ color: 'var(--dash-text-2)' }}>{partnership.confidentiality}</p>
-              </div>
-            )}
-
-            {/* Auto Renewal */}
-            {partnership?.auto_renewal && (
-              <div className="border-r-4 p-4 rounded-lg" style={{ borderColor: 'var(--dash-positive)', background: 'var(--dash-surface-hover)' }}>
-                <h3 className="font-bold mb-2 text-right" style={{ color: 'var(--dash-text)' }}>חידוש אוטומטי</h3>
-                <p className="text-sm text-right" style={{ color: 'var(--dash-positive)' }}>החוזה מתחדש אוטומטית בתום התקופה</p>
-              </div>
-            )}
-
-            {/* Key Dates */}
-            {partnership?.key_dates && partnership.key_dates.length > 0 && (
-              <div className="border-r-4 p-4 rounded-lg" style={{ borderColor: 'var(--color-info)', background: 'var(--dash-surface-hover)' }}>
-                <h3 className="font-bold mb-3 text-right" style={{ color: 'var(--dash-text)' }}>תאריכים חשובים</h3>
-                <ul className="text-sm space-y-2" style={{ color: 'var(--dash-text-2)' }}>
-                  {partnership.key_dates.map((kd, i) => (
-                    <li key={i} className="flex items-center justify-between text-right border-b pb-2 last:border-0" style={{ borderColor: 'var(--dash-border)' }}>
-                      <span>{kd.event}</span>
-                      <span className="font-medium" style={{ color: 'var(--color-info)' }}>
-                        {new Date(kd.date).toLocaleDateString('he-IL')}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-
-          {/* Empty State */}
-          {!partnership?.payment_schedule?.length &&
-           !partnership?.exclusivity &&
-           !partnership?.termination_clauses?.length &&
-           !partnership?.liability_clauses?.length &&
-           !partnership?.confidentiality && (
-            <div className="text-center py-12" style={{ color: 'var(--dash-text-3)' }}>
-              <svg className="h-16 w-16 mx-auto mb-4" style={{ color: 'var(--dash-muted)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <p className="text-lg mb-2">אין תנאי חוזה</p>
-              <p className="text-sm">העלה חוזה עם תנאים מפורטים</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Documents Tab */}
-      {activeTab === 'documents' && (
-        <div className="rounded-xl border p-6" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
-          {/* Upload Section */}
-          <div className="mb-8">
-            <h3 className="text-xl font-bold mb-6 text-right" style={{ color: 'var(--dash-text)' }}>
-              העלאת מסמכים
-            </h3>
-
-            {/* Document Type Selector */}
-            <div className="mb-6 rounded-lg p-4 border" style={{ background: 'var(--dash-surface-hover)', borderColor: 'var(--dash-border)' }}>
-              <label className="block text-sm font-semibold mb-3 text-right" style={{ color: 'var(--dash-text)' }}>
-                בחר סוג מסמך
-              </label>
-              <select
-                value={selectedDocumentType}
-                onChange={(e) => setSelectedDocumentType(e.target.value as any)}
-                disabled={isUploading}
-                className="w-full px-4 py-3 text-base border-2 rounded-lg text-right focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
-              >
-                <option value="contract">חוזה שת"פ</option>
-                <option value="brief">בריף קמפיין</option>
-                <option value="quote">הצעת מחיר</option>
-                <option value="invoice">חשבונית</option>
-                <option value="receipt">קבלה</option>
-                <option value="other">אחר</option>
-              </select>
-              <p className="text-xs mt-2 text-right" style={{ color: 'var(--dash-text-3)' }}>
-                {selectedDocumentType === 'contract' && 'הסכם שיתוף פעולה עם מותג'}
-                {selectedDocumentType === 'brief' && 'דרישות תוכן והנחיות לקמפיין'}
-                {selectedDocumentType === 'quote' && 'הצעה מסחרית או הצעת שת"פ'}
-                {selectedDocumentType === 'invoice' && 'חשבונית או דרישת תשלום'}
-                {selectedDocumentType === 'receipt' && 'אישור תשלום'}
-                {selectedDocumentType === 'other' && 'AI ינחש את סוג המסמך אוטומטית'}
-              </p>
-            </div>
-
-            {/* Upload Area */}
-            <div className="rounded-lg p-8 border-2 border-dashed" style={{ borderColor: 'var(--color-primary)', background: 'var(--dash-surface-hover)' }}>
-              <label className="flex flex-col items-center cursor-pointer group">
-                <div className="mb-4 h-20 w-20 rounded-full flex items-center justify-center" style={{ background: 'var(--dash-surface)' }}>
-                  <svg className="w-10 h-10" style={{ color: 'var(--color-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                    />
-                  </svg>
-                </div>
-                <p className="text-lg font-semibold mb-2" style={{ color: 'var(--dash-text)' }}>
-                  {isUploading ? 'מעלה ומנתח...' : 'לחץ להעלאת קבצים או גרור לכאן'}
-                </p>
-                <p className="text-sm mb-4" style={{ color: 'var(--dash-text-2)' }}>
-                  PDF, Word, תמונות - עד 10MB לקובץ
-                </p>
-                <div className="inline-flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors" style={{ background: 'var(--color-primary)', color: '#fff' }}>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  <span>{isUploading ? 'מעלה...' : 'בחר קבצים'}</span>
-                </div>
-                <input
-                  type="file"
-                  multiple
-                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                  onChange={handleFileUpload}
-                  disabled={isUploading}
-                  className="hidden"
-                />
-              </label>
-            </div>
-
-            {/* AI Processing Info */}
-            <div className="mt-4 rounded-xl border p-4" style={{ background: 'var(--dash-surface-hover)', borderColor: 'var(--color-info)' }}>
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 h-6 w-6 rounded-full flex items-center justify-center" style={{ background: 'var(--dash-surface)' }}>
-                  <svg className="h-4 w-4" style={{ color: 'var(--color-info)' }} fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="text-right flex-1">
-                  <p className="text-sm font-medium mb-1" style={{ color: 'var(--dash-text)' }}>
-                    ה-AI ינתח את המסמך אוטומטית
-                  </p>
-                  <p className="text-xs" style={{ color: 'var(--dash-text-2)' }}>
-                    המערכת תחלץ: שמות, תאריכים, סכומים, דליברבלס, תנאים ועוד. התהליך לוקח 30 שניות - 8 דקות.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t pt-6" style={{ borderColor: 'var(--dash-border)' }}></div>
-
-          {/* Documents List */}
-          <div>
-            <h3 className="text-lg font-semibold mb-4 text-right" style={{ color: 'var(--dash-text)' }}>
-              מסמכים קיימים
-            </h3>
-            {documents.length === 0 ? (
-              <div className="text-center py-12" style={{ color: 'var(--dash-text-3)' }}>
-                <svg
-                  className="w-16 h-16 mx-auto mb-4"
-                  style={{ color: 'var(--dash-muted)' }}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-                <p className="text-lg mb-2">אין מסמכים עדיין</p>
-                <p className="text-sm">העלה חוזים, הצעות מחיר או מסמכים אחרים</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {documents.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="flex items-center justify-between p-4 border rounded-lg transition-colors"
-                    style={{ borderColor: 'var(--dash-border)' }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--dash-surface-hover)'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                  >
-                    <div className="flex items-center gap-4 flex-1">
-                      {/* File Icon */}
-                      <div className="flex-shrink-0">
-                        <svg
-                          className="w-10 h-10"
-                          style={{ color: 'var(--color-primary)' }}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={1.5}
-                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                          />
-                        </svg>
-                      </div>
-
-                      {/* File Info */}
-                      <div className="flex-1 text-right">
-                        <div className="font-medium" style={{ color: 'var(--dash-text)' }}>{doc.file_name}</div>
-                        <div className="text-sm flex items-center gap-2 justify-end mt-1" style={{ color: 'var(--dash-text-3)' }}>
-                          <span>{(doc.file_size / 1024 / 1024).toFixed(2)} MB</span>
-                          <span>-</span>
-                          <span>{doc.document_type}</span>
-                          {doc.confidence_score && (
-                            <>
-                              <span>-</span>
-                              <span style={{ color: 'var(--dash-positive)' }}>
-                                AI: {(doc.confidence_score * 100).toFixed(0)}%
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex gap-2">
-                      {doc.parsed_data && (doc as any).parsing_status === 'completed' && (
-                        <button
-                          onClick={() =>
-                            router.push(
-                              `/influencer/${username}/documents/${doc.id}/review`
-                            )
-                          }
-                          className="text-sm"
-                          style={{ color: 'var(--color-primary)' }}
-                        >
-                          סקור נתונים
-                        </button>
-                      )}
-                      <button
-                        onClick={async () => {
-                          const res = await fetch(
-                            `/api/influencer/documents/${doc.id}?username=${username}`
-                          );
-                          const { document } = await res.json();
-                          if (document.download_url) {
-                            window.open(document.download_url, '_blank');
-                          }
-                        }}
-                        className="text-sm"
-                        style={{ color: 'var(--dash-text-2)' }}
-                      >
-                        הורד
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Coupons Tab */}
-      {activeTab === 'coupons' && (
-        <div className="rounded-xl border p-6" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
-          <div className="mb-6 flex justify-between items-center">
-            <h2 className="text-2xl font-bold text-right" style={{ color: 'var(--dash-text)' }}>קופונים ומעקב ROI</h2>
-            <button
-              onClick={() => setShowCouponForm(!showCouponForm)}
-              className="px-4 py-2 rounded-lg transition-colors"
-              style={{ background: 'var(--color-primary)', color: '#fff' }}
-            >
-              {showCouponForm ? 'ביטול' : '+ קופון חדש'}
-            </button>
-          </div>
-
-          {/* Create Coupon Form */}
-          {showCouponForm && (
-            <form onSubmit={handleCreateCoupon} className="mb-8 p-6 rounded-lg border" style={{ background: 'var(--dash-surface-hover)', borderColor: 'var(--dash-border)' }}>
-              <h3 className="text-lg font-semibold mb-4 text-right" style={{ color: 'var(--dash-text)' }}>צור קופון חדש</h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Coupon Code */}
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
-                    קוד קופון *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={newCoupon.code}
-                    onChange={(e) => setNewCoupon({ ...newCoupon, code: e.target.value.toUpperCase() })}
-                    placeholder="SUMMER2026"
-                    className="w-full px-4 py-2 border rounded-lg text-right"
-                    style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
-                  />
-                </div>
-
-                {/* Discount Type */}
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
-                    סוג הנחה *
-                  </label>
-                  <select
-                    value={newCoupon.discount_type}
-                    onChange={(e) => setNewCoupon({ ...newCoupon, discount_type: e.target.value })}
-                    className="w-full px-4 py-2 border rounded-lg text-right"
-                    style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
-                  >
-                    <option value="percentage">אחוז (%)</option>
-                    <option value="fixed">סכום קבוע (₪)</option>
-                    <option value="free_shipping">משלוח חינם</option>
-                  </select>
-                </div>
-
-                {/* Discount Value */}
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
-                    ערך ההנחה *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    step="0.01"
-                    value={newCoupon.discount_value}
-                    onChange={(e) => setNewCoupon({ ...newCoupon, discount_value: parseFloat(e.target.value) })}
-                    placeholder={newCoupon.discount_type === 'percentage' ? '10' : '50'}
-                    className="w-full px-4 py-2 border rounded-lg text-right"
-                    style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
-                  />
-                </div>
-
-                {/* Usage Limit */}
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
-                    מגבלת שימושים
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={newCoupon.usage_limit || ''}
-                    onChange={(e) => setNewCoupon({ ...newCoupon, usage_limit: e.target.value ? parseInt(e.target.value) : null })}
-                    placeholder="100 (או השאר ריק ללא הגבלה)"
-                    className="w-full px-4 py-2 border rounded-lg text-right"
-                    style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
-                  />
-                </div>
-
-                {/* Start Date */}
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
-                    תאריך התחלה
-                  </label>
-                  <input
-                    type="date"
-                    value={newCoupon.start_date}
-                    onChange={(e) => setNewCoupon({ ...newCoupon, start_date: e.target.value })}
-                    className="w-full px-4 py-2 border rounded-lg text-right"
-                    style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
-                  />
-                </div>
-
-                {/* End Date */}
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
-                    תאריך סיום
-                  </label>
-                  <input
-                    type="date"
-                    value={newCoupon.end_date}
-                    onChange={(e) => setNewCoupon({ ...newCoupon, end_date: e.target.value })}
-                    className="w-full px-4 py-2 border rounded-lg text-right"
-                    style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
-                  />
-                </div>
-
-                {/* Min Purchase */}
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
-                    סכום קנייה מינימלי (₪)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={newCoupon.min_purchase_amount || ''}
-                    onChange={(e) => setNewCoupon({ ...newCoupon, min_purchase_amount: e.target.value ? parseFloat(e.target.value) : null })}
-                    placeholder="0"
-                    className="w-full px-4 py-2 border rounded-lg text-right"
-                    style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
-                  />
-                </div>
-
-                {/* Max Discount */}
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
-                    הנחה מקסימלית (₪)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={newCoupon.max_discount_amount || ''}
-                    onChange={(e) => setNewCoupon({ ...newCoupon, max_discount_amount: e.target.value ? parseFloat(e.target.value) : null })}
-                    placeholder="לא מוגבל"
-                    className="w-full px-4 py-2 border rounded-lg text-right"
-                    style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
-                  />
-                </div>
-              </div>
-
-              {/* Description */}
-              <div className="mt-4">
-                <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
-                  תיאור
-                </label>
-                <textarea
-                  value={newCoupon.description}
-                  onChange={(e) => setNewCoupon({ ...newCoupon, description: e.target.value })}
-                  rows={2}
-                  placeholder="קופון מיוחד למשפיעני Summer 2026"
-                  className="w-full px-4 py-2 border rounded-lg text-right"
-                  style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
-                />
-              </div>
-
-              {/* Tracking URL */}
-              <div className="mt-4">
-                <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
-                  URL מעקב (עם UTM)
-                </label>
-                <input
-                  type="url"
-                  value={newCoupon.tracking_url}
-                  onChange={(e) => setNewCoupon({ ...newCoupon, tracking_url: e.target.value })}
-                  placeholder="https://example.com?utm_source=instagram&utm_campaign=summer"
-                  className="w-full px-4 py-2 border rounded-lg text-right"
-                  style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
-                />
-              </div>
-
-              {/* Submit Button */}
-              <div className="mt-6 flex gap-3">
-                <button
-                  type="submit"
-                  disabled={isCreatingCoupon}
-                  className="flex-1 px-6 py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                  style={{ background: 'var(--color-primary)', color: '#fff' }}
-                >
-                  {isCreatingCoupon ? 'יוצר קופון...' : 'צור קופון'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowCouponForm(false)}
-                  className="px-6 py-3 rounded-lg"
-                  style={{ background: 'var(--dash-surface)', color: 'var(--dash-text-2)' }}
-                >
-                  ביטול
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* Coupons List */}
-          <div>
-            <h3 className="text-lg font-semibold mb-4 text-right" style={{ color: 'var(--dash-text)' }}>
-              קופונים קיימים
-            </h3>
-
-            {isLoadingCoupons ? (
-              <div className="text-center py-12" style={{ background: 'var(--dash-bg)' }}>
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto" style={{ borderColor: 'var(--color-primary)' }}></div>
-                <p className="mt-4" style={{ color: 'var(--dash-text-3)' }}>טוען קופונים...</p>
-              </div>
-            ) : coupons.length === 0 ? (
-              <div className="text-center py-12" style={{ color: 'var(--dash-text-3)' }}>
-                <svg className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--dash-muted)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
-                </svg>
-                <p className="text-lg mb-2">אין קופונים עדיין</p>
-                <p className="text-sm">צור קופון ראשון למעקב אחר ROI</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {coupons.map((coupon) => (
-                  <div
-                    key={coupon.id}
-                    className="border rounded-lg p-6 transition-shadow"
-                    style={{ borderColor: 'var(--dash-border)' }}
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex-1 text-right">
-                        <div className="flex items-center gap-3 justify-end mb-2">
-                          <h4 className="text-xl font-bold font-mono" style={{ color: 'var(--dash-text)' }}>
-                            {coupon.code}
-                          </h4>
-                          {coupon.is_active ? (
-                            <span className="px-2 py-1 text-xs rounded-full" style={{ background: 'var(--dash-surface-hover)', color: 'var(--dash-positive)' }}>
-                              פעיל
-                            </span>
-                          ) : (
-                            <span className="px-2 py-1 text-xs rounded-full" style={{ background: 'var(--dash-surface-hover)', color: 'var(--dash-text-3)' }}>
-                              לא פעיל
-                            </span>
-                          )}
-                        </div>
-                        {coupon.description && (
-                          <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>{coupon.description}</p>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => copyToClipboard(coupon.code)}
-                        className="px-4 py-2 rounded-lg transition-colors text-sm"
-                        style={{ background: 'var(--color-primary)', color: '#fff' }}
-                      >
-                        העתק
-                      </button>
-                    </div>
-
-                    {/* Coupon Details */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                      <div className="text-right">
-                        <div className="text-sm" style={{ color: 'var(--dash-text-3)' }}>הנחה</div>
-                        <div className="text-lg font-semibold" style={{ color: 'var(--dash-text)' }}>
-                          {coupon.discount_type === 'percentage'
-                            ? `${coupon.discount_value}%`
-                            : coupon.discount_type === 'fixed'
-                            ? `₪${coupon.discount_value}`
-                            : 'משלוח חינם'}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm" style={{ color: 'var(--dash-text-3)' }}>שימושים</div>
-                        <div className="text-lg font-semibold" style={{ color: 'var(--dash-text)' }}>
-                          {coupon.usage_count || 0}
-                          {coupon.usage_limit && ` / ${coupon.usage_limit}`}
-                        </div>
-                      </div>
-                      {coupon.start_date && (
-                        <div className="text-right">
-                          <div className="text-sm" style={{ color: 'var(--dash-text-3)' }}>תחילה</div>
-                          <div className="text-sm font-medium" style={{ color: 'var(--dash-text)' }}>
-                            {new Date(coupon.start_date).toLocaleDateString('he-IL')}
-                          </div>
-                        </div>
-                      )}
-                      {coupon.end_date && (
-                        <div className="text-right">
-                          <div className="text-sm" style={{ color: 'var(--dash-text-3)' }}>סיום</div>
-                          <div className="text-sm font-medium" style={{ color: 'var(--dash-text)' }}>
-                            {new Date(coupon.end_date).toLocaleDateString('he-IL')}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Additional Info */}
-                    {(coupon.min_purchase_amount || coupon.max_discount_amount) && (
-                      <div className="text-sm space-y-1 text-right" style={{ color: 'var(--dash-text-2)' }}>
-                        {coupon.min_purchase_amount && (
-                          <div>קנייה מינימלית: ₪{coupon.min_purchase_amount}</div>
-                        )}
-                        {coupon.max_discount_amount && (
-                          <div>הנחה מקסימלית: ₪{coupon.max_discount_amount}</div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Tracking URL */}
-                    {coupon.tracking_url && (
-                      <div className="mt-3 pt-3 border-t" style={{ borderColor: 'var(--dash-border)' }}>
-                        <div className="text-sm mb-1 text-right" style={{ color: 'var(--dash-text-3)' }}>קישור מעקב:</div>
-                        <a
-                          href={coupon.tracking_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm truncate block text-right"
-                          style={{ color: 'var(--color-primary)' }}
-                        >
-                          {coupon.tracking_url}
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* ═══ Meta ═══ */}
+      <div className="text-[11px] text-center" style={{ color: 'var(--dash-text-3)' }}>
+        נוצר {new Date(partnership.created_at).toLocaleDateString('he-IL')} · עודכן {new Date(partnership.updated_at).toLocaleDateString('he-IL')}
+      </div>
     </div>
   );
 }
