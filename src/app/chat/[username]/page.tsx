@@ -659,7 +659,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       {/* Google Fonts */}
       <link href={getGoogleFontsUrl(influencer.theme)} rel="stylesheet" />
       
-      <main className="chat-page h-[100dvh] h-screen flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--color-background)' }}>
+      <main className="chat-page flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--color-background)' }}>
         {/* Header */}
         <header className="sticky top-0 z-50 glass header-border px-4 py-3">
           <div className="max-w-2xl mx-auto flex items-center justify-between">

@@ -118,6 +118,9 @@ h1, h2, h3, h4, h5, h6 {
   /* Semantic aliases for chat-specific elements */
   --chat-bot-bg: #ffffff;
   --chat-bot-border: #e5e5ea;
+  /* Full viewport height with dvh fallback */
+  height: 100vh;
+  height: 100dvh;
 }
 
 /* ============================================
