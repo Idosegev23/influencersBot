@@ -5,11 +5,11 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
-import { 
-  Send, 
-  Search, 
-  MessageCircle, 
-  Copy, 
+import {
+  Send,
+  Search,
+  MessageCircle,
+  Copy,
   Check,
   ChefHat,
   Shirt,
@@ -24,6 +24,10 @@ import {
   Headphones,
   X,
   Loader2,
+  Ticket,
+  AlertCircle,
+  HelpCircle,
+  ChevronLeft,
 } from 'lucide-react';
 import { getInfluencerByUsername, getBrandsByInfluencer, getContentByInfluencer, type Brand } from '@/lib/supabase';
 import { applyTheme, getGoogleFontsUrl } from '@/lib/theme';
@@ -132,7 +136,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   
-  const [activeTab, setActiveTab] = useState<'chat' | 'search'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'search' | 'coupons' | 'problem'>('chat');
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -157,10 +161,20 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [useStreaming, setUseStreaming] = useState(USE_STREAMING);
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   
+  const [isMobile, setIsMobile] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastTapRef = useRef<number>(0);
   const streamingMessageIdRef = useRef<string | null>(null);
+
+  // Detect mobile viewport
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -649,11 +663,12 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
         {/* Header */}
         <header className="sticky top-0 z-50 glass header-border px-4 py-3">
           <div className="max-w-2xl mx-auto flex items-center justify-between">
-            {/* Right side - Back button + Avatar */}
+            {/* Right side - Back button (desktop only) + Avatar + Name */}
             <div className="flex items-center gap-2.5">
+              {/* Back arrow - hidden on mobile */}
               <button
                 onClick={() => window.history.back()}
-                className="p-2 rounded-lg transition-all hover:bg-black/10"
+                className="hidden md:flex p-2 rounded-lg transition-all hover:bg-black/10"
                 style={{ color: 'var(--color-text)' }}
                 aria-label="חזרה"
               >
@@ -696,9 +711,10 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
               </div>
             </div>
 
-            {/* Left side - Tabs + New Chat */}
+            {/* Left side - Desktop: Tabs + New Chat | Mobile: Help icon */}
             <div className="flex items-center gap-2">
-              <div className="flex gap-1 p-1 rounded-full" style={{ backgroundColor: '#f0f0f2' }}>
+              {/* Desktop tab pills - hidden on mobile */}
+              <div className="hidden md:flex gap-1 p-1 rounded-full" style={{ backgroundColor: '#f0f0f2' }}>
                 <button
                   onClick={() => setActiveTab('chat')}
                   className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
@@ -719,11 +735,11 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 </button>
               </div>
 
-              {/* Support Button */}
+              {/* Support Button - desktop only */}
               {influencer.whatsapp_enabled && (
                 <button
                   onClick={() => setShowSupportModal(true)}
-                  className="p-2 rounded-lg transition-all hover:bg-black/10"
+                  className="hidden md:flex p-2 rounded-lg transition-all hover:bg-black/10"
                   style={{ color: 'var(--color-accent)' }}
                   aria-label="פנייה לתמיכה"
                   title="פנייה לתמיכה"
@@ -732,11 +748,11 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 </button>
               )}
 
-              {/* New Chat Button - only visible when there are messages */}
+              {/* New Chat Button - desktop only, visible when there are messages */}
               {messages.length > 0 && (
                 <button
                   onClick={handleNewChat}
-                  className="p-2 rounded-lg transition-all hover:bg-black/10"
+                  className="hidden md:flex p-2 rounded-lg transition-all hover:bg-black/10"
                   style={{ color: 'var(--color-primary)' }}
                   aria-label="שיחה חדשה"
                   title="שיחה חדשה"
@@ -744,6 +760,16 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   <Plus className="w-5 h-5" />
                 </button>
               )}
+
+              {/* Mobile: Help icon */}
+              <button
+                onClick={() => setShowSupportModal(true)}
+                className="flex md:hidden p-2 rounded-lg transition-all hover:bg-black/10"
+                style={{ color: 'var(--color-text)' }}
+                aria-label="עזרה"
+              >
+                <HelpCircle className="w-[18px] h-[18px]" />
+              </button>
             </div>
           </div>
         </header>
@@ -757,17 +783,18 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="h-full flex flex-col relative"
+                className={`h-full flex flex-col relative ${isMobile ? 'mobile-chat' : ''}`}
               >
                 {/* Chat Messages */}
-                <div className="flex-1 overflow-y-auto px-4 py-6 pb-32 space-y-4 chat-bg chat-messages-scroll">
+                <div className={`flex-1 overflow-y-auto px-4 py-6 space-y-4 chat-bg chat-messages-scroll ${isMobile ? 'pb-44' : 'pb-32'}`}>
                   {messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center text-center px-4 pt-10">
-                      {/* Avatar with decorative ring */}
+                      {/* Avatar with decorative ring - hidden on mobile empty state */}
                       <motion.div
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ duration: 0.4 }}
+                        className={isMobile ? 'hidden' : ''}
                       >
                         {influencer.avatar_url ? (
                           <div className="avatar-ring-lg mb-5">
@@ -798,27 +825,36 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4, delay: 0.1 }}
-                        className="text-xl font-semibold mb-2"
-                        style={{ color: 'var(--color-text)' }}
+                        className={isMobile ? 'font-semibold mb-2' : 'text-xl font-semibold mb-2'}
+                        style={isMobile
+                          ? { color: 'var(--color-text)', fontSize: '33px', lineHeight: '1.2' }
+                          : { color: 'var(--color-text)' }
+                        }
                       >
-                        {greetingMessage}
+                        {isMobile
+                          ? `היי אני העוזר האישי של ${influencer.display_name.split(' ')[0]}`
+                          : greetingMessage
+                        }
                       </motion.h2>
                       <motion.p
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4, delay: 0.2 }}
-                        className="mb-7 max-w-sm text-sm leading-relaxed"
-                        style={{ color: 'var(--color-text)', opacity: 0.6 }}
+                        className={isMobile ? 'mb-7 max-w-sm leading-relaxed' : 'mb-7 max-w-sm text-sm leading-relaxed'}
+                        style={isMobile
+                          ? { color: '#676767', fontSize: '16px' }
+                          : { color: 'var(--color-text)', opacity: 0.6 }
+                        }
                       >
                         אני כאן לעזור עם {(typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other).toLowerCase()}, מותגים וקופונים
                       </motion.p>
 
-                      {/* Quick Action Buttons */}
+                      {/* Quick Action Buttons - hidden on mobile (replaced by bottom tabs) */}
                       <motion.div
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4, delay: 0.3 }}
-                        className="flex gap-3 justify-center mb-8"
+                        className="hidden md:flex gap-3 justify-center mb-8"
                       >
                         {brands.length > 0 && (
                           <button
@@ -838,12 +874,15 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         </button>
                       </motion.div>
 
-                      {/* Dynamic welcome suggestion — one smart prompt */}
+                      {/* Dynamic welcome suggestions */}
                       <motion.div
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4, delay: 0.4 }}
-                        className="flex flex-wrap gap-2.5 justify-center max-w-md mb-8"
+                        className={isMobile
+                          ? 'flex gap-2.5 overflow-x-auto scrollbar-hide max-w-full mb-8 px-2'
+                          : 'flex flex-wrap gap-2.5 justify-center max-w-md mb-8'
+                        }
                       >
                         {suggestedQuestions.slice(0, 3).map((q, i) => (
                           <button
@@ -852,20 +891,20 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                               setInputValue(q);
                               inputRef.current?.focus();
                             }}
-                            className="suggestion-pill"
+                            className="suggestion-pill flex-shrink-0"
                           >
                             {q}
                           </button>
                         ))}
                       </motion.div>
 
-                      {/* Brands Preview */}
+                      {/* Brands Preview - hidden on mobile empty state */}
                       {brands.length > 0 && (
                         <motion.div
                           initial={{ opacity: 0, y: 8 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.4, delay: 0.4 }}
-                          className="w-full mt-2"
+                          className="hidden md:block w-full mt-2"
                         >
                           <p className="text-xs mb-3 text-center" style={{ color: 'var(--color-text)', opacity: 0.4 }}>
                             מותגים וקופונים
@@ -937,9 +976,9 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           <div
                             className={`flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'} items-end gap-2`}
                           >
-                            {/* Bot avatar (assistant messages only) */}
+                            {/* Bot avatar (assistant messages only) - hidden on mobile via CSS */}
                             {msg.role === 'assistant' && influencer.avatar_url && (
-                              <div className="relative w-6 h-6 rounded-full overflow-hidden flex-shrink-0 mb-5">
+                              <div className="bot-avatar-inline relative w-6 h-6 rounded-full overflow-hidden flex-shrink-0 mb-5">
                                 <Image
                                   src={getProxiedImageUrl(influencer.avatar_url)}
                                   alt=""
@@ -1205,7 +1244,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           className="flex justify-end items-end gap-2"
                         >
                           {influencer.avatar_url && (
-                            <div className="relative w-6 h-6 rounded-full overflow-hidden flex-shrink-0 mb-0.5">
+                            <div className="bot-avatar-inline relative w-6 h-6 rounded-full overflow-hidden flex-shrink-0 mb-0.5">
                               <Image
                                 src={getProxiedImageUrl(influencer.avatar_url)}
                                 alt=""
@@ -1230,13 +1269,13 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
 
                 {/* Chat Input */}
                 <div
-                  className="absolute bottom-0 left-0 right-0 px-4 pt-3 pb-safe"
-                  style={{ background: 'linear-gradient(to top, #ffffff 60%, rgba(255,255,255,0))' }}
+                  className={`absolute bottom-0 left-0 right-0 pt-3 chat-input-gradient ${isMobile ? 'px-[15px] pb-[calc(max(10px,env(safe-area-inset-bottom))+70px)]' : 'px-4 pb-safe'}`}
+                  style={!isMobile ? { background: 'linear-gradient(to top, #ffffff 60%, rgba(255,255,255,0))' } : undefined}
                 >
                   <div className="max-w-2xl mx-auto">
-                    {/* Quick action buttons above input */}
+                    {/* Quick action buttons above input - desktop only */}
                     {messages.length > 0 && (
-                      <div className="flex gap-2 mb-2 justify-center">
+                      <div className="hidden md:flex gap-2 mb-2 justify-center">
                         {brands.length > 0 && (
                           <button
                             onClick={() => setActiveTab('search')}
@@ -1286,7 +1325,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   </div>
                 </div>
               </motion.div>
-            ) : (
+            ) : activeTab === 'search' ? (
               <motion.div
                 key="search"
                 initial={{ opacity: 0 }}
@@ -1388,9 +1427,139 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   </div>
                 </div>
               </motion.div>
-            )}
+            ) : activeTab === 'coupons' ? (
+              /* ============ COUPONS TAB (Mobile) ============ */
+              <motion.div
+                key="coupons"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="h-full overflow-y-auto pb-32"
+                style={{ background: '#f4f5f7' }}
+              >
+                <div className="px-4 py-6">
+                  <div className="max-w-2xl mx-auto">
+                    <h2 className="font-semibold mb-1" style={{ fontSize: '26px', color: '#0c1013' }}>קופונים</h2>
+                    <p className="mb-6" style={{ fontSize: '16px', color: '#676767' }}>טקסט קצר על הקופונים</p>
+                    <div className="flex flex-col gap-3">
+                      {brands.map((brand) => (
+                        <button
+                          key={brand.id}
+                          onClick={() => brand.coupon_code && handleCopyCode(brand.coupon_code, brand.id)}
+                          className="mobile-brand-row"
+                        >
+                          {/* Brand logo */}
+                          {brand.image_url ? (
+                            <div className="brand-logo">
+                              <img src={brand.image_url} alt={brand.brand_name} />
+                            </div>
+                          ) : (
+                            <div className="brand-logo-placeholder">
+                              {brand.brand_name.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          {/* Brand name */}
+                          <div className="flex-1 min-w-0 text-right">
+                            <p className="font-semibold truncate" style={{ fontSize: '16px', color: '#0c1013' }}>
+                              {brand.brand_name}
+                            </p>
+                          </div>
+                          {/* Coupon badge or "no coupon" */}
+                          {brand.coupon_code ? (
+                            <div className="flex items-center gap-2">
+                              <span className="mobile-coupon-badge">
+                                {copiedCode === brand.id ? 'הועתק!' : brand.coupon_code}
+                              </span>
+                              <Copy className="w-4 h-4 flex-shrink-0" style={{ color: '#676767' }} />
+                            </div>
+                          ) : (
+                            <span className="mobile-coupon-none">ללא קוד קופון</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ) : activeTab === 'problem' ? (
+              /* ============ PROBLEM/SUPPORT TAB (Mobile) ============ */
+              <motion.div
+                key="problem"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="h-full overflow-y-auto pb-32"
+                style={{ background: '#f4f5f7' }}
+              >
+                <div className="px-4 py-6">
+                  <div className="max-w-2xl mx-auto">
+                    <h2 className="font-semibold mb-1" style={{ fontSize: '26px', color: '#0c1013' }}>פניית תמיכה</h2>
+                    <p className="mb-6" style={{ fontSize: '16px', color: '#676767' }}>בחר את המותג שיש לך בעיה איתו</p>
+                    <div className="flex flex-col gap-3">
+                      {brands.map((brand) => (
+                        <button
+                          key={brand.id}
+                          onClick={() => {
+                            setShowSupportModal(true);
+                          }}
+                          className="mobile-brand-row"
+                        >
+                          {/* Brand logo */}
+                          {brand.image_url ? (
+                            <div className="brand-logo">
+                              <img src={brand.image_url} alt={brand.brand_name} />
+                            </div>
+                          ) : (
+                            <div className="brand-logo-placeholder">
+                              {brand.brand_name.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          {/* Brand name */}
+                          <div className="flex-1 min-w-0 text-right">
+                            <p className="font-semibold truncate" style={{ fontSize: '16px', color: '#0c1013' }}>
+                              {brand.brand_name}
+                            </p>
+                          </div>
+                          {/* Arrow icon */}
+                          <ChevronLeft className="w-5 h-5 flex-shrink-0" style={{ color: '#676767' }} />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ) : null}
           </AnimatePresence>
         </div>
+
+        {/* Mobile Bottom Tab Bar */}
+        {isMobile && (
+          <div className="mobile-bottom-tabs">
+            <div className="mobile-bottom-tabs-inner">
+              <button
+                onClick={() => setActiveTab('chat')}
+                className={`mobile-tab-btn ${activeTab === 'chat' ? 'active-chat' : ''}`}
+              >
+                <MessageCircle className="w-[18px] h-[18px]" />
+                <span>צ'אט</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('coupons')}
+                className={`mobile-tab-btn ${activeTab === 'coupons' ? 'active-coupons' : ''}`}
+              >
+                <Ticket className="w-[18px] h-[18px]" />
+                <span>קופונים</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('problem')}
+                className={`mobile-tab-btn ${activeTab === 'problem' ? 'active-problem' : ''}`}
+              >
+                <AlertCircle className="w-[18px] h-[18px]" />
+                <span>בעיה בהזמנה</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Support Modal */}
         <AnimatePresence>

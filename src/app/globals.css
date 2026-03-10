@@ -673,3 +673,210 @@ h1, h2, h3, h4, h5, h6 {
 .pb-safe {
   padding-bottom: max(16px, env(safe-area-inset-bottom));
 }
+
+/* ============================================
+   Mobile Chat Redesign (< 768px)
+   ============================================ */
+
+/* Mobile bottom tab bar */
+.mobile-bottom-tabs {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: center;
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
+  padding-top: 6px;
+  pointer-events: none;
+}
+
+.mobile-bottom-tabs-inner {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px;
+  background: #ffffff;
+  border-radius: 60px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  pointer-events: auto;
+}
+
+.mobile-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 13px;
+  border-radius: 60px;
+  font-size: 13px;
+  font-weight: 400;
+  color: #676767;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.mobile-tab-btn.active-chat {
+  background: #dbe4f5;
+  color: #0c1013;
+  font-weight: 700;
+}
+
+.mobile-tab-btn.active-coupons {
+  background: #e5f2d6;
+  color: #0c1013;
+  font-weight: 700;
+}
+
+.mobile-tab-btn.active-problem {
+  background: #ffd6d7;
+  color: #0c1013;
+  font-weight: 700;
+}
+
+/* Mobile chat background */
+@media (max-width: 767px) {
+  .chat-bg {
+    background: #f4f5f7 !important;
+  }
+
+  /* Mobile chat bubble overrides */
+  .mobile-chat .chat-bubble-user {
+    background: #0c1013 !important;
+    color: #ffffff !important;
+    border-radius: 30px !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .mobile-chat .chat-bubble-assistant {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: #0c1013 !important;
+    font-size: 16px !important;
+    padding: 3px !important;
+    border-radius: 0 !important;
+  }
+
+  /* Mobile chat input */
+  .mobile-chat .chat-input-pill {
+    border: none !important;
+    border-radius: 60px !important;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1) !important;
+  }
+
+  .mobile-chat .chat-input-pill .send-btn {
+    background: #0c1013 !important;
+    width: 38px !important;
+    height: 38px !important;
+  }
+
+  /* Mobile suggestion pills */
+  .mobile-chat .suggestion-pill {
+    background: #ffffff !important;
+    border: none !important;
+    border-radius: 23px !important;
+    padding: 6px 15px !important;
+    font-size: 13px !important;
+    color: #676767 !important;
+    box-shadow: none !important;
+  }
+
+  .mobile-chat .suggestion-pill:hover {
+    background: #f0f0f2 !important;
+    transform: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Mobile: hide bot avatar next to messages */
+  .mobile-chat .bot-avatar-inline {
+    display: none !important;
+  }
+
+  /* Mobile typing indicator */
+  .mobile-chat .typing-indicator {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Mobile: message timestamp */
+  .mobile-chat .msg-time {
+    display: none;
+  }
+
+  /* Mobile input area gradient */
+  .mobile-chat .chat-input-gradient {
+    background: linear-gradient(to top, #f4f5f7 60%, rgba(244, 245, 247, 0)) !important;
+  }
+}
+
+/* Mobile brand row for coupons/problem tabs */
+.mobile-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 16px;
+  background: #ffffff;
+  border-radius: 60px;
+  height: 73px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mobile-brand-row:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.mobile-brand-row .brand-logo {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-brand-row .brand-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.mobile-brand-row .brand-logo-placeholder {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 12%, #f0f0f2);
+  flex-shrink: 0;
+}
+
+.mobile-coupon-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+
+.mobile-coupon-none {
+  font-size: 12px;
+  color: #999;
+}
