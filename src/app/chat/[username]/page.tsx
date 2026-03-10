@@ -659,7 +659,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       {/* Google Fonts */}
       <link href={getGoogleFontsUrl(influencer.theme)} rel="stylesheet" />
       
-      <main className="chat-page min-h-screen flex flex-col" style={{ backgroundColor: 'var(--color-background)' }}>
+      <main className="chat-page h-[100dvh] h-screen flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--color-background)' }}>
         {/* Header */}
         <header className="sticky top-0 z-50 glass header-border px-4 py-3">
           <div className="max-w-2xl mx-auto flex items-center justify-between">
@@ -786,7 +786,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 className={`h-full flex flex-col relative ${isMobile ? 'mobile-chat' : ''}`}
               >
                 {/* Chat Messages */}
-                <div className={`flex-1 overflow-y-auto px-4 py-6 space-y-4 chat-bg chat-messages-scroll ${isMobile ? 'pb-44' : 'pb-32'}`}>
+                <div className={`flex-1 overflow-y-auto px-4 py-6 space-y-4 chat-bg chat-messages-scroll ${isMobile ? 'pb-4' : 'pb-8'}`}>
                   {messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center text-center px-4 pt-10">
                       {/* Mobile: 3D bot illustration | Desktop: avatar with ring */}
@@ -1276,10 +1276,10 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
 
                 {/* Chat Input */}
                 <div
-                  className={`absolute bottom-0 left-0 right-0 pt-3 chat-input-gradient ${isMobile ? 'px-[15px] pb-[calc(max(8px,env(safe-area-inset-bottom))+60px)]' : 'px-4 pb-safe'}`}
+                  className={`flex-shrink-0 pt-3 chat-input-gradient ${isMobile ? 'px-[15px] pb-[calc(max(8px,env(safe-area-inset-bottom))+60px)]' : 'px-4 pb-safe'}`}
                   style={isMobile
-                    ? { background: 'linear-gradient(to top, #f4f5f7 70%, rgba(244,245,247,0))' }
-                    : { background: 'linear-gradient(to top, #ffffff 60%, rgba(255,255,255,0))' }
+                    ? { background: '#f4f5f7' }
+                    : { background: '#ffffff' }
                   }
                 >
                   <div className="max-w-2xl mx-auto">

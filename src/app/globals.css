@@ -737,8 +737,15 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 700;
 }
 
-/* Mobile chat background */
+/* Mobile chat background — full screen */
 @media (max-width: 767px) {
+  .chat-page {
+    background: #f4f5f7 !important;
+  }
+  .chat-page .glass {
+    background: rgba(244, 245, 247, 0.96) !important;
+    border-bottom: none !important;
+  }
   .chat-bg {
     background: #f4f5f7 !important;
   }
