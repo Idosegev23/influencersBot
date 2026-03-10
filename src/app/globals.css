@@ -712,7 +712,7 @@ h1, h2, h3, h4, h5, h6 {
   gap: 6px;
   padding: 6px 13px;
   border-radius: 60px;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 400;
   color: #676767;
   background: transparent;
@@ -740,14 +740,20 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 700;
 }
 
-/* Mobile chat background — full screen */
+/* Mobile chat background — full screen including overscroll */
 @media (max-width: 767px) {
+  html:has(.chat-page),
+  html:has(.chat-page) body {
+    background: #f4f5f7 !important;
+  }
   .chat-page {
     background: #f4f5f7 !important;
   }
   .chat-page .glass {
-    background: rgba(244, 245, 247, 0.96) !important;
-    border-bottom: none !important;
+    background: #f4f5f7 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border-bottom: 1px solid #d9d9d9 !important;
   }
   .chat-bg {
     background: #f4f5f7 !important;

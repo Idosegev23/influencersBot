@@ -656,12 +656,13 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
 
   return (
     <>
-      {/* Google Fonts */}
+      {/* Google Fonts + mobile theme color */}
       <link href={getGoogleFontsUrl(influencer.theme)} rel="stylesheet" />
+      <meta name="theme-color" content="#f4f5f7" />
       
       <main className="chat-page flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--color-background)' }}>
         {/* Header */}
-        <header className="sticky top-0 z-50 glass header-border px-4 py-3">
+        <header className={`sticky top-0 z-50 glass header-border px-4 ${isMobile ? 'h-[76px] flex items-center' : 'py-3'}`}>
           <div className="max-w-2xl mx-auto flex items-center justify-between">
             {/* Right side - Back button (desktop only) + Avatar + Name */}
             <div className="flex items-center gap-2.5">
@@ -786,15 +787,15 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 className={`h-full flex flex-col relative ${isMobile ? 'mobile-chat' : ''}`}
               >
                 {/* Chat Messages */}
-                <div className={`flex-1 overflow-y-auto px-4 py-6 space-y-4 chat-bg chat-messages-scroll ${isMobile ? 'pb-4' : 'pb-8'}`}>
+                <div className={`flex-1 overflow-y-auto px-4 space-y-4 chat-bg chat-messages-scroll ${isMobile ? (messages.length === 0 ? 'pb-[80px]' : 'pb-4') : 'py-6 pb-8'}`}>
                   {messages.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center text-center px-4 pt-10">
+                    <div className={`flex flex-col items-center text-center px-4 ${isMobile ? 'pt-[60px]' : 'pt-10 justify-center'}`}>
                       {/* Mobile: 3D bot illustration | Desktop: avatar with ring */}
                       <motion.div
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ duration: 0.4 }}
-                        className="mb-5"
+                        className={isMobile ? 'mb-6' : 'mb-5'}
                       >
                         {isMobile ? (
                           <div className="relative w-[124px] h-[128px] mx-auto">
@@ -835,9 +836,9 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4, delay: 0.1 }}
-                        className={isMobile ? 'font-semibold mb-2' : 'text-xl font-semibold mb-2'}
+                        className={isMobile ? 'font-semibold mb-2 w-[320px] max-w-full' : 'text-xl font-semibold mb-2'}
                         style={isMobile
-                          ? { color: 'var(--color-text)', fontSize: '33px', lineHeight: '1.2' }
+                          ? { color: '#0c1013', fontSize: '33px', lineHeight: '33px' }
                           : { color: 'var(--color-text)' }
                         }
                       >
@@ -850,7 +851,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4, delay: 0.2 }}
-                        className={isMobile ? 'mb-7 max-w-sm leading-relaxed' : 'mb-7 max-w-sm text-sm leading-relaxed'}
+                        className={isMobile ? 'mb-8 max-w-sm' : 'mb-7 max-w-sm text-sm leading-relaxed'}
                         style={isMobile
                           ? { color: '#676767', fontSize: '16px' }
                           : { color: 'var(--color-text)', opacity: 0.6 }
@@ -884,7 +885,46 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         </button>
                       </motion.div>
 
-                      {/* Dynamic welcome suggestions */}
+                      {/* Mobile: Inline input in empty state (Figma: input is in the middle, not at bottom) */}
+                      {isMobile && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.4, delay: 0.3 }}
+                          className="w-[363px] max-w-full mb-6"
+                        >
+                          <div className="chat-input-pill">
+                            <textarea
+                              ref={inputRef}
+                              value={inputValue}
+                              onChange={(e) => setInputValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                  e.preventDefault();
+                                  handleSendMessage();
+                                }
+                              }}
+                              placeholder="מה רצית לשאול?"
+                              disabled={isTyping}
+                              rows={1}
+                              onInput={(e) => {
+                                const t = e.currentTarget;
+                                t.style.height = 'auto';
+                                t.style.height = Math.min(t.scrollHeight, 120) + 'px';
+                              }}
+                            />
+                            <button
+                              onClick={handleSendMessage}
+                              disabled={!inputValue.trim() || isTyping}
+                              className="send-btn"
+                            >
+                              <Send className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
+
+                      {/* Dynamic welcome suggestions — below input on mobile per Figma */}
                       <motion.div
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -1274,9 +1314,9 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   )}
                 </div>
 
-                {/* Chat Input */}
+                {/* Chat Input — on mobile, hidden in empty state (shown inline above) */}
                 <div
-                  className={`flex-shrink-0 pt-3 chat-input-gradient ${isMobile ? 'px-[15px] pb-[calc(max(8px,env(safe-area-inset-bottom))+60px)]' : 'px-4 pb-safe'}`}
+                  className={`flex-shrink-0 pt-3 chat-input-gradient ${isMobile ? (messages.length === 0 ? 'hidden' : 'px-[15px] pb-[calc(max(8px,env(safe-area-inset-bottom))+60px)]') : 'px-4 pb-safe'}`}
                   style={isMobile
                     ? { background: '#f4f5f7' }
                     : { background: '#ffffff' }
