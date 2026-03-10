@@ -787,7 +787,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 className={`h-full flex flex-col relative ${isMobile ? 'mobile-chat' : ''}`}
               >
                 {/* Chat Messages */}
-                <div className={`flex-1 overflow-y-auto px-4 space-y-4 chat-bg chat-messages-scroll ${isMobile ? (messages.length === 0 ? 'pb-[80px]' : 'pb-4') : 'py-6 pb-8'}`}>
+                <div className={`flex-1 overflow-y-auto px-4 chat-bg chat-messages-scroll ${isMobile ? (messages.length === 0 ? 'pb-[80px]' : 'pb-2 pt-3') : 'py-6 pb-8 space-y-4'}`}>
                   {messages.length === 0 ? (
                     <div className={`flex flex-col items-center text-center px-4 ${isMobile ? 'pt-[60px]' : 'pt-10 justify-center'}`}>
                       {/* Mobile: 3D bot illustration | Desktop: avatar with ring */}
@@ -998,7 +998,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                       )}
                     </div>
                   ) : (
-                    <>
+                    <div className={`${isMobile ? 'flex flex-col justify-end min-h-full' : ''} space-y-4`}>
                       {messages.map((msg, index) => {
                         // For streaming messages, use the live text (strip suggestions tag)
                         const isStreamingThis = streamingMessageId === msg.id && isStreamActive;
@@ -1310,7 +1310,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         </motion.div>
                       )}
                       <div ref={messagesEndRef} />
-                    </>
+                    </div>
                   )}
                 </div>
 
