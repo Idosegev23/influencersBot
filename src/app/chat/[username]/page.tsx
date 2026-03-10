@@ -676,8 +676,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
               </button>
               <div onClick={handleAvatarTap} className="cursor-pointer select-none relative">
                 {influencer.avatar_url ? (
-                  <div className="avatar-ring">
-                    <div className="relative w-11 h-11 rounded-[14px] overflow-hidden">
+                  <div className={isMobile ? '' : 'avatar-ring'}>
+                    <div className={`relative w-11 h-11 overflow-hidden ${isMobile ? 'rounded-full' : 'rounded-[14px]'}`}>
                       <Image
                         src={getProxiedImageUrl(influencer.avatar_url)}
                         alt={influencer.display_name}
@@ -689,9 +689,9 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                     </div>
                   </div>
                 ) : (
-                  <div className="avatar-ring">
+                  <div className={isMobile ? '' : 'avatar-ring'}>
                     <div
-                      className="w-11 h-11 rounded-[14px] flex items-center justify-center text-white font-bold text-lg"
+                      className={`w-11 h-11 flex items-center justify-center text-white font-bold text-lg ${isMobile ? 'rounded-full' : 'rounded-[14px]'}`}
                       style={{ backgroundColor: 'var(--color-primary)' }}
                     >
                       {influencer.display_name.charAt(0)}
@@ -789,35 +789,57 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 <div className={`flex-1 overflow-y-auto px-4 py-6 space-y-4 chat-bg chat-messages-scroll ${isMobile ? 'pb-44' : 'pb-32'}`}>
                   {messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center text-center px-4 pt-10">
-                      {/* Avatar with decorative ring - hidden on mobile empty state */}
+                      {/* Avatar with decorative ring */}
                       <motion.div
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ duration: 0.4 }}
-                        className={isMobile ? 'hidden' : ''}
+                        className="mb-5"
                       >
                         {influencer.avatar_url ? (
-                          <div className="avatar-ring-lg mb-5">
-                            <div className="relative w-20 h-20 rounded-[20px] overflow-hidden">
+                          isMobile ? (
+                            <div className="relative w-[120px] h-[120px] rounded-full overflow-hidden mx-auto">
                               <Image
                                 src={getProxiedImageUrl(influencer.avatar_url)}
                                 alt={influencer.display_name}
                                 fill
                                 className="object-cover"
-                                sizes="80px"
+                                sizes="120px"
                                 unoptimized
                               />
                             </div>
-                          </div>
+                          ) : (
+                            <div className="avatar-ring-lg">
+                              <div className="relative w-20 h-20 rounded-[20px] overflow-hidden">
+                                <Image
+                                  src={getProxiedImageUrl(influencer.avatar_url)}
+                                  alt={influencer.display_name}
+                                  fill
+                                  className="object-cover"
+                                  sizes="80px"
+                                  unoptimized
+                                />
+                              </div>
+                            </div>
+                          )
                         ) : (
-                          <div className="avatar-ring-lg mb-5">
+                          isMobile ? (
                             <div
-                              className="w-20 h-20 rounded-[20px] flex items-center justify-center text-white font-bold text-2xl"
+                              className="w-[120px] h-[120px] rounded-full flex items-center justify-center text-white font-bold text-4xl mx-auto"
                               style={{ backgroundColor: 'var(--color-primary)' }}
                             >
                               {influencer.display_name.charAt(0)}
                             </div>
-                          </div>
+                          ) : (
+                            <div className="avatar-ring-lg">
+                              <div
+                                className="w-20 h-20 rounded-[20px] flex items-center justify-center text-white font-bold text-2xl"
+                                style={{ backgroundColor: 'var(--color-primary)' }}
+                              >
+                                {influencer.display_name.charAt(0)}
+                              </div>
+                            </div>
+                          )
                         )}
                       </motion.div>
 
@@ -879,10 +901,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4, delay: 0.4 }}
-                        className={isMobile
-                          ? 'flex gap-2.5 overflow-x-auto scrollbar-hide max-w-full mb-8 px-2'
-                          : 'flex flex-wrap gap-2.5 justify-center max-w-md mb-8'
-                        }
+                        className="flex flex-wrap gap-2.5 justify-center max-w-md mb-8"
                       >
                         {suggestedQuestions.slice(0, 3).map((q, i) => (
                           <button
@@ -891,7 +910,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                               setInputValue(q);
                               inputRef.current?.focus();
                             }}
-                            className="suggestion-pill flex-shrink-0"
+                            className="suggestion-pill"
                           >
                             {q}
                           </button>
@@ -1269,8 +1288,11 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
 
                 {/* Chat Input */}
                 <div
-                  className={`absolute bottom-0 left-0 right-0 pt-3 chat-input-gradient ${isMobile ? 'px-[15px] pb-[calc(max(10px,env(safe-area-inset-bottom))+70px)]' : 'px-4 pb-safe'}`}
-                  style={!isMobile ? { background: 'linear-gradient(to top, #ffffff 60%, rgba(255,255,255,0))' } : undefined}
+                  className={`absolute bottom-0 left-0 right-0 pt-3 chat-input-gradient ${isMobile ? 'px-[15px] pb-[calc(max(8px,env(safe-area-inset-bottom))+60px)]' : 'px-4 pb-safe'}`}
+                  style={isMobile
+                    ? { background: 'linear-gradient(to top, #f4f5f7 70%, rgba(244,245,247,0))' }
+                    : { background: 'linear-gradient(to top, #ffffff 60%, rgba(255,255,255,0))' }
+                  }
                 >
                   <div className="max-w-2xl mx-auto">
                     {/* Quick action buttons above input - desktop only */}
@@ -1449,15 +1471,13 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           className="mobile-brand-row"
                         >
                           {/* Brand logo */}
-                          {brand.image_url ? (
-                            <div className="brand-logo">
-                              <img src={brand.image_url} alt={brand.brand_name} />
-                            </div>
-                          ) : (
-                            <div className="brand-logo-placeholder">
-                              {brand.brand_name.charAt(0).toUpperCase()}
-                            </div>
-                          )}
+                          <div className="brand-logo">
+                            {brand.image_url ? (
+                              <img src={getProxiedImageUrl(brand.image_url)} alt={brand.brand_name} />
+                            ) : (
+                              <span className="brand-logo-letter">{brand.brand_name.charAt(0).toUpperCase()}</span>
+                            )}
+                          </div>
                           {/* Brand name */}
                           <div className="flex-1 min-w-0 text-right">
                             <p className="font-semibold truncate" style={{ fontSize: '16px', color: '#0c1013' }}>
@@ -1505,15 +1525,13 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           className="mobile-brand-row"
                         >
                           {/* Brand logo */}
-                          {brand.image_url ? (
-                            <div className="brand-logo">
-                              <img src={brand.image_url} alt={brand.brand_name} />
-                            </div>
-                          ) : (
-                            <div className="brand-logo-placeholder">
-                              {brand.brand_name.charAt(0).toUpperCase()}
-                            </div>
-                          )}
+                          <div className="brand-logo">
+                            {brand.image_url ? (
+                              <img src={getProxiedImageUrl(brand.image_url)} alt={brand.brand_name} />
+                            ) : (
+                              <span className="brand-logo-letter">{brand.brand_name.charAt(0).toUpperCase()}</span>
+                            )}
+                          </div>
                           {/* Brand name */}
                           <div className="flex-1 min-w-0 text-right">
                             <p className="font-semibold truncate" style={{ fontSize: '16px', color: '#0c1013' }}>
