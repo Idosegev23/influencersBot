@@ -789,57 +789,45 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 <div className={`flex-1 overflow-y-auto px-4 py-6 space-y-4 chat-bg chat-messages-scroll ${isMobile ? 'pb-44' : 'pb-32'}`}>
                   {messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center text-center px-4 pt-10">
-                      {/* Avatar with decorative ring */}
+                      {/* Mobile: 3D bot illustration | Desktop: avatar with ring */}
                       <motion.div
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ duration: 0.4 }}
                         className="mb-5"
                       >
-                        {influencer.avatar_url ? (
-                          isMobile ? (
-                            <div className="relative w-[120px] h-[120px] rounded-full overflow-hidden mx-auto">
+                        {isMobile ? (
+                          <div className="relative w-[124px] h-[128px] mx-auto">
+                            <Image
+                              src="/bot-illustration.png"
+                              alt="AI Assistant"
+                              fill
+                              className="object-contain"
+                              sizes="124px"
+                            />
+                          </div>
+                        ) : influencer.avatar_url ? (
+                          <div className="avatar-ring-lg">
+                            <div className="relative w-20 h-20 rounded-[20px] overflow-hidden">
                               <Image
                                 src={getProxiedImageUrl(influencer.avatar_url)}
                                 alt={influencer.display_name}
                                 fill
                                 className="object-cover"
-                                sizes="120px"
+                                sizes="80px"
                                 unoptimized
                               />
                             </div>
-                          ) : (
-                            <div className="avatar-ring-lg">
-                              <div className="relative w-20 h-20 rounded-[20px] overflow-hidden">
-                                <Image
-                                  src={getProxiedImageUrl(influencer.avatar_url)}
-                                  alt={influencer.display_name}
-                                  fill
-                                  className="object-cover"
-                                  sizes="80px"
-                                  unoptimized
-                                />
-                              </div>
-                            </div>
-                          )
+                          </div>
                         ) : (
-                          isMobile ? (
+                          <div className="avatar-ring-lg">
                             <div
-                              className="w-[120px] h-[120px] rounded-full flex items-center justify-center text-white font-bold text-4xl mx-auto"
+                              className="w-20 h-20 rounded-[20px] flex items-center justify-center text-white font-bold text-2xl"
                               style={{ backgroundColor: 'var(--color-primary)' }}
                             >
                               {influencer.display_name.charAt(0)}
                             </div>
-                          ) : (
-                            <div className="avatar-ring-lg">
-                              <div
-                                className="w-20 h-20 rounded-[20px] flex items-center justify-center text-white font-bold text-2xl"
-                                style={{ backgroundColor: 'var(--color-primary)' }}
-                              >
-                                {influencer.display_name.charAt(0)}
-                              </div>
-                            </div>
-                          )
+                          </div>
                         )}
                       </motion.div>
 
