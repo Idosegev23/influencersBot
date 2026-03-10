@@ -996,8 +996,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                 />
                               </div>
                             )}
-                            <div>
-                              <div className={`max-w-[80%] px-4 py-3 ${msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-assistant'}`}>
+                            <div className="w-full">
+                              <div className={`${msg.role === 'user' && isMobile ? '' : 'max-w-[80%]'} inline-block px-4 py-3 ${msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-assistant'}`}>
                                 {msg.role === 'user' ? (
                                   <p className="text-sm whitespace-pre-wrap">{displayContent}</p>
                                 ) : (
