@@ -534,28 +534,40 @@ export async function getBrandsByInfluencer(influencerId: string): Promise<Brand
   // 1. Get partnerships-based brands
   const partnerships = await getPartnershipsByInfluencer(influencerId);
   
-  // 2. For each partnership, get all its coupons
-  const partnershipBrands = await Promise.all(partnerships.map(async (p) => {
-    // Get all coupons for this partnership
+  // 2. For each partnership, create one row PER coupon
+  const partnershipBrandsNested = await Promise.all(partnerships.map(async (p) => {
     const { data: coupons } = await supabase
       .from('coupons')
-      .select('code')
+      .select('id, code, description')
       .eq('partnership_id', p.id)
       .eq('is_active', true);
-    
-    // Join all coupon codes with commas, or use the partnership's coupon_code as fallback
-    const couponCodes = coupons && coupons.length > 0 
-      ? coupons.map(c => c.code).join(', ')
-      : p.coupon_code;
-    
-    console.log(`[getBrandsByInfluencer] Brand: ${p.brand_name}, Partnership coupon: ${p.coupon_code}, Final coupon: ${couponCodes}`);
-    
-    return {
+
+    // If partnership has coupons, create a separate brand row for each coupon
+    if (coupons && coupons.length > 0) {
+      return coupons.map(c => ({
+        id: c.id,
+        influencer_id: influencerId,
+        brand_name: p.brand_name,
+        description: c.description || p.brief,
+        coupon_code: c.code,
+        link: p.link,
+        short_link: p.short_link,
+        category: p.category,
+        whatsapp_phone: p.whatsapp_phone,
+        image_url: p.brand_logo_url || null,
+        is_active: p.is_active || false,
+        created_at: p.created_at,
+        updated_at: p.updated_at,
+      }));
+    }
+
+    // No coupons — show partnership with its own coupon_code fallback
+    return [{
       id: p.id,
       influencer_id: influencerId,
       brand_name: p.brand_name,
       description: p.brief,
-      coupon_code: couponCodes,
+      coupon_code: p.coupon_code,
       link: p.link,
       short_link: p.short_link,
       category: p.category,
@@ -564,8 +576,9 @@ export async function getBrandsByInfluencer(influencerId: string): Promise<Brand
       is_active: p.is_active || false,
       created_at: p.created_at,
       updated_at: p.updated_at,
-    };
+    }];
   }));
+  const partnershipBrands = partnershipBrandsNested.flat();
 
   // 2. Get standalone coupons (without partnership)
   const { data: standaloneCoupons, error: couponsError } = await supabase
