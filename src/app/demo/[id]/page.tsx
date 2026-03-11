@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { X, Send, Copy, Check, ExternalLink } from 'lucide-react';
+import { Copy, Check, ExternalLink } from 'lucide-react';
 
 /**
  * Public Demo Page — shows client's website with widget overlay.
@@ -191,15 +191,16 @@ export default function DemoPage() {
 }
 
 // ============================================
-// CSS Animations
+// CSS Animations (matching widget.js keyframes)
 // ============================================
 
 const widgetStyles = `
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&display=swap');
 @keyframes demo-slide-up {
   from { opacity: 0; transform: translateY(20px) scale(0.95); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
-@keyframes demo-fade-in {
+@keyframes demo-msg-in {
   from { opacity: 0; transform: translateX(10px); }
   to { opacity: 1; transform: translateX(0); }
 }
@@ -207,14 +208,10 @@ const widgetStyles = `
   0%, 80%, 100% { transform: translateY(0); }
   40% { transform: translateY(-5px); }
 }
-@keyframes demo-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 var(--pulse-color, rgba(99,102,241,0.4)); }
-  50% { box-shadow: 0 0 0 8px var(--pulse-color-end, rgba(99,102,241,0)); }
-}
 `;
 
 // ============================================
-// Demo Widget — functional chat
+// Demo Widget — matches Figma spec 68:448 exactly
 // ============================================
 
 function DemoWidget({ accountId, config }: { accountId: string; config: WidgetConfig }) {
@@ -227,7 +224,7 @@ function DemoWidget({ accountId, config }: { accountId: string; config: WidgetCo
   const [sessionId, setSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const primaryColor = config.theme.primaryColor || '#6366f1';
+  const pc = config.theme.primaryColor || '#0c1013';
 
   useEffect(() => {
     if (!document.getElementById('demo-widget-styles')) {
@@ -315,201 +312,230 @@ function DemoWidget({ accountId, config }: { accountId: string; config: WidgetCo
     }
   };
 
-  // ---- Closed: toggle button ----
+  // Avatar helper — profile pic or video fallback
+  const Avatar = ({ size }: { size: number }) => (
+    <div style={{ width: size, height: size, flexShrink: 0, borderRadius: '50%', overflow: 'hidden' }}>
+      {config.profilePic ? (
+        <img src={config.profilePic} alt={config.brandName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      ) : (
+        <video autoPlay loop muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }}>
+          <source src="/bot-avatar.webm" type="video/webm" />
+          <source src="/bot-avatar.mp4" type="video/mp4" />
+        </video>
+      )}
+    </div>
+  );
+
+  // ---- Closed state: avatar + brand name + status (Figma) ----
   if (!isOpen) {
     return (
-      <button
+      <div
         onClick={() => setIsOpen(true)}
-        className="w-[71px] h-[71px] rounded-full overflow-hidden border-none cursor-pointer p-0 transition-all duration-300 hover:scale-110"
         style={{
-          boxShadow: `0 4px 24px ${primaryColor}66`,
-          animation: 'demo-pulse 2.5s infinite',
-          ['--pulse-color' as any]: `${primaryColor}66`,
-          ['--pulse-color-end' as any]: `${primaryColor}00`,
+          display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
+          fontFamily: '"Heebo", system-ui, sans-serif', direction: 'rtl',
+          animation: 'demo-slide-up 0.35s ease-out',
         }}
-        title="פתח צ׳אט"
       >
-        {config.profilePic ? (
-          <img src={config.profilePic} alt={config.brandName} className="w-full h-full rounded-full object-cover" />
-        ) : (
-          <video autoPlay loop muted playsInline className="w-full h-full rounded-full object-cover">
-            <source src="/bot-avatar.webm" type="video/webm" />
-            <source src="/bot-avatar.mp4" type="video/mp4" />
-          </video>
-        )}
-      </button>
+        {/* Avatar 60px with shadow */}
+        <div style={{ width: 60, height: 60, flexShrink: 0, borderRadius: '50%', overflow: 'hidden',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
+          <Avatar size={60} />
+        </div>
+        {/* Brand name + status */}
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <span style={{ fontWeight: 700, fontSize: 23, color: pc, lineHeight: 'normal', whiteSpace: 'nowrap' }}>
+            {config.brandName}
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
+            <span style={{ fontSize: 16, color: pc, lineHeight: 'normal' }}>זמין</span>
+          </div>
+        </div>
+      </div>
     );
   }
 
-  // ---- Open: chat panel ----
+  // ---- Open state: Figma panel 432×724, rounded-18, bg #f4f5f7 ----
   return (
-    <div
-      className="flex flex-col overflow-hidden"
-      dir="rtl"
-      style={{
-        width: '370px',
-        height: '520px',
-        borderRadius: '20px',
-        background: 'rgba(255,255,255,0.95)',
-        backdropFilter: 'blur(20px) saturate(180%)',
-        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-        boxShadow: '0 8px 40px rgba(0,0,0,0.15)',
-        border: '1px solid #e5e7eb',
-        animation: 'demo-slide-up 0.35s cubic-bezier(0.34,1.56,0.64,1)',
-      }}
-    >
-      {/* Header */}
+    <div style={{ fontFamily: '"Heebo", system-ui, sans-serif', direction: 'rtl' }}>
+      {/* Main panel */}
       <div
-        className="flex items-center gap-2.5 px-4 py-3.5 text-white shrink-0 relative overflow-hidden"
-        style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${primaryColor}cc 100%)` }}
+        style={{
+          width: 432, height: 'min(724px, calc(100vh - 120px))', borderRadius: 18,
+          background: '#f4f5f7', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          boxShadow: '0 8px 40px rgba(0,0,0,0.15)',
+          animation: 'demo-slide-up 0.35s cubic-bezier(0.34,1.56,0.64,1)',
+        }}
       >
-        <div className="absolute -top-5 -right-5 w-20 h-20 rounded-full bg-white/10" />
-        <div className="absolute -bottom-8 -left-3 w-16 h-16 rounded-full bg-white/[0.07]" />
-        <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white/30 shrink-0 relative z-10">
-          {config.profilePic ? (
-            <img src={config.profilePic} alt={config.brandName} className="w-full h-full object-cover" />
-          ) : (
-            <video autoPlay loop muted playsInline className="w-full h-full object-cover">
-              <source src="/bot-avatar.webm" type="video/webm" />
-              <source src="/bot-avatar.mp4" type="video/mp4" />
-            </video>
-          )}
+        {/* Header — 81px, primaryColor bg, rounded-top-18 */}
+        <div
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10, padding: '0 16px', height: 81,
+            flexShrink: 0, background: pc, color: '#fff', borderRadius: '18px 18px 0 0',
+          }}
+        >
+          <Avatar size={52} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: 23, lineHeight: 'normal' }}>{config.brandName}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
+              <span style={{ fontSize: 16 }}>זמין</span>
+            </div>
+          </div>
         </div>
-        <div className="flex-1 relative z-10">
-          <div className="font-bold text-[15px] tracking-tight">{config.brandName}</div>
-          <div className="text-[11px] opacity-85 mt-0.5">מקוון עכשיו</div>
+
+        {/* Messages area */}
+        <div
+          style={{ flex: 1, overflowY: 'auto', padding: 16 }}
+          className="[&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300/30 [&::-webkit-scrollbar-thumb]:rounded"
+        >
+          {messages.map((msg, i) => {
+            const isUser = msg.role === 'user';
+            const isLast = i === messages.length - 1;
+            const isEmpty = !msg.content && isLoading && isLast;
+
+            // Typing indicator
+            if (isEmpty) {
+              return (
+                <div key={i} style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12, animation: 'demo-msg-in 0.3s ease-out' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, maxWidth: '85%' }}>
+                    <Avatar size={20} />
+                    <div style={{ padding: '9px 12px', borderRadius: 30, fontSize: 16, background: '#fff', color: '#000', display: 'flex', gap: 4, alignItems: 'center' }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#676767', animation: 'demo-bounce 1.2s ease-in-out infinite' }} />
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#676767', animation: 'demo-bounce 1.2s ease-in-out 0.15s infinite' }} />
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#676767', animation: 'demo-bounce 1.2s ease-in-out 0.3s infinite' }} />
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            // User bubble — primaryColor bg, white text, rounded-30
+            if (isUser) {
+              return (
+                <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 12, animation: 'demo-msg-in 0.3s ease-out' }}>
+                  <div
+                    style={{
+                      maxWidth: '82%', padding: '9px 12px', borderRadius: 30, fontSize: 16,
+                      lineHeight: 1.5, background: pc, color: '#fff', wordBreak: 'break-word',
+                    }}
+                    dangerouslySetInnerHTML={{ __html: formatWidgetMessage(msg.content, true, pc) }}
+                  />
+                </div>
+              );
+            }
+
+            // Bot bubble — white bg, black text, rounded-30, with 20px avatar
+            return (
+              <div key={i} style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12, animation: 'demo-msg-in 0.3s ease-out' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, maxWidth: '85%' }}>
+                  <Avatar size={20} />
+                  <div
+                    style={{
+                      padding: '9px 12px', borderRadius: 30, fontSize: 16,
+                      lineHeight: 1.5, background: '#fff', color: '#000', wordBreak: 'break-word',
+                    }}
+                    dangerouslySetInnerHTML={{ __html: formatWidgetMessage(msg.content, false, pc) }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+          <div ref={messagesEndRef} />
         </div>
+
+        {/* Input area — white pill, rounded-18, 60px, shadow (Figma) */}
+        <div style={{ padding: '8px 14px 14px', flexShrink: 0 }}>
+          <div
+            style={{
+              display: 'flex', alignItems: 'center', gap: 16, background: '#fff', borderRadius: 18,
+              padding: '8px 8px 8px 10px', height: 60, boxShadow: '4px 6px 23px rgba(0,0,0,0.1)', overflow: 'hidden',
+            }}
+          >
+            {/* Send button — 38px round, primaryColor, up-arrow */}
+            <button
+              onClick={handleSend}
+              disabled={isLoading || !input.trim()}
+              style={{
+                width: 38, height: 38, background: pc, color: '#fff', border: 'none', borderRadius: 60,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0, transition: 'transform 0.2s, opacity 0.2s',
+                opacity: isLoading ? 0.5 : 1, pointerEvents: isLoading ? 'none' : 'auto',
+              }}
+            >
+              <svg width="14" height="16" viewBox="0 0 14 16" fill="none">
+                <path d="M7 1L1 7M7 1L13 7M7 1V15" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            {/* Input field */}
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+              placeholder="כתבו הודעה..."
+              disabled={isLoading}
+              autoFocus
+              style={{
+                flex: 1, border: 'none', outline: 'none', fontSize: 16, color: pc,
+                background: 'transparent', direction: 'rtl', fontFamily: 'inherit', textAlign: 'right', minWidth: 0,
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Close button below panel — 60px dark circle with chevron-down (Figma) */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
         <button
           onClick={() => setIsOpen(false)}
-          className="w-[30px] h-[30px] rounded-full bg-white/15 hover:bg-white/25 border-none text-white cursor-pointer flex items-center justify-center transition-colors relative z-10"
+          style={{
+            width: 60, height: 60, borderRadius: '50%', border: 'none', cursor: 'pointer',
+            background: pc, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 32px rgba(0,0,0,0.16), 0 1px 6px rgba(0,0,0,0.06)',
+            transition: 'transform 0.2s',
+          }}
+          onMouseOver={(e) => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.08)'; }}
+          onMouseOut={(e) => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; }}
         >
-          <X className="w-[18px] h-[18px]" />
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
         </button>
-      </div>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-thin scrollbar-thumb-gray-300/30">
-        {messages.map((msg, i) => {
-          const isUser = msg.role === 'user';
-          const isLast = i === messages.length - 1;
-          const isEmpty = !msg.content && isLoading && isLast;
-
-          if (isEmpty) {
-            return (
-              <div key={i} className="flex justify-end" style={{ animation: 'demo-fade-in 0.3s ease-out' }}>
-                <div className="flex items-end gap-1.5 max-w-[85%]">
-                  <div className="w-[30px] h-[30px] rounded-full overflow-hidden shrink-0">
-                    {config.profilePic ? (
-                      <img src={config.profilePic} alt={config.brandName} className="w-full h-full object-cover" />
-                    ) : (
-                      <video autoPlay loop muted playsInline className="w-full h-full object-cover">
-                        <source src="/bot-avatar.webm" type="video/webm" />
-                        <source src="/bot-avatar.mp4" type="video/mp4" />
-                      </video>
-                    )}
-                  </div>
-                  <div className="px-4 py-3 rounded-2xl rounded-br-sm bg-gray-100 flex gap-1 items-center">
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400" style={{ animation: 'demo-bounce 1.2s ease-in-out infinite' }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400" style={{ animation: 'demo-bounce 1.2s ease-in-out 0.15s infinite' }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400" style={{ animation: 'demo-bounce 1.2s ease-in-out 0.3s infinite' }} />
-                  </div>
-                </div>
-              </div>
-            );
-          }
-
-          if (isUser) {
-            return (
-              <div key={i} className="flex justify-start" style={{ animation: 'demo-fade-in 0.3s ease-out' }}>
-                <div
-                  className="max-w-[82%] px-3.5 py-2.5 rounded-2xl rounded-bl-sm text-sm leading-relaxed text-white"
-                  style={{
-                    background: `linear-gradient(135deg, ${primaryColor}, ${primaryColor}dd)`,
-                    boxShadow: `0 2px 8px ${primaryColor}33`,
-                  }}
-                >
-                  <span dangerouslySetInnerHTML={{ __html: formatWidgetMessage(msg.content) }} />
-                </div>
-              </div>
-            );
-          }
-
-          return (
-            <div key={i} className="flex justify-end" style={{ animation: 'demo-fade-in 0.3s ease-out' }}>
-              <div className="flex items-end gap-1.5 max-w-[85%]">
-                <div className="w-[30px] h-[30px] rounded-full overflow-hidden shrink-0">
-                  {config.profilePic ? (
-                    <img src={config.profilePic} alt={config.brandName} className="w-full h-full object-cover" />
-                  ) : (
-                    <video autoPlay loop muted playsInline className="w-full h-full object-cover">
-                      <source src="/bot-avatar.webm" type="video/webm" />
-                      <source src="/bot-avatar.mp4" type="video/mp4" />
-                    </video>
-                  )}
-                </div>
-                <div
-                  className="px-3.5 py-2.5 rounded-2xl rounded-br-sm text-sm leading-relaxed text-gray-800"
-                  style={{ background: '#f3f4f6', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
-                >
-                  <span dangerouslySetInnerHTML={{ __html: formatWidgetMessage(msg.content) }} />
-                </div>
-              </div>
-            </div>
-          );
-        })}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input */}
-      <div className="flex items-center gap-2 px-4 py-3 border-t border-gray-200/80 bg-gray-50/80 shrink-0">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-          placeholder="כתבו הודעה..."
-          className="flex-1 px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl text-gray-800 bg-white focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20 transition-all"
-          disabled={isLoading}
-          autoFocus
-        />
-        <button
-          onClick={handleSend}
-          disabled={isLoading || !input.trim()}
-          className="w-[38px] h-[38px] rounded-full flex items-center justify-center text-white border-none cursor-pointer transition-all hover:scale-105 disabled:opacity-40 disabled:pointer-events-none shrink-0"
-          style={{ background: `linear-gradient(135deg, ${primaryColor}, ${primaryColor}cc)` }}
-        >
-          <Send className="w-[18px] h-[18px] rotate-180" />
-        </button>
-      </div>
-
-      <div className="text-center py-1.5 text-[10px] text-gray-400 shrink-0">
-        Powered by InfluencerBot
       </div>
     </div>
   );
 }
 
 // ============================================
-// Message Formatting
+// Message Formatting (inline styles matching widget.js)
 // ============================================
 
-function formatInline(text: string): string {
-  let safe = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  safe = safe.replace(/!\[([^\]]*)\]\(([^)]+)\)/g,
-    '<div class="my-2"><img src="$2" alt="$1" class="max-w-full max-h-44 rounded-xl object-cover cursor-pointer shadow-sm" onerror="this.style.display=\'none\'" onclick="window.open(\'$2\',\'_blank\')" /></div>');
-  safe = safe.replace(/\[([^\]]+)\]\(([^)]+)\)/g,
-    '<a href="$2" target="_blank" rel="noopener" class="text-indigo-600 font-medium" style="border-bottom:1px solid rgba(99,102,241,0.25);">$1</a>');
-  safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold">$1</strong>');
-  safe = safe.replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1 rounded text-xs font-mono">$1</code>');
-  return safe;
+function escapeHtml(str: string): string {
+  if (!str) return '';
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function formatWidgetMessage(text: string): string {
+function formatWidgetMessage(text: string, isUserMsg: boolean = false, primaryColor: string = '#0c1013'): string {
   if (!text) return '';
+  const textColor = isUserMsg ? '#fff' : '#000';
+  const linkColor = isUserMsg ? '#93c5fd' : primaryColor;
   const lines = text.split('\n');
   let html = '';
   let inUl = false;
   let inOl = false;
+
+  function formatInline(t: string): string {
+    let safe = escapeHtml(t);
+    safe = safe.replace(/!\[([^\]]*)\]\(([^)]+)\)/g,
+      '<div style="margin:8px 0;"><img src="$2" alt="$1" style="max-width:100%;max-height:180px;border-radius:10px;object-fit:cover;cursor:pointer;" onerror="this.style.display=\'none\'" onclick="window.open(\'$2\',\'_blank\')" /></div>');
+    safe = safe.replace(/\[([^\]]+)\]\(([^)]+)\)/g,
+      `<a href="$2" target="_blank" rel="noopener" style="color:${linkColor};text-decoration:underline;text-underline-offset:2px;font-weight:500;">$1</a>`);
+    safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong style="font-weight:600;">$1</strong>');
+    safe = safe.replace(/`([^`]+)`/g, '<code style="background:rgba(0,0,0,0.06);padding:1px 5px;border-radius:4px;font-size:0.9em;">$1</code>');
+    return safe;
+  }
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -518,19 +544,19 @@ function formatWidgetMessage(text: string): string {
 
     if (bulletMatch) {
       if (inOl) { html += '</ol>'; inOl = false; }
-      if (!inUl) { html += '<ul class="my-1 space-y-0.5 list-none pr-3">'; inUl = true; }
-      html += `<li class="leading-relaxed relative pr-3"><span class="absolute right-0 text-indigo-500">\u2022</span>${formatInline(bulletMatch[1] || trimmed.replace(/^[-•*]\s+/, ''))}</li>`;
+      if (!inUl) { html += '<ul style="margin:4px 0;padding-right:16px;list-style:none;">'; inUl = true; }
+      html += `<li style="margin-bottom:3px;line-height:1.5;color:${textColor};position:relative;padding-right:12px;"><span style="position:absolute;right:0;">\u2022</span>${formatInline(bulletMatch[1] || trimmed.replace(/^[-•*]\s+/, ''))}</li>`;
     } else if (numMatch) {
       if (inUl) { html += '</ul>'; inUl = false; }
-      if (!inOl) { html += '<ol class="list-decimal list-inside my-1 space-y-0.5">'; inOl = true; }
-      html += `<li class="leading-relaxed">${formatInline(numMatch[1])}</li>`;
+      if (!inOl) { html += '<ol style="margin:4px 0;padding-right:16px;list-style:decimal inside;">'; inOl = true; }
+      html += `<li style="margin-bottom:3px;line-height:1.5;color:${textColor};">${formatInline(numMatch[1])}</li>`;
     } else {
       if (inUl) { html += '</ul>'; inUl = false; }
       if (inOl) { html += '</ol>'; inOl = false; }
       if (trimmed === '') {
-        html += '<div class="h-1.5"></div>';
+        html += '<div style="height:6px;"></div>';
       } else {
-        html += `<div class="mb-1 leading-relaxed">${formatInline(trimmed)}</div>`;
+        html += `<div style="margin-bottom:4px;line-height:1.5;">${formatInline(trimmed)}</div>`;
       }
     }
   }

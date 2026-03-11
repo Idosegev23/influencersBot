@@ -36,6 +36,7 @@
     position: 'bottom-right',
     brandName: 'העוזר החכם',
     profilePic: null,
+    primaryColor: '#0c1013',
   };
 
   // ============================================
@@ -72,6 +73,7 @@
     .then(function (data) {
       if (data.theme) {
         config.position = data.theme.position || config.position;
+        if (data.theme.primaryColor) config.primaryColor = data.theme.primaryColor;
       }
       if (data.welcomeMessage) config.welcomeMessage = data.welcomeMessage;
       if (data.placeholder) config.placeholder = data.placeholder;
@@ -135,8 +137,9 @@
       '<div id="ibot-trigger" style="' +
       'display:flex;align-items:center;gap:12px;cursor:pointer;' +
       'transition:transform 0.3s ease;animation:ibot-slide-up 0.35s ease-out;">' +
-      // Avatar (60px)
-      '<div style="width:60px;height:60px;flex-shrink:0;">' +
+      // Avatar (60px, Figma: rounded with shadow)
+      '<div style="width:60px;height:60px;flex-shrink:0;border-radius:50%;overflow:hidden;' +
+      'box-shadow:0 4px 20px rgba(0,0,0,0.1);">' +
       avatarHtml(60) +
       '</div>' +
       // Label text
