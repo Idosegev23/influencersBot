@@ -570,10 +570,12 @@ function DashboardContent() {
                                     ? 'bg-green-500/20 text-green-400'
                                     : website.status === 'running'
                                     ? 'bg-yellow-500/20 text-yellow-400'
+                                    : website.status === 'widget-only'
+                                    ? 'bg-blue-500/20 text-blue-400'
                                     : 'bg-gray-500/20 text-gray-400'
                                 }`}
                               >
-                                {website.status === 'completed' ? 'הושלם' : website.status === 'running' ? 'סורק...' : website.status}
+                                {website.status === 'completed' ? 'הושלם' : website.status === 'running' ? 'סורק...' : website.status === 'widget-only' ? 'ווידג׳ט' : website.status}
                               </span>
                             </div>
                           </div>
