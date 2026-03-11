@@ -32,13 +32,11 @@ type AccountFilter = 'all' | 'creator' | 'brand';
 interface WebsiteAccount {
   id: string;
   domain: string;
+  displayName: string;
   url: string;
-  status: string;
   pagesCount: number;
-  totalWords: number;
-  totalImages: number;
-  lastScanAt: string;
-  jobId: string;
+  chunksCount: number;
+  primaryColor: string;
 }
 
 function DashboardContent() {
@@ -516,7 +514,7 @@ function DashboardContent() {
                         <p className="text-3xl font-bold text-white">
                           {websites.reduce((sum, w) => sum + w.pagesCount, 0)}
                         </p>
-                        <p className="text-sm text-gray-400">עמודים נסרקו</p>
+                        <p className="text-sm text-gray-400">מסמכים</p>
                       </div>
                     </div>
                   </motion.div>
@@ -546,12 +544,15 @@ function DashboardContent() {
                         className="admin-card p-4 hover:border-indigo-500/50 transition-all"
                       >
                         <div className="flex items-start gap-3">
-                          <div className="w-14 h-14 rounded-xl bg-indigo-500/10 flex items-center justify-center flex-shrink-0 ring-2 ring-indigo-500/20">
-                            <Globe className="w-7 h-7 text-indigo-400" />
+                          <div
+                            className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 ring-2 ring-white/10"
+                            style={{ backgroundColor: website.primaryColor + '20' }}
+                          >
+                            <Globe className="w-7 h-7" style={{ color: website.primaryColor }} />
                           </div>
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-white truncate">
-                              {website.domain}
+                              {website.displayName}
                             </h3>
                             <a
                               href={website.url}
@@ -559,24 +560,11 @@ function DashboardContent() {
                               rel="noopener noreferrer"
                               className="text-sm text-indigo-400 hover:text-indigo-300 truncate block"
                             >
-                              {website.url}
+                              {website.domain}
                             </a>
                             <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-                              <span>{website.pagesCount} עמודים</span>
-                              <span>{formatNumber(website.totalWords)} מילים</span>
-                              <span
-                                className={`px-2 py-0.5 rounded-full ${
-                                  website.status === 'completed'
-                                    ? 'bg-green-500/20 text-green-400'
-                                    : website.status === 'running'
-                                    ? 'bg-yellow-500/20 text-yellow-400'
-                                    : website.status === 'widget-only'
-                                    ? 'bg-blue-500/20 text-blue-400'
-                                    : 'bg-gray-500/20 text-gray-400'
-                                }`}
-                              >
-                                {website.status === 'completed' ? 'הושלם' : website.status === 'running' ? 'סורק...' : website.status === 'widget-only' ? 'ווידג׳ט' : website.status}
-                              </span>
+                              <span>{website.pagesCount} מסמכים</span>
+                              <span>{website.chunksCount} chunks</span>
                             </div>
                           </div>
                         </div>
@@ -587,7 +575,7 @@ function DashboardContent() {
                             className="flex-1 flex items-center justify-center gap-1 py-2 text-sm text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
                           >
                             <ExternalLink className="w-4 h-4" />
-                            צפייה
+                            ווידג׳ט
                           </Link>
                           <a
                             href={website.url}
@@ -599,12 +587,6 @@ function DashboardContent() {
                             לאתר
                           </a>
                         </div>
-
-                        {website.lastScanAt && (
-                          <p className="text-xs text-gray-600 mt-2 text-center">
-                            סריקה אחרונה: {formatDateTime(website.lastScanAt)}
-                          </p>
-                        )}
                       </motion.div>
                     ))}
                   </div>
