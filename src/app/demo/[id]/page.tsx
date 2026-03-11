@@ -312,16 +312,13 @@ function DemoWidget({ accountId, config }: { accountId: string; config: WidgetCo
     }
   };
 
-  // Avatar helper — profile pic or video fallback
+  // Avatar helper — profile pic or GIF fallback (matches widget.js)
   const Avatar = ({ size }: { size: number }) => (
     <div style={{ width: size, height: size, flexShrink: 0, borderRadius: '50%', overflow: 'hidden' }}>
       {config.profilePic ? (
         <img src={config.profilePic} alt={config.brandName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       ) : (
-        <video autoPlay loop muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }}>
-          <source src="/bot-avatar.webm" type="video/webm" />
-          <source src="/bot-avatar.mp4" type="video/mp4" />
-        </video>
+        <img src="/vidNB_small.gif" alt="Bot" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       )}
     </div>
   );
