@@ -28,8 +28,8 @@ export const themePresets: Record<InfluencerType, InfluencerTheme> = {
       border: '#e5e5e5',
     },
     fonts: {
-      heading: 'Playfair Display',
-      body: 'Inter',
+      heading: 'Heebo',
+      body: 'Heebo',
     },
     style: 'elegant',
     darkMode: false,
@@ -44,8 +44,8 @@ export const themePresets: Record<InfluencerType, InfluencerTheme> = {
       border: '#334155',
     },
     fonts: {
-      heading: 'Space Grotesk',
-      body: 'Inter',
+      heading: 'Heebo',
+      body: 'Heebo',
     },
     style: 'minimal',
     darkMode: true,
@@ -76,8 +76,8 @@ export const themePresets: Record<InfluencerType, InfluencerTheme> = {
       border: '#bbf7d0',
     },
     fonts: {
-      heading: 'Oswald',
-      body: 'Open Sans',
+      heading: 'Heebo',
+      body: 'Heebo',
     },
     style: 'bold',
     darkMode: false,
@@ -92,8 +92,8 @@ export const themePresets: Record<InfluencerType, InfluencerTheme> = {
       border: '#fbcfe8',
     },
     fonts: {
-      heading: 'Cormorant Garamond',
-      body: 'Lato',
+      heading: 'Heebo',
+      body: 'Heebo',
     },
     style: 'elegant',
     darkMode: false,
@@ -197,7 +197,7 @@ export function applyTheme(theme?: InfluencerTheme): void {
 export function getGoogleFontsUrl(theme?: InfluencerTheme): string {
   if (!theme || !theme.fonts || !theme.fonts.heading || !theme.fonts.body) {
     // Return default fonts if theme is not available
-    return 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Heebo:wght@400;500;600;700&display=swap';
+    return 'https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&display=swap';
   }
   
   const fonts = new Set([theme.fonts.heading, theme.fonts.body]);

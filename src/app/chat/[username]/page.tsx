@@ -7,21 +7,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import {
   Send,
-  Search,
   MessageCircle,
   Copy,
-  Check,
   ChefHat,
   Shirt,
   Cpu,
   Heart,
   Dumbbell,
   Sparkles,
-  ArrowRight,
-  Plus,
   Baby,
   Plane,
-  Headphones,
   X,
   Loader2,
   Ticket,
@@ -136,13 +131,12 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   
-  const [activeTab, setActiveTab] = useState<'chat' | 'search' | 'coupons' | 'problem'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'coupons' | 'problem'>('chat');
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [responseId, setResponseId] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [tapCount, setTapCount] = useState(0);
   const [showSupportModal, setShowSupportModal] = useState(false);
@@ -617,11 +611,6 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     }
   };
 
-  const filteredBrands = brands.filter((b) =>
-    b.brand_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (b.category && b.category.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" dir="rtl">
@@ -662,117 +651,85 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       
       <main className="chat-page flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--color-background)' }}>
         {/* Header */}
-        <header className={`sticky top-0 z-50 glass header-border px-4 ${isMobile ? 'h-[76px] flex items-center' : 'py-3'}`}>
-          <div className="max-w-2xl mx-auto flex items-center justify-between">
-            {/* Right side - Back button (desktop only) + Avatar + Name */}
-            <div className="flex items-center gap-2.5">
-              {/* Back arrow - hidden on mobile */}
-              <button
-                onClick={() => window.history.back()}
-                className="hidden md:flex p-2 rounded-lg transition-all hover:bg-black/10"
-                style={{ color: 'var(--color-text)' }}
-                aria-label="חזרה"
-              >
-                <ArrowRight className="w-5 h-5" />
-              </button>
-              <div onClick={handleAvatarTap} className="cursor-pointer select-none relative">
-                {influencer.avatar_url ? (
-                  <div className={isMobile ? '' : 'avatar-ring'}>
-                    <div className={`relative w-11 h-11 overflow-hidden ${isMobile ? 'rounded-full' : 'rounded-[14px]'}`}>
-                      <Image
-                        src={getProxiedImageUrl(influencer.avatar_url)}
-                        alt={influencer.display_name}
-                        fill
-                        className="object-cover"
-                        sizes="44px"
-                        unoptimized
-                      />
+        <header className={`sticky top-0 z-50 ${isMobile ? 'glass header-border px-4 h-[76px] flex items-center' : 'px-4 py-[19px]'}`}>
+          {isMobile ? (
+            /* ---- Mobile Header ---- */
+            <div className="w-full flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div onClick={handleAvatarTap} className="cursor-pointer select-none relative">
+                  {influencer.avatar_url ? (
+                    <div className="relative w-11 h-11 rounded-full overflow-hidden">
+                      <Image src={getProxiedImageUrl(influencer.avatar_url)} alt={influencer.display_name} fill className="object-cover" sizes="44px" unoptimized />
                     </div>
-                  </div>
-                ) : (
-                  <div className={isMobile ? '' : 'avatar-ring'}>
-                    <div
-                      className={`w-11 h-11 flex items-center justify-center text-white font-bold text-lg ${isMobile ? 'rounded-full' : 'rounded-[14px]'}`}
-                      style={{ backgroundColor: 'var(--color-primary)' }}
-                    >
+                  ) : (
+                    <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-lg" style={{ backgroundColor: 'var(--color-primary)' }}>
                       {influencer.display_name.charAt(0)}
                     </div>
-                  </div>
-                )}
-                {/* Online status dot */}
-                <div className="status-dot absolute -bottom-0.5 -left-0.5" />
+                  )}
+                  <div className="status-dot absolute -bottom-0.5 -left-0.5" />
+                </div>
+                <div>
+                  <h1 className="font-semibold text-base" style={{ color: '#0c1013' }}>{influencer.display_name}</h1>
+                  <p className="text-xs" style={{ color: '#676767' }}>{typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other}</p>
+                </div>
               </div>
-              <div>
-                <h1 className="font-semibold text-base" style={{ color: 'var(--color-text)' }}>
-                  {influencer.display_name}
-                </h1>
-                <p className="text-xs" style={{ color: 'var(--color-text)', opacity: 0.5 }}>
-                  {typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other}
-                </p>
-              </div>
-            </div>
-
-            {/* Left side - Desktop: Tabs + New Chat | Mobile: Help icon */}
-            <div className="flex items-center gap-2">
-              {/* Desktop tab pills - hidden on mobile */}
-              <div className="hidden md:flex gap-1 p-1 rounded-full" style={{ backgroundColor: '#f0f0f2' }}>
-                <button
-                  onClick={() => setActiveTab('chat')}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                    activeTab === 'chat' ? 'tab-active' : ''
-                  }`}
-                  style={activeTab === 'chat' ? {} : { color: 'var(--color-text)' }}
-                >
-                  צ'אט
-                </button>
-                <button
-                  onClick={() => setActiveTab('search')}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                    activeTab === 'search' ? 'tab-active' : ''
-                  }`}
-                  style={activeTab === 'search' ? {} : { color: 'var(--color-text)' }}
-                >
-                  חיפוש
-                </button>
-              </div>
-
-              {/* Support Button - desktop only */}
-              {influencer.whatsapp_enabled && (
-                <button
-                  onClick={() => setShowSupportModal(true)}
-                  className="hidden md:flex p-2 rounded-lg transition-all hover:bg-black/10"
-                  style={{ color: 'var(--color-accent)' }}
-                  aria-label="פנייה לתמיכה"
-                  title="פנייה לתמיכה"
-                >
-                  <Headphones className="w-5 h-5" />
-                </button>
-              )}
-
-              {/* New Chat Button - desktop only, visible when there are messages */}
-              {messages.length > 0 && (
-                <button
-                  onClick={handleNewChat}
-                  className="hidden md:flex p-2 rounded-lg transition-all hover:bg-black/10"
-                  style={{ color: 'var(--color-primary)' }}
-                  aria-label="שיחה חדשה"
-                  title="שיחה חדשה"
-                >
-                  <Plus className="w-5 h-5" />
-                </button>
-              )}
-
-              {/* Mobile: Help icon */}
-              <button
-                onClick={() => setShowSupportModal(true)}
-                className="flex md:hidden p-2 rounded-lg transition-all hover:bg-black/10"
-                style={{ color: 'var(--color-text)' }}
-                aria-label="עזרה"
-              >
+              <button onClick={() => setShowSupportModal(true)} className="p-2 rounded-lg transition-all hover:bg-black/10" style={{ color: '#676767' }} aria-label="עזרה">
                 <HelpCircle className="w-[18px] h-[18px]" />
               </button>
             </div>
-          </div>
+          ) : (
+            /* ---- Desktop Header (Figma pill) ---- */
+            <div className="max-w-[700px] mx-auto bg-white rounded-full h-[69px] flex items-center justify-between px-3">
+              {/* Right side: Avatar + Name */}
+              <div className="flex items-center gap-2.5">
+                <div onClick={handleAvatarTap} className="cursor-pointer select-none relative">
+                  {influencer.avatar_url ? (
+                    <div className="relative w-[46px] h-[46px] rounded-full overflow-hidden">
+                      <Image src={getProxiedImageUrl(influencer.avatar_url)} alt={influencer.display_name} fill className="object-cover" sizes="46px" unoptimized />
+                    </div>
+                  ) : (
+                    <div className="w-[46px] h-[46px] rounded-full flex items-center justify-center text-white font-bold text-lg" style={{ backgroundColor: 'var(--color-primary)' }}>
+                      {influencer.display_name.charAt(0)}
+                    </div>
+                  )}
+                  <div className="status-dot absolute -bottom-0.5 -left-0.5" />
+                </div>
+                <div>
+                  <h1 className="font-semibold text-[19px]" style={{ color: '#0c1013' }}>{influencer.display_name}</h1>
+                  <p className="text-[13px]" style={{ color: '#676767' }}>{typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other}</p>
+                </div>
+              </div>
+
+              {/* Left side: Tab pills */}
+              <div className="flex items-center gap-[5px] bg-white rounded-full p-[6px]">
+                {/* Tabs in RTL order: צ'אט first (rightmost), then קופונים, then בעיה בהזמנה (leftmost) */}
+                <button
+                  onClick={() => setActiveTab('chat')}
+                  className={`flex items-center gap-[6px] px-[11px] py-[6px] rounded-full transition-all ${activeTab === 'chat' ? 'bg-[#dbe4f5]' : ''}`}
+                  style={{ color: activeTab === 'chat' ? '#0c1013' : '#676767', fontSize: '16px', fontWeight: activeTab === 'chat' ? 700 : 400 }}
+                >
+                  <span>צ׳אט</span>
+                  <MessageCircle className="w-[18px] h-[18px]" />
+                </button>
+                <button
+                  onClick={() => setActiveTab('coupons')}
+                  className={`flex items-center gap-[6px] px-[13px] py-[6px] rounded-full transition-all ${activeTab === 'coupons' ? 'bg-[#e5f2d6]' : ''}`}
+                  style={{ color: activeTab === 'coupons' ? '#0c1013' : '#676767', fontSize: '16px', fontWeight: activeTab === 'coupons' ? 700 : 400 }}
+                >
+                  <span>קופונים</span>
+                  <Ticket className="w-[18px] h-[18px]" />
+                </button>
+                <button
+                  onClick={() => setActiveTab('problem')}
+                  className={`flex items-center gap-[6px] px-[13px] py-[6px] rounded-full transition-all ${activeTab === 'problem' ? 'bg-[#ffd6d7]' : ''}`}
+                  style={{ color: activeTab === 'problem' ? '#0c1013' : '#676767', fontSize: '16px', fontWeight: activeTab === 'problem' ? 700 : 400 }}
+                >
+                  <span>בעיה בהזמנה</span>
+                  <AlertCircle className="w-[18px] h-[18px]" />
+                </button>
+              </div>
+            </div>
+          )}
         </header>
 
         {/* Main Content */}
@@ -787,144 +744,84 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 className={`h-full flex flex-col relative ${isMobile ? 'mobile-chat' : ''}`}
               >
                 {/* Chat Messages */}
-                <div className={`flex-1 overflow-y-auto px-4 chat-bg chat-messages-scroll ${isMobile ? (messages.length === 0 ? 'pb-[80px]' : 'pb-2 pt-3') : 'py-6 pb-8 space-y-4'}`}>
+                <div className={`flex-1 overflow-y-auto px-4 chat-bg chat-messages-scroll ${messages.length === 0 ? (isMobile ? 'pb-[80px]' : 'pb-8') : (isMobile ? 'pb-2 pt-3' : 'py-6 pb-8')} space-y-4`}>
                   {messages.length === 0 ? (
-                    <div className={`flex flex-col items-center text-center px-4 ${isMobile ? 'pt-[60px]' : 'pt-10 justify-center'}`}>
-                      {/* Mobile: 3D bot illustration | Desktop: avatar with ring */}
+                    <div className={`flex flex-col items-center text-center px-4 ${isMobile ? 'pt-[60px]' : 'pt-[100px]'}`}>
+                      {/* Bot illustration (same on mobile + desktop per Figma) */}
                       <motion.div
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ duration: 0.4 }}
-                        className={isMobile ? 'mb-6' : 'mb-5'}
+                        className="mb-6"
                       >
-                        {isMobile ? (
-                          <div className="relative w-[124px] h-[128px] mx-auto">
-                            <Image
-                              src="/bot-illustration.png"
-                              alt="AI Assistant"
-                              fill
-                              className="object-contain"
-                              sizes="124px"
-                            />
-                          </div>
-                        ) : influencer.avatar_url ? (
-                          <div className="avatar-ring-lg">
-                            <div className="relative w-20 h-20 rounded-[20px] overflow-hidden">
-                              <Image
-                                src={getProxiedImageUrl(influencer.avatar_url)}
-                                alt={influencer.display_name}
-                                fill
-                                className="object-cover"
-                                sizes="80px"
-                                unoptimized
-                              />
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="avatar-ring-lg">
-                            <div
-                              className="w-20 h-20 rounded-[20px] flex items-center justify-center text-white font-bold text-2xl"
-                              style={{ backgroundColor: 'var(--color-primary)' }}
-                            >
-                              {influencer.display_name.charAt(0)}
-                            </div>
-                          </div>
-                        )}
+                        <div className="relative w-[124px] h-[128px] mx-auto">
+                          <Image
+                            src="/bot-illustration.png"
+                            alt="AI Assistant"
+                            fill
+                            className="object-contain"
+                            sizes="124px"
+                          />
+                        </div>
                       </motion.div>
 
                       <motion.h2
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4, delay: 0.1 }}
-                        className={isMobile ? 'font-semibold mb-2 w-[320px] max-w-full' : 'text-xl font-semibold mb-2'}
-                        style={isMobile
-                          ? { color: '#0c1013', fontSize: '33px', lineHeight: '33px' }
-                          : { color: 'var(--color-text)' }
-                        }
+                        className="font-semibold mb-2 max-w-[426px]"
+                        style={{ color: '#0c1013', fontSize: '33px', lineHeight: '33px' }}
                       >
-                        {isMobile
-                          ? `היי אני העוזר האישי של ${influencer.display_name.split(' ')[0]}`
-                          : greetingMessage
-                        }
+                        {`היי אני העוזר האישי של ${influencer.display_name.split(' ')[0]}`}
                       </motion.h2>
                       <motion.p
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4, delay: 0.2 }}
-                        className={isMobile ? 'mb-8 max-w-sm' : 'mb-7 max-w-sm text-sm leading-relaxed'}
-                        style={isMobile
-                          ? { color: '#676767', fontSize: '16px' }
-                          : { color: 'var(--color-text)', opacity: 0.6 }
-                        }
+                        className="mb-8 max-w-sm"
+                        style={{ color: '#676767', fontSize: '16px' }}
                       >
                         אני כאן לעזור עם {(typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other).toLowerCase()}, מותגים וקופונים
                       </motion.p>
 
-                      {/* Quick Action Buttons - hidden on mobile (replaced by bottom tabs) */}
+                      {/* Inline input in empty state (centered, Figma style) */}
                       <motion.div
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4, delay: 0.3 }}
-                        className="hidden md:flex gap-3 justify-center mb-8"
+                        className={`${isMobile ? 'w-[363px]' : 'w-[670px]'} max-w-full mb-6`}
                       >
-                        {brands.length > 0 && (
+                        <div className="chat-input-pill">
+                          <textarea
+                            ref={inputRef}
+                            value={inputValue}
+                            onChange={(e) => setInputValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSendMessage();
+                              }
+                            }}
+                            placeholder="מה רצית לשאול?"
+                            disabled={isTyping}
+                            rows={1}
+                            onInput={(e) => {
+                              const t = e.currentTarget;
+                              t.style.height = 'auto';
+                              t.style.height = Math.min(t.scrollHeight, 120) + 'px';
+                            }}
+                          />
                           <button
-                            onClick={() => setActiveTab('search')}
-                            className="px-5 py-2.5 rounded-full text-sm font-medium transition-all hover:shadow-md"
-                            style={{ backgroundColor: '#ffffff', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+                            onClick={handleSendMessage}
+                            disabled={!inputValue.trim() || isTyping}
+                            className="send-btn"
                           >
-                            🛍️ קופונים ומותגים
+                            <Send className="w-4 h-4" />
                           </button>
-                        )}
-                        <button
-                          onClick={() => setShowSupportModal(true)}
-                          className="px-5 py-2.5 rounded-full text-sm font-medium transition-all hover:shadow-md"
-                          style={{ backgroundColor: '#ffffff', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
-                        >
-                          💬 בעיה בהזמנה
-                        </button>
+                        </div>
                       </motion.div>
 
-                      {/* Mobile: Inline input in empty state (Figma: input is in the middle, not at bottom) */}
-                      {isMobile && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 8 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.4, delay: 0.3 }}
-                          className="w-[363px] max-w-full mb-6"
-                        >
-                          <div className="chat-input-pill">
-                            <textarea
-                              ref={inputRef}
-                              value={inputValue}
-                              onChange={(e) => setInputValue(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                  e.preventDefault();
-                                  handleSendMessage();
-                                }
-                              }}
-                              placeholder="מה רצית לשאול?"
-                              disabled={isTyping}
-                              rows={1}
-                              onInput={(e) => {
-                                const t = e.currentTarget;
-                                t.style.height = 'auto';
-                                t.style.height = Math.min(t.scrollHeight, 120) + 'px';
-                              }}
-                            />
-                            <button
-                              onClick={handleSendMessage}
-                              disabled={!inputValue.trim() || isTyping}
-                              className="send-btn"
-                            >
-                              <Send className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </motion.div>
-                      )}
-
-                      {/* Dynamic welcome suggestions — below input on mobile per Figma */}
+                      {/* Suggestion pills below input */}
                       <motion.div
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -944,58 +841,6 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           </button>
                         ))}
                       </motion.div>
-
-                      {/* Brands Preview - hidden on mobile empty state */}
-                      {brands.length > 0 && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 8 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.4, delay: 0.4 }}
-                          className="hidden md:block w-full mt-2"
-                        >
-                          <p className="text-xs mb-3 text-center" style={{ color: 'var(--color-text)', opacity: 0.4 }}>
-                            מותגים וקופונים
-                          </p>
-                          <div className="flex gap-3 overflow-x-auto pb-3 px-4 scrollbar-hide">
-                            {brands.slice(0, 6).map((brand) => (
-                              <button
-                                key={brand.id}
-                                onClick={() => brand.coupon_code && handleCopyCode(brand.coupon_code, brand.id)}
-                                className="flex-shrink-0 w-32 p-3.5 rounded-2xl text-center transition-all hover:shadow-md"
-                                style={{ backgroundColor: '#ffffff', border: '1px solid var(--color-border)' }}
-                              >
-                                {brand.image_url ? (
-                                  <img src={brand.image_url} alt={brand.brand_name} className="w-10 h-10 mx-auto mb-2 rounded-lg object-contain" />
-                                ) : (
-                                  <div className="w-10 h-10 mx-auto mb-2 rounded-lg flex items-center justify-center text-sm font-bold" style={{ backgroundColor: 'color-mix(in srgb, var(--color-primary) 12%, #f0f0f2)', color: 'var(--color-primary)' }}>
-                                    {brand.brand_name.charAt(0).toUpperCase()}
-                                  </div>
-                                )}
-                                <p className="font-medium text-sm truncate" style={{ color: 'var(--color-text)' }}>
-                                  {brand.brand_name}
-                                </p>
-                                {brand.category && (
-                                  <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text)', opacity: 0.5 }}>
-                                    {brand.category}
-                                  </p>
-                                )}
-                                {brand.coupon_code ? (
-                                  <span
-                                    className="inline-block mt-2 px-2 py-1 text-[10px] font-mono font-semibold rounded-md"
-                                    style={{ backgroundColor: 'rgba(16,185,129,0.1)', color: '#10b981' }}
-                                  >
-                                    {copiedCode === brand.id ? 'הועתק!' : brand.coupon_code}
-                                  </span>
-                                ) : (
-                                  <span className="inline-block mt-2 text-[10px]" style={{ color: 'var(--color-text)', opacity: 0.4 }}>
-                                    ללא קופון
-                                  </span>
-                                )}
-                              </button>
-                            ))}
-                          </div>
-                        </motion.div>
-                      )}
                     </div>
                   ) : (
                     <div className={`${isMobile ? 'flex flex-col justify-end min-h-full' : ''} space-y-4`}>
@@ -1037,7 +882,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                               </div>
                             )}
                             <div className="w-full">
-                              <div className={`${msg.role === 'user' && isMobile ? '' : 'max-w-[80%]'} inline-block px-4 py-3 ${msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-assistant'}`}>
+                              <div className={`${msg.role === 'user' ? '' : 'max-w-[80%]'} inline-block ${msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-assistant'}`}>
                                 {msg.role === 'user' ? (
                                   <p className="text-sm whitespace-pre-wrap">{displayContent}</p>
                                 ) : (
@@ -1314,36 +1159,12 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   )}
                 </div>
 
-                {/* Chat Input — on mobile, hidden in empty state (shown inline above) */}
+                {/* Chat Input — hidden in empty state (shown inline above) */}
                 <div
-                  className={`flex-shrink-0 pt-3 chat-input-gradient ${isMobile ? (messages.length === 0 ? 'hidden' : 'px-[15px] pb-[calc(max(8px,env(safe-area-inset-bottom))+60px)]') : 'px-4 pb-safe'}`}
-                  style={isMobile
-                    ? { background: '#f4f5f7' }
-                    : { background: '#ffffff' }
-                  }
+                  className={`flex-shrink-0 pt-3 chat-input-gradient ${messages.length === 0 ? 'hidden' : (isMobile ? 'px-[15px] pb-[calc(max(8px,env(safe-area-inset-bottom))+60px)]' : 'px-4 pb-6')}`}
+                  style={{ background: '#f4f5f7' }}
                 >
-                  <div className="max-w-2xl mx-auto">
-                    {/* Quick action buttons above input - desktop only */}
-                    {messages.length > 0 && (
-                      <div className="hidden md:flex gap-2 mb-2 justify-center">
-                        {brands.length > 0 && (
-                          <button
-                            onClick={() => setActiveTab('search')}
-                            className="px-3 py-1.5 rounded-full text-xs font-medium transition-all"
-                            style={{ backgroundColor: '#ffffff', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
-                          >
-                            🛍️ קופונים
-                          </button>
-                        )}
-                        <button
-                          onClick={() => setShowSupportModal(true)}
-                          className="px-3 py-1.5 rounded-full text-xs font-medium transition-all"
-                          style={{ backgroundColor: '#ffffff', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
-                        >
-                          💬 בעיה בהזמנה
-                        </button>
-                      </div>
-                    )}
+                  <div className={`mx-auto ${isMobile ? 'max-w-2xl' : 'max-w-[670px]'}`}>
                     <div className="chat-input-pill">
                       <textarea
                         ref={inputRef}
@@ -1375,123 +1196,21 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   </div>
                 </div>
               </motion.div>
-            ) : activeTab === 'search' ? (
-              <motion.div
-                key="search"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="h-full overflow-y-auto"
-              >
-                {/* Search Header */}
-                <div className="sticky top-0 z-40 px-4 py-4 border-b" style={{ backgroundColor: '#ffffff', borderColor: 'var(--color-border)' }}>
-                  <div className="max-w-2xl mx-auto">
-                    <div className="relative">
-                      <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5" style={{ color: 'var(--color-text)', opacity: 0.4 }} />
-                      <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="חפשו מותגים, קופונים..."
-                        className="input pr-10"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Brands */}
-                <div className="px-4 py-6">
-                  <div className="max-w-2xl mx-auto space-y-6">
-                    {/* Coupons */}
-                    {brands.filter((b) => b.coupon_code).length > 0 && (
-                      <section>
-                        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text)' }}>קודי קופון</h3>
-                        <div className="grid grid-cols-2 gap-3">
-                          {brands.filter((b) => b.coupon_code).map((brand) => (
-                            <button
-                              key={brand.id}
-                              onClick={() => handleCopyCode(brand.coupon_code!, brand.id)}
-                              className="p-4 rounded-xl text-right transition-all"
-                              style={{ backgroundColor: '#ffffff', border: '1px solid var(--color-border)' }}
-                            >
-                              <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs" style={{ color: 'var(--color-text)', opacity: 0.6 }}>{brand.category || 'מותג'}</span>
-                                <span className="text-xs font-medium" style={{ color: copiedCode === brand.id ? '#10b981' : 'var(--color-primary)' }}>
-                                  {copiedCode === brand.id ? 'הועתק!' : 'העתק'}
-                                </span>
-                              </div>
-                              <p className="font-mono font-bold text-base" style={{ color: 'var(--color-text)' }}>{brand.coupon_code}</p>
-                              <p className="text-xs mt-1" style={{ color: 'var(--color-text)', opacity: 0.6 }}>{brand.brand_name}</p>
-                            </button>
-                          ))}
-                        </div>
-                      </section>
-                    )}
-
-                    {/* All Brands */}
-                    <section>
-                      <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text)' }}>מותגים</h3>
-                      <div className="grid grid-cols-2 gap-3">
-                        {filteredBrands.map((brand) => (
-                          <button
-                            key={brand.id}
-                            onClick={() => brand.coupon_code && handleCopyCode(brand.coupon_code, brand.id)}
-                            className="p-4 rounded-xl text-right transition-all hover:shadow-md flex gap-3 items-start"
-                            style={{ backgroundColor: '#ffffff', border: '1px solid var(--color-border)' }}
-                          >
-                            {brand.image_url ? (
-                              <img src={brand.image_url} alt={brand.brand_name} className="w-10 h-10 rounded-lg object-contain flex-shrink-0" />
-                            ) : (
-                              <div className="w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0" style={{ backgroundColor: 'color-mix(in srgb, var(--color-primary) 12%, #f0f0f2)', color: 'var(--color-primary)' }}>
-                                {brand.brand_name.charAt(0).toUpperCase()}
-                              </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-base" style={{ color: 'var(--color-text)' }}>{brand.brand_name}</p>
-                            {brand.description && (
-                              <p className="text-xs mt-1 line-clamp-2" style={{ color: 'var(--color-text)', opacity: 0.6 }}>{brand.description}</p>
-                            )}
-                            {brand.category && (
-                              <p className="text-xs mt-1" style={{ color: 'var(--color-primary)' }}>{brand.category}</p>
-                            )}
-                            {brand.coupon_code ? (
-                              <div className="mt-2 flex items-center gap-2">
-                                <span 
-                                  className="px-2 py-1 text-xs font-mono font-bold rounded"
-                                  style={{ backgroundColor: 'rgba(16,185,129,0.1)', color: '#10b981' }}
-                                >
-                                  {brand.coupon_code}
-                                </span>
-                                <span className="text-xs" style={{ color: copiedCode === brand.id ? '#10b981' : 'var(--color-text)', opacity: copiedCode === brand.id ? 1 : 0.5 }}>
-                                  {copiedCode === brand.id ? 'הועתק!' : 'לחץ להעתקה'}
-                                </span>
-                              </div>
-                            ) : (
-                              <p className="text-xs mt-2" style={{ color: 'var(--color-text)', opacity: 0.4 }}>ללא קופון כרגע</p>
-                            )}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </section>
-                  </div>
-                </div>
-              </motion.div>
             ) : activeTab === 'coupons' ? (
-              /* ============ COUPONS TAB (Mobile) ============ */
+              /* ============ COUPONS TAB ============ */
               <motion.div
                 key="coupons"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="h-full overflow-y-auto pb-32"
+                className={`h-full overflow-y-auto ${isMobile ? 'pb-32' : 'pb-8'}`}
                 style={{ background: '#f4f5f7' }}
               >
                 <div className="px-4 py-6">
-                  <div className="max-w-2xl mx-auto">
-                    <h2 className="font-semibold mb-1" style={{ fontSize: '26px', color: '#0c1013' }}>קופונים</h2>
-                    <p className="mb-6" style={{ fontSize: '16px', color: '#676767' }}>טקסט קצר על הקופונים</p>
-                    <div className="flex flex-col gap-3">
+                  <div className={`mx-auto ${isMobile ? 'max-w-2xl' : 'max-w-[700px]'}`}>
+                    <h2 className="font-semibold mb-1 text-center" style={{ fontSize: '26px', color: '#0c1013', lineHeight: '30px' }}>קופונים</h2>
+                    <p className="mb-6 text-center" style={{ fontSize: '16px', color: '#676767' }}>טקסט קצר על הקופונים</p>
+                    <div className={`${isMobile ? 'flex flex-col gap-3' : 'grid grid-cols-2 gap-4'}`}>
                       {brands.map((brand) => (
                         <button
                           key={brand.id}
@@ -1530,20 +1249,20 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 </div>
               </motion.div>
             ) : activeTab === 'problem' ? (
-              /* ============ PROBLEM/SUPPORT TAB (Mobile) ============ */
+              /* ============ PROBLEM/SUPPORT TAB ============ */
               <motion.div
                 key="problem"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="h-full overflow-y-auto pb-32"
+                className={`h-full overflow-y-auto ${isMobile ? 'pb-32' : 'pb-8'}`}
                 style={{ background: '#f4f5f7' }}
               >
                 <div className="px-4 py-6">
-                  <div className="max-w-2xl mx-auto">
-                    <h2 className="font-semibold mb-1" style={{ fontSize: '26px', color: '#0c1013' }}>פניית תמיכה</h2>
-                    <p className="mb-6" style={{ fontSize: '16px', color: '#676767' }}>בחר את המותג שיש לך בעיה איתו</p>
-                    <div className="flex flex-col gap-3">
+                  <div className={`mx-auto ${isMobile ? 'max-w-2xl' : 'max-w-[700px]'}`}>
+                    <h2 className="font-semibold mb-1 text-center" style={{ fontSize: '26px', color: '#0c1013', lineHeight: '30px' }}>פניית תמיכה</h2>
+                    <p className="mb-6 text-center" style={{ fontSize: '16px', color: '#676767' }}>בחר את המותג שיש לך בעיה איתו</p>
+                    <div className={`${isMobile ? 'flex flex-col gap-3' : 'grid grid-cols-2 gap-4'}`}>
                       {brands.map((brand) => (
                         <button
                           key={brand.id}
@@ -1605,6 +1324,18 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
               </button>
             </div>
           </div>
+        )}
+
+        {/* Desktop: Help icon bottom-left (Figma) */}
+        {!isMobile && (
+          <button
+            onClick={() => setShowSupportModal(true)}
+            className="fixed bottom-6 left-6 z-50 w-[18px] h-[18px] flex items-center justify-center"
+            style={{ color: '#676767' }}
+            aria-label="עזרה"
+          >
+            <HelpCircle className="w-[18px] h-[18px]" />
+          </button>
         )}
 
         {/* Support Modal */}
