@@ -47,6 +47,7 @@ export async function GET() {
         pagesCount: pagesCount || 0,
         chunksCount: chunksCount || 0,
         primaryColor: widgetConfig.primaryColor || '#6366f1',
+        profilePic: account.config?.profile_pic_url || null,
       });
     }
 

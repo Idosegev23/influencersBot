@@ -13,6 +13,7 @@ import { X, Send, Copy, Check, ExternalLink } from 'lucide-react';
 interface WidgetConfig {
   theme: { primaryColor: string };
   brandName: string;
+  profilePic: string | null;
   welcomeMessage: string;
   domain: string;
 }
@@ -90,12 +91,16 @@ export default function DemoPage() {
       {/* Top banner */}
       <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 bg-white border-b border-gray-200 shadow-sm z-20">
         <div className="flex items-center gap-3">
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold"
-            style={{ backgroundColor: primaryColor }}
-          >
-            {config.brandName.charAt(0)}
-          </div>
+          {config.profilePic ? (
+            <img src={config.profilePic} alt={config.brandName} className="w-8 h-8 rounded-lg object-cover" />
+          ) : (
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold"
+              style={{ backgroundColor: primaryColor }}
+            >
+              {config.brandName.charAt(0)}
+            </div>
+          )}
           <div>
             <span className="text-sm font-semibold text-gray-800">{config.brandName}</span>
             <span className="text-xs text-gray-400 mr-2">— דמו ווידג׳ט</span>
@@ -148,12 +153,16 @@ export default function DemoPage() {
             <div className="absolute top-20 right-20 w-72 h-72 rounded-full opacity-[0.07]" style={{ backgroundColor: primaryColor }} />
             <div className="absolute bottom-32 left-16 w-48 h-48 rounded-full opacity-[0.05]" style={{ backgroundColor: primaryColor }} />
 
-            <div
-              className="w-20 h-20 rounded-2xl flex items-center justify-center text-white text-3xl font-bold mb-6 shadow-lg"
-              style={{ backgroundColor: primaryColor }}
-            >
-              {config.brandName.charAt(0)}
-            </div>
+            {config.profilePic ? (
+              <img src={config.profilePic} alt={config.brandName} className="w-20 h-20 rounded-2xl object-cover mb-6 shadow-lg" />
+            ) : (
+              <div
+                className="w-20 h-20 rounded-2xl flex items-center justify-center text-white text-3xl font-bold mb-6 shadow-lg"
+                style={{ backgroundColor: primaryColor }}
+              >
+                {config.brandName.charAt(0)}
+              </div>
+            )}
             <h1 className="text-3xl font-bold text-gray-800 mb-2">{config.brandName}</h1>
             <p className="text-gray-500 mb-4">{config.domain}</p>
             <a
@@ -320,10 +329,14 @@ function DemoWidget({ accountId, config }: { accountId: string; config: WidgetCo
         }}
         title="פתח צ׳אט"
       >
-        <video autoPlay loop muted playsInline className="w-full h-full rounded-full object-cover">
-          <source src="/bot-avatar.webm" type="video/webm" />
-          <source src="/bot-avatar.mp4" type="video/mp4" />
-        </video>
+        {config.profilePic ? (
+          <img src={config.profilePic} alt={config.brandName} className="w-full h-full rounded-full object-cover" />
+        ) : (
+          <video autoPlay loop muted playsInline className="w-full h-full rounded-full object-cover">
+            <source src="/bot-avatar.webm" type="video/webm" />
+            <source src="/bot-avatar.mp4" type="video/mp4" />
+          </video>
+        )}
       </button>
     );
   }
@@ -353,10 +366,14 @@ function DemoWidget({ accountId, config }: { accountId: string; config: WidgetCo
         <div className="absolute -top-5 -right-5 w-20 h-20 rounded-full bg-white/10" />
         <div className="absolute -bottom-8 -left-3 w-16 h-16 rounded-full bg-white/[0.07]" />
         <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white/30 shrink-0 relative z-10">
-          <video autoPlay loop muted playsInline className="w-full h-full object-cover">
-            <source src="/bot-avatar.webm" type="video/webm" />
-            <source src="/bot-avatar.mp4" type="video/mp4" />
-          </video>
+          {config.profilePic ? (
+            <img src={config.profilePic} alt={config.brandName} className="w-full h-full object-cover" />
+          ) : (
+            <video autoPlay loop muted playsInline className="w-full h-full object-cover">
+              <source src="/bot-avatar.webm" type="video/webm" />
+              <source src="/bot-avatar.mp4" type="video/mp4" />
+            </video>
+          )}
         </div>
         <div className="flex-1 relative z-10">
           <div className="font-bold text-[15px] tracking-tight">{config.brandName}</div>
@@ -382,10 +399,14 @@ function DemoWidget({ accountId, config }: { accountId: string; config: WidgetCo
               <div key={i} className="flex justify-end" style={{ animation: 'demo-fade-in 0.3s ease-out' }}>
                 <div className="flex items-end gap-1.5 max-w-[85%]">
                   <div className="w-[30px] h-[30px] rounded-full overflow-hidden shrink-0">
-                    <video autoPlay loop muted playsInline className="w-full h-full object-cover">
-                      <source src="/bot-avatar.webm" type="video/webm" />
-                      <source src="/bot-avatar.mp4" type="video/mp4" />
-                    </video>
+                    {config.profilePic ? (
+                      <img src={config.profilePic} alt={config.brandName} className="w-full h-full object-cover" />
+                    ) : (
+                      <video autoPlay loop muted playsInline className="w-full h-full object-cover">
+                        <source src="/bot-avatar.webm" type="video/webm" />
+                        <source src="/bot-avatar.mp4" type="video/mp4" />
+                      </video>
+                    )}
                   </div>
                   <div className="px-4 py-3 rounded-2xl rounded-br-sm bg-gray-100 flex gap-1 items-center">
                     <span className="w-1.5 h-1.5 rounded-full bg-gray-400" style={{ animation: 'demo-bounce 1.2s ease-in-out infinite' }} />
@@ -417,10 +438,14 @@ function DemoWidget({ accountId, config }: { accountId: string; config: WidgetCo
             <div key={i} className="flex justify-end" style={{ animation: 'demo-fade-in 0.3s ease-out' }}>
               <div className="flex items-end gap-1.5 max-w-[85%]">
                 <div className="w-[30px] h-[30px] rounded-full overflow-hidden shrink-0">
-                  <video autoPlay loop muted playsInline className="w-full h-full object-cover">
-                    <source src="/bot-avatar.webm" type="video/webm" />
-                    <source src="/bot-avatar.mp4" type="video/mp4" />
-                  </video>
+                  {config.profilePic ? (
+                    <img src={config.profilePic} alt={config.brandName} className="w-full h-full object-cover" />
+                  ) : (
+                    <video autoPlay loop muted playsInline className="w-full h-full object-cover">
+                      <source src="/bot-avatar.webm" type="video/webm" />
+                      <source src="/bot-avatar.mp4" type="video/mp4" />
+                    </video>
+                  )}
                 </div>
                 <div
                   className="px-3.5 py-2.5 rounded-2xl rounded-br-sm text-sm leading-relaxed text-gray-800"

@@ -31,11 +31,11 @@
   var messages = [];
   var isLoading = false;
   var config = {
-    primaryColor: '#0c1013',
     welcomeMessage: 'שלום! איך אפשר לעזור? ✨',
     placeholder: 'כתבו הודעה...',
     position: 'bottom-right',
     brandName: 'העוזר החכם',
+    profilePic: null,
   };
 
   // ============================================
@@ -71,12 +71,12 @@
     .then(function (r) { return r.json(); })
     .then(function (data) {
       if (data.theme) {
-        config.primaryColor = data.theme.primaryColor || config.primaryColor;
         config.position = data.theme.position || config.position;
       }
       if (data.welcomeMessage) config.welcomeMessage = data.welcomeMessage;
       if (data.placeholder) config.placeholder = data.placeholder;
       if (data.brandName) config.brandName = data.brandName;
+      if (data.profilePic) config.profilePic = data.profilePic;
       updateContainerPosition();
       messages = [{ role: 'assistant', content: config.welcomeMessage }];
       render();
@@ -106,6 +106,10 @@
   // ============================================
 
   function avatarHtml(size) {
+    if (config.profilePic) {
+      return '<img src="' + escapeHtml(config.profilePic) + '" alt="' + escapeHtml(config.brandName) + '" ' +
+        'style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />';
+    }
     return '<video autoplay loop muted playsinline style="width:100%;height:100%;object-fit:cover;">' +
       '<source src="' + BASE_URL + '/bot-avatar.webm" type="video/webm" />' +
       '<source src="' + BASE_URL + '/bot-avatar.mp4" type="video/mp4" />' +

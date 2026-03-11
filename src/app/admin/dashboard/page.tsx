@@ -38,6 +38,7 @@ interface WebsiteAccount {
   pagesCount: number;
   chunksCount: number;
   primaryColor: string;
+  profilePic: string | null;
 }
 
 function DashboardContent() {
@@ -522,15 +523,8 @@ function DashboardContent() {
                 </div>
 
                 {/* Action bar */}
-                <div className="flex items-center justify-between mb-6">
+                <div className="mb-6">
                   <h2 className="text-xl font-semibold text-white">אתרים</h2>
-                  <Link
-                    href="/admin/websites/add"
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-indigo-500/25"
-                  >
-                    <Plus className="w-5 h-5" />
-                    הוספת אתר
-                  </Link>
                 </div>
 
                 {/* Websites Grid */}
@@ -545,12 +539,25 @@ function DashboardContent() {
                         className="admin-card p-4 hover:border-indigo-500/50 transition-all"
                       >
                         <div className="flex items-start gap-3">
-                          <div
-                            className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 ring-2 ring-white/10"
-                            style={{ backgroundColor: website.primaryColor + '20' }}
-                          >
-                            <Globe className="w-7 h-7" style={{ color: website.primaryColor }} />
-                          </div>
+                          {website.profilePic ? (
+                            <div className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 ring-2 ring-white/10">
+                              <Image
+                                src={website.profilePic}
+                                alt={website.displayName}
+                                fill
+                                className="object-cover"
+                                sizes="56px"
+                                unoptimized
+                              />
+                            </div>
+                          ) : (
+                            <div
+                              className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 ring-2 ring-white/10"
+                              style={{ backgroundColor: website.primaryColor + '20' }}
+                            >
+                              <Globe className="w-7 h-7" style={{ color: website.primaryColor }} />
+                            </div>
+                          )}
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-white truncate">
                               {website.displayName}
@@ -610,14 +617,7 @@ function DashboardContent() {
                       <Globe className="w-8 h-8 text-gray-600" />
                     </div>
                     <h3 className="text-lg font-medium text-white mb-2">אין עדיין אתרים</h3>
-                    <p className="text-gray-400 mb-6">הוסיפו אתר לסריקה ויצירת בוט חכם</p>
-                    <Link
-                      href="/admin/websites/add"
-                      className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-indigo-500/25"
-                    >
-                      <Plus className="w-5 h-5" />
-                      הוספת אתר
-                    </Link>
+                    <p className="text-gray-400">אתרים מתווספים דרך הקוד</p>
                   </motion.div>
                 )}
               </>

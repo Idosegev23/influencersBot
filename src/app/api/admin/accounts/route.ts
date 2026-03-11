@@ -89,7 +89,7 @@ export async function GET() {
         followers_count: latestProfile?.followers_count || persona?.instagram_followers || 0,
         following_count: latestProfile?.following_count || 0,
         posts_count: latestProfile?.posts_count || persona?.instagram_posts_count || 0,
-        profile_pic_url: latestProfile?.profile_pic_url || null,
+        profile_pic_url: config.profile_pic_url || latestProfile?.profile_pic_url || null,
         bio: latestProfile?.bio || null,
         is_verified: latestProfile?.is_verified || false,
         category: latestProfile?.category || null,

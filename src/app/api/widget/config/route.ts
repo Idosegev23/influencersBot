@@ -52,6 +52,7 @@ export async function GET(req: NextRequest) {
           position: widgetConfig.position || 'bottom-right',
         },
         brandName: config.display_name || config.username || '',
+        profilePic: config.profile_pic_url || null,
         welcomeMessage: widgetConfig.welcomeMessage || 'שלום! איך אפשר לעזור?',
         placeholder: widgetConfig.placeholder || 'שאלו משהו...',
         domain: widgetConfig.domain || config.username || '',
