@@ -1228,11 +1228,16 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                               <span className="brand-logo-letter">{brand.brand_name.charAt(0).toUpperCase()}</span>
                             )}
                           </div>
-                          {/* Brand name */}
+                          {/* Brand name + coupon description */}
                           <div className="flex-1 min-w-0 text-right">
                             <p className="font-semibold truncate" style={{ fontSize: '16px', color: '#0c1013' }}>
                               {brand.brand_name}
                             </p>
+                            {brand.description && (
+                              <p className="truncate" style={{ fontSize: '13px', color: '#676767', marginTop: '2px' }}>
+                                {brand.description}
+                              </p>
+                            )}
                           </div>
                           {/* Coupon badge or "no coupon" */}
                           {brand.coupon_code ? (
