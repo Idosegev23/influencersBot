@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAllInfluencers, updateInfluencer, upsertPosts } from '@/lib/supabase';
-import { scrapeInstagramProfile } from '@/lib/apify';
+import { getScrapeCreatorsClient } from '@/lib/scraping/scrapeCreatorsClient';
 import { analyzeAllPosts, extractDataFromPost } from '@/lib/openai';
-import type { ApifyPostData, Post } from '@/types';
+import type { ApifyPostData, ApifyProfileData, Post } from '@/types';
 
 // Vercel Cron - runs daily at 3 AM
 export const runtime = 'nodejs';
@@ -36,11 +36,37 @@ export async function GET(req: NextRequest) {
       try {
         console.log(`Syncing ${influencer.username}...`);
 
-        // Fetch latest posts using influencer's scrape settings
-        const { profile, posts } = await scrapeInstagramProfile(
-          influencer.username,
-          influencer.scrape_settings || { posts_limit: 20 }
-        );
+        // Fetch latest posts using ScrapeCreators
+        const postsLimit = influencer.scrape_settings?.posts_limit || 20;
+        const client = getScrapeCreatorsClient();
+        const [scProfile, scPosts] = await Promise.all([
+          client.getProfile(influencer.username),
+          client.getPosts(influencer.username, postsLimit),
+        ]);
+
+        // Map ScrapeCreators profile to ApifyProfileData format for downstream compatibility
+        const profile: ApifyProfileData = {
+          username: scProfile.username,
+          fullName: scProfile.full_name || '',
+          biography: scProfile.bio || '',
+          profilePicUrl: scProfile.profile_pic_url || '',
+          followersCount: scProfile.followers_count || 0,
+          followingCount: scProfile.following_count || 0,
+          postsCount: scProfile.posts_count || 0,
+          isVerified: scProfile.is_verified || false,
+        };
+
+        // Map ScrapeCreators posts to ApifyPostData format for downstream compatibility
+        const posts: ApifyPostData[] = scPosts.map((p) => ({
+          shortCode: p.shortcode,
+          type: p.media_type === 'video' ? 'Video' : p.media_type === 'carousel' ? 'Sidecar' : 'Image',
+          caption: p.caption || '',
+          displayUrl: p.thumbnail_url || p.media_urls[0] || '',
+          videoUrl: p.media_type === 'video' ? p.media_urls[0] : undefined,
+          likesCount: p.likes_count || 0,
+          commentsCount: p.comments_count || 0,
+          timestamp: p.posted_at || new Date().toISOString(),
+        }));
 
         // Analyze new posts
         const postAnalysis = await analyzeAllPosts(posts);
@@ -136,11 +162,38 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Fetch and sync using influencer's scrape settings
-    const { profile, posts } = await scrapeInstagramProfile(
-      influencer.username,
-      influencer.scrape_settings || { posts_limit: 30 }
-    );
+    // Fetch and sync using ScrapeCreators
+    const postsLimit = influencer.scrape_settings?.posts_limit || 30;
+    const client = getScrapeCreatorsClient();
+    const [scProfile, scPosts] = await Promise.all([
+      client.getProfile(influencer.username),
+      client.getPosts(influencer.username, postsLimit),
+    ]);
+
+    // Map ScrapeCreators profile to ApifyProfileData format
+    const profile: ApifyProfileData = {
+      username: scProfile.username,
+      fullName: scProfile.full_name || '',
+      biography: scProfile.bio || '',
+      profilePicUrl: scProfile.profile_pic_url || '',
+      followersCount: scProfile.followers_count || 0,
+      followingCount: scProfile.following_count || 0,
+      postsCount: scProfile.posts_count || 0,
+      isVerified: scProfile.is_verified || false,
+    };
+
+    // Map ScrapeCreators posts to ApifyPostData format
+    const posts: ApifyPostData[] = scPosts.map((p) => ({
+      shortCode: p.shortcode,
+      type: p.media_type === 'video' ? 'Video' : p.media_type === 'carousel' ? 'Sidecar' : 'Image',
+      caption: p.caption || '',
+      displayUrl: p.thumbnail_url || p.media_urls[0] || '',
+      videoUrl: p.media_type === 'video' ? p.media_urls[0] : undefined,
+      likesCount: p.likes_count || 0,
+      commentsCount: p.comments_count || 0,
+      timestamp: p.posted_at || new Date().toISOString(),
+    }));
+
     const postAnalysis = await analyzeAllPosts(posts);
 
     const dbPosts: Omit<Post, 'id' | 'created_at'>[] = posts.map((post) => {

@@ -6,7 +6,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireInfluencerAuth } from '@/lib/auth/middleware';
-import { InstagramActorManager, selectTopPostsForComments, extractTopHashtags, extractKeywordsFromBio } from '@/lib/scraping/apify-actors';
+import { getScrapeCreatorsClient } from '@/lib/scraping/scrapeCreatorsClient';
+import { selectTopPostsForComments, extractTopHashtags, extractKeywordsFromBio } from '@/lib/scraping/apify-actors';
 import { runPreprocessing } from '@/lib/scraping/preprocessing';
 import { runGeminiBuilder, savePersonaToDatabase } from '@/lib/ai/gemini-persona-builder';
 import { cookies } from 'next/headers';
@@ -203,26 +204,25 @@ export async function POST(request: Request) {
 // ============================================
 
 async function runStep1_Posts(supabase: any, accountId: string, username: string) {
-  console.log('[Step 1] Starting posts scrape...');
+  console.log('[Step 1] Starting posts scrape via ScrapeCreators...');
 
-  const manager = new InstagramActorManager(username);
-  const posts = await manager.scrapePosts(100);
+  const client = getScrapeCreatorsClient();
+  const posts = await client.getPosts(username, 100);
 
   console.log(`[Step 1] Scraped ${posts.length} posts, saving to database...`);
 
-  // Save to database
+  // Save to database — map ScrapeCreators fields to DB schema
   const postsToInsert = posts.map(post => ({
     account_id: accountId,
     shortcode: post.shortcode,
     post_id: post.post_id,
     post_url: post.post_url,
-    type: post.type,
+    type: post.media_type,  // ScrapeCreators uses media_type
     caption: post.caption,
-    hashtags: post.hashtags,
-    mentions: post.mentions,
+    hashtags: post.caption ? (post.caption.match(/#([a-zA-Z0-9_\u0590-\u05ff]+)/g) || []).map((t: string) => t.slice(1)) : [],
+    mentions: post.mentions || [],
     media_urls: post.media_urls,
     thumbnail_url: post.thumbnail_url,
-    video_duration: post.video_duration,
     likes_count: post.likes_count,
     comments_count: post.comments_count,
     views_count: post.views_count,
@@ -288,8 +288,8 @@ async function runStep2_Comments(supabase: any, accountId: string, username: str
 
   console.log(`[Step 2] Selected ${selectedUrls.length} posts for comment scraping`);
 
-  const manager = new InstagramActorManager(username);
-  const comments = await manager.scrapeComments(selectedUrls, 20);
+  const client = getScrapeCreatorsClient();
+  const comments = await client.getBatchPostComments(selectedUrls, 20);
 
   console.log(`[Step 2] Scraped ${comments.length} comments, saving to database...`);
 
@@ -361,14 +361,14 @@ async function runStep2_Comments(supabase: any, accountId: string, username: str
 // ============================================
 
 async function runStep3_Profile(supabase: any, accountId: string, username: string) {
-  console.log('[Step 3] Starting profile scrape...');
+  console.log('[Step 3] Starting profile scrape via ScrapeCreators...');
 
-  const manager = new InstagramActorManager(username);
-  const profile = await manager.scrapeProfile();
+  const client = getScrapeCreatorsClient();
+  const profile = await client.getProfile(username);
 
   console.log(`[Step 3] Scraped profile: @${profile.username}, saving to database...`);
 
-  // Save to database
+  // Save to database — ScrapeCreators fields already match the DB column names
   const { error } = await supabase
     .from('instagram_profile_history')
     .insert({
@@ -382,7 +382,7 @@ async function runStep3_Profile(supabase: any, accountId: string, username: stri
       posts_count: profile.posts_count,
       category: profile.category,
       is_verified: profile.is_verified,
-      is_business_account: profile.is_business_account,
+      is_business_account: profile.is_business,  // ScrapeCreators uses is_business
       profile_pic_url: profile.profile_pic_url,
       snapshot_date: new Date().toISOString(),
     });
@@ -409,7 +409,7 @@ async function runStep3_Profile(supabase: any, accountId: string, username: stri
 // ============================================
 
 async function runStep4_Hashtags(supabase: any, accountId: string, username: string) {
-  console.log('[Step 4] Starting hashtags scrape...');
+  console.log('[Step 4] Starting hashtags analysis (from existing posts)...');
 
   // Load posts to extract top hashtags
   const { data: posts } = await supabase
@@ -421,35 +421,28 @@ async function runStep4_Hashtags(supabase: any, accountId: string, username: str
     throw new Error('No posts found. Please run step 1 first.');
   }
 
-  // Extract top 20 hashtags
+  // Extract top 20 hashtags from our own posts
   const allHashtags: string[] = posts.flatMap((p: any) => p.hashtags || []);
   const topHashtags = extractTopHashtags(
     posts.map((p: any) => ({ hashtags: p.hashtags || [] } as any)),
     20
   );
 
-  console.log(`[Step 4] Top hashtags:`, topHashtags);
+  console.log(`[Step 4] Top hashtags from posts:`, topHashtags);
 
-  const manager = new InstagramActorManager(username);
-  const hashtagsData = await manager.scrapeHashtags(topHashtags, 30);
+  // NOTE: ScrapeCreators doesn't support hashtag popularity scraping.
+  // We save the hashtags we extracted from our own posts with frequency data.
+  const hashtagFrequency = new Map<string, number>();
+  allHashtags.forEach(h => hashtagFrequency.set(h, (hashtagFrequency.get(h) || 0) + 1));
 
-  console.log(`[Step 4] Scraped ${hashtagsData.length} hashtags, saving to database...`);
-
-  // Save to database - remove duplicates first
-  const uniqueHashtagsData = hashtagsData.filter((data, index, self) =>
-    index === self.findIndex((t) => t.hashtag === data.hashtag)
-  );
-
-  console.log(`[Step 4] After removing duplicates: ${uniqueHashtagsData.length} unique hashtags`);
-
-  const hashtagsToInsert = uniqueHashtagsData.map(data => ({
+  const hashtagsToInsert = topHashtags.map(hashtag => ({
     account_id: accountId,
-    hashtag: data.hashtag,
-    frequency: allHashtags.filter(h => h === data.hashtag).length,
+    hashtag,
+    frequency: hashtagFrequency.get(hashtag) || 0,
     last_seen: new Date().toISOString(),
-    context_posts: [], // Will be populated later if needed
-    total_posts_in_hashtag: data.total_posts_in_hashtag,
-    avg_engagement: data.avg_engagement,
+    context_posts: [],
+    total_posts_in_hashtag: null,  // Not available without Apify hashtag scraper
+    avg_engagement: null,
   }));
 
   // Delete old hashtags and insert new ones
@@ -471,10 +464,10 @@ async function runStep4_Hashtags(supabase: any, accountId: string, username: str
     throw new Error(`Failed to save hashtags: ${insertError.message}`);
   }
 
-  console.log('[Step 4] Hashtags saved successfully');
+  console.log(`[Step 4] Saved ${hashtagsToInsert.length} hashtags from post analysis`);
 
   return {
-    hashtagsTracked: hashtagsData.length,
+    hashtagsTracked: hashtagsToInsert.length,
     topHashtags: topHashtags.slice(0, 10),
     totalOccurrences: allHashtags.length,
   };
@@ -485,12 +478,15 @@ async function runStep4_Hashtags(supabase: any, accountId: string, username: str
 // ============================================
 
 async function runStep5_Search(supabase: any, accountId: string, username: string) {
-  console.log('[Step 5] Starting search scrape...');
+  console.log('[Step 5] Starting search/positioning analysis...');
+
+  // NOTE: ScrapeCreators doesn't support Instagram search scraping.
+  // We extract keywords from the bio and save them for positioning context.
 
   // Load profile to get bio keywords
   const { data: profile } = await supabase
     .from('instagram_profile_history')
-    .select('bio')
+    .select('bio, category')
     .eq('account_id', accountId)
     .order('snapshot_date', { ascending: false })
     .limit(1)
@@ -500,20 +496,18 @@ async function runStep5_Search(supabase: any, accountId: string, username: strin
   const keywords = extractKeywordsFromBio(bio, 10);
   const queries = [username, ...keywords];
 
-  console.log(`[Step 5] Search queries:`, queries);
+  console.log(`[Step 5] Positioning keywords:`, queries);
 
-  const manager = new InstagramActorManager(username);
-  const searchData = await manager.scrapeSearch(queries);
-
-  console.log(`[Step 5] Completed ${searchData.length} searches`);
-
-  // Update profile history with search results
+  // Save keyword-based positioning data (without external search results)
   const { error } = await supabase
     .from('instagram_profile_history')
     .update({
       search_results: {
         queries,
-        results: searchData,
+        results: [],  // No external search results available via ScrapeCreators
+        keywords,
+        category: profile?.category,
+        note: 'Hashtag and search scraping migrated away from Apify. Keywords extracted from bio.',
         searchedAt: new Date().toISOString(),
       },
     })
@@ -522,13 +516,14 @@ async function runStep5_Search(supabase: any, accountId: string, username: strin
     .limit(1);
 
   if (error) {
-    console.error('[Step 5] Error updating profile with search results:', error);
+    console.error('[Step 5] Error updating profile with positioning data:', error);
   }
 
   return {
     queriesExecuted: queries.length,
-    totalResults: searchData.reduce((sum, s) => sum + s.results.length, 0),
-    positioning: searchData[0]?.results.slice(0, 5) || [],
+    totalResults: 0,
+    positioning: [],
+    note: 'Search scraping not available via ScrapeCreators; keywords extracted from bio',
   };
 }
 

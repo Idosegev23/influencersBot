@@ -6,7 +6,8 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { InstagramActorManager } from '@/lib/scraping/apify-actors';
+import { getScrapeCreatorsClient } from '@/lib/scraping/scrapeCreatorsClient';
+import type { InstagramPost } from '@/lib/scraping/scrapeCreatorsClient';
 import { runPreprocessing } from '@/lib/scraping/preprocessing';
 import { ingestDocument, buildPostText } from '@/lib/rag/ingest';
 
@@ -98,8 +99,7 @@ export async function GET(request: Request) {
         const lastPostDate = lastPost?.posted_at || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
         // Quick check for new posts (only last 50)
-        const manager = new InstagramActorManager(username);
-        const newPosts = await quickCheckNewPosts(manager, lastPostDate);
+        const newPosts = await quickCheckNewPosts(username, lastPostDate);
 
         console.log(`[Daily Update] @${username} - found ${newPosts.length} new posts`);
 
@@ -133,15 +133,16 @@ export async function GET(request: Request) {
         try {
           for (const post of newPosts) {
             if (!post.caption?.trim()) continue;
+            const hashtags = post.caption ? (post.caption.match(/#([a-zA-Z0-9_\u0590-\u05ff]+)/g) || []).map((t: string) => t.slice(1)) : [];
             await ingestDocument({
               accountId: account.id,
               entityType: 'post',
               sourceId: post.shortcode || post.post_id || `daily-${Date.now()}`,
               title: (post.caption || '').substring(0, 120),
-              text: buildPostText(post),
+              text: buildPostText({ ...post, caption: post.caption ?? null }),
               metadata: {
-                postType: post.type,
-                hashtags: post.hashtags,
+                postType: post.media_type,
+                hashtags,
                 postedAt: post.posted_at,
                 isSponsored: post.is_sponsored,
               },
@@ -218,28 +219,28 @@ export async function GET(request: Request) {
 // Helper Functions
 // ============================================
 
-async function quickCheckNewPosts(manager: InstagramActorManager, since: string): Promise<any[]> {
-  // Scrape only last 50 posts (very fast, < 30 seconds)
-  const posts = await manager.scrapePosts(50);
+async function quickCheckNewPosts(username: string, since: string): Promise<InstagramPost[]> {
+  // Scrape only last 50 posts via ScrapeCreators (fast, < 30 seconds)
+  const client = getScrapeCreatorsClient();
+  const posts = await client.getPosts(username, 50);
 
   // Filter only posts newer than last sync
   const sinceDate = new Date(since);
-  return posts.filter(post => new Date(post.posted_at) > sinceDate);
+  return posts.filter(post => post.posted_at && new Date(post.posted_at) > sinceDate);
 }
 
-async function saveNewPosts(supabase: any, accountId: string, newPosts: any[]) {
+async function saveNewPosts(supabase: any, accountId: string, newPosts: InstagramPost[]) {
   const postsToInsert = newPosts.map(post => ({
     account_id: accountId,
     shortcode: post.shortcode,
     post_id: post.post_id,
     post_url: post.post_url,
-    type: post.type,
+    type: post.media_type,  // ScrapeCreators uses media_type instead of type
     caption: post.caption,
-    hashtags: post.hashtags,
-    mentions: post.mentions,
+    hashtags: post.caption ? (post.caption.match(/#([a-zA-Z0-9_\u0590-\u05ff]+)/g) || []).map((t: string) => t.slice(1)) : [],
+    mentions: post.mentions || [],
     media_urls: post.media_urls,
     thumbnail_url: post.thumbnail_url,
-    video_duration: post.video_duration,
     likes_count: post.likes_count,
     comments_count: post.comments_count,
     views_count: post.views_count,
