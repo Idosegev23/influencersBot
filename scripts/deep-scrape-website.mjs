@@ -80,6 +80,7 @@ const DISPLAY_NAME = getArg('--name', DOMAIN);
 const PRIMARY_COLOR = getArg('--color', '#6366f1');
 const WELCOME_MSG = getArg('--welcome', `שלום! איך אפשר לעזור?`);
 const SEED_PATHS = getArg('--seeds', '')?.split(',').filter(Boolean) || [];
+const EXCLUDE_PATHS = getArg('--exclude', '')?.split(',').filter(Boolean) || [];
 const SKIP_RAG = hasFlag('--skip-rag');
 const CLEAN_OLD = hasFlag('--clean');
 const EXISTING_ACCOUNT_ID = getArg('--account-id');
@@ -125,6 +126,8 @@ const SKIP_PATTERNS = [
   /\/feed\/?$/,
   /\/rss\/?$/,
   /\/sitemap/,
+  // User-defined exclude paths (--exclude flag)
+  ...EXCLUDE_PATHS.map(p => new RegExp(p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))),
 ];
 
 // ============================================
