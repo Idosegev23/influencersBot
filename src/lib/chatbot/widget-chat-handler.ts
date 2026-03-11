@@ -2,6 +2,9 @@
  * Widget Chat Handler
  * מטפל בהודעות צ'אט מהווידג'ט — משתמש באותו מנוע SandwichBot של הסושיאל
  * "אותו מוח, אותה איכות, שני מקומות שונים"
+ *
+ * כל חשבון הוא חשבון אחד (creator) — username = אינסטגרם, config.widget.domain = אתר.
+ * אין צורך ב-findLinkedSocialAccount — הכל באותו חשבון.
  */
 
 import { createClient } from '@/lib/supabase/server';
@@ -38,7 +41,6 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
   let session: any = null;
 
   if (sessionId) {
-    // Load existing session with all context fields
     const { data } = await supabase
       .from('chat_sessions')
       .select('*')
@@ -56,11 +58,12 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
     });
   }
 
-  // 2. Load account info + conversation history + personality (all in parallel)
-  const [accountData, historyData] = await Promise.all([
+  // 2. Load account info + conversation history in parallel
+  //    Note: username and display_name live inside config JSONB, not as direct columns
+  const [accountResult, historyData] = await Promise.all([
     supabase
       .from('accounts')
-      .select('username, display_name, account_type')
+      .select('id, type, config')
       .eq('id', accountId)
       .single()
       .then(r => r.data),
@@ -73,6 +76,10 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
       .then(r => r.data),
   ]);
 
+  const config = accountResult?.config || {};
+  const username = config.username || 'website';
+  const influencerName = config.display_name || config.username || 'Website';
+
   const conversationHistory = (historyData || [])
     .reverse()
     .map((m: any) => ({
@@ -80,24 +87,8 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
       content: m.content,
     }));
 
-  // 3. Resolve the effective account — for website accounts, find the linked social
-  //    so SandwichBot uses the SAME identity, personality, and knowledge as the social chatbot
-  let effectiveAccountId = accountId;
-  let username = accountData?.username || 'website';
-  let influencerName = accountData?.display_name || accountData?.username || 'Website';
-
-  if (accountData?.account_type === 'website') {
-    const linkedSocial = await findLinkedSocialAccount(supabase, accountId);
-    if (linkedSocial) {
-      effectiveAccountId = linkedSocial.id;
-      username = linkedSocial.username;
-      influencerName = linkedSocial.display_name || linkedSocial.username;
-      console.log(`[WidgetChat] Website account ${accountId} → linked social ${linkedSocial.id} (@${linkedSocial.username})`);
-    }
-  }
-
-  // 4. Load personality from the EFFECTIVE account (social, not website)
-  const personalityConfig = await buildPersonalityFromDB(effectiveAccountId).catch(() => null);
+  // 3. Load personality from the account
+  const personalityConfig = await buildPersonalityFromDB(accountId).catch(() => null);
 
   // Prepend rolling summary if available (same as social chat)
   if (session?.rolling_summary) {
@@ -107,15 +98,15 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
     });
   }
 
-  // 5. Process through SandwichBot — SAME engine as social chatbot
-  //    Including previousResponseId for OpenAI context chaining (key quality feature)
+  // 4. Process through SandwichBot — SAME engine as social chatbot
+  //    mode: 'widget' activates sales-oriented prompt with links, images, CTAs
   let fullText = '';
   let responseId: string | null = null;
 
   try {
     const sandwichResult = await processSandwichMessageWithMetadata({
       userMessage: message,
-      accountId: effectiveAccountId,
+      accountId,
       username,
       influencerName,
       conversationHistory,
@@ -129,19 +120,14 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
       },
     });
 
-    // If streaming was used, fullText was accumulated via onToken
-    // If not (fallback), use the response directly
     if (!fullText && sandwichResult.response) {
       fullText = sandwichResult.response;
     }
 
-    // Capture response ID for context chaining on next turn
     responseId = sandwichResult.responseId || null;
-
-    // Strip <<SUGGESTIONS>> tags — widget doesn't use suggestion chips
     fullText = stripSuggestions(fullText);
 
-    console.log(`[WidgetChat] SandwichBot response:`, {
+    console.log(`[WidgetChat] @${username} response:`, {
       archetype: sandwichResult.metadata.archetype,
       confidence: sandwichResult.metadata.confidence,
       personalityApplied: sandwichResult.metadata.personalityApplied,
@@ -154,7 +140,7 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
     fullText = 'מצטער, לא הצלחתי לעבד את הבקשה. נסו שוב.';
   }
 
-  // 6. Save messages + update session state (parallel)
+  // 5. Save messages + update session state (parallel)
   const msgCount = (session?.message_count || 0) + 2;
   await Promise.all([
     supabase.from('chat_messages').insert({
@@ -167,7 +153,6 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
       role: 'assistant',
       content: fullText,
     }),
-    // Save response_id for context chaining + increment message count
     supabase
       .from('chat_sessions')
       .update({
@@ -177,7 +162,7 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
       .eq('id', sessionId),
   ]);
 
-  // 7. Update rolling summary if threshold reached (fire-and-forget)
+  // 6. Update rolling summary if threshold reached (fire-and-forget)
   if (shouldUpdateSummary(msgCount)) {
     updateRollingSummary(
       sessionId!,
@@ -192,54 +177,6 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
 // Helpers
 // ============================================
 
-/**
- * Find the linked social account for a website account.
- * Looks for a social account with matching domain in their bio websites.
- */
-async function findLinkedSocialAccount(
-  supabase: any,
-  websiteAccountId: string,
-): Promise<{ id: string; username: string; display_name?: string } | null> {
-  try {
-    // Get the website URL from the website account
-    const { data: websiteAccount } = await supabase
-      .from('accounts')
-      .select('username, config')
-      .eq('id', websiteAccountId)
-      .single();
-
-    if (!websiteAccount) return null;
-
-    // The username for website accounts is the domain (e.g., "argania-oil.co.il")
-    const domain = websiteAccount.username;
-
-    // Find social accounts that have this domain in their bio websites
-    const { data: linkedPages } = await supabase
-      .from('instagram_bio_websites')
-      .select('account_id')
-      .ilike('url', `%${domain}%`)
-      .neq('account_id', websiteAccountId)
-      .limit(1);
-
-    if (linkedPages?.[0]) {
-      const { data: socialAccount } = await supabase
-        .from('accounts')
-        .select('id, username, display_name')
-        .eq('id', linkedPages[0].account_id)
-        .single();
-      return socialAccount || null;
-    }
-
-    return null;
-  } catch (error: any) {
-    console.error('[WidgetChat] Failed to find linked social account:', error.message);
-    return null;
-  }
-}
-
-/**
- * Strip <<SUGGESTIONS>> tags from response — widget doesn't use suggestion chips.
- */
 function stripSuggestions(text: string): string {
   return text.replace(/<<SUGGESTIONS>>[\s\S]*?<<\/SUGGESTIONS>>/g, '').trim();
 }

@@ -51,9 +51,10 @@ export async function GET(req: NextRequest) {
           darkMode: config.theme?.darkMode || false,
           position: widgetConfig.position || 'bottom-right',
         },
+        brandName: config.display_name || config.username || '',
         welcomeMessage: widgetConfig.welcomeMessage || 'שלום! איך אפשר לעזור?',
         placeholder: widgetConfig.placeholder || 'שאלו משהו...',
-        domain: config.username || '',
+        domain: widgetConfig.domain || config.username || '',
       },
       { headers: corsHeaders },
     );
