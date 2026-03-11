@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
 
     // Build brand performance
     const brandPerformance = allCoupons.map((c) => ({
-      brandId: c.partnership_id || c.id,
+      brandId: c.id,
       brandName: c.brand_name || c.partnerships?.brand_name || 'לא ידוע',
       couponCode: c.code,
       category: c.brand_category || '',

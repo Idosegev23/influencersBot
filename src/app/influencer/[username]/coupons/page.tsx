@@ -111,7 +111,7 @@ export default function CouponsAnalyticsPage() {
       // Transform API format to frontend format with null safety
       const transformedData: CouponData = {
         overview: {
-          total_coupons: apiResult?.totals?.totalBrands || 0,
+          total_coupons: apiResult?.brandPerformance?.length || 0,
           total_copied: apiResult?.totals?.totalCopies || 0,
           total_used: 0, // Not available from current API
           total_revenue: 0, // Not available from current API
