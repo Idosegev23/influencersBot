@@ -20,6 +20,7 @@ import {
   FileText,
   Building2,
   ClipboardCheck,
+  Copy,
   Image as LucideImage,
 } from 'lucide-react';
 import type { Influencer } from '@/types';
@@ -586,6 +587,15 @@ function DashboardContent() {
                             <Globe className="w-4 h-4" />
                             לאתר
                           </a>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${window.location.origin}/demo/${website.id}`);
+                            }}
+                            className="flex items-center justify-center gap-1 px-3 py-2 text-sm text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 rounded-lg transition-colors"
+                            title="העתק לינק דמו"
+                          >
+                            <Copy className="w-4 h-4" />
+                          </button>
                         </div>
                       </motion.div>
                     ))}
