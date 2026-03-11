@@ -126,21 +126,22 @@
 
   // ---- Closed state: avatar + label ----
   function renderClosed() {
+    var pc = config.primaryColor;
     container.innerHTML =
       '<div id="ibot-trigger" style="' +
       'display:flex;align-items:center;gap:12px;cursor:pointer;' +
       'transition:transform 0.3s ease;animation:ibot-slide-up 0.35s ease-out;">' +
-      // Avatar circle (60px)
+      // Avatar (60px)
       '<div style="width:60px;height:60px;flex-shrink:0;">' +
       avatarHtml(60) +
       '</div>' +
       // Label text
       '<div style="display:flex;flex-direction:column;">' +
-      '<span style="font-weight:700;font-size:23px;color:#0c1013;line-height:normal;white-space:nowrap;">' +
+      '<span style="font-weight:700;font-size:23px;color:' + pc + ';line-height:normal;white-space:nowrap;">' +
       escapeHtml(config.brandName) + '</span>' +
       '<div style="display:flex;align-items:center;gap:4px;">' +
       '<span style="width:10px;height:10px;border-radius:50%;background:#22c55e;flex-shrink:0;"></span>' +
-      '<span style="font-size:16px;color:#0c1013;line-height:normal;">זמין</span>' +
+      '<span style="font-size:16px;color:' + pc + ';line-height:normal;">זמין</span>' +
       '</div>' +
       '</div>' +
       '</div>';
@@ -153,6 +154,7 @@
 
   // ---- Open state: chat panel ----
   function renderOpen() {
+    var pc = config.primaryColor; // per-widget color
     // Build messages HTML
     var msgsHtml = '';
     for (var mi = 0; mi < messages.length; mi++) {
@@ -178,11 +180,11 @@
       }
 
       if (isUser) {
-        // User bubble: dark, rounded-30px, right-aligned (flex-start in RTL)
+        // User bubble: primary color, rounded-30px, right-aligned (flex-start in RTL)
         msgsHtml +=
           '<div style="display:flex;justify-content:flex-start;margin-bottom:12px;animation:ibot-msg-in 0.3s ease-out;">' +
           '<div style="max-width:82%;padding:9px 12px;border-radius:30px;font-size:16px;line-height:1.5;' +
-          'background:#0c1013;color:#fff;word-break:break-word;">' +
+          'background:' + pc + ';color:#fff;word-break:break-word;">' +
           formatMessage(m.content, true) +
           '</div></div>';
       } else {
@@ -216,7 +218,7 @@
 
       // ---- Dark header (81px) ----
       '<div style="display:flex;align-items:center;gap:10px;padding:0 16px;height:81px;flex-shrink:0;' +
-      'background:#0c1013;color:#fff;' +
+      'background:' + pc + ';color:#fff;' +
       (isMobile ? '' : 'border-radius:18px 18px 0 0;') + '">' +
       // Avatar (52px)
       '<div style="width:52px;height:52px;flex-shrink:0;">' +
@@ -246,7 +248,7 @@
       '<div style="display:flex;align-items:center;gap:16px;background:#fff;border-radius:18px;' +
       'padding:8px 8px 8px 10px;height:60px;box-shadow:4px 6px 23px rgba(0,0,0,0.1);overflow:hidden;">' +
       // Send button (left side in RTL)
-      '<button id="ibot-send" style="width:38px;height:38px;background:#0c1013;color:#fff;border:none;' +
+      '<button id="ibot-send" style="width:38px;height:38px;background:' + pc + ';color:#fff;border:none;' +
       'border-radius:60px;cursor:pointer;display:flex;align-items:center;justify-content:center;' +
       'flex-shrink:0;transition:transform 0.2s,opacity 0.2s;' +
       (isLoading ? 'opacity:0.5;pointer-events:none;' : '') + '">' +
@@ -256,7 +258,7 @@
       '</button>' +
       // Input field
       '<input id="ibot-input" type="text" placeholder="' + escapeHtml(config.placeholder) + '" ' +
-      'style="flex:1;border:none;outline:none;font-size:16px;color:#0c1013;background:transparent;' +
+      'style="flex:1;border:none;outline:none;font-size:16px;color:' + pc + ';background:transparent;' +
       'direction:rtl;font-family:inherit;text-align:right;min-width:0;" />' +
       '</div></div>' +
 
@@ -266,7 +268,7 @@
       (isMobile ? '' :
         '<div style="display:flex;justify-content:flex-end;margin-top:12px;">' +
         '<button id="ibot-close" style="width:60px;height:60px;border-radius:50%;border:none;cursor:pointer;' +
-        'background:#0c1013;color:#fff;display:flex;align-items:center;justify-content:center;' +
+        'background:' + pc + ';color:#fff;display:flex;align-items:center;justify-content:center;' +
         'box-shadow:0 2px 32px rgba(0,0,0,0.16),0 1px 6px rgba(0,0,0,0.06);' +
         'transition:transform 0.2s;">' +
         '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
@@ -402,7 +404,7 @@
   function formatMessage(str, isUserMsg) {
     if (!str) return '';
     var textColor = isUserMsg ? '#fff' : '#000';
-    var linkColor = isUserMsg ? '#93c5fd' : '#0c1013';
+    var linkColor = isUserMsg ? '#93c5fd' : config.primaryColor;
     var lines = str.split('\n');
     var html = '';
     var inUl = false;
