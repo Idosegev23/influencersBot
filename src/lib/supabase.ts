@@ -109,7 +109,8 @@ export async function getInfluencerBySubdomain(subdomain: string): Promise<Influ
  * Wrapper function for backward compatibility
  */
 export async function getInfluencerByUsername(username: string): Promise<Influencer | null> {
-  const { data: account, error } = await supabase
+  // First try: full query with embedded resources
+  let { data: account, error } = await supabase
     .from('accounts')
     .select(`
       *,
@@ -138,11 +139,33 @@ export async function getInfluencerByUsername(username: string): Promise<Influen
     `)
     .eq('config->>username', username)
     .eq('status', 'active')
-    .single();
+    .maybeSingle();
 
-  if (error) {
-    console.error('Error fetching account by username:', error);
-    return null;
+  if (error || !account) {
+    if (error) console.error('Error fetching account by username:', error);
+    // Fallback: query without embedded resources (avoids RLS issues on joined tables)
+    const { data: fallback, error: fbErr } = await supabase
+      .from('accounts')
+      .select('*')
+      .eq('config->>username', username)
+      .eq('status', 'active')
+      .maybeSingle();
+    if (fbErr || !fallback) {
+      if (fbErr) console.error('[getInfluencerByUsername] Fallback also failed:', fbErr);
+      return null;
+    }
+    console.log('[getInfluencerByUsername] Fallback succeeded for @' + username + ' — fetching relations separately');
+    const [{ data: persona }, { data: history }] = await Promise.all([
+      supabase.from('chatbot_persona')
+        .select('id, name, instagram_username, instagram_followers, tone, response_style, topics, common_phrases, created_at, updated_at')
+        .eq('account_id', fallback.id),
+      supabase.from('instagram_profile_history')
+        .select('username, full_name, bio, followers_count, profile_pic_url, is_verified, category, snapshot_date')
+        .eq('account_id', fallback.id),
+    ]);
+    (fallback as any).chatbot_persona = persona || [];
+    (fallback as any).instagram_profile_history = history || [];
+    account = fallback;
   }
 
   if (!account) return null;

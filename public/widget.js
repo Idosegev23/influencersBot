@@ -158,7 +158,7 @@
     if (!isOpen) {
       container.innerHTML =
         '<button id="ibot-toggle" style="' +
-        'width:62px;height:62px;border-radius:50%;border:none;cursor:pointer;' +
+        'width:71px;height:71px;border-radius:50%;border:none;cursor:pointer;' +
         'background:transparent;padding:0;' +
         'box-shadow:0 4px 24px rgba(99,102,241,0.4);' +
         'display:flex;align-items:center;justify-content:center;' +
@@ -200,7 +200,7 @@
           '<div style="display:flex;justify-content:flex-end;margin-bottom:8px;animation:ibot-msg-in 0.3s ease-out;">' +
           '<div style="display:flex;align-items:flex-end;gap:6px;max-width:85%;">' +
           // AI avatar
-          '<div style="width:26px;height:26px;border-radius:50%;overflow:hidden;flex-shrink:0;">' +
+          '<div style="width:30px;height:30px;border-radius:50%;overflow:hidden;flex-shrink:0;">' +
           '<video autoplay loop muted playsinline style="width:100%;height:100%;object-fit:cover;"><source src="' + BASE_URL + '/bot-avatar.webm" type="video/webm" /><source src="' + BASE_URL + '/bot-avatar.mp4" type="video/mp4" /></video>' +
           '</div>' +
           '<div style="padding:12px 16px;border-radius:16px 16px 4px 16px;font-size:14px;' +
@@ -225,7 +225,7 @@
           '<div style="display:flex;justify-content:flex-end;margin-bottom:8px;animation:ibot-msg-in 0.3s ease-out;">' +
           '<div style="display:flex;align-items:flex-end;gap:6px;max-width:85%;">' +
           // AI avatar
-          '<div style="width:26px;height:26px;border-radius:50%;overflow:hidden;flex-shrink:0;">' +
+          '<div style="width:30px;height:30px;border-radius:50%;overflow:hidden;flex-shrink:0;">' +
           '<video autoplay loop muted playsinline style="width:100%;height:100%;object-fit:cover;"><source src="' + BASE_URL + '/bot-avatar.webm" type="video/webm" /><source src="' + BASE_URL + '/bot-avatar.mp4" type="video/mp4" /></video>' +
           '</div>' +
           '<div style="padding:10px 14px;border-radius:16px 16px 4px 16px;font-size:14px;line-height:1.6;' +
@@ -258,7 +258,7 @@
       '<div style="position:absolute;top:-20px;right:-20px;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.1);"></div>' +
       '<div style="position:absolute;bottom:-30px;left:-10px;width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,0.07);"></div>' +
       // Icon
-      '<div style="width:34px;height:34px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,0.3);flex-shrink:0;position:relative;z-index:1;">' +
+      '<div style="width:39px;height:39px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,0.3);flex-shrink:0;position:relative;z-index:1;">' +
       '<video autoplay loop muted playsinline style="width:100%;height:100%;object-fit:cover;"><source src="' + BASE_URL + '/bot-avatar.webm" type="video/webm" /><source src="' + BASE_URL + '/bot-avatar.mp4" type="video/mp4" /></video>' +
       '</div>' +
       // Title

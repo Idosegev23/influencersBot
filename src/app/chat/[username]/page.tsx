@@ -754,7 +754,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         transition={{ duration: 0.4 }}
                         className="mb-6"
                       >
-                        <div className="relative w-[124px] h-[128px] mx-auto">
+                        <div className="relative w-[143px] h-[147px] mx-auto">
                           <video
                             autoPlay
                             loop

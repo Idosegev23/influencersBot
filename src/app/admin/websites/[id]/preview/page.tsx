@@ -229,14 +229,17 @@ function WidgetPreview({ accountId }: { accountId: string }) {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="w-[62px] h-[62px] rounded-full overflow-hidden border-none cursor-pointer p-0 transition-all duration-300 hover:scale-110"
+        className="w-[71px] h-[71px] rounded-full overflow-hidden border-none cursor-pointer p-0 transition-all duration-300 hover:scale-110"
         style={{
           boxShadow: '0 4px 24px rgba(99,102,241,0.4)',
           animation: 'widget-pulse 2.5s infinite',
         }}
         title="פתח צ'אט"
       >
-        <img src="/widget-icon.png" alt="Chat" className="w-full h-full rounded-full object-cover" />
+        <video autoPlay loop muted playsInline className="w-full h-full rounded-full object-cover">
+          <source src="/bot-avatar.webm" type="video/webm" />
+          <source src="/bot-avatar.mp4" type="video/mp4" />
+        </video>
       </button>
     );
   }
@@ -267,8 +270,11 @@ function WidgetPreview({ accountId }: { accountId: string }) {
         <div className="absolute -top-5 -right-5 w-20 h-20 rounded-full bg-white/10" />
         <div className="absolute -bottom-8 -left-3 w-16 h-16 rounded-full bg-white/[0.07]" />
         {/* AI Icon */}
-        <div className="w-9 h-9 rounded-full overflow-hidden border-2 border-white/30 shrink-0 relative z-10">
-          <img src="/widget-icon.png" alt="" className="w-full h-full object-cover" />
+        <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white/30 shrink-0 relative z-10">
+          <video autoPlay loop muted playsInline className="w-full h-full object-cover">
+            <source src="/bot-avatar.webm" type="video/webm" />
+            <source src="/bot-avatar.mp4" type="video/mp4" />
+          </video>
         </div>
         {/* Title */}
         <div className="flex-1 relative z-10">
@@ -296,8 +302,11 @@ function WidgetPreview({ accountId }: { accountId: string }) {
             return (
               <div key={i} className="flex justify-end" style={{ animation: 'widget-fade-in 0.3s ease-out' }}>
                 <div className="flex items-end gap-1.5 max-w-[85%]">
-                  <div className="w-[26px] h-[26px] rounded-full overflow-hidden shrink-0">
-                    <img src="/widget-icon.png" className="w-full h-full object-cover" alt="" />
+                  <div className="w-[30px] h-[30px] rounded-full overflow-hidden shrink-0">
+                    <video autoPlay loop muted playsInline className="w-full h-full object-cover">
+                      <source src="/bot-avatar.webm" type="video/webm" />
+                      <source src="/bot-avatar.mp4" type="video/mp4" />
+                    </video>
                   </div>
                   <div className="px-4 py-3 rounded-2xl rounded-br-sm bg-gray-100 flex gap-1 items-center">
                     <span className="w-1.5 h-1.5 rounded-full bg-gray-400" style={{ animation: 'widget-bounce 1.2s ease-in-out infinite' }} />
@@ -329,8 +338,11 @@ function WidgetPreview({ accountId }: { accountId: string }) {
           return (
             <div key={i} className="flex justify-end" style={{ animation: 'widget-fade-in 0.3s ease-out' }}>
               <div className="flex items-end gap-1.5 max-w-[85%]">
-                <div className="w-[26px] h-[26px] rounded-full overflow-hidden shrink-0">
-                  <img src="/widget-icon.png" className="w-full h-full object-cover" alt="" />
+                <div className="w-[30px] h-[30px] rounded-full overflow-hidden shrink-0">
+                  <video autoPlay loop muted playsInline className="w-full h-full object-cover">
+                    <source src="/bot-avatar.webm" type="video/webm" />
+                    <source src="/bot-avatar.mp4" type="video/mp4" />
+                  </video>
                 </div>
                 <div
                   className="px-3.5 py-2.5 rounded-2xl rounded-br-sm text-sm leading-relaxed text-gray-800"
