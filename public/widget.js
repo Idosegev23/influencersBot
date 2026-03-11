@@ -112,10 +112,8 @@
       return '<img src="' + escapeHtml(config.profilePic) + '" alt="' + escapeHtml(config.brandName) + '" ' +
         'style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />';
     }
-    return '<video autoplay loop muted playsinline style="width:100%;height:100%;object-fit:cover;">' +
-      '<source src="' + BASE_URL + '/bot-avatar.webm" type="video/webm" />' +
-      '<source src="' + BASE_URL + '/bot-avatar.mp4" type="video/mp4" />' +
-      '</video>';
+    return '<img src="' + BASE_URL + '/vidNB_small.gif" alt="Bot" ' +
+      'style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />';
   }
 
   // ============================================
