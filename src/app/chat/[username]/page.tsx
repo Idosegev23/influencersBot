@@ -755,13 +755,16 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         className="mb-6"
                       >
                         <div className="relative w-[124px] h-[128px] mx-auto">
-                          <Image
-                            src="/bot-illustration.png"
-                            alt="AI Assistant"
-                            fill
-                            className="object-contain"
-                            sizes="124px"
-                          />
+                          <video
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            className="w-full h-full object-contain"
+                          >
+                            <source src="/bot-avatar.webm" type="video/webm" />
+                            <source src="/bot-avatar.mp4" type="video/mp4" />
+                          </video>
                         </div>
                       </motion.div>
 

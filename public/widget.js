@@ -165,8 +165,10 @@
         'transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1),box-shadow 0.3s;overflow:hidden;' +
         'animation:ibot-pulse 2.5s infinite;' +
         '">' +
-        '<img src="' + BASE_URL + '/widget-icon.png" alt="Chat" ' +
-        'style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />' +
+        '<video autoplay loop muted playsinline style="width:100%;height:100%;border-radius:50%;object-fit:cover;">' +
+        '<source src="' + BASE_URL + '/bot-avatar.webm" type="video/webm" />' +
+        '<source src="' + BASE_URL + '/bot-avatar.mp4" type="video/mp4" />' +
+        '</video>' +
         '</button>';
 
       document.getElementById('ibot-toggle').onclick = function () {
@@ -199,7 +201,7 @@
           '<div style="display:flex;align-items:flex-end;gap:6px;max-width:85%;">' +
           // AI avatar
           '<div style="width:26px;height:26px;border-radius:50%;overflow:hidden;flex-shrink:0;">' +
-          '<img src="' + BASE_URL + '/widget-icon.png" style="width:100%;height:100%;object-fit:cover;" />' +
+          '<video autoplay loop muted playsinline style="width:100%;height:100%;object-fit:cover;"><source src="' + BASE_URL + '/bot-avatar.webm" type="video/webm" /><source src="' + BASE_URL + '/bot-avatar.mp4" type="video/mp4" /></video>' +
           '</div>' +
           '<div style="padding:12px 16px;border-radius:16px 16px 4px 16px;font-size:14px;' +
           'background:' + t.msgBg + ';color:' + t.text + ';display:flex;gap:4px;align-items:center;">' +
@@ -224,7 +226,7 @@
           '<div style="display:flex;align-items:flex-end;gap:6px;max-width:85%;">' +
           // AI avatar
           '<div style="width:26px;height:26px;border-radius:50%;overflow:hidden;flex-shrink:0;">' +
-          '<img src="' + BASE_URL + '/widget-icon.png" style="width:100%;height:100%;object-fit:cover;" />' +
+          '<video autoplay loop muted playsinline style="width:100%;height:100%;object-fit:cover;"><source src="' + BASE_URL + '/bot-avatar.webm" type="video/webm" /><source src="' + BASE_URL + '/bot-avatar.mp4" type="video/mp4" /></video>' +
           '</div>' +
           '<div style="padding:10px 14px;border-radius:16px 16px 4px 16px;font-size:14px;line-height:1.6;' +
           'background:' + t.msgBg + ';color:' + t.text + ';word-break:break-word;' +
@@ -257,7 +259,7 @@
       '<div style="position:absolute;bottom:-30px;left:-10px;width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,0.07);"></div>' +
       // Icon
       '<div style="width:34px;height:34px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,0.3);flex-shrink:0;position:relative;z-index:1;">' +
-      '<img src="' + BASE_URL + '/widget-icon.png" style="width:100%;height:100%;object-fit:cover;" />' +
+      '<video autoplay loop muted playsinline style="width:100%;height:100%;object-fit:cover;"><source src="' + BASE_URL + '/bot-avatar.webm" type="video/webm" /><source src="' + BASE_URL + '/bot-avatar.mp4" type="video/mp4" /></video>' +
       '</div>' +
       // Title
       '<div style="flex:1;position:relative;z-index:1;">' +
