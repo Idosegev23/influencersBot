@@ -92,9 +92,10 @@ export default function DocumentsPage() {
         }),
       });
 
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'הניתוח נכשל');
+      const result = await response.json();
+
+      if (!response.ok || result.success === false) {
+        throw new Error(result.error || result.details || 'הניתוח נכשל');
       }
 
       setParseSuccess(true);
