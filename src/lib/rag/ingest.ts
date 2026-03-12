@@ -521,31 +521,44 @@ export function buildDocumentText(doc: {
   filename: string;
   document_type: string;
   parsed_data: any;
+  extracted_text?: string;
 }): string {
   const parts = [`Document: ${doc.filename}`, `Type: ${doc.document_type}`];
   const data = doc.parsed_data;
-  if (!data) return parts.join('\n');
 
-  const extractText = (obj: any, prefix = ''): string[] => {
-    const lines: string[] = [];
-    for (const [key, value] of Object.entries(obj)) {
-      if (typeof value === 'string' && value.trim()) {
-        lines.push(`${prefix}${key}: ${value}`);
-      } else if (typeof value === 'number') {
-        lines.push(`${prefix}${key}: ${value}`);
-      } else if (Array.isArray(value)) {
-        for (const item of value) {
-          if (typeof item === 'string') lines.push(`${prefix}${key}: ${item}`);
-          else if (typeof item === 'object' && item !== null) lines.push(...extractText(item, `${prefix}  `));
+  // Include AI-parsed structured data
+  if (data) {
+    const extractFields = (obj: any, prefix = ''): string[] => {
+      const lines: string[] = [];
+      for (const [key, value] of Object.entries(obj)) {
+        if (typeof value === 'string' && value.trim()) {
+          lines.push(`${prefix}${key}: ${value}`);
+        } else if (typeof value === 'number') {
+          lines.push(`${prefix}${key}: ${value}`);
+        } else if (Array.isArray(value)) {
+          for (const item of value) {
+            if (typeof item === 'string') lines.push(`${prefix}${key}: ${item}`);
+            else if (typeof item === 'object' && item !== null) lines.push(...extractFields(item, `${prefix}  `));
+          }
+        } else if (typeof value === 'object' && value !== null) {
+          lines.push(...extractFields(value, `${prefix}${key}.`));
         }
-      } else if (typeof value === 'object' && value !== null) {
-        lines.push(...extractText(value, `${prefix}${key}.`));
       }
-    }
-    return lines;
-  };
+      return lines;
+    };
 
-  parts.push(...extractText(data));
+    parts.push(...extractFields(data));
+  }
+
+  // Include raw extracted text for comprehensive RAG coverage
+  // This ensures the chatbot can answer questions from any part of the document,
+  // not just the structured fields the AI chose to extract
+  if (doc.extracted_text && doc.extracted_text.trim().length > 50) {
+    parts.push('');
+    parts.push('--- Full Document Text ---');
+    parts.push(doc.extracted_text);
+  }
+
   return parts.join('\n');
 }
 

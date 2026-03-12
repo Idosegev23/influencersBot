@@ -1,19 +1,19 @@
-// Parse uploaded documents with AI
+// Parse uploaded documents with multi-layer AI analysis
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { parseDocument, mergeDocuments } from '@/lib/ai-parser';
+import type { MultiLayerResult } from '@/lib/ai-parser';
 import type { DocumentType, ParseResult } from '@/lib/ai-parser/types';
 
-// Gemini 3 Pro is powerful but slow - allow 8 minutes for parsing
-export const maxDuration = 480; // 8 minutes
+// Multi-layer analysis takes longer — allow 10 minutes
+export const maxDuration = 600; // 10 minutes
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { documentId, documentIds, documentType } = body;
 
-    // Support both single document and multiple documents
     const idsToProcess = documentId ? [documentId] : documentIds;
 
     if (!idsToProcess || idsToProcess.length === 0) {
@@ -23,9 +23,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`[Parse API] Starting parse for ${idsToProcess.length} document(s)`);
+    console.log(`[Parse API] Starting multi-layer parse for ${idsToProcess.length} document(s)`);
 
-    // Fetch documents from database
     const { data: documents, error: fetchError } = await supabase
       .from('partnership_documents')
       .select('*')
@@ -47,13 +46,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const parseResults: ParseResult[] = [];
+    const parseResults: MultiLayerResult[] = [];
 
-    // Parse each document
     for (const doc of documents) {
       console.log(`[Parse API] Processing document ${doc.id}: ${doc.filename} (type: ${doc.document_type})`);
 
-      // Update status to processing
       await supabase
         .from('partnership_documents')
         .update({ parsing_status: 'processing' })
@@ -77,18 +74,21 @@ export async function POST(request: NextRequest) {
 
         console.log(`[Parse API] File downloaded successfully, size: ${fileData.size} bytes`);
 
-        // Convert blob to File
         const file = new File([fileData], doc.filename, { type: doc.mime_type });
 
-        // Parse with AI
-        console.log(`[Parse API] Starting AI parsing for ${doc.id}...`);
+        // Multi-layer AI parsing (text extraction + vision + text analysis)
+        console.log(`[Parse API] Starting multi-layer AI parsing for ${doc.id}...`);
         const result = await parseDocument({
           file,
           documentType: doc.document_type as DocumentType,
           language: 'auto',
         });
 
-        console.log(`[Parse API] AI parsing ${result.success ? 'succeeded' : 'failed'} for ${doc.id}, confidence: ${result.confidence}%`);
+        const layersSummary = result.layers
+          ? `text=${result.layers.textExtraction}, vision=${result.layers.visionAnalysis}, textAI=${result.layers.textAnalysis}`
+          : 'unknown';
+        console.log(`[Parse API] Multi-layer parsing ${result.success ? 'succeeded' : 'failed'} for ${doc.id}, confidence: ${(result.confidence * 100).toFixed(1)}%, layers: ${layersSummary}`);
+
         parseResults.push(result);
 
         // Update document with parsing results
@@ -135,9 +135,9 @@ export async function POST(request: NextRequest) {
         }
 
         // RAG ingestion — awaited so document is searchable by chatbot immediately
+        // Now includes raw extracted text for comprehensive coverage
         if (result.success && result.data && doc.account_id) {
           try {
-            // Mark RAG as processing
             await supabase
               .from('partnership_documents')
               .update({ rag_status: 'processing' })
@@ -148,6 +148,7 @@ export async function POST(request: NextRequest) {
               filename: doc.filename,
               document_type: doc.document_type,
               parsed_data: result.data,
+              extracted_text: result.extractedText, // Layer 1 raw text
             });
 
             if (text.trim()) {
@@ -161,10 +162,11 @@ export async function POST(request: NextRequest) {
                   filename: doc.filename,
                   documentType: doc.document_type,
                   parsingConfidence: result.confidence,
+                  layers: result.layers,
+                  hasExtractedText: !!result.extractedText,
                 },
               });
 
-              // Mark RAG as indexed
               await supabase
                 .from('partnership_documents')
                 .update({
@@ -204,7 +206,6 @@ export async function POST(request: NextRequest) {
           documentType: doc.document_type,
         });
 
-        // Update status to failed with error message
         await supabase
           .from('partnership_documents')
           .update({
@@ -214,7 +215,6 @@ export async function POST(request: NextRequest) {
           })
           .eq('id', doc.id);
 
-        // Log the failed attempt
         await supabase.from('ai_parsing_logs').insert({
           document_id: doc.id,
           attempt_number: 1,
@@ -239,7 +239,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Merge all parsed documents
     const mergedData = mergeDocuments(parseResults);
 
     const successCount = parseResults.filter(r => r.success).length;
@@ -247,18 +246,17 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Parse API] Parsing complete: ${successCount} succeeded, ${failedCount} failed`);
 
-    // If all parsing failed, return more helpful error
     if (failedCount === parseResults.length) {
       const errorMessages = parseResults.map(r => r.error).filter(Boolean).join('; ');
       console.error(`[Parse API] All parsing attempts failed:`, errorMessages);
-      
+
       return NextResponse.json({
         success: false,
         error: 'הניתוח נכשל',
         details: errorMessages || 'לא הצלחנו לנתח את המסמך. אנא נסה למלא את הפרטים באופן ידני.',
         results: parseResults,
         canFallbackToManual: true,
-      }, { status: 200 }); // 200 to allow frontend to handle gracefully
+      }, { status: 200 });
     }
 
     return NextResponse.json({
@@ -279,13 +277,12 @@ export async function POST(request: NextRequest) {
     console.error('[Parse API] Unexpected error:', error);
     console.error('[Parse API] Error stack:', error.stack);
     return NextResponse.json(
-      { 
+      {
         error: 'שגיאה בניתוח המסמך',
-        details: error.message || 'אירעה שגיאה בלתי צפויה', 
-        canFallbackToManual: true 
+        details: error.message || 'אירעה שגיאה בלתי צפויה',
+        canFallbackToManual: true
       },
       { status: 500 }
     );
   }
 }
-

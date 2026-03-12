@@ -114,6 +114,95 @@ export async function parseWithGemini(options: ParseOptions): Promise<ParseResul
 }
 
 /**
+ * Parse document using Gemini with extracted text (no vision — text-based deep analysis)
+ * Layer 3: Takes pre-extracted text and analyzes it deeply
+ */
+export async function parseWithGeminiText(
+  options: ParseOptions & { extractedText: string }
+): Promise<ParseResult> {
+  const startTime = Date.now();
+  const { file, documentType, language = 'auto', extractedText } = options;
+
+  try {
+    console.log(`[Gemini-Text] Deep text analysis for ${file.name} (${extractedText.length} chars)...`);
+
+    // Get structured extraction prompt
+    const structuredPrompt = getPrompt(documentType, language);
+
+    // Build comprehensive prompt with the extracted text
+    const fullPrompt = `${structuredPrompt}
+
+--- תחילת תוכן המסמך ---
+${extractedText}
+--- סוף תוכן המסמך ---
+
+חלץ את כל המידע מהטקסט למעלה. זה טקסט שחולץ ישירות מהקובץ "${file.name}".
+אם הטקסט מכיל מידע שלא מתאים לסכמה, הוסף אותו בשדה content או keyPoints.
+החזר רק JSON תקין.`;
+
+    // Use Gemini text model (same model, text-only input)
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-3-pro-preview',
+      generationConfig: {
+        temperature: 0.1,
+        topP: 0.95,
+        topK: 40,
+        maxOutputTokens: 8192,
+        responseMimeType: 'application/json',
+      },
+    });
+
+    const result = await retryWithBackoff(async () => {
+      return await model.generateContent([fullPrompt]);
+    }, 3, 2000);
+
+    const response = result.response;
+    const text = response.text();
+
+    console.log('[Gemini-Text] Raw response (first 500 chars):', text.substring(0, 500));
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(text);
+    } catch (parseError) {
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        parsed = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error('Failed to parse JSON from text analysis response');
+      }
+    }
+
+    const confidence = calculateConfidence(parsed, documentType);
+    const duration = Date.now() - startTime;
+
+    console.log(`[Gemini-Text] Success! Confidence: ${(confidence * 100).toFixed(1)}%, Duration: ${duration}ms`);
+
+    return {
+      success: true,
+      data: parsed,
+      confidence,
+      model: 'gemini',
+      attemptNumber: 1,
+      duration_ms: duration,
+    };
+  } catch (error: any) {
+    const duration = Date.now() - startTime;
+    console.error('[Gemini-Text] Error:', error.message);
+
+    return {
+      success: false,
+      data: null,
+      confidence: 0,
+      model: 'gemini',
+      attemptNumber: 1,
+      error: error.message || String(error),
+      duration_ms: duration,
+    };
+  }
+}
+
+/**
  * Parse multiple documents in parallel
  */
 export async function parseMultipleWithGemini(
