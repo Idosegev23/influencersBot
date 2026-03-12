@@ -25,6 +25,8 @@ import {
   ChevronLeft,
   Plus,
   RotateCcw,
+  CheckCircle,
+  ArrowRight,
 } from 'lucide-react';
 import { getInfluencerByUsername, getBrandsByInfluencer, getContentByInfluencer, type Brand } from '@/lib/supabase';
 import { applyTheme, getGoogleFontsUrl } from '@/lib/theme';
@@ -147,6 +149,11 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [supportForm, setSupportForm] = useState({ name: '', phone: '', message: '' });
   const [supportLoading, setSupportLoading] = useState(false);
   const [supportSuccess, setSupportSuccess] = useState(false);
+  const [problemStep, setProblemStep] = useState<'brands' | 'form' | 'success'>('brands');
+  const [problemBrand, setProblemBrand] = useState<Brand | null>(null);
+  const [problemForm, setProblemForm] = useState({ name: '', phone: '', order: '', details: '' });
+  const [problemLoading, setProblemLoading] = useState(false);
+  const [problemError, setProblemError] = useState<string | null>(null);
   const [supportState, setSupportState] = useState<SupportState | null>(null);
   const [currentTraceId, setCurrentTraceId] = useState<string | null>(null);
   const [currentDecisionId, setCurrentDecisionId] = useState<string | null>(null);
@@ -173,6 +180,16 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Reset problem tab when switching away
+  useEffect(() => {
+    if (activeTab !== 'problem') {
+      setProblemStep('brands');
+      setProblemBrand(null);
+      setProblemForm({ name: '', phone: '', order: '', details: '' });
+      setProblemError(null);
+    }
+  }, [activeTab]);
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -613,6 +630,44 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     } finally {
       setSupportLoading(false);
     }
+  };
+
+  const handleProblemSubmit = async () => {
+    if (!problemBrand || !problemForm.name || !problemForm.phone || !problemForm.details || !influencer) {
+      setProblemError('נא למלא את כל השדות החובה');
+      return;
+    }
+    setProblemLoading(true);
+    setProblemError(null);
+    try {
+      const response = await fetch('/api/support', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username,
+          brand: problemBrand.brand_name,
+          customerName: problemForm.name,
+          customerPhone: problemForm.phone,
+          orderNumber: problemForm.order || null,
+          problem: problemForm.details,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'שגיאה בשליחת הפנייה');
+      setProblemStep('success');
+    } catch (err) {
+      setProblemError(err instanceof Error ? err.message : 'שגיאה בשליחת הפנייה');
+    } finally {
+      setProblemLoading(false);
+    }
+  };
+
+  const resetProblemTab = () => {
+    setProblemStep('brands');
+    setProblemBrand(null);
+    setProblemForm({ name: '', phone: '', order: '', details: '' });
+    setProblemError(null);
+    setProblemLoading(false);
   };
 
   if (loading) {
@@ -1272,7 +1327,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 </div>
               </motion.div>
             ) : activeTab === 'problem' ? (
-              /* ============ PROBLEM/SUPPORT TAB ============ */
+              /* ============ PROBLEM/SUPPORT TAB (INLINE) ============ */
               <motion.div
                 key="problem"
                 initial={{ opacity: 0 }}
@@ -1283,37 +1338,251 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
               >
                 <div className="px-4 py-6">
                   <div className={`mx-auto ${isMobile ? 'max-w-2xl' : 'max-w-[700px]'}`}>
-                    <h2 className="font-semibold mb-1 text-center" style={{ fontSize: '26px', color: '#0c1013', lineHeight: '30px' }}>פניית תמיכה</h2>
-                    <p className="mb-6 text-center" style={{ fontSize: '16px', color: '#676767' }}>בחר את המותג שיש לך בעיה איתו</p>
-                    <div className={`${isMobile ? 'flex flex-col gap-3' : 'grid grid-cols-2 gap-4'}`}>
-                      {brands.map((brand) => (
-                        <button
-                          key={brand.id}
-                          onClick={() => {
-                            setSupportBrand(brand.brand_name);
-                            setShowSupportModal(true);
-                          }}
-                          className="mobile-brand-row"
+                    <AnimatePresence mode="wait">
+                      {/* ---- STEP 1: Brand Selection ---- */}
+                      {problemStep === 'brands' && (
+                        <motion.div
+                          key="problem-brands"
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -20 }}
                         >
-                          {/* Brand logo */}
-                          <div className="brand-logo">
-                            {brand.image_url ? (
-                              <img src={getProxiedImageUrl(brand.image_url)} alt={brand.brand_name} />
-                            ) : (
-                              <span className="brand-logo-letter">{brand.brand_name.charAt(0).toUpperCase()}</span>
+                          <h2 className="font-semibold mb-1 text-center" style={{ fontSize: '26px', color: '#0c1013', lineHeight: '30px' }}>פניית תמיכה</h2>
+                          <p className="mb-6 text-center" style={{ fontSize: '16px', color: '#676767' }}>בחר את המותג שיש לך בעיה איתו</p>
+                          <div className={`${isMobile ? 'flex flex-col gap-3' : 'grid grid-cols-2 gap-4'}`}>
+                            {brands.map((brand) => (
+                              <button
+                                key={brand.id}
+                                onClick={() => {
+                                  setProblemBrand(brand);
+                                  setProblemStep('form');
+                                }}
+                                className="mobile-brand-row"
+                              >
+                                <div className="brand-logo">
+                                  {brand.image_url ? (
+                                    <img src={getProxiedImageUrl(brand.image_url)} alt={brand.brand_name} />
+                                  ) : (
+                                    <span className="brand-logo-letter">{brand.brand_name.charAt(0).toUpperCase()}</span>
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0 text-right">
+                                  <p className="font-semibold truncate" style={{ fontSize: '16px', color: '#0c1013' }}>
+                                    {brand.brand_name}
+                                  </p>
+                                </div>
+                                <ChevronLeft className="w-5 h-5 flex-shrink-0" style={{ color: '#676767' }} />
+                              </button>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+
+                      {/* ---- STEP 2: Form ---- */}
+                      {problemStep === 'form' && problemBrand && (
+                        <motion.div
+                          key="problem-form"
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -20 }}
+                        >
+                          <h2 className="font-semibold mb-1 text-center" style={{ fontSize: '26px', color: '#0c1013', lineHeight: '30px' }}>פניית תמיכה</h2>
+                          <p className="mb-5 text-center" style={{ fontSize: '16px', color: '#676767' }}>מלא את הפרטים ונחזור אליך בהקדם</p>
+
+                          {/* Selected brand pill */}
+                          <div
+                            className="flex items-center gap-3 mx-auto mb-6"
+                            style={{
+                              backgroundColor: '#ffd6d7',
+                              borderRadius: '60px',
+                              height: '43px',
+                              maxWidth: isMobile ? '100%' : '318px',
+                              padding: '0 6px 0 14px',
+                            }}
+                          >
+                            <div className="w-[30px] h-[30px] rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center" style={{ background: '#fff' }}>
+                              {problemBrand.image_url ? (
+                                <img src={getProxiedImageUrl(problemBrand.image_url)} alt={problemBrand.brand_name} className="w-full h-full object-cover rounded-full" />
+                              ) : (
+                                <span className="text-xs font-bold" style={{ color: '#0c1013' }}>{problemBrand.brand_name.charAt(0).toUpperCase()}</span>
+                              )}
+                            </div>
+                            <span className="text-[14px] font-semibold flex-1 text-right" style={{ color: '#0c1013' }}>{problemBrand.brand_name}</span>
+                            <span className="text-[12px]" style={{ color: '#676767' }}>מותג</span>
+                            <button
+                              onClick={() => {
+                                setProblemBrand(null);
+                                setProblemStep('brands');
+                              }}
+                              className="w-[26px] h-[26px] rounded-full flex items-center justify-center hover:bg-white/50 transition-all"
+                            >
+                              <X className="w-3.5 h-3.5" style={{ color: '#0c1013' }} />
+                            </button>
+                          </div>
+
+                          {/* Form fields */}
+                          <div className={`flex flex-col gap-3 ${isMobile ? '' : 'items-center'}`}>
+                            {/* Name */}
+                            <input
+                              type="text"
+                              value={problemForm.name}
+                              onChange={(e) => setProblemForm({ ...problemForm, name: e.target.value })}
+                              placeholder="שם מלא *"
+                              dir="rtl"
+                              className="w-full focus:outline-none focus:ring-2 focus:ring-[#0c1013]/10"
+                              style={{
+                                maxWidth: isMobile ? '100%' : '363px',
+                                height: '73px',
+                                borderRadius: '60px',
+                                background: '#ffffff',
+                                border: 'none',
+                                padding: '0 24px',
+                                fontSize: '16px',
+                                color: '#0c1013',
+                              }}
+                            />
+                            {/* Phone */}
+                            <input
+                              type="tel"
+                              value={problemForm.phone}
+                              onChange={(e) => setProblemForm({ ...problemForm, phone: e.target.value.replace(/\D/g, '') })}
+                              placeholder="מספר טלפון *"
+                              dir="ltr"
+                              className="w-full focus:outline-none focus:ring-2 focus:ring-[#0c1013]/10 text-right"
+                              style={{
+                                maxWidth: isMobile ? '100%' : '363px',
+                                height: '73px',
+                                borderRadius: '60px',
+                                background: '#ffffff',
+                                border: 'none',
+                                padding: '0 24px',
+                                fontSize: '16px',
+                                color: '#0c1013',
+                              }}
+                            />
+                            {/* Order number */}
+                            <input
+                              type="text"
+                              value={problemForm.order}
+                              onChange={(e) => setProblemForm({ ...problemForm, order: e.target.value })}
+                              placeholder="מספר הזמנה (אופציונלי)"
+                              dir="rtl"
+                              className="w-full focus:outline-none focus:ring-2 focus:ring-[#0c1013]/10"
+                              style={{
+                                maxWidth: isMobile ? '100%' : '363px',
+                                height: '73px',
+                                borderRadius: '60px',
+                                background: '#ffffff',
+                                border: 'none',
+                                padding: '0 24px',
+                                fontSize: '16px',
+                                color: '#0c1013',
+                              }}
+                            />
+                            {/* Problem details textarea */}
+                            <textarea
+                              value={problemForm.details}
+                              onChange={(e) => setProblemForm({ ...problemForm, details: e.target.value })}
+                              placeholder="תאר את הבעיה... *"
+                              dir="rtl"
+                              rows={4}
+                              className="w-full resize-none focus:outline-none focus:ring-2 focus:ring-[#0c1013]/10"
+                              style={{
+                                maxWidth: isMobile ? '100%' : '363px',
+                                minHeight: '156px',
+                                borderRadius: '30px',
+                                background: '#ffffff',
+                                border: 'none',
+                                padding: '20px 24px',
+                                fontSize: '16px',
+                                color: '#0c1013',
+                              }}
+                            />
+
+                            {/* Error message */}
+                            {problemError && (
+                              <div className="text-center text-sm" style={{ color: '#ef4444', maxWidth: isMobile ? '100%' : '363px' }}>
+                                {problemError}
+                              </div>
                             )}
+
+                            {/* Buttons */}
+                            <div className={`flex gap-3 mt-2 ${isMobile ? 'flex-col-reverse' : 'justify-center'}`} style={{ maxWidth: isMobile ? '100%' : '363px', width: '100%' }}>
+                              <button
+                                onClick={() => {
+                                  setProblemStep('brands');
+                                  setProblemBrand(null);
+                                  setProblemForm({ name: '', phone: '', order: '', details: '' });
+                                  setProblemError(null);
+                                }}
+                                className="flex items-center justify-center gap-2 font-medium transition-all hover:bg-[#f4f5f7]"
+                                style={{
+                                  height: '53px',
+                                  borderRadius: '60px',
+                                  border: '1px solid #b5b5b5',
+                                  color: '#676767',
+                                  fontSize: '16px',
+                                  flex: isMobile ? undefined : 1,
+                                  width: isMobile ? '100%' : undefined,
+                                }}
+                              >
+                                <ArrowRight className="w-4 h-4" />
+                                חזרה
+                              </button>
+                              <button
+                                onClick={handleProblemSubmit}
+                                disabled={problemLoading}
+                                className="flex items-center justify-center gap-2 text-white font-medium transition-all hover:opacity-90 disabled:opacity-50"
+                                style={{
+                                  height: '53px',
+                                  borderRadius: '60px',
+                                  backgroundColor: '#0c1013',
+                                  fontSize: '16px',
+                                  flex: isMobile ? undefined : 1,
+                                  width: isMobile ? '100%' : undefined,
+                                }}
+                              >
+                                {problemLoading ? (
+                                  <Loader2 className="w-5 h-5 animate-spin" />
+                                ) : (
+                                  'שלח פנייה'
+                                )}
+                              </button>
+                            </div>
                           </div>
-                          {/* Brand name */}
-                          <div className="flex-1 min-w-0 text-right">
-                            <p className="font-semibold truncate" style={{ fontSize: '16px', color: '#0c1013' }}>
-                              {brand.brand_name}
-                            </p>
+                        </motion.div>
+                      )}
+
+                      {/* ---- STEP 3: Success ---- */}
+                      {problemStep === 'success' && (
+                        <motion.div
+                          key="problem-success"
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="text-center py-12"
+                        >
+                          <div
+                            className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+                            style={{ backgroundColor: '#0c1013' }}
+                          >
+                            <CheckCircle className="w-8 h-8 text-white" />
                           </div>
-                          {/* Arrow icon */}
-                          <ChevronLeft className="w-5 h-5 flex-shrink-0" style={{ color: '#676767' }} />
-                        </button>
-                      ))}
-                    </div>
+                          <h3 className="text-[22px] font-semibold mb-2" style={{ color: '#0c1013' }}>
+                            הפנייה נשלחה בהצלחה!
+                          </h3>
+                          <p className="text-[16px] mb-8" style={{ color: '#676767' }}>
+                            נחזור אליך בהקדם האפשרי
+                          </p>
+                          <button
+                            onClick={resetProblemTab}
+                            className="h-[53px] px-10 rounded-[60px] text-white font-medium transition-all hover:opacity-90"
+                            style={{ backgroundColor: '#0c1013', fontSize: '16px' }}
+                          >
+                            סגור
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </div>
               </motion.div>
