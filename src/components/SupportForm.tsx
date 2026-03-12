@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Loader2, CheckCircle, Phone, User, Package, MessageSquare, Tag, ChevronDown } from 'lucide-react';
+import { X, Send, Loader2, CheckCircle, Phone, User, Package, MessageSquare, Tag } from 'lucide-react';
 import type { Product } from '@/types';
 
 interface SupportFormProps {
@@ -14,8 +14,8 @@ interface SupportFormProps {
 }
 
 export default function SupportForm({ username, influencerName, products, onClose, onSuccess }: SupportFormProps) {
-  const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
-  const [successBrand, setSuccessBrand] = useState<string | null>(null);
+  const [step, setStep] = useState<'brand' | 'details' | 'success'>('brand');
+  const [selectedBrand, setSelectedBrand] = useState<string>('');
   const [formData, setFormData] = useState({
     customerName: '',
     customerPhone: '',
@@ -31,17 +31,6 @@ export default function SupportForm({ username, influencerName, products, onClos
       .filter(p => p.brand || p.coupon_code)
       .map(p => p.brand || p.name.replace('קופון ', ''))
   )).filter(Boolean);
-
-  const handleBrandClick = (brand: string) => {
-    if (selectedBrand === brand) {
-      setSelectedBrand(null);
-    } else {
-      setSelectedBrand(brand);
-      setError(null);
-      setFormData({ customerName: '', customerPhone: '', orderNumber: '', problem: '' });
-      setSuccessBrand(null);
-    }
-  };
 
   const handleSubmit = async () => {
     if (!selectedBrand || !formData.customerName || !formData.customerPhone || !formData.problem) {
@@ -72,8 +61,7 @@ export default function SupportForm({ username, influencerName, products, onClos
         throw new Error(data.error || 'שגיאה בשליחת הפנייה');
       }
 
-      setSuccessBrand(selectedBrand);
-      setSelectedBrand(null);
+      setStep('success');
       onSuccess?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'שגיאה בשליחת הפנייה');
@@ -83,164 +71,208 @@ export default function SupportForm({ username, influencerName, products, onClos
   };
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2 mb-2" style={{ color: 'var(--color-text)', opacity: 0.7 }}>
-        <Tag className="w-4 h-4" />
-        <span className="text-sm">בחר את המותג שיש לך בעיה איתו</span>
-      </div>
-
-      {brands.length === 0 && (
-        <div className="text-center py-6" style={{ color: 'var(--color-text)', opacity: 0.5 }}>
-          <p>אין מותגים זמינים</p>
-        </div>
-      )}
-
-      {brands.map((brand) => (
-        <div key={brand} className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
-          {/* Brand header */}
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl"
+        style={{ backgroundColor: 'var(--color-surface)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div
+          className="px-5 py-4 flex items-center justify-between"
+          style={{ borderBottom: '1px solid var(--color-border)' }}
+        >
+          <h2 className="font-semibold text-lg" style={{ color: 'var(--color-text)' }}>
+            פניית תמיכה
+          </h2>
           <button
-            onClick={() => handleBrandClick(brand)}
-            className="w-full p-4 text-right transition-all flex items-center justify-between"
-            style={{
-              backgroundColor: selectedBrand === brand ? 'var(--color-primary)' : 'var(--color-background)',
-              color: selectedBrand === brand ? 'white' : 'var(--color-text)',
-            }}
+            onClick={onClose}
+            className="p-2 rounded-lg transition-all hover:bg-black/10"
+            style={{ color: 'var(--color-text)' }}
           >
-            <ChevronDown
-              className={`w-4 h-4 transition-transform ${selectedBrand === brand ? 'rotate-180' : ''}`}
-            />
-            <span className="font-medium">{brand}</span>
+            <X className="w-5 h-5" />
           </button>
+        </div>
 
-          {/* Inline success message */}
-          <AnimatePresence>
-            {successBrand === brand && (
+        {/* Content */}
+        <div className="p-5 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 10rem)' }}>
+          <AnimatePresence mode="wait">
+            {step === 'brand' && (
               <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.3 }}
-                className="overflow-hidden"
+                key="brand"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-4"
               >
-                <div className="p-4 text-center" style={{ backgroundColor: 'var(--color-background)' }}>
-                  <CheckCircle className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--color-primary)' }} />
-                  <p className="font-medium text-sm" style={{ color: 'var(--color-text)' }}>הפנייה נשלחה בהצלחה!</p>
-                  <p className="text-xs mt-1" style={{ color: 'var(--color-text)', opacity: 0.6 }}>ניצור קשר בהקדם</p>
+                <div className="flex items-center gap-2 mb-4" style={{ color: 'var(--color-text)', opacity: 0.7 }}>
+                  <Tag className="w-4 h-4" />
+                  <span className="text-sm">בחר את המותג שיש לך בעיה איתו</span>
                 </div>
+
+                <div className="grid gap-2">
+                  {brands.map((brand) => (
+                    <button
+                      key={brand}
+                      onClick={() => {
+                        setSelectedBrand(brand);
+                        setStep('details');
+                      }}
+                      className="w-full p-4 rounded-xl text-right transition-all hover:scale-[1.02]"
+                      style={{
+                        backgroundColor: 'var(--color-background)',
+                        border: '1px solid var(--color-border)',
+                        color: 'var(--color-text)',
+                      }}
+                    >
+                      <div className="font-medium">{brand}</div>
+                    </button>
+                  ))}
+                </div>
+
+                {brands.length === 0 && (
+                  <div className="text-center py-6" style={{ color: 'var(--color-text)', opacity: 0.5 }}>
+                    <p>אין מותגים זמינים</p>
+                  </div>
+                )}
               </motion.div>
             )}
-          </AnimatePresence>
 
-          {/* Expandable form */}
-          <AnimatePresence>
-            {selectedBrand === brand && (
+            {step === 'details' && (
               <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.3 }}
-                className="overflow-hidden"
+                key="details"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-4"
               >
-                <div className="p-4 space-y-3" style={{ backgroundColor: 'var(--color-background)', borderTop: '1px solid var(--color-border)' }}>
-                  {/* Customer Name */}
-                  <div>
-                    <label className="flex items-center gap-2 text-xs mb-1.5" style={{ color: 'var(--color-text)', opacity: 0.7 }}>
-                      <User className="w-3.5 h-3.5" />
-                      שם מלא *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.customerName}
-                      onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
-                      className="w-full px-3 py-2.5 rounded-xl text-sm"
-                      style={{
-                        backgroundColor: 'var(--color-surface, #fff)',
-                        border: '1px solid var(--color-border)',
-                        color: 'var(--color-text)',
-                      }}
-                      placeholder="הכנס את שמך המלא"
-                    />
+                <div
+                  className="px-3 py-2 rounded-lg text-sm font-medium"
+                  style={{ backgroundColor: 'var(--color-primary)', color: 'white' }}
+                >
+                  מותג: {selectedBrand}
+                </div>
+
+                {/* Customer Name */}
+                <div>
+                  <label className="flex items-center gap-2 text-sm mb-2" style={{ color: 'var(--color-text)', opacity: 0.7 }}>
+                    <User className="w-4 h-4" />
+                    שם מלא *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.customerName}
+                    onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl"
+                    style={{
+                      backgroundColor: 'var(--color-background)',
+                      border: '1px solid var(--color-border)',
+                      color: 'var(--color-text)',
+                    }}
+                    placeholder="הכנס את שמך המלא"
+                  />
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label className="flex items-center gap-2 text-sm mb-2" style={{ color: 'var(--color-text)', opacity: 0.7 }}>
+                    <Phone className="w-4 h-4" />
+                    מספר טלפון *
+                  </label>
+                  <input
+                    type="tel"
+                    value={formData.customerPhone}
+                    onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value.replace(/\D/g, '') })}
+                    className="w-full px-4 py-3 rounded-xl"
+                    style={{
+                      backgroundColor: 'var(--color-background)',
+                      border: '1px solid var(--color-border)',
+                      color: 'var(--color-text)',
+                    }}
+                    placeholder="05XXXXXXXX"
+                    dir="ltr"
+                  />
+                </div>
+
+                {/* Order Number */}
+                <div>
+                  <label className="flex items-center gap-2 text-sm mb-2" style={{ color: 'var(--color-text)', opacity: 0.7 }}>
+                    <Package className="w-4 h-4" />
+                    מספר הזמנה (אופציונלי)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.orderNumber}
+                    onChange={(e) => setFormData({ ...formData, orderNumber: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl"
+                    style={{
+                      backgroundColor: 'var(--color-background)',
+                      border: '1px solid var(--color-border)',
+                      color: 'var(--color-text)',
+                    }}
+                    placeholder="מספר ההזמנה מהאתר"
+                  />
+                </div>
+
+                {/* Problem */}
+                <div>
+                  <label className="flex items-center gap-2 text-sm mb-2" style={{ color: 'var(--color-text)', opacity: 0.7 }}>
+                    <MessageSquare className="w-4 h-4" />
+                    תיאור הבעיה *
+                  </label>
+                  <textarea
+                    value={formData.problem}
+                    onChange={(e) => setFormData({ ...formData, problem: e.target.value })}
+                    rows={3}
+                    className="w-full px-4 py-3 rounded-xl resize-none"
+                    style={{
+                      backgroundColor: 'var(--color-background)',
+                      border: '1px solid var(--color-border)',
+                      color: 'var(--color-text)',
+                    }}
+                    placeholder="תאר את הבעיה שחווית..."
+                  />
+                </div>
+
+                {error && (
+                  <div className="p-3 rounded-lg bg-red-500/20 text-red-400 text-sm">
+                    {error}
                   </div>
+                )}
 
-                  {/* Phone */}
-                  <div>
-                    <label className="flex items-center gap-2 text-xs mb-1.5" style={{ color: 'var(--color-text)', opacity: 0.7 }}>
-                      <Phone className="w-3.5 h-3.5" />
-                      מספר טלפון *
-                    </label>
-                    <input
-                      type="tel"
-                      value={formData.customerPhone}
-                      onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value.replace(/\D/g, '') })}
-                      className="w-full px-3 py-2.5 rounded-xl text-sm"
-                      style={{
-                        backgroundColor: 'var(--color-surface, #fff)',
-                        border: '1px solid var(--color-border)',
-                        color: 'var(--color-text)',
-                      }}
-                      placeholder="05XXXXXXXX"
-                      dir="ltr"
-                    />
-                  </div>
-
-                  {/* Order Number */}
-                  <div>
-                    <label className="flex items-center gap-2 text-xs mb-1.5" style={{ color: 'var(--color-text)', opacity: 0.7 }}>
-                      <Package className="w-3.5 h-3.5" />
-                      מספר הזמנה (אופציונלי)
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.orderNumber}
-                      onChange={(e) => setFormData({ ...formData, orderNumber: e.target.value })}
-                      className="w-full px-3 py-2.5 rounded-xl text-sm"
-                      style={{
-                        backgroundColor: 'var(--color-surface, #fff)',
-                        border: '1px solid var(--color-border)',
-                        color: 'var(--color-text)',
-                      }}
-                      placeholder="מספר ההזמנה מהאתר"
-                    />
-                  </div>
-
-                  {/* Problem */}
-                  <div>
-                    <label className="flex items-center gap-2 text-xs mb-1.5" style={{ color: 'var(--color-text)', opacity: 0.7 }}>
-                      <MessageSquare className="w-3.5 h-3.5" />
-                      תיאור הבעיה *
-                    </label>
-                    <textarea
-                      value={formData.problem}
-                      onChange={(e) => setFormData({ ...formData, problem: e.target.value })}
-                      rows={3}
-                      className="w-full px-3 py-2.5 rounded-xl resize-none text-sm"
-                      style={{
-                        backgroundColor: 'var(--color-surface, #fff)',
-                        border: '1px solid var(--color-border)',
-                        color: 'var(--color-text)',
-                      }}
-                      placeholder="תאר את הבעיה שחווית..."
-                    />
-                  </div>
-
-                  {error && (
-                    <div className="p-2.5 rounded-lg bg-red-500/20 text-red-400 text-xs">
-                      {error}
-                    </div>
-                  )}
-
-                  {/* Submit */}
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={() => setStep('brand')}
+                    className="flex-1 py-3 rounded-xl transition-all"
+                    style={{
+                      backgroundColor: 'var(--color-background)',
+                      border: '1px solid var(--color-border)',
+                      color: 'var(--color-text)',
+                    }}
+                  >
+                    חזרה
+                  </button>
                   <button
                     onClick={handleSubmit}
                     disabled={loading}
-                    className="w-full py-2.5 rounded-xl text-white font-medium flex items-center justify-center gap-2 transition-all hover:opacity-90 disabled:opacity-50 text-sm"
+                    className="flex-1 py-3 rounded-xl text-white font-medium flex items-center justify-center gap-2 transition-all hover:opacity-90 disabled:opacity-50"
                     style={{ backgroundColor: 'var(--color-primary)' }}
                   >
                     {loading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Loader2 className="w-5 h-5 animate-spin" />
                     ) : (
                       <>
-                        <Send className="w-3.5 h-3.5" />
+                        <Send className="w-4 h-4" />
                         שלח פנייה
                       </>
                     )}
@@ -248,9 +280,38 @@ export default function SupportForm({ username, influencerName, products, onClos
                 </div>
               </motion.div>
             )}
+
+            {step === 'success' && (
+              <motion.div
+                key="success"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="text-center py-6"
+              >
+                <div
+                  className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+                  style={{ backgroundColor: 'var(--color-primary)' }}
+                >
+                  <CheckCircle className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--color-text)' }}>
+                  הפנייה נשלחה בהצלחה!
+                </h3>
+                <p className="mb-6" style={{ color: 'var(--color-text)', opacity: 0.7 }}>
+                  {influencerName} יחזור אליך בהקדם האפשרי
+                </p>
+                <button
+                  onClick={onClose}
+                  className="px-6 py-3 rounded-xl text-white font-medium transition-all hover:opacity-90"
+                  style={{ backgroundColor: 'var(--color-primary)' }}
+                >
+                  סגור
+                </button>
+              </motion.div>
+            )}
           </AnimatePresence>
         </div>
-      ))}
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

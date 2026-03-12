@@ -337,7 +337,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   useEffect(() => {
     const lastMessage = messages[messages.length - 1];
     if (lastMessage?.role === 'assistant' && lastMessage?.uiDirectives?.showSupportModal) {
-      setActiveTab('problem');
+      setShowSupportModal(true);
     }
   }, [messages]);
 
@@ -681,7 +681,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                     <Plus className="w-[16px] h-[16px]" />
                   </button>
                 )}
-                <button onClick={() => setActiveTab('problem')} className="p-2 rounded-lg transition-all hover:bg-black/10" style={{ color: '#676767' }} aria-label="עזרה">
+                <button onClick={() => setShowSupportModal(true)} className="p-2 rounded-lg transition-all hover:bg-black/10" style={{ color: '#676767' }} aria-label="עזרה">
                   <HelpCircle className="w-[18px] h-[18px]" />
                 </button>
               </div>
@@ -1063,7 +1063,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                       setIsTyping(false);
                                     }
                                   } else if (action === 'start_support') {
-                                    setActiveTab('problem');
+                                    setShowSupportModal(true);
                                   }
                                 }}
                                 onBrandAction={(action, brand) => {
@@ -1080,10 +1080,10 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                     });
                                     window.open(brand.link, '_blank');
                                   } else if (action === 'support') {
-                                    trackEvent('support_started', { 
+                                    trackEvent('support_started', {
                                       brandName: brand.brand_name,
                                     });
-                                    setActiveTab('problem');
+                                    setShowSupportModal(true);
                                   }
                                 }}
                                 onFormSubmit={(type, value) => {
@@ -1283,19 +1283,34 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   <div className={`mx-auto ${isMobile ? 'max-w-2xl' : 'max-w-[700px]'}`}>
                     <h2 className="font-semibold mb-1 text-center" style={{ fontSize: '26px', color: '#0c1013', lineHeight: '30px' }}>פניית תמיכה</h2>
                     <p className="mb-6 text-center" style={{ fontSize: '16px', color: '#676767' }}>בחר את המותג שיש לך בעיה איתו</p>
-                    <SupportForm
-                      username={username}
-                      influencerName={influencer.display_name}
-                      products={brands.map(b => ({
-                        id: b.id,
-                        name: b.brand_name,
-                        brand: b.brand_name,
-                        coupon_code: b.coupon_code || null,
-                        image_url: b.image_url || null,
-                      }))}
-                      onClose={() => setActiveTab('chat')}
-                      onSuccess={() => setSupportSuccess(true)}
-                    />
+                    <div className={`${isMobile ? 'flex flex-col gap-3' : 'grid grid-cols-2 gap-4'}`}>
+                      {brands.map((brand) => (
+                        <button
+                          key={brand.id}
+                          onClick={() => {
+                            setShowSupportModal(true);
+                          }}
+                          className="mobile-brand-row"
+                        >
+                          {/* Brand logo */}
+                          <div className="brand-logo">
+                            {brand.image_url ? (
+                              <img src={getProxiedImageUrl(brand.image_url)} alt={brand.brand_name} />
+                            ) : (
+                              <span className="brand-logo-letter">{brand.brand_name.charAt(0).toUpperCase()}</span>
+                            )}
+                          </div>
+                          {/* Brand name */}
+                          <div className="flex-1 min-w-0 text-right">
+                            <p className="font-semibold truncate" style={{ fontSize: '16px', color: '#0c1013' }}>
+                              {brand.brand_name}
+                            </p>
+                          </div>
+                          {/* Arrow icon */}
+                          <ChevronLeft className="w-5 h-5 flex-shrink-0" style={{ color: '#676767' }} />
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -1335,7 +1350,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
         {/* Desktop: Help icon bottom-left (Figma) */}
         {!isMobile && (
           <button
-            onClick={() => setActiveTab('problem')}
+            onClick={() => setShowSupportModal(true)}
             className="fixed bottom-6 left-6 z-50 w-[18px] h-[18px] flex items-center justify-center"
             style={{ color: '#676767' }}
             aria-label="עזרה"
@@ -1344,7 +1359,30 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
           </button>
         )}
 
-        {/* Support tab shortcut — help buttons navigate to problem tab */}
+        {/* Support Modal */}
+        <AnimatePresence>
+          {showSupportModal && (
+            <SupportForm
+              username={username}
+              influencerName={influencer.display_name}
+              products={brands.map(b => ({
+                id: b.id,
+                name: b.brand_name,
+                brand: b.brand_name,
+                coupon_code: b.coupon_code || null,
+                image_url: b.image_url || null,
+              }))}
+              onClose={() => setShowSupportModal(false)}
+              onSuccess={() => {
+                setSupportSuccess(true);
+                setTimeout(() => {
+                  setShowSupportModal(false);
+                  setSupportSuccess(false);
+                }, 2000);
+              }}
+            />
+          )}
+        </AnimatePresence>
       </main>
     </>
   );
