@@ -64,7 +64,7 @@ function fibSphere(n) {
   return pts;
 }
 
-const DOTS = fibSphere(1100);
+const DOTS = fibSphere(800);
 
 // ─── TURBULENT NOISE — chaotic, layered, fast ────────────────────────────────
 function turbulence(nx, ny, nz, t) {
@@ -144,7 +144,7 @@ function render() {
     let [cny, cnz2] = rotX(wny, cnz1, tiltX);
 
     const col  = dotColor(cnx, cny, cnz2, depth);
-    const size = Math.max(0.3, scale * 1.05);
+    const size = Math.max(0.3, scale * 0.75);
 
     return { sx, sy, z: rz2, size, col };
   });

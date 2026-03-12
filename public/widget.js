@@ -211,7 +211,7 @@
     // Panel dimensions per Figma
     var panelStyle = isMobile
       ? 'position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;border-radius:0;'
-      : 'width:432px;height:min(724px, calc(100vh - 120px));border-radius:18px;';
+      : 'width:432px;height:min(600px, calc(100vh - 140px));border-radius:18px;';
 
     container.innerHTML =
       // Main panel
