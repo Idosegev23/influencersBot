@@ -23,6 +23,7 @@ import {
   AlertCircle,
   HelpCircle,
   ChevronLeft,
+  Plus,
 } from 'lucide-react';
 import { getInfluencerByUsername, getBrandsByInfluencer, getContentByInfluencer, type Brand } from '@/lib/supabase';
 import { applyTheme, getGoogleFontsUrl } from '@/lib/theme';
@@ -673,9 +674,16 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   <p className="text-xs" style={{ color: '#676767' }}>{typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other}</p>
                 </div>
               </div>
-              <button onClick={() => setShowSupportModal(true)} className="p-2 rounded-lg transition-all hover:bg-black/10" style={{ color: '#676767' }} aria-label="עזרה">
-                <HelpCircle className="w-[18px] h-[18px]" />
-              </button>
+              <div className="flex items-center gap-1">
+                {messages.length > 0 && (
+                  <button onClick={handleNewChat} className="p-2 rounded-lg transition-all hover:bg-black/10" style={{ color: '#676767' }} aria-label="שיחה חדשה">
+                    <Plus className="w-[18px] h-[18px]" />
+                  </button>
+                )}
+                <button onClick={() => setShowSupportModal(true)} className="p-2 rounded-lg transition-all hover:bg-black/10" style={{ color: '#676767' }} aria-label="עזרה">
+                  <HelpCircle className="w-[18px] h-[18px]" />
+                </button>
+              </div>
             </div>
           ) : (
             /* ---- Desktop Header (Figma pill) ---- */
@@ -700,7 +708,13 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 </div>
               </div>
 
-              {/* Left side: Tab pills */}
+              {/* Left side: Tab pills + new chat */}
+              <div className="flex items-center gap-2">
+                {messages.length > 0 && (
+                  <button onClick={handleNewChat} className="p-2 rounded-full transition-all hover:bg-black/5" style={{ color: '#676767' }} aria-label="שיחה חדשה" title="שיחה חדשה">
+                    <Plus className="w-[18px] h-[18px]" />
+                  </button>
+                )}
               <div className="flex items-center gap-[5px] bg-white rounded-full p-[6px]">
                 {/* Tabs in RTL order: צ'אט first (rightmost), then קופונים, then בעיה בהזמנה (leftmost) */}
                 <button
@@ -727,6 +741,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   <span>בעיה בהזמנה</span>
                   <AlertCircle className="w-[18px] h-[18px]" />
                 </button>
+              </div>
               </div>
             </div>
           )}
