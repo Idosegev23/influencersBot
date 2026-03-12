@@ -165,26 +165,30 @@ export async function POST(req: NextRequest) {
 
     // Update support request with notification statuses
     if (supportRequest) {
-      await supabase
+      const { error: updateErr } = await supabase
         .from('support_requests')
         .update({
           whatsapp_sent: whatsappSent,
           brand_email: brandEmail || null,
         })
-        .eq('id', supportRequest.id)
-        .catch(() => {}); // non-blocking
+        .eq('id', supportRequest.id);
+      if (updateErr) console.error('[Support] Update notification status error:', updateErr);
     }
 
     // Send confirmation to CUSTOMER if they provided phone
     let confirmationSent = false;
     if (sanitizedPhone) {
       console.log('[Support] Sending customer confirmation to:', sanitizedPhone);
-      const result = await sendSupportConfirmation(
-        sanitizedPhone,
-        sanitizedBrand || influencer.display_name // Use brand name if available
-      );
-      console.log('[Support] Customer confirmation result:', result);
-      confirmationSent = result.success;
+      try {
+        const result = await sendSupportConfirmation(
+          sanitizedPhone,
+          sanitizedBrand || influencer.display_name // Use brand name if available
+        );
+        console.log('[Support] Customer confirmation result:', result);
+        confirmationSent = result.success;
+      } catch (err) {
+        console.error('[Support] Customer confirmation error:', err);
+      }
     } else {
       console.log('[Support] No customer phone provided, skipping customer notification');
     }
