@@ -295,17 +295,17 @@ function WidgetPreview({ accountId, config }: { accountId: string; config: Widge
           }}
         >
           <Avatar size={52} />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 23, lineHeight: 'normal' }}>{config.brandName}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 23, lineHeight: 'normal', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{config.brandName}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
               <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
-              <span style={{ fontSize: 16 }}>זמין</span>
+              <span style={{ fontSize: 16, whiteSpace: 'nowrap' }}>זמין</span>
             </div>
           </div>
         </div>
 
-        {/* Messages area */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+        {/* Messages area (padding matches header 16px) */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
           {messages.map((msg, i) => {
             const isUser = msg.role === 'user';
             const isLast = i === messages.length - 1;
@@ -361,8 +361,8 @@ function WidgetPreview({ accountId, config }: { accountId: string; config: Widge
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input area — white pill, rounded-18, 60px, shadow (Figma) */}
-        <div style={{ padding: '8px 14px 14px', flexShrink: 0 }}>
+        {/* Input area — centered, same 16px side padding as header */}
+        <div style={{ padding: '8px 16px 14px', flexShrink: 0 }}>
           <div
             style={{
               display: 'flex', alignItems: 'center', gap: 16, background: '#fff', borderRadius: 18,

@@ -215,12 +215,12 @@
       // Avatar (52px)
       '<div style="width:52px;height:52px;flex-shrink:0;">' +
       avatarHtml(52) + '</div>' +
-      // Title + status
-      '<div style="flex:1;">' +
-      '<div style="font-weight:700;font-size:23px;line-height:normal;">' + escapeHtml(config.brandName) + '</div>' +
+      // Title + status (no wrap)
+      '<div style="flex:1;min-width:0;">' +
+      '<div style="font-weight:700;font-size:23px;line-height:normal;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(config.brandName) + '</div>' +
       '<div style="display:flex;align-items:center;gap:4px;margin-top:2px;">' +
       '<span style="width:10px;height:10px;border-radius:50%;background:#22c55e;flex-shrink:0;"></span>' +
-      '<span style="font-size:16px;">זמין</span>' +
+      '<span style="font-size:16px;white-space:nowrap;">זמין</span>' +
       '</div></div>' +
       // Mobile: close button in header
       (isMobile
@@ -230,13 +230,13 @@
         : '') +
       '</div>' +
 
-      // ---- Messages area ----
-      '<div id="ibot-messages" style="flex:1;overflow-y:auto;padding:16px;direction:rtl;">' +
+      // ---- Messages area (padding matches header 16px) ----
+      '<div id="ibot-messages" style="flex:1;overflow-y:auto;padding:12px 16px;direction:rtl;">' +
       msgsHtml +
       '</div>' +
 
-      // ---- Input area (Figma: white pill, rounded-18px, shadow) ----
-      '<div style="padding:8px 14px 14px;flex-shrink:0;">' +
+      // ---- Input area (centered, same 16px side padding as header) ----
+      '<div style="padding:8px 16px 14px;flex-shrink:0;">' +
       '<div style="display:flex;align-items:center;gap:16px;background:#fff;border-radius:18px;' +
       'padding:8px 8px 8px 10px;height:60px;box-shadow:4px 6px 23px rgba(0,0,0,0.1);overflow:hidden;">' +
       // Send button (left side in RTL)

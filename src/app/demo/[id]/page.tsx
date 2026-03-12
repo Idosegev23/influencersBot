@@ -361,18 +361,18 @@ function DemoWidget({ accountId, config }: { accountId: string; config: WidgetCo
           }}
         >
           <Avatar size={52} />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 23, lineHeight: 'normal' }}>{config.brandName}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 23, lineHeight: 'normal', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{config.brandName}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
               <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
-              <span style={{ fontSize: 16 }}>זמין</span>
+              <span style={{ fontSize: 16, whiteSpace: 'nowrap' }}>זמין</span>
             </div>
           </div>
         </div>
 
-        {/* Messages area */}
+        {/* Messages area (padding matches header 16px) */}
         <div
-          style={{ flex: 1, overflowY: 'auto', padding: 16 }}
+          style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}
           className="[&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300/30 [&::-webkit-scrollbar-thumb]:rounded"
         >
           {messages.map((msg, i) => {
@@ -430,8 +430,8 @@ function DemoWidget({ accountId, config }: { accountId: string; config: WidgetCo
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input area — white pill, rounded-18, 60px, shadow (Figma) */}
-        <div style={{ padding: '8px 14px 14px', flexShrink: 0 }}>
+        {/* Input area — centered, same 16px side padding as header */}
+        <div style={{ padding: '8px 16px 14px', flexShrink: 0 }}>
           <div
             style={{
               display: 'flex', alignItems: 'center', gap: 16, background: '#fff', borderRadius: 18,
