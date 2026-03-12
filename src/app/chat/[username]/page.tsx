@@ -833,7 +833,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4, delay: 0.4 }}
-                        className="flex flex-wrap gap-2.5 justify-center max-w-md mb-8"
+                        className={`flex flex-wrap gap-2.5 justify-center mb-8 ${isMobile ? 'max-w-md' : 'max-w-[600px]'}`}
                       >
                         {suggestedQuestions.slice(0, 3).map((q, i) => (
                           <button
