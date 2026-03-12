@@ -128,27 +128,14 @@
     }
   }
 
-  // ---- Closed state: avatar + label ----
+  // ---- Closed state: blob only ----
   function renderClosed() {
-    var pc = config.primaryColor;
     container.innerHTML =
       '<div id="ibot-trigger" style="' +
-      'display:flex;align-items:center;gap:12px;cursor:pointer;' +
-      'transition:transform 0.3s ease;animation:ibot-slide-up 0.35s ease-out;">' +
-      // Avatar (60px, Figma: rounded with shadow)
-      '<div style="width:60px;height:60px;flex-shrink:0;border-radius:50%;overflow:hidden;' +
-      'box-shadow:0 4px 20px rgba(0,0,0,0.1);">' +
+      'width:60px;height:60px;cursor:pointer;' +
+      'transition:transform 0.3s ease;animation:ibot-slide-up 0.35s ease-out;' +
+      'border-radius:50%;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.1);">' +
       avatarHtml(60) +
-      '</div>' +
-      // Label text
-      '<div style="display:flex;flex-direction:column;">' +
-      '<span style="font-weight:700;font-size:23px;color:' + pc + ';line-height:normal;white-space:nowrap;">' +
-      escapeHtml(config.brandName) + '</span>' +
-      '<div style="display:flex;align-items:center;gap:4px;">' +
-      '<span style="width:10px;height:10px;border-radius:50%;background:#22c55e;flex-shrink:0;"></span>' +
-      '<span style="font-size:16px;color:' + pc + ';line-height:normal;">זמין</span>' +
-      '</div>' +
-      '</div>' +
       '</div>';
 
     var trigger = document.getElementById('ibot-trigger');

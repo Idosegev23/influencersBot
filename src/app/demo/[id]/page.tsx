@@ -329,26 +329,14 @@ function DemoWidget({ accountId, config }: { accountId: string; config: WidgetCo
       <div
         onClick={() => setIsOpen(true)}
         style={{
-          display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
+          width: 60, height: 60, cursor: 'pointer',
           fontFamily: '"Heebo", system-ui, sans-serif', direction: 'rtl',
           animation: 'demo-slide-up 0.35s ease-out',
+          borderRadius: '50%', overflow: 'hidden',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
         }}
       >
-        {/* Avatar 60px with shadow */}
-        <div style={{ width: 60, height: 60, flexShrink: 0, borderRadius: '50%', overflow: 'hidden',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
-          <Avatar size={60} />
-        </div>
-        {/* Brand name + status */}
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <span style={{ fontWeight: 700, fontSize: 23, color: pc, lineHeight: 'normal', whiteSpace: 'nowrap' }}>
-            {config.brandName}
-          </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
-            <span style={{ fontSize: 16, color: pc, lineHeight: 'normal' }}>זמין</span>
-          </div>
-        </div>
+        <Avatar size={60} />
       </div>
     );
   }
