@@ -1179,10 +1179,10 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
 
                 {/* Chat Input — hidden in empty state (shown inline above) */}
                 <div
-                  className={`flex-shrink-0 pt-3 chat-input-gradient ${messages.length === 0 ? 'hidden' : (isMobile ? 'px-[15px] pb-[calc(max(8px,env(safe-area-inset-bottom))+60px)]' : 'px-4 pb-6')}`}
+                  className={`flex-shrink-0 pt-3 chat-input-gradient ${messages.length === 0 ? 'hidden' : (isMobile ? 'px-[15px] pb-[calc(max(8px,env(safe-area-inset-bottom))+60px)]' : 'px-6 pb-6')}`}
                   style={{ background: '#f4f5f7' }}
                 >
-                  <div className={`mx-auto ${isMobile ? 'max-w-2xl' : 'max-w-[700px]'}`}>
+                  <div className={`mx-auto ${isMobile ? 'max-w-2xl' : 'max-w-[670px]'}`}>
                     <div className="chat-input-pill">
                       <textarea
                         ref={inputRef}
