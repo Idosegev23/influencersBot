@@ -1122,13 +1122,13 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             initial={{ opacity: 0, y: 8 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.3, delay: 0.2 }}
-                            className="flex flex-wrap gap-2 justify-start mt-3"
+                            className="flex gap-2 mt-3"
                           >
                             {lastMsg.suggestions.map((s, i) => (
                               <button
                                 key={i}
                                 onClick={() => sendQuickMessage(s)}
-                                className="suggestion-pill text-xs"
+                                className="suggestion-pill text-xs flex-1 justify-center"
                               >
                                 {s}
                               </button>
