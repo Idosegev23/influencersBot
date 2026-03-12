@@ -154,6 +154,11 @@ const REQUIRED_FIELDS: Record<DocumentType, Record<string, number>> = {
 
   other: {
     content: 1.0,
+    title: 0.8,
+    keyPoints: 0.7,
+    knowledge_entries: 0.6,
+    actionItems: 0.4,
+    contacts: 0.3,
   },
 };
 

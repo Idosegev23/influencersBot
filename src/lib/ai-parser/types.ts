@@ -131,21 +131,41 @@ export const SUPPORTED_MIME_TYPES = {
   'application/pdf': '.pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
   'application/msword': '.doc',
-  
+
   // Spreadsheets
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
   'application/vnd.ms-excel': '.xls',
-  
+
   // Presentations
   'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx',
   'application/vnd.ms-powerpoint': '.ppt',
-  
+
   // Images
   'image/jpeg': '.jpg',
   'image/png': '.png',
   'image/webp': '.webp',
   'image/heic': '.heic',
-  
+  'image/heif': '.heif',
+  'image/gif': '.gif',
+
+  // Audio (Gemini multimodal)
+  'audio/mp3': '.mp3',
+  'audio/mpeg': '.mp3',
+  'audio/wav': '.wav',
+  'audio/m4a': '.m4a',
+  'audio/aac': '.aac',
+  'audio/ogg': '.ogg',
+  'audio/flac': '.flac',
+  'audio/webm': '.weba',
+
+  // Video (Gemini multimodal)
+  'video/mp4': '.mp4',
+  'video/quicktime': '.mov',
+  'video/mov': '.mov',
+  'video/mpeg': '.mpeg',
+  'video/webm': '.webm',
+  'video/avi': '.avi',
+
   // Other
   'text/plain': '.txt',
 } as const;

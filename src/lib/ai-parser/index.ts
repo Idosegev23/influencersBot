@@ -2,7 +2,11 @@
 // Multi-Layer Document Analysis Pipeline
 
 import { parseWithOpenAI } from './openai';
-import { parseWithGemini, parseWithGeminiText } from './gemini';
+import {
+  parseWithGemini, parseWithGeminiText,
+  parseAudioWithGemini, parseVideoWithGemini, parseUrlWithGemini,
+  VISION_SUPPORTED_MIMES, AUDIO_MIMES, VIDEO_MIMES,
+} from './gemini';
 import { extractTextFromFile } from './text-extractor';
 import { CONFIDENCE_THRESHOLD } from './types';
 import type { ParseOptions, ParseResult } from './types';
@@ -39,9 +43,38 @@ export async function parseDocument(options: ParseOptions): Promise<MultiLayerRe
   const { file, documentType, language = 'auto' } = options;
   const mimeType = file.type || 'application/pdf';
   const isImage = mimeType.startsWith('image/');
+  const isAudio = AUDIO_MIMES.includes(mimeType);
+  const isVideo = VIDEO_MIMES.includes(mimeType);
+  const canUseVision = VISION_SUPPORTED_MIMES.includes(mimeType);
 
   console.log(`[AI Parser] Starting multi-layer analysis: ${file.name}`);
-  console.log(`[AI Parser] Type: ${documentType}, MIME: ${mimeType}, Language: ${language}`);
+  console.log(`[AI Parser] Type: ${documentType}, MIME: ${mimeType}, Language: ${language}, Vision: ${canUseVision}, Audio: ${isAudio}, Video: ${isVideo}`);
+
+  // ========================================
+  // Special path: Audio files → Gemini Audio
+  // ========================================
+  if (isAudio) {
+    console.log(`[AI Parser] Audio file detected — using Gemini Audio processing`);
+    const audioResult = await parseAudioWithGemini(options);
+    return {
+      ...audioResult,
+      extractedText: audioResult.transcription || undefined,
+      layers: { textExtraction: false, visionAnalysis: false, textAnalysis: true },
+    };
+  }
+
+  // ========================================
+  // Special path: Video files → Gemini Video
+  // ========================================
+  if (isVideo) {
+    console.log(`[AI Parser] Video file detected — using Gemini Video processing`);
+    const videoResult = await parseVideoWithGemini(options);
+    return {
+      ...videoResult,
+      extractedText: videoResult.transcription || undefined,
+      layers: { textExtraction: false, visionAnalysis: true, textAnalysis: true },
+    };
+  }
 
   const layers = {
     textExtraction: false,
@@ -65,7 +98,7 @@ export async function parseDocument(options: ParseOptions): Promise<MultiLayerRe
         layers.textExtraction = true;
         console.log(`[AI Parser] Layer 1 OK: ${extraction.charCount} chars, ${extraction.pageCount || '?'} pages (${extraction.method})`);
       } else {
-        console.log(`[AI Parser] Layer 1: Minimal text extracted (${extraction.charCount} chars), will rely on vision`);
+        console.log(`[AI Parser] Layer 1: Minimal text extracted (${extraction.charCount} chars)${canUseVision ? ', will rely on vision' : ', will try text AI'}`);
       }
     } catch (err: any) {
       console.error(`[AI Parser] Layer 1 error:`, err.message);
@@ -78,8 +111,8 @@ export async function parseDocument(options: ParseOptions): Promise<MultiLayerRe
   // Layer 2: Vision Analysis (AI — for images and visual docs)
   // ========================================
   let visionResult: ParseResult | null = null;
-  if (isImage || !layers.textExtraction) {
-    // Use vision for images OR when text extraction failed
+  if (canUseVision && (isImage || !layers.textExtraction)) {
+    // Use vision for images OR when text extraction failed (only if MIME is supported)
     try {
       console.log(`[AI Parser] Layer 2: Vision analysis (Gemini)...`);
       visionResult = await parseWithGemini(options);
@@ -93,6 +126,8 @@ export async function parseDocument(options: ParseOptions): Promise<MultiLayerRe
     } catch (err: any) {
       console.error(`[AI Parser] Layer 2 error:`, err.message);
     }
+  } else if (!canUseVision && !isImage) {
+    console.log(`[AI Parser] Layer 2: Skipped (${mimeType} not supported by Gemini Vision)`);
   }
 
   // ========================================
@@ -373,4 +408,8 @@ function deduplicateArray(arr: any[], key: string): any[] {
 // Re-export types and utils
 export * from './types';
 export * from './utils';
-export { parseWithOpenAI, parseWithGemini, parseWithGeminiText };
+export {
+  parseWithOpenAI, parseWithGemini, parseWithGeminiText,
+  parseAudioWithGemini, parseVideoWithGemini, parseUrlWithGemini,
+  VISION_SUPPORTED_MIMES, AUDIO_MIMES, VIDEO_MIMES,
+};

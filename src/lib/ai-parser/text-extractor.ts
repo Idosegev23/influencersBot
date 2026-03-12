@@ -2,7 +2,7 @@
  * Text Extractor — Layer 1 of Multi-Layer Document Analysis
  *
  * Extracts raw text from documents using native parsers (no AI).
- * Supports: PDF (pdf-parse), plain text, and fallback for other types.
+ * Supports: PDF (pdf-parse), XLSX/XLS (xlsx), DOCX, PPTX, plain text.
  */
 
 /**
@@ -29,7 +29,6 @@ export async function extractTextFromFile(
       method = 'pdf-parse';
 
       // Quality check: Hebrew PDFs with custom font encodings produce garbled text
-      // Detect this by checking if text contains actual Hebrew/English characters
       if (text.length > 0 && isGarbledText(text)) {
         console.log(`[TextExtractor] PDF text is garbled (custom font encoding), discarding`);
         text = '';
@@ -37,16 +36,36 @@ export async function extractTextFromFile(
       } else {
         console.log(`[TextExtractor] PDF extracted: ${pageCount} pages, ${text.length} chars`);
       }
-    } else if (mimeType === 'text/plain') {
-      text = buffer.toString('utf-8');
-      method = 'text-plain';
+    } else if (
+      mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      mimeType === 'application/vnd.ms-excel'
+    ) {
+      // XLSX/XLS — extract all sheets as structured text
+      text = extractTextFromXlsx(buffer);
+      method = text ? 'xlsx' : 'xlsx-empty';
+      if (text) {
+        console.log(`[TextExtractor] XLSX extracted: ${text.length} chars`);
+      }
     } else if (
       mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
       mimeType === 'application/msword'
     ) {
-      // DOCX/DOC — try basic XML extraction
+      // DOCX/DOC — XML extraction
       text = extractTextFromDocx(buffer);
-      method = 'docx-xml';
+      method = text ? 'docx-xml' : 'docx-empty';
+    } else if (
+      mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+      mimeType === 'application/vnd.ms-powerpoint'
+    ) {
+      // PPTX — extract slide text from XML
+      text = extractTextFromPptx(buffer);
+      method = text ? 'pptx-xml' : 'pptx-empty';
+      if (text) {
+        console.log(`[TextExtractor] PPTX extracted: ${text.length} chars`);
+      }
+    } else if (mimeType === 'text/plain') {
+      text = buffer.toString('utf-8');
+      method = 'text-plain';
     } else if (mimeType.startsWith('image/')) {
       // Images don't have extractable text — will rely on vision layer
       text = '';
@@ -56,7 +75,6 @@ export async function extractTextFromFile(
       // Unsupported format — try as UTF-8 text
       try {
         const rawText = buffer.toString('utf-8');
-        // Check if it looks like valid text (not binary garbage)
         const printableRatio = rawText.replace(/[^\x20-\x7E\u0590-\u05FF\u0600-\u06FF\u0400-\u04FF\s]/g, '').length / rawText.length;
         if (printableRatio > 0.7) {
           text = rawText;
@@ -93,21 +111,85 @@ export async function extractTextFromFile(
 }
 
 /**
+ * Extract text from XLSX/XLS using the xlsx library.
+ * Converts each sheet into a readable text table.
+ */
+function extractTextFromXlsx(buffer: Buffer): string {
+  try {
+    // Dynamic import to avoid bundling issues
+    const XLSX = require('xlsx');
+    const workbook = XLSX.read(buffer, { type: 'buffer' });
+
+    const parts: string[] = [];
+
+    for (const sheetName of workbook.SheetNames) {
+      const sheet = workbook.Sheets[sheetName];
+      if (!sheet) continue;
+
+      // Convert to array of arrays
+      const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+      if (!rows || rows.length === 0) continue;
+
+      parts.push(`=== גיליון: ${sheetName} ===`);
+
+      for (const row of rows) {
+        const cells = row.map((cell: any) => {
+          if (cell === null || cell === undefined || cell === '') return '';
+          return String(cell).trim();
+        });
+        // Skip completely empty rows
+        if (cells.every((c: string) => c === '')) continue;
+        parts.push(cells.join(' | '));
+      }
+
+      parts.push(''); // blank line between sheets
+    }
+
+    return parts.join('\n');
+  } catch (err: any) {
+    console.error(`[TextExtractor] XLSX extraction error:`, err.message);
+    return '';
+  }
+}
+
+/**
  * Basic DOCX text extraction via XML parsing
  * DOCX files are ZIP archives with XML content
  */
 function extractTextFromDocx(buffer: Buffer): string {
   try {
-    // DOCX is a ZIP file; try to find the document.xml content
-    // Look for the PK signature (ZIP magic bytes)
     if (buffer[0] !== 0x50 || buffer[1] !== 0x4B) {
       return '';
     }
 
-    // Simple approach: extract readable text between XML tags
     const content = buffer.toString('utf-8');
     // Match text between <w:t> tags (Word XML format)
     const matches = content.match(/<w:t[^>]*>([^<]+)<\/w:t>/g);
+    if (matches) {
+      return matches
+        .map((m) => m.replace(/<[^>]+>/g, ''))
+        .join(' ');
+    }
+
+    return '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Basic PPTX text extraction via XML parsing
+ * PPTX files are ZIP archives containing slide XML
+ */
+function extractTextFromPptx(buffer: Buffer): string {
+  try {
+    if (buffer[0] !== 0x50 || buffer[1] !== 0x4B) {
+      return '';
+    }
+
+    const content = buffer.toString('utf-8');
+    // Match text in <a:t> tags (PowerPoint XML format)
+    const matches = content.match(/<a:t>([^<]+)<\/a:t>/g);
     if (matches) {
       return matches
         .map((m) => m.replace(/<[^>]+>/g, ''))
