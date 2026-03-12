@@ -676,8 +676,9 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
               </div>
               <div className="flex items-center gap-1">
                 {messages.length > 0 && (
-                  <button onClick={handleNewChat} className="p-2 rounded-lg transition-all hover:bg-black/10" style={{ color: '#676767' }} aria-label="שיחה חדשה">
-                    <Plus className="w-[18px] h-[18px]" />
+                  <button onClick={handleNewChat} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-all hover:bg-black/10" style={{ color: '#676767' }} aria-label="שיחה חדשה">
+                    <span className="text-xs font-medium">שיחה חדשה</span>
+                    <Plus className="w-[16px] h-[16px]" />
                   </button>
                 )}
                 <button onClick={() => setShowSupportModal(true)} className="p-2 rounded-lg transition-all hover:bg-black/10" style={{ color: '#676767' }} aria-label="עזרה">
@@ -711,8 +712,9 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
               {/* Left side: Tab pills + new chat */}
               <div className="flex items-center gap-2">
                 {messages.length > 0 && (
-                  <button onClick={handleNewChat} className="p-2 rounded-full transition-all hover:bg-black/5" style={{ color: '#676767' }} aria-label="שיחה חדשה" title="שיחה חדשה">
-                    <Plus className="w-[18px] h-[18px]" />
+                  <button onClick={handleNewChat} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all hover:bg-black/5" style={{ color: '#676767' }} aria-label="שיחה חדשה" title="שיחה חדשה">
+                    <span className="text-sm font-medium">שיחה חדשה</span>
+                    <Plus className="w-[16px] h-[16px]" />
                   </button>
                 )}
               <div className="flex items-center gap-[5px] bg-white rounded-full p-[6px]">
