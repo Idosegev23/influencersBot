@@ -80,8 +80,13 @@ const nextConfig: NextConfig = {
         headers: headersWithoutFrame,
       },
       {
+        // Static blob animation: allow self-embedding
+        source: '/blob-animation.html',
+        headers: headersWithoutFrame,
+      },
+      {
         // All other routes: full security headers including X-Frame-Options
-        source: '/((?!api/widget|api/admin/proxy).*)',
+        source: '/((?!api/widget|api/admin/proxy|blob-animation).*)',
         headers: securityHeaders,
       },
     ];
