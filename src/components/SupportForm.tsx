@@ -3,12 +3,18 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send, Loader2, CheckCircle, Phone, User, Package, MessageSquare, Tag } from 'lucide-react';
-import type { Product } from '@/types';
+interface SupportFormProduct {
+  id: string;
+  name: string;
+  brand: string;
+  coupon_code: string | null;
+  image_url?: string | null;
+}
 
 interface SupportFormProps {
   username: string;
   influencerName: string;
-  products: Product[];
+  products: SupportFormProduct[];
   onClose: () => void;
   onSuccess?: () => void;
   initialBrand?: string;

@@ -107,13 +107,13 @@ const typeLabels: Record<InfluencerType, string> = {
  * Returns clean text (without the tag) and parsed suggestions array.
  */
 function parseSuggestions(text: string): { cleanText: string; suggestions: string[] } {
-  const match = text.match(/<<SUGGESTIONS>>(.*?)<\/SUGGESTIONS>>/s);
+  const match = text.match(/<<SUGGESTIONS>>([\s\S]*?)<\/SUGGESTIONS>>/);
   if (!match) {
     // Also strip partial tag at end (during streaming)
-    const partialClean = text.replace(/<<SUGGESTIONS>>.*$/s, '').trim();
+    const partialClean = text.replace(/<<SUGGESTIONS>>[\s\S]*$/, '').trim();
     return { cleanText: partialClean, suggestions: [] };
   }
-  const cleanText = text.replace(/<<SUGGESTIONS>>.*?<\/SUGGESTIONS>>/s, '').trim();
+  const cleanText = text.replace(/<<SUGGESTIONS>>[\s\S]*?<\/SUGGESTIONS>>/, '').trim();
   const suggestions = match[1]
     .split('|')
     .map(s => s.trim())
@@ -855,7 +855,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         // For streaming messages, use the live text (strip suggestions tag)
                         const isStreamingThis = streamingMessageId === msg.id && isStreamActive;
                         const rawContent = isStreamingThis ? streamText : msg.content;
-                        const displayContent = rawContent.replace(/<<SUGGESTIONS>>.*$/s, '').trim();
+                        const displayContent = rawContent.replace(/<<SUGGESTIONS>>[\s\S]*$/, '').trim();
                         // For streaming, use meta directives until done
                         const displayDirectives = isStreamingThis && streamMeta?.uiDirectives 
                           ? streamMeta.uiDirectives as UIDirectives 
