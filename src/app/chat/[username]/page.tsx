@@ -754,7 +754,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 {/* Chat Messages */}
                 <div className={`flex-1 overflow-y-auto px-4 chat-bg chat-messages-scroll ${messages.length === 0 ? (isMobile ? 'pb-[80px]' : 'pb-8') : (isMobile ? 'pb-2 pt-3' : 'py-6 pb-8')} space-y-4`}>
                   {messages.length === 0 ? (
-                    <div className={`flex flex-col items-center text-center px-4 ${isMobile ? 'pt-[60px]' : 'pt-[100px]'}`}>
+                    <div className={`flex flex-col items-center text-center px-4 ${isMobile ? 'pt-[60px]' : 'justify-center min-h-full'}`}>
                       {/* Bot illustration (same on mobile + desktop per Figma) */}
                       <motion.div
                         initial={{ opacity: 0, scale: 0.9 }}
