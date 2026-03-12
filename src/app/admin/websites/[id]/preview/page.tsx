@@ -250,14 +250,10 @@ function WidgetPreview({ accountId, config }: { accountId: string; config: Widge
     }
   };
 
-  // Avatar helper — profile pic or blob animation fallback
+  // Avatar helper — always show blob animation
   const Avatar = ({ size }: { size: number }) => (
     <div style={{ width: size, height: size, flexShrink: 0, borderRadius: '50%', overflow: 'hidden' }}>
-      {config.profilePic ? (
-        <img src={config.profilePic} alt={config.brandName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-      ) : (
-        <iframe src="/blob-animation.html" style={{ width: '100%', height: '100%', border: 'none', pointerEvents: 'none' }} title="Bot" />
-      )}
+      <iframe src="/blob-animation.html" style={{ width: '100%', height: '100%', border: 'none', pointerEvents: 'none' }} title="Bot" />
     </div>
   );
 

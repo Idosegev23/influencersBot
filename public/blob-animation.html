@@ -144,7 +144,7 @@ function render() {
     let [cny, cnz2] = rotX(wny, cnz1, tiltX);
 
     const col  = dotColor(cnx, cny, cnz2, depth);
-    const size = Math.max(0.4, scale * 1.45);
+    const size = Math.max(0.3, scale * 1.05);
 
     return { sx, sy, z: rz2, size, col };
   });
