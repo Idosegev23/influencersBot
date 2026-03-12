@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, use } from 'react';
+import { useState, useRef, useEffect, useMemo, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -172,6 +172,18 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastTapRef = useRef<number>(0);
   const streamingMessageIdRef = useRef<string | null>(null);
+
+  // Unique brands for problem tab (deduplicate by brand_name, keep first with logo)
+  const uniqueBrands = useMemo(() => {
+    const seen = new Map<string, Brand>();
+    for (const b of brands) {
+      const existing = seen.get(b.brand_name);
+      if (!existing || (!existing.image_url && b.image_url)) {
+        seen.set(b.brand_name, b);
+      }
+    }
+    return Array.from(seen.values());
+  }, [brands]);
 
   // Detect mobile viewport
   useEffect(() => {
@@ -1350,7 +1362,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           <h2 className="font-semibold mb-1 text-center" style={{ fontSize: '26px', color: '#0c1013', lineHeight: '30px' }}>פניית תמיכה</h2>
                           <p className="mb-6 text-center" style={{ fontSize: '16px', color: '#676767' }}>בחר את המותג שיש לך בעיה איתו</p>
                           <div className={`${isMobile ? 'flex flex-col gap-3' : 'grid grid-cols-2 gap-4'}`}>
-                            {brands.map((brand) => (
+                            {uniqueBrands.map((brand) => (
                               <button
                                 key={brand.id}
                                 onClick={() => {
