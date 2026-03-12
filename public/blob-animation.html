@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+
+let W, H, CX, CY;
+function resize() {
+  W = canvas.width  = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  CX = W / 2; CY = H / 2;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ─── COLOR ────────────────────────────────────────────────────────────────────
+function dotColor(nx, ny, nz, depth) {
+  const coolWarm = nx * 0.55 + nz * 0.3 + 0.5;
+  const cool = { r: 140, g: 148, b: 225 };
+  const warm = { r: 238, g: 165, b: 155 };
+  const mid  = { r: 192, g: 182, b: 222 };
+
+  let t = Math.max(0, Math.min(1, coolWarm));
+  let r, g, b;
+  if (t < 0.5) {
+    const s = t * 2;
+    r = cool.r + (mid.r - cool.r) * s;
+    g = cool.g + (mid.g - cool.g) * s;
+    b = cool.b + (mid.b - cool.b) * s;
+  } else {
+    const s = (t - 0.5) * 2;
+    r = mid.r + (warm.r - mid.r) * s;
+    g = mid.g + (warm.g - mid.g) * s;
+    b = mid.b + (warm.b - mid.b) * s;
+  }
+
+  const fade = 0.15 + depth * 0.85;
+  return { r: r|0, g: g|0, b: b|0, a: fade };
+}
+
+// ─── FIBONACCI SPHERE ─────────────────────────────────────────────────────────
+function fibSphere(n) {
+  const pts = [], gr = (1 + Math.sqrt(5)) / 2;
+  for (let i = 0; i < n; i++) {
+    const phi   = Math.acos(1 - 2*(i+0.5)/n);
+    const theta = 2 * Math.PI * i / gr;
+    pts.push({
+      bx: Math.sin(phi)*Math.cos(theta),
+      by: Math.cos(phi),
+      bz: Math.sin(phi)*Math.sin(theta),
+    });
+  }
+  return pts;
+}
+
+const DOTS = fibSphere(1100);
+
+// ─── TURBULENT NOISE — chaotic, layered, fast ────────────────────────────────
+function turbulence(nx, ny, nz, t) {
+  // Layer 1 — large slow undulation
+  const L1 =
+    Math.sin(nx * 1.9 + t * 0.85) * Math.cos(ny * 1.7 + t * 0.68) * 0.38 +
+    Math.sin(ny * 1.7 + t * 0.75) * Math.cos(nz * 2.0 + t * 0.62) * 0.32 +
+    Math.sin(nz * 2.1 + t * 0.70) * Math.cos(nx * 1.8 + t * 0.78) * 0.28;
+
+  // Layer 2 — medium ripples
+  const L2 =
+    Math.sin(nx * 3.8 + t * 1.45 + ny * 2.1) * 0.16 +
+    Math.sin(ny * 4.1 + t * 1.30 + nz * 1.9) * 0.14 +
+    Math.sin(nz * 3.6 + t * 1.55 + nx * 2.2) * 0.12;
+
+  // Layer 3 — fast tiny turbulence (the "noise" / roughness)
+  const L3 =
+    Math.sin(nx * 6.5 + t * 2.20 + ny * 3.0) * 0.08 +
+    Math.sin(ny * 7.0 + t * 2.40 + nz * 2.8) * 0.07 +
+    Math.sin(nz * 6.2 + t * 2.10 + nx * 3.1) * 0.06;
+
+  // Layer 4 — diagonal traveling waves
+  const L4 =
+    Math.sin((nx + ny) * 2.8 + t * 1.65) * 0.09 +
+    Math.sin((ny - nz) * 3.1 + t * 1.80) * 0.08 +
+    Math.sin((nx + nz) * 2.5 + t * 1.50) * 0.07 +
+    Math.sin((nx - ny + nz) * 3.8 + t * 2.00) * 0.05;
+
+  return L1 + L2 + L3 + L4;
+}
+
+// ─── ROTATION ────────────────────────────────────────────────────────────────
+function rotY(x, z, a) {
+  const c = Math.cos(a), s = Math.sin(a);
+  return [x*c + z*s, -x*s + z*c];
+}
+function rotX(y, z, a) {
+  const c = Math.cos(a), s = Math.sin(a);
+  return [y*c - z*s, y*s + z*c];
+}
+
+let time = 0;
+
+function render() {
+  requestAnimationFrame(render);
+  time += 0.007; // faster tick
+
+  const R   = Math.min(W, H) * 0.28;
+  const fov = R * 2.85;
+
+  const tiltY = time * 0.32 + Math.sin(time * 0.15) * 0.22;
+  const tiltX = Math.sin(time * 0.21) * 0.35 + Math.cos(time * 0.11) * 0.15;
+
+  ctx.clearRect(0, 0, W, H);
+
+  const projected = DOTS.map(({ bx, by, bz }) => {
+    const d = turbulence(bx, by, bz, time);
+
+    // Heavy surface warp — normals shift a lot
+    const warp = 0.10;
+    const wnx  = bx + Math.sin(bz * 3.2 + time * 0.9) * warp;
+    const wny  = by + Math.sin(bx * 3.5 + time * 0.8) * warp;
+    const wnz  = bz + Math.sin(by * 3.0 + time * 1.0) * warp;
+
+    const r = R * (1 + d * 0.52); // deep deformation
+
+    let x = r*bx, y = r*by, z = r*bz;
+    let [rx,  rz1] = rotY(x, z,   tiltY);
+    let [ry,  rz2] = rotX(y, rz1, tiltX);
+
+    const scale = fov / (fov + rz2);
+    const sx    = CX + rx * scale;
+    const sy    = CY + ry * scale;
+    const depth = Math.max(0, Math.min(1, (scale - 0.4) / 1.25));
+
+    let [cnx, cnz1] = rotY(wnx, wnz,  tiltY);
+    let [cny, cnz2] = rotX(wny, cnz1, tiltX);
+
+    const col  = dotColor(cnx, cny, cnz2, depth);
+    const size = Math.max(0.4, scale * 1.45);
+
+    return { sx, sy, z: rz2, size, col };
+  });
+
+  projected.sort((a, b) => a.z - b.z);
+
+  for (const { sx, sy, size, col } of projected) {
+    ctx.beginPath();
+    ctx.arc(sx, sy, size, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${col.r},${col.g},${col.b},${col.a.toFixed(3)})`;
+    ctx.fill();
+  }
+}
+
+render();
+
+</script>
+</body>
+</html>

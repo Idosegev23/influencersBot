@@ -119,7 +119,7 @@ export default function WebsitePreviewPage() {
               width: 60, height: 60, borderRadius: '50%', overflow: 'hidden',
               boxShadow: '0 4px 20px rgba(0,0,0,0.1)', cursor: 'pointer',
             }}>
-              <img src="/vidNB_small.gif" alt="Bot" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <iframe src="/blob-animation.html" style={{ width: '100%', height: '100%', border: 'none', pointerEvents: 'none' }} title="Bot" />
             </div>
           )}
         </div>
@@ -250,13 +250,13 @@ function WidgetPreview({ accountId, config }: { accountId: string; config: Widge
     }
   };
 
-  // Avatar helper — profile pic or GIF fallback (matches widget.js)
+  // Avatar helper — profile pic or blob animation fallback
   const Avatar = ({ size }: { size: number }) => (
     <div style={{ width: size, height: size, flexShrink: 0, borderRadius: '50%', overflow: 'hidden' }}>
       {config.profilePic ? (
         <img src={config.profilePic} alt={config.brandName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       ) : (
-        <img src="/vidNB_small.gif" alt="Bot" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        <iframe src="/blob-animation.html" style={{ width: '100%', height: '100%', border: 'none', pointerEvents: 'none' }} title="Bot" />
       )}
     </div>
   );

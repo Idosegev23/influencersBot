@@ -770,16 +770,12 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         className="mb-6"
                       >
                         <div className="relative w-[143px] h-[147px] mx-auto">
-                          <video
-                            autoPlay
-                            loop
-                            muted
-                            playsInline
-                            className="w-full h-full object-contain"
-                          >
-                            <source src="/bot-avatar.webm" type="video/webm" />
-                            <source src="/bot-avatar.mp4" type="video/mp4" />
-                          </video>
+                          <iframe
+                            src="/blob-animation.html"
+                            className="w-full h-full border-0"
+                            style={{ background: 'transparent', pointerEvents: 'none' }}
+                            title="Bot animation"
+                          />
                         </div>
                       </motion.div>
 

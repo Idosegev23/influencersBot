@@ -112,8 +112,8 @@
       return '<img src="' + escapeHtml(config.profilePic) + '" alt="' + escapeHtml(config.brandName) + '" ' +
         'style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />';
     }
-    return '<img src="' + BASE_URL + '/vidNB_small.gif" alt="Bot" ' +
-      'style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />';
+    return '<iframe src="' + BASE_URL + '/blob-animation.html" ' +
+      'style="width:100%;height:100%;border:none;border-radius:50%;pointer-events:none;" title="Bot"></iframe>';
   }
 
   // ============================================
