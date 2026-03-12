@@ -1162,6 +1162,16 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           </div>
                         </motion.div>
                       )}
+                      {messages.length > 0 && !isTyping && !isStreamActive && (
+                        <button
+                          onClick={() => setShowNewChatConfirm(true)}
+                          className="flex items-center gap-1.5 mx-auto mt-4 transition-all hover:opacity-70"
+                          style={{ color: '#9ca3af', fontSize: '13px' }}
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>שיחה חדשה</span>
+                        </button>
+                      )}
                       <div ref={messagesEndRef} />
                     </div>
                   )}
@@ -1201,16 +1211,6 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         <Send className="w-4 h-4" />
                       </button>
                     </div>
-                    {messages.length > 0 && (
-                      <button
-                        onClick={() => setShowNewChatConfirm(true)}
-                        className="flex items-center gap-1.5 mx-auto mt-2 transition-all hover:opacity-70"
-                        style={{ color: '#9ca3af', fontSize: '13px' }}
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        <span>שיחה חדשה</span>
-                      </button>
-                    )}
                   </div>
                 </div>
               </motion.div>
