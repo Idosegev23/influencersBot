@@ -689,9 +689,9 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
             </div>
           ) : (
             /* ---- Desktop Header (Figma pill) ---- */
-            <div className="max-w-[700px] mx-auto bg-white rounded-full h-[69px] flex items-center justify-between px-3">
+            <div className="max-w-[700px] mx-auto bg-white rounded-full h-[69px] flex items-center justify-between px-3 flex-nowrap overflow-hidden">
               {/* Right side: Avatar + Name */}
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2.5 min-w-0 flex-shrink">
                 <div onClick={handleAvatarTap} className="cursor-pointer select-none relative">
                   {influencer.avatar_url ? (
                     <div className="relative w-[46px] h-[46px] rounded-full overflow-hidden">
@@ -704,14 +704,14 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   )}
                   <div className="status-dot absolute -bottom-0.5 -left-0.5" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h1 className="font-semibold text-[19px] whitespace-nowrap overflow-hidden text-ellipsis" style={{ color: '#0c1013' }}>{influencer.display_name}</h1>
-                  <p className="text-[13px]" style={{ color: '#676767' }}>{typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other}</p>
+                  <p className="text-[13px] whitespace-nowrap" style={{ color: '#676767' }}>{typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other}</p>
                 </div>
               </div>
 
               {/* Left side: Tab pills + new chat */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-shrink-0">
                 {messages.length > 0 && (
                   <button onClick={handleNewChat} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all hover:bg-black/5" style={{ color: '#676767' }} aria-label="שיחה חדשה" title="שיחה חדשה">
                     <span className="text-sm font-medium">שיחה חדשה</span>
