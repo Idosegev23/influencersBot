@@ -1122,7 +1122,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             initial={{ opacity: 0, y: 8 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.3, delay: 0.2 }}
-                            className="flex flex-wrap gap-2 justify-end mt-3"
+                            className="flex flex-wrap gap-2 justify-start mt-3"
                           >
                             {lastMsg.suggestions.map((s, i) => (
                               <button
@@ -1378,18 +1378,17 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.92, opacity: 0 }}
                 transition={{ duration: 0.2 }}
-                className="w-full max-w-[340px] rounded-2xl overflow-hidden shadow-2xl bg-white p-6 text-center"
+                className="w-full max-w-[340px] rounded-[30px] bg-white p-7 text-center"
+                style={{ boxShadow: '0px 6px 20px rgba(0,0,0,0.1)' }}
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: '#f4f5f7' }}>
-                  <RotateCcw className="w-5 h-5" style={{ color: '#676767' }} />
-                </div>
-                <h3 className="font-semibold text-lg mb-1" style={{ color: '#0c1013' }}>שיחה חדשה?</h3>
-                <p className="text-sm mb-5" style={{ color: '#676767' }}>השיחה הנוכחית תימחק ותתחיל שיחה חדשה</p>
+                <RotateCcw className="w-5 h-5 mx-auto mb-4" style={{ color: '#676767' }} />
+                <h3 className="font-semibold text-[19px] mb-1" style={{ color: '#0c1013' }}>שיחה חדשה?</h3>
+                <p className="text-[14px] mb-6" style={{ color: '#676767' }}>השיחה הנוכחית תימחק ותתחיל שיחה חדשה</p>
                 <div className="flex gap-3">
                   <button
                     onClick={() => setShowNewChatConfirm(false)}
-                    className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all hover:bg-gray-100"
+                    className="flex-1 h-[43px] rounded-[60px] text-[16px] font-medium transition-all hover:bg-[#f4f5f7]"
                     style={{ color: '#676767', border: '1px solid #e5e7eb' }}
                   >
                     ביטול
@@ -1399,8 +1398,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                       setShowNewChatConfirm(false);
                       handleNewChat();
                     }}
-                    className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white transition-all hover:opacity-90"
-                    style={{ backgroundColor: 'var(--color-primary)' }}
+                    className="flex-1 h-[43px] rounded-[60px] text-[16px] font-medium text-white transition-all hover:opacity-90"
+                    style={{ backgroundColor: '#0c1013' }}
                   >
                     כן, התחל חדש
                   </button>
