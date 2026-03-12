@@ -105,7 +105,7 @@ export default function SupportForm({ username, influencerName, products, onClos
         </div>
 
         {/* Content */}
-        <div className="p-5">
+        <div className="p-5 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 10rem)' }}>
           <AnimatePresence mode="wait">
             {step === 'brand' && (
               <motion.div
