@@ -8,7 +8,6 @@ import {
   FileText,
   CheckCircle2,
   Loader2,
-  ChevronDown,
   Database,
   ArrowRight,
 } from 'lucide-react';
@@ -30,25 +29,6 @@ interface Document {
   rag_chunks_count?: number | null;
 }
 
-type DocumentType = 'partnership_agreement' | 'invoice' | 'brief' | 'proposal' | 'general';
-
-const DOC_TYPE_LABELS: Record<string, string> = {
-  quote: 'הצעת מחיר',
-  contract: 'חוזה',
-  brief: 'בריף',
-  invoice: 'חשבונית',
-  receipt: 'קבלה',
-  other: 'אחר',
-};
-
-const DOC_TYPE_OPTIONS: { value: DocumentType; label: string; apiType: string }[] = [
-  { value: 'general', label: 'מסמך כללי', apiType: 'other' },
-  { value: 'partnership_agreement', label: 'חוזה שת"פ', apiType: 'contract' },
-  { value: 'proposal', label: 'הצעת מחיר', apiType: 'quote' },
-  { value: 'invoice', label: 'חשבונית', apiType: 'invoice' },
-  { value: 'brief', label: 'בריף', apiType: 'brief' },
-];
-
 export default function DocumentsPage() {
   const params = useParams();
   const router = useRouter();
@@ -57,11 +37,9 @@ export default function DocumentsPage() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [typeFilter, setTypeFilter] = useState<string>('all');
 
   // Upload state
   const [accountId, setAccountId] = useState<string | null>(null);
-  const [documentType, setDocumentType] = useState<DocumentType>('general');
   const [isParsing, setIsParsing] = useState(false);
   const [parseSuccess, setParseSuccess] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -86,7 +64,6 @@ export default function DocumentsPage() {
       const result = await response.json();
       setDocuments(result.documents || []);
 
-      // Extract accountId from the auth response
       if (!accountId) {
         const { getInfluencerByUsername } = await import('@/lib/supabase');
         const inf = await getInfluencerByUsername(username);
@@ -121,10 +98,7 @@ export default function DocumentsPage() {
       }
 
       setParseSuccess(true);
-      // Reload document list
       await loadData();
-
-      // Clear success after 5 seconds
       setTimeout(() => setParseSuccess(false), 5000);
     } catch (err: any) {
       setUploadError(err.message || 'שגיאה בניתוח המסמך');
@@ -137,17 +111,10 @@ export default function DocumentsPage() {
     setUploadError(error);
   }, []);
 
-  const filteredDocuments = documents.filter(
-    (doc) => typeFilter === 'all' || doc.document_type === typeFilter
-  );
-
   const stats = {
     total: documents.length,
-    parsed: documents.filter((d) => d.parsing_status === 'completed').length,
     indexed: documents.filter((d) => d.rag_status === 'indexed').length,
   };
-
-  const selectedTypeOption = DOC_TYPE_OPTIONS.find((o) => o.value === documentType) || DOC_TYPE_OPTIONS[0];
 
   if (isLoading) {
     return (
@@ -164,9 +131,9 @@ export default function DocumentsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>מסמכים</h1>
+            <h1 className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>מאגר מסמכים</h1>
             <p className="text-sm mt-1" style={{ color: 'var(--dash-text-2)' }}>
-              העלה מסמכים — המערכת תנתח, תאנדקס ותזין לצ&#39;אטבוט
+              העלה מסמכים למאגר המידע של הצ&#39;אטבוט
             </p>
           </div>
           <Link
@@ -186,35 +153,19 @@ export default function DocumentsPage() {
         >
           <div className="flex items-center gap-2">
             <Upload className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
-            <h2 className="font-semibold" style={{ color: 'var(--dash-text)' }}>העלאת מסמך חדש</h2>
+            <h2 className="font-semibold" style={{ color: 'var(--dash-text)' }}>העלאת מסמך למאגר</h2>
           </div>
 
-          {/* Document type selector — compact inline */}
-          <div className="flex flex-wrap gap-2">
-            {DOC_TYPE_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setDocumentType(opt.value)}
-                className="px-3 py-1.5 text-xs rounded-lg transition-all"
-                style={{
-                  background: documentType === opt.value
-                    ? 'var(--color-primary)'
-                    : 'var(--dash-bg)',
-                  color: documentType === opt.value ? 'white' : 'var(--dash-text-2)',
-                  border: `1px solid ${documentType === opt.value ? 'var(--color-primary)' : 'var(--dash-border)'}`,
-                }}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
+          <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
+            המסמך ינותח אוטומטית, יפוצל לחלקים ויוזן למאגר הידע של הצ&#39;אטבוט. PDF, Word, Excel, תמונות (עד 10MB)
+          </p>
 
           {/* File uploader */}
           {accountId && (
             <FileUploader
               accountId={accountId}
               username={username}
-              documentType={selectedTypeOption.apiType}
+              documentType="other"
               onUploadComplete={handleUploadComplete}
               onError={handleUploadError}
               multiple={true}
@@ -231,7 +182,7 @@ export default function DocumentsPage() {
               <div>
                 <p className="text-sm font-medium" style={{ color: 'var(--color-info)' }}>מנתח ומאנדקס...</p>
                 <p className="text-xs" style={{ color: 'var(--dash-text-2)' }}>
-                  המסמך עובר ניתוח AI, פיצול לחלקים, והזנה לצ&#39;אטבוט
+                  המסמך עובר ניתוח AI, פיצול לחלקים, והזנה למאגר הידע
                 </p>
               </div>
             </div>
@@ -245,7 +196,7 @@ export default function DocumentsPage() {
             >
               <CheckCircle2 className="w-5 h-5" style={{ color: 'var(--dash-positive)' }} />
               <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--dash-positive)' }}>המסמך נותח והוזן בהצלחה!</p>
+                <p className="text-sm font-medium" style={{ color: 'var(--dash-positive)' }}>המסמך נוסף למאגר בהצלחה!</p>
                 <p className="text-xs" style={{ color: 'var(--dash-text-2)' }}>
                   התוכן זמין לשליפה בצ&#39;אטבוט כבר עכשיו
                 </p>
@@ -273,38 +224,15 @@ export default function DocumentsPage() {
 
         {/* Stats strip */}
         {documents.length > 0 && (
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="rounded-xl border p-4 text-center" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
               <div className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>{stats.total}</div>
-              <div className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>מסמכים</div>
-            </div>
-            <div className="rounded-xl border p-4 text-center" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
-              <div className="text-2xl font-bold" style={{ color: 'var(--dash-positive)' }}>{stats.parsed}</div>
-              <div className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>נותחו</div>
+              <div className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>מסמכים במאגר</div>
             </div>
             <div className="rounded-xl border p-4 text-center" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
               <div className="text-2xl font-bold" style={{ color: 'var(--color-info)' }}>{stats.indexed}</div>
-              <div className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>באנדקס הצ&#39;אטבוט</div>
+              <div className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>מאונדקסים בצ&#39;אטבוט</div>
             </div>
-          </div>
-        )}
-
-        {/* Filter */}
-        {documents.length > 0 && (
-          <div className="flex items-center gap-3">
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className="px-3 py-2 rounded-lg text-sm"
-              style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid var(--dash-border)' }}
-            >
-              <option value="all">כל הסוגים</option>
-              <option value="quote">הצעות מחיר</option>
-              <option value="contract">חוזים</option>
-              <option value="brief">בריפים</option>
-              <option value="invoice">חשבוניות</option>
-              <option value="other">אחר</option>
-            </select>
           </div>
         )}
 
@@ -316,32 +244,21 @@ export default function DocumentsPage() {
         )}
 
         {/* Documents List */}
-        {filteredDocuments.length === 0 && documents.length === 0 ? (
+        {documents.length === 0 ? (
           <div className="rounded-xl border p-12 text-center" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
             <FileText className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--dash-text-3)' }} />
-            <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>אין מסמכים עדיין</p>
+            <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>אין מסמכים במאגר עדיין</p>
             <p className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>
-              העלה מסמך למעלה והמערכת תנתח אותו אוטומטית
+              העלה מסמך למעלה והמערכת תוסיף אותו אוטומטית
             </p>
-          </div>
-        ) : filteredDocuments.length === 0 ? (
-          <div className="rounded-xl border p-8 text-center" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
-            <p className="text-sm" style={{ color: 'var(--dash-text-3)' }}>אין מסמכים מסוג זה</p>
           </div>
         ) : (
           <div className="space-y-2">
-            {filteredDocuments.map((doc) => (
+            {documents.map((doc) => (
               <div
                 key={doc.id}
-                className="rounded-xl border p-4 flex items-center gap-4 transition-colors cursor-pointer"
+                className="rounded-xl border p-4 flex items-center gap-4 transition-colors"
                 style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
-                onClick={() => {
-                  if (doc.parsing_status === 'completed') {
-                    router.push(`/influencer/${username}/documents/${doc.id}/review`);
-                  }
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--dash-surface-hover)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--dash-surface)'; }}
               >
                 {/* Icon */}
                 <FileText className="w-8 h-8 flex-shrink-0" style={{ color: 'var(--color-info)' }} />
@@ -352,7 +269,6 @@ export default function DocumentsPage() {
                     {doc.filename}
                   </h3>
                   <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--dash-text-3)' }}>
-                    <span>{DOC_TYPE_LABELS[doc.document_type] || doc.document_type}</span>
                     <span>{(doc.file_size / 1024 / 1024).toFixed(1)} MB</span>
                     <span>{new Date(doc.uploaded_at).toLocaleDateString('he-IL')}</span>
                   </div>
@@ -360,10 +276,22 @@ export default function DocumentsPage() {
 
                 {/* Status badges */}
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  {/* Parsing status */}
-                  {doc.parsing_status === 'completed' && doc.parsing_confidence != null && (
-                    <span className="text-xs px-2 py-1 rounded" style={{ background: 'color-mix(in srgb, var(--dash-positive) 15%, transparent)', color: 'var(--dash-positive)' }}>
-                      AI {Math.round(doc.parsing_confidence * 100)}%
+                  {/* RAG status */}
+                  {doc.rag_status === 'indexed' && (
+                    <span className="text-xs px-2 py-1 rounded flex items-center gap-1" style={{ background: 'color-mix(in srgb, var(--dash-positive) 15%, transparent)', color: 'var(--dash-positive)' }}>
+                      <Database className="w-3 h-3" />
+                      {doc.rag_chunks_count || 0} חלקים
+                    </span>
+                  )}
+                  {doc.rag_status === 'processing' && (
+                    <span className="text-xs px-2 py-1 rounded flex items-center gap-1" style={{ background: 'color-mix(in srgb, var(--color-info) 15%, transparent)', color: 'var(--color-info)' }}>
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      מאנדקס
+                    </span>
+                  )}
+                  {doc.rag_status === 'failed' && (
+                    <span className="text-xs px-2 py-1 rounded" style={{ background: 'color-mix(in srgb, var(--dash-negative, red) 15%, transparent)', color: 'var(--dash-negative, red)' }}>
+                      נכשל
                     </span>
                   )}
                   {doc.parsing_status === 'pending' && (
@@ -375,24 +303,6 @@ export default function DocumentsPage() {
                     <span className="text-xs px-2 py-1 rounded flex items-center gap-1" style={{ background: 'color-mix(in srgb, var(--color-info) 15%, transparent)', color: 'var(--color-info)' }}>
                       <Loader2 className="w-3 h-3 animate-spin" />
                       מנתח
-                    </span>
-                  )}
-                  {doc.parsing_status === 'failed' && (
-                    <span className="text-xs px-2 py-1 rounded" style={{ background: 'color-mix(in srgb, var(--dash-negative, red) 15%, transparent)', color: 'var(--dash-negative, red)' }}>
-                      נכשל
-                    </span>
-                  )}
-
-                  {/* RAG status */}
-                  {doc.rag_status === 'indexed' && (
-                    <span className="text-xs px-2 py-1 rounded flex items-center gap-1" style={{ background: 'color-mix(in srgb, var(--color-info) 15%, transparent)', color: 'var(--color-info)' }}>
-                      <Database className="w-3 h-3" />
-                      {doc.rag_chunks_count || 0}
-                    </span>
-                  )}
-                  {doc.rag_status === 'failed' && (
-                    <span className="text-xs px-2 py-1 rounded" style={{ background: 'color-mix(in srgb, var(--dash-negative, red) 15%, transparent)', color: 'var(--dash-negative, red)' }}>
-                      RAG נכשל
                     </span>
                   )}
                 </div>
