@@ -951,7 +951,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           
                           {/* Engine v2: UI Directives Renderer (including streaming) */}
                           {msg.role === 'assistant' && displayDirectives && index === messages.length - 1 && (!isTyping || isStreamingThis) && (
-                            <div className="mt-3 max-w-[95%] mr-auto">
+                            <div className="mt-3">
                               <DirectiveRenderer
                                 directives={displayDirectives}
                                 brands={displayCards?.type === 'brands' ? displayCards.data : undefined}
@@ -1122,7 +1122,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             initial={{ opacity: 0, y: 8 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.3, delay: 0.2 }}
-                            className="flex flex-wrap gap-2 justify-center mt-3"
+                            className="flex flex-wrap gap-2 justify-end mt-3"
                           >
                             {lastMsg.suggestions.map((s, i) => (
                               <button
