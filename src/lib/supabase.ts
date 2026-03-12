@@ -613,7 +613,7 @@ export async function getBrandsByInfluencer(influencerId: string): Promise<Brand
   // 4. Combine all brands - show ALL partnerships, with or without coupons
   const allBrands = [...partnershipBrands, ...standaloneBrands];
   
-  console.log(`[getBrandsByInfluencer] ✅ Found ${allBrands.length} brands (${allBrands.filter(b => b.coupon_code).length} with coupons)`);
+  console.log(`[getBrandsByInfluencer] ✅ Found ${allBrands.length} brands (${allBrands.filter(b => b.coupon_code).length} with coupons, ${allBrands.filter(b => b.image_url).length} with logos)`);
   
   return allBrands;
 }
