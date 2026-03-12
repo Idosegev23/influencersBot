@@ -27,7 +27,16 @@ export async function extractTextFromFile(
       text = result.text || '';
       pageCount = result.numpages;
       method = 'pdf-parse';
-      console.log(`[TextExtractor] PDF extracted: ${pageCount} pages, ${text.length} chars`);
+
+      // Quality check: Hebrew PDFs with custom font encodings produce garbled text
+      // Detect this by checking if text contains actual Hebrew/English characters
+      if (text.length > 0 && isGarbledText(text)) {
+        console.log(`[TextExtractor] PDF text is garbled (custom font encoding), discarding`);
+        text = '';
+        method = 'pdf-parse-garbled';
+      } else {
+        console.log(`[TextExtractor] PDF extracted: ${pageCount} pages, ${text.length} chars`);
+      }
     } else if (mimeType === 'text/plain') {
       text = buffer.toString('utf-8');
       method = 'text-plain';
@@ -109,6 +118,24 @@ function extractTextFromDocx(buffer: Buffer): string {
   } catch {
     return '';
   }
+}
+
+/**
+ * Detect garbled text from PDFs with custom font encodings.
+ * Hebrew PDFs often use embedded fonts that map characters to wrong Unicode points.
+ * If text has very few recognizable Hebrew/English/Arabic chars, it's likely garbled.
+ */
+function isGarbledText(text: string): boolean {
+  const sample = text.substring(0, 2000);
+  if (sample.length < 20) return false;
+
+  // Count recognizable characters: Hebrew, English, Arabic, Russian, digits, common punctuation
+  const recognizable = sample.match(/[\u0590-\u05FF\u0600-\u06FF\u0400-\u04FFa-zA-Z0-9.,;:!?()\-\s]/g);
+  const ratio = (recognizable?.length || 0) / sample.length;
+
+  // If less than 40% of chars are recognizable, it's garbled
+  // Normal Hebrew text has 70%+ recognizable chars
+  return ratio < 0.4;
 }
 
 /**
