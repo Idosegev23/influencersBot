@@ -11,11 +11,12 @@ interface SupportFormProps {
   products: Product[];
   onClose: () => void;
   onSuccess?: () => void;
+  initialBrand?: string;
 }
 
-export default function SupportForm({ username, influencerName, products, onClose, onSuccess }: SupportFormProps) {
-  const [step, setStep] = useState<'brand' | 'details' | 'success'>('brand');
-  const [selectedBrand, setSelectedBrand] = useState<string>('');
+export default function SupportForm({ username, influencerName, products, onClose, onSuccess, initialBrand }: SupportFormProps) {
+  const [step, setStep] = useState<'brand' | 'details' | 'success'>(initialBrand ? 'details' : 'brand');
+  const [selectedBrand, setSelectedBrand] = useState<string>(initialBrand || '');
   const [formData, setFormData] = useState({
     customerName: '',
     customerPhone: '',

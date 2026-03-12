@@ -141,6 +141,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [tapCount, setTapCount] = useState(0);
   const [showSupportModal, setShowSupportModal] = useState(false);
+  const [supportBrand, setSupportBrand] = useState<string>('');
   const [supportForm, setSupportForm] = useState({ name: '', phone: '', message: '' });
   const [supportLoading, setSupportLoading] = useState(false);
   const [supportSuccess, setSupportSuccess] = useState(false);
@@ -670,7 +671,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   <div className="status-dot absolute -bottom-0.5 -left-0.5" />
                 </div>
                 <div>
-                  <h1 className="font-semibold text-base" style={{ color: '#0c1013' }}>{influencer.display_name}</h1>
+                  <h1 className="font-semibold text-base whitespace-nowrap overflow-hidden text-ellipsis" style={{ color: '#0c1013' }}>{influencer.display_name}</h1>
                   <p className="text-xs" style={{ color: '#676767' }}>{typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other}</p>
                 </div>
               </div>
@@ -704,7 +705,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   <div className="status-dot absolute -bottom-0.5 -left-0.5" />
                 </div>
                 <div>
-                  <h1 className="font-semibold text-[19px]" style={{ color: '#0c1013' }}>{influencer.display_name}</h1>
+                  <h1 className="font-semibold text-[19px] whitespace-nowrap overflow-hidden text-ellipsis" style={{ color: '#0c1013' }}>{influencer.display_name}</h1>
                   <p className="text-[13px]" style={{ color: '#676767' }}>{typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other}</p>
                 </div>
               </div>
@@ -805,7 +806,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4, delay: 0.3 }}
-                        className={`${isMobile ? 'w-[363px]' : 'w-[670px]'} max-w-full mb-6`}
+                        className={`${isMobile ? 'w-[363px]' : 'w-[700px]'} max-w-full mb-6`}
                       >
                         <div className="chat-input-pill">
                           <textarea
@@ -859,7 +860,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                       </motion.div>
                     </div>
                   ) : (
-                    <div className={`${isMobile ? 'flex flex-col justify-end min-h-full' : ''} space-y-4`}>
+                    <div className={`${isMobile ? 'flex flex-col justify-end min-h-full' : 'max-w-[700px] mx-auto'} space-y-4`}>
                       {messages.map((msg, index) => {
                         // For streaming messages, use the live text (strip suggestions tag)
                         const isStreamingThis = streamingMessageId === msg.id && isStreamActive;
@@ -1083,6 +1084,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                     trackEvent('support_started', {
                                       brandName: brand.brand_name,
                                     });
+                                    setSupportBrand(brand.brand_name);
                                     setShowSupportModal(true);
                                   }
                                 }}
@@ -1180,7 +1182,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   className={`flex-shrink-0 pt-3 chat-input-gradient ${messages.length === 0 ? 'hidden' : (isMobile ? 'px-[15px] pb-[calc(max(8px,env(safe-area-inset-bottom))+60px)]' : 'px-4 pb-6')}`}
                   style={{ background: '#f4f5f7' }}
                 >
-                  <div className={`mx-auto ${isMobile ? 'max-w-2xl' : 'max-w-[670px]'}`}>
+                  <div className={`mx-auto ${isMobile ? 'max-w-2xl' : 'max-w-[700px]'}`}>
                     <div className="chat-input-pill">
                       <textarea
                         ref={inputRef}
@@ -1288,6 +1290,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         <button
                           key={brand.id}
                           onClick={() => {
+                            setSupportBrand(brand.brand_name);
                             setShowSupportModal(true);
                           }}
                           className="mobile-brand-row"
@@ -1372,7 +1375,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 coupon_code: b.coupon_code || null,
                 image_url: b.image_url || null,
               }))}
-              onClose={() => setShowSupportModal(false)}
+              initialBrand={supportBrand}
+              onClose={() => { setShowSupportModal(false); setSupportBrand(''); }}
               onSuccess={() => {
                 setSupportSuccess(true);
                 setTimeout(() => {
