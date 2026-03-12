@@ -226,20 +226,76 @@ export abstract class BaseArchetype {
   }
 
   /**
-   * Build persona context block (bio, directives, interests) for the system prompt.
-   * These come from the chatbot_persona table and give the bot domain-specific identity.
+   * Build persona context block for the system prompt.
+   * Uses rich JSONB fields (voice_rules, knowledge_map, boundaries, response_policy)
+   * from chatbot_persona, falling back to simple bio/interests/directives.
    */
   private buildPersonaContextPrompt(config: PersonalityConfig, name: string): string {
     const sections: string[] = [];
 
-    if (config.bio) {
+    // --- Identity & Voice (from voice_rules) ---
+    const vr = config.voiceRules;
+    if (vr) {
+      if (vr.identity?.who) {
+        sections.push(`🪪 זהות:\n${vr.identity.who}`);
+      }
+      if (vr.tone) {
+        const toneExtra = vr.toneSecondary?.length ? ` | ניואנסים: ${vr.toneSecondary.join(', ')}` : '';
+        sections.push(`🎤 טון: ${vr.tone}${toneExtra}`);
+      }
+      if (vr.responseStructure) {
+        sections.push(`📐 מבנה תשובה טיפוסי:\n${vr.responseStructure}`);
+      }
+      if (vr.answerExamples?.length) {
+        sections.push(`💡 דפוסי תשובה:\n${vr.answerExamples.map(e => `• ${e}`).join('\n')}`);
+      }
+    } else if (config.bio) {
+      // Fallback to simple bio
       sections.push(`📋 ביוגרפיה של ${name}:\n${config.bio}`);
     }
 
-    if (config.interests && config.interests.length > 0) {
+    // --- Knowledge Map (core topics) ---
+    const km = config.knowledgeMap;
+    if (km?.coreTopics?.length) {
+      const topicLines = km.coreTopics.map(t => {
+        const subs = t.subtopics?.length ? ` (${t.subtopics.join(', ')})` : '';
+        const points = t.keyPoints?.slice(0, 2).map(p => `  - ${p}`).join('\n') || '';
+        return `• ${t.name}${subs}${points ? '\n' + points : ''}`;
+      }).join('\n');
+      sections.push(`📚 תחומי ידע של ${name}:\n${topicLines}`);
+    } else if (config.interests?.length) {
+      // Fallback to simple interests
       sections.push(`🎯 תחומי עניין: ${config.interests.join(', ')}`);
     }
 
+    // --- Boundaries ---
+    const bd = config.boundaries;
+    if (bd?.discussed?.length) {
+      sections.push(`✅ נושאים שהיא מדברת עליהם: ${bd.discussed.join(', ')}`);
+    }
+    if (bd?.uncertainAreas?.length) {
+      sections.push(`⚠️ אזורי אי-ודאות (היזהר):\n${bd.uncertainAreas.map(a => `• ${a}`).join('\n')}`);
+    }
+
+    // --- Response Policy ---
+    const rp = config.responsePolicy;
+    if (rp) {
+      const policyLines: string[] = [];
+      if (rp.refuse?.length) {
+        policyLines.push(`🚫 סרב:\n${rp.refuse.map(r => `• ${r}`).join('\n')}`);
+      }
+      if (rp.cautious?.length) {
+        policyLines.push(`⚠️ זהירות:\n${rp.cautious.map(c => `• ${c}`).join('\n')}`);
+      }
+      if (rp.refusalStyle) {
+        policyLines.push(`סגנון סירוב: ${rp.refusalStyle}`);
+      }
+      if (policyLines.length) {
+        sections.push(`📜 מדיניות תשובה:\n${policyLines.join('\n')}`);
+      }
+    }
+
+    // --- Simple directives (always add if present) ---
     if (config.directives) {
       sections.push(`📌 הנחיות מיוחדות:\n${config.directives}`);
     }
@@ -262,17 +318,15 @@ export abstract class BaseArchetype {
       // Build context from knowledge base
       const kbContext = this.buildKnowledgeContext(input.knowledgeBase);
 
-      // Build personality prompt (use pre-loaded config if available, else load from DB)
+      // Build personality + persona context prompt (always — not just for streaming)
       let personalityBlock = '';
       let personaContextBlock = '';
-      if (input.onToken) {
-        try {
-          const personalityConfig = input.personalityConfig || await buildPersonalityFromDB(input.accountContext.accountId);
-          personalityBlock = `\n🎭 סגנון אישיות:\n${this.buildPersonalityPrompt(personalityConfig, influencerName)}`;
-          personaContextBlock = this.buildPersonaContextPrompt(personalityConfig, influencerName);
-        } catch (e) {
-          console.warn('[BaseArchetype] Failed to load personality, using defaults');
-        }
+      try {
+        const personalityConfig = input.personalityConfig || await buildPersonalityFromDB(input.accountContext.accountId);
+        personalityBlock = `\n🎭 סגנון אישיות:\n${this.buildPersonalityPrompt(personalityConfig, influencerName)}`;
+        personaContextBlock = this.buildPersonaContextPrompt(personalityConfig, influencerName);
+      } catch (e) {
+        console.warn('[BaseArchetype] Failed to load personality, using defaults');
       }
 
       // Build archetype-specific instructions (replaces system prompt)

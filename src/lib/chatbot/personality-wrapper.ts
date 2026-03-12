@@ -46,6 +46,34 @@ export interface PersonalityConfig {
   bio?: string;              // Influencer bio / about text
   interests?: string[];      // Topics the influencer covers
   greetingMessage?: string;  // Custom greeting for first message
+
+  // Rich persona JSONB fields
+  voiceRules?: {
+    tone?: string;
+    toneSecondary?: string[];
+    identity?: { who?: string; entityType?: string };
+    firstPerson?: string;
+    responseStructure?: string;
+    answerExamples?: string[];
+    recurringPhrases?: string[];
+  };
+  knowledgeMap?: {
+    coreTopics?: Array<{
+      name: string;
+      subtopics?: string[];
+      keyPoints?: string[];
+    }>;
+  };
+  boundaries?: {
+    discussed?: string[];
+    uncertainAreas?: string[];
+  };
+  responsePolicy?: {
+    refuse?: string[];
+    cautious?: string[];
+    refusalStyle?: string;
+    highConfidence?: string[];
+  };
 }
 
 export interface ResponseWrapperInput {
@@ -349,6 +377,12 @@ export async function buildPersonalityFromDB(accountId: string): Promise<Persona
     bio: persona.bio || undefined,
     interests: persona.interests || undefined,
     greetingMessage: persona.greeting_message || undefined,
+
+    // Rich persona JSONB fields
+    voiceRules: persona.voice_rules || undefined,
+    knowledgeMap: persona.knowledge_map || undefined,
+    boundaries: persona.boundaries || undefined,
+    responsePolicy: persona.response_policy || undefined,
   };
 
   return config;

@@ -122,8 +122,10 @@ async function classifyQuery(query: string): Promise<{
 }> {
   const lowerQuery = query.toLowerCase();
 
-  // Check for structured indicators
-  const isStructured = STRUCTURED_INDICATORS.some(ind => lowerQuery.includes(ind));
+  // Check for structured indicators (whole-word match to avoid Hebrew false positives,
+  // e.g. "הכי" matching inside "להכין")
+  const paddedQuery = ` ${lowerQuery} `;
+  const isStructured = STRUCTURED_INDICATORS.some(ind => paddedQuery.includes(` ${ind} `));
 
   // Infer entity types from keywords
   const inferredTypes: EntityType[] = [];
@@ -157,10 +159,10 @@ async function classifyQuery(query: string): Promise<{
   }
 
   // Determine query type
+  // "structured" only when we have both structured indicators AND specific entity types.
+  // Without entity types, FTS has nothing to target — vector search is always better.
   let queryType: QueryType;
-  if (isStructured && inferredTypes.length === 0) {
-    queryType = 'structured';
-  } else if (isStructured) {
+  if (isStructured && inferredTypes.length > 0) {
     queryType = 'mixed';
   } else {
     queryType = 'unstructured';
