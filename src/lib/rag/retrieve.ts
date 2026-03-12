@@ -428,6 +428,43 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
     // Always search original query terms via ILIKE (catches brand names, Hebrew terms)
     const originalTerms = query.replace(/[?!.,؟]/g, '').split(/\s+/).filter(w => w.length > 2);
 
+    // Bigram/trigram phrase search — search consecutive word pairs/triples from the query
+    // e.g. "פסטה בסיר אחד" → also search "בסיר אחד", "פסטה בסיר"
+    // This catches cases like "פסטה עגבניות בסיר אחד" where the full phrase doesn't match
+    const allQueryWords = query.replace(/[?!.,؟]/g, '').split(/\s+/).filter(w => w.length >= 2);
+    const phraseSearches = [];
+    for (let i = 0; i < allQueryWords.length - 1; i++) {
+      const bigram = `${allQueryWords[i]} ${allQueryWords[i + 1]}`;
+      phraseSearches.push(
+        supabase
+          .from('document_chunks')
+          .select('id, document_id, entity_type, chunk_index, chunk_text, token_count, metadata, updated_at')
+          .eq('account_id', accountId)
+          .ilike('chunk_text', `%${bigram}%`)
+          .limit(8)
+      );
+    }
+    if (phraseSearches.length > 0) {
+      const phraseResults = await Promise.all(phraseSearches);
+      for (const { data } of phraseResults) {
+        if (!data) continue;
+        for (const kr of data) {
+          if (!existingIds.has(kr.id)) {
+            existingIds.add(kr.id);
+            // Phrase matches get a higher base similarity than single-word matches
+            candidates.push({ ...kr, similarity: 0.60 });
+            added++;
+          } else {
+            // If already in candidates, boost its similarity for phrase match
+            const existing = candidates.find(c => c.id === kr.id);
+            if (existing && existing.similarity < 0.60) {
+              existing.similarity = Math.max(existing.similarity, 0.60);
+            }
+          }
+        }
+      }
+    }
+
     // For Hebrew morphology: also search shorter prefixes of long words
     // e.g. "פנטניות" (6 chars) → also search "פנטני" (5), "פנטנ" (4)
     // This handles Hebrew suffixes like ות, ים, ה etc.
@@ -490,8 +527,11 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
     });
   }
 
-  // --- Heuristic reranking: boost recency + chunk position ---
+  // --- Heuristic reranking: boost recency + chunk position + keyword match ---
   const now = Date.now();
+  const queryLower = query.toLowerCase();
+  // Split query into words (3+ chars) for partial matching
+  const queryWords = queryLower.replace(/[?!.,؟]/g, '').split(/\s+/).filter(w => w.length >= 2);
   for (const c of filtered) {
     // Recency bonus: content from last 30 days gets +0.05
     const ageMs = now - new Date(c.updated_at).getTime();
@@ -501,6 +541,20 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
     // First chunk bonus: chunk_index 0 usually has the most important content
     if (c.chunk_index === 0) {
       c.similarity += 0.03;
+    }
+    // Exact phrase match bonus: if the chunk contains the full query phrase, boost significantly
+    const chunkLower = c.chunk_text.toLowerCase();
+    if (chunkLower.includes(queryLower)) {
+      c.similarity += 0.25;
+    } else {
+      // Partial keyword bonus: boost by how many query words appear in the chunk
+      const matchedWords = queryWords.filter(w => chunkLower.includes(w));
+      const matchRatio = matchedWords.length / queryWords.length;
+      if (matchRatio >= 0.8) {
+        c.similarity += 0.15;
+      } else if (matchRatio >= 0.5) {
+        c.similarity += 0.08;
+      }
     }
   }
   // Re-sort after heuristic adjustments

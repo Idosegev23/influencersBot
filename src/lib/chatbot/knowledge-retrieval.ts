@@ -201,7 +201,7 @@ export async function retrieveKnowledge(
 
   // Direct DB queries — ALWAYS run regardless of RAG availability
   const directPromises = {
-    websites: fetchRelevantWebsites(supabase, accountId, [], 3),
+    websites: fetchRelevantWebsites(supabase, accountId, userMessage, 3),
     coupons: fetchRelevantCoupons(supabase, accountId, [], archetype, userMessage),
     partnerships: fetchRelevantPartnerships(supabase, accountId, [], userMessage),
     insights: fetchRelevantInsights(supabase, accountId, archetype, 3),
@@ -961,30 +961,87 @@ async function fetchRelevantInsights(
 async function fetchRelevantWebsites(
   supabase: any,
   accountId: string,
-  keywords: string[],
+  userQuery: string,
   limit: number
 ): Promise<WebsiteContent[]> {
   try {
-    // ⚡ AI-First: Get all Linkis pages (coupons, links, etc.)
-    const { data, error } = await supabase
+    // 1. Get recent pages (always)
+    const recentPromise = supabase
       .from('instagram_bio_websites')
       .select('url, page_title, page_content, scraped_at, image_urls')
       .eq('account_id', accountId)
       .order('scraped_at', { ascending: false })
-      .limit(20); // Get all recent website data
+      .limit(20);
 
-    if (error) {
-      console.error('[fetchWebsites] Error:', error);
-      return [];
+    // 2. Search by query keywords in page_title (finds specific recipe/content pages)
+    const queryWords = (userQuery || '').replace(/[?!.,؟]/g, '').split(/\s+/).filter(w => w.length >= 2);
+    const searchPromises = [];
+    // Search for word pairs (bigrams) — more precise than single words
+    for (let i = 0; i < queryWords.length - 1; i++) {
+      const bigram = `${queryWords[i]} ${queryWords[i + 1]}`;
+      searchPromises.push(
+        supabase
+          .from('instagram_bio_websites')
+          .select('url, page_title, page_content, scraped_at, image_urls')
+          .eq('account_id', accountId)
+          .ilike('page_title', `%${bigram}%`)
+          .limit(5)
+      );
+    }
+    // Also search full query in page_content for exact matches
+    if (queryWords.length >= 2) {
+      searchPromises.push(
+        supabase
+          .from('instagram_bio_websites')
+          .select('url, page_title, page_content, scraped_at, image_urls')
+          .eq('account_id', accountId)
+          .ilike('page_content', `%${queryWords.join(' ')}%`)
+          .limit(5)
+      );
     }
 
-    return (data || []).map((w: any) => ({
-      url: w.url,
-      title: w.page_title,
-      content: w.page_content,
-      scraped_at: w.scraped_at,
-      image_urls: w.image_urls || [],
-    }));
+    const [recentResult, ...searchResults] = await Promise.all([recentPromise, ...searchPromises]);
+
+    if (recentResult.error) {
+      console.error('[fetchWebsites] Error:', recentResult.error);
+    }
+
+    // Merge and deduplicate by URL
+    const seen = new Set<string>();
+    const allPages: WebsiteContent[] = [];
+
+    // Query-matched pages first (higher relevance)
+    for (const { data } of searchResults) {
+      for (const w of data || []) {
+        if (!seen.has(w.url)) {
+          seen.add(w.url);
+          allPages.push({
+            url: w.url,
+            title: w.page_title,
+            content: w.page_content,
+            scraped_at: w.scraped_at,
+            image_urls: w.image_urls || [],
+          });
+        }
+      }
+    }
+
+    // Then recent pages
+    for (const w of recentResult.data || []) {
+      if (!seen.has(w.url)) {
+        seen.add(w.url);
+        allPages.push({
+          url: w.url,
+          title: w.page_title,
+          content: w.page_content,
+          scraped_at: w.scraped_at,
+          image_urls: w.image_urls || [],
+        });
+      }
+    }
+
+    console.log(`[fetchWebsites] ${allPages.length} pages (${seen.size - (recentResult.data?.length || 0)} from query search, ${recentResult.data?.length || 0} recent)`);
+    return allPages;
   } catch (error) {
     console.error('[fetchWebsites] Exception:', error);
     return [];
