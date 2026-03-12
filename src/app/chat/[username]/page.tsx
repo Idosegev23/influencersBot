@@ -24,6 +24,7 @@ import {
   HelpCircle,
   ChevronLeft,
   Plus,
+  RotateCcw,
 } from 'lucide-react';
 import { getInfluencerByUsername, getBrandsByInfluencer, getContentByInfluencer, type Brand } from '@/lib/supabase';
 import { applyTheme, getGoogleFontsUrl } from '@/lib/theme';
@@ -142,6 +143,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [tapCount, setTapCount] = useState(0);
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [supportBrand, setSupportBrand] = useState<string>('');
+  const [showNewChatConfirm, setShowNewChatConfirm] = useState(false);
   const [supportForm, setSupportForm] = useState({ name: '', phone: '', message: '' });
   const [supportLoading, setSupportLoading] = useState(false);
   const [supportSuccess, setSupportSuccess] = useState(false);
@@ -676,12 +678,6 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                {messages.length > 0 && (
-                  <button onClick={handleNewChat} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-all hover:bg-black/10" style={{ color: '#676767' }} aria-label="שיחה חדשה">
-                    <span className="text-xs font-medium">שיחה חדשה</span>
-                    <Plus className="w-[16px] h-[16px]" />
-                  </button>
-                )}
                 <button onClick={() => setShowSupportModal(true)} className="p-2 rounded-lg transition-all hover:bg-black/10" style={{ color: '#676767' }} aria-label="עזרה">
                   <HelpCircle className="w-[18px] h-[18px]" />
                 </button>
@@ -710,14 +706,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 </div>
               </div>
 
-              {/* Left side: Tab pills + new chat */}
+              {/* Left side: Tab pills */}
               <div className="flex items-center gap-2 flex-shrink-0">
-                {messages.length > 0 && (
-                  <button onClick={handleNewChat} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all hover:bg-black/5" style={{ color: '#676767' }} aria-label="שיחה חדשה" title="שיחה חדשה">
-                    <span className="text-sm font-medium">שיחה חדשה</span>
-                    <Plus className="w-[16px] h-[16px]" />
-                  </button>
-                )}
               <div className="flex items-center gap-[5px] bg-white rounded-full p-[6px]">
                 {/* Tabs in RTL order: צ'אט first (rightmost), then קופונים, then בעיה בהזמנה (leftmost) */}
                 <button
@@ -1211,6 +1201,16 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         <Send className="w-4 h-4" />
                       </button>
                     </div>
+                    {messages.length > 0 && (
+                      <button
+                        onClick={() => setShowNewChatConfirm(true)}
+                        className="flex items-center gap-1.5 mx-auto mt-2 transition-all hover:opacity-70"
+                        style={{ color: '#9ca3af', fontSize: '13px' }}
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>שיחה חדשה</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </motion.div>
@@ -1361,6 +1361,54 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
             <HelpCircle className="w-[18px] h-[18px]" />
           </button>
         )}
+
+        {/* New Chat Confirmation */}
+        <AnimatePresence>
+          {showNewChatConfirm && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4"
+              style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}
+              onClick={() => setShowNewChatConfirm(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.92, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.92, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="w-full max-w-[340px] rounded-2xl overflow-hidden shadow-2xl bg-white p-6 text-center"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: '#f4f5f7' }}>
+                  <RotateCcw className="w-5 h-5" style={{ color: '#676767' }} />
+                </div>
+                <h3 className="font-semibold text-lg mb-1" style={{ color: '#0c1013' }}>שיחה חדשה?</h3>
+                <p className="text-sm mb-5" style={{ color: '#676767' }}>השיחה הנוכחית תימחק ותתחיל שיחה חדשה</p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowNewChatConfirm(false)}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all hover:bg-gray-100"
+                    style={{ color: '#676767', border: '1px solid #e5e7eb' }}
+                  >
+                    ביטול
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowNewChatConfirm(false);
+                      handleNewChat();
+                    }}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white transition-all hover:opacity-90"
+                    style={{ backgroundColor: 'var(--color-primary)' }}
+                  >
+                    כן, התחל חדש
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Support Modal */}
         <AnimatePresence>
