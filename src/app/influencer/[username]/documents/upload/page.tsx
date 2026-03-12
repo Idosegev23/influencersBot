@@ -295,7 +295,7 @@ export default function DocumentUploadPage({
                     {uploadedDocuments.length} מסמכים הועלו בהצלחה!
                   </h3>
                   <p className="text-sm mb-4" style={{ color: 'var(--dash-text-2)' }}>
-                    המסמכים נותחו בהצלחה. עבור לדף הסקירה לאישור הנתונים.
+                    המסמכים נותחו והוזנו למערכת הצ&#39;אטבוט. התוכן יהיה זמין לשליפה כבר מהסשן הבא.
                   </p>
                   <Link
                     href={`/influencer/${username}/documents/review`}
@@ -318,6 +318,7 @@ export default function DocumentUploadPage({
             <ul className="text-sm space-y-1" style={{ color: 'var(--dash-text-2)' }}>
               <li>• ניתן להעלות מספר קבצים בו-זמנית</li>
               <li>• המערכת תנתח אוטומטית את המסמכים עם AI</li>
+              <li>• התוכן יוזן אוטומטית לצ&#39;אטבוט ויהיה זמין לשליפה</li>
               <li>• תוכל לערוך את הנתונים לפני יצירת השת"פ</li>
               <li>• קבצים נתמכים: PDF, Word, Excel, תמונות</li>
             </ul>

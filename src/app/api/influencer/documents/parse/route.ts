@@ -119,31 +119,39 @@ export async function POST(request: NextRequest) {
 
         // Auto-route parsed data to coupons/partnerships/knowledge base
         if (result.success && result.data && doc.account_id) {
-          import('@/lib/ai-parser/document-router').then(({ routeParsedDocument }) => {
-            routeParsedDocument({
+          try {
+            const { routeParsedDocument } = await import('@/lib/ai-parser/document-router');
+            const routeResult = await routeParsedDocument({
               accountId: doc.account_id,
               documentId: doc.id,
               documentType: doc.document_type,
               parsedData: result.data,
               confidence: result.confidence,
-            }).then(routeResult => {
-              console.log(`[Parse API] Auto-routing complete for ${doc.id}:`, routeResult);
-            }).catch(err => {
-              console.error(`[Parse API] Auto-routing failed for ${doc.id}:`, err);
             });
-          }).catch(err => console.error('[Parse API] Failed to import document-router:', err));
+            console.log(`[Parse API] Auto-routing complete for ${doc.id}:`, routeResult);
+          } catch (err) {
+            console.error(`[Parse API] Auto-routing failed for ${doc.id}:`, err);
+          }
         }
 
-        // Fire-and-forget RAG ingestion so chatbot can reference document content
+        // RAG ingestion — awaited so document is searchable by chatbot immediately
         if (result.success && result.data && doc.account_id) {
-          import('@/lib/rag/ingest').then(({ ingestDocument, buildDocumentText }) => {
+          try {
+            // Mark RAG as processing
+            await supabase
+              .from('partnership_documents')
+              .update({ rag_status: 'processing' })
+              .eq('id', doc.id);
+
+            const { ingestDocument, buildDocumentText } = await import('@/lib/rag/ingest');
             const text = buildDocumentText({
               filename: doc.filename,
               document_type: doc.document_type,
               parsed_data: result.data,
             });
+
             if (text.trim()) {
-              ingestDocument({
+              const ragResult = await ingestDocument({
                 accountId: doc.account_id,
                 entityType: 'document',
                 sourceId: doc.id,
@@ -154,13 +162,36 @@ export async function POST(request: NextRequest) {
                   documentType: doc.document_type,
                   parsingConfidence: result.confidence,
                 },
-              }).then(res => {
-                console.log(`[Parse API] RAG ingestion complete for ${doc.id}: ${res.chunksCreated} chunks`);
-              }).catch(err => {
-                console.error(`[Parse API] RAG ingestion failed for ${doc.id}:`, err);
               });
+
+              // Mark RAG as indexed
+              await supabase
+                .from('partnership_documents')
+                .update({
+                  rag_status: 'indexed',
+                  rag_indexed_at: new Date().toISOString(),
+                  rag_chunks_count: ragResult.chunksCreated,
+                })
+                .eq('id', doc.id);
+
+              console.log(`[Parse API] RAG ingestion complete for ${doc.id}: ${ragResult.chunksCreated} chunks`);
+            } else {
+              await supabase
+                .from('partnership_documents')
+                .update({ rag_status: 'skipped' })
+                .eq('id', doc.id);
+              console.log(`[Parse API] RAG skipped for ${doc.id}: empty text`);
             }
-          }).catch(err => console.error('[Parse API] Failed to import RAG ingest:', err));
+          } catch (err: any) {
+            console.error(`[Parse API] RAG ingestion failed for ${doc.id}:`, err);
+            await supabase
+              .from('partnership_documents')
+              .update({
+                rag_status: 'failed',
+                rag_error: err.message || 'Unknown RAG error',
+              })
+              .eq('id', doc.id);
+          }
         }
 
       } catch (error: any) {

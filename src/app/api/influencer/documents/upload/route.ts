@@ -131,15 +131,9 @@ export async function POST(request: NextRequest) {
         storagePath: storagePath,
       });
 
-      // Trigger AI parsing asynchronously (don't await - let it run in background)
-      fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'}/api/influencer/documents/parse`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          documentId: document.id,
-          documentType: documentType,
-        }),
-      }).catch(err => console.error('[Upload] Failed to trigger parsing:', err));
+      // Note: parsing + RAG ingestion is triggered by the upload UI (page.tsx)
+      // which calls /api/influencer/documents/parse after upload completes.
+      // No fire-and-forget here to avoid double-processing.
     }
 
     return NextResponse.json({
