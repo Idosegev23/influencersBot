@@ -21,13 +21,11 @@ export async function extractTextFromFile(
     let pageCount: number | undefined;
 
     if (mimeType === 'application/pdf') {
-      // PDF extraction using pdf-parse v2 (class-based API)
-      const { PDFParse } = await import('pdf-parse');
-      const parser = new PDFParse({ data: new Uint8Array(buffer) });
-      const result = await parser.getText();
+      // PDF extraction using pdf-parse v1 (simple, serverless-compatible, no canvas needed)
+      const pdfParse = (await import('pdf-parse')).default;
+      const result = await pdfParse(buffer);
       text = result.text || '';
-      pageCount = result.total;
-      await parser.destroy();
+      pageCount = result.numpages;
       method = 'pdf-parse';
       console.log(`[TextExtractor] PDF extracted: ${pageCount} pages, ${text.length} chars`);
     } else if (mimeType === 'text/plain') {
