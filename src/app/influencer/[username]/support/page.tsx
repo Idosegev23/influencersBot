@@ -149,15 +149,15 @@ export default function SupportPage({
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" dir="rtl" style={{ background: 'var(--dash-bg)' }}>
+      <div className="min-h-screen flex items-center justify-center" dir="rtl" style={{ background: 'transparent' }}>
         <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--color-primary)' }} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen" dir="rtl" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
-      <div className="max-w-6xl mx-auto p-4">
+    <div className="min-h-screen" dir="rtl" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
+      <div className="max-w-6xl mx-auto p-4 animate-slide-up">
         {/* Page Title + Refresh */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -187,17 +187,13 @@ export default function SupportPage({
             <button
               key={tab.key}
               onClick={() => setFilter(tab.key as typeof filter)}
-              className="px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-2"
-              style={{
-                background: filter === tab.key ? 'var(--color-primary)' : 'var(--dash-surface)',
-                color: filter === tab.key ? 'white' : 'var(--dash-text-2)',
-              }}
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-2 ${filter === tab.key ? 'pill pill-purple' : 'pill pill-neutral'}`}
             >
               {tab.label}
               <span
                 className="px-2 py-0.5 rounded-full text-xs"
                 style={{
-                  background: filter === tab.key ? 'rgba(255,255,255,0.2)' : 'var(--dash-surface-hover)',
+                  background: filter === tab.key ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.05)',
                 }}
               >
                 {tab.count}
@@ -223,10 +219,11 @@ export default function SupportPage({
                 return (
                   <div
                     key={request.id}
-                    className="p-4 rounded-xl cursor-pointer transition-all border"
+                    className="p-4 rounded-xl cursor-pointer transition-all"
                     style={{
-                      borderColor: selectedRequest?.id === request.id ? 'var(--color-primary)' : 'var(--dash-border)',
-                      background: selectedRequest?.id === request.id ? 'color-mix(in srgb, var(--color-primary) 10%, transparent)' : 'transparent',
+                      borderColor: selectedRequest?.id === request.id ? 'var(--color-primary)' : 'var(--dash-glass-border)',
+                      background: selectedRequest?.id === request.id ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)',
+                      border: '1px solid'
                     }}
                     onClick={() => setSelectedRequest(request)}
                   >
@@ -263,8 +260,8 @@ export default function SupportPage({
             {selectedRequest ? (
               <div
                 key={selectedRequest.id}
-                className="sticky top-24 p-6 rounded-xl border"
-                style={{ borderColor: 'var(--dash-border)' }}
+                className="sticky top-24 p-6 glass-card rounded-2xl animate-slide-up relative z-10"
+                style={{ borderColor: 'var(--dash-glass-border)' }}
               >
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-lg font-semibold" style={{ color: 'var(--dash-text)' }}>פרטי הפנייה</h3>
@@ -278,7 +275,7 @@ export default function SupportPage({
 
                 <div className="space-y-4">
                   {/* Customer Info */}
-                  <div className="p-4 rounded-xl" style={{ background: 'var(--dash-surface)' }}>
+                  <div className="p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)' }}>
                     <div className="flex items-center gap-3 mb-2">
                       <User className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
                       <span className="font-medium" style={{ color: 'var(--dash-text)' }}>{selectedRequest.customer_name}</span>
@@ -299,7 +296,7 @@ export default function SupportPage({
 
                   {/* Product Info */}
                   {selectedRequest.products && (
-                    <div className="p-4 rounded-xl" style={{ background: 'var(--dash-surface)' }}>
+                    <div className="p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)' }}>
                       <div className="flex items-center gap-2 text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>
                         <Package className="w-4 h-4" />
                         <span>מוצר קשור</span>
@@ -316,7 +313,7 @@ export default function SupportPage({
                   {/* Message */}
                   <div>
                     <p className="text-sm mb-2" style={{ color: 'var(--dash-text-2)' }}>הודעה:</p>
-                    <p className="whitespace-pre-wrap p-4 rounded-xl" style={{ background: 'var(--dash-surface)', color: 'var(--dash-text)' }}>
+                    <p className="whitespace-pre-wrap p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--dash-text)' }}>
                       {selectedRequest.message}
                     </p>
                   </div>
@@ -328,7 +325,7 @@ export default function SupportPage({
                   </div>
 
                   {/* Status Actions */}
-                  <div className="pt-4" style={{ borderTop: '1px solid var(--dash-border)' }}>
+                  <div className="pt-4" style={{ borderTop: '1px solid var(--dash-glass-border)' }}>
                     <p className="text-sm mb-3" style={{ color: 'var(--dash-text-2)' }}>שנה סטטוס:</p>
                     <div className="flex flex-wrap gap-2">
                       {(['new', 'in_progress', 'resolved', 'closed'] as const).map((status) => (
@@ -342,7 +339,7 @@ export default function SupportPage({
                               : ''
                           }`}
                           style={selectedRequest.status !== status ? {
-                            background: 'var(--dash-surface)',
+                            background: 'rgba(255,255,255,0.05)',
                             color: 'var(--dash-text-2)',
                           } : undefined}
                         >
@@ -355,8 +352,8 @@ export default function SupportPage({
               </div>
             ) : (
               <div
-                className="hidden md:flex items-center justify-center p-12 rounded-xl border"
-                style={{ borderColor: 'var(--dash-border)' }}
+                className="hidden md:flex items-center justify-center p-12 glass-card rounded-2xl"
+                style={{ borderColor: 'var(--dash-glass-border)' }}
               >
                 <p style={{ color: 'var(--dash-text-3)' }}>בחר פנייה לצפייה בפרטים</p>
               </div>

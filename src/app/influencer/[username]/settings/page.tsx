@@ -284,7 +284,7 @@ export default function SettingsPage({
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" dir="rtl" style={{ background: 'var(--dash-bg)' }}>
+      <div className="min-h-screen flex items-center justify-center" dir="rtl" style={{ background: 'transparent' }}>
         <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--color-primary)' }} />
       </div>
     );
@@ -293,17 +293,15 @@ export default function SettingsPage({
   if (!influencer) return null;
 
   return (
-    <div className="min-h-screen" dir="rtl" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
+    <div className="min-h-screen" dir="rtl" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
         {/* Top Actions */}
-        <div className="flex items-center justify-end gap-2 mb-8">
+        <div className="flex items-center justify-end gap-2 mb-8 animate-slide-up">
           <button
             onClick={() => setShowPreview(!showPreview)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
-            style={{
-              background: showPreview ? 'var(--color-primary)' : 'var(--dash-surface)',
-              color: showPreview ? 'white' : 'var(--dash-text-2)',
-            }}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-all ${
+              showPreview ? 'btn-primary' : 'btn-ghost'
+            }`}
           >
             <Eye className="w-4 h-4" />
             תצוגה מקדימה
@@ -311,11 +309,9 @@ export default function SettingsPage({
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
-            style={{
-              background: saved ? 'var(--dash-positive)' : 'var(--color-primary)',
-              color: 'white',
-            }}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-all ${
+              saved ? 'btn-teal' : 'btn-solid'
+            }`}
           >
             {saving ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -333,8 +329,8 @@ export default function SettingsPage({
           <div className="space-y-8">
             {/* Theme Settings */}
             <div
-              className="rounded-xl border p-6"
-              style={{ borderColor: 'var(--dash-border)' }}
+              className="glass-card rounded-2xl p-6 animate-slide-up"
+              style={{ borderColor: 'var(--dash-glass-border)' }}
             >
               <h2 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
                 <Palette className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
@@ -342,15 +338,15 @@ export default function SettingsPage({
               </h2>
 
               {/* Color Presets */}
-              <div className="mb-6">
+              <div className="mb-6 relative z-10">
                 <label className="block text-sm font-medium mb-3" style={{ color: 'var(--dash-text-2)' }}>ערכות צבעים מוכנות</label>
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
                   {colorPresets.map((preset) => (
                     <button
                       key={preset.name}
                       onClick={() => applyPreset(preset)}
-                      className="group flex flex-col items-center gap-2 p-3 rounded-xl border transition-all"
-                      style={{ borderColor: 'var(--dash-border)' }}
+                      className="group flex flex-col items-center gap-2 p-3 rounded-xl border transition-all glass-subtle"
+                      style={{ borderColor: 'var(--dash-glass-border)' }}
                     >
                       <div
                         className="w-8 h-8 rounded-full"
@@ -367,7 +363,7 @@ export default function SettingsPage({
               </div>
 
               {/* Custom Colors */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="grid grid-cols-2 gap-4 mb-6 relative z-10">
                 <div>
                   <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>צבע ראשי</label>
                   <div className="flex items-center gap-2">
@@ -381,8 +377,8 @@ export default function SettingsPage({
                       type="text"
                       value={theme.colors.primary}
                       onChange={(e) => setTheme({ ...theme, colors: { ...theme.colors, primary: e.target.value } })}
-                      className="flex-1 rounded-lg px-3 py-2 text-sm"
-                      style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
+                      className="flex-1 rounded-xl px-3 py-2 text-sm"
+                      style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
                     />
                   </div>
                 </div>
@@ -399,8 +395,8 @@ export default function SettingsPage({
                       type="text"
                       value={theme.colors.accent}
                       onChange={(e) => setTheme({ ...theme, colors: { ...theme.colors, accent: e.target.value } })}
-                      className="flex-1 rounded-lg px-3 py-2 text-sm"
-                      style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
+                      className="flex-1 rounded-xl px-3 py-2 text-sm"
+                      style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
                     />
                   </div>
                 </div>
@@ -417,8 +413,8 @@ export default function SettingsPage({
                       type="text"
                       value={theme.colors.background}
                       onChange={(e) => setTheme({ ...theme, colors: { ...theme.colors, background: e.target.value } })}
-                      className="flex-1 rounded-lg px-3 py-2 text-sm"
-                      style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
+                      className="flex-1 rounded-xl px-3 py-2 text-sm"
+                      style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
                     />
                   </div>
                 </div>
@@ -435,15 +431,15 @@ export default function SettingsPage({
                       type="text"
                       value={theme.colors.text}
                       onChange={(e) => setTheme({ ...theme, colors: { ...theme.colors, text: e.target.value } })}
-                      className="flex-1 rounded-lg px-3 py-2 text-sm"
-                      style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
+                      className="flex-1 rounded-xl px-3 py-2 text-sm"
+                      style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
                     />
                   </div>
                 </div>
               </div>
 
               {/* Font */}
-              <div>
+              <div className="relative z-10">
                 <label className="block text-sm font-medium mb-2 flex items-center gap-2" style={{ color: 'var(--dash-text-2)' }}>
                   <Type className="w-4 h-4" />
                   גופן
@@ -451,8 +447,8 @@ export default function SettingsPage({
                 <select
                   value={theme.fonts.heading}
                   onChange={(e) => setTheme({ ...theme, fonts: { heading: e.target.value, body: e.target.value } })}
-                  className="w-full rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
+                  className="w-full rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
                 >
                   {fontOptions.map((font) => (
                     <option key={font.value} value={font.value}>{font.label}</option>
@@ -463,10 +459,10 @@ export default function SettingsPage({
 
             {/* Greeting & Questions */}
             <div
-              className="rounded-xl border p-6"
-              style={{ borderColor: 'var(--dash-border)' }}
+              className="glass-card rounded-2xl p-6 animate-slide-up"
+              style={{ borderColor: 'var(--dash-glass-border)' }}
             >
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center justify-between mb-6 relative z-10">
                 <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
                   <MessageCircle className="w-5 h-5" style={{ color: 'var(--color-info)' }} />
                   הודעת פתיחה ושאלות מוצעות
@@ -474,8 +470,7 @@ export default function SettingsPage({
                 <button
                   onClick={handleRegenerateAI}
                   disabled={regenerating}
-                  className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-all"
-                  style={{ background: 'var(--color-primary)', color: 'white' }}
+                  className="flex items-center gap-2 px-3 py-2 text-sm btn-primary transition-all"
                 >
                   {regenerating ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -487,20 +482,20 @@ export default function SettingsPage({
               </div>
 
               {/* Greeting Message */}
-              <div className="mb-6">
+              <div className="mb-6 relative z-10">
                 <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>הודעת פתיחה</label>
                 <textarea
                   value={greetingMessage}
                   onChange={(e) => setGreetingMessage(e.target.value)}
                   rows={3}
-                  className="w-full rounded-lg px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-                  style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
+                  className="w-full rounded-xl px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                  style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
                   placeholder="היי! אני העוזר שלך..."
                 />
               </div>
 
               {/* Suggested Questions */}
-              <div>
+              <div className="relative z-10">
                 <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>שאלות מוצעות</label>
                 <div className="space-y-2">
                   {suggestedQuestions.map((question, index) => (
@@ -509,8 +504,8 @@ export default function SettingsPage({
                         type="text"
                         value={question}
                         onChange={(e) => updateQuestion(index, e.target.value)}
-                        className="flex-1 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
+                        className="flex-1 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
                         placeholder={`שאלה ${index + 1}`}
                       />
                       <button
@@ -525,8 +520,7 @@ export default function SettingsPage({
                 {suggestedQuestions.length < 6 && (
                   <button
                     onClick={addQuestion}
-                    className="mt-3 text-sm transition-colors"
-                    style={{ color: 'var(--color-primary)' }}
+                    className="mt-3 text-sm transition-colors text-purple-400 hover:text-purple-300"
                   >
                     + הוסף שאלה
                   </button>
@@ -536,15 +530,15 @@ export default function SettingsPage({
 
             {/* Persona Settings */}
             <div
-              className="rounded-xl border p-6"
-              style={{ borderColor: 'var(--dash-border)' }}
+              className="glass-card rounded-2xl p-6 animate-slide-up"
+              style={{ borderColor: 'var(--dash-glass-border)' }}
             >
               <h2 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
                 <User className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
                 פרסונה וטון הצ&apos;אטבוט
               </h2>
 
-              <div className="space-y-6">
+              <div className="space-y-6 relative z-10">
                 {/* Tone */}
                 <div>
                   <label className="block text-sm font-medium mb-2 flex items-center gap-2" style={{ color: 'var(--dash-text-2)' }}>
@@ -555,8 +549,8 @@ export default function SettingsPage({
                     type="text"
                     value={personaTone}
                     onChange={(e) => setPersonaTone(e.target.value)}
-                    className="w-full rounded-lg px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
+                    className="w-full rounded-xl px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
                     placeholder="לדוגמה: חם, ידידותי ומעודד"
                   />
                   <p className="mt-1 text-xs" style={{ color: 'var(--dash-text-3)' }}>תאר איך הצ&apos;אטבוט צריך לדבר - האם הוא רשמי, חברותי, הומוריסטי?</p>
@@ -572,8 +566,8 @@ export default function SettingsPage({
                     value={personaStyle}
                     onChange={(e) => setPersonaStyle(e.target.value)}
                     rows={2}
-                    className="w-full rounded-lg px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
-                    style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
+                    className="w-full rounded-xl px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                    style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
                     placeholder="לדוגמה: שיחתי, קליל, עם הרבה הדגשות ודוגמאות"
                   />
                 </div>
@@ -594,12 +588,9 @@ export default function SettingsPage({
                         key={lang.value}
                         type="button"
                         onClick={() => setPersonaLanguage(lang.value as 'he' | 'en' | 'mixed')}
-                        className="flex items-center justify-center gap-2 p-3 rounded-xl border transition-all"
-                        style={{
-                          background: personaLanguage === lang.value ? 'color-mix(in srgb, var(--color-primary) 20%, transparent)' : 'var(--dash-surface)',
-                          borderColor: personaLanguage === lang.value ? 'var(--color-primary)' : 'var(--dash-border)',
-                          color: personaLanguage === lang.value ? 'var(--dash-text)' : 'var(--dash-text-2)',
-                        }}
+                        className={`flex items-center justify-center gap-2 p-3 rounded-full border transition-all ${
+                          personaLanguage === lang.value ? 'pill pill-purple' : 'pill pill-neutral'
+                        }`}
                       >
                         <span>{lang.icon}</span>
                         <span className="text-sm">{lang.label}</span>
@@ -624,12 +615,9 @@ export default function SettingsPage({
                         key={style.value}
                         type="button"
                         onClick={() => setPersonaEmojiStyle(style.value as 'none' | 'minimal' | 'frequent')}
-                        className="flex flex-col items-center gap-1 p-3 rounded-xl border transition-all"
-                        style={{
-                          background: personaEmojiStyle === style.value ? 'color-mix(in srgb, var(--color-warning) 20%, transparent)' : 'var(--dash-surface)',
-                          borderColor: personaEmojiStyle === style.value ? 'var(--color-warning)' : 'var(--dash-border)',
-                          color: personaEmojiStyle === style.value ? 'var(--dash-text)' : 'var(--dash-text-2)',
-                        }}
+                        className={`flex flex-col items-center gap-1 p-3 rounded-full border transition-all ${
+                          personaEmojiStyle === style.value ? 'pill pill-amber' : 'pill pill-neutral'
+                        }`}
                       >
                         <span className="text-sm font-medium">{style.label}</span>
                         <span className="text-xs opacity-60">{style.example}</span>
@@ -655,8 +643,8 @@ export default function SettingsPage({
                             updated[index] = e.target.value;
                             setPersonaInterests(updated);
                           }}
-                          className="flex-1 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
+                          className="flex-1 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
                           placeholder={`תחום עניין ${index + 1}`}
                         />
                         <button
@@ -673,8 +661,7 @@ export default function SettingsPage({
                     <button
                       type="button"
                       onClick={() => setPersonaInterests([...personaInterests, ''])}
-                      className="mt-3 text-sm transition-colors"
-                      style={{ color: 'var(--color-primary)' }}
+                      className="mt-3 text-sm transition-colors text-purple-400 hover:text-purple-300"
                     >
                       + הוסף תחום עניין
                     </button>
@@ -698,8 +685,8 @@ export default function SettingsPage({
                             updated[index] = e.target.value;
                             setPersonaPhrases(updated);
                           }}
-                          className="flex-1 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
+                          className="flex-1 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
                           placeholder={`ביטוי ${index + 1}`}
                         />
                         <button
@@ -716,8 +703,7 @@ export default function SettingsPage({
                     <button
                       type="button"
                       onClick={() => setPersonaPhrases([...personaPhrases, ''])}
-                      className="mt-3 text-sm transition-colors"
-                      style={{ color: 'var(--color-primary)' }}
+                      className="mt-3 text-sm transition-colors text-purple-400 hover:text-purple-300"
                     >
                       + הוסף ביטוי
                     </button>
@@ -725,7 +711,7 @@ export default function SettingsPage({
                 </div>
 
                 {/* Info box */}
-                <div className="p-4 rounded-xl" style={{ background: 'color-mix(in srgb, var(--color-primary) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 30%, transparent)' }}>
+                <div className="p-4 rounded-xl glass-subtle" style={{ background: 'color-mix(in srgb, var(--color-primary) 10%, transparent)', border: '1px solid var(--dash-glass-border)' }}>
                   <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>
                     <strong>💡 טיפ:</strong> הגדרות אלה משפיעות על איך הצ&apos;אטבוט מדבר עם המבקרים.
                     ככל שתתאימו יותר לסגנון האישי שלכם, ככה התגובות יהיו אותנטיות יותר.
@@ -736,15 +722,15 @@ export default function SettingsPage({
 
             {/* Scrape Settings */}
             <div
-              className="rounded-xl border p-6"
-              style={{ borderColor: 'var(--dash-border)' }}
+              className="glass-card rounded-2xl p-6 animate-slide-up"
+              style={{ borderColor: 'var(--dash-glass-border)' }}
             >
               <h2 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
                 <Database className="w-5 h-5" style={{ color: 'var(--dash-positive)' }} />
                 הגדרות סריקת אינסטגרם
               </h2>
 
-              <div className="space-y-6">
+              <div className="space-y-6 relative z-10">
                 {/* Posts Limit Slider */}
                 <div>
                   <label className="block text-sm font-medium mb-3" style={{ color: 'var(--dash-text-2)' }}>
@@ -757,8 +743,8 @@ export default function SettingsPage({
                     step="10"
                     value={scrapeSettings.posts_limit}
                     onChange={(e) => setScrapeSettings({ ...scrapeSettings, posts_limit: parseInt(e.target.value) })}
-                    className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-green-500"
-                    style={{ background: 'var(--dash-surface)' }}
+                    className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+                    style={{ background: 'rgba(255,255,255,0.1)', accentColor: 'var(--color-primary)' }}
                   />
                   <div className="flex justify-between text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>
                     <span>10</span>
@@ -796,16 +782,13 @@ export default function SettingsPage({
                               });
                             }
                           }}
-                          className="flex items-center gap-3 p-3 rounded-xl border transition-all"
-                          style={{
-                            background: isSelected ? 'color-mix(in srgb, var(--dash-positive) 20%, transparent)' : 'var(--dash-surface)',
-                            borderColor: isSelected ? 'var(--dash-positive)' : 'var(--dash-border)',
-                            color: isSelected ? 'var(--dash-text)' : 'var(--dash-text-2)',
-                          }}
+                          className={`flex items-center gap-3 p-3 rounded-full border transition-all ${
+                            isSelected ? 'pill pill-teal' : 'pill pill-neutral'
+                          }`}
                         >
-                          <Icon className="w-5 h-5" style={isSelected ? { color: 'var(--dash-positive)' } : undefined} />
+                          <Icon className="w-5 h-5" />
                           <span className="text-sm font-medium">{label}</span>
-                          {isSelected && <Check className="w-4 h-4 mr-auto" style={{ color: 'var(--dash-positive)' }} />}
+                          {isSelected && <Check className="w-4 h-4 mr-auto" />}
                         </button>
                       );
                     })}
@@ -815,7 +798,7 @@ export default function SettingsPage({
                 {/* Additional Options */}
                 <div className="space-y-3">
                   {/* Include Hashtags */}
-                  <div className="flex items-center justify-between p-4 rounded-xl" style={{ background: 'var(--dash-surface)' }}>
+                  <div className="flex items-center justify-between p-4 rounded-xl glass-subtle" style={{ borderColor: 'var(--dash-glass-border)', border: '1px solid' }}>
                     <div className="flex items-center gap-3">
                       <Hash className="w-5 h-5" style={{ color: 'var(--color-info)' }} />
                       <div>
@@ -825,9 +808,10 @@ export default function SettingsPage({
                     </div>
                     <button
                       onClick={() => setScrapeSettings({ ...scrapeSettings, include_hashtags: !scrapeSettings.include_hashtags })}
-                      className={`w-12 h-7 rounded-full relative transition-colors ${
-                        scrapeSettings.include_hashtags ? 'bg-green-600' : 'bg-gray-600'
-                      }`}
+                      className={`w-12 h-7 rounded-full relative transition-colors`}
+                      style={{
+                        background: scrapeSettings.include_hashtags ? 'var(--color-primary)' : 'rgba(255,255,255,0.1)',
+                      }}
                     >
                       <div
                         className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all ${
@@ -838,7 +822,7 @@ export default function SettingsPage({
                   </div>
 
                   {/* Include Comments */}
-                  <div className="flex items-center justify-between p-4 rounded-xl" style={{ background: 'var(--dash-surface)' }}>
+                  <div className="flex items-center justify-between p-4 rounded-xl glass-subtle" style={{ borderColor: 'var(--dash-glass-border)', border: '1px solid' }}>
                     <div className="flex items-center gap-3">
                       <MessageSquare className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
                       <div>
@@ -848,9 +832,10 @@ export default function SettingsPage({
                     </div>
                     <button
                       onClick={() => setScrapeSettings({ ...scrapeSettings, include_comments: !scrapeSettings.include_comments })}
-                      className={`w-12 h-7 rounded-full relative transition-colors ${
-                        scrapeSettings.include_comments ? 'bg-purple-600' : 'bg-gray-600'
-                      }`}
+                      className={`w-12 h-7 rounded-full relative transition-colors`}
+                      style={{
+                        background: scrapeSettings.include_comments ? 'var(--color-primary)' : 'rgba(255,255,255,0.1)',
+                      }}
                     >
                       <div
                         className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all ${
@@ -861,19 +846,18 @@ export default function SettingsPage({
                   </div>
                 </div>
 
-                <div className="p-4 rounded-xl" style={{ background: 'color-mix(in srgb, var(--color-info) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-info) 30%, transparent)' }}>
+                <div className="p-4 rounded-xl glass-subtle" style={{ background: 'color-mix(in srgb, var(--color-info) 10%, transparent)', border: '1px solid var(--dash-glass-border)' }}>
                   <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>
                     <strong>שימו לב:</strong> Highlights ו-Stories לא נתמכים על ידי הסריקה (דורשים התחברות לאינסטגרם).
                   </p>
                 </div>
 
                 {/* Rescan Button */}
-                <div className="pt-4" style={{ borderTop: '1px solid var(--dash-border)' }}>
+                <div className="pt-4" style={{ borderTop: '1px solid var(--dash-glass-border)' }}>
                   <button
                     onClick={handleRescan}
                     disabled={rescanning}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 disabled:opacity-50 text-white font-medium rounded-xl transition-all"
-                    style={{ background: 'var(--dash-positive)' }}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 disabled:opacity-50 font-medium btn-teal transition-all"
                   >
                     {rescanning ? (
                       <>
@@ -888,7 +872,7 @@ export default function SettingsPage({
                     )}
                   </button>
                   {rescanResult && (
-                    <div className="mt-3 p-3 rounded-xl" style={{ background: 'color-mix(in srgb, var(--dash-positive) 20%, transparent)', border: '1px solid color-mix(in srgb, var(--dash-positive) 30%, transparent)' }}>
+                    <div className="mt-3 p-3 rounded-xl glass-subtle" style={{ background: 'color-mix(in srgb, var(--dash-positive) 20%, transparent)', border: '1px solid var(--dash-glass-border)' }}>
                       <p className="text-sm text-center" style={{ color: 'var(--dash-positive)' }}>
                         נמצאו {rescanResult.products} מוצרים ו-{rescanResult.content} פריטי תוכן
                       </p>
@@ -900,15 +884,15 @@ export default function SettingsPage({
 
             {/* WhatsApp & Phone Settings */}
             <div
-              className="rounded-xl border p-6"
-              style={{ borderColor: 'var(--dash-border)' }}
+              className="glass-card rounded-2xl p-6 animate-slide-up"
+              style={{ borderColor: 'var(--dash-glass-border)' }}
             >
               <h2 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
                 <Phone className="w-5 h-5" style={{ color: 'var(--dash-positive)' }} />
                 טלפון והתראות WhatsApp
               </h2>
 
-              <div className="space-y-6">
+              <div className="space-y-6 relative z-10">
                 {/* Phone Number */}
                 <div>
                   <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>מספר טלפון</label>
@@ -922,8 +906,8 @@ export default function SettingsPage({
                       }}
                       placeholder="0541234567"
                       dir="ltr"
-                      className="w-full rounded-lg px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 text-left"
-                      style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
+                      className="w-full rounded-xl px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 text-left"
+                      style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
                     />
                     <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" style={{ color: 'var(--dash-text-3)' }} />
                   </div>
@@ -933,7 +917,7 @@ export default function SettingsPage({
                 </div>
 
                 {/* WhatsApp Notifications Toggle */}
-                <div className="flex items-center justify-between p-4 rounded-xl" style={{ background: 'var(--dash-surface)' }}>
+                <div className="flex items-center justify-between p-4 rounded-xl glass-subtle" style={{ borderColor: 'var(--dash-glass-border)', border: '1px solid' }}>
                   <div className="flex items-center gap-3">
                     <Bell className="w-5 h-5" style={{ color: 'var(--dash-positive)' }} />
                     <div>
@@ -944,9 +928,10 @@ export default function SettingsPage({
                   <button
                     onClick={() => setWhatsappEnabled(!whatsappEnabled)}
                     disabled={!phoneNumber}
-                    className={`w-12 h-7 rounded-full relative transition-colors ${
-                      whatsappEnabled && phoneNumber ? 'bg-green-600' : 'bg-gray-600'
-                    } ${!phoneNumber ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`w-12 h-7 rounded-full relative transition-colors ${!phoneNumber ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    style={{
+                      background: whatsappEnabled && phoneNumber ? 'var(--color-primary)' : 'rgba(255,255,255,0.1)',
+                    }}
                   >
                     <div
                       className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all ${
@@ -957,7 +942,7 @@ export default function SettingsPage({
                 </div>
 
                 {!phoneNumber && whatsappEnabled && (
-                  <div className="p-4 rounded-xl" style={{ background: 'color-mix(in srgb, var(--color-warning) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-warning) 30%, transparent)' }}>
+                  <div className="p-4 rounded-xl glass-subtle" style={{ background: 'color-mix(in srgb, var(--color-warning) 10%, transparent)', border: '1px solid var(--dash-glass-border)' }}>
                     <p className="text-sm" style={{ color: 'var(--color-warning)' }}>
                       יש להזין מספר טלפון כדי להפעיל התראות WhatsApp
                     </p>
@@ -965,7 +950,7 @@ export default function SettingsPage({
                 )}
 
                 {phoneNumber && whatsappEnabled && (
-                  <div className="p-4 rounded-xl" style={{ background: 'color-mix(in srgb, var(--dash-positive) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--dash-positive) 30%, transparent)' }}>
+                  <div className="p-4 rounded-xl glass-subtle" style={{ background: 'color-mix(in srgb, var(--dash-positive) 10%, transparent)', border: '1px solid var(--dash-glass-border)' }}>
                     <p className="text-sm" style={{ color: 'var(--dash-positive)' }}>
                       התראות WhatsApp פעילות - תקבלו הודעה בכל פנייה חדשה
                     </p>
@@ -976,8 +961,8 @@ export default function SettingsPage({
 
             {/* White Label Settings */}
             <div
-              className="rounded-xl border p-6"
-              style={{ borderColor: 'var(--dash-border)' }}
+              className="glass-card rounded-2xl p-6 animate-slide-up"
+              style={{ borderColor: 'var(--dash-glass-border)' }}
             >
               <h2 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
                 <svg className="w-5 h-5" style={{ color: 'var(--color-primary)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -986,18 +971,19 @@ export default function SettingsPage({
                 White Label (מיתוג עצמי)
               </h2>
 
-              <div className="space-y-4">
+              <div className="space-y-4 relative z-10">
                 {/* Hide Branding Toggle */}
-                <div className="flex items-center justify-between p-4 rounded-xl" style={{ background: 'var(--dash-surface)' }}>
+                <div className="flex items-center justify-between p-4 rounded-xl glass-subtle" style={{ borderColor: 'var(--dash-glass-border)', border: '1px solid' }}>
                   <div>
                     <h4 className="font-medium" style={{ color: 'var(--dash-text)' }}>הסתר מיתוג המערכת</h4>
                     <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>הסתר את הלוגו והקרדיט של InfluencerBot</p>
                   </div>
                   <button
                     onClick={() => setHideBranding(!hideBranding)}
-                    className={`w-12 h-7 rounded-full relative transition-colors ${
-                      hideBranding ? 'bg-indigo-600' : 'bg-gray-600'
-                    }`}
+                    className={`w-12 h-7 rounded-full relative transition-colors`}
+                    style={{
+                      background: hideBranding ? 'var(--color-primary)' : 'rgba(255,255,255,0.1)',
+                    }}
                   >
                     <div
                       className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all ${
@@ -1015,8 +1001,8 @@ export default function SettingsPage({
                     value={customLogoUrl}
                     onChange={(e) => setCustomLogoUrl(e.target.value)}
                     placeholder="https://example.com/logo.png"
-                    className="w-full rounded-lg px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
+                    className="w-full rounded-xl px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
                   />
                   <p className="mt-2 text-xs" style={{ color: 'var(--dash-text-3)' }}>
                     השאירו ריק להצגת תמונת הפרופיל שלכם
@@ -1024,7 +1010,7 @@ export default function SettingsPage({
                 </div>
 
                 {hideBranding && (
-                  <div className="p-4 rounded-xl" style={{ background: 'color-mix(in srgb, var(--color-warning) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-warning) 30%, transparent)' }}>
+                  <div className="p-4 rounded-xl glass-subtle" style={{ background: 'color-mix(in srgb, var(--color-warning) 10%, transparent)', border: '1px solid var(--dash-glass-border)' }}>
                     <p className="text-sm" style={{ color: 'var(--color-warning)' }}>
                       💡 אפשרות זו זמינה בחבילות Premium. צרו קשר לשדרוג.
                     </p>
@@ -1036,9 +1022,9 @@ export default function SettingsPage({
 
           {/* Preview Panel */}
           {showPreview && (
-            <div className="lg:sticky lg:top-24 h-fit">
-              <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--dash-border)' }}>
-                <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--dash-border)' }}>
+            <div className="lg:sticky lg:top-24 h-fit animate-fade-in">
+              <div className="glass-card rounded-2xl overflow-hidden" style={{ borderColor: 'var(--dash-glass-border)' }}>
+                <div className="p-4 flex items-center justify-between relative z-10" style={{ borderBottom: '1px solid var(--dash-glass-border)' }}>
                   <span className="text-sm font-medium" style={{ color: 'var(--dash-text-2)' }}>תצוגה מקדימה</span>
                   <div className="flex gap-1.5">
                     <div className="w-3 h-3 rounded-full bg-red-500" />
@@ -1090,11 +1076,7 @@ export default function SettingsPage({
                     {suggestedQuestions.slice(0, 4).map((q, i) => (
                       <button
                         key={i}
-                        className="px-3 py-2 text-xs rounded-lg border"
-                        style={{
-                          borderColor: `${theme.colors.primary}50`,
-                          color: theme.colors.text,
-                        }}
+                        className="px-3 py-2 text-xs rounded-full border pill pill-purple"
                       >
                         {q || `שאלה ${i + 1}`}
                       </button>

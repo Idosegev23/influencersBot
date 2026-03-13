@@ -49,10 +49,10 @@ export default function AddInfluencerPage() {
 
   // Polling for scraping progress
   const [jobStatus, setJobStatus] = useState<any>(null);
-  
+
   // Processing status
   const [processingStatus, setProcessingStatus] = useState<any>(null);
-  
+
   // Transcription progress (NEW!)
   const [transcriptionProgress, setTranscriptionProgress] = useState<any>(null);
 
@@ -155,7 +155,7 @@ export default function AddInfluencerPage() {
               step: 'processing', // ⚡ Move to processing step
             }));
             clearInterval(interval);
-            
+
             // ⚡ REMOVED: startContentProcessing() - orchestrator handles this automatically!
           } else if (data.status === 'failed') {
             setState((prev) => ({
@@ -178,7 +178,7 @@ export default function AddInfluencerPage() {
   // Handle resume from existing account
   const handleResumeExisting = async () => {
     const { existingAccount, existingJob } = state;
-    
+
     if (!existingAccount) return;
 
     setState((prev) => ({ ...prev, isLoading: true }));
@@ -186,11 +186,11 @@ export default function AddInfluencerPage() {
     try {
       // Check if scan already completed successfully
       const scanCompleted = existingJob && existingJob.status === 'succeeded';
-      
+
       if (scanCompleted) {
         // ✅ Scan already completed - processing runs automatically by orchestrator!
         console.log(`[Resume] Scan already completed - orchestrator handles processing automatically for account ${existingAccount.id}`);
-        
+
         setState((prev) => ({
           ...prev,
           accountId: existingAccount.id,
@@ -199,7 +199,7 @@ export default function AddInfluencerPage() {
           step: 'processing', // ⚡ Go to processing step!
           isLoading: false,
         }));
-        
+
         // ⚡ REMOVED: startContentProcessing(existingAccount.id);
         // Processing is handled by newScanOrchestrator automatically to avoid duplicate runs!
         return;
@@ -210,9 +210,9 @@ export default function AddInfluencerPage() {
       if (hasActiveJob) {
         // Resume from existing job
         const nextStep = existingJob.current_step + 1; // Continue from next step
-        
+
         console.log(`[Resume] Continuing job ${existingJob.id} from step ${nextStep}`);
-        
+
         setState((prev) => ({
           ...prev,
           accountId: existingAccount.id,
@@ -220,12 +220,12 @@ export default function AddInfluencerPage() {
           step: 'scraping',
           isLoading: false,
         }));
-        
+
         // NEW: Scan continues automatically
       } else {
         // Job failed or doesn't exist - start new scan
         console.log(`[Resume] Starting new job for existing account ${existingAccount.id}`);
-        
+
         const scrapingRes = await fetch('/api/scan/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -250,7 +250,7 @@ export default function AddInfluencerPage() {
         step: 'scraping',
         isLoading: false,
       }));
-        
+
         // NEW: Scan starts automatically when created!
       }
     } catch (error: any) {
@@ -266,7 +266,7 @@ export default function AddInfluencerPage() {
   // Handle delete and restart
   const handleDeleteAndRestart = async () => {
     const { existingAccount, existingJob } = state;
-    
+
     if (!existingAccount) return;
 
     setState((prev) => ({ ...prev, isLoading: true }));
@@ -278,15 +278,15 @@ export default function AddInfluencerPage() {
       if (existingJob) {
         await fetch(`/api/scan/status?jobId=${existingJob.id}`, { method: 'DELETE' });
       }
-      
+
       // Delete account
       await fetch(`/api/admin/accounts/${existingAccount.id}`, { method: 'DELETE' });
-      
+
       console.log(`[Delete] Deleted account and job, starting fresh...`);
-      
+
       // Wait a bit for deletion to complete
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       // Create new account
       const accountRes = await fetch('/api/admin/accounts', {
         method: 'POST',
@@ -397,16 +397,16 @@ export default function AddInfluencerPage() {
   // Step 1: Handle username submission
   const handleUsernameSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const username = state.username.trim().replace('@', '');
     if (!username) {
       setState((prev) => ({ ...prev, error: 'נא להזין שם משתמש' }));
       return;
     }
 
-    setState((prev) => ({ 
-      ...prev, 
-      isLoading: true, 
+    setState((prev) => ({
+      ...prev,
+      isLoading: true,
       error: null,
       subdomain: username.toLowerCase().replace(/[^a-z0-9]/g, ''),
     }));
@@ -414,17 +414,17 @@ export default function AddInfluencerPage() {
     try {
       // Check account status with smart resume logic
       const statusRes = await fetch(`/api/admin/accounts/status?username=${username}`);
-      
+
       if (statusRes.ok) {
         const status = await statusRes.json();
-        
+
         if (status.exists) {
           // Account exists - determine what to do based on status
           const { recommendation, accountId, hasPosts, hasPersona } = status;
-          
+
           console.log('[Resume] Status:', status);
           console.log('[Resume] Recommendation:', recommendation);
-          
+
           setState((prev) => ({
             ...prev,
             accountId,
@@ -433,7 +433,7 @@ export default function AddInfluencerPage() {
             existingJob: status.lastJob,
             isLoading: false,
           }));
-          
+
           // Auto-navigate based on recommendation
           if (recommendation.action === 'skip_to_settings') {
             // Everything done - skip to settings
@@ -467,11 +467,11 @@ export default function AddInfluencerPage() {
               step: 'resume-choice',
             }));
           }
-          
+
           return;
         }
       }
-      
+
       // Account doesn't exist - create new one
       const accountRes = await fetch('/api/admin/accounts', {
         method: 'POST',
@@ -544,9 +544,9 @@ export default function AddInfluencerPage() {
     e.preventDefault();
 
     if (!state.password || state.password.length < 6) {
-      setState((prev) => ({ 
-        ...prev, 
-        error: 'סיסמה חייבת להכיל לפחות 6 תווים' 
+      setState((prev) => ({
+        ...prev,
+        error: 'סיסמה חייבת להכיל לפחות 6 תווים'
       }));
       return;
     }
@@ -585,7 +585,7 @@ export default function AddInfluencerPage() {
   if (checkingAuth) {
     return (
       <div className="min-h-screen admin-panel flex items-center justify-center" dir="rtl">
-        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-[#a094e0] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -611,22 +611,22 @@ export default function AddInfluencerPage() {
           return (
             <div key={step.id} className="flex items-center">
               <div
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                className="flex items-center gap-2 px-4 py-2 rounded-full transition-all"
+                style={
                   isActive
-                    ? 'bg-indigo-500 text-white'
+                    ? { background: 'rgba(160, 148, 224, 0.15)', color: '#a094e0', border: '1px solid rgba(160, 148, 224, 0.3)' }
                     : isCompleted
-                    ? 'bg-green-500/20 text-green-400'
-                    : 'bg-gray-800 text-gray-500'
-                }`}
+                    ? { background: 'rgba(94, 234, 212, 0.08)', color: '#5eead4', border: '1px solid rgba(94, 234, 212, 0.15)' }
+                    : { background: 'rgba(255, 255, 255, 0.02)', color: 'rgba(237, 233, 248, 0.25)', border: '1px solid rgba(255, 255, 255, 0.04)' }
+                }
               >
                 <Icon className="w-4 h-4" />
                 <span className="text-sm font-medium hidden sm:inline">{step.label}</span>
               </div>
               {index < steps.length - 1 && (
                 <div
-                  className={`w-8 h-0.5 mx-2 ${
-                    isCompleted ? 'bg-green-500' : 'bg-gray-700'
-                  }`}
+                  className="w-8 h-0.5 mx-2"
+                  style={{ background: isCompleted ? '#5eead4' : 'rgba(255, 255, 255, 0.06)' }}
                 />
               )}
             </div>
@@ -638,22 +638,22 @@ export default function AddInfluencerPage() {
 
   return (
     <div className="min-h-screen admin-panel" dir="rtl">
-      {/* Background */}
-      <div className="fixed inset-0 bg-gradient-to-br from-indigo-900/20 via-gray-950 to-purple-900/20" />
-
       {/* Header */}
-      <header className="relative z-10 px-6 py-4 border-b border-gray-800">
+      <header
+        className="relative z-10 px-6 py-4"
+        style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.06)' }}
+      >
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <Link
             href="/admin/dashboard"
-            className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
+            className="btn-ghost flex items-center gap-2 text-sm"
           >
             <ArrowRight className="w-5 h-5" />
             חזרה לדשבורד
           </Link>
           <div className="flex items-center gap-2">
-            <Zap className="w-5 h-5 text-indigo-500" />
-            <span className="font-semibold text-white">הוספת משפיען חדש</span>
+            <Zap className="w-5 h-5" style={{ color: '#a094e0' }} />
+            <span className="font-semibold" style={{ color: '#ede9f8' }}>הוספת משפיען חדש</span>
           </div>
         </div>
       </header>
@@ -667,7 +667,7 @@ export default function AddInfluencerPage() {
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-6 p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-center"
+            className="pill pill-red mb-6 px-4 py-3 text-sm text-center w-full"
           >
             {state.error}
           </motion.div>
@@ -678,53 +678,54 @@ export default function AddInfluencerPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-2xl p-8"
+            className="admin-card p-8"
           >
             <div className="text-center mb-8">
-              <Instagram className="w-16 h-16 text-indigo-500 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-white mb-2">
+              <Instagram className="w-16 h-16 mx-auto mb-4" style={{ color: '#a094e0' }} />
+              <h2 className="text-2xl font-bold mb-2" style={{ color: '#ede9f8' }}>
                 הזן שם משתמש אינסטגרם
               </h2>
-              <p className="text-gray-400">
+              <p style={{ color: 'rgba(237, 233, 248, 0.35)' }}>
                 המערכת תסרוק את הפרופיל ותבנה פרסונה מלאה
               </p>
             </div>
 
             <form onSubmit={handleUsernameSubmit} className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium mb-2" style={{ color: 'rgba(237, 233, 248, 0.5)' }}>
                   שם משתמש
                 </label>
                 <div className="relative">
-                  <Instagram className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                  <Instagram className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5" style={{ color: 'rgba(237, 233, 248, 0.25)' }} />
                   <input
                     type="text"
                     value={state.username}
                     onChange={(e) => setState(prev => ({ ...prev, username: e.target.value }))}
                     placeholder="username"
-                    className="w-full pr-12 pl-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="admin-input w-full !rounded-xl pr-12 pl-4 py-3"
                     disabled={state.isLoading}
                   />
                 </div>
-                <p className="mt-2 text-sm text-gray-500">
+                <p className="mt-2 text-sm" style={{ color: 'rgba(237, 233, 248, 0.25)' }}>
                   אפשר להזין עם או בלי @
                 </p>
               </div>
 
               {/* Account Type Selector */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium mb-2" style={{ color: 'rgba(237, 233, 248, 0.5)' }}>
                   סוג חשבון
                 </label>
                 <div className="flex gap-3">
                   <button
                     type="button"
                     onClick={() => setState(prev => ({ ...prev, accountType: 'creator' }))}
-                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border transition-all ${
+                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-all"
+                    style={
                       state.accountType === 'creator'
-                        ? 'border-indigo-500 bg-indigo-500/10 text-white'
-                        : 'border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600'
-                    }`}
+                        ? { background: 'rgba(160, 148, 224, 0.1)', border: '1px solid rgba(160, 148, 224, 0.3)', color: '#ede9f8' }
+                        : { background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.06)', color: 'rgba(237, 233, 248, 0.35)' }
+                    }
                   >
                     <User className="w-5 h-5" />
                     משפיען / יוצר תוכן
@@ -732,11 +733,12 @@ export default function AddInfluencerPage() {
                   <button
                     type="button"
                     onClick={() => setState(prev => ({ ...prev, accountType: 'brand' }))}
-                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border transition-all ${
+                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-all"
+                    style={
                       state.accountType === 'brand'
-                        ? 'border-indigo-500 bg-indigo-500/10 text-white'
-                        : 'border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600'
-                    }`}
+                        ? { background: 'rgba(160, 148, 224, 0.1)', border: '1px solid rgba(160, 148, 224, 0.3)', color: '#ede9f8' }
+                        : { background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.06)', color: 'rgba(237, 233, 248, 0.35)' }
+                    }
                   >
                     <Building2 className="w-5 h-5" />
                     מותג
@@ -747,7 +749,7 @@ export default function AddInfluencerPage() {
               <button
                 type="submit"
                 disabled={state.isLoading || !state.username.trim()}
-                className="w-full py-3 bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                className="btn-primary w-full py-3 font-medium flex items-center justify-center gap-2"
               >
                 {state.isLoading ? (
                   <>
@@ -770,52 +772,55 @@ export default function AddInfluencerPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-2xl p-8"
+            className="admin-card p-8"
           >
             <div className="text-center mb-8">
-              <Instagram className="w-16 h-16 text-indigo-500 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-white mb-2">
+              <Instagram className="w-16 h-16 mx-auto mb-4" style={{ color: '#a094e0' }} />
+              <h2 className="text-2xl font-bold mb-2" style={{ color: '#ede9f8' }}>
                 חשבון קיים נמצא
               </h2>
-              <p className="text-gray-400">
+              <p style={{ color: 'rgba(237, 233, 248, 0.35)' }}>
                 @{state.username} כבר קיים במערכת
               </p>
             </div>
 
             {/* Account Info */}
-            <div className="bg-gray-800/50 rounded-xl p-6 mb-6">
+            <div
+              className="rounded-xl p-6 mb-6"
+              style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.06)' }}
+            >
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-400">חשבון:</span>
-                  <span className="text-white font-medium">@{state.username}</span>
+                  <span style={{ color: 'rgba(237, 233, 248, 0.35)' }}>חשבון:</span>
+                  <span className="font-medium" style={{ color: '#ede9f8' }}>@{state.username}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-400">סטטוס:</span>
-                  <span className="text-green-400">{state.existingAccount.status}</span>
+                  <span style={{ color: 'rgba(237, 233, 248, 0.35)' }}>סטטוס:</span>
+                  <span style={{ color: '#5eead4' }}>{state.existingAccount.status}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-400">נוצר:</span>
-                  <span className="text-white">
+                  <span style={{ color: 'rgba(237, 233, 248, 0.35)' }}>נוצר:</span>
+                  <span style={{ color: '#ede9f8' }}>
                     {new Date(state.existingAccount.createdAt).toLocaleString('he-IL')}
                   </span>
                 </div>
                 {state.existingJob && (
                   <>
-                    <div className="border-t border-gray-700 my-3"></div>
+                    <div className="my-3" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.06)' }} />
                     <div className="flex justify-between">
-                      <span className="text-gray-400">ריצה:</span>
-                      <span className={`font-medium ${
-                        state.existingJob.status === 'completed' ? 'text-green-400' :
-                        state.existingJob.status === 'failed' ? 'text-red-400' :
-                        'text-yellow-400'
-                      }`}>
+                      <span style={{ color: 'rgba(237, 233, 248, 0.35)' }}>ריצה:</span>
+                      <span className="font-medium" style={{
+                        color: state.existingJob.status === 'completed' ? '#5eead4' :
+                               state.existingJob.status === 'failed' ? '#f87171' :
+                               '#fbbf24'
+                      }}>
                         {state.existingJob.status === 'completed' ? '✅ הושלם' :
                          state.existingJob.status === 'failed' ? `❌ נכשל בשלב ${state.existingJob.error_step || state.existingJob.current_step}` :
                          `🔄 שלב ${state.existingJob.current_step} מתוך 7`}
                       </span>
                     </div>
                     {state.existingJob.error_message && (
-                      <div className="text-xs text-red-400 mt-2">
+                      <div className="text-xs mt-2" style={{ color: '#f87171' }}>
                         שגיאה: {state.existingJob.error_message}
                       </div>
                     )}
@@ -829,17 +834,17 @@ export default function AddInfluencerPage() {
               <button
                 onClick={handleResumeExisting}
                 disabled={state.isLoading}
-                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white px-8 py-4 rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="btn-primary w-full py-4 font-medium flex items-center justify-center gap-2"
               >
                 {state.isLoading ? (
                   <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
                     מעבד...
                   </>
                 ) : (
                   <>
                     <ArrowRight className="w-5 h-5" />
-                    {state.existingJob ? 
+                    {state.existingJob ?
                       `המשך מ${state.existingJob.status === 'failed' ? 'שלב שנכשל' : `שלב ${state.existingJob.current_step + 1}`}` :
                       'התחל ריצה חדשה עם הנתונים הקיימים'
                     }
@@ -850,7 +855,8 @@ export default function AddInfluencerPage() {
               <button
                 onClick={handleDeleteAndRestart}
                 disabled={state.isLoading}
-                className="w-full bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-600/50 px-8 py-4 rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-4 rounded-full font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: 'rgba(239, 68, 68, 0.08)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.15)' }}
               >
                 🗑️ מחק הכל והתחל מאפס
               </button>
@@ -858,7 +864,7 @@ export default function AddInfluencerPage() {
               <button
                 onClick={() => setState((prev) => ({ ...prev, step: 'username', username: '' }))}
                 disabled={state.isLoading}
-                className="w-full text-gray-400 hover:text-white transition-colors py-2"
+                className="btn-ghost w-full py-2"
               >
                 ← חזור
               </button>
@@ -871,19 +877,20 @@ export default function AddInfluencerPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-2xl p-8"
+            className="admin-card p-8"
           >
             <div className="text-center mb-8">
-              <Zap className="w-16 h-16 text-indigo-500 mx-auto mb-4 animate-pulse" />
-              <h2 className="text-2xl font-bold text-white mb-2">
+              <Zap className="w-16 h-16 mx-auto mb-4 animate-pulse" style={{ color: '#a094e0' }} />
+              <h2 className="text-2xl font-bold mb-2" style={{ color: '#ede9f8' }}>
                 סורק ומנתח את הפרופיל
               </h2>
-              <p className="text-gray-400 mb-4">
+              <p className="mb-4" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>
                 תהליך זה עשוי לקחת 15-20 דקות
               </p>
               <button
                 onClick={handleCancelScraping}
-                className="text-red-400 hover:text-red-300 text-sm underline transition-colors"
+                className="text-sm underline transition-colors"
+                style={{ color: '#f87171' }}
               >
                 בטל ריצה ומחק נתונים
               </button>
@@ -892,58 +899,68 @@ export default function AddInfluencerPage() {
             {jobStatus && (
               <div className="space-y-6">
                 {/* Progress Bar */}
-                <div className="w-full bg-gray-800 rounded-full h-3 overflow-hidden">
+                <div className="w-full h-3 rounded-full overflow-hidden" style={{ background: 'rgba(255, 255, 255, 0.06)' }}>
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${jobStatus.progress || 0}%` }}
                     transition={{ duration: 0.5 }}
-                    className="h-full bg-gradient-to-r from-indigo-500 to-purple-500"
+                    className="h-full rounded-full"
+                    style={{ background: '#a094e0' }}
                   />
                 </div>
 
                 {/* Current Status */}
                 <div className="text-center">
-                  <p className="text-lg font-medium text-white mb-1">
+                  <p className="text-lg font-medium mb-1" style={{ color: '#ede9f8' }}>
                     {jobStatus.status === 'queued' && '⏳ ממתין בתור...'}
                     {jobStatus.status === 'running' && `🔄 ${jobStatus.current_step || 'סורק נתונים'}...`}
                     {jobStatus.status === 'succeeded' && '✅ סריקה הושלמה!'}
                     {jobStatus.status === 'failed' && '❌ נכשל'}
                   </p>
-                  <p className="text-sm text-gray-400">
+                  <p className="text-sm" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>
                     {Math.round(jobStatus.progress || 0)}% הושלם
                   </p>
                 </div>
 
-                {/* Detailed Steps (NEW!) */}
+                {/* Detailed Steps */}
                 {jobStatus.steps && Object.keys(jobStatus.steps).length > 0 && (
-                  <div className="bg-gray-800/50 rounded-xl p-5 space-y-3">
-                    <p className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                  <div
+                    className="rounded-xl p-5 space-y-3"
+                    style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.06)' }}
+                  >
+                    <p className="text-sm font-bold mb-4 flex items-center gap-2" style={{ color: '#ede9f8' }}>
                       🔍 שלבי הסריקה בזמן אמת:
                     </p>
                     <div className="space-y-3">
                       {Object.entries(jobStatus.steps).map(([key, step]: [string, any]) => (
-                        <div key={key} className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-700/30 transition-colors">
-                          <span className={`text-lg mt-0.5 flex-shrink-0 ${
-                            step.status === 'completed' ? 'text-green-400' :
-                            step.status === 'running' ? 'text-blue-400 animate-pulse' :
-                            step.status === 'failed' ? 'text-red-400' :
-                            'text-gray-500'
-                          }`}>
+                        <div
+                          key={key}
+                          className="flex items-start gap-3 p-2 rounded-lg transition-colors"
+                          style={{ background: 'transparent' }}
+                        >
+                          <span className={`text-lg mt-0.5 flex-shrink-0 ${step.status === 'running' ? 'animate-pulse' : ''}`}
+                            style={{
+                              color: step.status === 'completed' ? '#5eead4' :
+                                     step.status === 'running' ? '#a094e0' :
+                                     step.status === 'failed' ? '#f87171' :
+                                     'rgba(237, 233, 248, 0.25)'
+                            }}
+                          >
                             {step.status === 'completed' && '✅'}
                             {step.status === 'running' && '🔄'}
                             {step.status === 'failed' && '❌'}
                             {step.status === 'pending' && '⏸️'}
                           </span>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm text-gray-200 font-medium">{step.message || key}</p>
+                            <p className="text-sm font-medium" style={{ color: 'rgba(237, 233, 248, 0.7)' }}>{step.message || key}</p>
                             {step.timestamp && (
-                              <p className="text-xs text-gray-500 mt-0.5">
+                              <p className="text-xs mt-0.5" style={{ color: 'rgba(237, 233, 248, 0.2)' }}>
                                 {new Date(step.timestamp).toLocaleTimeString('he-IL')}
                               </p>
                             )}
                           </div>
                           {step.progress > 0 && (
-                            <span className="text-xs text-gray-400 font-mono">
+                            <span className="text-xs font-mono" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>
                               {step.progress}%
                             </span>
                           )}
@@ -953,45 +970,48 @@ export default function AddInfluencerPage() {
                   </div>
                 )}
 
-                {/* Results Summary (if available) */}
+                {/* Results Summary */}
                 {jobStatus.results && (
-                  <div className="bg-gray-800/50 rounded-xl p-4 space-y-2">
-                    <p className="text-sm font-medium text-white mb-3">✅ נסרק בהצלחה:</p>
+                  <div
+                    className="rounded-xl p-4 space-y-2"
+                    style={{ background: 'rgba(94, 234, 212, 0.04)', border: '1px solid rgba(94, 234, 212, 0.1)' }}
+                  >
+                    <p className="text-sm font-medium mb-3" style={{ color: '#ede9f8' }}>✅ נסרק בהצלחה:</p>
                     <div className="grid grid-cols-2 gap-3 text-xs">
                       {jobStatus.results.profile && (
                         <div className="flex items-center gap-2">
-                          <span className="text-green-400">✓</span>
-                          <span className="text-gray-300">פרופיל</span>
+                          <span style={{ color: '#5eead4' }}>✓</span>
+                          <span style={{ color: 'rgba(237, 233, 248, 0.5)' }}>פרופיל</span>
                         </div>
                       )}
                       {jobStatus.results.posts_count > 0 && (
                         <div className="flex items-center gap-2">
-                          <span className="text-green-400">✓</span>
-                          <span className="text-gray-300">{jobStatus.results.posts_count} פוסטים</span>
+                          <span style={{ color: '#5eead4' }}>✓</span>
+                          <span style={{ color: 'rgba(237, 233, 248, 0.5)' }}>{jobStatus.results.posts_count} פוסטים</span>
                         </div>
                       )}
                       {jobStatus.results.highlights_count > 0 && (
                         <div className="flex items-center gap-2">
-                          <span className="text-green-400">✓</span>
-                          <span className="text-gray-300">{jobStatus.results.highlights_count} הילייטס</span>
+                          <span style={{ color: '#5eead4' }}>✓</span>
+                          <span style={{ color: 'rgba(237, 233, 248, 0.5)' }}>{jobStatus.results.highlights_count} הילייטס</span>
                         </div>
                       )}
                       {jobStatus.results.comments_count > 0 && (
                         <div className="flex items-center gap-2">
-                          <span className="text-green-400">✓</span>
-                          <span className="text-gray-300">{jobStatus.results.comments_count} תגובות</span>
+                          <span style={{ color: '#5eead4' }}>✓</span>
+                          <span style={{ color: 'rgba(237, 233, 248, 0.5)' }}>{jobStatus.results.comments_count} תגובות</span>
                         </div>
                       )}
                       {jobStatus.results.websites_crawled > 0 && (
                         <div className="flex items-center gap-2">
-                          <span className="text-green-400">✓</span>
-                          <span className="text-gray-300">{jobStatus.results.websites_crawled} אתרים</span>
+                          <span style={{ color: '#5eead4' }}>✓</span>
+                          <span style={{ color: 'rgba(237, 233, 248, 0.5)' }}>{jobStatus.results.websites_crawled} אתרים</span>
                         </div>
                       )}
                       {jobStatus.results.transcripts_count > 0 && (
                         <div className="flex items-center gap-2">
-                          <span className="text-green-400">✓</span>
-                          <span className="text-gray-300">{jobStatus.results.transcripts_count} תמלולים</span>
+                          <span style={{ color: '#5eead4' }}>✓</span>
+                          <span style={{ color: 'rgba(237, 233, 248, 0.5)' }}>{jobStatus.results.transcripts_count} תמלולים</span>
                         </div>
                       )}
                     </div>
@@ -1000,11 +1020,14 @@ export default function AddInfluencerPage() {
 
                 {/* Error Display */}
                 {jobStatus.error && (
-                  <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
-                    <p className="text-red-400 font-medium mb-1">שגיאה:</p>
-                    <p className="text-sm text-red-300">{jobStatus.error.message}</p>
+                  <div
+                    className="rounded-xl p-4"
+                    style={{ background: 'rgba(239, 68, 68, 0.06)', border: '1px solid rgba(239, 68, 68, 0.15)' }}
+                  >
+                    <p className="font-medium mb-1" style={{ color: '#f87171' }}>שגיאה:</p>
+                    <p className="text-sm" style={{ color: '#fca5a5' }}>{jobStatus.error.message}</p>
                     {jobStatus.error.code && (
-                      <p className="text-xs text-red-400 mt-2">קוד: {jobStatus.error.code}</p>
+                      <p className="text-xs mt-2" style={{ color: '#f87171' }}>קוד: {jobStatus.error.code}</p>
                     )}
                   </div>
                 )}
@@ -1013,25 +1036,25 @@ export default function AddInfluencerPage() {
           </motion.div>
         )}
 
-        {/* Step 3: Processing Content & Building Persona (NEW!) */}
+        {/* Step 3: Processing Content & Building Persona */}
         {state.step === 'processing' && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-2xl p-8"
+            className="admin-card p-8"
           >
             <div className="text-center mb-8">
-              <Zap className="w-16 h-16 text-purple-500 mx-auto mb-4 animate-pulse" />
-              <h2 className="text-2xl font-bold text-white mb-2">
+              <Zap className="w-16 h-16 mx-auto mb-4 animate-pulse" style={{ color: '#a094e0' }} />
+              <h2 className="text-2xl font-bold mb-2" style={{ color: '#ede9f8' }}>
                 מעבד תוכן ובונה פרסונה 🤖
               </h2>
               {/* ⚡ Show transcription progress in header */}
               {transcriptionProgress && transcriptionProgress.total > 0 && (
-                <p className="text-indigo-400 font-medium mb-1">
+                <p className="font-medium mb-1" style={{ color: '#a094e0' }}>
                   מתמלל סרטון {transcriptionProgress.completed + 1} מתוך {transcriptionProgress.total}
                 </p>
               )}
-              <p className="text-gray-400">
+              <p style={{ color: 'rgba(237, 233, 248, 0.35)' }}>
                 תמלול סרטונים + ניתוח AI + בניית אישיות ייחודית
               </p>
             </div>
@@ -1041,91 +1064,102 @@ export default function AddInfluencerPage() {
               <div className="space-y-4">
                 {/* Progress Indicator */}
                 <div className="flex items-center justify-center gap-3 mb-6">
-                  <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
-                  <span className="text-white font-medium">מעבד...</span>
+                  <div className="w-12 h-12 border-4 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#a094e0', borderTopColor: 'transparent' }} />
+                  <span className="font-medium" style={{ color: '#ede9f8' }}>מעבד...</span>
                 </div>
 
                 {/* Current Content */}
-                <div className="bg-gray-800/50 rounded-xl p-4">
-                  <p className="text-sm font-medium text-white mb-3">📊 תוכן זמין:</p>
+                <div
+                  className="rounded-xl p-4"
+                  style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.06)' }}
+                >
+                  <p className="text-sm font-medium mb-3" style={{ color: '#ede9f8' }}>📊 תוכן זמין:</p>
                   <div className="grid grid-cols-2 gap-3 text-xs">
                     <div className="flex items-center justify-between">
-                      <span className="text-gray-300">פוסטים</span>
-                      <span className="text-white font-medium">{processingStatus.content?.posts || 0}</span>
+                      <span style={{ color: 'rgba(237, 233, 248, 0.5)' }}>פוסטים</span>
+                      <span className="font-medium" style={{ color: '#ede9f8' }}>{processingStatus.content?.posts || 0}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-gray-300">Stories</span>
-                      <span className="text-white font-medium">{processingStatus.content?.highlights || 0}</span>
+                      <span style={{ color: 'rgba(237, 233, 248, 0.5)' }}>Stories</span>
+                      <span className="font-medium" style={{ color: '#ede9f8' }}>{processingStatus.content?.highlights || 0}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-gray-300">תמלולים</span>
-                      <span className="text-white font-medium">{processingStatus.transcriptions?.completed || 0}</span>
+                      <span style={{ color: 'rgba(237, 233, 248, 0.5)' }}>תמלולים</span>
+                      <span className="font-medium" style={{ color: '#ede9f8' }}>{processingStatus.transcriptions?.completed || 0}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-gray-300">בהמתנה</span>
-                      <span className="text-gray-400">{processingStatus.transcriptions?.pending || 0}</span>
+                      <span style={{ color: 'rgba(237, 233, 248, 0.5)' }}>בהמתנה</span>
+                      <span style={{ color: 'rgba(237, 233, 248, 0.35)' }}>{processingStatus.transcriptions?.pending || 0}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* ⚡ NEW: Transcription Progress */}
+                {/* ⚡ Transcription Progress */}
                 {transcriptionProgress && transcriptionProgress.total > 0 && (
-                  <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4">
+                  <div
+                    className="rounded-xl p-4"
+                    style={{ background: 'rgba(160, 148, 224, 0.06)', border: '1px solid rgba(160, 148, 224, 0.15)' }}
+                  >
                     <div className="flex items-center justify-between mb-3">
-                      <p className="text-sm font-medium text-white">🎤 התקדמות תמלול:</p>
-                      <span className="text-indigo-400 font-bold">
+                      <p className="text-sm font-medium" style={{ color: '#ede9f8' }}>🎤 התקדמות תמלול:</p>
+                      <span className="font-bold" style={{ color: '#a094e0' }}>
                         {transcriptionProgress.completed}/{transcriptionProgress.total}
                       </span>
                     </div>
 
                     {/* Progress Bar */}
-                    <div className="w-full bg-gray-800 rounded-full h-2 mb-3 overflow-hidden">
+                    <div className="w-full h-2 mb-3 rounded-full overflow-hidden" style={{ background: 'rgba(255, 255, 255, 0.06)' }}>
                       <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${transcriptionProgress.percentage || 0}%` }}
                         transition={{ duration: 0.3 }}
-                        className="h-full bg-gradient-to-r from-indigo-500 to-purple-500"
+                        className="h-full rounded-full"
+                        style={{ background: '#a094e0' }}
                       />
                     </div>
 
                     {/* Status Breakdown */}
                     <div className="grid grid-cols-4 gap-2 text-xs mb-3">
                       <div className="text-center">
-                        <div className="text-green-400 font-bold">{transcriptionProgress.completed}</div>
-                        <div className="text-gray-400">הושלם</div>
+                        <div className="font-bold" style={{ color: '#5eead4' }}>{transcriptionProgress.completed}</div>
+                        <div style={{ color: 'rgba(237, 233, 248, 0.35)' }}>הושלם</div>
                       </div>
                       {transcriptionProgress.processing > 0 && (
                         <div className="text-center">
-                          <div className="text-blue-400 font-bold animate-pulse">{transcriptionProgress.processing}</div>
-                          <div className="text-gray-400">מתמלל</div>
+                          <div className="font-bold animate-pulse" style={{ color: '#a094e0' }}>{transcriptionProgress.processing}</div>
+                          <div style={{ color: 'rgba(237, 233, 248, 0.35)' }}>מתמלל</div>
                         </div>
                       )}
                       {transcriptionProgress.pending > 0 && (
                         <div className="text-center">
-                          <div className="text-yellow-400 font-bold">{transcriptionProgress.pending}</div>
-                          <div className="text-gray-400">ממתין</div>
+                          <div className="font-bold" style={{ color: '#fbbf24' }}>{transcriptionProgress.pending}</div>
+                          <div style={{ color: 'rgba(237, 233, 248, 0.35)' }}>ממתין</div>
                         </div>
                       )}
                       {transcriptionProgress.failed > 0 && (
                         <div className="text-center">
-                          <div className="text-red-400 font-bold">{transcriptionProgress.failed}</div>
-                          <div className="text-gray-400">נכשל</div>
+                          <div className="font-bold" style={{ color: '#f87171' }}>{transcriptionProgress.failed}</div>
+                          <div style={{ color: 'rgba(237, 233, 248, 0.35)' }}>נכשל</div>
                         </div>
                       )}
                     </div>
 
                     {/* Recent Transcriptions Summary */}
                     {transcriptionProgress.recentTranscriptions && transcriptionProgress.recentTranscriptions.length > 0 && (
-                      <div className="border-t border-indigo-500/20 pt-3">
-                        <p className="text-xs text-gray-400 mb-2">תמלולים אחרונים:</p>
+                      <div className="pt-3" style={{ borderTop: '1px solid rgba(160, 148, 224, 0.15)' }}>
+                        <p className="text-xs mb-2" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>תמלולים אחרונים:</p>
                         <div className="space-y-2">
                           {transcriptionProgress.recentTranscriptions.map((t: any, i: number) => (
-                            <div key={i} className="text-xs bg-gray-800/50 rounded p-2">
+                            <div
+                              key={i}
+                              className="text-xs rounded p-2"
+                              style={{ background: 'rgba(255, 255, 255, 0.02)' }}
+                            >
                               <div className="flex items-center justify-between mb-1">
-                                <span className="text-indigo-400">{t.sourceType}</span>
-                                <span className="text-gray-500">{t.language}</span>
+                                <span style={{ color: '#a094e0' }}>{t.sourceType}</span>
+                                <span style={{ color: 'rgba(237, 233, 248, 0.25)' }}>{t.language}</span>
                               </div>
-                              <p className="text-gray-300 truncate">{t.preview}</p>
+                              <p className="truncate" style={{ color: 'rgba(237, 233, 248, 0.5)' }}>{t.preview}</p>
                             </div>
                           ))}
                         </div>
@@ -1136,10 +1170,13 @@ export default function AddInfluencerPage() {
 
                 {/* Persona Status */}
                 {processingStatus.hasPersona ? (
-                  <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 text-center">
-                    <p className="text-green-400 font-medium mb-2">✅ הפרסונה נבנתה בהצלחה!</p>
+                  <div
+                    className="rounded-xl p-4 text-center"
+                    style={{ background: 'rgba(94, 234, 212, 0.06)', border: '1px solid rgba(94, 234, 212, 0.15)' }}
+                  >
+                    <p className="font-medium mb-2" style={{ color: '#5eead4' }}>✅ הפרסונה נבנתה בהצלחה!</p>
                     {processingStatus.persona && (
-                      <div className="text-xs text-gray-300 space-y-1">
+                      <div className="text-xs space-y-1" style={{ color: 'rgba(237, 233, 248, 0.5)' }}>
                         <p>שם: {processingStatus.persona.name}</p>
                         <p>טון: {processingStatus.persona.tone}</p>
                         <p>{processingStatus.persona.topics} נושאים | {processingStatus.persona.products} מוצרים | {processingStatus.persona.coupons} קופונים</p>
@@ -1147,36 +1184,42 @@ export default function AddInfluencerPage() {
                     )}
                   </div>
                 ) : (
-                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-center">
-                    <p className="text-blue-400 font-medium">🤖 בונה פרסונה...</p>
-                    <p className="text-xs text-gray-400 mt-1">זה עשוי לקחת 1-3 דקות</p>
+                  <div
+                    className="rounded-xl p-4 text-center"
+                    style={{ background: 'rgba(160, 148, 224, 0.06)', border: '1px solid rgba(160, 148, 224, 0.15)' }}
+                  >
+                    <p className="font-medium" style={{ color: '#a094e0' }}>🤖 בונה פרסונה...</p>
+                    <p className="text-xs mt-1" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>זה עשוי לקחת 1-3 דקות</p>
                   </div>
                 )}
 
                 {/* Processing Steps */}
-                <div className="bg-gray-800/50 rounded-xl p-4">
-                  <p className="text-sm font-medium text-white mb-3">⚡ מה קורה עכשיו:</p>
-                  <div className="space-y-2 text-xs text-gray-300">
+                <div
+                  className="rounded-xl p-4"
+                  style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.06)' }}
+                >
+                  <p className="text-sm font-medium mb-3" style={{ color: '#ede9f8' }}>⚡ מה קורה עכשיו:</p>
+                  <div className="space-y-2 text-xs" style={{ color: 'rgba(237, 233, 248, 0.5)' }}>
                     <div className="flex items-center gap-2">
-                      <span className={processingStatus.transcriptions?.completed > 0 ? 'text-green-400' : 'text-blue-400'}>
+                      <span style={{ color: processingStatus.transcriptions?.completed > 0 ? '#5eead4' : '#a094e0' }}>
                         {processingStatus.transcriptions?.completed > 0 ? '✓' : '⏳'}
                       </span>
                       <span>תמלול סרטונים באמצעות Gemini 3 Pro</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className={processingStatus.hasPersona ? 'text-green-400' : 'text-blue-400'}>
+                      <span style={{ color: processingStatus.hasPersona ? '#5eead4' : '#a094e0' }}>
                         {processingStatus.hasPersona ? '✓' : '⏳'}
                       </span>
                       <span>ניתוח תוכן וזיהוי דפוסים</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className={processingStatus.hasPersona ? 'text-green-400' : 'text-blue-400'}>
+                      <span style={{ color: processingStatus.hasPersona ? '#5eead4' : '#a094e0' }}>
                         {processingStatus.hasPersona ? '✓' : '⏳'}
                       </span>
                       <span>בניית פרסונה AI ייחודית</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className={processingStatus.hasPersona ? 'text-green-400' : 'text-blue-400'}>
+                      <span style={{ color: processingStatus.hasPersona ? '#5eead4' : '#a094e0' }}>
                         {processingStatus.hasPersona ? '✓' : '⏳'}
                       </span>
                       <span>זיהוי מוצרים, קופונים ושותפויות</span>
@@ -1187,8 +1230,8 @@ export default function AddInfluencerPage() {
             )}
 
             {!processingStatus && (
-              <div className="text-center text-gray-400">
-                <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+              <div className="text-center" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>
+                <div className="w-12 h-12 border-4 border-t-transparent rounded-full animate-spin mx-auto mb-4" style={{ borderColor: '#a094e0', borderTopColor: 'transparent' }} />
                 <p>מתחבר למערכת העיבוד...</p>
               </div>
             )}
@@ -1200,21 +1243,21 @@ export default function AddInfluencerPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-2xl p-8"
+            className="admin-card p-8"
           >
             <div className="text-center mb-8">
-              <User className="w-16 h-16 text-indigo-500 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-white mb-2">
+              <User className="w-16 h-16 mx-auto mb-4" style={{ color: '#a094e0' }} />
+              <h2 className="text-2xl font-bold mb-2" style={{ color: '#ede9f8' }}>
                 הגדרות חשבון
               </h2>
-              <p className="text-gray-400">
+              <p style={{ color: 'rgba(237, 233, 248, 0.35)' }}>
                 הפרסונה נבנתה בהצלחה! כעת נשאר להגדיר את פרטי הגישה
               </p>
             </div>
 
             <form onSubmit={handlePublish} className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium mb-2" style={{ color: 'rgba(237, 233, 248, 0.5)' }}>
                   תת-דומיין *
                 </label>
                 <div className="flex items-center gap-2">
@@ -1222,63 +1265,67 @@ export default function AddInfluencerPage() {
                     type="text"
                     value={state.subdomain}
                     onChange={(e) => setState(prev => ({ ...prev, subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '') }))}
-                    className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="admin-input flex-1 !rounded-xl px-4 py-3"
                     placeholder="username"
                     required
                   />
-                  <span className="text-gray-400 whitespace-nowrap">
+                  <span style={{ color: 'rgba(237, 233, 248, 0.35)' }} className="whitespace-nowrap">
                     .influencer.bot
                   </span>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium mb-2" style={{ color: 'rgba(237, 233, 248, 0.5)' }}>
                   סיסמת ניהול *
                 </label>
                 <div className="relative">
-                  <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                  <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5" style={{ color: 'rgba(237, 233, 248, 0.25)' }} />
                   <input
                     type="password"
                     value={state.password}
                     onChange={(e) => setState(prev => ({ ...prev, password: e.target.value }))}
-                    className="w-full pr-12 pl-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="admin-input w-full !rounded-xl pr-12 pl-4 py-3"
                     placeholder="••••••"
                     minLength={6}
                     required
                   />
                 </div>
-                <p className="mt-2 text-sm text-gray-500">
+                <p className="mt-2 text-sm" style={{ color: 'rgba(237, 233, 248, 0.25)' }}>
                   לפחות 6 תווים
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium mb-2" style={{ color: 'rgba(237, 233, 248, 0.5)' }}>
                   מספר טלפון (אופציונלי)
                 </label>
                 <div className="relative">
-                  <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                  <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5" style={{ color: 'rgba(237, 233, 248, 0.25)' }} />
                   <input
                     type="tel"
                     value={state.phoneNumber}
                     onChange={(e) => setState(prev => ({ ...prev, phoneNumber: e.target.value }))}
-                    className="w-full pr-12 pl-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="admin-input w-full !rounded-xl pr-12 pl-4 py-3"
                     placeholder="050-1234567"
                   />
                 </div>
               </div>
 
               {state.phoneNumber && (
-                <div className="flex items-center gap-3 p-4 bg-gray-800 rounded-lg">
+                <div
+                  className="flex items-center gap-3 p-4 rounded-xl"
+                  style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.06)' }}
+                >
                   <input
                     type="checkbox"
                     id="whatsapp"
                     checked={state.whatsappEnabled}
                     onChange={(e) => setState(prev => ({ ...prev, whatsappEnabled: e.target.checked }))}
-                    className="w-5 h-5 rounded border-gray-600 text-indigo-500 focus:ring-indigo-500"
+                    className="w-5 h-5 rounded"
+                    style={{ accentColor: '#a094e0' }}
                   />
-                  <label htmlFor="whatsapp" className="text-white cursor-pointer">
+                  <label htmlFor="whatsapp" className="cursor-pointer" style={{ color: '#ede9f8' }}>
                     הפעל התראות WhatsApp
                   </label>
                 </div>
@@ -1287,7 +1334,7 @@ export default function AddInfluencerPage() {
               <button
                 type="submit"
                 disabled={state.isLoading}
-                className="w-full py-3 bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                className="btn-primary w-full py-3 font-medium flex items-center justify-center gap-2"
               >
                 {state.isLoading ? (
                   <>
@@ -1305,33 +1352,36 @@ export default function AddInfluencerPage() {
           </motion.div>
         )}
 
-        {/* Step 4: Complete */}
+        {/* Step 5: Complete */}
         {state.step === 'complete' && (
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-2xl p-8 text-center"
+            className="admin-card p-8 text-center"
           >
-            <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Zap className="w-10 h-10 text-green-500" />
+            <div
+              className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
+              style={{ background: 'rgba(94, 234, 212, 0.1)', border: '1px solid rgba(94, 234, 212, 0.2)' }}
+            >
+              <Zap className="w-10 h-10" style={{ color: '#5eead4' }} />
             </div>
-            <h2 className="text-3xl font-bold text-white mb-4">
+            <h2 className="text-3xl font-bold mb-4" style={{ color: '#ede9f8' }}>
               🎉 המשפיען נוסף בהצלחה!
             </h2>
-            <p className="text-gray-400 mb-8">
+            <p className="mb-8" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>
               הפרסונה נבנתה והחשבון מוכן לשימוש
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 href={`/influencer/${state.username}/dashboard`}
-                className="px-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-medium rounded-lg transition-colors"
+                className="btn-primary px-6 py-3 font-medium"
               >
                 לדשבורד המשפיען
               </Link>
               <Link
                 href="/admin/dashboard"
-                className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-lg transition-colors"
+                className="btn-ghost px-6 py-3 font-medium"
               >
                 חזרה לניהול
               </Link>

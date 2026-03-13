@@ -54,7 +54,7 @@ export default function WebsitePreviewPage() {
   if (loading) {
     return (
       <div className="min-h-screen admin-panel flex items-center justify-center" dir="rtl">
-        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-[#a094e0] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -67,21 +67,24 @@ export default function WebsitePreviewPage() {
   return (
     <div className="h-screen flex flex-col admin-panel" dir="rtl">
       {/* Top bar */}
-      <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-gray-900/95 backdrop-blur border-b border-gray-800 z-20">
+      <div
+        className="flex-shrink-0 flex items-center justify-between px-4 py-2 z-20"
+        style={{ background: 'rgba(7, 7, 13, 0.88)', backdropFilter: 'blur(20px) saturate(1.4)', borderBottom: '1px solid rgba(255, 255, 255, 0.06)' }}
+      >
         <div className="flex items-center gap-3">
-          <Link href="/admin/dashboard" className="text-gray-400 hover:text-white transition-colors">
+          <Link href="/admin/dashboard" className="btn-ghost px-2 py-1">
             <ArrowRight className="w-5 h-5" />
           </Link>
-          <span className="text-sm text-gray-300 truncate max-w-xs">
+          <span className="text-sm truncate max-w-xs" style={{ color: 'rgba(237, 233, 248, 0.5)' }}>
             תצוגה מקדימה — {config?.brandName || websiteUrl}
           </span>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={handleCopyCode}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+            className="btn-ghost flex items-center gap-1.5 px-3 py-1.5 text-sm"
           >
-            {codeCopied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+            {codeCopied ? <Check className="w-3.5 h-3.5" style={{ color: '#5eead4' }} /> : <Copy className="w-3.5 h-3.5" />}
             {codeCopied ? 'הועתק!' : 'העתק קוד'}
           </button>
           {websiteUrl && (
@@ -89,7 +92,7 @@ export default function WebsitePreviewPage() {
               href={websiteUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              className="btn-ghost flex items-center gap-1.5 px-3 py-1.5 text-sm"
             >
               <ExternalLink className="w-3.5 h-3.5" />
               פתח באתר

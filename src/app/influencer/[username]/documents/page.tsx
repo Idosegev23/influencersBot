@@ -119,18 +119,18 @@ export default function DocumentsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--dash-bg)' }}>
+      <div className="min-h-screen flex items-center justify-center animate-fade-in" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
         <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--dash-text-3)' }} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen" dir="rtl" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
+    <div className="min-h-screen" dir="rtl" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
       <div className="max-w-4xl mx-auto py-8 px-4 space-y-6">
 
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between animate-slide-up">
           <div>
             <h1 className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>מאגר מסמכים</h1>
             <p className="text-sm mt-1" style={{ color: 'var(--dash-text-2)' }}>
@@ -139,8 +139,12 @@ export default function DocumentsPage() {
           </div>
           <Link
             href={`/influencer/${username}/dashboard`}
-            className="flex items-center gap-1 text-sm transition-colors"
-            style={{ color: 'var(--dash-text-3)' }}
+            className="flex items-center gap-1 text-sm transition-all duration-300 px-3 py-2 rounded-2xl"
+            style={{
+              color: 'var(--dash-text)',
+              border: 'var(--dash-glass-border)',
+              background: 'rgba(255, 255, 255, 0.05)'
+            }}
           >
             <ArrowRight className="w-4 h-4" />
             חזרה
@@ -149,8 +153,8 @@ export default function DocumentsPage() {
 
         {/* Upload Section */}
         <div
-          className="rounded-xl border p-5 space-y-4"
-          style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
+          className="glass-card rounded-2xl p-5 space-y-4 animate-slide-up"
+          style={{ borderColor: 'var(--dash-glass-border)' }}
         >
           <div className="flex items-center gap-2">
             <Upload className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
@@ -176,8 +180,8 @@ export default function DocumentsPage() {
           {/* Parsing state */}
           {isParsing && (
             <div
-              className="flex items-center gap-3 p-4 rounded-lg"
-              style={{ background: 'color-mix(in srgb, var(--color-info) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-info) 30%, transparent)' }}
+              className="flex items-center gap-3 p-4 rounded-2xl transition-all duration-300 animate-fade-in"
+              style={{ background: 'color-mix(in srgb, var(--color-info) 10%, transparent)', border: '1px solid var(--dash-glass-border)' }}
             >
               <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--color-info)' }} />
               <div>
@@ -192,8 +196,8 @@ export default function DocumentsPage() {
           {/* Parse success */}
           {parseSuccess && (
             <div
-              className="flex items-center gap-3 p-4 rounded-lg"
-              style={{ background: 'color-mix(in srgb, var(--dash-positive) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--dash-positive) 30%, transparent)' }}
+              className="flex items-center gap-3 p-4 rounded-2xl transition-all duration-300 animate-fade-in"
+              style={{ background: 'color-mix(in srgb, var(--dash-positive) 10%, transparent)', border: '1px solid var(--dash-glass-border)' }}
             >
               <CheckCircle2 className="w-5 h-5" style={{ color: 'var(--dash-positive)' }} />
               <div>
@@ -208,13 +212,13 @@ export default function DocumentsPage() {
           {/* Upload error */}
           {uploadError && (
             <div
-              className="flex items-center gap-3 p-4 rounded-lg"
-              style={{ background: 'color-mix(in srgb, var(--dash-negative, red) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--dash-negative, red) 30%, transparent)' }}
+              className="flex items-center gap-3 p-4 rounded-2xl transition-all duration-300 animate-fade-in"
+              style={{ background: 'color-mix(in srgb, var(--dash-negative, red) 10%, transparent)', border: '1px solid var(--dash-glass-border)' }}
             >
               <p className="text-sm" style={{ color: 'var(--dash-negative, red)' }}>{uploadError}</p>
               <button
                 onClick={() => setUploadError(null)}
-                className="mr-auto text-xs underline"
+                className="mr-auto text-xs underline transition-all duration-300"
                 style={{ color: 'var(--dash-text-3)' }}
               >
                 סגור
@@ -225,12 +229,12 @@ export default function DocumentsPage() {
 
         {/* Stats strip */}
         {documents.length > 0 && (
-          <div className="grid grid-cols-2 gap-4">
-            <div className="rounded-xl border p-4 text-center" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+          <div className="grid grid-cols-2 gap-4 animate-slide-up">
+            <div className="metric-card rounded-2xl p-4 text-center transition-all duration-300" style={{ borderColor: 'var(--dash-glass-border)' }}>
               <div className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>{stats.total}</div>
               <div className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>מסמכים במאגר</div>
             </div>
-            <div className="rounded-xl border p-4 text-center" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+            <div className="metric-card rounded-2xl p-4 text-center transition-all duration-300" style={{ borderColor: 'var(--dash-glass-border)' }}>
               <div className="text-2xl font-bold" style={{ color: 'var(--color-info)' }}>{stats.indexed}</div>
               <div className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>מאונדקסים בצ&#39;אטבוט</div>
             </div>
@@ -239,14 +243,14 @@ export default function DocumentsPage() {
 
         {/* Error */}
         {error && (
-          <div className="p-4 rounded-lg" style={{ background: 'color-mix(in srgb, var(--dash-negative, red) 10%, transparent)', color: 'var(--dash-negative, red)' }}>
+          <div className="p-4 rounded-2xl animate-fade-in" style={{ background: 'color-mix(in srgb, var(--dash-negative, red) 10%, transparent)', color: 'var(--dash-negative, red)', border: '1px solid var(--dash-glass-border)' }}>
             {error}
           </div>
         )}
 
         {/* Documents List */}
         {documents.length === 0 ? (
-          <div className="rounded-xl border p-12 text-center" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+          <div className="glass-card rounded-2xl p-12 text-center animate-fade-in" style={{ borderColor: 'var(--dash-glass-border)' }}>
             <FileText className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--dash-text-3)' }} />
             <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>אין מסמכים במאגר עדיין</p>
             <p className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>
@@ -254,12 +258,12 @@ export default function DocumentsPage() {
             </p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-2 animate-slide-up">
             {documents.map((doc) => (
               <div
                 key={doc.id}
-                className="rounded-xl border p-4 flex items-center gap-4 transition-colors"
-                style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
+                className="glass-card rounded-2xl p-4 flex items-center gap-4 transition-all duration-300 hover:shadow-lg"
+                style={{ borderColor: 'var(--dash-glass-border)' }}
               >
                 {/* Icon */}
                 <FileText className="w-8 h-8 flex-shrink-0" style={{ color: 'var(--color-info)' }} />
@@ -279,29 +283,29 @@ export default function DocumentsPage() {
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {/* RAG status */}
                   {doc.rag_status === 'indexed' && (
-                    <span className="text-xs px-2 py-1 rounded flex items-center gap-1" style={{ background: 'color-mix(in srgb, var(--dash-positive) 15%, transparent)', color: 'var(--dash-positive)' }}>
+                    <span className="pill pill-green flex items-center gap-1">
                       <Database className="w-3 h-3" />
                       {doc.rag_chunks_count || 0} חלקים
                     </span>
                   )}
                   {doc.rag_status === 'processing' && (
-                    <span className="text-xs px-2 py-1 rounded flex items-center gap-1" style={{ background: 'color-mix(in srgb, var(--color-info) 15%, transparent)', color: 'var(--color-info)' }}>
+                    <span className="pill pill-blue flex items-center gap-1">
                       <Loader2 className="w-3 h-3 animate-spin" />
                       מאנדקס
                     </span>
                   )}
                   {doc.rag_status === 'failed' && (
-                    <span className="text-xs px-2 py-1 rounded" style={{ background: 'color-mix(in srgb, var(--dash-negative, red) 15%, transparent)', color: 'var(--dash-negative, red)' }}>
+                    <span className="pill pill-red">
                       נכשל
                     </span>
                   )}
                   {doc.parsing_status === 'pending' && (
-                    <span className="text-xs px-2 py-1 rounded" style={{ background: 'color-mix(in srgb, var(--color-warning) 15%, transparent)', color: 'var(--color-warning)' }}>
+                    <span className="pill pill-amber">
                       ממתין
                     </span>
                   )}
                   {doc.parsing_status === 'processing' && (
-                    <span className="text-xs px-2 py-1 rounded flex items-center gap-1" style={{ background: 'color-mix(in srgb, var(--color-info) 15%, transparent)', color: 'var(--color-info)' }}>
+                    <span className="pill pill-blue flex items-center gap-1">
                       <Loader2 className="w-3 h-3 animate-spin" />
                       מנתח
                     </span>

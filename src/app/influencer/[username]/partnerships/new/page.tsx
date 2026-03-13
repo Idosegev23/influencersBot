@@ -316,7 +316,7 @@ export default function NewPartnershipPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
+    <div className="max-w-4xl mx-auto py-8 px-4 animate-slide-up" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
       {/* Back Button */}
       <div className="mb-6">
         <button
@@ -341,7 +341,7 @@ export default function NewPartnershipPage() {
 
       {/* Error Message */}
       {error && (
-        <div className="mb-6 rounded-xl border p-4" style={{ borderColor: 'var(--dash-negative)', background: 'var(--dash-surface)', color: 'var(--dash-negative)' }}>
+        <div className="mb-6 rounded-xl border p-4" style={{ borderColor: 'var(--dash-negative)', background: 'rgba(255,255,255,0.03)', color: 'var(--dash-negative)' }}>
           {error}
         </div>
       )}
@@ -353,12 +353,12 @@ export default function NewPartnershipPage() {
           <button
             onClick={() => setCreationMode('upload')}
             className="rounded-xl border-2 p-8 text-center transition-all group"
-            style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
+            style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}
             onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-primary)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--dash-border)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--dash-glass-border)'; }}
           >
             <div className="flex justify-center mb-4">
-              <div className="h-16 w-16 rounded-full flex items-center justify-center" style={{ background: 'var(--dash-surface-hover)' }}>
+              <div className="h-16 w-16 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
                 <Upload className="h-8 w-8" style={{ color: 'var(--color-primary)' }} />
               </div>
             </div>
@@ -380,12 +380,12 @@ export default function NewPartnershipPage() {
           <button
             onClick={() => setCreationMode('manual')}
             className="rounded-xl border-2 p-8 text-center transition-all group"
-            style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
+            style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}
             onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-primary)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--dash-border)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--dash-glass-border)'; }}
           >
             <div className="flex justify-center mb-4">
-              <div className="h-16 w-16 rounded-full flex items-center justify-center" style={{ background: 'var(--dash-surface-hover)' }}>
+              <div className="h-16 w-16 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
                 <FileText className="h-8 w-8" style={{ color: 'var(--dash-text-2)' }} />
               </div>
             </div>
@@ -404,7 +404,7 @@ export default function NewPartnershipPage() {
 
       {/* UPLOAD MODE */}
       {creationMode === 'upload' && (
-        <div className="rounded-xl border p-8" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+        <div className="rounded-xl border p-8" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}>
           <div className="max-w-xl mx-auto">
             {!isUploading && !isParsing && (
               <>
@@ -418,7 +418,7 @@ export default function NewPartnershipPage() {
                   </p>
                 </div>
 
-                <div className="border-2 border-dashed rounded-lg p-8 text-center" style={{ borderColor: 'var(--dash-border)' }}>
+                <div className="border-2 border-dashed rounded-xl p-8 text-center" style={{ borderColor: 'var(--dash-glass-border)' }}>
                   <input
                     type="file"
                     accept=".pdf,.doc,.docx"
@@ -445,8 +445,8 @@ export default function NewPartnershipPage() {
 
                 <button
                   onClick={() => setCreationMode('select')}
-                  className="mt-6 w-full px-4 py-2 border rounded-lg transition-colors"
-                  style={{ borderColor: 'var(--dash-border)', color: 'var(--dash-text-2)' }}
+                  className="mt-6 w-full px-4 py-2 border rounded-xl transition-colors"
+                  style={{ borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text-2)' }}
                 >
                   חזור לבחירת שיטה
                 </button>
@@ -454,7 +454,7 @@ export default function NewPartnershipPage() {
             )}
 
             {isUploading && (
-              <div className="text-center py-12" style={{ background: 'var(--dash-bg)' }}>
+              <div className="text-center py-12" style={{ background: 'transparent' }}>
                 <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4" style={{ color: 'var(--color-primary)' }} />
                 <p className="text-lg font-medium" style={{ color: 'var(--dash-text)' }}>מעלה מסמך...</p>
                 <p className="text-sm mt-2" style={{ color: 'var(--dash-text-3)' }}>אנא המתן</p>
@@ -462,12 +462,12 @@ export default function NewPartnershipPage() {
             )}
 
             {isParsing && (
-              <div className="text-center py-12" style={{ background: 'var(--dash-bg)' }}>
+              <div className="text-center py-12" style={{ background: 'transparent' }}>
                 <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4" style={{ color: 'var(--color-primary)' }} />
                 <p className="text-lg font-medium" style={{ color: 'var(--dash-text)' }}>מנתח את החוזה...</p>
                 <p className="text-sm mt-2" style={{ color: 'var(--dash-text-3)' }}>זה עשוי לקחת 30 שניות - 8 דקות</p>
                 <div className="mt-6 max-w-md mx-auto text-right">
-                  <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--color-info)' }}>
+                  <div className="rounded-xl border p-4" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--color-info)' }}>
                     <p className="text-xs font-medium mb-2" style={{ color: 'var(--color-info)' }}>מחלץ מהמסמך:</p>
                     <ul className="text-xs space-y-1" style={{ color: 'var(--dash-text-2)' }}>
                       <li>✓ שמות הצדדים (מותג, משפיען, סוכן)</li>
@@ -486,7 +486,7 @@ export default function NewPartnershipPage() {
 
       {/* REVIEW MODE - Show what AI found */}
       {creationMode === 'review' && parsedRawData && (
-        <div className="rounded-xl border p-6" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+        <div className="rounded-xl border p-6" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}>
           <div className="mb-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="h-12 w-12 rounded-full flex items-center justify-center" style={{ background: 'var(--dash-positive)', opacity: 0.15 }}>
@@ -503,13 +503,13 @@ export default function NewPartnershipPage() {
             {/* Extracted Data Summary */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               {/* Brand */}
-              <div className="rounded-lg p-4" style={{ background: 'var(--dash-surface-hover)' }}>
+              <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.05)' }}>
                 <p className="text-xs font-medium mb-1" style={{ color: 'var(--color-primary)' }}>מותג</p>
                 <p className="text-lg font-bold" style={{ color: 'var(--dash-text)' }}>{parsedRawData.parties?.brand || '—'}</p>
               </div>
 
               {/* Amount */}
-              <div className="rounded-lg p-4" style={{ background: 'var(--dash-surface-hover)' }}>
+              <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.05)' }}>
                 <p className="text-xs font-medium mb-1" style={{ color: 'var(--dash-positive)' }}>סכום</p>
                 <p className="text-lg font-bold" style={{ color: 'var(--dash-text)' }}>
                   {parsedRawData.paymentTerms?.totalAmount
@@ -519,7 +519,7 @@ export default function NewPartnershipPage() {
               </div>
 
               {/* Dates */}
-              <div className="rounded-lg p-4" style={{ background: 'var(--dash-surface-hover)' }}>
+              <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.05)' }}>
                 <p className="text-xs font-medium mb-1" style={{ color: 'var(--color-info)' }}>תאריכים</p>
                 <p className="text-sm font-bold" style={{ color: 'var(--dash-text)' }}>
                   {parsedRawData.effectiveDate || '—'} → {parsedRawData.expiryDate || '—'}
@@ -527,7 +527,7 @@ export default function NewPartnershipPage() {
               </div>
 
               {/* Deliverables */}
-              <div className="rounded-lg p-4" style={{ background: 'var(--dash-surface-hover)' }}>
+              <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.05)' }}>
                 <p className="text-xs font-medium mb-1" style={{ color: 'var(--color-warning)' }}>דליברבלס</p>
                 <p className="text-lg font-bold" style={{ color: 'var(--dash-text)' }}>
                   {parsedRawData.deliverables?.length || 0} פריטים
@@ -541,7 +541,7 @@ export default function NewPartnershipPage() {
                 <p className="text-sm font-medium mb-3 text-right" style={{ color: 'var(--dash-text-2)' }}>מועדי תשלום שזוהו:</p>
                 <div className="space-y-2">
                   {parsedRawData.paymentTerms.schedule.map((payment: any, i: number) => (
-                    <div key={i} className="flex items-center justify-between rounded-lg border p-3" style={{ background: 'var(--dash-surface-hover)', borderColor: 'var(--dash-border)' }}>
+                    <div key={i} className="flex items-center justify-between rounded-xl border p-3" style={{ background: 'rgba(255,255,255,0.05)', borderColor: 'var(--dash-glass-border)' }}>
                       <div className="text-right flex-1">
                         <p className="font-bold" style={{ color: 'var(--dash-positive)' }}>
                           ₪{payment.amount?.toLocaleString()} ({payment.percentage}%)
@@ -565,7 +565,7 @@ export default function NewPartnershipPage() {
                 <p className="text-sm font-medium mb-3 text-right" style={{ color: 'var(--dash-text-2)' }}>דליברבלס שזוהו:</p>
                 <ul className="space-y-2">
                   {parsedRawData.deliverables.map((d: any, i: number) => (
-                    <li key={i} className="flex items-start gap-2 text-sm rounded-lg border p-3" style={{ background: 'var(--dash-surface-hover)', borderColor: 'var(--dash-border)', color: 'var(--dash-text-2)' }}>
+                    <li key={i} className="flex items-start gap-2 text-sm rounded-xl border p-3" style={{ background: 'rgba(255,255,255,0.05)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text-2)' }}>
                       <span className="font-bold" style={{ color: 'var(--color-primary)' }}>{i + 1}.</span>
                       <span className="flex-1 text-right">
                         {d.quantity && <strong>{d.quantity}x </strong>}
@@ -589,7 +589,7 @@ export default function NewPartnershipPage() {
               <p className="text-sm font-medium mb-3 text-right" style={{ color: 'var(--dash-text-2)' }}>תנאים חשובים:</p>
               <div className="space-y-2">
                 {parsedRawData.exclusivity?.isExclusive && (
-                  <div className="rounded-lg border p-3 text-right" style={{ background: 'var(--dash-surface-hover)', borderColor: 'var(--dash-border)' }}>
+                  <div className="rounded-xl border p-3 text-right" style={{ background: 'rgba(255,255,255,0.05)', borderColor: 'var(--dash-glass-border)' }}>
                     <p className="text-sm font-bold" style={{ color: 'var(--color-warning)' }}>חוזה אקסקלוסיבי</p>
                     {parsedRawData.exclusivity.categories?.length > 0 && (
                       <p className="text-xs mt-1" style={{ color: 'var(--dash-text-2)' }}>
@@ -600,7 +600,7 @@ export default function NewPartnershipPage() {
                 )}
 
                 {parsedRawData.terminationClauses?.[0] && (
-                  <div className="rounded-lg border p-3 text-right" style={{ background: 'var(--dash-surface-hover)', borderColor: 'var(--dash-border)' }}>
+                  <div className="rounded-xl border p-3 text-right" style={{ background: 'rgba(255,255,255,0.05)', borderColor: 'var(--dash-glass-border)' }}>
                     <p className="text-xs" style={{ color: 'var(--dash-text-2)' }}>{parsedRawData.terminationClauses[0]}</p>
                   </div>
                 )}
@@ -612,8 +612,8 @@ export default function NewPartnershipPage() {
           <div className="flex gap-3">
             <button
               onClick={() => setCreationMode('select')}
-              className="flex-1 px-6 py-3 border rounded-lg transition-colors"
-              style={{ borderColor: 'var(--dash-border)', color: 'var(--dash-text-2)' }}
+              className="flex-1 px-6 py-3 border rounded-xl transition-colors"
+              style={{ borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text-2)' }}
             >
               התחל מחדש
             </button>
@@ -622,8 +622,7 @@ export default function NewPartnershipPage() {
                 console.log('[Partnership Creation] 🎯 Moving to form edit mode');
                 setCreationMode('manual');
               }}
-              className="flex-1 px-6 py-3 rounded-lg transition-colors font-medium"
-              style={{ background: 'var(--color-primary)', color: '#fff' }}
+              className="flex-1 px-6 py-3 rounded-xl transition-colors font-medium btn-primary"
             >
               המשך לעריכה
             </button>
@@ -636,7 +635,7 @@ export default function NewPartnershipPage() {
         <>
           {/* AI Parsing Success Notice */}
           {uploadedDocumentId && (
-            <div className="mb-6 rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--color-info)' }}>
+            <div className="mb-6 rounded-xl border p-4" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--color-info)' }}>
               <div className="flex items-start gap-3">
                 <svg className="h-5 w-5 mt-0.5" style={{ color: 'var(--color-info)' }} fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -653,7 +652,7 @@ export default function NewPartnershipPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="rounded-xl border p-6 space-y-6" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+          <form onSubmit={handleSubmit} className="rounded-xl border p-6 space-y-6" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}>
         {/* Brand Name */}
         <div>
           <label className="block text-sm font-medium mb-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
@@ -664,8 +663,8 @@ export default function NewPartnershipPage() {
             required
             value={formData.brand_name}
             onChange={(e) => setFormData({ ...formData, brand_name: e.target.value })}
-            className="w-full px-4 py-2 border rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
+            className="w-full px-4 py-2 border rounded-xl text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            style={{ background: 'transparent', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)' }}
             placeholder="לדוגמה: Nike, Adidas"
           />
         </div>
@@ -679,8 +678,8 @@ export default function NewPartnershipPage() {
             type="text"
             value={formData.campaign_name}
             onChange={(e) => setFormData({ ...formData, campaign_name: e.target.value })}
-            className="w-full px-4 py-2 border rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
+            className="w-full px-4 py-2 border rounded-xl text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            style={{ background: 'transparent', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)' }}
             placeholder="לדוגמה: Summer Collection 2024"
           />
         </div>
@@ -693,8 +692,8 @@ export default function NewPartnershipPage() {
           <select
             value={formData.status}
             onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-            className="w-full px-4 py-2 border rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
+            className="w-full px-4 py-2 border rounded-xl text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            style={{ background: 'transparent', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)' }}
           >
             <option value="lead">Lead</option>
             <option value="negotiation">משא ומתן</option>
@@ -715,8 +714,8 @@ export default function NewPartnershipPage() {
               type="date"
               value={formData.start_date}
               onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-              className="w-full px-4 py-2 border rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
+              className="w-full px-4 py-2 border rounded-xl text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              style={{ background: 'transparent', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)' }}
             />
           </div>
           <div>
@@ -727,8 +726,8 @@ export default function NewPartnershipPage() {
               type="date"
               value={formData.end_date}
               onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-              className="w-full px-4 py-2 border rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
+              className="w-full px-4 py-2 border rounded-xl text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              style={{ background: 'transparent', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)' }}
             />
           </div>
         </div>
@@ -743,8 +742,8 @@ export default function NewPartnershipPage() {
             step="0.01"
             value={formData.contract_amount}
             onChange={(e) => setFormData({ ...formData, contract_amount: e.target.value })}
-            className="w-full px-4 py-2 border rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
+            className="w-full px-4 py-2 border rounded-xl text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            style={{ background: 'transparent', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)' }}
             placeholder="0.00"
           />
         </div>
@@ -758,8 +757,8 @@ export default function NewPartnershipPage() {
             value={formData.deliverables}
             onChange={(e) => setFormData({ ...formData, deliverables: e.target.value })}
             rows={3}
-            className="w-full px-4 py-2 border rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
+            className="w-full px-4 py-2 border rounded-xl text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            style={{ background: 'transparent', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)' }}
             placeholder="לדוגמה: 3 פוסטים באינסטגרם, 2 סטוריז, 1 ריל"
           />
         </div>
@@ -773,8 +772,8 @@ export default function NewPartnershipPage() {
             value={formData.notes}
             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
             rows={3}
-            className="w-full px-4 py-2 border rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
+            className="w-full px-4 py-2 border rounded-xl text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            style={{ background: 'transparent', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)' }}
             placeholder="הערות נוספות..."
           />
         </div>
@@ -789,8 +788,8 @@ export default function NewPartnershipPage() {
             multiple
             accept=".pdf,.doc,.docx,.txt"
             onChange={handleFileChange}
-            className="w-full px-4 py-2 border rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            style={{ background: 'var(--dash-bg)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
+            className="w-full px-4 py-2 border rounded-xl text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            style={{ background: 'transparent', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)' }}
           />
           {uploadedFiles.length > 0 && (
             <div className="mt-2 text-sm" style={{ color: 'var(--dash-text-2)' }}>
@@ -803,7 +802,7 @@ export default function NewPartnershipPage() {
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3 justify-end pt-4 border-t" style={{ borderColor: 'var(--dash-border)' }}>
+        <div className="flex gap-3 justify-end pt-4 border-t" style={{ borderColor: 'var(--dash-glass-border)' }}>
           <button
             type="button"
             onClick={() => {
@@ -813,16 +812,15 @@ export default function NewPartnershipPage() {
                 router.back();
               }
             }}
-            className="px-6 py-2 border rounded-lg transition-colors"
-            style={{ borderColor: 'var(--dash-border)', color: 'var(--dash-text-2)' }}
+            className="px-6 py-2 border rounded-xl transition-colors"
+            style={{ borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text-2)' }}
           >
             {uploadedDocumentId ? 'חזור לבחירת שיטה' : 'ביטול'}
           </button>
           <button
             type="submit"
             disabled={isSubmitting}
-            className="px-6 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ background: 'var(--color-primary)', color: '#fff' }}
+            className="px-6 py-2 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed btn-solid"
           >
             {isSubmitting ? 'שומר...' : 'צור שת"פ'}
           </button>

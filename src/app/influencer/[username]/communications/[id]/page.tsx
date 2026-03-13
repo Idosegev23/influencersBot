@@ -53,11 +53,11 @@ export default function CommunicationThreadPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen" dir="rtl" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
-        <div className="max-w-6xl mx-auto py-8 px-4">
+      <div className="min-h-screen animate-slide-up" dir="rtl" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
+        <div className="max-w-6xl mx-auto py-8 px-4 animate-slide-up">
           <div className="animate-pulse space-y-4">
-            <div className="h-8 rounded w-1/4" style={{ background: 'var(--dash-surface)' }} />
-            <div className="h-96 rounded" style={{ background: 'var(--dash-surface)' }} />
+            <div className="h-8 rounded w-1/4" style={{ background: 'rgba(255,255,255,0.03)' }} />
+            <div className="h-96 rounded" style={{ background: 'rgba(255,255,255,0.03)' }} />
           </div>
         </div>
       </div>
@@ -66,7 +66,7 @@ export default function CommunicationThreadPage() {
 
   if (error || !communication) {
     return (
-      <div className="min-h-screen" dir="rtl" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
+      <div className="min-h-screen" dir="rtl" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
         <div className="max-w-6xl mx-auto py-8 px-4">
           <div
             className="rounded-xl border p-6 text-center"
@@ -78,8 +78,7 @@ export default function CommunicationThreadPage() {
             <p style={{ color: 'var(--dash-negative)' }}>{error || 'תקשורת לא נמצאה'}</p>
             <button
               onClick={() => router.back()}
-              className="mt-4 px-4 py-2 rounded-lg"
-              style={{ background: 'var(--dash-negative)', color: 'white' }}
+              className="btn-coral mt-4 px-4 py-2 rounded-xl"
             >
               חזור
             </button>
@@ -90,7 +89,7 @@ export default function CommunicationThreadPage() {
   }
 
   return (
-    <div className="min-h-screen" dir="rtl" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
+    <div className="min-h-screen" dir="rtl" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
       <div className="max-w-6xl mx-auto py-8 px-4">
         {/* Back Button */}
         <div className="mb-6">
@@ -113,7 +112,7 @@ export default function CommunicationThreadPage() {
           <div className="flex gap-2 mt-2">
             <span
               className="text-xs px-2 py-1 rounded"
-              style={{ background: 'var(--dash-surface)', color: 'var(--dash-text-2)' }}
+              style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--dash-text-2)' }}
             >
               {communication.category}
             </span>
@@ -122,7 +121,7 @@ export default function CommunicationThreadPage() {
               style={{
                 background: communication.status === 'open'
                   ? 'color-mix(in srgb, var(--dash-positive) 20%, transparent)'
-                  : 'var(--dash-surface)',
+                  : 'rgba(255,255,255,0.03)',
                 color: communication.status === 'open'
                   ? 'var(--dash-positive)'
                   : 'var(--dash-text-2)',

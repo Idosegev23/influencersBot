@@ -66,13 +66,13 @@ export default function AudiencePage() {
     return (
       <div
         className="max-w-6xl mx-auto py-8 px-4"
-        style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}
+        style={{ background: 'transparent', color: 'var(--dash-text)' }}
       >
         <div className="animate-pulse space-y-8">
-          <div className="h-8 rounded w-1/4" style={{ background: 'var(--dash-surface)' }} />
+          <div className="h-8 rounded w-1/4" style={{ background: 'rgba(255,255,255,0.05)' }} />
           <div className="grid grid-cols-4 gap-4">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-24 rounded" style={{ background: 'var(--dash-surface)' }} />
+              <div key={i} className="h-24 rounded" style={{ background: 'rgba(255,255,255,0.05)' }} />
             ))}
           </div>
         </div>
@@ -84,17 +84,16 @@ export default function AudiencePage() {
     return (
       <div
         className="max-w-6xl mx-auto py-8 px-4"
-        style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}
+        style={{ background: 'transparent', color: 'var(--dash-text)' }}
       >
         <div
-          className="rounded-lg p-6 text-center"
-          style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-negative)' }}
+          className="glass-card rounded-2xl p-6 text-center"
+          style={{ background: 'rgba(255,255,255,0.03)', borderColor: '1px solid var(--dash-negative)' }}
         >
           <p style={{ color: 'var(--dash-negative)' }}>{error}</p>
           <button
             onClick={loadData}
-            className="mt-4 px-4 py-2 rounded-lg"
-            style={{ background: 'var(--dash-negative)', color: 'white' }}
+            className="mt-4 px-4 py-2 rounded-xl btn-coral"
           >
             נסה שוב
           </button>
@@ -109,8 +108,8 @@ export default function AudiencePage() {
 
   return (
     <div
-      className="max-w-6xl mx-auto py-8 px-4 space-y-8"
-      style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}
+      className="max-w-6xl mx-auto py-8 px-4 space-y-8 animate-slide-up"
+      style={{ background: 'transparent', color: 'var(--dash-text)' }}
     >
       {/* Back Button */}
       <div className="mb-4">
@@ -134,56 +133,56 @@ export default function AudiencePage() {
 
       {/* Overview Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+        <div className="glass-card rounded-2xl p-4 animate-fade-in" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', border: '1px solid' }}>
           <div className="text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>סה"כ שיחות</div>
           <div className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>
             {data.overview.totalConversations}
           </div>
         </div>
 
-        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+        <div className="glass-card rounded-2xl p-4 animate-fade-in" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', border: '1px solid' }}>
           <div className="text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>הודעות ממוצע לשיחה</div>
           <div className="text-2xl font-bold" style={{ color: 'var(--color-info)' }}>
             {data.overview.avgMessagesPerSession}
           </div>
         </div>
 
-        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+        <div className="glass-card rounded-2xl p-4 animate-fade-in" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', border: '1px solid' }}>
           <div className="text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>קופונים הועתקו</div>
           <div className="text-2xl font-bold" style={{ color: 'var(--color-primary)' }}>
             {data.overview.couponCopiedCount}
           </div>
         </div>
 
-        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+        <div className="glass-card rounded-2xl p-4 animate-fade-in" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', border: '1px solid' }}>
           <div className="text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>אחוז המרה</div>
           <div className="text-2xl font-bold" style={{ color: 'var(--dash-positive)' }}>
             {data.overview.conversionRate}%
           </div>
         </div>
 
-        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+        <div className="glass-card rounded-2xl p-4 animate-fade-in" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', border: '1px solid' }}>
           <div className="text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>משתמשים ייחודיים</div>
           <div className="text-2xl font-bold" style={{ color: 'var(--color-warning)' }}>
             {data.overview.uniqueCouponUsers}
           </div>
         </div>
 
-        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+        <div className="glass-card rounded-2xl p-4 animate-fade-in" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', border: '1px solid' }}>
           <div className="text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>פניות תמיכה</div>
           <div className="text-2xl font-bold" style={{ color: 'var(--color-warning)' }}>
             {data.overview.supportRequests}
           </div>
         </div>
 
-        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+        <div className="glass-card rounded-2xl p-4 animate-fade-in" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', border: '1px solid' }}>
           <div className="text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>שביעות רצון</div>
           <div className="text-2xl font-bold" style={{ color: 'var(--dash-positive)' }}>
             {data.overview.satisfactionRate}%
           </div>
         </div>
 
-        <div className="rounded-xl border p-4" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+        <div className="glass-card rounded-2xl p-4 animate-fade-in" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', border: '1px solid' }}>
           <div className="text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>מרוצים / לא מרוצים</div>
           <div className="text-lg font-bold" style={{ color: 'var(--dash-text)' }}>
             {data.overview.satisfiedCount} / {data.overview.unsatisfiedCount}

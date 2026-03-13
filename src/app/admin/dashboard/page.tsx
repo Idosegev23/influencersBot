@@ -172,45 +172,42 @@ function DashboardContent() {
   if (loading) {
     return (
       <div className="min-h-screen admin-panel flex items-center justify-center" dir="rtl">
-        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-[#a094e0] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen admin-panel" dir="rtl">
-      {/* Background */}
-      <div className="fixed inset-0 bg-gradient-to-br from-indigo-900/20 via-gray-950 to-purple-900/20" />
-
       {/* Success Notification */}
       {showCreatedNotification && (
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
-          className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 bg-green-500 text-white rounded-xl shadow-lg"
+          className="fixed top-4 left-1/2 -translate-x-1/2 z-50 pill pill-green px-5 py-3 text-sm font-medium shadow-lg"
         >
-          <Check className="w-5 h-5" />
+          <Check className="w-4 h-4" />
           צ&apos;אטבוט נוצר בהצלחה! - /chat/{createdSubdomain}
         </motion.div>
       )}
 
       {/* Header */}
-      <header className="relative z-10 sticky top-0 bg-gray-900/80 backdrop-blur-xl border-b border-gray-800">
+      <header className="relative z-10 sticky top-0" style={{ background: 'rgba(7, 7, 13, 0.88)', backdropFilter: 'blur(20px) saturate(1.4)', borderBottom: '1px solid rgba(255, 255, 255, 0.04)', boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3)' }}>
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-                <Zap className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(160, 148, 224, 0.12)', border: '1px solid rgba(160, 148, 224, 0.18)' }}>
+                <Zap className="w-5 h-5" style={{ color: '#a094e0' }} />
               </div>
               <div>
-                <h1 className="font-semibold text-white">InfluencerBot</h1>
-                <p className="text-xs text-gray-500">פאנל ניהול</p>
+                <h1 className="font-semibold" style={{ color: '#ede9f8' }}>InfluencerBot</h1>
+                <p className="text-xs" style={{ color: 'rgba(237, 233, 248, 0.4)' }}>פאנל ניהול</p>
               </div>
             </div>
             <button
               onClick={handleLogout}
-              className="px-3 py-2 text-sm text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors flex items-center gap-2"
+              className="btn-ghost flex items-center gap-2 text-sm"
             >
               <LogOut className="w-4 h-4" />
               יציאה
@@ -221,35 +218,37 @@ function DashboardContent() {
 
       <main className="relative z-10 p-6 max-w-6xl mx-auto">
         {/* Tab Bar */}
-        <div className="flex items-center gap-2 mb-6">
+        <div className="flex items-center gap-2 mb-6 flex-wrap">
           <button
             onClick={() => setActiveTab('social')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${
+            className={`pill flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition-all ${
               activeTab === 'social'
-                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/25'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                ? 'pill-purple'
+                : ''
             }`}
+            style={activeTab === 'social' ? { background: 'rgba(160, 148, 224, 0.15)', borderColor: 'rgba(160, 148, 224, 0.25)', color: '#a094e0' } : {}}
           >
             <Users className="w-4 h-4" />
             חשבונות סושיאל
           </button>
           <button
             onClick={() => setActiveTab('websites')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${
+            className={`pill flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition-all ${
               activeTab === 'websites'
-                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/25'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                ? 'pill-teal'
+                : ''
             }`}
+            style={activeTab === 'websites' ? { background: 'rgba(94, 234, 212, 0.12)', borderColor: 'rgba(94, 234, 212, 0.2)', color: '#5eead4' } : {}}
           >
             <Globe className="w-4 h-4" />
             אתרים
           </button>
 
-          <div className="w-px h-6 bg-gray-700 mx-1" />
+          <div className="w-px h-6 mx-1" style={{ background: 'rgba(255, 255, 255, 0.06)' }} />
 
           <Link
             href="/admin/onboarding"
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white transition-all"
+            className="pill flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition-all hover:border-[rgba(160,148,224,0.15)]"
           >
             <ClipboardCheck className="w-4 h-4" />
             אונבורדינג
@@ -257,7 +256,7 @@ function DashboardContent() {
 
           <Link
             href="/admin/brand-logos"
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white transition-all"
+            className="pill flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition-all hover:border-[rgba(160,148,224,0.15)]"
           >
             <LucideImage className="w-4 h-4" />
             לוגואים
@@ -275,12 +274,12 @@ function DashboardContent() {
                 className="admin-card p-6"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-indigo-500/20 flex items-center justify-center">
-                    <Users className="w-6 h-6 text-indigo-400" />
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(160, 148, 224, 0.1)', border: '1px solid rgba(160, 148, 224, 0.12)' }}>
+                    <Users className="w-6 h-6" style={{ color: '#a094e0' }} />
                   </div>
                   <div>
-                    <p className="text-3xl font-bold text-white">{filteredInfluencers.length}</p>
-                    <p className="text-sm text-gray-400">חשבונות</p>
+                    <p className="text-3xl font-bold" style={{ color: '#ede9f8' }}>{filteredInfluencers.length}</p>
+                    <p className="text-sm" style={{ color: 'rgba(237, 233, 248, 0.4)' }}>חשבונות</p>
                   </div>
                 </div>
               </motion.div>
@@ -292,14 +291,14 @@ function DashboardContent() {
                 className="admin-card p-6"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center">
-                    <MessageCircle className="w-6 h-6 text-green-400" />
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(94, 234, 212, 0.1)', border: '1px solid rgba(94, 234, 212, 0.12)' }}>
+                    <MessageCircle className="w-6 h-6" style={{ color: '#5eead4' }} />
                   </div>
                   <div>
-                    <p className="text-3xl font-bold text-white">
+                    <p className="text-3xl font-bold" style={{ color: '#ede9f8' }}>
                       {filteredInfluencers.filter((i) => i.is_active).length}
                     </p>
-                    <p className="text-sm text-gray-400">פעילים</p>
+                    <p className="text-sm" style={{ color: 'rgba(237, 233, 248, 0.4)' }}>פעילים</p>
                   </div>
                 </div>
               </motion.div>
@@ -311,25 +310,25 @@ function DashboardContent() {
                 className="admin-card p-6"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                    <BarChart3 className="w-6 h-6 text-purple-400" />
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(224, 164, 148, 0.1)', border: '1px solid rgba(224, 164, 148, 0.12)' }}>
+                    <BarChart3 className="w-6 h-6" style={{ color: '#e0a494' }} />
                   </div>
                   <div>
-                    <p className="text-3xl font-bold text-white">
+                    <p className="text-3xl font-bold" style={{ color: '#ede9f8' }}>
                       {formatNumber(filteredInfluencers.reduce((sum, i) => sum + (i.followers_count || 0), 0))}
                     </p>
-                    <p className="text-sm text-gray-400">עוקבים כולל</p>
+                    <p className="text-sm" style={{ color: 'rgba(237, 233, 248, 0.4)' }}>עוקבים כולל</p>
                   </div>
                 </div>
               </motion.div>
             </div>
 
             {/* Action bar with sub-filter */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
               <div className="flex items-center gap-3">
-                <h2 className="text-xl font-semibold text-white">חשבונות</h2>
+                <h2 className="text-xl font-semibold" style={{ color: '#ede9f8' }}>חשבונות</h2>
                 {/* Sub-filter pills */}
-                <div className="flex items-center gap-1 bg-gray-800/50 rounded-lg p-1">
+                <div className="flex items-center gap-1 rounded-full p-1" style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
                   {([
                     { key: 'all' as AccountFilter, label: 'הכל' },
                     { key: 'creator' as AccountFilter, label: 'משפיענים' },
@@ -338,11 +337,15 @@ function DashboardContent() {
                     <button
                       key={key}
                       onClick={() => setAccountFilter(key)}
-                      className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                      className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all ${
                         accountFilter === key
-                          ? 'bg-gray-700 text-white'
-                          : 'text-gray-500 hover:text-gray-300'
+                          ? ''
+                          : ''
                       }`}
+                      style={accountFilter === key
+                        ? { background: 'rgba(160, 148, 224, 0.12)', color: '#a094e0', border: '1px solid rgba(160, 148, 224, 0.15)' }
+                        : { color: 'rgba(237, 233, 248, 0.35)', border: '1px solid transparent' }
+                      }
                     >
                       {label}
                     </button>
@@ -352,16 +355,16 @@ function DashboardContent() {
               <div className="flex gap-3">
                 <Link
                   href="/admin/influencers"
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-xl transition-all"
+                  className="btn-ghost flex items-center gap-2 text-sm"
                 >
-                  <Users className="w-5 h-5" />
+                  <Users className="w-4 h-4" />
                   תצוגה מפורטת
                 </Link>
                 <Link
                   href="/admin/add"
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-indigo-500/25"
+                  className="btn-primary flex items-center gap-2 text-sm font-medium"
                 >
-                  <Plus className="w-5 h-5" />
+                  <Plus className="w-4 h-4" />
                   הוסף חשבון
                 </Link>
               </div>
@@ -376,11 +379,11 @@ function DashboardContent() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.05 }}
-                    className="admin-card p-4 hover:border-indigo-500/50 transition-all"
+                    className="admin-card p-4 transition-all"
                   >
                     <div className="flex items-start gap-3">
                       {influencer.profile_pic_url ? (
-                        <div className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 ring-2 ring-indigo-500/20">
+                        <div className="relative w-14 h-14 rounded-2xl overflow-hidden flex-shrink-0" style={{ border: '2px solid rgba(160, 148, 224, 0.15)' }}>
                           <Image
                             src={getProxiedImageUrl(influencer.profile_pic_url || '')}
                             alt={influencer.display_name}
@@ -391,28 +394,28 @@ function DashboardContent() {
                           />
                         </div>
                       ) : (
-                        <div className="w-14 h-14 rounded-xl bg-gray-700 flex items-center justify-center text-2xl font-bold text-gray-400 flex-shrink-0">
-                          {influencer.display_name.charAt(0)}
+                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-bold flex-shrink-0" style={{ background: 'rgba(255, 255, 255, 0.03)', border: '2px solid rgba(255, 255, 255, 0.06)', color: 'rgba(237, 233, 248, 0.3)' }}>
+                          ?
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-white truncate">
+                        <h3 className="font-semibold truncate" style={{ color: '#ede9f8' }}>
                           {influencer.display_name}
                         </h3>
-                        <p className="text-sm text-gray-400">@{influencer.username}</p>
-                        <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-                          <span>{formatNumber(influencer.followers_count)} עוקבים</span>
+                        <p className="text-sm" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>@{influencer.username}</p>
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                          <span className="text-xs" style={{ color: 'rgba(237, 233, 248, 0.3)' }}>{formatNumber(influencer.followers_count)} עוקבים</span>
                           <span
-                            className={`px-2 py-0.5 rounded-full ${
+                            className={`pill text-[11px] py-0.5 px-2 ${
                               influencer.is_active
-                                ? 'bg-green-500/20 text-green-400'
-                                : 'bg-gray-500/20 text-gray-400'
+                                ? 'pill-green'
+                                : 'pill-neutral'
                             }`}
                           >
                             {influencer.is_active ? 'פעיל' : 'לא פעיל'}
                           </span>
                           {influencer.type === 'brand' && (
-                            <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400">
+                            <span className="pill pill-blue text-[11px] py-0.5 px-2">
                               מותג
                             </span>
                           )}
@@ -420,29 +423,30 @@ function DashboardContent() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-700">
+                    <div className="flex items-center gap-2 mt-4 pt-4" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.04)' }}>
                       <a
                         href={`/chat/${influencer.username}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex-1 flex items-center justify-center gap-1 py-2 text-sm text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+                        className="btn-ghost flex-1 flex items-center justify-center gap-1 py-2 text-sm"
                       >
-                        <ExternalLink className="w-4 h-4" />
+                        <ExternalLink className="w-3.5 h-3.5" />
                         צפייה
                       </a>
                       <Link
                         href={`/admin/influencers/${influencer.id}`}
-                        className="flex-1 flex items-center justify-center gap-1 py-2 text-sm text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+                        className="btn-ghost flex-1 flex items-center justify-center gap-1 py-2 text-sm"
                       >
-                        <Settings className="w-4 h-4" />
+                        <Settings className="w-3.5 h-3.5" />
                         ניהול
                       </Link>
                       <button
                         onClick={() => handleDelete(influencer)}
-                        className="flex items-center justify-center gap-1 px-3 py-2 text-sm text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition-colors"
+                        className="flex items-center justify-center gap-1 px-3 py-2 text-sm rounded-full transition-all"
+                        style={{ background: 'rgba(239, 68, 68, 0.08)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.12)' }}
                         title="מחק"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </motion.div>
@@ -454,18 +458,18 @@ function DashboardContent() {
                 animate={{ opacity: 1 }}
                 className="admin-card p-12 text-center"
               >
-                <div className="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center mx-auto mb-4">
-                  <Users className="w-8 h-8 text-gray-600" />
+                <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                  <Users className="w-8 h-8" style={{ color: 'rgba(237, 233, 248, 0.2)' }} />
                 </div>
-                <h3 className="text-lg font-medium text-white mb-2">
+                <h3 className="text-lg font-medium mb-2" style={{ color: '#ede9f8' }}>
                   {accountFilter === 'all' ? 'אין עדיין חשבונות' : accountFilter === 'creator' ? 'אין משפיענים' : 'אין מותגים'}
                 </h3>
-                <p className="text-gray-400 mb-6">
+                <p className="mb-6" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>
                   {accountFilter === 'all' ? 'התחילו על ידי הוספת חשבון ראשון' : 'לא נמצאו חשבונות מסוג זה'}
                 </p>
                 <Link
                   href="/admin/add"
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-indigo-500/25"
+                  className="btn-primary inline-flex items-center gap-2 px-6 py-3 font-medium"
                 >
                   <Plus className="w-5 h-5" />
                   הוסף חשבון
@@ -480,7 +484,7 @@ function DashboardContent() {
           <>
             {websitesLoading ? (
               <div className="flex items-center justify-center py-20">
-                <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                <div className="w-8 h-8 border-2 border-[#5eead4] border-t-transparent rounded-full animate-spin" />
               </div>
             ) : (
               <>
@@ -492,12 +496,12 @@ function DashboardContent() {
                     className="admin-card p-6"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-indigo-500/20 flex items-center justify-center">
-                        <Globe className="w-6 h-6 text-indigo-400" />
+                      <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(94, 234, 212, 0.1)', border: '1px solid rgba(94, 234, 212, 0.12)' }}>
+                        <Globe className="w-6 h-6" style={{ color: '#5eead4' }} />
                       </div>
                       <div>
-                        <p className="text-3xl font-bold text-white">{websites.length}</p>
-                        <p className="text-sm text-gray-400">אתרים</p>
+                        <p className="text-3xl font-bold" style={{ color: '#ede9f8' }}>{websites.length}</p>
+                        <p className="text-sm" style={{ color: 'rgba(237, 233, 248, 0.4)' }}>אתרים</p>
                       </div>
                     </div>
                   </motion.div>
@@ -509,14 +513,14 @@ function DashboardContent() {
                     className="admin-card p-6"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center">
-                        <FileText className="w-6 h-6 text-green-400" />
+                      <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(160, 148, 224, 0.1)', border: '1px solid rgba(160, 148, 224, 0.12)' }}>
+                        <FileText className="w-6 h-6" style={{ color: '#a094e0' }} />
                       </div>
                       <div>
-                        <p className="text-3xl font-bold text-white">
+                        <p className="text-3xl font-bold" style={{ color: '#ede9f8' }}>
                           {websites.reduce((sum, w) => sum + w.pagesCount, 0)}
                         </p>
-                        <p className="text-sm text-gray-400">מסמכים</p>
+                        <p className="text-sm" style={{ color: 'rgba(237, 233, 248, 0.4)' }}>מסמכים</p>
                       </div>
                     </div>
                   </motion.div>
@@ -524,7 +528,7 @@ function DashboardContent() {
 
                 {/* Action bar */}
                 <div className="mb-6">
-                  <h2 className="text-xl font-semibold text-white">אתרים</h2>
+                  <h2 className="text-xl font-semibold" style={{ color: '#ede9f8' }}>אתרים</h2>
                 </div>
 
                 {/* Websites Grid */}
@@ -536,11 +540,11 @@ function DashboardContent() {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}
-                        className="admin-card p-4 hover:border-indigo-500/50 transition-all"
+                        className="admin-card p-4 transition-all"
                       >
                         <div className="flex items-start gap-3">
                           {website.profilePic ? (
-                            <div className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 ring-2 ring-white/10">
+                            <div className="relative w-14 h-14 rounded-2xl overflow-hidden flex-shrink-0" style={{ border: '2px solid rgba(255, 255, 255, 0.06)' }}>
                               <Image
                                 src={website.profilePic}
                                 alt={website.displayName}
@@ -552,56 +556,58 @@ function DashboardContent() {
                             </div>
                           ) : (
                             <div
-                              className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 ring-2 ring-white/10"
-                              style={{ backgroundColor: website.primaryColor + '20' }}
+                              className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
+                              style={{ backgroundColor: website.primaryColor + '15', border: `2px solid ${website.primaryColor}20` }}
                             >
                               <Globe className="w-7 h-7" style={{ color: website.primaryColor }} />
                             </div>
                           )}
                           <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold text-white truncate">
+                            <h3 className="font-semibold truncate" style={{ color: '#ede9f8' }}>
                               {website.displayName}
                             </h3>
                             <a
                               href={website.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-sm text-indigo-400 hover:text-indigo-300 truncate block"
+                              className="text-sm truncate block transition-colors"
+                              style={{ color: '#5eead4' }}
                             >
                               {website.domain}
                             </a>
-                            <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                            <div className="flex items-center gap-2 mt-1.5 text-xs" style={{ color: 'rgba(237, 233, 248, 0.3)' }}>
                               <span>{website.pagesCount} מסמכים</span>
                               <span>{website.chunksCount} chunks</span>
                             </div>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-700">
+                        <div className="flex items-center gap-2 mt-4 pt-4" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.04)' }}>
                           <Link
                             href={`/admin/websites/${website.id}/preview`}
-                            className="flex-1 flex items-center justify-center gap-1 py-2 text-sm text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+                            className="btn-ghost flex-1 flex items-center justify-center gap-1 py-2 text-sm"
                           >
-                            <ExternalLink className="w-4 h-4" />
+                            <ExternalLink className="w-3.5 h-3.5" />
                             ווידג׳ט
                           </Link>
                           <a
                             href={website.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex-1 flex items-center justify-center gap-1 py-2 text-sm text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+                            className="btn-ghost flex-1 flex items-center justify-center gap-1 py-2 text-sm"
                           >
-                            <Globe className="w-4 h-4" />
+                            <Globe className="w-3.5 h-3.5" />
                             לאתר
                           </a>
                           <button
                             onClick={() => {
                               navigator.clipboard.writeText(`${window.location.origin}/demo/${website.id}`);
                             }}
-                            className="flex items-center justify-center gap-1 px-3 py-2 text-sm text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 rounded-lg transition-colors"
+                            className="flex items-center justify-center gap-1 px-3 py-2 text-sm rounded-full transition-all"
+                            style={{ background: 'rgba(160, 148, 224, 0.08)', color: '#a094e0', border: '1px solid rgba(160, 148, 224, 0.12)' }}
                             title="העתק לינק דמו"
                           >
-                            <Copy className="w-4 h-4" />
+                            <Copy className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </motion.div>
@@ -613,11 +619,11 @@ function DashboardContent() {
                     animate={{ opacity: 1 }}
                     className="admin-card p-12 text-center"
                   >
-                    <div className="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center mx-auto mb-4">
-                      <Globe className="w-8 h-8 text-gray-600" />
+                    <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                      <Globe className="w-8 h-8" style={{ color: 'rgba(237, 233, 248, 0.2)' }} />
                     </div>
-                    <h3 className="text-lg font-medium text-white mb-2">אין עדיין אתרים</h3>
-                    <p className="text-gray-400">אתרים מתווספים דרך הקוד</p>
+                    <h3 className="text-lg font-medium mb-2" style={{ color: '#ede9f8' }}>אין עדיין אתרים</h3>
+                    <p style={{ color: 'rgba(237, 233, 248, 0.35)' }}>אתרים מתווספים דרך הקוד</p>
                   </motion.div>
                 )}
               </>
@@ -633,7 +639,7 @@ export default function AdminDashboard() {
   return (
     <Suspense fallback={
       <div className="min-h-screen admin-panel flex items-center justify-center" dir="rtl">
-        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-[#a094e0] border-t-transparent rounded-full animate-spin" />
       </div>
     }>
       <DashboardContent />

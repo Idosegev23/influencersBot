@@ -79,12 +79,12 @@ export default function CommunicationsPage() {
 
   if (isLoading) {
     return (
-      <div className="max-w-6xl mx-auto py-8 px-4" style={{ background: 'var(--dash-bg)' }}>
+      <div className="max-w-6xl mx-auto py-8 px-4 animate-slide-up" style={{ background: 'transparent' }}>
         <div className="animate-pulse space-y-4">
-          <div className="h-8 rounded w-1/4" style={{ background: 'var(--dash-surface)' }} />
+          <div className="h-8 rounded w-1/4" style={{ background: 'rgba(255,255,255,0.03)' }} />
           <div className="grid grid-cols-3 gap-4">
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-24 rounded" style={{ background: 'var(--dash-surface)' }} />
+              <div key={i} className="h-24 rounded" style={{ background: 'rgba(255,255,255,0.03)' }} />
             ))}
           </div>
         </div>
@@ -93,7 +93,7 @@ export default function CommunicationsPage() {
   }
 
   return (
-    <div className="min-h-screen" dir="rtl" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
+    <div className="min-h-screen" dir="rtl" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
       <div className="max-w-6xl mx-auto py-8 px-4 space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -103,8 +103,7 @@ export default function CommunicationsPage() {
           </div>
           <button
             onClick={() => router.push(`/influencer/${username}/communications/new`)}
-            className="px-4 py-2 rounded-lg transition-colors"
-            style={{ background: 'var(--color-primary)', color: 'white' }}
+            className="btn-primary px-4 py-2 rounded-xl transition-colors"
           >
             + תקשורת חדשה
           </button>
@@ -112,7 +111,7 @@ export default function CommunicationsPage() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <div className="rounded-xl border p-4" style={{ borderColor: 'var(--dash-border)' }}>
+          <div className="rounded-xl border p-4" style={{ borderColor: 'var(--dash-glass-border)' }}>
             <div className="text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>סה"כ</div>
             <div className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>{stats.total}</div>
           </div>
@@ -122,7 +121,7 @@ export default function CommunicationsPage() {
             <div className="text-2xl font-bold" style={{ color: 'var(--dash-positive)' }}>{stats.open}</div>
           </div>
 
-          <div className="rounded-xl border p-4" style={{ borderColor: 'var(--dash-border)' }}>
+          <div className="rounded-xl border p-4" style={{ borderColor: 'var(--dash-glass-border)' }}>
             <div className="text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>סגור</div>
             <div className="text-2xl font-bold" style={{ color: 'var(--dash-text-3)' }}>{stats.closed}</div>
           </div>
@@ -144,13 +143,13 @@ export default function CommunicationsPage() {
         </div>
 
         {/* Filters */}
-        <div className="rounded-xl border p-4" style={{ borderColor: 'var(--dash-border)' }}>
+        <div className="rounded-xl border p-4" style={{ borderColor: 'var(--dash-glass-border)' }}>
           <div className="flex gap-4">
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="px-4 py-2 rounded-lg text-right"
-              style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
+              className="px-4 py-2 rounded-xl text-right"
+              style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
             >
               <option value="all">כל הקטגוריות</option>
               <option value="financial">פיננסי</option>
@@ -162,8 +161,8 @@ export default function CommunicationsPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 rounded-lg text-right"
-              style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
+              className="px-4 py-2 rounded-xl text-right"
+              style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
             >
               <option value="all">כל הסטטוסים</option>
               <option value="open">פתוח</option>
@@ -178,8 +177,7 @@ export default function CommunicationsPage() {
             <p className="mb-4" style={{ color: 'var(--dash-negative)' }}>{error}</p>
             <button
               onClick={loadData}
-              className="px-4 py-2 rounded-lg"
-              style={{ background: 'var(--dash-negative)', color: 'white' }}
+              className="btn-coral px-4 py-2 rounded-xl"
             >
               נסה שוב
             </button>
@@ -188,7 +186,7 @@ export default function CommunicationsPage() {
 
         {/* Empty State */}
         {!error && communications.length === 0 && (
-          <div className="rounded-xl border p-12 text-center" style={{ borderColor: 'var(--dash-border)' }}>
+          <div className="rounded-xl border p-12 text-center" style={{ borderColor: 'var(--dash-glass-border)' }}>
             <div className="text-6xl mb-4">💬</div>
             <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--dash-text)' }}>
               אין תקשורת עם מותגים עדיין
@@ -198,8 +196,7 @@ export default function CommunicationsPage() {
             </p>
             <button
               onClick={() => router.push(`/influencer/${username}/communications/new`)}
-              className="px-6 py-3 rounded-lg transition-colors"
-              style={{ background: 'var(--color-primary)', color: 'white' }}
+              className="btn-primary px-6 py-3 rounded-xl transition-colors"
             >
               צור תקשורת ראשונה
             </button>

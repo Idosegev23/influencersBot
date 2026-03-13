@@ -312,8 +312,8 @@ export default function ManagePage({
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" dir="rtl" style={{ background: 'var(--dash-bg)' }}>
-        <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--color-primary)' }} />
+      <div className="min-h-screen flex items-center justify-center animate-slide-up" dir="rtl" style={{ background: 'transparent' }}>
+        <Loader2 className="w-8 h-8 animate-spin animate-slide-up" style={{ color: 'var(--color-primary)' }} />
       </div>
     );
   }
@@ -321,54 +321,50 @@ export default function ManagePage({
   if (!influencer) return null;
 
   return (
-    <div className="min-h-screen" dir="rtl" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
-      <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-8">
+    <div className="min-h-screen animate-slide-up" dir="rtl" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
+      <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-8 animate-slide-up">
         {/* Tabs */}
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
           <button
             onClick={() => setActiveTab('brands')}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors"
-            style={
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium whitespace-nowrap transition-colors ${
               activeTab === 'brands'
-                ? { background: 'var(--color-primary)', color: 'white' }
-                : { background: 'var(--dash-surface)', color: 'var(--dash-text-2)' }
-            }
+                ? 'btn-primary'
+                : 'pill pill-neutral'
+            }`}
           >
             <Store className="w-4 h-4" />
             מותגים וקופונים ({brands.length})
           </button>
           <button
             onClick={() => setActiveTab('products')}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors"
-            style={
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium whitespace-nowrap transition-colors ${
               activeTab === 'products'
-                ? { background: 'var(--color-primary)', color: 'white' }
-                : { background: 'var(--dash-surface)', color: 'var(--dash-text-2)' }
-            }
+                ? 'btn-primary'
+                : 'pill pill-neutral'
+            }`}
           >
             <Package className="w-4 h-4" />
             מוצרים ({products.length})
           </button>
           <button
             onClick={() => setActiveTab('content')}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors"
-            style={
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium whitespace-nowrap transition-colors ${
               activeTab === 'content'
-                ? { background: 'var(--color-primary)', color: 'white' }
-                : { background: 'var(--dash-surface)', color: 'var(--dash-text-2)' }
-            }
+                ? 'btn-primary'
+                : 'pill pill-neutral'
+            }`}
           >
             <FileText className="w-4 h-4" />
             תוכן מפוסטים ({contentItems.length})
           </button>
           <button
             onClick={() => setActiveTab('settings')}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors"
-            style={
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium whitespace-nowrap transition-colors ${
               activeTab === 'settings'
-                ? { background: 'var(--color-primary)', color: 'white' }
-                : { background: 'var(--dash-surface)', color: 'var(--dash-text-2)' }
-            }
+                ? 'btn-primary'
+                : 'pill pill-neutral'
+            }`}
           >
             <Settings className="w-4 h-4" />
             הגדרות צ'אט
@@ -385,7 +381,7 @@ export default function ManagePage({
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="חיפוש..."
               className="w-full pr-10 pl-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid var(--dash-border)' }}
+              style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid var(--dash-glass-border)' }}
             />
           </div>
         )}
@@ -397,8 +393,7 @@ export default function ManagePage({
               <h2 className="text-xl font-bold" style={{ color: 'var(--dash-text)' }}>מותגים וקופונים</h2>
               <button
                 onClick={handleAddBrand}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors"
-                style={{ background: 'var(--color-primary)', color: 'white' }}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl transition-colors btn-primary"
               >
                 <Plus className="w-4 h-4" />
                 הוסף מותג
@@ -406,14 +401,13 @@ export default function ManagePage({
             </div>
 
             {filteredBrands.length === 0 ? (
-              <div className="text-center py-16 rounded-xl" style={{ background: 'var(--dash-surface)' }}>
+              <div className="text-center py-16 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
                 <Store className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--dash-text-3)' }} />
                 <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--dash-text)' }}>אין מותגים עדיין</h3>
                 <p className="mb-6" style={{ color: 'var(--dash-text-2)' }}>הוסיפי מותגים וקופונים שהבוט יכיר</p>
                 <button
                   onClick={handleAddBrand}
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-lg transition-colors"
-                  style={{ background: 'var(--color-primary)', color: 'white' }}
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl transition-colors btn-primary"
                 >
                   <Plus className="w-5 h-5" />
                   הוסף מותג ראשון
@@ -425,7 +419,7 @@ export default function ManagePage({
                   <div
                     key={brand.id}
                     className="p-5 rounded-xl border transition-all"
-                    style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
+                    style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
@@ -438,7 +432,7 @@ export default function ManagePage({
                       </div>
                       <Link
                         href={`/influencer/${username}/partnerships/${brand.id}`}
-                        className="p-2 rounded-lg transition-colors"
+                        className="p-2 rounded-xl transition-colors"
                         style={{ color: 'var(--dash-text-2)' }}
                       >
                         <Edit2 className="w-4 h-4" />
@@ -455,7 +449,7 @@ export default function ManagePage({
                           <button
                             key={coupon.id}
                             onClick={() => handleCopyCode(coupon.code)}
-                            className="w-full flex items-center justify-between px-3 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 rounded-lg transition-colors"
+                            className="w-full flex items-center justify-between px-3 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 rounded-xl transition-colors"
                           >
                             <span className="font-mono text-sm font-bold">{coupon.code}</span>
                             {copiedCode === coupon.code ? (
@@ -477,7 +471,7 @@ export default function ManagePage({
                         href={brand.link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-2 mt-3 px-3 py-2 text-sm rounded-lg transition-colors"
+                        className="flex items-center justify-center gap-2 mt-3 px-3 py-2 text-sm rounded-xl transition-colors"
                         style={{ color: 'var(--dash-text-2)' }}
                       >
                         <ExternalLink className="w-4 h-4" />
@@ -498,8 +492,7 @@ export default function ManagePage({
               <h2 className="text-xl font-bold" style={{ color: 'var(--dash-text)' }}>מוצרים</h2>
               <button
                 onClick={handleAddProduct}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors"
-                style={{ background: 'var(--color-primary)', color: 'white' }}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl transition-colors btn-primary"
               >
                 <Plus className="w-4 h-4" />
                 הוסף מוצר
@@ -507,14 +500,13 @@ export default function ManagePage({
             </div>
 
             {filteredProducts.length === 0 ? (
-              <div className="text-center py-16 rounded-xl" style={{ background: 'var(--dash-surface)' }}>
+              <div className="text-center py-16 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
                 <Package className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--dash-text-3)' }} />
                 <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--dash-text)' }}>אין מוצרים עדיין</h3>
                 <p className="mb-6" style={{ color: 'var(--dash-text-2)' }}>הוסיפי מוצרים שהבוט ידבר עליהם</p>
                 <button
                   onClick={handleAddProduct}
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-lg transition-colors"
-                  style={{ background: 'var(--color-primary)', color: 'white' }}
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl transition-colors btn-primary"
                 >
                   <Plus className="w-5 h-5" />
                   הוסף מוצר ראשון
@@ -526,7 +518,7 @@ export default function ManagePage({
                   <div
                     key={product.id || idx}
                     className="p-4 rounded-xl border transition-all"
-                    style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
+                    style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
@@ -542,7 +534,7 @@ export default function ManagePage({
                       </div>
                       <button
                         onClick={() => handleDeleteProduct(product.id || product.product_id)}
-                        className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+                        className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-colors"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -560,7 +552,7 @@ export default function ManagePage({
             <h2 className="text-xl font-bold mb-6" style={{ color: 'var(--dash-text)' }}>תוכן מפוסטים</h2>
 
             {filteredContent.length === 0 ? (
-              <div className="text-center py-16 rounded-xl" style={{ background: 'var(--dash-surface)' }}>
+              <div className="text-center py-16 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
                 <FileText className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--dash-text-3)' }} />
                 <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--dash-text)' }}>אין תוכן עדיין</h3>
                 <p style={{ color: 'var(--dash-text-2)' }}>התוכן נסרק אוטומטית מהפוסטים שלך באינסטגרם</p>
@@ -575,10 +567,10 @@ export default function ManagePage({
                     <div
                       key={item.id}
                       className="rounded-xl border overflow-hidden transition-all"
-                      style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
+                      style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}
                     >
                       {item.image_url && (
-                        <div className="relative h-40" style={{ background: 'var(--dash-bg)' }}>
+                        <div className="relative h-40" style={{ background: 'transparent' }}>
                           <Image
                             src={item.image_url}
                             alt={item.title}
@@ -620,30 +612,29 @@ export default function ManagePage({
 
             <div className="space-y-6">
               {/* Greeting Message */}
-              <div className="rounded-xl border p-6" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+              <div className="rounded-xl border p-6" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}>
                 <label className="block text-sm font-medium mb-3" style={{ color: 'var(--dash-text-2)' }}>
                   הודעת ברכה
                 </label>
                 <textarea
                   value={greetingMessage}
                   onChange={(e) => setGreetingMessage(e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   rows={4}
                   placeholder="היי! אני הבוט של..."
-                  style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid var(--dash-border)' }}
+                  style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid var(--dash-glass-border)' }}
                 />
               </div>
 
               {/* Suggested Questions */}
-              <div className="rounded-xl border p-6" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+              <div className="rounded-xl border p-6" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}>
                 <div className="flex items-center justify-between mb-4">
                   <label className="block text-sm font-medium" style={{ color: 'var(--dash-text-2)' }}>
                     שאלות מוצעות
                   </label>
                   <button
                     onClick={handleAddQuestion}
-                    className="px-3 py-1.5 text-xs rounded transition-colors flex items-center gap-1"
-                    style={{ background: 'var(--color-primary)', color: 'white' }}
+                    className="px-3 py-1.5 text-xs rounded transition-colors flex items-center gap-1 btn-primary"
                   >
                     <Plus className="w-3 h-3" />
                     הוסף שאלה
@@ -657,13 +648,13 @@ export default function ManagePage({
                         type="text"
                         value={question}
                         onChange={(e) => handleUpdateQuestion(idx, e.target.value)}
-                        className="flex-1 px-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="flex-1 px-4 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         placeholder={`שאלה ${idx + 1}`}
-                        style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid var(--dash-border)' }}
+                        style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid var(--dash-glass-border)' }}
                       />
                       <button
                         onClick={() => handleDeleteQuestion(idx)}
-                        className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+                        className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-colors"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -679,8 +670,7 @@ export default function ManagePage({
               <button
                 onClick={handleSaveSettings}
                 disabled={saving}
-                className="w-full px-6 py-4 disabled:opacity-50 rounded-xl transition-all font-medium flex items-center justify-center gap-2 text-lg"
-                style={{ background: 'var(--color-primary)', color: 'white' }}
+                className="w-full px-6 py-4 disabled:opacity-50 rounded-xl transition-all font-medium flex items-center justify-center gap-2 text-lg btn-primary"
               >
                 {saving ? (
                   <>

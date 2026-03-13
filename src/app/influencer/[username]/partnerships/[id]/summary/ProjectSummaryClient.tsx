@@ -100,8 +100,7 @@ export default function ProjectSummaryClient({
           <button
             onClick={handleExport}
             disabled={isExporting}
-            className="px-6 py-3 rounded-lg print:hidden"
-            style={{ background: 'var(--color-primary)', color: '#fff' }}
+            className="px-6 py-3 rounded-lg print:hidden btn-primary"
           >
             {isExporting ? 'מייצא...' : 'ייצא ל-PDF'}
           </button>

@@ -56,7 +56,7 @@ export default function ExperimentsAdminPage() {
   const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null);
   const [results, setResults] = useState<ExperimentResults | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  
+
   // Create form state
   const [newExperiment, setNewExperiment] = useState({
     key: '',
@@ -159,99 +159,99 @@ export default function ExperimentsAdminPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-white"></div>
+      <div className="min-h-screen admin-panel flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-[#a094e0] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="min-h-screen admin-panel" dir="rtl">
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold">🧪 A/B Testing</h1>
-            <p className="text-gray-400 mt-1">ניהול ניסויים ווריאנטים</p>
+            <h1 className="text-3xl font-bold" style={{ color: '#ede9f8' }}>A/B Testing</h1>
+            <p className="mt-1" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>ניהול ניסויים ווריאנטים</p>
           </div>
           <div className="flex gap-2">
             <button
               onClick={() => setShowCreateForm(true)}
-              className="px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg transition"
+              className="btn-teal flex items-center gap-2 text-sm"
             >
-              ➕ ניסוי חדש
+              + ניסוי חדש
             </button>
             <a
               href="/admin/rules"
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition"
+              className="btn-ghost flex items-center gap-2 text-sm"
             >
-              🎯 חוקים
+              חוקים
             </a>
           </div>
         </div>
 
         {error && (
-          <div className="bg-red-500/20 border border-red-500 text-red-200 px-4 py-3 rounded-lg mb-6">
-            {error}
-            <button onClick={() => setError(null)} className="float-left">✕</button>
+          <div className="pill pill-red px-4 py-3 text-sm mb-6 w-full justify-between">
+            <span>{error}</span>
+            <button onClick={() => setError(null)} className="opacity-60 hover:opacity-100">✕</button>
           </div>
         )}
 
         {/* Create Form Modal */}
         {showCreateForm && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-gray-800 rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-              <h2 className="text-xl font-semibold mb-4">יצירת ניסוי חדש</h2>
-              
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="admin-card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+              <h2 className="text-xl font-semibold mb-4" style={{ color: '#ede9f8' }}>יצירת ניסוי חדש</h2>
+
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1">מפתח (key)</label>
+                  <label className="block text-sm mb-1" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>מפתח (key)</label>
                   <input
                     type="text"
                     value={newExperiment.key}
                     onChange={e => setNewExperiment({...newExperiment, key: e.target.value})}
                     placeholder="quick_actions_count"
-                    className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2"
+                    className="admin-input !rounded-xl"
                   />
                 </div>
-                
+
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1">שם</label>
+                  <label className="block text-sm mb-1" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>שם</label>
                   <input
                     type="text"
                     value={newExperiment.name}
                     onChange={e => setNewExperiment({...newExperiment, name: e.target.value})}
                     placeholder="Quick Actions Count Test"
-                    className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2"
+                    className="admin-input !rounded-xl"
                   />
                 </div>
-                
+
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1">תיאור</label>
+                  <label className="block text-sm mb-1" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>תיאור</label>
                   <textarea
                     value={newExperiment.description}
                     onChange={e => setNewExperiment({...newExperiment, description: e.target.value})}
-                    className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 h-20"
+                    className="admin-input !rounded-xl h-20"
                   />
                 </div>
-                
+
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1">אחוז משתמשים ({newExperiment.allocation}%)</label>
+                  <label className="block text-sm mb-1" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>אחוז משתמשים ({newExperiment.allocation}%)</label>
                   <input
                     type="range"
                     min="0"
                     max="100"
                     value={newExperiment.allocation}
                     onChange={e => setNewExperiment({...newExperiment, allocation: parseInt(e.target.value)})}
-                    className="w-full"
+                    className="w-full accent-[#a094e0]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1">מצב יעד</label>
+                  <label className="block text-sm mb-1" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>מצב יעד</label>
                   <select
                     value={newExperiment.targetMode}
                     onChange={e => setNewExperiment({...newExperiment, targetMode: e.target.value})}
-                    className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2"
+                    className="admin-input !rounded-xl"
                   >
                     <option value="both">שניהם</option>
                     <option value="creator">Creator</option>
@@ -260,7 +260,7 @@ export default function ExperimentsAdminPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">וריאנטים</label>
+                  <label className="block text-sm mb-2" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>וריאנטים</label>
                   {newExperiment.variants.map((v, i) => (
                     <div key={i} className="flex gap-2 mb-2">
                       <input
@@ -271,7 +271,7 @@ export default function ExperimentsAdminPage() {
                           variants[i].name = e.target.value;
                           setNewExperiment({...newExperiment, variants});
                         }}
-                        className="flex-1 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm"
+                        className="admin-input flex-1 !rounded-xl text-sm"
                         placeholder="שם וריאנט"
                       />
                       <input
@@ -282,7 +282,7 @@ export default function ExperimentsAdminPage() {
                           variants[i].weight = parseInt(e.target.value);
                           setNewExperiment({...newExperiment, variants});
                         }}
-                        className="w-20 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm"
+                        className="admin-input w-20 !rounded-xl text-sm"
                         placeholder="משקל"
                       />
                     </div>
@@ -292,7 +292,7 @@ export default function ExperimentsAdminPage() {
                       ...newExperiment,
                       variants: [...newExperiment.variants, { name: `Variant ${String.fromCharCode(65 + newExperiment.variants.length - 1)}`, weight: 50, uiOverrides: {} }],
                     })}
-                    className="text-sm text-indigo-400 hover:text-indigo-300"
+                    className="text-sm transition-colors" style={{ color: '#a094e0' }}
                   >
                     + הוסף וריאנט
                   </button>
@@ -302,13 +302,13 @@ export default function ExperimentsAdminPage() {
               <div className="flex gap-2 mt-6">
                 <button
                   onClick={createExperiment}
-                  className="flex-1 py-2 bg-green-600 hover:bg-green-500 rounded-lg transition"
+                  className="btn-teal flex-1 py-2.5 text-sm"
                 >
                   צור ניסוי
                 </button>
                 <button
                   onClick={() => setShowCreateForm(false)}
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition"
+                  className="btn-ghost px-4 py-2.5 text-sm"
                 >
                   ביטול
                 </button>
@@ -319,30 +319,30 @@ export default function ExperimentsAdminPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Experiments List */}
-          <div className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-xl font-semibold mb-4">ניסויים ({experiments.length})</h2>
-            
+          <div className="admin-card p-6">
+            <h2 className="text-xl font-semibold mb-4" style={{ color: '#ede9f8' }}>ניסויים ({experiments.length})</h2>
+
             <div className="space-y-3 max-h-[600px] overflow-y-auto">
               {experiments.map(exp => (
                 <div
                   key={exp.id}
                   onClick={() => setSelectedExperiment(exp)}
-                  className={`p-4 rounded-lg cursor-pointer transition border ${
-                    selectedExperiment?.id === exp.id
-                      ? 'bg-gray-700 border-indigo-500'
-                      : 'bg-gray-750 border-transparent hover:bg-gray-700'
-                  }`}
+                  className="p-4 rounded-xl cursor-pointer transition-all"
+                  style={selectedExperiment?.id === exp.id
+                    ? { background: 'rgba(160, 148, 224, 0.08)', border: '1px solid rgba(160, 148, 224, 0.2)' }
+                    : { background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }
+                  }
                 >
                   <div className="flex justify-between items-start">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className={`text-xs px-2 py-0.5 rounded ${exp.enabled ? 'bg-green-600' : 'bg-gray-600'}`}>
+                        <span className={`pill text-[11px] py-0.5 px-2 ${exp.enabled ? 'pill-green' : 'pill-neutral'}`}>
                           {exp.enabled ? 'פעיל' : 'מושבת'}
                         </span>
-                        <span className="text-xs text-gray-500">{exp.allocation}%</span>
+                        <span className="text-xs" style={{ color: 'rgba(237, 233, 248, 0.3)' }}>{exp.allocation}%</span>
                       </div>
-                      <h3 className="font-medium mt-1">{exp.name}</h3>
-                      <p className="text-sm text-gray-400">{exp.key}</p>
+                      <h3 className="font-medium mt-1" style={{ color: '#ede9f8' }}>{exp.name}</h3>
+                      <p className="text-sm" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>{exp.key}</p>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
@@ -354,19 +354,30 @@ export default function ExperimentsAdminPage() {
                         }}
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-green-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                      <div className="w-11 h-6 rounded-full peer after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:rounded-full after:h-5 after:w-5 after:transition-all"
+                        style={{
+                          background: exp.enabled ? 'rgba(94, 234, 212, 0.3)' : 'rgba(255, 255, 255, 0.06)',
+                        }}
+                      >
+                        <div className="absolute top-[2px] rounded-full h-5 w-5 transition-all"
+                          style={{
+                            left: exp.enabled ? '22px' : '2px',
+                            background: exp.enabled ? '#5eead4' : 'rgba(237, 233, 248, 0.3)',
+                          }}
+                        />
+                      </div>
                     </label>
                   </div>
-                  <div className="mt-2 flex gap-2 text-xs text-gray-500">
+                  <div className="mt-2 flex gap-2 text-xs" style={{ color: 'rgba(237, 233, 248, 0.25)' }}>
                     <span>{exp.variants.length} variants</span>
                     <span>•</span>
                     <span>{exp.targetMode}</span>
                   </div>
                 </div>
               ))}
-              
+
               {experiments.length === 0 && (
-                <div className="text-center text-gray-500 py-8">
+                <div className="text-center py-8" style={{ color: 'rgba(237, 233, 248, 0.3)' }}>
                   אין ניסויים עדיין
                 </div>
               )}
@@ -377,86 +388,86 @@ export default function ExperimentsAdminPage() {
           <div className="space-y-6">
             {selectedExperiment ? (
               <>
-                <div className="bg-gray-800 rounded-xl p-6">
-                  <h2 className="text-xl font-semibold mb-4">{selectedExperiment.name}</h2>
-                  
+                <div className="admin-card p-6">
+                  <h2 className="text-xl font-semibold mb-4" style={{ color: '#ede9f8' }}>{selectedExperiment.name}</h2>
+
                   <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div className="bg-gray-900 rounded-lg p-3">
-                      <div className="text-sm text-gray-400">Key</div>
-                      <div className="font-mono text-sm">{selectedExperiment.key}</div>
+                    <div className="p-3 rounded-xl" style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                      <div className="text-sm" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>Key</div>
+                      <div className="font-mono text-sm" style={{ color: '#ede9f8' }}>{selectedExperiment.key}</div>
                     </div>
-                    <div className="bg-gray-900 rounded-lg p-3">
-                      <div className="text-sm text-gray-400">Allocation</div>
-                      <div className="text-2xl font-bold">{selectedExperiment.allocation}%</div>
+                    <div className="p-3 rounded-xl" style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                      <div className="text-sm" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>Allocation</div>
+                      <div className="text-2xl font-bold" style={{ color: '#ede9f8' }}>{selectedExperiment.allocation}%</div>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <div className="text-sm text-gray-400">Variants</div>
+                    <div className="text-sm" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>Variants</div>
                     {selectedExperiment.variants.map((v, i) => (
-                      <div key={i} className="flex justify-between items-center bg-gray-900 rounded px-3 py-2">
-                        <span>{v.name}</span>
-                        <span className="text-sm text-gray-400">weight: {v.weight}</span>
+                      <div key={i} className="flex justify-between items-center px-3 py-2 rounded-xl" style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                        <span style={{ color: '#ede9f8' }}>{v.name}</span>
+                        <span className="text-sm" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>weight: {v.weight}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
                 {/* Results */}
-                <div className="bg-gray-800 rounded-xl p-6">
-                  <h3 className="font-semibold mb-4">📊 תוצאות</h3>
-                  
+                <div className="admin-card p-6">
+                  <h3 className="font-semibold mb-4" style={{ color: '#ede9f8' }}>תוצאות</h3>
+
                   {results ? (
                     <div className="space-y-4">
-                      <div className="bg-gray-900 rounded-lg p-4">
-                        <div className="text-sm text-gray-400">Total Exposures</div>
-                        <div className="text-3xl font-bold">{results.totalExposures.toLocaleString()}</div>
+                      <div className="p-4 rounded-xl" style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                        <div className="text-sm" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>Total Exposures</div>
+                        <div className="text-3xl font-bold" style={{ color: '#ede9f8' }}>{results.totalExposures.toLocaleString()}</div>
                       </div>
 
                       {results.variants.map((v, i) => (
-                        <div key={i} className="bg-gray-900 rounded-lg p-4">
+                        <div key={i} className="p-4 rounded-xl" style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
                           <div className="flex justify-between items-center mb-3">
-                            <span className="font-medium">{v.variantName}</span>
-                            <span className="text-sm text-gray-400">{v.exposures} exposures</span>
+                            <span className="font-medium" style={{ color: '#ede9f8' }}>{v.variantName}</span>
+                            <span className="text-sm" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>{v.exposures} exposures</span>
                           </div>
-                          
+
                           <div className="grid grid-cols-2 gap-2 text-sm">
                             <div className="flex justify-between">
-                              <span className="text-gray-400">Coupon copied:</span>
-                              <span className="text-green-400">{(v.conversionRates.coupon_copied * 100).toFixed(1)}%</span>
+                              <span style={{ color: 'rgba(237, 233, 248, 0.35)' }}>Coupon copied:</span>
+                              <span style={{ color: '#5eead4' }}>{(v.conversionRates.coupon_copied * 100).toFixed(1)}%</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-gray-400">Link clicked:</span>
-                              <span className="text-blue-400">{(v.conversionRates.link_clicked * 100).toFixed(1)}%</span>
+                              <span style={{ color: 'rgba(237, 233, 248, 0.35)' }}>Link clicked:</span>
+                              <span style={{ color: '#a094e0' }}>{(v.conversionRates.link_clicked * 100).toFixed(1)}%</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-gray-400">Support created:</span>
-                              <span className="text-yellow-400">{(v.conversionRates.support_created * 100).toFixed(1)}%</span>
+                              <span style={{ color: 'rgba(237, 233, 248, 0.35)' }}>Support created:</span>
+                              <span style={{ color: '#e0a494' }}>{(v.conversionRates.support_created * 100).toFixed(1)}%</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-gray-400">Satisfied:</span>
-                              <span className="text-purple-400">{(v.conversionRates.satisfied * 100).toFixed(1)}%</span>
+                              <span style={{ color: 'rgba(237, 233, 248, 0.35)' }}>Satisfied:</span>
+                              <span style={{ color: '#f472b6' }}>{(v.conversionRates.satisfied * 100).toFixed(1)}%</span>
                             </div>
                           </div>
                         </div>
                       ))}
 
                       {results.variants.length === 0 && (
-                        <div className="text-center text-gray-500 py-4">
+                        <div className="text-center py-4" style={{ color: 'rgba(237, 233, 248, 0.3)' }}>
                           אין נתונים עדיין
                         </div>
                       )}
                     </div>
                   ) : (
-                    <div className="text-center text-gray-500 py-4">
+                    <div className="text-center py-4" style={{ color: 'rgba(237, 233, 248, 0.3)' }}>
                       טוען נתונים...
                     </div>
                   )}
                 </div>
               </>
             ) : (
-              <div className="bg-gray-800 rounded-xl p-6 text-center text-gray-500">
-                <div className="text-4xl mb-4">👈</div>
+              <div className="admin-card p-6 text-center" style={{ color: 'rgba(237, 233, 248, 0.3)' }}>
+                <p className="text-4xl mb-4">👈</p>
                 <p>בחר ניסוי מהרשימה לצפייה בתוצאות</p>
               </div>
             )}
@@ -466,6 +477,3 @@ export default function ExperimentsAdminPage() {
     </div>
   );
 }
-
-
-

@@ -18,6 +18,8 @@ import {
   Layers,
   ChevronLeft,
   BadgeCheck,
+  TrendingUp,
+  TrendingDown,
 } from 'lucide-react';
 import { formatNumber, formatRelativeTime } from '@/lib/utils';
 
@@ -130,21 +132,29 @@ function ActivityChart({ data }: { data: { date: string; messages: number }[] })
       {recent.map((d) => (
         <div key={d.date} className="group relative flex-1 flex items-end">
           <div
-            className="w-full rounded-sm transition-colors"
+            className="w-full transition-all duration-300"
             style={{
               height: `${Math.max((d.messages / max) * 100, 4)}%`,
-              background: 'var(--dash-bar)',
+              background: 'linear-gradient(to top, var(--dash-bar), var(--dash-bar-hover))',
+              borderRadius: '4px',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--dash-bar-hover)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--dash-bar)'; }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--dash-bar-hover)';
+              e.currentTarget.style.boxShadow = '0 0 8px var(--dash-glow-primary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'var(--dash-bar)';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
           />
           <div className="absolute bottom-full mb-2 right-1/2 translate-x-1/2 hidden group-hover:block z-10 pointer-events-none">
             <div
-              className="text-[11px] px-2 py-1 rounded shadow-lg whitespace-nowrap border"
+              className="text-[11px] px-2.5 py-1.5 rounded-xl whitespace-nowrap backdrop-blur-xl"
               style={{
-                background: 'var(--dash-bg)',
+                background: 'var(--dash-surface)',
                 color: 'var(--dash-text-2)',
-                borderColor: 'var(--dash-border)',
+                border: '1px solid var(--dash-glass-border)',
+                boxShadow: 'var(--dash-card-shadow)',
               }}
             >
               {d.date.slice(5)} &middot; {d.messages}
@@ -185,10 +195,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 function Section({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <section
-      className={`rounded-xl border overflow-hidden ${className}`}
-      style={{ borderColor: 'var(--dash-border)' }}
-    >
+    <section className={`glass-card overflow-hidden ${className}`}>
       {children}
     </section>
   );
@@ -201,18 +208,24 @@ function SectionHeader({ title, sub, href, linkText = 'הכל' }: {
   linkText?: string;
 }) {
   return (
-    <div className="px-5 pt-5 pb-3 flex items-center justify-between">
-      <h2 className="text-sm font-medium" style={{ color: 'var(--dash-text)' }}>
+    <div className="px-5 pt-5 pb-3 flex items-center justify-between relative z-10">
+      <h2 className="text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>
         {title}
-        {sub && <span className="font-normal mr-1" style={{ color: 'var(--dash-text-3)' }}>{sub}</span>}
+        {sub && <span className="font-normal mr-1.5 text-xs" style={{ color: 'var(--dash-text-3)' }}>{sub}</span>}
       </h2>
       {href && (
         <Link
           href={href}
-          className="text-xs flex items-center gap-0.5 transition-colors"
+          className="text-xs flex items-center gap-0.5 transition-all duration-300 rounded-lg px-2 py-1"
           style={{ color: 'var(--dash-text-3)' }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--dash-text-2)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--dash-text-3)'; }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--color-primary)';
+            e.currentTarget.style.background = 'var(--dash-muted)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--dash-text-3)';
+            e.currentTarget.style.background = 'transparent';
+          }}
         >
           {linkText} <ChevronLeft className="w-3 h-3" />
         </Link>
@@ -275,8 +288,13 @@ export default function InfluencerDashboardPage({
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--dash-bg)' }}>
-        <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--dash-text-3)' }} />
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'transparent' }}>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 rounded-2xl flex items-center justify-center animate-pulse" style={{ background: 'var(--dash-surface)' }}>
+            <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--dash-text-3)' }} />
+          </div>
+          <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>טוען דשבורד...</p>
+        </div>
       </div>
     );
   }
@@ -290,17 +308,20 @@ export default function InfluencerDashboardPage({
   // ── Render ──
 
   return (
-    <div className="min-h-screen" dir="rtl" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
+    <div className="min-h-screen" dir="rtl" style={{ color: 'var(--dash-text)' }}>
 
       {/* ── Page header ── */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-2 flex items-center justify-between">
-        <div className="flex items-center gap-3 min-w-0">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-2 flex items-center justify-between animate-fade-in aurora-bg rounded-2xl mb-2">
+        <div className="flex items-center gap-3.5 min-w-0">
           {influencer.avatar_url ? (
-            <img src={influencer.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+            <div className="relative">
+              <img src={influencer.avatar_url} alt="" className="w-11 h-11 rounded-2xl object-cover flex-shrink-0" style={{ border: '2px solid var(--dash-glass-border)' }} />
+              <div className="absolute -bottom-0.5 -left-0.5 w-3.5 h-3.5 rounded-full border-2 bg-emerald-400" style={{ borderColor: 'var(--dash-bg)' }} />
+            </div>
           ) : (
             <div
-              className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0"
-              style={{ background: 'var(--dash-surface-hover)', color: 'var(--dash-text-2)' }}
+              className="w-11 h-11 rounded-2xl flex items-center justify-center text-sm font-semibold flex-shrink-0"
+              style={{ background: 'var(--dash-surface)', color: 'var(--dash-text-2)', border: '1px solid var(--dash-glass-border)' }}
             >
               {influencer.display_name?.charAt(0)}
             </div>
@@ -314,36 +335,26 @@ export default function InfluencerDashboardPage({
           </div>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           <button
             onClick={copyLink}
-            className="h-8 px-2.5 text-xs rounded-md transition-colors flex items-center gap-1.5"
-            style={{ color: 'var(--dash-text-2)' }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--dash-surface-hover)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            className={`pill ${copied ? 'pill-green' : 'pill-neutral'} text-xs transition-all duration-300 hover:scale-[1.02]`}
           >
-            {copied ? <Check className="w-3.5 h-3.5" style={{ color: 'var(--dash-positive)' }} /> : <Copy className="w-3.5 h-3.5" />}
+            {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
             <span className="hidden sm:inline">{copied ? 'הועתק' : 'לינק'}</span>
           </button>
           <a
             href={chatLink}
             target="_blank"
             rel="noopener noreferrer"
-            className="h-8 px-2.5 text-xs rounded-md transition-colors hidden sm:flex items-center gap-1.5"
-            style={{ color: 'var(--dash-text-2)' }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--dash-surface-hover)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            className="pill pill-purple text-xs hidden sm:inline-flex transition-all duration-300 hover:scale-[1.02]"
           >
             <ExternalLink className="w-3.5 h-3.5" />
             בוט
           </a>
-          {/* Rescan removed — daily cron at 01:00 UTC handles this */}
           <button
             onClick={logout}
-            className="h-8 px-2.5 text-xs rounded-md transition-colors flex items-center gap-1.5"
-            style={{ color: 'var(--dash-text-3)' }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--dash-surface-hover)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            className="pill pill-neutral text-xs transition-all duration-300 hover:scale-[1.02]"
           >
             <LogOut className="w-3.5 h-3.5" />
           </button>
@@ -354,32 +365,36 @@ export default function InfluencerDashboardPage({
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-5 space-y-5">
 
         {/* ── Metrics strip ── */}
-        <div
-          className="grid grid-cols-3 sm:grid-cols-6 gap-px rounded-xl overflow-hidden"
-          style={{ background: 'var(--dash-border)' }}
-        >
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 stagger-children">
           {[
             {
               label: 'עוקבים',
               value: formatNumber(instagram.followers),
               delta: instagram.followersGrowth !== 0 ? instagram.followersGrowth : null,
+              fill: 'fill-purple',
+              icon: Users,
+              iconColor: '#a094e0',
             },
-            { label: 'שיחות', value: formatNumber(chat.totalSessions), sub: `${formatNumber(chat.totalMessages)} הודעות` },
-            { label: 'שת״פים', value: partnerships.active, sub: partnerships.total > partnerships.active ? `מתוך ${partnerships.total}` : undefined },
-            { label: 'קופונים', value: coupons.active, sub: coupons.totalCopies > 0 ? `${formatNumber(coupons.totalCopies)} העתקות` : undefined },
-            { label: 'אנגייג׳מנט', value: `${instagram.avgEngagement}%`, sub: instagram.totalLikes > 0 ? `${formatNumber(instagram.totalLikes)} לייקים` : undefined },
-            { label: 'צפיות', value: formatNumber(instagram.totalViews), sub: instagram.scrapedPosts > 0 ? `${instagram.scrapedPosts} פוסטים` : undefined },
+            { label: 'שיחות', value: formatNumber(chat.totalSessions), sub: `${formatNumber(chat.totalMessages)} הודעות`, fill: 'fill-blue', icon: MessageSquare, iconColor: '#60a5fa' },
+            { label: 'שת״פים', value: partnerships.active, sub: partnerships.total > partnerships.active ? `מתוך ${partnerships.total}` : undefined, fill: 'fill-coral', icon: Heart, iconColor: '#e0a494' },
+            { label: 'קופונים', value: coupons.active, sub: coupons.totalCopies > 0 ? `${formatNumber(coupons.totalCopies)} העתקות` : undefined, fill: 'fill-green', icon: Copy, iconColor: '#34d399' },
+            { label: 'אנגייג׳מנט', value: `${instagram.avgEngagement}%`, sub: instagram.totalLikes > 0 ? `${formatNumber(instagram.totalLikes)} לייקים` : undefined, fill: 'fill-pink', icon: Eye, iconColor: '#f472b6' },
+            { label: 'צפיות', value: formatNumber(instagram.totalViews), sub: instagram.scrapedPosts > 0 ? `${instagram.scrapedPosts} פוסטים` : undefined, fill: 'fill-amber', icon: Play, iconColor: '#fbbf24' },
           ].map((m, i) => (
-            <div key={i} className="p-4 text-center" style={{ background: 'var(--dash-bg)' }}>
-              <p className="text-xl sm:text-2xl font-semibold tabular-nums" style={{ color: 'var(--dash-text)' }}>{m.value}</p>
-              <p className="text-[11px] mt-1" style={{ color: 'var(--dash-text-3)' }}>{m.label}</p>
+            <div key={i} className="metric-card text-center animate-slide-up" style={{ animationDelay: `${i * 0.05}s`, animationFillMode: 'both' }}>
+              <div className={`w-8 h-8 rounded-xl mx-auto mb-2 flex items-center justify-center relative z-10 ${m.fill}`}>
+                <m.icon className="w-4 h-4" style={{ color: m.iconColor }} />
+              </div>
+              <p className="text-xl sm:text-2xl font-bold tabular-nums relative z-10" style={{ color: 'var(--dash-text)' }}>{m.value}</p>
+              <p className="text-[11px] mt-1 relative z-10" style={{ color: 'var(--dash-text-3)' }}>{m.label}</p>
               {'delta' in m && m.delta != null && (
-                <p className="text-[11px] mt-0.5" style={{ color: m.delta > 0 ? 'var(--dash-positive)' : 'var(--dash-negative)' }}>
+                <p className="text-[11px] mt-0.5 flex items-center justify-center gap-0.5 relative z-10" style={{ color: m.delta > 0 ? 'var(--dash-positive)' : 'var(--dash-negative)' }}>
+                  {m.delta > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                   {m.delta > 0 ? '+' : ''}{formatNumber(m.delta)}
                 </p>
               )}
               {'sub' in m && m.sub && (
-                <p className="text-[11px] mt-0.5" style={{ color: 'var(--dash-text-3)' }}>{m.sub}</p>
+                <p className="text-[11px] mt-0.5 relative z-10" style={{ color: 'var(--dash-text-3)' }}>{m.sub}</p>
               )}
             </div>
           ))}
@@ -392,21 +407,21 @@ export default function InfluencerDashboardPage({
           <div className="lg:col-span-3 space-y-5">
 
             {/* Chat activity */}
-            <Section>
+            <Section className="glow-border">
               <SectionHeader title="פעילות בוט" sub="30 יום" href={`/influencer/${username}/analytics`} linkText="אנליטיקס" />
-              <div className="px-5 grid grid-cols-3 gap-4 pb-4">
+              <div className="px-5 grid grid-cols-3 gap-4 pb-4 relative z-10">
                 {[
                   { label: 'הודעות נכנסות', value: formatNumber(analytics.messagesReceived) },
                   { label: 'תגובות', value: formatNumber(analytics.responsesSent) },
                   { label: 'זמן תגובה', value: avgSec ? `${avgSec}s` : '—' },
                 ].map((s) => (
                   <div key={s.label}>
-                    <p className="text-lg font-semibold tabular-nums" style={{ color: 'var(--dash-text)' }}>{s.value}</p>
+                    <p className="text-lg font-bold tabular-nums" style={{ color: 'var(--dash-text)' }}>{s.value}</p>
                     <p className="text-[11px]" style={{ color: 'var(--dash-text-3)' }}>{s.label}</p>
                   </div>
                 ))}
               </div>
-              <div className="px-5 pb-5">
+              <div className="px-5 pb-5 relative z-10">
                 {analytics.dailyActivity.length > 0 ? (
                   <ActivityChart data={analytics.dailyActivity} />
                 ) : (
@@ -417,32 +432,32 @@ export default function InfluencerDashboardPage({
 
             {/* Recent posts */}
             <Section>
-              <div className="px-5 pt-5 pb-3 flex items-center justify-between">
-                <h2 className="text-sm font-medium" style={{ color: 'var(--dash-text)' }}>פוסטים אחרונים</h2>
+              <div className="px-5 pt-5 pb-3 flex items-center justify-between relative z-10">
+                <h2 className="text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>פוסטים אחרונים</h2>
                 {Object.keys(instagram.postsByType).length > 0 && (
                   <div className="flex gap-2">
                     {Object.entries(instagram.postsByType).map(([type, count]) => (
-                      <span key={type} className="text-[11px]" style={{ color: 'var(--dash-text-3)' }}>{type} {count}</span>
+                      <span key={type} className="pill pill-neutral text-[11px]">{type} {count}</span>
                     ))}
                   </div>
                 )}
               </div>
 
               {recentPosts.length > 0 ? (
-                <div>
+                <div className="relative z-10">
                   {recentPosts.map((post, i) => {
                     const Icon = POST_ICON[post.type] || ImageIcon;
                     return (
-                      <div
-                        key={post.id}
-                        className="px-5 py-3 flex items-center gap-3 transition-colors"
-                        style={{
-                          borderTop: i > 0 ? '1px solid var(--dash-border)' : undefined,
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--dash-surface)'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                      >
-                        <Icon className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--dash-text-3)' }} />
+                      <div key={post.id}>
+                        {i > 0 && <div className="glow-line mx-5" />}
+                        <div
+                          className="px-5 py-3 flex items-center gap-3 transition-all duration-300"
+                          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--dash-surface-hover)'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                        >
+                        <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-glass-border)' }}>
+                          <Icon className="w-3.5 h-3.5" style={{ color: 'var(--dash-text-3)' }} />
+                        </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm truncate" style={{ color: 'var(--dash-text)' }}>{post.caption || `${post.type} post`}</p>
                           <p className="text-[11px]" style={{ color: 'var(--dash-text-3)' }}>{formatRelativeTime(post.postedAt)}</p>
@@ -452,12 +467,13 @@ export default function InfluencerDashboardPage({
                           {post.comments > 0 && <span className="flex items-center gap-1"><MessageSquare className="w-3 h-3" />{formatNumber(post.comments)}</span>}
                           {post.views > 0 && <span className="flex items-center gap-1"><Eye className="w-3 h-3" />{formatNumber(post.views)}</span>}
                         </div>
+                        </div>
                       </div>
                     );
                   })}
                 </div>
               ) : (
-                <p className="px-5 pb-5 text-xs" style={{ color: 'var(--dash-text-3)' }}>אין פוסטים נסרקים</p>
+                <p className="px-5 pb-5 text-xs relative z-10" style={{ color: 'var(--dash-text-3)' }}>אין פוסטים נסרקים</p>
               )}
             </Section>
 
@@ -465,30 +481,31 @@ export default function InfluencerDashboardPage({
             <Section>
               <SectionHeader title="שיחות אחרונות" href={`/influencer/${username}/conversations`} />
               {chat.recentSessions.length > 0 ? (
-                <div>
+                <div className="relative z-10">
                   {chat.recentSessions.map((s, i) => (
-                    <div
-                      key={s.id}
-                      className="px-5 py-3 flex items-center justify-between transition-colors"
-                      style={{ borderTop: i > 0 ? '1px solid var(--dash-border)' : undefined }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--dash-surface)'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                    >
+                    <div key={s.id}>
+                      {i > 0 && <div className="glow-line mx-5" />}
+                      <div
+                        className="px-5 py-3 flex items-center justify-between transition-all duration-300"
+                        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--dash-surface-hover)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                      >
                       <div className="flex items-center gap-3">
                         <div
-                          className="w-7 h-7 rounded-full flex items-center justify-center"
-                          style={{ background: 'var(--dash-muted)' }}
+                          className="w-8 h-8 rounded-xl flex items-center justify-center"
+                          style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-glass-border)' }}
                         >
                           <Users className="w-3.5 h-3.5" style={{ color: 'var(--dash-text-3)' }} />
                         </div>
                         <span className="text-sm" style={{ color: 'var(--dash-text)' }}>{s.messageCount} הודעות</span>
                       </div>
                       <span className="text-[11px]" style={{ color: 'var(--dash-text-3)' }}>{formatRelativeTime(s.createdAt)}</span>
+                      </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="px-5 pb-5 text-center">
+                <div className="px-5 pb-5 text-center relative z-10">
                   <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>אין עדיין שיחות</p>
                   <p className="text-[11px] mt-1" style={{ color: 'var(--dash-text-3)' }}>שתפו את הלינק כדי להתחיל</p>
                 </div>
@@ -504,8 +521,8 @@ export default function InfluencerDashboardPage({
               <SectionHeader title="שת״פים" href={`/influencer/${username}/partnerships`} linkText="ניהול" />
 
               {partnerships.totalRevenue > 0 && (
-                <div className="mx-5 mb-3 flex items-baseline gap-3">
-                  <span className="text-lg font-semibold tabular-nums" style={{ color: 'var(--dash-text)' }}>
+                <div className="mx-5 mb-3 flex items-baseline gap-3 relative z-10">
+                  <span className="text-lg font-bold tabular-nums text-gradient-premium">
                     ₪{formatNumber(partnerships.totalRevenue)}
                   </span>
                   {partnerships.pendingRevenue > 0 && (
@@ -517,37 +534,37 @@ export default function InfluencerDashboardPage({
               )}
 
               {partnerships.list.length > 0 ? (
-                <div>
+                <div className="relative z-10">
                   {partnerships.list.map((p, i) => (
-                    <Link
-                      key={p.id}
-                      href={`/influencer/${username}/partnerships/${p.id}`}
-                      className="px-5 py-3 flex items-center justify-between transition-colors block"
-                      style={{ borderTop: i > 0 ? '1px solid var(--dash-border)' : undefined }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--dash-surface)'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                    >
+                    <div key={p.id}>
+                      {i > 0 && <div className="glow-line mx-5" />}
+                      <Link
+                        href={`/influencer/${username}/partnerships/${p.id}`}
+                        className="px-5 py-3 flex items-center justify-between transition-all duration-300 block"
+                        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--dash-surface-hover)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                      >
                       <div className="min-w-0">
-                        <p className="text-sm truncate" style={{ color: 'var(--dash-text)' }}>{p.brandName}</p>
-                        <p className="text-[11px]" style={{ color: STATUS_COLOR[p.status] || 'var(--dash-text-3)' }}>
+                        <p className="text-sm truncate font-medium" style={{ color: 'var(--dash-text)' }}>{p.brandName}</p>
+                        <p className="text-[11px] font-medium" style={{ color: STATUS_COLOR[p.status] || 'var(--dash-text-3)' }}>
                           {STATUS_LABEL[p.status] || p.status}
                         </p>
                       </div>
                       {p.contractAmount > 0 && (
-                        <span className="text-sm tabular-nums mr-3" style={{ color: 'var(--dash-text-2)' }}>
+                        <span className="text-sm tabular-nums mr-3 font-medium" style={{ color: 'var(--dash-text-2)' }}>
                           ₪{formatNumber(p.contractAmount)}
                         </span>
                       )}
-                    </Link>
+                      </Link>
+                    </div>
                   ))}
                 </div>
               ) : (
-                <div className="px-5 pb-5">
+                <div className="px-5 pb-5 relative z-10">
                   <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>אין עדיין שת"פים</p>
                   <Link
                     href={`/influencer/${username}/partnerships`}
-                    className="inline-block mt-2 text-xs transition-colors"
-                    style={{ color: 'var(--dash-text-2)' }}
+                    className="pill pill-purple text-xs mt-2 inline-flex transition-all duration-300 hover:scale-[1.02]"
                   >
                     + הוסף שת"פ
                   </Link>
@@ -559,20 +576,21 @@ export default function InfluencerDashboardPage({
             {coupons.list.length > 0 && (
               <Section>
                 <SectionHeader title="קופונים" href={`/influencer/${username}/coupons`} />
-                <div>
+                <div className="relative z-10">
                   {coupons.list.map((c, i) => (
-                    <div
-                      key={c.id}
-                      className="px-5 py-3 flex items-center justify-between"
-                      style={{ borderTop: i > 0 ? '1px solid var(--dash-border)' : undefined }}
-                    >
+                    <div key={c.id}>
+                      {i > 0 && <div className="glow-line mx-5" />}
+                      <div
+                        className="px-5 py-3 flex items-center justify-between"
+                      >
                       <div className="min-w-0">
-                        <code className="text-sm font-mono" style={{ color: 'var(--dash-text)' }}>{c.code}</code>
+                        <code className="text-sm font-mono font-semibold" style={{ color: 'var(--dash-text)' }}>{c.code}</code>
                         {c.brandName && <p className="text-[11px] mt-0.5" style={{ color: 'var(--dash-text-3)' }}>{c.brandName}</p>}
                       </div>
                       <div className="text-left text-[11px] tabular-nums" style={{ color: 'var(--dash-text-3)' }}>
                         {c.discountValue > 0 && <p>{c.discountType === 'percentage' ? `${c.discountValue}%` : `₪${c.discountValue}`}</p>}
                         {c.copyCount > 0 && <p>{c.copyCount} העתקות</p>}
+                      </div>
                       </div>
                     </div>
                   ))}
@@ -583,7 +601,7 @@ export default function InfluencerDashboardPage({
             {/* Bot status */}
             <Section>
               <SectionHeader title="סטטוס הבוט" href={`/influencer/${username}/manage`} linkText="ניהול" />
-              <div className="px-5 pb-5 space-y-2.5">
+              <div className="px-5 pb-5 space-y-3 relative z-10">
                 {[
                   { label: 'מסמכים', value: formatNumber(botKnowledge.totalDocuments) },
                   { label: 'פרגמנטי ידע', value: formatNumber(botKnowledge.totalChunks) },
@@ -597,7 +615,7 @@ export default function InfluencerDashboardPage({
                   <div key={row.label} className="flex items-center justify-between text-sm">
                     <span style={{ color: 'var(--dash-text-3)' }}>{row.label}</span>
                     <span
-                      className="tabular-nums"
+                      className="tabular-nums font-medium"
                       style={{ color: row.warn ? 'var(--color-warning)' : 'var(--dash-text)' }}
                     >
                       {row.value}
@@ -609,25 +627,22 @@ export default function InfluencerDashboardPage({
 
             {/* Quick nav */}
             <Section>
-              <div className="px-5 pt-5 pb-3">
-                <h2 className="text-sm font-medium" style={{ color: 'var(--dash-text)' }}>ניווט מהיר</h2>
+              <div className="px-5 pt-5 pb-3 relative z-10">
+                <h2 className="text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>ניווט מהיר</h2>
               </div>
-              <div className="px-5 pb-5 grid grid-cols-2 gap-2">
+              <div className="px-5 pb-5 grid grid-cols-2 gap-2 relative z-10">
                 {[
-                  { href: 'manage', label: 'ניהול תוכן' },
-                  { href: 'chatbot-persona', label: 'פרסונת הבוט' },
-                  { href: 'documents', label: 'מסמכים' },
-                  { href: 'share', label: 'QR + שיתוף' },
-                  { href: 'support', label: 'תמיכה' },
-                  { href: 'settings', label: 'הגדרות' },
+                  { href: 'manage', label: 'ניהול תוכן', pill: 'pill-purple' },
+                  { href: 'chatbot-persona', label: 'פרסונת הבוט', pill: 'pill-coral' },
+                  { href: 'documents', label: 'מסמכים', pill: 'pill-blue' },
+                  { href: 'share', label: 'QR + שיתוף', pill: 'pill-teal' },
+                  { href: 'support', label: 'תמיכה', pill: 'pill-pink' },
+                  { href: 'settings', label: 'הגדרות', pill: 'pill-neutral' },
                 ].map((item) => (
                   <Link
                     key={item.href}
                     href={`/influencer/${username}/${item.href}`}
-                    className="px-3 py-2.5 text-xs rounded-lg transition-colors text-center"
-                    style={{ color: 'var(--dash-text-2)' }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--dash-surface)'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                    className={`pill ${item.pill} text-xs justify-center py-2.5 transition-all duration-300 hover:scale-[1.02]`}
                   >
                     {item.label}
                   </Link>

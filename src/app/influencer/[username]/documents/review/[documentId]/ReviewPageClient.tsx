@@ -442,8 +442,7 @@ export function ReviewPageClient({
             <button
               onClick={handleCreatePartnership}
               disabled={isCreating || !parsedData.brand_name}
-              className="px-6 py-2.5 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: 'var(--color-primary)', color: 'white' }}
+              className="btn-primary px-6 py-2.5 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isCreating ? 'יוצר...' : 'צור שת"פ'}
             </button>

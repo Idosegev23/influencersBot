@@ -55,20 +55,17 @@ export default function AdminLogin() {
   if (checking) {
     return (
       <div className="min-h-screen admin-panel flex items-center justify-center" dir="rtl">
-        <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#a094e0' }} />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen admin-panel flex items-center justify-center p-4" dir="rtl">
-      {/* Background gradient */}
-      <div className="fixed inset-0 bg-gradient-to-br from-indigo-900/20 via-gray-950 to-purple-900/20" />
-
       {/* Back button */}
       <Link
         href="/"
-        className="fixed top-4 right-4 z-10 px-4 py-2 text-sm text-gray-400 hover:text-white bg-gray-800/50 hover:bg-gray-800 backdrop-blur rounded-xl transition-all"
+        className="fixed top-4 right-4 z-10 btn-ghost text-sm"
       >
         חזרה
       </Link>
@@ -80,16 +77,16 @@ export default function AdminLogin() {
       >
         {/* Logo */}
         <div className="flex justify-center mb-8">
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center ring-4 ring-indigo-500/20">
-            <Zap className="w-10 h-10 text-white" />
+          <div className="w-20 h-20 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(160, 148, 224, 0.12)', border: '1px solid rgba(160, 148, 224, 0.18)', boxShadow: '0 0 40px rgba(160, 148, 224, 0.1)' }}>
+            <Zap className="w-10 h-10" style={{ color: '#a094e0' }} />
           </div>
         </div>
 
         {/* Card */}
         <div className="admin-card p-6 sm:p-8">
           <div className="text-center mb-6">
-            <h1 className="text-xl font-bold text-white mb-1">פאנל ניהול</h1>
-            <p className="text-gray-400 text-sm">InfluencerBot</p>
+            <h1 className="text-xl font-bold mb-1" style={{ color: '#ede9f8' }}>פאנל ניהול</h1>
+            <p className="text-sm" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>InfluencerBot</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -109,7 +106,7 @@ export default function AdminLogin() {
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-sm text-center"
+                className="pill pill-red px-4 py-3 text-sm text-center w-full justify-center"
               >
                 {error}
               </motion.div>
@@ -118,7 +115,7 @@ export default function AdminLogin() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/25"
+              className="btn-solid w-full py-3.5 font-medium text-base disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <Loader2 className="w-5 h-5 animate-spin mx-auto" />
@@ -132,12 +129,3 @@ export default function AdminLogin() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-

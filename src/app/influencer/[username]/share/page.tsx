@@ -220,7 +220,7 @@ export default function SharePage({
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" dir="rtl" style={{ background: 'var(--dash-bg)' }}>
+      <div className="min-h-screen flex items-center justify-center" dir="rtl" style={{ background: 'transparent' }}>
         <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--color-primary)' }} />
       </div>
     );
@@ -229,13 +229,13 @@ export default function SharePage({
   if (!influencer) return null;
 
   return (
-    <div className="min-h-screen" dir="rtl" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
+    <div className="min-h-screen" dir="rtl" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* QR Code Section */}
           <div
-            className="rounded-xl border p-6"
-            style={{ borderColor: 'var(--dash-border)' }}
+            className="glass-card rounded-2xl p-6 animate-slide-up"
+            style={{ borderColor: 'var(--dash-glass-border)' }}
           >
             <h2 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
               <QrCode className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
@@ -261,8 +261,7 @@ export default function SharePage({
 
               <button
                 onClick={handleDownloadQR}
-                className="flex items-center gap-2 px-6 py-3 rounded-xl transition-colors"
-                style={{ background: 'var(--color-primary)', color: 'white' }}
+                className="btn-primary flex items-center gap-2 px-6 py-3 rounded-xl transition-colors"
               >
                 <Download className="w-5 h-5" />
                 הורד QR Code
@@ -272,8 +271,8 @@ export default function SharePage({
 
           {/* Links Section */}
           <div
-            className="rounded-xl border p-6"
-            style={{ borderColor: 'var(--dash-border)' }}
+            className="glass-card rounded-2xl p-6 animate-slide-up"
+            style={{ borderColor: 'var(--dash-glass-border)' }}
           >
             <h2 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
               <Link2 className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
@@ -285,16 +284,16 @@ export default function SharePage({
               <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>לינק בסיסי</label>
               <div className="flex items-center gap-2">
                 <div
-                  className="flex-1 px-4 py-3 rounded-lg text-sm truncate"
-                  style={{ background: 'var(--dash-surface)', color: 'var(--dash-text-2)' }}
+                  className="flex-1 px-4 py-3 rounded-xl text-sm truncate"
+                  style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--dash-text-2)' }}
                 >
                   {chatLink}
                 </div>
                 <button
                   onClick={() => handleCopy(chatLink, 'basic')}
-                  className="p-3 rounded-lg transition-colors"
+                  className="p-3 rounded-xl transition-colors"
                   style={{
-                    background: copied === 'basic' ? 'var(--dash-positive)' : 'var(--dash-surface)',
+                    background: copied === 'basic' ? 'var(--dash-positive)' : 'rgba(255,255,255,0.03)',
                     color: copied === 'basic' ? 'white' : 'var(--dash-text-2)',
                   }}
                 >
@@ -304,8 +303,8 @@ export default function SharePage({
                   href={chatLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-3 rounded-lg transition-colors"
-                  style={{ background: 'var(--dash-surface)', color: 'var(--dash-text-2)' }}
+                  className="p-3 rounded-xl transition-colors"
+                  style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--dash-text-2)' }}
                 >
                   <ExternalLink className="w-5 h-5" />
                 </a>
@@ -324,11 +323,12 @@ export default function SharePage({
                     <button
                       key={source.id}
                       onClick={() => setSelectedSource(source.id)}
-                      className="flex flex-col items-center gap-2 p-3 rounded-xl border transition-all"
+                      className="flex flex-col items-center gap-2 p-3 rounded-xl transition-all"
                       style={{
-                        borderColor: selectedSource === source.id ? 'var(--color-primary)' : 'var(--dash-border)',
-                        background: selectedSource === source.id ? 'color-mix(in srgb, var(--color-primary) 10%, transparent)' : 'transparent',
+                        borderColor: selectedSource === source.id ? 'var(--color-primary)' : 'var(--dash-glass-border)',
+                        background: selectedSource === source.id ? 'color-mix(in srgb, var(--color-primary) 10%, transparent)' : 'rgba(255,255,255,0.03)',
                         color: selectedSource === source.id ? 'var(--dash-text)' : 'var(--dash-text-2)',
+                        border: '1px solid'
                       }}
                     >
                       <Icon className="w-5 h-5" />
@@ -346,16 +346,16 @@ export default function SharePage({
                     value={customSource}
                     onChange={(e) => setCustomSource(e.target.value)}
                     placeholder="מקור (source)"
-                    className="rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
+                    className="rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
                   />
                   <input
                     type="text"
                     value={customMedium}
                     onChange={(e) => setCustomMedium(e.target.value)}
                     placeholder="אמצעי (medium)"
-                    className="rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
+                    className="rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
                   />
                 </div>
               )}
@@ -366,23 +366,23 @@ export default function SharePage({
                 value={customCampaign}
                 onChange={(e) => setCustomCampaign(e.target.value)}
                 placeholder="שם הקמפיין (אופציונלי)"
-                className="w-full rounded-lg px-4 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)', border: '1px solid' }}
+                className="w-full rounded-xl px-4 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
               />
 
               {/* Generated UTM Link */}
               <div className="flex items-center gap-2">
                 <div
-                  className="flex-1 px-4 py-3 rounded-lg text-sm truncate"
-                  style={{ background: 'var(--dash-surface)', color: 'var(--dash-text-2)' }}
+                  className="flex-1 px-4 py-3 rounded-xl text-sm truncate"
+                  style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--dash-text-2)' }}
                 >
                   {utmLink}
                 </div>
                 <button
                   onClick={() => handleCopy(utmLink, 'utm')}
-                  className="p-3 rounded-lg transition-colors"
+                  className="p-3 rounded-xl transition-colors"
                   style={{
-                    background: copied === 'utm' ? 'var(--dash-positive)' : 'var(--dash-surface)',
+                    background: copied === 'utm' ? 'var(--dash-positive)' : 'rgba(255,255,255,0.03)',
                     color: copied === 'utm' ? 'white' : 'var(--dash-text-2)',
                   }}
                 >
@@ -395,8 +395,8 @@ export default function SharePage({
 
         {/* Tips */}
         <div
-          className="mt-8 rounded-xl border p-6"
-          style={{ borderColor: 'color-mix(in srgb, var(--color-primary) 30%, transparent)', background: 'color-mix(in srgb, var(--color-primary) 5%, transparent)' }}
+          className="mt-8 glass-card rounded-2xl p-6 animate-slide-up"
+          style={{ borderColor: 'var(--dash-glass-border)', background: 'rgba(255,255,255,0.03)' }}
         >
           <h3 className="font-semibold mb-4" style={{ color: 'var(--dash-text)' }}>💡 טיפים לשיתוף</h3>
           <ul className="space-y-2 text-sm" style={{ color: 'var(--dash-text-2)' }}>

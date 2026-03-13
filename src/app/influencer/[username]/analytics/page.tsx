@@ -143,7 +143,7 @@ export default function AnalyticsPage({
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" dir="rtl" style={{ background: 'var(--dash-bg)' }}>
+      <div className="min-h-screen flex items-center justify-center" dir="rtl" style={{ background: 'transparent' }}>
         <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--dash-text-3)' }} />
       </div>
     );
@@ -168,9 +168,9 @@ export default function AnalyticsPage({
   }));
 
   return (
-    <div className="min-h-screen" dir="rtl" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
+    <div className="min-h-screen" dir="rtl" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
       {/* Sub-header with date range selector */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-2">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-2 animate-slide-up">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
             <BarChart3 className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
@@ -183,10 +183,10 @@ export default function AnalyticsPage({
             <select
               value={dateRange}
               onChange={(e) => setDateRange(e.target.value as DateRange)}
-              className="rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+              className="rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
               style={{
-                background: 'var(--dash-surface)',
-                border: '1px solid var(--dash-border)',
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid var(--dash-glass-border)',
                 color: 'var(--dash-text)',
               }}
             >
@@ -234,10 +234,11 @@ export default function AnalyticsPage({
           ].map((card, i) => (
             <div
               key={i}
-              className="rounded-xl p-5"
+              className="glass-card rounded-2xl p-5 animate-fade-in"
               style={{
-                background: 'var(--dash-surface)',
-                border: '1px solid var(--dash-border)',
+                background: 'rgba(255,255,255,0.03)',
+                borderColor: 'var(--dash-glass-border)',
+                border: '1px solid'
               }}
             >
               <div className="flex items-start justify-between mb-3">
@@ -276,10 +277,11 @@ export default function AnalyticsPage({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* Sessions & Messages Chart */}
           <div
-            className="rounded-xl p-6"
+            className="glass-card rounded-2xl p-6 animate-slide-up"
             style={{
-              background: 'var(--dash-surface)',
-              border: '1px solid var(--dash-border)',
+              background: 'rgba(255,255,255,0.03)',
+              borderColor: 'var(--dash-glass-border)',
+              border: '1px solid'
             }}
           >
             <h3 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
@@ -299,14 +301,14 @@ export default function AnalyticsPage({
                       <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--dash-border)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--dash-glass-border)" />
                   <XAxis dataKey="date" stroke="var(--dash-text-3)" fontSize={12} />
                   <YAxis stroke="var(--dash-text-3)" fontSize={12} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: 'var(--dash-surface)',
-                      border: '1px solid var(--dash-border)',
-                      borderRadius: '8px',
+                      backgroundColor: 'rgba(255,255,255,0.08)',
+                      border: '1px solid var(--dash-glass-border)',
+                      borderRadius: '12px',
                       direction: 'rtl',
                       color: 'var(--dash-text)',
                     }}
@@ -336,10 +338,11 @@ export default function AnalyticsPage({
 
           {/* Conversions Chart */}
           <div
-            className="rounded-xl p-6"
+            className="glass-card rounded-2xl p-6 animate-slide-up"
             style={{
-              background: 'var(--dash-surface)',
-              border: '1px solid var(--dash-border)',
+              background: 'rgba(255,255,255,0.03)',
+              borderColor: 'var(--dash-glass-border)',
+              border: '1px solid'
             }}
           >
             <h3 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
@@ -349,14 +352,14 @@ export default function AnalyticsPage({
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--dash-border)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--dash-glass-border)" />
                   <XAxis dataKey="date" stroke="var(--dash-text-3)" fontSize={12} />
                   <YAxis stroke="var(--dash-text-3)" fontSize={12} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: 'var(--dash-surface)',
-                      border: '1px solid var(--dash-border)',
-                      borderRadius: '8px',
+                      backgroundColor: 'rgba(255,255,255,0.08)',
+                      border: '1px solid var(--dash-glass-border)',
+                      borderRadius: '12px',
                       direction: 'rtl',
                       color: 'var(--dash-text)',
                     }}
@@ -373,10 +376,11 @@ export default function AnalyticsPage({
 
         {/* Top Products */}
         <div
-          className="rounded-xl p-6"
+          className="glass-card rounded-2xl p-6 animate-slide-up"
           style={{
-            background: 'var(--dash-surface)',
-            border: '1px solid var(--dash-border)',
+            background: 'rgba(255,255,255,0.03)',
+            borderColor: 'var(--dash-glass-border)',
+            border: '1px solid'
           }}
         >
           <h3 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
@@ -388,7 +392,7 @@ export default function AnalyticsPage({
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="text-sm" style={{ borderBottom: '1px solid var(--dash-border)', color: 'var(--dash-text-2)' }}>
+                  <tr className="text-sm" style={{ borderBottom: '1px solid var(--dash-glass-border)', color: 'var(--dash-text-2)' }}>
                     <th className="text-right py-3 px-4">#</th>
                     <th className="text-right py-3 px-4">מוצר</th>
                     <th className="text-right py-3 px-4">מותג</th>
@@ -402,8 +406,8 @@ export default function AnalyticsPage({
                     <tr
                       key={product.id}
                       className="transition-colors"
-                      style={{ borderBottom: '1px solid var(--dash-border)' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--dash-surface-hover)'; }}
+                      style={{ borderBottom: '1px solid var(--dash-glass-border)' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
                       onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                     >
                       <td className="py-4 px-4">
@@ -413,7 +417,7 @@ export default function AnalyticsPage({
                           index === 2 ? 'bg-orange-500/20 text-orange-400' :
                           ''
                         }`}
-                          style={index > 2 ? { background: 'var(--dash-muted)', color: 'var(--dash-text-3)' } : undefined}
+                          style={index > 2 ? { background: 'rgba(255,255,255,0.05)', color: 'var(--dash-text-3)' } : undefined}
                         >
                           {index + 1}
                         </div>

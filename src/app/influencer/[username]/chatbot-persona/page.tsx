@@ -128,11 +128,11 @@ const EMOJI_LABELS: Record<string, string> = {
 function Badge({ children, color = 'var(--color-primary)' }: { children: React.ReactNode; color?: string }) {
   return (
     <span
-      className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium"
+      className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium relative z-10"
       style={{
         background: `color-mix(in srgb, ${color} 15%, transparent)`,
         color,
-        border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`,
+        border: `1px solid var(--dash-glass-border)`,
       }}
     >
       {children}
@@ -143,12 +143,7 @@ function Badge({ children, color = 'var(--color-primary)' }: { children: React.R
 function Chip({ children, onRemove }: { children: React.ReactNode; onRemove?: () => void }) {
   return (
     <span
-      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm"
-      style={{
-        background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)',
-        color: 'var(--color-primary)',
-        border: '1px solid color-mix(in srgb, var(--color-primary) 25%, transparent)',
-      }}
+      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm relative z-10 pill pill-purple"
     >
       {children}
       {onRemove && (
@@ -176,14 +171,11 @@ function SectionCard({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div
-      className="rounded-xl border overflow-hidden"
-      style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
-    >
+    <div className="glass-card rounded-2xl overflow-hidden">
       <button
         type="button"
         onClick={() => collapsible && setOpen(!open)}
-        className={`w-full flex items-center gap-3 p-5 text-right ${
+        className={`w-full flex items-center gap-3 p-5 text-right relative z-10 ${
           collapsible ? 'cursor-pointer' : 'cursor-default'
         }`}
         style={{ color: 'var(--dash-text)' }}
@@ -195,7 +187,7 @@ function SectionCard({
         )}
       </button>
       {open && (
-        <div className="px-5 pb-5 space-y-4">
+        <div className="px-5 pb-5 space-y-4 relative z-10">
           {children}
         </div>
       )}
@@ -530,7 +522,7 @@ export default function ChatbotPersonaPage({
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--dash-bg)' }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'transparent' }}>
         <div
           className="animate-spin rounded-full h-12 w-12 border-b-2"
           style={{ borderColor: 'var(--color-primary)' }}
@@ -547,11 +539,11 @@ export default function ChatbotPersonaPage({
     <div
       dir="rtl"
       className="min-h-screen py-8 px-4"
-      style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}
+      style={{ background: 'transparent', color: 'var(--dash-text)' }}
     >
       <div className="max-w-6xl mx-auto space-y-6">
         {/* ---- Header ---- */}
-        <div className="mb-2">
+        <div className="mb-2 animate-slide-up">
           <button
             onClick={() => router.back()}
             className="flex items-center gap-2 mb-4 transition-colors"
@@ -570,10 +562,10 @@ export default function ChatbotPersonaPage({
         {/* ---- Notifications ---- */}
         {error && (
           <div
-            className="p-4 rounded-lg text-sm"
+            className="p-4 rounded-lg text-sm relative z-10"
             style={{
               background: 'color-mix(in srgb, var(--dash-negative) 12%, transparent)',
-              border: '1px solid color-mix(in srgb, var(--dash-negative) 40%, transparent)',
+              border: '1px solid var(--dash-glass-border)',
               color: 'var(--dash-negative)',
             }}
           >
@@ -582,10 +574,10 @@ export default function ChatbotPersonaPage({
         )}
         {success && (
           <div
-            className="p-4 rounded-lg text-sm"
+            className="p-4 rounded-lg text-sm relative z-10"
             style={{
               background: 'color-mix(in srgb, var(--dash-positive) 12%, transparent)',
-              border: '1px solid color-mix(in srgb, var(--dash-positive) 40%, transparent)',
+              border: '1px solid var(--dash-glass-border)',
               color: 'var(--dash-positive)',
             }}
           >
@@ -600,10 +592,10 @@ export default function ChatbotPersonaPage({
         <SectionCard icon={Sliders} title="בקרת אישיות הבוט">
           {/* Warning banner */}
           <div
-            className="rounded-lg p-3 flex items-start gap-2"
+            className="rounded-lg p-3 flex items-start gap-2 relative z-10"
             style={{
               background: 'color-mix(in srgb, var(--dash-warning, #f59e0b) 10%, transparent)',
-              border: '1px solid color-mix(in srgb, var(--dash-warning, #f59e0b) 30%, transparent)',
+              border: '1px solid var(--dash-glass-border)',
             }}
           >
             <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: 'var(--dash-warning, #f59e0b)' }} />
@@ -614,7 +606,7 @@ export default function ChatbotPersonaPage({
           </div>
 
           {/* Identity header */}
-          <div className="flex items-center gap-3 pb-2">
+          <div className="flex items-center gap-3 pb-2 relative z-10">
             <div
               className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
               style={{ background: 'color-mix(in srgb, var(--color-primary) 15%, transparent)' }}
@@ -643,8 +635,8 @@ export default function ChatbotPersonaPage({
               <select
                 value={persona.narrative_perspective || 'sidekick-professional'}
                 onChange={(e) => setPersona({ ...persona, narrative_perspective: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none"
-                style={{ background: 'var(--dash-bg)', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
+                className="w-full px-3 py-2 rounded-xl text-sm focus:outline-none"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }}
               >
                 {Object.entries(NARRATIVE_LABELS).map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
@@ -660,8 +652,8 @@ export default function ChatbotPersonaPage({
               <select
                 value={persona.storytelling_mode || 'balanced'}
                 onChange={(e) => setPersona({ ...persona, storytelling_mode: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none"
-                style={{ background: 'var(--dash-bg)', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
+                className="w-full px-3 py-2 rounded-xl text-sm focus:outline-none"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }}
               >
                 {Object.entries(STORYTELLING_LABELS).map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
@@ -677,8 +669,8 @@ export default function ChatbotPersonaPage({
               <select
                 value={persona.message_structure || 'whatsapp'}
                 onChange={(e) => setPersona({ ...persona, message_structure: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none"
-                style={{ background: 'var(--dash-bg)', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
+                className="w-full px-3 py-2 rounded-xl text-sm focus:outline-none"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }}
               >
                 {Object.entries(MESSAGE_STRUCTURE_LABELS).map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
@@ -694,8 +686,8 @@ export default function ChatbotPersonaPage({
               <select
                 value={persona.emoji_usage || 'moderate'}
                 onChange={(e) => setPersona({ ...persona, emoji_usage: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none"
-                style={{ background: 'var(--dash-bg)', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
+                className="w-full px-3 py-2 rounded-xl text-sm focus:outline-none"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }}
               >
                 {Object.entries(EMOJI_LABELS).map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
@@ -705,7 +697,7 @@ export default function ChatbotPersonaPage({
           </div>
 
           {/* Sass Level Slider */}
-          <div>
+          <div className="relative z-10">
             <label className="block text-xs font-medium mb-1" style={{ color: 'var(--dash-text-2)' }}>
               רמת סאס (חוצפה/שנינות)
             </label>
@@ -728,7 +720,7 @@ export default function ChatbotPersonaPage({
           </div>
 
           {/* Common Phrases (editable chips) */}
-          <div>
+          <div className="relative z-10">
             <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--dash-text-2)' }}>
               ביטויים חוזרים (הבוט ישתמש בהם בתגובות)
             </label>
@@ -739,13 +731,12 @@ export default function ChatbotPersonaPage({
                 onChange={(e) => setNewPhrase(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addPhrase()}
                 placeholder={'למשל: "בדיוק כמו שאני תמיד אומרת"'}
-                className="flex-1 px-3 py-2 rounded-lg text-sm focus:outline-none"
-                style={{ background: 'var(--dash-bg)', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
+                className="flex-1 px-3 py-2 rounded-xl text-sm focus:outline-none"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }}
               />
               <button
                 onClick={addPhrase}
-                className="px-3 py-2 rounded-lg transition-colors flex items-center gap-1 text-sm"
-                style={{ background: 'var(--color-primary)', color: 'white' }}
+                className="px-3 py-2 rounded-xl transition-colors flex items-center gap-1 text-sm btn-primary"
               >
                 <Plus className="w-4 h-4" />
               </button>
@@ -846,7 +837,7 @@ export default function ChatbotPersonaPage({
 
             {/* Humor & Slang */}
             {voiceRules?.styleMarkers?.humorAndSlang && voiceRules.styleMarkers.humorAndSlang.length > 0 && (
-              <div>
+              <div className="relative z-10">
                 <div className="flex items-center gap-2 mb-2">
                   <Layers className="w-4 h-4" style={{ color: 'var(--color-info)' }} />
                   <h3 className="text-sm font-semibold" style={{ color: 'var(--dash-text-2)' }}>
@@ -857,12 +848,7 @@ export default function ChatbotPersonaPage({
                   {voiceRules.styleMarkers.humorAndSlang.map((item, i) => (
                     <span
                       key={i}
-                      className="px-3 py-1 rounded-full text-sm"
-                      style={{
-                        background: 'color-mix(in srgb, var(--color-info) 10%, transparent)',
-                        color: 'var(--color-info)',
-                        border: '1px solid color-mix(in srgb, var(--color-info) 20%, transparent)',
-                      }}
+                      className="pill pill-blue"
                     >
                       {item}
                     </span>
@@ -873,7 +859,7 @@ export default function ChatbotPersonaPage({
 
             {/* Recurring Phrases */}
             {allPhrases.length > 0 && (
-              <div>
+              <div className="relative z-10">
                 <div className="flex items-center gap-2 mb-2">
                   <Quote className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
                   <h3 className="text-sm font-semibold" style={{ color: 'var(--dash-text-2)' }}>
@@ -884,12 +870,7 @@ export default function ChatbotPersonaPage({
                   {allPhrases.map((phrase, i) => (
                     <span
                       key={i}
-                      className="px-3 py-1 rounded-full text-sm"
-                      style={{
-                        background: 'color-mix(in srgb, var(--color-primary) 10%, transparent)',
-                        color: 'var(--color-primary)',
-                        border: '1px solid color-mix(in srgb, var(--color-primary) 20%, transparent)',
-                      }}
+                      className="pill pill-purple"
                     >
                       &ldquo;{phrase}&rdquo;
                     </span>
@@ -900,7 +881,7 @@ export default function ChatbotPersonaPage({
 
             {/* Avoided Words */}
             {voiceRules?.avoidedWords && voiceRules.avoidedWords.length > 0 && (
-              <div>
+              <div className="relative z-10">
                 <div className="flex items-center gap-2 mb-2">
                   <Ban className="w-4 h-4" style={{ color: 'var(--dash-negative)' }} />
                   <h3 className="text-sm font-semibold" style={{ color: 'var(--dash-text-2)' }}>
@@ -911,12 +892,7 @@ export default function ChatbotPersonaPage({
                   {voiceRules.avoidedWords.map((word, i) => (
                     <span
                       key={i}
-                      className="px-3 py-1 rounded-full text-sm"
-                      style={{
-                        background: 'color-mix(in srgb, var(--dash-negative) 10%, transparent)',
-                        color: 'var(--dash-negative)',
-                        border: '1px solid color-mix(in srgb, var(--dash-negative) 20%, transparent)',
-                      }}
+                      className="pill pill-coral"
                     >
                       {word}
                     </span>
@@ -927,7 +903,7 @@ export default function ChatbotPersonaPage({
 
             {/* Slang Map */}
             {slangEntries.length > 0 && (
-              <div>
+              <div className="glass-subtle rounded-xl p-3 relative z-10">
                 <div className="flex items-center gap-2 mb-2">
                   <Layers className="w-4 h-4" style={{ color: 'var(--color-info)' }} />
                   <h3 className="text-sm font-semibold" style={{ color: 'var(--dash-text-2)' }}>
@@ -965,7 +941,7 @@ export default function ChatbotPersonaPage({
             <div className="space-y-5">
               {/* Format A: coreTopics (simple) */}
               {knowledgeMap.coreTopics?.map((topic, ti) => (
-                <div key={`ct-${ti}`}>
+                <div key={`ct-${ti}`} className="glass-subtle rounded-xl p-3 relative z-10">
                   <div className="flex items-center gap-2 mb-2">
                     <Map className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
                     <h3 className="font-bold text-sm" style={{ color: 'var(--dash-text)' }}>
@@ -984,7 +960,7 @@ export default function ChatbotPersonaPage({
                   {topic.subtopics && topic.subtopics.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mb-2">
                       {topic.subtopics.map((sub, si) => (
-                        <span key={si} className="px-2 py-0.5 rounded text-xs" style={{ background: 'color-mix(in srgb, var(--color-info) 12%, transparent)', color: 'var(--color-info)' }}>
+                        <span key={si} className="pill pill-blue">
                           {sub}
                         </span>
                       ))}
@@ -993,21 +969,21 @@ export default function ChatbotPersonaPage({
                   {topic.examples && topic.examples.length > 0 && (
                     <div className="space-y-1 mr-3">
                       {topic.examples.map((ex, ei) => (
-                        <p key={ei} className="text-xs pr-3 leading-relaxed" style={{ color: 'var(--dash-text-3)', borderRight: '2px solid var(--dash-border)' }}>
+                        <p key={ei} className="text-xs pr-3 leading-relaxed" style={{ color: 'var(--dash-text-3)', borderRight: '2px solid var(--dash-glass-border)' }}>
                           {ex}
                         </p>
                       ))}
                     </div>
                   )}
                   {ti < (knowledgeMap.coreTopics?.length ?? 0) - 1 && (
-                    <hr className="mt-4" style={{ borderColor: 'var(--dash-border)' }} />
+                    <hr className="mt-4" style={{ borderColor: 'var(--dash-glass-border)' }} />
                   )}
                 </div>
               ))}
 
               {/* Format B: domains (rich AI-generated) */}
               {knowledgeMap.domains?.map((domain, di) => (
-                <div key={`dm-${di}`}>
+                <div key={`dm-${di}`} className="glass-subtle rounded-xl p-3 relative z-10">
                   <div className="flex items-center gap-2 mb-2">
                     <Map className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
                     <h3 className="font-bold text-sm" style={{ color: 'var(--dash-text)' }}>
@@ -1030,7 +1006,7 @@ export default function ChatbotPersonaPage({
                   {domain.brandsAndLinesExplicitlyCovered && domain.brandsAndLinesExplicitlyCovered.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mb-2">
                       {domain.brandsAndLinesExplicitlyCovered.map((brand, bi) => (
-                        <span key={bi} className="px-2 py-0.5 rounded text-xs" style={{ background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)', color: 'var(--color-primary)' }}>
+                        <span key={bi} className="pill pill-purple">
                           {brand}
                         </span>
                       ))}
@@ -1041,7 +1017,7 @@ export default function ChatbotPersonaPage({
                   {domain.notableIngredientsMentioned && domain.notableIngredientsMentioned.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mb-2">
                       {domain.notableIngredientsMentioned.map((ing, ii) => (
-                        <span key={ii} className="px-2 py-0.5 rounded text-xs" style={{ background: 'color-mix(in srgb, var(--color-info) 12%, transparent)', color: 'var(--color-info)' }}>
+                        <span key={ii} className="pill pill-blue">
                           {ing}
                         </span>
                       ))}
@@ -1052,7 +1028,7 @@ export default function ChatbotPersonaPage({
                   {domain.examples && domain.examples.length > 0 && (
                     <div className="space-y-1 mr-3">
                       {domain.examples.map((ex, ei) => (
-                        <p key={ei} className="text-xs pr-3 leading-relaxed" style={{ color: 'var(--dash-text-3)', borderRight: '2px solid var(--dash-border)' }}>
+                        <p key={ei} className="text-xs pr-3 leading-relaxed" style={{ color: 'var(--dash-text-3)', borderRight: '2px solid var(--dash-glass-border)' }}>
                           {typeof ex === 'string' ? ex : ex.topic || ''}
                           {typeof ex === 'object' && ex.whatIncluded ? ` — ${ex.whatIncluded}` : ''}
                         </p>
@@ -1068,7 +1044,7 @@ export default function ChatbotPersonaPage({
                   )}
 
                   {di < (knowledgeMap.domains?.length ?? 0) - 1 && (
-                    <hr className="mt-4" style={{ borderColor: 'var(--dash-border)' }} />
+                    <hr className="mt-4" style={{ borderColor: 'var(--dash-glass-border)' }} />
                   )}
                 </div>
               ))}
@@ -1083,10 +1059,10 @@ export default function ChatbotPersonaPage({
         <SectionCard icon={Settings} title="הגדרות ניתנות לעריכה">
           {/* Legal notice (compact) */}
           <div
-            className="rounded-lg p-4"
+            className="rounded-lg p-4 relative z-10"
             style={{
               background: 'color-mix(in srgb, var(--color-info) 8%, transparent)',
-              border: '1px solid color-mix(in srgb, var(--color-info) 30%, transparent)',
+              border: '1px solid var(--dash-glass-border)',
             }}
           >
             <p className="text-xs leading-relaxed" style={{ color: 'var(--color-info)' }}>
@@ -1095,7 +1071,7 @@ export default function ChatbotPersonaPage({
           </div>
 
           {/* Greeting message */}
-          <div>
+          <div className="relative z-10">
             <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text-2)' }}>
               הודעת ברוכים הבאים
             </label>
@@ -1104,17 +1080,17 @@ export default function ChatbotPersonaPage({
               onChange={(e) => setPersona({ ...persona, greeting_message: e.target.value })}
               rows={3}
               placeholder='היי! אני הבוט של ירדן, פה לעזור לך עם כל שאלה...'
-              className="w-full px-4 py-3 rounded-lg text-sm focus:outline-none resize-none"
+              className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none resize-none"
               style={{
-                background: 'var(--dash-bg)',
-                border: '1px solid var(--dash-border)',
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid var(--dash-glass-border)',
                 color: 'var(--dash-text)',
               }}
             />
           </div>
 
           {/* Bio */}
-          <div>
+          <div className="relative z-10">
             <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text-2)' }}>
               קצת על עצמי - הבוט ישתמש בזה
             </label>
@@ -1123,17 +1099,17 @@ export default function ChatbotPersonaPage({
               onChange={(e) => setPersona({ ...persona, bio: e.target.value })}
               rows={3}
               placeholder="אני ירדן, בלוגרית אופנה וטיולים. גרה בתל אביב, אוהבת קפה..."
-              className="w-full px-4 py-3 rounded-lg text-sm focus:outline-none resize-none"
+              className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none resize-none"
               style={{
-                background: 'var(--dash-bg)',
-                border: '1px solid var(--dash-border)',
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid var(--dash-glass-border)',
                 color: 'var(--dash-text)',
               }}
             />
           </div>
 
           {/* Interests */}
-          <div>
+          <div className="relative z-10">
             <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text-2)' }}>
               תחומי עניין
             </label>
@@ -1144,17 +1120,16 @@ export default function ChatbotPersonaPage({
                 onChange={(e) => setNewInterest(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addInterest()}
                 placeholder="לדוגמה: ברצלונה, קפה, צילום"
-                className="flex-1 px-4 py-2 rounded-lg text-sm focus:outline-none"
+                className="flex-1 px-4 py-2 rounded-xl text-sm focus:outline-none"
                 style={{
-                  background: 'var(--dash-bg)',
-                  border: '1px solid var(--dash-border)',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid var(--dash-glass-border)',
                   color: 'var(--dash-text)',
                 }}
               />
               <button
                 onClick={addInterest}
-                className="px-3 py-2 rounded-lg transition-colors flex items-center gap-1 text-sm"
-                style={{ background: 'var(--color-primary)', color: 'white' }}
+                className="px-3 py-2 rounded-xl transition-colors flex items-center gap-1 text-sm btn-primary"
               >
                 <Plus className="w-4 h-4" />
                 הוסף
@@ -1174,7 +1149,7 @@ export default function ChatbotPersonaPage({
           </div>
 
           {/* Directives */}
-          <div>
+          <div className="relative z-10">
             <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text-2)' }}>
               הנחיות התנהגות לבוט
             </label>
@@ -1184,7 +1159,7 @@ export default function ChatbotPersonaPage({
               className="rounded-lg p-3 mb-3"
               style={{
                 background: 'color-mix(in srgb, var(--dash-positive) 8%, transparent)',
-                border: '1px solid color-mix(in srgb, var(--dash-positive) 25%, transparent)',
+                border: '1px solid var(--dash-glass-border)',
               }}
             >
               <p className="text-xs" style={{ color: 'var(--dash-positive)' }}>
@@ -1199,17 +1174,16 @@ export default function ChatbotPersonaPage({
                 onChange={(e) => setNewDirective(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addDirective()}
                 placeholder="הוסף הנחיה חדשה..."
-                className="flex-1 px-4 py-2 rounded-lg text-sm focus:outline-none"
+                className="flex-1 px-4 py-2 rounded-xl text-sm focus:outline-none"
                 style={{
-                  background: 'var(--dash-bg)',
-                  border: '1px solid var(--dash-border)',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid var(--dash-glass-border)',
                   color: 'var(--dash-text)',
                 }}
               />
               <button
                 onClick={addDirective}
-                className="px-3 py-2 rounded-lg transition-colors flex items-center gap-1 text-sm"
-                style={{ background: 'var(--color-primary)', color: 'white' }}
+                className="px-3 py-2 rounded-xl transition-colors flex items-center gap-1 text-sm btn-primary"
               >
                 <Plus className="w-4 h-4" />
                 הוסף
@@ -1221,8 +1195,8 @@ export default function ChatbotPersonaPage({
                 {persona.directives.map((directive, index) => (
                   <div
                     key={index}
-                    className="flex items-center justify-between p-3 rounded-lg text-sm"
-                    style={{ background: 'var(--dash-bg)', border: '1px solid var(--dash-border)' }}
+                    className="flex items-center justify-between p-3 rounded-xl text-sm"
+                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--dash-glass-border)' }}
                   >
                     <span className="flex-1" style={{ color: 'var(--dash-text)' }}>
                       {directive}
@@ -1243,12 +1217,11 @@ export default function ChatbotPersonaPage({
           </div>
 
           {/* Save button */}
-          <div className="pt-2">
+          <div className="pt-2 relative z-10">
             <button
               onClick={handleSave}
               disabled={saving || syncing}
-              className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              style={{ background: 'var(--color-primary)', color: 'white' }}
+              className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-2xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm btn-solid"
             >
               {saving ? (
                 <>
@@ -1269,10 +1242,7 @@ export default function ChatbotPersonaPage({
         {/*  5. SYNC FROM INSTAGRAM                                       */}
         {/* ============================================================ */}
 
-        <div
-          className="rounded-xl border p-5 space-y-4"
-          style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
-        >
+        <div className="glass-card rounded-2xl p-5 space-y-4 relative z-10">
           {/* Sync from Instagram */}
           <div className="flex flex-col sm:flex-row items-center gap-4">
             <div className="flex-1 text-center sm:text-right">
@@ -1286,8 +1256,7 @@ export default function ChatbotPersonaPage({
             <button
               onClick={syncFromInstagram}
               disabled={syncing || saving || restoring}
-              className="shrink-0 flex items-center gap-2 px-5 py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              style={{ background: 'var(--color-primary)', color: 'white' }}
+              className="shrink-0 flex items-center gap-2 px-5 py-3 rounded-2xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm btn-primary"
             >
               {syncing ? (
                 <>
@@ -1306,7 +1275,7 @@ export default function ChatbotPersonaPage({
           {/* Restore from AI snapshot */}
           {persona.ai_snapshot && (
             <>
-              <hr style={{ borderColor: 'var(--dash-border)' }} />
+              <hr style={{ borderColor: 'var(--dash-glass-border)' }} />
               <div className="flex flex-col sm:flex-row items-center gap-4">
                 <div className="flex-1 text-center sm:text-right">
                   <h3 className="font-bold text-sm mb-1" style={{ color: 'var(--dash-text)' }}>
@@ -1319,8 +1288,7 @@ export default function ChatbotPersonaPage({
                 <button
                   onClick={handleRestore}
                   disabled={restoring || syncing || saving}
-                  className="shrink-0 flex items-center gap-2 px-5 py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm border"
-                  style={{ borderColor: 'var(--dash-negative)', color: 'var(--dash-negative)' }}
+                  className="shrink-0 flex items-center gap-2 px-5 py-3 rounded-2xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm btn-coral"
                 >
                   {restoring ? (
                     <>

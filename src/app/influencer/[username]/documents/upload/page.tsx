@@ -200,8 +200,8 @@ export default function DocumentUploadPage({
   };
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
-      <div className="container mx-auto py-8 px-4 max-w-6xl">
+    <div className="min-h-screen" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
+      <div className="container mx-auto py-8 px-4 max-w-6xl animate-slide-up">
         {/* Header */}
         <div className="mb-8">
           <Link
@@ -224,7 +224,7 @@ export default function DocumentUploadPage({
         {/* Main Content */}
         <div className="space-y-6">
           {/* Step 1: Document Type */}
-          <div className="rounded-xl border p-6" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+          <div className="glass-card rounded-2xl p-6 animate-fade-in" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}>
             <div className="flex items-center gap-2 mb-4">
               <div className="flex items-center justify-center h-8 w-8 rounded-full text-sm font-bold" style={{ background: 'color-mix(in srgb, var(--color-primary) 20%, transparent)', color: 'var(--color-primary)' }}>
                 1
@@ -241,7 +241,7 @@ export default function DocumentUploadPage({
           </div>
 
           {/* Step 2: Upload Files */}
-          <div className="rounded-xl border p-6" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+          <div className="glass-card rounded-2xl p-6 animate-fade-in" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}>
             <div className="flex items-center gap-2 mb-4">
               <div className="flex items-center justify-center h-8 w-8 rounded-full text-sm font-bold" style={{ background: 'color-mix(in srgb, var(--color-primary) 20%, transparent)', color: 'var(--color-primary)' }}>
                 2
@@ -287,7 +287,7 @@ export default function DocumentUploadPage({
 
           {/* Success Summary */}
           {uploadedDocuments.length > 0 && uploads.length === 0 && !isParsing && (
-            <div className="rounded-xl p-6" style={{ background: 'color-mix(in srgb, var(--dash-positive) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--dash-positive) 30%, transparent)' }}>
+            <div className="glass-card rounded-2xl p-6 animate-slide-up relative z-10" style={{ background: 'rgba(34, 197, 94, 0.1)', borderColor: 'var(--dash-glass-border)' }}>
               <div className="flex items-start gap-4">
                 <CheckCircle2 className="h-6 w-6 flex-shrink-0" style={{ color: 'var(--dash-positive)' }} />
                 <div className="flex-1">
@@ -299,8 +299,7 @@ export default function DocumentUploadPage({
                   </p>
                   <Link
                     href={`/influencer/${username}/documents/review`}
-                    className="inline-flex items-center gap-2 px-4 py-2 font-medium rounded-lg transition-colors"
-                    style={{ background: 'var(--dash-positive)', color: 'white' }}
+                    className="btn-teal inline-flex items-center gap-2 px-4 py-2 font-medium rounded-lg transition-colors"
                   >
                     עבור לסקירה
                     <ArrowRight className="h-4 w-4 rotate-180" />
@@ -311,7 +310,7 @@ export default function DocumentUploadPage({
           )}
 
           {/* Instructions */}
-          <div className="rounded-xl p-4" style={{ background: 'color-mix(in srgb, var(--color-info) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-info) 30%, transparent)' }}>
+          <div className="glass-card rounded-2xl p-4 animate-fade-in relative z-10" style={{ background: 'rgba(59, 130, 246, 0.1)', borderColor: 'var(--dash-glass-border)' }}>
             <h3 className="text-sm font-medium mb-2" style={{ color: 'var(--color-info)' }}>
               💡 טיפים:
             </h3>

@@ -364,7 +364,7 @@ export default function BotContentPage({
       <div
         className="min-h-screen flex items-center justify-center"
         dir="rtl"
-        style={{ background: 'var(--dash-bg)' }}
+        style={{ background: 'transparent' }}
       >
         <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--color-primary)' }} />
       </div>
@@ -385,7 +385,7 @@ export default function BotContentPage({
     <div
       className="min-h-screen"
       dir="rtl"
-      style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}
+      style={{ background: 'transparent', color: 'var(--dash-text)' }}
     >
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
 
@@ -445,8 +445,8 @@ export default function BotContentPage({
               {coreTopics.map((topic, idx) => (
                 <div
                   key={idx}
-                  className="p-4 rounded-xl"
-                  style={{ background: 'var(--dash-surface-hover)' }}
+                  className="p-4 rounded-2xl"
+                  style={{ background: 'rgba(255,255,255,0.05)' }}
                 >
                   <h4 className="font-semibold text-sm mb-2" style={{ color: 'var(--dash-text)' }}>
                     {topic.name}
@@ -507,8 +507,8 @@ export default function BotContentPage({
               {coupons.map((coupon) => (
                 <div
                   key={coupon.id}
-                  className="flex items-center justify-between p-4 rounded-xl"
-                  style={{ background: 'var(--dash-surface-hover)' }}
+                  className="flex items-center justify-between p-4 rounded-2xl"
+                  style={{ background: 'rgba(255,255,255,0.05)' }}
                 >
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -584,8 +584,8 @@ export default function BotContentPage({
               {partnerships.map((p) => (
                 <div
                   key={p.id}
-                  className="flex items-center justify-between p-4 rounded-xl"
-                  style={{ background: 'var(--dash-surface-hover)' }}
+                  className="flex items-center justify-between p-4 rounded-2xl"
+                  style={{ background: 'rgba(255,255,255,0.05)' }}
                 >
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -639,10 +639,10 @@ export default function BotContentPage({
             <textarea
               value={greetingMessage}
               onChange={(e) => setGreetingMessage(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2"
+              className="w-full px-4 py-3 rounded-xl focus:outline-none focus:ring-2"
               style={{
-                background: 'var(--dash-surface)',
-                border: '1px solid var(--dash-border)',
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid var(--dash-glass-border)',
                 color: 'var(--dash-text)',
               }}
               rows={3}
@@ -658,8 +658,7 @@ export default function BotContentPage({
               </label>
               <button
                 onClick={handleAddQuestion}
-                className="px-2 py-1 text-xs rounded transition-colors flex items-center gap-1"
-                style={{ background: 'var(--color-primary)', color: 'white' }}
+                className="px-2 py-1 text-xs rounded transition-colors flex items-center gap-1 btn-primary"
               >
                 <Plus className="w-3 h-3" />
                 הוסף שאלה
@@ -672,17 +671,17 @@ export default function BotContentPage({
                     type="text"
                     value={question}
                     onChange={(e) => handleUpdateQuestion(idx, e.target.value)}
-                    className="flex-1 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 text-sm"
+                    className="flex-1 px-4 py-2 rounded-xl focus:outline-none focus:ring-2 text-sm"
                     style={{
-                      background: 'var(--dash-surface)',
-                      border: '1px solid var(--dash-border)',
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid var(--dash-glass-border)',
                       color: 'var(--dash-text)',
                     }}
                     placeholder={`שאלה ${idx + 1}`}
                   />
                   <button
                     onClick={() => handleDeleteQuestion(idx)}
-                    className="p-2 rounded-lg transition-colors"
+                    className="p-2 rounded-xl transition-colors"
                     style={{ color: 'var(--dash-negative)' }}
                   >
                     <Trash2 className="w-4 h-4" />
@@ -701,8 +700,7 @@ export default function BotContentPage({
           <button
             onClick={handleSaveConfig}
             disabled={saving}
-            className="w-full px-6 py-3 disabled:opacity-50 rounded-xl transition-all font-medium flex items-center justify-center gap-2"
-            style={{ background: 'var(--color-primary)', color: 'white' }}
+            className="w-full px-6 py-3 disabled:opacity-50 rounded-2xl transition-all font-medium flex items-center justify-center gap-2 btn-primary"
           >
             {saving ? (
               <>
@@ -727,8 +725,8 @@ export default function BotContentPage({
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div
-              className="p-4 rounded-xl"
-              style={{ background: 'var(--dash-surface-hover)' }}
+              className="p-4 rounded-2xl"
+              style={{ background: 'rgba(255,255,255,0.05)' }}
             >
               <p className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>
                 {stats.botKnowledge.totalDocuments}
@@ -738,8 +736,8 @@ export default function BotContentPage({
               </p>
             </div>
             <div
-              className="p-4 rounded-xl"
-              style={{ background: 'var(--dash-surface-hover)' }}
+              className="p-4 rounded-2xl"
+              style={{ background: 'rgba(255,255,255,0.05)' }}
             >
               <p className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>
                 {stats.botKnowledge.totalChunks}
@@ -760,7 +758,7 @@ export default function BotContentPage({
                 {Object.entries(stats.botKnowledge.docsByType).map(([type, count]) => (
                   <span
                     key={type}
-                    className="px-2 py-1 rounded-lg text-xs"
+                    className="px-2 py-1 rounded-xl text-xs"
                     style={{
                       background: 'rgba(59,130,246,0.12)',
                       color: 'var(--color-info)',
@@ -779,8 +777,7 @@ export default function BotContentPage({
             </p>
             <Link
               href={`/influencer/${username}/documents/upload`}
-              className="shrink-0 px-4 py-2 text-sm rounded-lg font-medium transition-colors flex items-center gap-2"
-              style={{ background: 'var(--color-primary)', color: 'white' }}
+              className="shrink-0 px-4 py-2 text-sm rounded-xl font-medium transition-colors flex items-center gap-2 btn-primary"
             >
               <Upload className="w-4 h-4" />
               העלאת מסמך
@@ -798,8 +795,8 @@ export default function BotContentPage({
         >
           {/* Add form */}
           <div
-            className="p-4 rounded-xl mb-4"
-            style={{ background: 'var(--dash-surface-hover)' }}
+            className="p-4 rounded-2xl mb-4"
+            style={{ background: 'rgba(255,255,255,0.05)' }}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
               <div>
@@ -809,10 +806,10 @@ export default function BotContentPage({
                 <select
                   value={newEntry.knowledge_type}
                   onChange={(e) => setNewEntry({ ...newEntry, knowledge_type: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2"
+                  className="w-full px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2"
                   style={{
-                    background: 'var(--dash-surface)',
-                    border: '1px solid var(--dash-border)',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid var(--dash-glass-border)',
                     color: 'var(--dash-text)',
                   }}
                 >
@@ -830,10 +827,10 @@ export default function BotContentPage({
                   type="text"
                   value={newEntry.title}
                   onChange={(e) => setNewEntry({ ...newEntry, title: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2"
+                  className="w-full px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2"
                   style={{
-                    background: 'var(--dash-surface)',
-                    border: '1px solid var(--dash-border)',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid var(--dash-glass-border)',
                     color: 'var(--dash-text)',
                   }}
                   placeholder="לדוגמה: מהן שעות הפעילות?"
@@ -847,10 +844,10 @@ export default function BotContentPage({
               <textarea
                 value={newEntry.content}
                 onChange={(e) => setNewEntry({ ...newEntry, content: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2"
+                className="w-full px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2"
                 style={{
-                  background: 'var(--dash-surface)',
-                  border: '1px solid var(--dash-border)',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid var(--dash-glass-border)',
                   color: 'var(--dash-text)',
                 }}
                 rows={3}
@@ -860,8 +857,7 @@ export default function BotContentPage({
             <button
               onClick={handleAddKnowledgeEntry}
               disabled={addingEntry}
-              className="px-4 py-2 text-sm rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
-              style={{ background: 'var(--color-primary)', color: 'white' }}
+              className="px-4 py-2 text-sm rounded-xl font-medium transition-colors flex items-center gap-2 disabled:opacity-50 btn-primary"
             >
               {addingEntry ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -882,8 +878,8 @@ export default function BotContentPage({
               {knowledgeEntries.map((entry) => (
                 <div
                   key={entry.id}
-                  className="flex items-start justify-between p-4 rounded-xl gap-3"
-                  style={{ background: 'var(--dash-surface-hover)' }}
+                  className="flex items-start justify-between p-4 rounded-2xl gap-3"
+                  style={{ background: 'rgba(255,255,255,0.05)' }}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -916,7 +912,7 @@ export default function BotContentPage({
                     <button
                       onClick={() => handleDeleteKnowledgeEntry(entry.id)}
                       disabled={deletingEntryId === entry.id}
-                      className="p-2 rounded-lg transition-colors shrink-0"
+                      className="p-2 rounded-xl transition-colors shrink-0"
                       style={{ color: 'var(--dash-negative)' }}
                     >
                       {deletingEntryId === entry.id ? (
@@ -960,12 +956,12 @@ function StatCard({
 }) {
   return (
     <div
-      className="rounded-xl border p-4"
-      style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
+      className="rounded-2xl border p-4"
+      style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-border)' }}
     >
       <div className="flex items-center gap-3">
         <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+          className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"
           style={{ background: iconBg, color: iconColor }}
         >
           {icon}
@@ -1000,8 +996,8 @@ function CollapsibleSection({
 }) {
   return (
     <div
-      className="rounded-xl border p-6 mb-6"
-      style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
+      className="rounded-2xl border p-6 mb-6"
+      style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-border)' }}
     >
       <div
         className="flex items-center justify-between cursor-pointer"

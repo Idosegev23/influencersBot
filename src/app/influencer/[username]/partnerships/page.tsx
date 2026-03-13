@@ -128,15 +128,15 @@ export default function PartnershipsDashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="max-w-6xl mx-auto py-8 px-4" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
+      <div className="max-w-6xl mx-auto py-8 px-4 space-y-8" style={{ color: 'var(--dash-text)' }}>
         <div className="animate-pulse space-y-8">
-          <div className="h-8 rounded w-1/4" style={{ background: 'var(--dash-surface)' }} />
+          <div className="h-8 rounded w-1/4 glass-card" />
           <div className="grid grid-cols-3 gap-4">
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-24 rounded" style={{ background: 'var(--dash-surface)' }} />
+              <div key={i} className="h-24 metric-card" />
             ))}
           </div>
-          <div className="h-80 rounded" style={{ background: 'var(--dash-surface)' }} />
+          <div className="h-80 glass-card" />
         </div>
       </div>
     );
@@ -144,13 +144,12 @@ export default function PartnershipsDashboardPage() {
 
   if (error) {
     return (
-      <div className="max-w-6xl mx-auto py-8 px-4" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
-        <div className="rounded-xl border p-6 text-center" style={{ borderColor: 'var(--dash-border)', background: 'var(--dash-surface)' }}>
+      <div className="max-w-6xl mx-auto py-8 px-4" style={{ color: 'var(--dash-text)' }}>
+        <div className="glass-card p-6 text-center" style={{ borderColor: 'var(--dash-glass-border)' }}>
           <p style={{ color: 'var(--dash-negative)' }}>{error}</p>
           <button
             onClick={loadData}
-            className="mt-4 px-4 py-2 rounded-lg"
-            style={{ background: 'var(--dash-negative)', color: '#fff' }}
+            className="mt-4 px-4 py-2 rounded-xl btn-primary"
           >
             נסה שוב
           </button>
@@ -164,12 +163,12 @@ export default function PartnershipsDashboardPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto py-8 px-4 space-y-8" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
+    <div className="max-w-6xl mx-auto py-8 px-4 space-y-8 animate-fade-in" style={{ color: 'var(--dash-text)' }}>
       {/* Back Button */}
       <div className="flex items-center gap-4 mb-4">
         <button
           onClick={() => router.push(`/influencer/${username}/dashboard`)}
-          className="flex items-center gap-2 transition-colors"
+          className="flex items-center gap-2 transition-all duration-300 hover:opacity-75"
           style={{ color: 'var(--dash-text-2)' }}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -185,15 +184,14 @@ export default function PartnershipsDashboardPage() {
           <h1 className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>שיתופי פעולה</h1>
           <button
             onClick={() => router.push(`/influencer/${username}/partnerships/new`)}
-            className="px-3.5 py-1.5 rounded-lg transition-colors text-sm font-medium"
-            style={{ background: 'var(--color-primary)', color: '#fff' }}
+            className="px-3.5 py-1.5 rounded-xl text-sm font-medium btn-primary transition-all duration-300"
           >
             + חדש
           </button>
         </div>
 
         {/* View Selector */}
-        <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid var(--dash-border)' }}>
+        <div className="glass-nav flex rounded-xl overflow-hidden" style={{ border: '1px solid var(--dash-glass-border)' }}>
           {[
             { key: 'library' as const, label: 'ספרייה' },
             { key: 'overview' as const, label: 'סקירה' },
@@ -202,11 +200,9 @@ export default function PartnershipsDashboardPage() {
             <button
               key={tab.key}
               onClick={() => setView(tab.key)}
-              className="px-4 py-2 text-sm font-medium transition-colors"
-              style={{
-                background: view === tab.key ? 'var(--color-primary)' : 'transparent',
-                color: view === tab.key ? '#fff' : 'var(--dash-text-2)',
-              }}
+              className={`px-4 py-2 text-sm font-medium transition-all duration-300 ${
+                view === tab.key ? 'pill pill-purple' : 'pill pill-neutral'
+              }`}
             >
               {tab.label}
             </button>
@@ -224,7 +220,7 @@ export default function PartnershipsDashboardPage() {
           { label: 'ממוצע', value: `₪${data.overview.avg_deal_size.toLocaleString('he-IL')}`, color: 'var(--color-warning, var(--dash-text-2))' },
           { label: 'השלמה', value: `${data.overview.completion_rate}%`, color: 'var(--dash-positive)' },
         ].map(stat => (
-          <div key={stat.label} className="rounded-xl border px-3 py-3 text-center" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
+          <div key={stat.label} className="metric-card relative z-10 px-3 py-3 text-center transition-all duration-300" style={{ borderColor: 'var(--dash-glass-border)' }}>
             <div className="text-[11px] mb-0.5" style={{ color: 'var(--dash-text-3)' }}>{stat.label}</div>
             <div className="text-lg font-bold truncate" style={{ color: stat.color }}>{stat.value}</div>
           </div>
@@ -235,28 +231,28 @@ export default function PartnershipsDashboardPage() {
       {view === 'overview' && (
         <>
           {data.pipeline.length > 0 || data.monthly_revenue.length > 0 ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-slide-up">
               <PipelineChart data={data.pipeline} />
               <RevenueChart data={data.monthly_revenue} />
             </div>
           ) : (
-            <div className="py-12 text-center rounded-2xl" style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}>
-              <p className="text-sm" style={{ color: 'var(--dash-text-3)' }}>אין מספיק נתונים להצגת גרפים</p>
+            <div className="glass-card py-12 text-center rounded-2xl" style={{ border: '1px solid var(--dash-glass-border)' }}>
+              <p className="text-sm relative z-10" style={{ color: 'var(--dash-text-3)' }}>אין מספיק נתונים להצגת גרפים</p>
             </div>
           )}
 
           {/* Upcoming Deadlines */}
           {data.upcoming_deadlines.length > 0 && (
-            <div className="rounded-xl border p-6" style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}>
-              <h3 className="text-lg font-semibold mb-4 text-right" style={{ color: 'var(--dash-text)' }}>
+            <div className="glass-card p-6" style={{ borderColor: 'var(--dash-glass-border)' }}>
+              <h3 className="text-lg font-semibold mb-4 text-right relative z-10" style={{ color: 'var(--dash-text)' }}>
                 דדליינים קרובים
               </h3>
-              <div className="space-y-3">
+              <div className="space-y-3 relative z-10">
                 {data.upcoming_deadlines.slice(0, 5).map((task: any) => (
                   <div
                     key={task.id}
-                    className="flex items-center justify-between p-3 border rounded-lg"
-                    style={{ borderColor: 'var(--dash-border)' }}
+                    className="flex items-center justify-between p-3 rounded-xl transition-all duration-300 hover:opacity-80"
+                    style={{ border: '1px solid var(--dash-glass-border)' }}
                   >
                     <div className="text-right flex-1">
                       <div className="font-medium" style={{ color: 'var(--dash-text)' }}>{task.title}</div>

@@ -140,11 +140,11 @@ export default function ChatbotSettingsPage() {
   if (loading) {
     return (
       <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ background: 'var(--dash-bg)' }}
+        className="min-h-screen flex items-center justify-center animate-slide-up"
+        style={{ background: 'transparent' }}
       >
         <div
-          className="animate-spin rounded-full h-12 w-12 border-b-2"
+          className="animate-spin rounded-full h-12 w-12 border-b-2 animate-slide-up"
           style={{ borderColor: 'var(--color-primary)' }}
         ></div>
       </div>
@@ -153,10 +153,10 @@ export default function ChatbotSettingsPage() {
 
   return (
     <div
-      className="min-h-screen p-6"
-      style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}
+      className="min-h-screen p-6 animate-slide-up"
+      style={{ background: 'transparent', color: 'var(--dash-text)' }}
     >
-      <div className="max-w-6xl mx-auto space-y-8">
+      <div className="max-w-6xl mx-auto space-y-8 animate-slide-up">
         {/* Header */}
         <div>
           <h1 className="text-4xl font-bold" style={{ color: 'var(--dash-text)' }}>הגדרות צ'אטבוט</h1>
@@ -191,7 +191,7 @@ export default function ChatbotSettingsPage() {
         {/* Scraping Section */}
         <div
           className="rounded-xl border p-6"
-          style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
+          style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}
         >
           <h2 className="text-2xl font-bold mb-4" style={{ color: 'var(--dash-text)' }}>בניית פרסונה</h2>
 
@@ -199,7 +199,7 @@ export default function ChatbotSettingsPage() {
             <div className="space-y-4">
               <div
                 className="border-r-4 p-4 rounded"
-                style={{ background: 'var(--dash-surface-hover)', borderColor: 'var(--color-info)' }}
+                style={{ background: 'rgba(255,255,255,0.05)', borderColor: 'var(--color-info)' }}
               >
                 <p style={{ color: 'var(--dash-text)' }}>
                   <strong>בניית פרסונה מאפס</strong> תארך כ-20-30 דקות ותעבור על 7 שלבים:
@@ -214,8 +214,7 @@ export default function ChatbotSettingsPage() {
 
               <button
                 onClick={() => setShowProgress(true)}
-                className="w-full px-6 py-4 rounded-lg font-bold text-lg transition-all"
-                style={{ background: 'var(--color-primary)', color: 'white' }}
+                className="w-full px-6 py-4 rounded-xl font-bold text-lg transition-all btn-primary"
               >
                 התחל בניית פרסונה מחדש
               </button>
@@ -239,7 +238,7 @@ export default function ChatbotSettingsPage() {
         {/* History Section */}
         <div
           className="rounded-xl border p-6"
-          style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
+          style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}
         >
           <h2 className="text-2xl font-bold mb-4" style={{ color: 'var(--dash-text)' }}>היסטוריית סריקות</h2>
 
@@ -251,7 +250,7 @@ export default function ChatbotSettingsPage() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr style={{ background: 'var(--dash-surface-hover)' }}>
+                  <tr style={{ background: 'rgba(255,255,255,0.05)' }}>
                     <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>תאריך</th>
                     <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>סטטוס</th>
                     <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>סוג</th>
@@ -264,7 +263,7 @@ export default function ChatbotSettingsPage() {
                     <tr
                       key={job.id}
                       className="transition-colors"
-                      style={{ borderBottom: '1px solid var(--dash-border)' }}
+                      style={{ borderBottom: '1px solid var(--dash-glass-border)' }}
                     >
                       <td className="p-3 text-sm">
                         {new Date(job.created_at).toLocaleDateString('he-IL', {
@@ -299,7 +298,7 @@ export default function ChatbotSettingsPage() {
         {/* Embed Code Section */}
         <div
           className="rounded-xl border p-6"
-          style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
+          style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}
         >
           <h2 className="text-2xl font-bold mb-4" style={{ color: 'var(--dash-text)' }}>הטמעת Widget</h2>
 
@@ -309,13 +308,12 @@ export default function ChatbotSettingsPage() {
             </p>
 
             <div
-              className="rounded-lg p-4 font-mono text-sm relative"
+              className="rounded-xl p-4 font-mono text-sm relative"
               style={{ background: 'var(--dash-bar)', color: 'var(--dash-text)' }}
             >
               <button
                 onClick={() => copyToClipboard(generateEmbedCode())}
-                className="absolute top-2 left-2 px-3 py-1 rounded text-xs font-sans transition-colors"
-                style={{ background: 'var(--color-primary)', color: 'white' }}
+                className="absolute top-2 left-2 px-3 py-1 rounded text-xs font-sans transition-colors btn-primary"
               >
                 העתק
               </button>
@@ -324,7 +322,7 @@ export default function ChatbotSettingsPage() {
 
             <div
               className="border-r-4 p-4 rounded"
-              style={{ background: 'var(--dash-surface-hover)', borderColor: 'var(--color-info)' }}
+              style={{ background: 'rgba(255,255,255,0.05)', borderColor: 'var(--color-info)' }}
             >
               <p className="text-sm" style={{ color: 'var(--dash-text)' }}>
                 <strong>קישור ישיר:</strong>{' '}
@@ -366,7 +364,7 @@ function StatCard({
   return (
     <div
       className="rounded-xl border p-6 transition-shadow"
-      style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
+      style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}
     >
       <div className="flex items-center justify-between">
         <div className="flex-1">
@@ -375,7 +373,7 @@ function StatCard({
             {isText ? value : value.toLocaleString('he-IL')}
           </p>
         </div>
-        <div className="text-4xl p-3 rounded-full" style={{ background: 'var(--dash-surface-hover)' }}>
+        <div className="text-4xl p-3 rounded-full" style={{ background: 'rgba(255,255,255,0.05)' }}>
           {icon}
         </div>
       </div>

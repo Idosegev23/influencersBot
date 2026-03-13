@@ -65,7 +65,7 @@ interface InfluencerDetails {
 export default function InfluencerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const id = resolvedParams.id;
-  
+
   const [influencer, setInfluencer] = useState<InfluencerDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [rebuilding, setRebuilding] = useState(false);
@@ -113,7 +113,6 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
       });
 
       if (res.ok) {
-        // Reload documents list after upload
         setTimeout(() => loadDocuments(), 2000);
       } else {
         const data = await res.json();
@@ -158,7 +157,7 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
 
   async function rebuildPersona() {
     if (!confirm('לבנות מחדש את הפרסונה? (לוקח כ-2 דקות)')) return;
-    
+
     setRebuilding(true);
     try {
       const res = await fetch('/api/persona/rebuild', {
@@ -166,7 +165,7 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accountId: id })
       });
-      
+
       if (res.ok) {
         alert('הפרסונה נבנתה מחדש בהצלחה!');
         loadInfluencer();
@@ -183,7 +182,7 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
   if (loading) {
     return (
       <div className="min-h-screen admin-panel flex items-center justify-center">
-        <div className="text-white">טוען...</div>
+        <div className="w-8 h-8 border-2 border-[#a094e0] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -192,9 +191,9 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
     return (
       <div className="min-h-screen admin-panel flex items-center justify-center">
         <div className="text-center">
-          <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-          <div className="text-white text-xl mb-2">משפיענית לא נמצאה</div>
-          <Link href="/admin/influencers" className="text-indigo-400 hover:underline">
+          <AlertCircle className="w-16 h-16 mx-auto mb-4" style={{ color: '#f87171' }} />
+          <div className="text-xl mb-2" style={{ color: '#ede9f8' }}>משפיענית לא נמצאה</div>
+          <Link href="/admin/influencers" className="hover:underline" style={{ color: '#a094e0' }}>
             חזרה לרשימה
           </Link>
         </div>
@@ -209,26 +208,27 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
         <div className="flex items-center gap-4 mb-8">
           <Link
             href="/admin/influencers"
-            className="w-10 h-10 flex items-center justify-center bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+            className="w-10 h-10 flex items-center justify-center rounded-full transition-all"
+            style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.06)' }}
           >
-            <ArrowRight className="w-5 h-5 text-white" />
+            <ArrowRight className="w-5 h-5" style={{ color: '#ede9f8' }} />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-white">{influencer.displayName}</h1>
-            <p className="text-gray-400">@{influencer.username}</p>
+            <h1 className="text-2xl font-bold" style={{ color: '#ede9f8' }}>{influencer.displayName}</h1>
+            <p style={{ color: 'rgba(237, 233, 248, 0.35)' }}>@{influencer.username}</p>
           </div>
           <div className="mr-auto flex gap-2">
             <Link
               href={`/chat/${influencer.username}`}
               target="_blank"
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors flex items-center gap-2"
+              className="btn-primary flex items-center gap-2 text-sm"
             >
               <Eye className="w-4 h-4" />
               צפייה בצ'אט
             </Link>
             <Link
               href={`/admin/chatbot-persona/${id}`}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors flex items-center gap-2"
+              className="btn-ghost flex items-center gap-2 text-sm"
             >
               <Settings className="w-4 h-4" />
               הגדרות פרסונה
@@ -242,11 +242,11 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
             {/* Persona Status */}
             <div className="admin-card p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-white">סטטוס הפרסונה</h2>
+                <h2 className="text-xl font-bold" style={{ color: '#ede9f8' }}>סטטוס הפרסונה</h2>
                 <button
                   onClick={rebuildPersona}
                   disabled={rebuilding}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                  className="btn-coral flex items-center gap-2 text-sm disabled:opacity-50"
                 >
                   <RefreshCw className={`w-4 h-4 ${rebuilding ? 'animate-spin' : ''}`} />
                   {rebuilding ? 'בונה...' : 'בניה מחדש'}
@@ -254,84 +254,89 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className={`p-4 rounded-lg ${influencer.persona.hasGemini ? 'bg-green-500/10 border border-green-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
+                <div className="p-4 rounded-xl" style={influencer.persona.hasGemini
+                  ? { background: 'rgba(94, 234, 212, 0.06)', border: '1px solid rgba(94, 234, 212, 0.15)' }
+                  : { background: 'rgba(239, 68, 68, 0.06)', border: '1px solid rgba(239, 68, 68, 0.15)' }
+                }>
                   <div className="flex items-center gap-2 mb-2">
                     {influencer.persona.hasGemini ? (
-                      <CheckCircle className="w-5 h-5 text-green-400" />
+                      <CheckCircle className="w-5 h-5" style={{ color: '#5eead4' }} />
                     ) : (
-                      <AlertCircle className="w-5 h-5 text-red-400" />
+                      <AlertCircle className="w-5 h-5" style={{ color: '#f87171' }} />
                     )}
-                    <span className="text-white font-medium">Gemini Output</span>
+                    <span className="font-medium" style={{ color: '#ede9f8' }}>Gemini Output</span>
                   </div>
-                  <p className={influencer.persona.hasGemini ? 'text-green-300 text-sm' : 'text-red-300 text-sm'}>
+                  <p className="text-sm" style={{ color: influencer.persona.hasGemini ? '#5eead4' : '#f87171' }}>
                     {influencer.persona.hasGemini ? 'קיים ✓' : 'חסר - יש לבנות'}
                   </p>
                 </div>
 
-                <div className={`p-4 rounded-lg ${influencer.persona.instagramUsername ? 'bg-green-500/10 border border-green-500/30' : 'bg-yellow-500/10 border border-yellow-500/30'}`}>
+                <div className="p-4 rounded-xl" style={influencer.persona.instagramUsername
+                  ? { background: 'rgba(94, 234, 212, 0.06)', border: '1px solid rgba(94, 234, 212, 0.15)' }
+                  : { background: 'rgba(224, 164, 148, 0.06)', border: '1px solid rgba(224, 164, 148, 0.15)' }
+                }>
                   <div className="flex items-center gap-2 mb-2">
                     {influencer.persona.instagramUsername ? (
-                      <CheckCircle className="w-5 h-5 text-green-400" />
+                      <CheckCircle className="w-5 h-5" style={{ color: '#5eead4' }} />
                     ) : (
-                      <AlertCircle className="w-5 h-5 text-yellow-400" />
+                      <AlertCircle className="w-5 h-5" style={{ color: '#e0a494' }} />
                     )}
-                    <span className="text-white font-medium">Instagram Username</span>
+                    <span className="font-medium" style={{ color: '#ede9f8' }}>Instagram Username</span>
                   </div>
-                  <p className={influencer.persona.instagramUsername ? 'text-green-300 text-sm' : 'text-yellow-300 text-sm'}>
+                  <p className="text-sm" style={{ color: influencer.persona.instagramUsername ? '#5eead4' : '#e0a494' }}>
                     {influencer.persona.instagramUsername || 'לא מוגדר'}
                   </p>
                 </div>
 
-                <div className="p-4 rounded-lg bg-gray-800/50">
-                  <div className="text-gray-400 text-sm mb-1">מוצרים</div>
-                  <div className="text-white text-2xl font-bold">{influencer.persona.productsCount}</div>
+                <div className="p-4 rounded-xl" style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                  <div className="text-sm mb-1" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>מוצרים</div>
+                  <div className="text-2xl font-bold" style={{ color: '#ede9f8' }}>{influencer.persona.productsCount}</div>
                 </div>
 
-                <div className="p-4 rounded-lg bg-gray-800/50">
-                  <div className="text-gray-400 text-sm mb-1">מותגים</div>
-                  <div className="text-white text-2xl font-bold">{influencer.persona.brandsCount}</div>
+                <div className="p-4 rounded-xl" style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                  <div className="text-sm mb-1" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>מותגים</div>
+                  <div className="text-2xl font-bold" style={{ color: '#ede9f8' }}>{influencer.persona.brandsCount}</div>
                 </div>
               </div>
             </div>
 
             {/* Content Stats */}
             <div className="admin-card p-6">
-              <h2 className="text-xl font-bold text-white mb-4">תוכן</h2>
+              <h2 className="text-xl font-bold mb-4" style={{ color: '#ede9f8' }}>תוכן</h2>
               <div className="grid grid-cols-3 gap-4">
-                <div className="p-4 rounded-lg bg-gray-800/50">
-                  <div className="text-gray-400 text-sm mb-1">פוסטים</div>
-                  <div className="text-white text-2xl font-bold">{influencer.stats.posts}</div>
-                </div>
-                <div className="p-4 rounded-lg bg-gray-800/50">
-                  <div className="text-gray-400 text-sm mb-1">תמלולים</div>
-                  <div className="text-white text-2xl font-bold">{influencer.stats.transcriptions}</div>
-                </div>
-                <div className="p-4 rounded-lg bg-gray-800/50">
-                  <div className="text-gray-400 text-sm mb-1">אתרים</div>
-                  <div className="text-white text-2xl font-bold">{influencer.stats.websites}</div>
-                </div>
+                {[
+                  { label: 'פוסטים', value: influencer.stats.posts },
+                  { label: 'תמלולים', value: influencer.stats.transcriptions },
+                  { label: 'אתרים', value: influencer.stats.websites },
+                ].map((stat) => (
+                  <div key={stat.label} className="p-4 rounded-xl" style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                    <div className="text-sm mb-1" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>{stat.label}</div>
+                    <div className="text-2xl font-bold" style={{ color: '#ede9f8' }}>{stat.value}</div>
+                  </div>
+                ))}
               </div>
             </div>
 
             {/* Commerce */}
             <div className="admin-card p-6">
-              <h2 className="text-xl font-bold text-white mb-4">מסחר</h2>
+              <h2 className="text-xl font-bold mb-4" style={{ color: '#ede9f8' }}>מסחר</h2>
               <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 rounded-lg bg-gray-800/50">
-                  <div className="text-gray-400 text-sm mb-1">קופונים (DB)</div>
-                  <div className="text-white text-2xl font-bold">{influencer.stats.coupons}</div>
-                </div>
-                <div className="p-4 rounded-lg bg-gray-800/50">
-                  <div className="text-gray-400 text-sm mb-1">שיתופי פעולה</div>
-                  <div className="text-white text-2xl font-bold">{influencer.stats.partnerships}</div>
-                </div>
+                {[
+                  { label: 'קופונים (DB)', value: influencer.stats.coupons },
+                  { label: 'שיתופי פעולה', value: influencer.stats.partnerships },
+                ].map((stat) => (
+                  <div key={stat.label} className="p-4 rounded-xl" style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                    <div className="text-sm mb-1" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>{stat.label}</div>
+                    <div className="text-2xl font-bold" style={{ color: '#ede9f8' }}>{stat.value}</div>
+                  </div>
+                ))}
               </div>
             </div>
 
             {/* Documents */}
             <div className="admin-card p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: '#ede9f8' }}>
                   <FileText className="w-5 h-5" />
                   מסמכים ({documents.length})
                 </h2>
@@ -347,7 +352,7 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-700 text-white rounded-lg transition-colors flex items-center gap-2 text-sm"
+                    className="btn-primary flex items-center gap-2 text-sm disabled:opacity-50"
                   >
                     {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                     {uploading ? 'מעלה...' : 'העלאת מסמך'}
@@ -356,31 +361,31 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
               </div>
 
               {docsLoading ? (
-                <div className="text-gray-400 text-center py-4">טוען מסמכים...</div>
+                <div className="text-center py-4" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>טוען מסמכים...</div>
               ) : documents.length === 0 ? (
-                <div className="text-gray-500 text-center py-8">
-                  <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p>אין מסמכים עדיין</p>
-                  <p className="text-sm mt-1">העלה PDF, מצגות, או מסמכים שייכנסו למאגר הידע של הבוט</p>
+                <div className="text-center py-8">
+                  <FileText className="w-12 h-12 mx-auto mb-2" style={{ color: 'rgba(237, 233, 248, 0.15)' }} />
+                  <p style={{ color: 'rgba(237, 233, 248, 0.3)' }}>אין מסמכים עדיין</p>
+                  <p className="text-sm mt-1" style={{ color: 'rgba(237, 233, 248, 0.2)' }}>העלה PDF, מצגות, או מסמכים שייכנסו למאגר הידע של הבוט</p>
                 </div>
               ) : (
                 <div className="space-y-2">
                   {documents.map((doc) => (
-                    <div key={doc.id} className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-lg">
-                      <FileText className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                    <div key={doc.id} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                      <FileText className="w-5 h-5 flex-shrink-0" style={{ color: 'rgba(237, 233, 248, 0.3)' }} />
                       <div className="flex-1 min-w-0">
-                        <div className="text-white text-sm truncate">{doc.filename}</div>
-                        <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
+                        <div className="text-sm truncate" style={{ color: '#ede9f8' }}>{doc.filename}</div>
+                        <div className="flex items-center gap-2 text-xs mt-0.5" style={{ color: 'rgba(237, 233, 248, 0.3)' }}>
                           <span>{doc.document_type}</span>
                           <span>·</span>
                           <span>{(doc.file_size / 1024).toFixed(0)} KB</span>
                           <span>·</span>
-                          <span className={
-                            doc.parsing_status === 'completed' ? 'text-green-400' :
-                            doc.parsing_status === 'failed' ? 'text-red-400' :
-                            doc.parsing_status === 'processing' ? 'text-yellow-400' :
-                            'text-gray-400'
-                          }>
+                          <span style={{
+                            color: doc.parsing_status === 'completed' ? '#5eead4' :
+                            doc.parsing_status === 'failed' ? '#f87171' :
+                            doc.parsing_status === 'processing' ? '#e0a494' :
+                            'rgba(237, 233, 248, 0.3)'
+                          }}>
                             {doc.parsing_status === 'completed' ? 'נותח' :
                              doc.parsing_status === 'failed' ? 'נכשל' :
                              doc.parsing_status === 'processing' ? 'מנתח...' :
@@ -402,7 +407,8 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
                       </div>
                       <button
                         onClick={() => deleteDocument(doc.id)}
-                        className="p-1.5 text-gray-500 hover:text-red-400 transition-colors"
+                        className="p-1.5 transition-colors rounded-full"
+                        style={{ color: 'rgba(237, 233, 248, 0.25)' }}
                         title="מחק"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -418,20 +424,20 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
           <div className="space-y-6">
             {/* Chat Config */}
             <div className="admin-card p-6">
-              <h2 className="text-lg font-bold text-white mb-4">הגדרות צ'אט</h2>
-              
+              <h2 className="text-lg font-bold mb-4" style={{ color: '#ede9f8' }}>הגדרות צ'אט</h2>
+
               <div className="mb-4">
-                <div className="text-gray-400 text-sm mb-2">הודעת פתיחה</div>
-                <div className="text-white text-sm bg-gray-800/50 rounded-lg p-3">
+                <div className="text-sm mb-2" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>הודעת פתיחה</div>
+                <div className="text-sm rounded-xl p-3" style={{ color: '#ede9f8', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
                   {influencer.chatConfig.greeting || 'לא מוגדרת'}
                 </div>
               </div>
 
               <div className="mb-4">
-                <div className="text-gray-400 text-sm mb-2">שאלות מוכנות</div>
+                <div className="text-sm mb-2" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>שאלות מוכנות</div>
                 <div className="space-y-2">
                   {influencer.chatConfig.questions.map((q, i) => (
-                    <div key={i} className="text-white text-sm bg-gray-800/50 rounded-lg p-2">
+                    <div key={i} className="text-sm rounded-xl p-2" style={{ color: '#ede9f8', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
                       {i + 1}. {q}
                     </div>
                   ))}
@@ -439,20 +445,20 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
               </div>
 
               <div>
-                <div className="text-gray-400 text-sm mb-2">ערכת צבעים</div>
+                <div className="text-sm mb-2" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>ערכת צבעים</div>
                 <div className="flex gap-2">
                   <div className="flex-1">
-                    <div className="text-xs text-gray-500 mb-1">ראשי</div>
+                    <div className="text-xs mb-1" style={{ color: 'rgba(237, 233, 248, 0.25)' }}>ראשי</div>
                     <div
-                      className="h-10 rounded-lg"
+                      className="h-10 rounded-xl"
                       style={{ backgroundColor: influencer.chatConfig.theme.primary }}
                     />
                   </div>
                   <div className="flex-1">
-                    <div className="text-xs text-gray-500 mb-1">רקע</div>
+                    <div className="text-xs mb-1" style={{ color: 'rgba(237, 233, 248, 0.25)' }}>רקע</div>
                     <div
-                      className="h-10 rounded-lg border border-gray-700"
-                      style={{ backgroundColor: influencer.chatConfig.theme.background }}
+                      className="h-10 rounded-xl"
+                      style={{ backgroundColor: influencer.chatConfig.theme.background, border: '1px solid rgba(255, 255, 255, 0.06)' }}
                     />
                   </div>
                 </div>
@@ -461,17 +467,17 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
 
             {/* Quick Actions */}
             <div className="admin-card p-6">
-              <h2 className="text-lg font-bold text-white mb-4">פעולות</h2>
+              <h2 className="text-lg font-bold mb-4" style={{ color: '#ede9f8' }}>פעולות</h2>
               <div className="space-y-2">
                 <Link
                   href={`/manage/123456?account=${id}`}
-                  className="block w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-center transition-colors"
+                  className="btn-primary block w-full text-center text-sm py-2.5"
                 >
                   דף ניהול
                 </Link>
                 <Link
                   href={`/api/process/start?accountId=${id}`}
-                  className="block w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-center transition-colors"
+                  className="btn-coral block w-full text-center text-sm py-2.5"
                 >
                   תמלול מלא
                 </Link>

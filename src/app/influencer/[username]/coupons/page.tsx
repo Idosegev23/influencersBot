@@ -154,30 +154,27 @@ export default function CouponsAnalyticsPage() {
 
   if (isLoading) {
     return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ background: 'var(--dash-bg)' }}
-      >
-        <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--dash-text-3)' }} />
+      <div className="min-h-screen flex items-center justify-center transparent">
+        <div className="glass-card p-8 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--dash-text-3)' }} />
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="max-w-6xl mx-auto py-8 px-4" style={{ background: 'var(--dash-bg)' }}>
+      <div className="max-w-6xl mx-auto py-8 px-4 transparent">
         <div
-          className="rounded-xl p-6 text-center"
+          className="glass-card p-6 text-center animate-fade-in"
           style={{
-            background: 'var(--dash-surface)',
-            border: '1px solid var(--dash-negative)',
+            borderColor: 'var(--dash-negative)',
           }}
         >
           <p style={{ color: 'var(--dash-negative)' }}>{error}</p>
           <button
             onClick={loadData}
-            className="mt-4 px-4 py-2 rounded-lg text-white"
-            style={{ background: 'var(--dash-negative)' }}
+            className="mt-4 px-4 py-2 rounded-xl transition-all duration-300 hover:scale-105 btn-coral"
           >
             נסה שוב
           </button>
@@ -191,16 +188,16 @@ export default function CouponsAnalyticsPage() {
   }
 
   return (
-    <div className="min-h-screen" dir="rtl" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
+    <div className="min-h-screen transparent" dir="rtl" style={{ color: 'var(--dash-text)' }}>
       <div className="max-w-6xl mx-auto py-8 px-4 space-y-8">
         {/* Header */}
-        <div>
+        <div className="animate-fade-in relative z-10">
           <h1 className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>אנליטיקס קופונים</h1>
           <p className="mt-2" style={{ color: 'var(--dash-text-2)' }}>ביצועי קופונים ומכירות</p>
         </div>
 
         {/* Overview Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 stagger-children">
           {[
             { label: 'סה"כ קופונים', value: data?.overview?.total_coupons || 0, color: 'var(--dash-text)' },
             { label: 'הועתקו', value: data?.overview?.total_copied || 0, color: 'var(--color-info)' },
@@ -211,10 +208,9 @@ export default function CouponsAnalyticsPage() {
           ].map((card, i) => (
             <div
               key={i}
-              className="rounded-xl p-4"
+              className="metric-card relative z-10 transition-all duration-300"
               style={{
-                background: 'var(--dash-surface)',
-                border: '1px solid var(--dash-border)',
+                border: 'var(--dash-glass-border)',
               }}
             >
               <div className="text-sm mb-1" style={{ color: 'var(--dash-text-2)' }}>{card.label}</div>
@@ -227,13 +223,14 @@ export default function CouponsAnalyticsPage() {
 
         {/* Coupons Table */}
         {data?.coupons && data.coupons.length > 0 ? (
-          <CouponPerformanceTable coupons={data.coupons} />
+          <div className="animate-slide-up relative z-10">
+            <CouponPerformanceTable coupons={data.coupons} />
+          </div>
         ) : (
           <div
-            className="rounded-xl p-6"
+            className="glass-card p-6 animate-slide-up relative z-10"
             style={{
-              background: 'var(--dash-surface)',
-              border: '1px solid var(--dash-border)',
+              border: 'var(--dash-glass-border)',
             }}
           >
             <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--dash-text)' }}>ביצועי קופונים מפורטים</h3>
@@ -243,13 +240,14 @@ export default function CouponsAnalyticsPage() {
 
         {/* Top Products */}
         {data?.top_products && data.top_products.length > 0 ? (
-          <TopProducts products={data.top_products} />
+          <div className="animate-slide-up relative z-10">
+            <TopProducts products={data.top_products} />
+          </div>
         ) : (
           <div
-            className="rounded-xl p-6"
+            className="glass-card p-6 animate-slide-up relative z-10"
             style={{
-              background: 'var(--dash-surface)',
-              border: '1px solid var(--dash-border)',
+              border: 'var(--dash-glass-border)',
             }}
           >
             <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--dash-text)' }}>מוצרים פופולריים</h3>

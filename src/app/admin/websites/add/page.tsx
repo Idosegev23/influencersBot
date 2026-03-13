@@ -94,7 +94,6 @@ export default function AddWebsitePage() {
     setState((s) => ({ ...s, isLoading: true, error: null }));
 
     try {
-      // First, create an account for this website
       const accountRes = await fetch('/api/admin/accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -120,15 +119,10 @@ export default function AddWebsitePage() {
 
       setState((s) => ({ ...s, accountId }));
 
-      // Start the scan
       const res = await fetch('/api/scraping/website/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url: state.url,
-          accountId,
-          maxPages: 50,
-        }),
+        body: JSON.stringify({ url: state.url, accountId, maxPages: 50 }),
       });
 
       const data = await res.json();
@@ -138,12 +132,7 @@ export default function AddWebsitePage() {
         return;
       }
 
-      setState((s) => ({
-        ...s,
-        step: 'scraping',
-        jobId: data.jobId,
-        isLoading: false,
-      }));
+      setState((s) => ({ ...s, step: 'scraping', jobId: data.jobId, isLoading: false }));
     } catch (error: any) {
       setState((s) => ({ ...s, error: error.message, isLoading: false }));
     }
@@ -158,7 +147,7 @@ export default function AddWebsitePage() {
         body: JSON.stringify({ jobId: state.jobId }),
       });
     } catch {
-      // Ignore errors — we're resetting anyway
+      // Ignore
     }
     setState((s) => ({ ...s, step: 'url', jobId: null, error: null, isLoading: false }));
   };
@@ -173,7 +162,7 @@ export default function AddWebsitePage() {
   if (checkingAuth) {
     return (
       <div className="min-h-screen admin-panel flex items-center justify-center" dir="rtl">
-        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-[#a094e0] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -189,19 +178,17 @@ export default function AddWebsitePage() {
 
   return (
     <div className="min-h-screen admin-panel" dir="rtl">
-      <div className="fixed inset-0 bg-gradient-to-br from-indigo-900/20 via-gray-950 to-purple-900/20" />
-
       {/* Header */}
-      <header className="relative z-10 sticky top-0 bg-gray-900/80 backdrop-blur-xl border-b border-gray-800">
+      <header className="relative z-10 sticky top-0 backdrop-blur-xl border-b" style={{ background: 'rgba(7, 7, 13, 0.88)', borderColor: 'rgba(255, 255, 255, 0.06)' }}>
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Link href="/admin/dashboard" className="text-gray-400 hover:text-white transition-colors">
+              <Link href="/admin/dashboard" className="transition-colors" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>
                 <ArrowRight className="w-5 h-5" />
               </Link>
               <div className="flex items-center gap-2">
-                <Globe className="w-5 h-5 text-indigo-400" />
-                <h1 className="font-semibold text-white">הוספת אתר</h1>
+                <Globe className="w-5 h-5" style={{ color: '#a094e0' }} />
+                <h1 className="font-semibold" style={{ color: '#ede9f8' }}>הוספת אתר</h1>
               </div>
             </div>
           </div>
@@ -214,21 +201,22 @@ export default function AddWebsitePage() {
           {steps.map((s, i) => (
             <div key={s.key} className="flex items-center gap-2">
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
+                className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors"
+                style={
                   i < currentStepIndex
-                    ? 'bg-green-500 text-white'
+                    ? { background: 'rgba(94, 234, 212, 0.15)', color: '#5eead4' }
                     : i === currentStepIndex
-                    ? 'bg-indigo-500 text-white'
-                    : 'bg-gray-700 text-gray-400'
-                }`}
+                    ? { background: 'rgba(160, 148, 224, 0.15)', color: '#a094e0' }
+                    : { background: 'rgba(255, 255, 255, 0.04)', color: 'rgba(237, 233, 248, 0.25)' }
+                }
               >
                 {i < currentStepIndex ? <Check className="w-4 h-4" /> : i + 1}
               </div>
-              <span className={`text-sm ${i === currentStepIndex ? 'text-white' : 'text-gray-500'}`}>
+              <span className="text-sm" style={{ color: i === currentStepIndex ? '#ede9f8' : 'rgba(237, 233, 248, 0.25)' }}>
                 {s.label}
               </span>
               {i < steps.length - 1 && (
-                <div className={`w-8 h-0.5 ${i < currentStepIndex ? 'bg-green-500' : 'bg-gray-700'}`} />
+                <div className="w-8 h-0.5" style={{ background: i < currentStepIndex ? 'rgba(94, 234, 212, 0.3)' : 'rgba(255, 255, 255, 0.06)' }} />
               )}
             </div>
           ))}
@@ -237,8 +225,8 @@ export default function AddWebsitePage() {
         {/* Step: URL Input */}
         {state.step === 'url' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="admin-card p-8">
-            <h2 className="text-xl font-semibold text-white mb-2">הזינו את כתובת האתר</h2>
-            <p className="text-gray-400 mb-6">נסרוק את כל דפי האתר ונאנדקס את התוכן לצ'אטבוט חכם</p>
+            <h2 className="text-xl font-semibold mb-2" style={{ color: '#ede9f8' }}>הזינו את כתובת האתר</h2>
+            <p className="mb-6" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>נסרוק את כל דפי האתר ונאנדקס את התוכן לצ&#39;אטבוט חכם</p>
 
             <input
               type="url"
@@ -246,25 +234,21 @@ export default function AddWebsitePage() {
               value={state.url}
               onChange={(e) => setState((s) => ({ ...s, url: e.target.value, error: null }))}
               onKeyDown={(e) => e.key === 'Enter' && handleStartScan()}
-              className="admin-input w-full text-lg mb-4"
+              className="admin-input w-full !rounded-xl text-lg mb-4"
               dir="ltr"
               autoFocus
             />
 
             {state.error && (
-              <p className="text-red-400 text-sm mb-4">{state.error}</p>
+              <p className="text-sm mb-4" style={{ color: '#f87171' }}>{state.error}</p>
             )}
 
             <button
               onClick={handleStartScan}
               disabled={state.isLoading || !state.url.trim()}
-              className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-indigo-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-primary w-full flex items-center justify-center gap-2 py-3 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {state.isLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <Zap className="w-5 h-5" />
-              )}
+              {state.isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Zap className="w-5 h-5" />}
               {state.isLoading ? 'מתחיל...' : 'התחל סריקה'}
             </button>
           </motion.div>
@@ -273,23 +257,27 @@ export default function AddWebsitePage() {
         {/* Step: Scraping */}
         {state.step === 'scraping' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="admin-card p-8">
-            <h2 className="text-xl font-semibold text-white mb-2">סורקים את האתר...</h2>
-            <p className="text-gray-400 mb-6">התהליך עשוי לקחת כמה דקות. אל תסגרו את הדף.</p>
+            <h2 className="text-xl font-semibold mb-2" style={{ color: '#ede9f8' }}>סורקים את האתר...</h2>
+            <p className="mb-6" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>התהליך עשוי לקחת כמה דקות. אל תסגרו את הדף.</p>
 
             <div className="space-y-3 mb-6">
               {deduplicateSteps(jobStatus?.steps || []).map((step: any, i: number) => (
                 <div key={step.step || i} className="flex items-center gap-3">
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 ${
-                    step.status === 'completed' ? 'bg-green-500 text-white' :
-                    step.status === 'running' ? 'bg-indigo-500 text-white animate-pulse' :
-                    step.status === 'failed' ? 'bg-red-500 text-white' :
-                    'bg-gray-700 text-gray-400'
-                  }`}>
+                  <div
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0"
+                    style={
+                      step.status === 'completed' ? { background: 'rgba(94, 234, 212, 0.15)', color: '#5eead4' } :
+                      step.status === 'running' ? { background: 'rgba(160, 148, 224, 0.15)', color: '#a094e0' } :
+                      step.status === 'failed' ? { background: 'rgba(239, 68, 68, 0.15)', color: '#f87171' } :
+                      { background: 'rgba(255, 255, 255, 0.04)', color: 'rgba(237, 233, 248, 0.25)' }
+                    }
+                  >
                     {step.status === 'completed' ? <Check className="w-3 h-3" /> :
-                     step.status === 'running' ? <Loader2 className="w-3 h-3 animate-spin" /> :
-                     ''}
+                     step.status === 'running' ? <Loader2 className="w-3 h-3 animate-spin" /> : ''}
                   </div>
-                  <span className={`text-sm ${step.status === 'running' ? 'text-white font-medium' : step.status === 'completed' ? 'text-green-400' : 'text-gray-400'}`}>
+                  <span className="text-sm" style={{
+                    color: step.status === 'running' ? '#ede9f8' : step.status === 'completed' ? '#5eead4' : 'rgba(237, 233, 248, 0.35)'
+                  }}>
                     {step.message}
                   </span>
                 </div>
@@ -297,9 +285,10 @@ export default function AddWebsitePage() {
             </div>
 
             {/* Progress bar */}
-            <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+            <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255, 255, 255, 0.06)' }}>
               <motion.div
-                className="h-full bg-gradient-to-r from-indigo-500 to-purple-500"
+                className="h-full rounded-full"
+                style={{ background: '#a094e0' }}
                 initial={{ width: '5%' }}
                 animate={{ width: `${getLatestProgress(jobStatus?.steps || [])}%` }}
                 transition={{ duration: 0.5 }}
@@ -307,21 +296,21 @@ export default function AddWebsitePage() {
             </div>
 
             {state.error && (
-              <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-                <p className="text-red-400 text-sm">{state.error}</p>
+              <div className="mt-4 p-3 rounded-xl" style={{ background: 'rgba(239, 68, 68, 0.06)', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
+                <p className="text-sm" style={{ color: '#f87171' }}>{state.error}</p>
                 <button
                   onClick={() => setState((s) => ({ ...s, step: 'url', error: null, jobId: null }))}
-                  className="mt-2 text-sm text-indigo-400 hover:text-indigo-300"
+                  className="mt-2 text-sm" style={{ color: '#a094e0' }}
                 >
                   נסה שוב
                 </button>
               </div>
             )}
 
-            {/* Cancel button */}
             <button
               onClick={handleCancelScan}
-              className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-red-400 hover:text-red-300 border border-red-500/30 hover:border-red-500/50 rounded-lg transition-colors"
+              className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2 text-sm rounded-full transition-all"
+              style={{ color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.15)' }}
             >
               ביטול סריקה
             </button>
@@ -331,36 +320,37 @@ export default function AddWebsitePage() {
         {/* Step: Settings */}
         {state.step === 'settings' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="admin-card p-8">
-            <h2 className="text-xl font-semibold text-white mb-2">הגדרות ווידג'ט</h2>
-            <p className="text-gray-400 mb-6">התאימו את הצ'אטבוט לאתר שלכם</p>
+            <h2 className="text-xl font-semibold mb-2" style={{ color: '#ede9f8' }}>הגדרות ווידג&#39;ט</h2>
+            <p className="mb-6" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>התאימו את הצ&#39;אטבוט לאתר שלכם</p>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-gray-300 mb-2">צבע ראשי</label>
+                <label className="block text-sm mb-2" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>צבע ראשי</label>
                 <div className="flex items-center gap-3">
                   <input
                     type="color"
                     value={state.widgetColor}
                     onChange={(e) => setState((s) => ({ ...s, widgetColor: e.target.value }))}
-                    className="w-10 h-10 rounded-lg border border-gray-600 cursor-pointer"
+                    className="w-10 h-10 rounded-lg cursor-pointer"
+                    style={{ border: '1px solid rgba(255, 255, 255, 0.06)' }}
                   />
                   <input
                     type="text"
                     value={state.widgetColor}
                     onChange={(e) => setState((s) => ({ ...s, widgetColor: e.target.value }))}
-                    className="admin-input flex-1"
+                    className="admin-input flex-1 !rounded-xl"
                     dir="ltr"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm text-gray-300 mb-2">הודעת ברכה</label>
+                <label className="block text-sm mb-2" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>הודעת ברכה</label>
                 <input
                   type="text"
                   value={state.welcomeMessage}
                   onChange={(e) => setState((s) => ({ ...s, welcomeMessage: e.target.value }))}
-                  className="admin-input w-full"
+                  className="admin-input w-full !rounded-xl"
                 />
               </div>
             </div>
@@ -369,25 +359,20 @@ export default function AddWebsitePage() {
               onClick={async () => {
                 setState((s) => ({ ...s, isLoading: true }));
                 try {
-                  // Save widget settings to account config
                   await fetch(`/api/admin/accounts/${state.accountId}/config`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                      widget: {
-                        primaryColor: state.widgetColor,
-                        welcomeMessage: state.welcomeMessage,
-                        position: 'bottom-right',
-                      },
+                      widget: { primaryColor: state.widgetColor, welcomeMessage: state.welcomeMessage, position: 'bottom-right' },
                     }),
                   });
                 } catch {
-                  // Continue even if save fails — defaults will work
+                  // Continue even if save fails
                 }
                 setState((s) => ({ ...s, step: 'complete', isLoading: false }));
               }}
               disabled={state.isLoading}
-              className="w-full mt-6 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-indigo-500/25 disabled:opacity-50"
+              className="btn-primary w-full mt-6 flex items-center justify-center gap-2 py-3 font-medium disabled:opacity-50"
             >
               {state.isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
               {state.isLoading ? 'שומר...' : 'סיום'}
@@ -399,26 +384,26 @@ export default function AddWebsitePage() {
         {state.step === 'complete' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
             <div className="admin-card p-8 text-center">
-              <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4">
-                <Check className="w-8 h-8 text-green-400" />
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(94, 234, 212, 0.12)', border: '1px solid rgba(94, 234, 212, 0.18)' }}>
+                <Check className="w-8 h-8" style={{ color: '#5eead4' }} />
               </div>
-              <h2 className="text-xl font-semibold text-white mb-2">האתר נסרק בהצלחה!</h2>
-              <p className="text-gray-400 mb-6">הווידג'ט מוכן להטמעה באתר שלכם</p>
+              <h2 className="text-xl font-semibold mb-2" style={{ color: '#ede9f8' }}>האתר נסרק בהצלחה!</h2>
+              <p className="mb-6" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>הווידג&#39;ט מוכן להטמעה באתר שלכם</p>
 
               {/* Scan results */}
               {jobStatus?.result && (
                 <div className="grid grid-cols-3 gap-4 mb-6">
-                  <div className="bg-gray-800 rounded-lg p-3">
-                    <p className="text-2xl font-bold text-white">{jobStatus.result.pagesScraped || 0}</p>
-                    <p className="text-xs text-gray-400">דפים</p>
+                  <div className="rounded-xl p-3" style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                    <p className="text-2xl font-bold" style={{ color: '#ede9f8' }}>{jobStatus.result.pagesScraped || 0}</p>
+                    <p className="text-xs" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>דפים</p>
                   </div>
-                  <div className="bg-gray-800 rounded-lg p-3">
-                    <p className="text-2xl font-bold text-white">{formatNumber(jobStatus.result.totalWords || 0)}</p>
-                    <p className="text-xs text-gray-400">מילים</p>
+                  <div className="rounded-xl p-3" style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                    <p className="text-2xl font-bold" style={{ color: '#ede9f8' }}>{formatNumber(jobStatus.result.totalWords || 0)}</p>
+                    <p className="text-xs" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>מילים</p>
                   </div>
-                  <div className="bg-gray-800 rounded-lg p-3">
-                    <p className="text-2xl font-bold text-white">{jobStatus.result.totalImages || 0}</p>
-                    <p className="text-xs text-gray-400">תמונות</p>
+                  <div className="rounded-xl p-3" style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                    <p className="text-2xl font-bold" style={{ color: '#ede9f8' }}>{jobStatus.result.totalImages || 0}</p>
+                    <p className="text-xs" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>תמונות</p>
                   </div>
                 </div>
               )}
@@ -426,29 +411,23 @@ export default function AddWebsitePage() {
 
             {/* Embed Code */}
             <div className="admin-card p-6">
-              <h3 className="text-lg font-semibold text-white mb-3">קוד הטמעה</h3>
-              <p className="text-sm text-gray-400 mb-4">
+              <h3 className="text-lg font-semibold mb-3" style={{ color: '#ede9f8' }}>קוד הטמעה</h3>
+              <p className="text-sm mb-4" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>
                 הדביקו את הקוד הזה לפני תגית {'</body>'} בכל דפי האתר שלכם
               </p>
 
-              <div className="bg-gray-900 rounded-lg p-4 font-mono text-sm text-gray-300 mb-4" dir="ltr">
+              <div className="rounded-xl p-4 font-mono text-sm mb-4" dir="ltr" style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)', color: '#ede9f8' }}>
                 {`<script src="${typeof window !== 'undefined' ? window.location.origin : ''}/widget.js" data-account-id="${state.accountId}"></script>`}
               </div>
 
               <button
                 onClick={handleCopyCode}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                className="btn-ghost w-full flex items-center justify-center gap-2 py-2.5"
               >
                 {codeCopied ? (
-                  <>
-                    <Check className="w-4 h-4 text-green-400" />
-                    הועתק!
-                  </>
+                  <><Check className="w-4 h-4" style={{ color: '#5eead4' }} /> הועתק!</>
                 ) : (
-                  <>
-                    <Copy className="w-4 h-4" />
-                    העתק קוד
-                  </>
+                  <><Copy className="w-4 h-4" /> העתק קוד</>
                 )}
               </button>
             </div>
@@ -457,14 +436,13 @@ export default function AddWebsitePage() {
             <div className="flex gap-3">
               <Link
                 href={`/admin/websites/${state.accountId}/preview`}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition-colors"
+                className="btn-primary flex-1 flex items-center justify-center gap-2 py-3"
               >
-                <ExternalLink className="w-4 h-4" />
-                צפה בהדגמה
+                <ExternalLink className="w-4 h-4" /> צפה בהדגמה
               </Link>
               <Link
                 href="/admin/dashboard"
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-xl transition-colors"
+                className="btn-ghost flex-1 flex items-center justify-center gap-2 py-3"
               >
                 חזרה לדשבורד
               </Link>

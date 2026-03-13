@@ -153,8 +153,8 @@ export default function ConversationsPage({
   if (!influencer) return null;
 
   return (
-    <div className="min-h-screen" dir="rtl" style={{ background: 'var(--dash-bg)', color: 'var(--dash-text)' }}>
-      <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-8">
+    <div className="min-h-screen" dir="rtl" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
+      <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-8 animate-slide-up">
         {/* Page Title */}
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
@@ -167,7 +167,7 @@ export default function ConversationsPage({
         </div>
 
         {/* Search and Filters */}
-        <div className="mb-6 space-y-4">
+        <div className="mb-6 space-y-4 animate-slide-up">
           {/* Search */}
           <div className="relative">
             <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5" style={{ color: 'var(--dash-text-3)' }} />
@@ -176,17 +176,12 @@ export default function ConversationsPage({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="חיפוש בשיחות..."
-              className="w-full rounded-xl pr-12 pl-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-              style={{
-                background: 'var(--dash-surface)',
-                border: '1px solid var(--dash-border)',
-                color: 'var(--dash-text)',
-              }}
+              className="input w-full pr-12 pl-4 py-3"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute left-4 top-1/2 -translate-y-1/2"
+                className="absolute left-4 top-1/2 -translate-y-1/2 transition-all duration-300"
                 style={{ color: 'var(--dash-text-3)' }}
               >
                 <X className="w-5 h-5" />
@@ -201,32 +196,26 @@ export default function ConversationsPage({
           <div className="flex gap-2">
             <button
               onClick={() => setFilter('all')}
-              className="px-4 py-2 rounded-lg text-sm font-medium transition-all"
-              style={{
-                background: filter === 'all' ? 'var(--color-primary)' : 'var(--dash-surface)',
-                color: filter === 'all' ? '#fff' : 'var(--dash-text-2)',
-              }}
+              className={`pill transition-all duration-300 ${
+                filter === 'all' ? 'pill-purple' : 'pill-neutral'
+              }`}
             >
               הכל
             </button>
             <button
               onClick={() => setFilter('starred')}
-              className="px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2"
-              style={{
-                background: filter === 'starred' ? '#ca8a04' : 'var(--dash-surface)',
-                color: filter === 'starred' ? '#fff' : 'var(--dash-text-2)',
-              }}
+              className={`pill transition-all duration-300 flex items-center gap-2 ${
+                filter === 'starred' ? 'pill-amber' : 'pill-neutral'
+              }`}
             >
               <Star className="w-4 h-4" />
               מסומנות בכוכב
             </button>
             <button
               onClick={() => setFilter('flagged')}
-              className="px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2"
-              style={{
-                background: filter === 'flagged' ? '#dc2626' : 'var(--dash-surface)',
-                color: filter === 'flagged' ? '#fff' : 'var(--dash-text-2)',
-              }}
+              className={`pill transition-all duration-300 flex items-center gap-2 ${
+                filter === 'flagged' ? 'pill-red' : 'pill-neutral'
+              }`}
             >
               <Flag className="w-4 h-4" />
               מסומנות לטיפול
@@ -235,7 +224,7 @@ export default function ConversationsPage({
         </div>
 
         {/* Sessions List */}
-        <div className="space-y-4">
+        <div className="space-y-4 animate-slide-up">
           {filteredSessions.length > 0 ? (
             filteredSessions.map((session) => {
               const isExpanded = expandedSession === session.id;
@@ -246,24 +235,21 @@ export default function ConversationsPage({
               return (
                 <div
                   key={session.id}
-                  className="rounded-xl overflow-hidden transition-all"
+                  className="glass-card rounded-2xl overflow-hidden transition-all duration-300"
                   style={{
-                    border: `1px solid ${isFlagged ? 'rgba(239,68,68,0.5)' : isStarred ? 'rgba(234,179,8,0.5)' : 'var(--dash-border)'}`,
-                    background: 'var(--dash-surface)',
+                    borderColor: isFlagged ? 'rgba(239,68,68,0.5)' : isStarred ? 'rgba(234,179,8,0.5)' : 'var(--dash-glass-border)',
+                    borderWidth: '1px',
                   }}
                 >
                   {/* Session Header */}
                   <div
-                    className="p-4 cursor-pointer transition-colors"
-                    style={{ background: 'var(--dash-surface)' }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--dash-surface-hover)'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--dash-surface)'; }}
+                    className="p-4 cursor-pointer transition-all duration-300 hover:bg-[var(--dash-surface-hover)]"
                     onClick={() => setExpandedSession(isExpanded ? null : session.id)}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-                          <User className="w-6 h-6 text-white" />
+                        <div className="w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300" style={{ background: 'var(--dash-surface)', border: '2px solid var(--dash-glass-border)' }}>
+                          <User className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
@@ -287,7 +273,7 @@ export default function ConversationsPage({
                             e.stopPropagation();
                             toggleStar(session.id);
                           }}
-                          className={`p-2 rounded-lg transition-colors ${
+                          className={`p-2 rounded-2xl transition-all duration-300 ${
                             isStarred
                               ? 'text-yellow-400 bg-yellow-400/10'
                               : 'hover:bg-[var(--dash-surface-hover)]'
@@ -301,7 +287,7 @@ export default function ConversationsPage({
                             e.stopPropagation();
                             toggleFlag(session.id);
                           }}
-                          className={`p-2 rounded-lg transition-colors ${
+                          className={`p-2 rounded-2xl transition-all duration-300 ${
                             isFlagged
                               ? 'text-red-400 bg-red-400/10'
                               : 'hover:bg-[var(--dash-surface-hover)]'
@@ -312,7 +298,7 @@ export default function ConversationsPage({
                         </button>
 
                         <div
-                          className="transition-transform"
+                          className="transition-transform duration-300"
                           style={{
                             color: 'var(--dash-text-3)',
                             transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
@@ -334,18 +320,18 @@ export default function ConversationsPage({
                   {/* Expanded Messages */}
                   {isExpanded && (
                     <div>
-                      <div className="p-4 space-y-3 max-h-96 overflow-y-auto" style={{ borderTop: '1px solid var(--dash-border)' }}>
+                      <div className="p-4 space-y-3 max-h-96 overflow-y-auto" style={{ borderTop: `1px solid var(--dash-glass-border)` }}>
                         {session.messages.map((message) => (
                           <div
                             key={message.id}
                             className={`flex gap-3 ${message.role === 'user' ? 'flex-row' : 'flex-row-reverse'}`}
                           >
                             <div
-                              className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                message.role === 'user'
-                                  ? 'bg-indigo-500/20'
-                                  : 'bg-green-500/20'
-                              }`}
+                              className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300"
+                              style={{
+                                background: message.role === 'user' ? 'rgba(99,102,241,0.2)' : 'rgba(34,197,94,0.2)',
+                                border: `1px solid var(--dash-glass-border)`
+                              }}
                             >
                               {message.role === 'user' ? (
                                 <User className="w-4 h-4 text-indigo-400" />
@@ -354,12 +340,26 @@ export default function ConversationsPage({
                               )}
                             </div>
                             <div
-                              className={`max-w-[80%] p-3 rounded-2xl ${
+                              className={`max-w-[80%] p-3 rounded-2xl transition-all duration-300 ${
                                 message.role === 'user'
-                                  ? 'bg-indigo-600 text-white rounded-tr-sm'
-                                  : 'rounded-tl-sm'
+                                  ? 'pill-purple'
+                                  : ''
                               }`}
-                              style={message.role !== 'user' ? { background: 'var(--dash-muted)', color: 'var(--dash-text)' } : undefined}
+                              style={
+                                message.role === 'user'
+                                  ? {
+                                      background: 'rgba(160, 148, 224, 0.15)',
+                                      color: 'var(--dash-text)',
+                                      borderBottomRightRadius: '4px',
+                                      border: '1px solid rgba(160, 148, 224, 0.2)',
+                                    }
+                                  : {
+                                      background: 'var(--dash-muted)',
+                                      color: 'var(--dash-text)',
+                                      border: `1px solid var(--dash-glass-border)`,
+                                      borderBottomLeftRadius: '4px',
+                                    }
+                              }
                             >
                               <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                               <p className="text-xs opacity-50 mt-1">
@@ -378,8 +378,10 @@ export default function ConversationsPage({
               );
             })
           ) : (
-            <div className="text-center py-16">
-              <MessageCircle className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--dash-text-3)' }} />
+            <div className="text-center py-16 animate-slide-up">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center transition-all duration-300" style={{ background: 'var(--dash-surface)', border: `1px solid var(--dash-glass-border)` }}>
+                <MessageCircle className="w-8 h-8" style={{ color: 'var(--color-primary)' }} />
+              </div>
               <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--dash-text)' }}>
                 {searchQuery ? 'לא נמצאו תוצאות' : 'אין שיחות עדיין'}
               </h3>
@@ -394,21 +396,17 @@ export default function ConversationsPage({
 
         {/* Load More */}
         {sessions.length >= 50 && (
-          <div className="mt-8 text-center">
+          <div className="mt-8 text-center animate-slide-up">
             <button
               onClick={async () => {
                 if (!influencer) return;
                 const more = await getChatSessionsWithMessages(influencer.id, 50, sessions.length);
                 setSessions([...sessions, ...more]);
               }}
-              className="px-6 py-3 rounded-xl transition-colors"
+              className="glass-subtle px-6 py-3 rounded-2xl transition-all duration-300 hover:glass-card"
               style={{
-                background: 'var(--dash-surface)',
                 color: 'var(--dash-text)',
-                border: '1px solid var(--dash-border)',
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--dash-surface-hover)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--dash-surface)'; }}
             >
               טען עוד שיחות
             </button>
