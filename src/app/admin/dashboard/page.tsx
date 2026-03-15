@@ -58,6 +58,8 @@ function DashboardContent() {
   const [websites, setWebsites] = useState<WebsiteAccount[]>([]);
   const [websitesLoading, setWebsitesLoading] = useState(false);
   const [websitesFetched, setWebsitesFetched] = useState(false);
+  const [copiedManageId, setCopiedManageId] = useState<string | null>(null);
+  const [generatingTokenId, setGeneratingTokenId] = useState<string | null>(null);
 
   useEffect(() => {
     if (createdSubdomain) {
@@ -583,6 +585,7 @@ function DashboardContent() {
                           </div>
                         </div>
 
+                        {/* Action buttons row */}
                         <div className="flex items-center gap-2 mt-4 pt-4" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.04)' }}>
                           <Link
                             href={`/admin/websites/${website.id}/preview`}
@@ -610,19 +613,66 @@ function DashboardContent() {
                           >
                             <Copy className="w-3.5 h-3.5" />
                           </button>
-                          {website.managementToken && (
-                            <button
-                              onClick={() => {
-                                navigator.clipboard.writeText(`${window.location.origin}/manage/${website.managementToken}`);
-                              }}
-                              className="flex items-center justify-center gap-1 px-3 py-2 text-sm rounded-full transition-all"
-                              style={{ background: 'rgba(94, 234, 212, 0.08)', color: '#5eead4', border: '1px solid rgba(94, 234, 212, 0.12)' }}
-                              title="העתק לינק ניהול ללקוח"
-                            >
-                              <Settings className="w-3.5 h-3.5" />
-                            </button>
-                          )}
                         </div>
+
+                        {/* Management panel link button */}
+                        <button
+                          onClick={async () => {
+                            let token = website.managementToken;
+                            if (!token) {
+                              setGeneratingTokenId(website.id);
+                              try {
+                                const res = await fetch('/api/admin/websites', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ accountId: website.id }),
+                                });
+                                const data = await res.json();
+                                if (data.token) {
+                                  token = data.token;
+                                  setWebsites(prev => prev.map(w =>
+                                    w.id === website.id ? { ...w, managementToken: token } : w
+                                  ));
+                                }
+                              } catch {} finally {
+                                setGeneratingTokenId(null);
+                              }
+                            }
+                            if (token) {
+                              navigator.clipboard.writeText(`${window.location.origin}/manage/${token}`);
+                              setCopiedManageId(website.id);
+                              setTimeout(() => setCopiedManageId(null), 2000);
+                            }
+                          }}
+                          disabled={generatingTokenId === website.id}
+                          className="w-full flex items-center justify-center gap-2 mt-2 py-2.5 text-sm font-medium rounded-xl transition-all cursor-pointer"
+                          style={{
+                            background: website.managementToken
+                              ? 'rgba(94, 234, 212, 0.08)'
+                              : 'rgba(251, 191, 36, 0.08)',
+                            color: website.managementToken ? '#5eead4' : '#fbbf24',
+                            border: `1px solid ${website.managementToken ? 'rgba(94, 234, 212, 0.15)' : 'rgba(251, 191, 36, 0.15)'}`,
+                          }}
+                        >
+                          {generatingTokenId === website.id ? (
+                            <>מייצר קישור...</>
+                          ) : copiedManageId === website.id ? (
+                            <>
+                              <Check className="w-4 h-4" />
+                              הקישור הועתק!
+                            </>
+                          ) : website.managementToken ? (
+                            <>
+                              <Copy className="w-4 h-4" />
+                              העתק לינק פאנל ניהול
+                            </>
+                          ) : (
+                            <>
+                              <Settings className="w-4 h-4" />
+                              צור לינק פאנל ניהול
+                            </>
+                          )}
+                        </button>
                       </motion.div>
                     ))}
                   </div>

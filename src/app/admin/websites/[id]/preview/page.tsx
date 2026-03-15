@@ -113,8 +113,8 @@ export default function WebsitePreviewPage() {
           />
         )}
 
-        {/* Widget floating in corner — same design as widget.js */}
-        <div className="absolute bottom-6 right-6 z-50">
+        {/* Widget floating in corner — pinned to bottom-right, flex-col to keep within bounds */}
+        <div className="absolute bottom-0 right-0 z-50 flex flex-col items-end justify-end p-6" style={{ maxHeight: '100%' }}>
           {config ? (
             <WidgetPreview accountId={accountId} config={config} />
           ) : (
@@ -284,7 +284,7 @@ function WidgetPreview({ accountId, config }: { accountId: string; config: Widge
       {/* Main panel */}
       <div
         style={{
-          width: 432, height: 'min(724px, calc(100vh - 120px))', borderRadius: 18,
+          width: 370, height: 'min(520px, calc(100vh - 200px))', borderRadius: 18,
           background: '#f4f5f7', display: 'flex', flexDirection: 'column', overflow: 'hidden',
           boxShadow: '0 8px 40px rgba(0,0,0,0.15)',
           animation: 'wp-slide-up 0.35s cubic-bezier(0.34,1.56,0.64,1)',
