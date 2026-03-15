@@ -73,13 +73,20 @@ async function enrichSingleProduct(product: any): Promise<AIProfile | null> {
       config: {
         systemInstruction: ENRICHMENT_PROMPT,
         temperature: 0.2,
-        maxOutputTokens: 800,
+        maxOutputTokens: 8192,
+        thinkingConfig: { thinkingBudget: 0 },
       },
     });
 
     const text = response.text || '';
-    const jsonStr = text.replace(/```json?\s*/g, '').replace(/```\s*/g, '').trim();
-    return JSON.parse(jsonStr) as AIProfile;
+    let jsonStr = text.replace(/```json?\s*/g, '').replace(/```\s*/g, '').trim();
+    try {
+      return JSON.parse(jsonStr) as AIProfile;
+    } catch {
+      // Fix unescaped Hebrew abbreviation quotes (מ"ל, ק"ג, ס"מ)
+      jsonStr = jsonStr.replace(/([\u0590-\u05FF])"([\u0590-\u05FF])/g, '$1\u05F4$2');
+      return JSON.parse(jsonStr) as AIProfile;
+    }
   } catch (err: any) {
     console.error(`[EnrichProducts] Failed to enrich ${product.name}:`, err.message);
     return null;

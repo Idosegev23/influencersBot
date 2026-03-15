@@ -109,28 +109,28 @@ ${(page.page_content || '').substring(0, 3000)}
       config: {
         systemInstruction: EXTRACTION_PROMPT,
         temperature: 0.1,
-        maxOutputTokens: 1000,
+        maxOutputTokens: 8192,
+        thinkingConfig: { thinkingBudget: 0 },
       },
     });
 
     const text = response.text || '';
-    console.log(`[ExtractProducts] Gemini response for ${page.url.split('/').pop()?.substring(0, 40)}:`, text.substring(0, 200));
-
     // Parse JSON from response (handle markdown fences)
-    const jsonStr = text.replace(/```json?\s*/g, '').replace(/```\s*/g, '').trim();
-    const data = JSON.parse(jsonStr);
+    let jsonStr = text.replace(/```json?\s*/g, '').replace(/```\s*/g, '').trim();
+    let data: any;
+    try {
+      data = JSON.parse(jsonStr);
+    } catch {
+      // Fix unescaped Hebrew abbreviation quotes (מ"ל, ק"ג, ס"מ)
+      jsonStr = jsonStr.replace(/([\u0590-\u05FF])"([\u0590-\u05FF])/g, '$1\u05F4$2');
+      data = JSON.parse(jsonStr);
+    }
 
     // Skip catalog/listing pages
-    if (data.isProductPage === false) {
-      console.log(`[ExtractProducts] Skipped (not product page): ${page.url.split('/').pop()?.substring(0, 40)}`);
-      return null;
-    }
+    if (data.isProductPage === false) return null;
 
     // Skip if no name extracted
-    if (!data.name || data.name === 'כל המוצרים') {
-      console.log(`[ExtractProducts] Skipped (no name): ${page.url.split('/').pop()?.substring(0, 40)}`);
-      return null;
-    }
+    if (!data.name || data.name === 'כל המוצרים') return null;
 
     // Pick best image
     const imageUrl =
