@@ -30,6 +30,7 @@
   var sessionId = localStorage.getItem('ibot_widget_' + ACCOUNT_ID) || null;
   var messages = [];
   var isLoading = false;
+  var thinkingText = null;
   var config = {
     welcomeMessage: 'שלום! איך אפשר לעזור? ✨',
     placeholder: 'כתבו הודעה...',
@@ -57,6 +58,7 @@
     '@keyframes ibot-slide-up{from{opacity:0;transform:translateY(20px) scale(0.95);}to{opacity:1;transform:translateY(0) scale(1);}}' +
     '@keyframes ibot-bounce{0%,80%,100%{transform:translateY(0);}40%{transform:translateY(-5px);}}' +
     '@keyframes ibot-msg-in{from{opacity:0;transform:translateX(10px);}to{opacity:1;transform:translateX(0);}}' +
+    '@keyframes ibot-fade-in{from{opacity:0;}to{opacity:1;}}' +
     '#ibot-widget-container *{box-sizing:border-box;font-family:"Heebo",system-ui,-apple-system,sans-serif;}' +
     '#ibot-widget-container input:focus{outline:none;}' +
     '#ibot-widget-container ::-webkit-scrollbar{width:4px;}' +
@@ -155,8 +157,13 @@
       var isLast = mi === messages.length - 1;
       var isEmpty = !m.content && isLoading && isLast;
 
-      // Typing indicator
+      // Typing / thinking indicator
       if (isEmpty) {
+        var indicatorContent = thinkingText
+          ? '<span style="animation:ibot-fade-in 0.3s ease-out;">' + escapeHtml(thinkingText) + '</span>'
+          : '<span style="width:6px;height:6px;border-radius:50%;background:#676767;animation:ibot-bounce 1.2s ease-in-out infinite;"></span>' +
+            '<span style="width:6px;height:6px;border-radius:50%;background:#676767;animation:ibot-bounce 1.2s ease-in-out 0.15s infinite;"></span>' +
+            '<span style="width:6px;height:6px;border-radius:50%;background:#676767;animation:ibot-bounce 1.2s ease-in-out 0.3s infinite;"></span>';
         msgsHtml +=
           '<div style="display:flex;justify-content:flex-end;margin-bottom:12px;animation:ibot-msg-in 0.3s ease-out;">' +
           '<div style="display:flex;align-items:flex-end;gap:8px;max-width:85%;">' +
@@ -164,9 +171,7 @@
           avatarHtml(20) + '</div>' +
           '<div style="padding:9px 12px;border-radius:30px;font-size:16px;' +
           'background:#fff;color:#000;display:flex;gap:4px;align-items:center;">' +
-          '<span style="width:6px;height:6px;border-radius:50%;background:#676767;animation:ibot-bounce 1.2s ease-in-out infinite;"></span>' +
-          '<span style="width:6px;height:6px;border-radius:50%;background:#676767;animation:ibot-bounce 1.2s ease-in-out 0.15s infinite;"></span>' +
-          '<span style="width:6px;height:6px;border-radius:50%;background:#676767;animation:ibot-bounce 1.2s ease-in-out 0.3s infinite;"></span>' +
+          indicatorContent +
           '</div></div></div>';
         continue;
       }
@@ -332,6 +337,7 @@
           reader.read().then(function (result) {
             if (result.done) {
               isLoading = false;
+              thinkingText = null;
               messages[messages.length - 1].content = fullText.replace(/<<SUGGESTIONS>>[\s\S]*?<<\/SUGGESTIONS>>/g, '').trim();
               render();
               return;
@@ -343,7 +349,11 @@
             for (var i = 0; i < lines.length; i++) {
               try {
                 var event = JSON.parse(lines[i]);
-                if (event.type === 'delta' && event.text) {
+                if (event.type === 'thinking' && event.text) {
+                  thinkingText = event.text;
+                  render();
+                } else if (event.type === 'delta' && event.text) {
+                  thinkingText = null;
                   fullText += event.text;
                   var displayText = fullText.replace(/<<SUGGESTIONS>>[\s\S]*/g, '').trim();
                   messages[messages.length - 1].content = displayText;
@@ -366,6 +376,7 @@
             read();
           }).catch(function () {
             isLoading = false;
+            thinkingText = null;
             messages[messages.length - 1].content = 'שגיאה בחיבור. נסו שוב.';
             render();
           });
@@ -375,6 +386,7 @@
       })
       .catch(function () {
         isLoading = false;
+        thinkingText = null;
         messages[messages.length - 1].content = 'שגיאה בחיבור. נסו שוב.';
         render();
       });

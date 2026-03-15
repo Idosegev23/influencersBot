@@ -68,6 +68,20 @@ export async function POST(req: NextRequest) {
             encodeEvent({ type: 'meta', sessionId: sessionId || 'pending' }),
           );
 
+          // Send thinking indicator (immediate — reduces perceived latency)
+          const thinkingTexts = [
+            'רגע, בודק... 🔍',
+            'שנייה, בודק...',
+            'אחלה, תן לי רגע...',
+            'בודק את זה...',
+          ];
+          controller.enqueue(
+            encodeEvent({
+              type: 'thinking',
+              text: thinkingTexts[Math.floor(Math.random() * thinkingTexts.length)],
+            }),
+          );
+
           // Process message with streaming
           const result = await processWidgetMessage({
             accountId,

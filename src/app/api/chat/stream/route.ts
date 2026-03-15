@@ -105,13 +105,18 @@ interface StreamDone {
   fullText: string;
 }
 
+interface StreamThinking {
+  type: 'thinking';
+  text: string;
+}
+
 interface StreamError {
   type: 'error';
   message: string;
   code?: string;
 }
 
-type StreamEvent = StreamMeta | StreamCards | StreamDelta | StreamDone | StreamError;
+type StreamEvent = StreamMeta | StreamCards | StreamDelta | StreamDone | StreamError | StreamThinking;
 
 // ============================================
 // Helper: Encode NDJSON
@@ -503,6 +508,18 @@ export async function POST(req: NextRequest) {
           experiments: [],
         };
         controller.enqueue(encodeEvent(metaEvent));
+
+        // === SEND THINKING INDICATOR (immediate — reduces perceived latency) ===
+        const thinkingTexts = [
+          'רגע, בודק... 🔍',
+          'שנייה, בודק...',
+          'אחלה, תן לי רגע...',
+          'בודק את זה...',
+        ];
+        controller.enqueue(encodeEvent({
+          type: 'thinking',
+          text: thinkingTexts[Math.floor(Math.random() * thinkingTexts.length)],
+        }));
 
         // === SEND CARDS (if needed) ===
         if (decision.uiDirectives.showCardList === 'brands' && brands.length > 0) {

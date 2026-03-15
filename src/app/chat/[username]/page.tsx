@@ -213,10 +213,11 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const streamCardsRef = useRef<StreamCards | null>(null);
 
   // Streaming hook
-  const { 
+  const {
     isStreaming: isStreamActive,
     meta: streamMeta,
     cards: streamCards,
+    thinkingText: streamThinkingText,
     text: streamText,
     sendMessage: sendStreamMessage,
     cancel: cancelStream,
@@ -961,12 +962,16 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                   <p className="text-sm whitespace-pre-wrap">{displayContent}</p>
                                 ) : (
                                   <div className="text-sm markdown-content">
-                                    {/* Show typing indicator when streaming starts but no text yet */}
+                                    {/* Show thinking text or typing indicator when streaming starts but no text yet */}
                                     {isStreamingThis && !displayContent && (
-                                      <div className="flex items-center gap-1 text-gray-400">
-                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                        <span>מקליד...</span>
-                                      </div>
+                                      streamThinkingText ? (
+                                        <p className="text-sm whitespace-pre-wrap animate-pulse">{streamThinkingText}</p>
+                                      ) : (
+                                        <div className="flex items-center gap-1 text-gray-400">
+                                          <Loader2 className="w-4 h-4 animate-spin" />
+                                          <span>מקליד...</span>
+                                        </div>
+                                      )
                                     )}
                                     {displayContent && (
                                       <ReactMarkdown
