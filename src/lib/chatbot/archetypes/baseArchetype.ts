@@ -424,6 +424,7 @@ ${input.mode === 'widget' ? `
 • CTA קצר בסוף.
 • ענה בגוף שלישי ("אצלנו יש...", "באתר תמצא/י...").` : ''}
 ${input.mode === 'widget' && input.widgetConfig?.prompt ? this.buildAdditiveWidgetPrompt(input.widgetConfig.prompt) : ''}
+${input.mode === 'widget' && input.widgetConfig?._recommendationBlock ? `\n${input.widgetConfig._recommendationBlock}\n` : ''}
 💬 סגנון שיחה — פרסונלי ומכוון:
 • **שאלות רחבות** ("יש לך מתכון לפסטה?"): רמוז/י שיש לך כמה אפשרויות ותשאל/י שאלה מכוונת — "שמנת או עגבניות? משהו מהיר ליומיום או לאירוח?" — כדי לתת בדיוק מה שצריך.
 • **שאלות ספציפיות** ("מה המתכון לרביולי בטטה?"): תן/י תשובה מלאה ומפורטת ישר — אל תשאל/י שאלות מיותרות.

@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/server';
 import { processSandwichMessageWithMetadata } from './sandwichBot';
 import { buildPersonalityFromDB } from './personality-wrapper';
 import { updateRollingSummary, shouldUpdateSummary } from './conversation-memory';
+import { getRecommendations } from '@/lib/recommendations/engine';
 
 // ============================================
 // Type Definitions
@@ -98,10 +99,31 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
     });
   }
 
-  // 4. Process through SandwichBot — SAME engine as social chatbot
+  // 4. Fetch product recommendations (fire parallel, non-blocking if fails)
+  let recommendationBlock = '';
+  try {
+    const recResult = await getRecommendations({
+      accountId,
+      sessionId,
+      conversationContext: message,
+      maxResults: 3,
+      strategy: 'auto',
+    });
+    recommendationBlock = recResult.promptBlock;
+  } catch (err: any) {
+    console.error('[WidgetChat] Recommendations error (non-fatal):', err.message);
+  }
+
+  // 5. Process through SandwichBot — SAME engine as social chatbot
   //    mode: 'widget' activates sales-oriented prompt with links, images, CTAs
   let fullText = '';
   let responseId: string | null = null;
+
+  // Merge recommendation block into widgetConfig for prompt injection
+  const widgetConfigWithRecs = {
+    ...(config.widget || {}),
+    _recommendationBlock: recommendationBlock,
+  };
 
   try {
     const sandwichResult = await processSandwichMessageWithMetadata({
@@ -114,7 +136,7 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
       personalityConfig: personalityConfig || undefined,
       previousResponseId: session?.last_response_id || null,
       mode: 'widget',
-      widgetConfig: config.widget || undefined,
+      widgetConfig: widgetConfigWithRecs,
       onToken: (token: string) => {
         fullText += token;
         onToken?.(token);
@@ -141,7 +163,7 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
     fullText = 'מצטער, לא הצלחתי לעבד את הבקשה. נסו שוב.';
   }
 
-  // 5. Save messages + update session state (parallel)
+  // 6. Save messages + update session state (parallel)
   const msgCount = (session?.message_count || 0) + 2;
   await Promise.all([
     supabase.from('chat_messages').insert({
@@ -163,7 +185,7 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
       .eq('id', sessionId),
   ]);
 
-  // 6. Update rolling summary if threshold reached (fire-and-forget)
+  // 7. Update rolling summary if threshold reached (fire-and-forget)
   if (shouldUpdateSummary(msgCount)) {
     updateRollingSummary(
       sessionId!,

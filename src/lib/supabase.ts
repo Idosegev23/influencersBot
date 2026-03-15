@@ -190,7 +190,7 @@ export async function getInfluencerByUsername(username: string): Promise<Influen
     instagram_username: latestProfile?.username || persona?.instagram_username || config.username,
     followers_count: latestProfile?.followers_count || persona?.instagram_followers || 0,
     profile_pic_url: latestProfile?.profile_pic_url || null,
-    avatar_url: config.avatar_url || latestProfile?.profile_pic_url || null, // ⚡ Avatar for chat UI
+    avatar_url: config.profile_pic_url || config.avatar_url || latestProfile?.profile_pic_url || null, // ⚡ Prefer Supabase storage URL (permanent) over Instagram CDN (expires)
     bio: latestProfile?.bio || null,
     is_verified: latestProfile?.is_verified || false,
     category: latestProfile?.category || null,

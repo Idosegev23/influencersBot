@@ -10,6 +10,7 @@ import { preprocessInstagramData } from '@/lib/scraping/preprocessing';
 import { ingestAllForAccount } from '@/lib/rag/ingest';
 import { generateAndSaveChatConfig } from './generate-chat-config';
 import { syncCommerceData } from './sync-commerce-data';
+import { extractCouponsFromContent } from './extract-coupons';
 
 // ============================================
 // Type Definitions
@@ -216,6 +217,22 @@ export async function processAccountContent(
     ].join(' • ');
     
     await logProgress('preprocess_complete', preprocessSummary);
+
+    // ============================================
+    // Step 3.5: Extract Coupons from Transcriptions
+    // ============================================
+    console.log('\n🎟️ [Step 3.5] Extracting coupons from transcriptions...');
+    await logProgress('coupon_extract_start', '🎟️ מחלץ קופונים מתמלולים...');
+
+    try {
+      const couponResult = await extractCouponsFromContent(config.accountId);
+      console.log(`✅ Coupon extraction: ${couponResult.couponsCreated} new, ${couponResult.partnershipsCreated} partnerships`);
+      await logProgress('coupon_extract_complete', `✅ חולצו ${couponResult.couponsCreated} קופונים ו-${couponResult.partnershipsCreated} שת"פים`);
+    } catch (error: any) {
+      console.error('❌ Coupon extraction failed (non-blocking):', error.message);
+      result.errors.push(`Coupon extraction failed: ${error.message}`);
+      await logProgress('coupon_extract_error', `❌ שגיאה בחילוץ קופונים: ${error.message}`);
+    }
 
     // ============================================
     // Step 4: Build RAG Index (Vector Embeddings)

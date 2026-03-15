@@ -442,9 +442,14 @@
           'onerror="this.style.display=\'none\'" ' +
           'onclick="window.open(\'' + src + '\',\'_blank\')" /></div>';
       });
-      // Markdown links
+      // Markdown links (with product click tracking for /product/ URLs)
       safe = safe.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function (_, t, u) {
-        return '<a href="' + u + '" target="_blank" rel="noopener" style="color:' + linkColor + ';text-decoration:underline;' +
+        var isProductLink = u.indexOf('/product') !== -1;
+        var trackAttr = isProductLink
+          ? ' onclick="(function(e){try{fetch((window.IBOT_HOST||\'\')+\'/api/widget/recommendations/click\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({accountId:\'' + config.accountId + '\',productId:null})}).catch(function(){});}catch(x){}})()"'
+          : '';
+        return '<a href="' + u + '" target="_blank" rel="noopener"' + trackAttr +
+          ' style="color:' + linkColor + ';text-decoration:underline;' +
           'text-underline-offset:2px;font-weight:500;">' + t + '</a>';
       });
       // **bold**

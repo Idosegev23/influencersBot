@@ -63,7 +63,7 @@ export default function ManagePage() {
   const [domain, setDomain] = useState('');
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'instructions' | 'faq' | 'pages' | 'knowledge' | 'design'>('instructions');
+  const [activeTab, setActiveTab] = useState<'instructions' | 'faq' | 'pages' | 'knowledge' | 'products' | 'design'>('instructions');
 
   // Settings state
   const [settings, setSettings] = useState<WidgetSettings>({});
@@ -95,6 +95,13 @@ export default function ManagePage() {
   const [knowledgeLoading, setKnowledgeLoading] = useState(false);
   const [showAddKnowledge, setShowAddKnowledge] = useState(false);
   const [newKnowledge, setNewKnowledge] = useState({ title: '', content: '', knowledge_type: 'custom', keywords: '' });
+
+  // Products state
+  const [products, setProducts] = useState<any[]>([]);
+  const [productSeries, setProductSeries] = useState<any[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const [extractResult, setExtractResult] = useState<any>(null);
 
   // Design state
   const [welcomeMessage, setWelcomeMessage] = useState('');
@@ -336,6 +343,75 @@ export default function ManagePage() {
   };
 
   // ============================================
+  // Products
+  // ============================================
+
+  const loadProducts = async () => {
+    setProductsLoading(true);
+    try {
+      const res = await fetch('/api/manage/products');
+      const data = await res.json();
+      if (data.success) {
+        setProducts(data.products || []);
+        setProductSeries(data.series || []);
+      }
+    } catch (err) {
+      console.error('Failed to load products:', err);
+    } finally {
+      setProductsLoading(false);
+    }
+  };
+
+  const extractProducts = async () => {
+    setExtracting(true);
+    setExtractResult(null);
+    try {
+      const res = await fetch('/api/manage/products/extract', { method: 'POST' });
+      const data = await res.json();
+      setExtractResult(data);
+      if (data.success) {
+        loadProducts(); // Refresh list
+      }
+    } catch (err) {
+      console.error('Failed to extract products:', err);
+      setExtractResult({ error: 'שגיאה בחילוץ מוצרים' });
+    } finally {
+      setExtracting(false);
+    }
+  };
+
+  const toggleFeatured = async (id: string, current: boolean) => {
+    try {
+      const res = await fetch('/api/manage/products', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, is_featured: !current }),
+      });
+      if ((await res.json()).success) {
+        setProducts(prev => prev.map(p => p.id === id ? { ...p, is_featured: !current } : p));
+      }
+    } catch (err) {
+      console.error('Failed to toggle featured:', err);
+    }
+  };
+
+  const deleteProduct = async (id: string) => {
+    if (!confirm('למחוק את המוצר הזה?')) return;
+    try {
+      const res = await fetch('/api/manage/products', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      if ((await res.json()).success) {
+        setProducts(prev => prev.filter(p => p.id !== id));
+      }
+    } catch (err) {
+      console.error('Failed to delete product:', err);
+    }
+  };
+
+  // ============================================
   // Tab loading
   // ============================================
 
@@ -343,6 +419,7 @@ export default function ManagePage() {
     if (!isAuthenticated) return;
     if (activeTab === 'pages' && pages.length === 0) loadPages();
     if (activeTab === 'knowledge' && knowledge.length === 0) loadKnowledge();
+    if (activeTab === 'products' && products.length === 0) loadProducts();
   }, [activeTab, isAuthenticated]);
 
   // ============================================
@@ -377,6 +454,7 @@ export default function ManagePage() {
     { id: 'faq' as const, label: 'שאלות נפוצות', icon: '❓' },
     { id: 'pages' as const, label: 'דפים סרוקים', icon: '📄' },
     { id: 'knowledge' as const, label: 'ידע נוסף', icon: '📚' },
+    { id: 'products' as const, label: 'מוצרים', icon: '🛍️' },
     { id: 'design' as const, label: 'הגדרות ווידג\'ט', icon: '⚙️' },
   ];
 
@@ -793,7 +871,157 @@ export default function ManagePage() {
           </div>
         )}
 
-        {/* Tab 5: Design */}
+        {/* Tab 5: Products */}
+        {activeTab === 'products' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold">קטלוג מוצרים ({products.length})</h2>
+              <div className="flex gap-2">
+                <button onClick={loadProducts} className="text-sm text-indigo-600 hover:text-indigo-700">
+                  רענן
+                </button>
+                <button
+                  onClick={extractProducts}
+                  disabled={extracting}
+                  className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {extracting ? 'מחלץ מוצרים...' : 'חלץ מוצרים מהאתר'}
+                </button>
+              </div>
+            </div>
+
+            {/* Extraction result */}
+            {extractResult && (
+              <div className={`p-4 rounded-xl border text-sm ${extractResult.success ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+                {extractResult.success ? (
+                  <div className="space-y-1">
+                    <div className="font-medium">חילוץ הושלם בהצלחה!</div>
+                    <div>מוצרים שחולצו: {extractResult.extraction?.productsExtracted || 0}</div>
+                    <div>סדרות שזוהו: {extractResult.extraction?.seriesDetected || 0}</div>
+                    {extractResult.enrichment && (
+                      <>
+                        <div>פרופילים AI: {extractResult.enrichment.productsEnriched}</div>
+                        <div>embeddings: {extractResult.enrichment.embeddingsGenerated}</div>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div>{extractResult.error || extractResult.details || 'שגיאה'}</div>
+                )}
+              </div>
+            )}
+
+            {/* Extracting indicator */}
+            {extracting && (
+              <div className="text-center py-8">
+                <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                <p className="text-gray-500 text-sm">מחלץ מוצרים מדפי האתר...</p>
+                <p className="text-gray-400 text-xs mt-1">זה עלול לקחת כמה דקות</p>
+              </div>
+            )}
+
+            {/* Series chips */}
+            {productSeries.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {productSeries.map((s: any) => (
+                  <span key={s.id} className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-medium">
+                    {s.name} ({s.product_count})
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Products grid */}
+            {productsLoading ? (
+              <div className="text-center py-8 text-gray-400">טוען מוצרים...</div>
+            ) : products.length === 0 && !extracting ? (
+              <div className="text-center py-12 text-gray-400">
+                <div className="text-4xl mb-2">🛍️</div>
+                <p>אין מוצרים עדיין</p>
+                <p className="text-xs mt-1">לחץ &quot;חלץ מוצרים מהאתר&quot; כדי ליצור קטלוג אוטומטי</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {products.map((product: any) => (
+                  <div key={product.id} className={`bg-white border rounded-xl overflow-hidden ${product.is_featured ? 'border-yellow-400 ring-1 ring-yellow-200' : 'border-gray-200'}`}>
+                    <div className="flex gap-3 p-3">
+                      {/* Product image */}
+                      {product.image_url ? (
+                        <img
+                          src={product.image_url}
+                          alt={product.name}
+                          className="w-16 h-16 rounded-lg object-cover flex-shrink-0 border border-gray-100"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
+                      ) : (
+                        <div className="w-16 h-16 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 text-2xl">
+                          🛍️
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm text-gray-900 truncate">{product.name}</div>
+                        {product.price && (
+                          <div className="text-sm mt-0.5">
+                            {product.is_on_sale && product.original_price && (
+                              <span className="text-gray-400 line-through text-xs ml-1">₪{product.original_price}</span>
+                            )}
+                            <span className="font-bold text-indigo-600">₪{product.price}</span>
+                          </div>
+                        )}
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {product.category && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                              {product.category}
+                            </span>
+                          )}
+                          {product.product_line && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600">
+                              {product.product_line}
+                            </span>
+                          )}
+                          {product.is_featured && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700">
+                              מקודם
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    {/* Actions */}
+                    <div className="flex border-t border-gray-100 divide-x divide-gray-100">
+                      <button
+                        onClick={() => toggleFeatured(product.id, product.is_featured)}
+                        className={`flex-1 py-2 text-xs font-medium transition-colors ${
+                          product.is_featured
+                            ? 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100'
+                            : 'text-gray-500 hover:bg-gray-50'
+                        }`}
+                      >
+                        {product.is_featured ? 'הסר קידום' : 'קדם מוצר'}
+                      </button>
+                      <a
+                        href={product.product_url}
+                        target="_blank"
+                        rel="noopener"
+                        className="flex-1 py-2 text-xs font-medium text-gray-500 hover:bg-gray-50 text-center"
+                      >
+                        צפה באתר
+                      </a>
+                      <button
+                        onClick={() => deleteProduct(product.id)}
+                        className="flex-1 py-2 text-xs font-medium text-red-500 hover:bg-red-50"
+                      >
+                        מחק
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 6: Design */}
         {activeTab === 'design' && (
           <div className="space-y-6">
             <Card title="הודעת פתיחה" description="ההודעה שתופיע כשהווידג'ט נפתח">
