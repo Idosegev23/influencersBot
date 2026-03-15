@@ -72,26 +72,58 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Create and run scan jobs sequentially
+    // Pre-check: get last scan time per account and sort oldest-first
+    // This ensures stale accounts get priority when we hit the time budget
+    const accountsWithLastScan = await Promise.all(
+      accounts.map(async (account) => {
+        const recentJobs = await repo.getRecentJobs(account.instagram_username, 1);
+        const lastJob = recentJobs[0];
+        return { ...account, lastJob };
+      })
+    );
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    // Filter to accounts that need scanning, then sort oldest scan first
+    const accountsToScan = accountsWithLastScan
+      .filter(a => {
+        const shouldScan =
+          !a.lastJob ||
+          new Date(a.lastJob.created_at) < yesterday ||
+          a.lastJob.status === 'failed';
+        return shouldScan;
+      })
+      .sort((a, b) => {
+        // No scan at all → highest priority
+        if (!a.lastJob) return -1;
+        if (!b.lastJob) return 1;
+        // Failed scans get priority over old succeeded scans
+        if (a.lastJob.status === 'failed' && b.lastJob.status !== 'failed') return -1;
+        if (b.lastJob.status === 'failed' && a.lastJob.status !== 'failed') return 1;
+        // Oldest scan first
+        return new Date(a.lastJob.created_at).getTime() - new Date(b.lastJob.created_at).getTime();
+      });
+
+    const skippedCount = accounts.length - accountsToScan.length;
+    console.log(`[Cron] ${accountsToScan.length} accounts need scanning, ${skippedCount} skipped (recent). Order: ${accountsToScan.map(a => a.instagram_username).join(', ')}`);
+
+    // Time budget: stop 30s before maxDuration to return a clean response
+    const startTime = Date.now();
+    const TIME_BUDGET_MS = (maxDuration - 30) * 1000; // 570s
+
     let jobsCreated = 0;
     let jobsCompleted = 0;
     let jobsFailed = 0;
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
     const results: Array<{ username: string; status: string }> = [];
 
-    for (const account of accounts) {
-      // Check if already scanned today
-      const recentJobs = await repo.getRecentJobs(account.instagram_username, 1);
-      const lastJob = recentJobs[0];
-
-      const shouldScan =
-        !lastJob ||
-        new Date(lastJob.created_at) < yesterday ||
-        lastJob.status === 'failed';
-
-      if (!shouldScan) {
-        results.push({ username: account.instagram_username, status: 'skipped (recent)' });
+    for (const account of accountsToScan) {
+      // Check time budget before starting a new scan
+      const elapsed = Date.now() - startTime;
+      if (elapsed > TIME_BUDGET_MS) {
+        const remaining = accountsToScan.length - jobsCreated;
+        console.log(`[Cron] ⏰ Time budget reached after ${Math.round(elapsed / 1000)}s. ${remaining} accounts deferred to next run.`);
+        results.push({ username: account.instagram_username, status: 'deferred (time budget)' });
         continue;
       }
 
@@ -124,12 +156,14 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    console.log(`[Cron] Daily scan done: ${jobsCompleted} completed, ${jobsFailed} failed, ${accounts.length - jobsCreated} skipped`);
+    console.log(`[Cron] Daily scan done: ${jobsCompleted} completed, ${jobsFailed} failed, ${skippedCount} skipped (recent)`);
 
     return NextResponse.json({
       success: true,
       message: `Scanned ${jobsCompleted}/${jobsCreated} accounts`,
       accountsChecked: accounts.length,
+      needsScan: accountsToScan.length,
+      skippedRecent: skippedCount,
       jobsCreated,
       jobsCompleted,
       jobsFailed,
