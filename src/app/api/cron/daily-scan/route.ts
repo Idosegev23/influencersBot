@@ -32,28 +32,38 @@ export async function GET(req: NextRequest) {
     const supabase = await createClient();
     const repo = getScanJobsRepo();
 
-    // Get all accounts with instagram_username from chatbot_persona
-    const { data: personas, error: accountsError } = await supabase
-      .from('chatbot_persona')
-      .select('account_id, instagram_username')
-      .not('instagram_username', 'is', null);
+    // Get ALL active creator accounts — not just those with persona
+    const { data: activeAccounts, error: accountsError } = await supabase
+      .from('accounts')
+      .select('id, config, status')
+      .eq('type', 'creator')
+      .eq('status', 'active');
 
     if (accountsError) {
       throw new Error(`Failed to fetch accounts: ${accountsError.message}`);
     }
 
-    // Filter only active accounts (not suspended/deleted)
-    const activeAccountIds = personas?.map(p => p.account_id) || [];
-    const { data: activeAccounts } = await supabase
-      .from('accounts')
-      .select('id, status')
-      .in('id', activeAccountIds)
-      .eq('status', 'active');
+    // Also load persona data for instagram_username fallback
+    const accountIds = (activeAccounts || []).map(a => a.id);
+    const { data: personas } = await supabase
+      .from('chatbot_persona')
+      .select('account_id, instagram_username')
+      .in('account_id', accountIds);
 
-    const activeSet = new Set(activeAccounts?.map(a => a.id) || []);
-    const accounts = personas
-      ?.filter(p => activeSet.has(p.account_id))
-      .map(p => ({ id: p.account_id, instagram_username: p.instagram_username })) || [];
+    const personaMap = new Map(
+      (personas || []).map(p => [p.account_id, p.instagram_username])
+    );
+
+    // Build account list: prefer persona.instagram_username, fallback to config.username
+    const accounts = (activeAccounts || [])
+      .map(a => ({
+        id: a.id,
+        instagram_username:
+          personaMap.get(a.id) ||
+          (a.config as any)?.username ||
+          null,
+      }))
+      .filter(a => a.instagram_username); // Skip accounts with no username at all
 
     if (accounts.length === 0) {
       return NextResponse.json({
