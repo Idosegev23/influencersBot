@@ -48,6 +48,7 @@ export async function GET() {
         chunksCount: chunksCount || 0,
         primaryColor: widgetConfig.primaryColor || '#6366f1',
         profilePic: account.config?.profile_pic_url || null,
+        managementToken: widgetConfig.managementToken || null,
       });
     }
 

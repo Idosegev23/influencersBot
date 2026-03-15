@@ -126,6 +126,7 @@ export async function processWithArchetype(
     personalityConfig?: any;
     previousResponseId?: string | null;
     mode?: 'widget' | 'social' | 'dm';
+    widgetConfig?: any;
   }
 ) {
   console.log('\n' + '='.repeat(80));
@@ -173,6 +174,7 @@ export async function processWithArchetype(
     personalityConfig: context.personalityConfig,
     previousResponseId: context.previousResponseId,
     mode: context.mode,
+    widgetConfig: context.widgetConfig,
   });
   
   console.log('\n' + '='.repeat(80));

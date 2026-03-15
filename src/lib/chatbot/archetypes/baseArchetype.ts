@@ -182,6 +182,44 @@ export abstract class BaseArchetype {
    * Build personality instructions for the system prompt
    * Replaces post-processing personality wrapper for streaming mode
    */
+  private buildAdditiveWidgetPrompt(prompt: any): string {
+    const blocks: string[] = [];
+    blocks.push('\n📋 הנחיות נוספות מבעל האתר:');
+
+    if (prompt.additionalInstructions) {
+      blocks.push(prompt.additionalInstructions);
+    }
+
+    const toneMap: Record<string, string> = {
+      friendly: 'ידידותי וחם',
+      professional: 'מקצועי ורשמי',
+      casual: 'קז\'ואלי ולא פורמלי',
+      formal: 'פורמלי ומנומס',
+    };
+    if (prompt.tone && toneMap[prompt.tone]) {
+      blocks.push(`🎤 טון: ${toneMap[prompt.tone]}`);
+    }
+
+    if (prompt.focusTopics?.length) {
+      blocks.push(`🎯 נושאים לדגש: ${prompt.focusTopics.join(', ')}`);
+    }
+
+    if (prompt.bannedTopics?.length) {
+      blocks.push(`🚫 נושאים אסורים (סרב בנימוס ואל תדון בהם): ${prompt.bannedTopics.join(', ')}`);
+    }
+
+    if (prompt.faq?.length) {
+      blocks.push('❓ שאלות נפוצות (עדיפות גבוהה — ענה לפי זה):');
+      for (const item of prompt.faq.slice(0, 15)) {
+        if (item.question && item.answer) {
+          blocks.push(`• ש: ${item.question}\n  ת: ${item.answer}`);
+        }
+      }
+    }
+
+    return blocks.join('\n');
+  }
+
   private buildPersonalityPrompt(config: PersonalityConfig, name: string): string {
     const lines: string[] = [];
 
@@ -385,6 +423,7 @@ ${input.mode === 'widget' ? `
 • קופון רלוונטי — הציע פרואקטיבית.
 • CTA קצר בסוף.
 • ענה בגוף שלישי ("אצלנו יש...", "באתר תמצא/י...").` : ''}
+${input.mode === 'widget' && input.widgetConfig?.prompt ? this.buildAdditiveWidgetPrompt(input.widgetConfig.prompt) : ''}
 💬 סגנון שיחה — פרסונלי ומכוון:
 • **שאלות רחבות** ("יש לך מתכון לפסטה?"): רמוז/י שיש לך כמה אפשרויות ותשאל/י שאלה מכוונת — "שמנת או עגבניות? משהו מהיר ליומיום או לאירוח?" — כדי לתת בדיוק מה שצריך.
 • **שאלות ספציפיות** ("מה המתכון לרביולי בטטה?"): תן/י תשובה מלאה ומפורטת ישר — אל תשאל/י שאלות מיותרות.

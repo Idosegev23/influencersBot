@@ -39,6 +39,7 @@ interface WebsiteAccount {
   chunksCount: number;
   primaryColor: string;
   profilePic: string | null;
+  managementToken: string | null;
 }
 
 function DashboardContent() {
@@ -609,6 +610,18 @@ function DashboardContent() {
                           >
                             <Copy className="w-3.5 h-3.5" />
                           </button>
+                          {website.managementToken && (
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(`${window.location.origin}/manage/${website.managementToken}`);
+                              }}
+                              className="flex items-center justify-center gap-1 px-3 py-2 text-sm rounded-full transition-all"
+                              style={{ background: 'rgba(94, 234, 212, 0.08)', color: '#5eead4', border: '1px solid rgba(94, 234, 212, 0.12)' }}
+                              title="העתק לינק ניהול ללקוח"
+                            >
+                              <Settings className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </motion.div>
                     ))}

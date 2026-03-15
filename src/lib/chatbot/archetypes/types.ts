@@ -106,6 +106,7 @@ export interface ArchetypeInput {
   personalityConfig?: any; // Pre-loaded personality config (avoids DB call in archetype)
   previousResponseId?: string | null; // OpenAI Responses API: chain context across turns
   mode?: 'widget' | 'social' | 'dm'; // Widget = sales-oriented, Social = engagement, DM = Instagram direct messages
+  widgetConfig?: any; // Widget-specific config from accounts.config.widget (prompt overrides, FAQ, etc.)
 }
 
 export interface ArchetypeOutput {

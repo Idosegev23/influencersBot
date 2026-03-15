@@ -114,6 +114,7 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
       personalityConfig: personalityConfig || undefined,
       previousResponseId: session?.last_response_id || null,
       mode: 'widget',
+      widgetConfig: config.widget || undefined,
       onToken: (token: string) => {
         fullText += token;
         onToken?.(token);

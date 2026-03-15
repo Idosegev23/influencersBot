@@ -37,6 +37,8 @@ export default function AddWebsitePage() {
 
   const [jobStatus, setJobStatus] = useState<any>(null);
   const [codeCopied, setCodeCopied] = useState(false);
+  const [manageLinkCopied, setManageLinkCopied] = useState(false);
+  const [manageToken, setManageToken] = useState('');
 
   // Auth check
   useEffect(() => {
@@ -359,11 +361,21 @@ export default function AddWebsitePage() {
               onClick={async () => {
                 setState((s) => ({ ...s, isLoading: true }));
                 try {
+                  // Generate management token for client access
+                  const token = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+                    .map(b => b.toString(16).padStart(2, '0')).join('');
+                  setManageToken(token);
+
                   await fetch(`/api/admin/accounts/${state.accountId}/config`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                      widget: { primaryColor: state.widgetColor, welcomeMessage: state.welcomeMessage, position: 'bottom-right' },
+                      widget: {
+                        primaryColor: state.widgetColor,
+                        welcomeMessage: state.welcomeMessage,
+                        position: 'bottom-right',
+                        managementToken: token,
+                      },
                     }),
                   });
                 } catch {
@@ -431,6 +443,33 @@ export default function AddWebsitePage() {
                 )}
               </button>
             </div>
+
+            {/* Management Link */}
+            {manageToken && (
+              <div className="admin-card p-6">
+                <h3 className="text-lg font-semibold mb-3" style={{ color: '#ede9f8' }}>לינק ניהול ללקוח</h3>
+                <p className="text-sm mb-4" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>
+                  שלחו את הלינק הזה לבעל האתר — הוא יוכל לנהל הנחיות, שאלות נפוצות וידע
+                </p>
+                <div className="rounded-xl p-4 font-mono text-sm mb-4" dir="ltr" style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)', color: '#ede9f8', wordBreak: 'break-all' }}>
+                  {typeof window !== 'undefined' ? `${window.location.origin}/manage/${manageToken}` : ''}
+                </div>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/manage/${manageToken}`);
+                    setManageLinkCopied(true);
+                    setTimeout(() => setManageLinkCopied(false), 2000);
+                  }}
+                  className="btn-ghost w-full flex items-center justify-center gap-2 py-2.5"
+                >
+                  {manageLinkCopied ? (
+                    <><Check className="w-4 h-4" style={{ color: '#5eead4' }} /> הועתק!</>
+                  ) : (
+                    <><Copy className="w-4 h-4" /> העתק לינק ניהול</>
+                  )}
+                </button>
+              </div>
+            )}
 
             {/* Action Buttons */}
             <div className="flex gap-3">
