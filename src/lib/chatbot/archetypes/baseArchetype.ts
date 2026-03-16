@@ -455,8 +455,9 @@ ${(input.mode === 'widget' || input.mode === 'dm') ? `📌 ${input.mode === 'wid
 
 השם שלך: ${influencerName} (לעולם אל תכתוב [שם המשפיענית])`;
 
+      const userNameLine = input.userName ? `\n👤 שם המשתמש/ת: ${input.userName} — פנה/י אליו/ה בשם כשזה מתאים באופן טבעי.\n` : '';
       const userPrompt = `${kbContext}
-
+${userNameLine}
 💬 הודעת המשתמש:
 "${input.userMessage}"
 

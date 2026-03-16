@@ -41,6 +41,7 @@ import { SupportFlowForm } from '@/components/chat/SupportFlowForm';
 import { DirectiveRenderer, type UIDirectives, type BrandCardData } from '@/components/chat';
 import { useStreamChat, type StreamMeta, type StreamCards, type StreamDone } from '@/hooks/useStreamChat';
 import SupportForm from '@/components/SupportForm';
+import { LeadCapturePopup } from '@/components/chat/LeadCapturePopup';
 import type { Influencer, ContentItem, InfluencerType } from '@/types';
 
 // Feature flag for streaming
@@ -174,6 +175,9 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [isMobile, setIsMobile] = useState(false);
   const [discoveryCategories, setDiscoveryCategories] = useState<DiscoveryCategoryAvailability[]>([]);
   const [initialDiscoverySlug, setInitialDiscoverySlug] = useState<string | null>(null);
+  const [showLeadPopup, setShowLeadPopup] = useState(false);
+  const [leadInfo, setLeadInfo] = useState<{ firstName: string; serialNumber: string } | null>(null);
+  const userMsgCountRef = useRef(0);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -373,6 +377,12 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
         if (data?.categories) setDiscoveryCategories(data.categories.filter((c: DiscoveryCategoryAvailability) => c.available));
       })
       .catch(() => {});
+
+    // Check if lead already registered
+    try {
+      const stored = localStorage.getItem(`chat_lead_${username}`);
+      if (stored) setLeadInfo(JSON.parse(stored));
+    } catch {}
   }, [username]);
 
   // Scroll to bottom on new messages
@@ -489,6 +499,16 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     setMessages((prev) => [...prev, userMessage]);
     const messageContent = inputValue.trim();
     setInputValue('');
+
+    // Lead capture trigger: after 4 user messages
+    userMsgCountRef.current++;
+    if (userMsgCountRef.current >= 4 && !leadInfo && !showLeadPopup) {
+      try {
+        const dismissed = localStorage.getItem(`chat_lead_dismissed_${username}`);
+        const canShow = !dismissed || (Date.now() - parseInt(dismissed)) > 86400000; // 24h
+        if (canShow) setTimeout(() => setShowLeadPopup(true), 2000);
+      } catch {}
+    }
     setIsTyping(true);
 
     try {
@@ -1672,11 +1692,24 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   influencerName={influencer.display_name || ''}
                   sessionId={sessionId || undefined}
                   initialCategory={initialDiscoverySlug}
-                  onAskInChat={(message) => {
-                    setInputValue(message);
+                  onAskInChat={async (message, enrichedData) => {
                     setActiveTab('chat');
-                    // Auto-send after state update propagates
-                    setTimeout(() => handleSendMessage(), 150);
+                    // Add user bubble with clean message
+                    const userMsg = { id: Date.now().toString(), role: 'user' as const, content: message };
+                    setMessages(prev => [...prev, userMsg]);
+                    setIsTyping(true);
+                    // Prepare assistant streaming bubble
+                    const assistantMessageId = (Date.now() + 1).toString();
+                    setStreamingMessageId(assistantMessageId);
+                    setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant' as const, content: '' }]);
+                    setIsTyping(false);
+                    await sendStreamMessage({
+                      message: enrichedData || message,
+                      username,
+                      sessionId: sessionId || undefined,
+                      previousResponseId: responseId || undefined,
+                      clientMessageId: assistantMessageId,
+                    });
                   }}
                   onCategoryOpened={() => setInitialDiscoverySlug(null)}
                 />
@@ -1731,6 +1764,23 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
           >
             <HelpCircle className="w-[18px] h-[18px]" />
           </button>
+        )}
+
+        {/* Lead Capture Popup */}
+        {showLeadPopup && (
+          <LeadCapturePopup
+            username={username}
+            sessionId={sessionId}
+            onClose={() => {
+              setShowLeadPopup(false);
+              try { localStorage.setItem(`chat_lead_dismissed_${username}`, Date.now().toString()); } catch {}
+            }}
+            onSubmit={(data) => {
+              setLeadInfo({ firstName: data.firstName, serialNumber: data.serialNumber });
+              setShowLeadPopup(false);
+              try { localStorage.setItem(`chat_lead_${username}`, JSON.stringify({ firstName: data.firstName, serialNumber: data.serialNumber })); } catch {}
+            }}
+          />
         )}
 
         {/* New Chat Confirmation */}

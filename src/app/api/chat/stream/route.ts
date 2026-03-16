@@ -309,6 +309,19 @@ export async function POST(req: NextRequest) {
 
         let session = sessionData;
 
+        // === LOAD LEAD NAME (for personalization) ===
+        let leadName: string | undefined;
+        if (session?.lead_id) {
+          try {
+            const { data: lead } = await supabase
+              .from('chat_leads')
+              .select('first_name')
+              .eq('id', session.lead_id)
+              .maybeSingle();
+            if (lead?.first_name) leadName = lead.first_name;
+          } catch {}
+        }
+
         // === CHECK IF ALREADY IN SUPPORT FLOW ===
         const isInSupportFlow = session?.state?.startsWith('Support.');
         console.log('[Stream] Session check:', {
@@ -621,6 +634,7 @@ export async function POST(req: NextRequest) {
             username: username,
             influencerName,
             conversationHistory,
+            userName: leadName,
             rollingSummary: session?.rolling_summary || undefined,
             modelTier: decision?.modelStrategy?.model,
             personalityConfig: personalityConfig || undefined,
