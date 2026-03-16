@@ -34,7 +34,7 @@ export function useMagicBento(
     if (!feed || !spot) return;
     if (typeof window !== 'undefined' && window.innerWidth <= 768) return;
 
-    const cards = Array.from(feed.querySelectorAll<HTMLElement>('.bt-bento'));
+    const cards = Array.from(feed.querySelectorAll<HTMLElement>('.bt-card'));
     if (!cards.length) return;
 
     const pMap = new Map<HTMLElement, HTMLDivElement[]>();

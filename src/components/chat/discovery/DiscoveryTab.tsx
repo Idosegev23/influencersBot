@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Loader2, ChevronDown, ChevronUp, Play } from 'lucide-react';
+import { Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDiscoveryAll } from '@/hooks/useDiscoveryAll';
 import { useDiscovery } from '@/hooks/useDiscovery';
@@ -28,9 +28,6 @@ function getThumb(item: DiscoveryItem): string | null {
       : null;
 }
 
-/* layout pattern per section index */
-const LAYOUTS = ['a', 'b', 'c'] as const;
-
 export default function DiscoveryTab({
   username, influencerName, sessionId, initialCategory, onAskInChat, onCategoryOpened,
 }: DiscoveryTabProps) {
@@ -52,16 +49,15 @@ export default function DiscoveryTab({
     else if (initialCategory) { setFilter(initialCategory); onCategoryOpened?.(); }
   }, [initialCategory, onCategoryOpened]);
 
-  const ask = useCallback((item: DiscoveryItem, row: DiscoveryRow) => {
-    const t = item.aiTitle || item.captionExcerpt;
-    const short = t.length > 80 ? t.slice(0, 80) + '…' : t;
-    const visible = `ספרי לי עוד על: ${short}`;
+  const askCategory = useCallback((row: DiscoveryRow) => {
+    const title = row.category.title.replace(/\s+של\s+.+$/, '');
+    const visibleMsg = `ספרי לי על ${title}`;
     const ctx = row.items.map((it, i) => {
-      const title = it.aiTitle || it.captionExcerpt || '';
+      const t = it.aiTitle || it.captionExcerpt || '';
       const m = it.metricValue && it.metricLabel ? ` (${it.metricLabel}: ${it.metricValue.toLocaleString()})` : '';
-      return `${i + 1}. ${title}${m}${it.aiSummary ? ' — ' + it.aiSummary : ''}`;
+      return `${i + 1}. ${t}${m}${it.aiSummary ? ' — ' + it.aiSummary : ''}`;
     }).join('\n');
-    onAskInChat(visible, `[הנתונים מתוך "${row.category.title}":\n${ctx}]\n\n${visible}`);
+    onAskInChat(visibleMsg, `[הנתונים מתוך "${row.category.title}":\n${ctx}]\n\n${visibleMsg}`);
   }, [onAskInChat]);
 
   const visible = filter ? rows.filter(r => r.category.slug === filter) : rows;
@@ -98,54 +94,31 @@ export default function DiscoveryTab({
           </nav>
 
           <div className="bt-feed" ref={feedRef}>
-            {visible.map((row, ri) => {
-              const count = Math.min(row.items.length, 3);
-              const lay = LAYOUTS[ri % 3];
-
-              return (
-                <motion.section
-                  key={row.category.slug}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: ri * 0.04, duration: 0.3, ease: [.22,1,.36,1] }}
-                  className="bt-section"
-                >
-                  <p className="bt-label">{row.category.title.replace(/\s+של\s+.+$/, '')}</p>
-
-                  <div
-                    className={`bt-bento bt-n${count}`}
-                    data-lay={lay}
-                  >
-                    {row.items.slice(0, 3).map((item, i) => {
-                      const src = getThumb(item);
-                      const isVideo = item.mediaType === 'reel' || item.mediaType === 'video';
-                      return (
-                        <button
-                          key={item.postId || item.shortcode || i}
-                          className="bt-cell"
-                          onClick={() => ask(item, row)}
-                        >
-                          {src ? (
-                            <img src={src} alt="" className="bt-cell-img" loading="lazy" />
-                          ) : (
-                            <div className="bt-cell-img bt-cell-ph" />
-                          )}
-                          {isVideo && (
-                            <div className="bt-cell-play">
-                              <Play className="w-3 h-3 text-white fill-white" />
-                            </div>
-                          )}
-                          <div className="bt-cell-over" />
-                          <p className="bt-cell-text">
-                            {item.aiTitle || item.captionExcerpt}
-                          </p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </motion.section>
-              );
-            })}
+            {visible.map((row, ri) => (
+              <motion.button
+                key={row.category.slug}
+                className="bt-card"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: ri * 0.04, duration: 0.3, ease: [.22,1,.36,1] }}
+                onClick={() => askCategory(row)}
+              >
+                <p className="bt-card-title">
+                  {row.category.title.replace(/\s+של\s+.+$/, '')}
+                </p>
+                <div className="bt-card-thumbs">
+                  {row.items.slice(0, 3).map((item, i) => {
+                    const src = getThumb(item);
+                    return src ? (
+                      <img key={item.postId || item.shortcode || i} src={src} alt="" className="bt-card-thumb" loading="lazy" />
+                    ) : (
+                      <div key={i} className="bt-card-thumb bt-card-ph" />
+                    );
+                  })}
+                </div>
+                <span className="bt-card-count">{row.items.length} פריטים</span>
+              </motion.button>
+            ))}
           </div>
         </>
       )}
