@@ -851,7 +851,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   <span>בעיה בהזמנה</span>
                   <AlertCircle className="w-[18px] h-[18px]" />
                 </button>
-                {username === 'the_dekel' && (
+                {username === 'miranbozaglo' && (
                 <button
                   onClick={() => setActiveTab('discover')}
                   className={`flex items-center gap-[6px] px-[11px] py-[6px] rounded-full transition-all`}
@@ -970,7 +970,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                       </motion.div>
 
                       {/* Discovery category pills — only for the_dekel */}
-                      {username === 'the_dekel' && discoveryCategories.length > 0 && (
+                      {username === 'miranbozaglo' && discoveryCategories.length > 0 && (
                         <motion.div
                           initial={{ opacity: 0, y: 8 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -1728,7 +1728,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 <AlertCircle className="w-[18px] h-[18px]" />
                 <span>בעיה בהזמנה</span>
               </button>
-              {username === 'the_dekel' && (
+              {username === 'miranbozaglo' && (
               <button
                 onClick={() => setActiveTab('discover')}
                 className={`mobile-tab-btn ${activeTab === 'discover' ? 'active-discover' : ''}`}

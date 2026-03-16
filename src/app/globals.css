@@ -227,34 +227,6 @@ h1, h2, h3, h4, h5, h6 {
   position: relative;
 }
 
-/* Plissé — colored gradient lines that fade at edges */
-.chat-page::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background: linear-gradient(to left,
-    rgba(180, 120, 255, 0.2) 0%,
-    rgba(220, 120, 235, 0.25) 20%,
-    rgba(244, 114, 182, 0.32) 40%,
-    rgba(255, 130, 180, 0.38) 60%,
-    rgba(255, 140, 185, 0.4) 80%,
-    rgba(255, 155, 190, 0.38) 100%);
-  pointer-events: none;
-  z-index: 0;
-  -webkit-mask-image:
-    repeating-linear-gradient(90deg,
-      black 0px, black 2px, transparent 2px, transparent 32px
-    ),
-    radial-gradient(ellipse 70% 55% at 50% 55%, black 0%, transparent 70%);
-  -webkit-mask-composite: source-in;
-  mask-image:
-    repeating-linear-gradient(90deg,
-      black 0px, black 2px, transparent 2px, transparent 32px
-    ),
-    radial-gradient(ellipse 70% 55% at 50% 55%, black 0%, transparent 70%);
-  mask-composite: intersect;
-}
-
 /* ============================================
    GLASSMORPHIC FOUNDATION
    ============================================ */
@@ -1873,34 +1845,6 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* No visual change on focus — same look always */
-
-/* Gradient glow from input pill — always visible, right-to-left gradient */
-.chat-input-pill::after {
-  content: '';
-  position: absolute;
-  bottom: -60px;
-  left: -10%;
-  right: -10%;
-  height: 180px;
-  background: linear-gradient(to left,
-    rgba(139, 92, 246, 0.7) 5%,
-    rgba(168, 85, 247, 0.6) 20%,
-    rgba(217, 70, 239, 0.5) 40%,
-    rgba(244, 114, 182, 0.45) 60%,
-    rgba(255, 180, 200, 0.35) 80%,
-    rgba(255, 200, 220, 0.25) 95%);
-  filter: blur(35px);
-  pointer-events: none;
-  z-index: -1;
-  opacity: 1;
-  animation: inputGlowPulse 5s ease-in-out infinite alternate;
-}
-
-@keyframes inputGlowPulse {
-  0% { opacity: 0.9; transform: scaleX(0.97); }
-  50% { opacity: 1; transform: scaleX(1.05); }
-  100% { opacity: 0.92; transform: scaleX(0.98); }
-}
 
 .chat-input-pill textarea {
   background: transparent;
