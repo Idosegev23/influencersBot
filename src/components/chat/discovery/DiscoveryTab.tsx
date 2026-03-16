@@ -95,24 +95,24 @@ export default function DiscoveryTab({
 
           <div className="bt-feed">
             {visible.map((row, ri) => {
-              const count = Math.min(row.items.length, 5);
+              const count = Math.min(row.items.length, 3);
               const lay = LAYOUTS[ri % 3];
 
               return (
                 <motion.section
                   key={row.category.slug}
-                  initial={{ opacity: 0, y: 14 }}
+                  initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: ri * 0.06, duration: 0.35, ease: [.22,1,.36,1] }}
+                  transition={{ delay: ri * 0.04, duration: 0.3, ease: [.22,1,.36,1] }}
                   className="bt-section"
                 >
-                  <p className="bt-label">{row.category.title}</p>
+                  <p className="bt-label">{row.category.title.replace(/\s+של\s+.+$/, '')}</p>
 
                   <div
                     className={`bt-bento bt-n${count}`}
                     data-lay={lay}
                   >
-                    {row.items.slice(0, 5).map((item, i) => {
+                    {row.items.slice(0, 3).map((item, i) => {
                       const src = getThumb(item);
                       const isVideo = item.mediaType === 'reel' || item.mediaType === 'video';
                       return (
@@ -128,7 +128,7 @@ export default function DiscoveryTab({
                           )}
                           {isVideo && (
                             <div className="bt-cell-play">
-                              <Play className="w-3.5 h-3.5 text-white fill-white" />
+                              <Play className="w-3 h-3 text-white fill-white" />
                             </div>
                           )}
                           <div className="bt-cell-over" />
