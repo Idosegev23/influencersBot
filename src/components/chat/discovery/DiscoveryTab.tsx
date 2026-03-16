@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { Loader2, ChevronDown, ChevronUp, Play } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, Loader2, Sparkles } from 'lucide-react';
 import { useDiscoveryAll } from '@/hooks/useDiscoveryAll';
 import { useDiscovery } from '@/hooks/useDiscovery';
-import { DiscoveryRow } from './DiscoveryRow';
 import { QuestionsView } from './QuestionsView';
+import { getProxiedImageUrl, getProxiedImageByShortcode } from '@/lib/image-utils';
 import type { DiscoveryItem } from '@/lib/discovery/types';
+import type { DiscoveryRow } from '@/hooks/useDiscoveryAll';
 
 interface DiscoveryTabProps {
   username: string;
@@ -18,153 +19,158 @@ interface DiscoveryTabProps {
   onCategoryOpened?: () => void;
 }
 
-export default function DiscoveryTab({ username, influencerName, sessionId, initialCategory, onAskInChat, onCategoryOpened }: DiscoveryTabProps) {
+function getThumb(item: DiscoveryItem): string | null {
+  return item.thumbnailUrl
+    ? getProxiedImageUrl(item.thumbnailUrl, item.shortcode)
+    : item.shortcode
+      ? getProxiedImageByShortcode(item.shortcode)
+      : null;
+}
+
+/* layout pattern per section index */
+const LAYOUTS = ['a', 'b', 'c'] as const;
+
+export default function DiscoveryTab({
+  username, influencerName, sessionId, initialCategory, onAskInChat, onCategoryOpened,
+}: DiscoveryTabProps) {
   const { rows, loading, error } = useDiscoveryAll({ username });
-  const {
-    questionsData,
-    questionsLoading,
-    loadQuestions,
-    submitNewQuestion,
-    vote,
-  } = useDiscovery({ username, sessionId });
+  const { questionsData, questionsLoading, loadQuestions, submitNewQuestion, vote } =
+    useDiscovery({ username, sessionId });
 
-  const [showQuestions, setShowQuestions] = useState(false);
-  const questionsLoadedRef = useRef(false);
+  const [filter, setFilter] = useState<string | null>(null);
+  const [showQ, setShowQ] = useState(false);
+  const qLoaded = useRef(false);
 
   useEffect(() => {
-    if (showQuestions && !questionsLoadedRef.current) {
-      questionsLoadedRef.current = true;
-      loadQuestions();
-    }
-  }, [showQuestions, loadQuestions]);
+    if (showQ && !qLoaded.current) { qLoaded.current = true; loadQuestions(); }
+  }, [showQ, loadQuestions]);
 
   useEffect(() => {
-    if (initialCategory === 'questions') {
-      setShowQuestions(true);
-      onCategoryOpened?.();
-    } else if (initialCategory) {
-      onCategoryOpened?.();
-    }
+    if (initialCategory === 'questions') { setShowQ(true); onCategoryOpened?.(); }
+    else if (initialCategory) { setFilter(initialCategory); onCategoryOpened?.(); }
   }, [initialCategory, onCategoryOpened]);
 
-  const handleItemClick = (item: DiscoveryItem, categoryTitle: string, categorySlug: string) => {
-    const title = item.aiTitle || item.captionExcerpt;
-    const truncated = title.length > 80 ? title.slice(0, 80) + '...' : title;
-    const visibleMsg = `ספרי לי עוד על: ${truncated}`;
+  const ask = useCallback((item: DiscoveryItem, row: DiscoveryRow) => {
+    const t = item.aiTitle || item.captionExcerpt;
+    const short = t.length > 80 ? t.slice(0, 80) + '…' : t;
+    const visible = `ספרי לי עוד על: ${short}`;
+    const ctx = row.items.map((it, i) => {
+      const title = it.aiTitle || it.captionExcerpt || '';
+      const m = it.metricValue && it.metricLabel ? ` (${it.metricLabel}: ${it.metricValue.toLocaleString()})` : '';
+      return `${i + 1}. ${title}${m}${it.aiSummary ? ' — ' + it.aiSummary : ''}`;
+    }).join('\n');
+    onAskInChat(visible, `[הנתונים מתוך "${row.category.title}":\n${ctx}]\n\n${visible}`);
+  }, [onAskInChat]);
 
-    const row = rows.find(r => r.category.slug === categorySlug);
-    let enrichedData: string | undefined;
-    if (row) {
-      const contextLines = row.items.map((it, idx) => {
-        const t = it.aiTitle || it.captionExcerpt || '';
-        const summary = it.aiSummary || '';
-        const metric = it.metricValue && it.metricLabel
-          ? ` (${it.metricLabel}: ${it.metricValue.toLocaleString()})`
-          : '';
-        return `${idx + 1}. ${t}${metric}${summary ? ' — ' + summary : ''}`;
-      }).join('\n');
-      enrichedData = `[הנתונים מתוך הרשימה "${categoryTitle}":\n${contextLines}]\n\nספרי לי עוד על: ${truncated}`;
-    }
-
-    onAskInChat(visibleMsg, enrichedData);
-  };
+  const visible = filter ? rows.filter(r => r.category.slug === filter) : rows;
 
   return (
-    <div className="h-full overflow-y-auto" style={{ backgroundColor: '#f4f5f7' }}>
-      {/* Header */}
-      <div className="px-4 pt-5 pb-3" dir="rtl">
-        <div className="flex items-center gap-2 mb-0.5">
-          <Sparkles className="w-5 h-5" style={{ color: '#e5a00d' }} />
-          <h2 className="text-[22px] font-bold" style={{ color: '#0c1013' }}>
-            גלו תוכן
-          </h2>
-        </div>
-        <p className="text-[13px]" style={{ color: '#676767' }}>
-          הרשימות הכי מעניינות של {influencerName}
-        </p>
-      </div>
+    <div className="bt-page" dir="rtl">
 
-      {/* Loading */}
       {loading && (
-        <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <Loader2 className="w-7 h-7 animate-spin" style={{ color: '#bbb' }} />
-          <p className="text-[14px]" style={{ color: '#999' }}>טוען תוכן...</p>
+        <div className="bt-loading">
+          <Loader2 className="w-5 h-5 animate-spin" style={{ color: '#ccc' }} />
         </div>
       )}
 
-      {/* Error */}
-      {error && !loading && (
-        <div className="px-4 py-16 text-center">
-          <p className="text-[14px]" style={{ color: '#999' }}>{error}</p>
-        </div>
-      )}
+      {error && !loading && <p className="bt-empty">{error}</p>}
 
-      {/* Marquee rows — each row has its own fade edges */}
       {!loading && rows.length > 0 && (
-        <div className="pt-1 pb-4">
-          {rows.map((row, idx) => {
-            // Different speed per row so they don't move in sync
-            const speeds = [28, 38, 22, 34, 26, 42, 30, 36];
-            const duration = speeds[idx % speeds.length];
-            return (
-              <DiscoveryRow
-                key={row.category.slug}
-                slug={row.category.slug}
-                title={row.category.title}
-                subtitle={row.category.subtitle}
-                color={row.category.color}
-                items={row.items}
-                onItemClick={handleItemClick}
-                reverse={idx % 2 === 1}
-                duration={duration}
-              />
-            );
-          })}
-        </div>
-      )}
+        <>
+          <h2 className="bt-title">גלו</h2>
 
-      {/* Empty */}
-      {!loading && rows.length === 0 && !error && (
-        <div className="px-4 py-16 text-center">
-          <p className="text-[28px] mb-2 opacity-30">🔍</p>
-          <p className="text-[14px]" style={{ color: '#999' }}>אין רשימות זמינות כרגע</p>
-        </div>
-      )}
+          <nav className="bt-nav">
+            <button
+              className={`bt-chip ${!filter ? 'bt-chip-on' : ''}`}
+              onClick={() => setFilter(null)}
+            >הכל</button>
+            {rows.map(r => (
+              <button
+                key={r.category.slug}
+                className={`bt-chip ${filter === r.category.slug ? 'bt-chip-on' : ''}`}
+                onClick={() => setFilter(filter === r.category.slug ? null : r.category.slug)}
+              >{r.category.title.replace(/\s+של\s+.+$/, '')}</button>
+            ))}
+          </nav>
 
-      {/* Questions */}
-      <div className="mt-2 mx-4 mb-32">
-        <button
-          onClick={() => setShowQuestions(!showQuestions)}
-          className="w-full flex items-center justify-between rounded-[20px] p-4 transition-colors"
-          style={{ backgroundColor: '#ffffff', border: '1px solid #e5e5ea' }}
-          dir="rtl"
-        >
-          <div className="flex items-center gap-2">
-            <span className="text-[16px]">❓</span>
-            <span className="text-[15px] font-semibold" style={{ color: '#0c1013' }}>
-              שאלות שתמיד רציתם לשאול
-            </span>
+          <div className="bt-feed">
+            {visible.map((row, ri) => {
+              const count = Math.min(row.items.length, 5);
+              const lay = LAYOUTS[ri % 3];
+
+              return (
+                <motion.section
+                  key={row.category.slug}
+                  initial={{ opacity: 0, y: 14 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: ri * 0.06, duration: 0.35, ease: [.22,1,.36,1] }}
+                  className="bt-section"
+                >
+                  <p className="bt-label">{row.category.title}</p>
+
+                  <div
+                    className={`bt-bento bt-n${count}`}
+                    data-lay={lay}
+                  >
+                    {row.items.slice(0, 5).map((item, i) => {
+                      const src = getThumb(item);
+                      const isVideo = item.mediaType === 'reel' || item.mediaType === 'video';
+                      return (
+                        <button
+                          key={item.postId || item.shortcode || i}
+                          className="bt-cell"
+                          onClick={() => ask(item, row)}
+                        >
+                          {src ? (
+                            <img src={src} alt="" className="bt-cell-img" loading="lazy" />
+                          ) : (
+                            <div className="bt-cell-img bt-cell-ph" />
+                          )}
+                          {isVideo && (
+                            <div className="bt-cell-play">
+                              <Play className="w-3.5 h-3.5 text-white fill-white" />
+                            </div>
+                          )}
+                          <div className="bt-cell-over" />
+                          <p className="bt-cell-text">
+                            {item.aiTitle || item.captionExcerpt}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </motion.section>
+              );
+            })}
           </div>
-          {showQuestions
-            ? <ChevronUp className="w-5 h-5" style={{ color: '#676767' }} />
-            : <ChevronDown className="w-5 h-5" style={{ color: '#676767' }} />
-          }
-        </button>
+        </>
+      )}
 
+      {!loading && rows.length === 0 && !error && (
+        <p className="bt-empty">אין תוכן זמין כרגע</p>
+      )}
+
+      {/* questions */}
+      <div className="bt-q">
+        <button className="bt-q-btn" onClick={() => setShowQ(!showQ)}>
+          <span>שאלות שתמיד רציתם לשאול</span>
+          {showQ
+            ? <ChevronUp className="w-4 h-4" style={{ color: '#bbb' }} />
+            : <ChevronDown className="w-4 h-4" style={{ color: '#bbb' }} />}
+        </button>
         <AnimatePresence>
-          {showQuestions && (
+          {showQ && (
             <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.25 }}
-              className="overflow-hidden"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              style={{ overflow: 'hidden' }}
             >
-              <div className="pt-2">
+              <div style={{ paddingTop: 12 }}>
                 <QuestionsView
                   data={questionsData}
                   loading={questionsLoading}
-                  onBack={() => setShowQuestions(false)}
+                  onBack={() => setShowQ(false)}
                   onSubmit={submitNewQuestion}
                   onVote={vote}
                 />
@@ -173,6 +179,8 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
           )}
         </AnimatePresence>
       </div>
+
+      <div style={{ height: 120 }} />
     </div>
   );
 }

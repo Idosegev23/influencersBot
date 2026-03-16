@@ -227,43 +227,32 @@ h1, h2, h3, h4, h5, h6 {
   position: relative;
 }
 
-/* Plissé — colored gradient lines (purple → pink) */
-.chat-page::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background: linear-gradient(to left,
-    rgba(180, 120, 255, 0.18) 0%,
-    rgba(200, 140, 255, 0.12) 25%,
-    rgba(230, 130, 220, 0.1) 50%,
-    rgba(255, 150, 200, 0.12) 75%,
-    rgba(255, 170, 190, 0.18) 100%);
-  pointer-events: none;
-  z-index: 0;
-  mask-image: radial-gradient(ellipse 70% 55% at 50% 50%, black 0%, transparent 75%);
-  -webkit-mask-image: radial-gradient(ellipse 70% 55% at 50% 50%, black 0%, transparent 75%);
-}
-
+/* Plissé — colored gradient lines that fade at edges */
 .chat-page::after {
   content: '';
   position: fixed;
   inset: 0;
-  background-image:
-    repeating-linear-gradient(90deg,
-      rgba(255, 255, 255, 0.45) 0px,
-      rgba(255, 255, 255, 0.2) 1px,
-      transparent 2px,
-      transparent 14px,
-      rgba(0, 0, 0, 0.015) 15px,
-      transparent 16px,
-      transparent 30px,
-      rgba(255, 255, 255, 0.2) 31px,
-      rgba(255, 255, 255, 0.45) 32px
-    );
+  background: linear-gradient(to left,
+    rgba(180, 120, 255, 0.2) 0%,
+    rgba(220, 120, 235, 0.25) 20%,
+    rgba(244, 114, 182, 0.32) 40%,
+    rgba(255, 130, 180, 0.38) 60%,
+    rgba(255, 140, 185, 0.4) 80%,
+    rgba(255, 155, 190, 0.38) 100%);
   pointer-events: none;
   z-index: 0;
-  mask-image: radial-gradient(ellipse 75% 60% at 50% 50%, black 0%, transparent 70%);
-  -webkit-mask-image: radial-gradient(ellipse 75% 60% at 50% 50%, black 0%, transparent 70%);
+  -webkit-mask-image:
+    repeating-linear-gradient(90deg,
+      black 0px, black 2px, transparent 2px, transparent 32px
+    ),
+    radial-gradient(ellipse 70% 55% at 50% 55%, black 0%, transparent 70%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    repeating-linear-gradient(90deg,
+      black 0px, black 2px, transparent 2px, transparent 32px
+    ),
+    radial-gradient(ellipse 70% 55% at 50% 55%, black 0%, transparent 70%);
+  mask-composite: intersect;
 }
 
 /* ============================================
@@ -1481,6 +1470,11 @@ h1, h2, h3, h4, h5, h6 {
   from { transform: translateX(0); }
   to { transform: translateX(calc(-100% - var(--gap))); }
 }
+/* Discovery row – pixel-precise infinite scroll */
+@keyframes discovery-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(var(--scroll-dist)); }
+}
 @keyframes marquee-vertical {
   from { transform: translateY(0); }
   to { transform: translateY(calc(-100% - var(--gap))); }
@@ -1576,6 +1570,643 @@ h1, h2, h3, h4, h5, h6 {
   z-index: 1;
 }
 
+/* ============================================
+   Discovery Tab — Bento + Glassmorphic
+   ============================================ */
+
+.bt-page {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 16px;
+  background: transparent;
+  position: relative;
+  z-index: 1;
+}
+
+.bt-loading { display: flex; justify-content: center; padding: 80px 0; }
+.bt-empty { text-align: center; padding: 80px 0; font-size: 14px; color: #b0b0b0; }
+
+/* ── Title — gradient text ── */
+
+.bt-title {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  margin: 20px 0 0;
+  background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 40%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Filter chips — glass pills ── */
+
+.bt-nav {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  padding: 14px 0 6px;
+  scrollbar-width: none;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: linear-gradient(to bottom,
+    rgba(244,245,247,0.85) 0%,
+    rgba(244,245,247,0.6) 70%,
+    rgba(244,245,247,0) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.bt-nav::-webkit-scrollbar { display: none; }
+
+.bt-chip {
+  flex-shrink: 0;
+  padding: 6px 15px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #888;
+  background: rgba(255,255,255,0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.55);
+  cursor: pointer;
+  transition: all 0.25s ease;
+  white-space: nowrap;
+}
+.bt-chip:hover {
+  background: rgba(255,255,255,0.65);
+  color: #666;
+}
+.bt-chip-on {
+  color: #7c3aed;
+  font-weight: 600;
+  background: linear-gradient(135deg, rgba(139,92,246,0.1), rgba(168,85,247,0.06));
+  border-color: rgba(139,92,246,0.3);
+  box-shadow: 0 2px 10px rgba(139,92,246,0.08);
+}
+
+/* ── Feed ── */
+
+.bt-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding-top: 14px;
+}
+
+.bt-section { display: flex; flex-direction: column; }
+
+.bt-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bt-label::before {
+  content: '';
+  width: 3px;
+  height: 14px;
+  border-radius: 3px;
+  background: linear-gradient(to bottom, #8b5cf6, #d946ef);
+  flex-shrink: 0;
+}
+
+/* ══════════════════════════════════════════════
+   BENTO GRID — glass-wrapped, 3 layouts
+   ══════════════════════════════════════════════ */
+
+.bt-bento {
+  display: grid;
+  gap: 3px;
+  border-radius: 20px;
+  overflow: hidden;
+  direction: ltr;
+  border: 1px solid rgba(255,255,255,0.55);
+  box-shadow:
+    0 4px 24px rgba(0,0,0,0.05),
+    0 0 0 1px rgba(255,255,255,0.15) inset;
+  position: relative;
+}
+
+.bt-bento::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.75), transparent);
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* ── 1 item ── */
+.bt-n1 { grid-template-columns: 1fr; aspect-ratio: 16 / 9; }
+
+/* ── 2 items ── */
+.bt-n2 { grid-template-columns: 1fr 1fr; aspect-ratio: 2 / 1; }
+
+/* ── 3 items ── */
+
+/* Layout A: large RIGHT + 2 stacked left */
+.bt-n3[data-lay="a"] {
+  grid-template-columns: 2fr 3fr;
+  grid-template-rows: 1fr 1fr;
+  aspect-ratio: 5 / 3;
+}
+.bt-n3[data-lay="a"] > :nth-child(1) { grid-column: 2; grid-row: 1 / 3; }
+
+/* Layout B: wide top + 2 bottom */
+.bt-n3[data-lay="b"] {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1.4fr 1fr;
+  aspect-ratio: 5 / 3;
+}
+.bt-n3[data-lay="b"] > :nth-child(1) { grid-column: 1 / 3; }
+
+/* Layout C: large LEFT + 2 stacked right */
+.bt-n3[data-lay="c"] {
+  grid-template-columns: 3fr 2fr;
+  grid-template-rows: 1fr 1fr;
+  aspect-ratio: 5 / 3;
+}
+.bt-n3[data-lay="c"] > :nth-child(1) { grid-column: 1; grid-row: 1 / 3; }
+
+/* ── 4 items ── */
+
+/* Layout A: large RIGHT + 2 stacked left + full bottom */
+.bt-n4[data-lay="a"] {
+  grid-template-columns: 2fr 3fr;
+  grid-template-rows: 1fr 1fr 1fr;
+  aspect-ratio: 4 / 3;
+}
+.bt-n4[data-lay="a"] > :nth-child(1) { grid-column: 2; grid-row: 1 / 3; }
+.bt-n4[data-lay="a"] > :nth-child(4) { grid-column: 1 / 3; }
+
+/* Layout B: wide top + 3 bottom */
+.bt-n4[data-lay="b"] {
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: 1.5fr 1fr;
+  aspect-ratio: 3 / 2;
+}
+.bt-n4[data-lay="b"] > :nth-child(1) { grid-column: 1 / 4; }
+
+/* Layout C: 2x2 grid */
+.bt-n4[data-lay="c"] {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  aspect-ratio: 1;
+}
+
+/* ── 5 items ── */
+
+/* Layout A: large RIGHT + 2 stacked left + 2 bottom */
+.bt-n5[data-lay="a"] {
+  grid-template-columns: 2fr 3fr;
+  grid-template-rows: 1fr 1fr 1fr;
+  aspect-ratio: 4 / 3;
+}
+.bt-n5[data-lay="a"] > :nth-child(1) { grid-column: 2; grid-row: 1 / 3; }
+
+/* Layout B: wide top + 4 bottom */
+.bt-n5[data-lay="b"] {
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: 1.6fr 1fr;
+  aspect-ratio: 8 / 5;
+}
+.bt-n5[data-lay="b"] > :nth-child(1) { grid-column: 1 / 5; }
+
+/* Layout C: large LEFT + 2 stacked right + 2 bottom */
+.bt-n5[data-lay="c"] {
+  grid-template-columns: 3fr 2fr;
+  grid-template-rows: 1fr 1fr 1fr;
+  aspect-ratio: 4 / 3;
+}
+.bt-n5[data-lay="c"] > :nth-child(1) { grid-column: 1; grid-row: 1 / 3; }
+
+/* ── Cell ── */
+
+.bt-cell {
+  position: relative;
+  overflow: hidden;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  min-height: 0;
+  min-width: 0;
+  direction: rtl;
+  background: #e8e8ec;
+  transition: filter 0.3s ease;
+}
+
+.bt-cell-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.bt-cell:hover .bt-cell-img { transform: scale(1.04); }
+
+.bt-cell-ph { background: linear-gradient(135deg, #f0f0f4, #e4e4e8); }
+
+.bt-cell-over {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 60%;
+  background: linear-gradient(to top,
+    rgba(0,0,0,0.5) 0%,
+    rgba(0,0,0,0.12) 45%,
+    transparent 100%);
+  pointer-events: none;
+}
+
+.bt-cell-text {
+  position: absolute;
+  bottom: 10px; right: 10px; left: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1.35;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.35);
+  z-index: 1;
+}
+
+/* Play — frosted circle */
+.bt-cell-play {
+  position: absolute;
+  top: 8px; left: 8px;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.2);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.25);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  z-index: 2;
+}
+
+/* Large cell text — Layout A & C main item */
+.bt-n3 > :nth-child(1) .bt-cell-text,
+.bt-n4[data-lay="a"] > :nth-child(1) .bt-cell-text,
+.bt-n4[data-lay="b"] > :nth-child(1) .bt-cell-text,
+.bt-n5[data-lay="a"] > :nth-child(1) .bt-cell-text,
+.bt-n5[data-lay="b"] > :nth-child(1) .bt-cell-text,
+.bt-n5[data-lay="c"] > :nth-child(1) .bt-cell-text {
+  font-size: 14px;
+  font-weight: 700;
+  bottom: 14px; right: 14px; left: 14px;
+  -webkit-line-clamp: 3;
+}
+
+/* ── Questions — glass card ── */
+
+.bt-q { margin-top: 28px; }
+
+.bt-q-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border: 1px solid rgba(255,255,255,0.6);
+  border-radius: 18px;
+  background: rgba(255,255,255,0.5);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.03), 0 0 0 1px rgba(255,255,255,0.15) inset;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a2e;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.bt-q-btn::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent);
+  pointer-events: none;
+}
+
+.bt-q-btn:hover {
+  background: rgba(255,255,255,0.65);
+  border-color: rgba(139,92,246,0.2);
+  box-shadow: 0 4px 20px rgba(139,92,246,0.06), 0 0 0 1px rgba(255,255,255,0.2) inset;
+}
+
+/* ── Glass (QuestionsView) ── */
+
+.discovery-glass-card {
+  background: rgba(255,255,255,0.5);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid rgba(255,255,255,0.6);
+  border-radius: 18px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.04);
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.discovery-glass-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.75), transparent);
+  pointer-events: none;
+}
+
+.discovery-glass-card:hover {
+  background: rgba(255,255,255,0.65);
+  border-color: rgba(139,92,246,0.2);
+  box-shadow: 0 4px 20px rgba(139,92,246,0.06);
+}
+
+.discovery-glass-input {
+  width: 100%;
+  background: rgba(255,255,255,0.5);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid rgba(255,255,255,0.6);
+  border-radius: 9999px;
+  padding: 12px 20px;
+  font-size: 14px;
+  outline: none;
+  direction: rtl;
+  transition: all 0.25s ease;
+}
+
+.discovery-glass-input:focus {
+  border-color: rgba(139,92,246,0.4);
+  box-shadow: 0 0 0 3px rgba(139,92,246,0.08), 0 4px 16px rgba(0,0,0,0.04);
+}
+
+/* ============================================
+   Coupons Tab — Glassmorphic WOW
+   ============================================ */
+.coupons-tab {
+  background: transparent;
+  position: relative;
+  z-index: 1;
+}
+
+.coupons-header-title {
+  font-size: 26px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #059669 0%, #10b981 50%, #34d399 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.coupon-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 16px 18px;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(255, 255, 255, 0.2) inset;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  overflow: hidden;
+}
+
+.coupon-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
+  pointer-events: none;
+}
+
+.coupon-card:hover {
+  transform: translateY(-3px);
+  background: rgba(255, 255, 255, 0.65);
+  box-shadow: 0 8px 32px rgba(16, 185, 129, 0.12), 0 0 0 1px rgba(255, 255, 255, 0.3) inset;
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.coupon-card:active {
+  transform: translateY(0);
+}
+
+.coupon-card .brand-logo {
+  width: 50px;
+  height: 50px;
+  border-radius: 16px;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.coupon-card .brand-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 16px;
+}
+
+.coupon-code-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 700;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(52, 211, 153, 0.08));
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  backdrop-filter: blur(8px);
+  transition: all 0.25s ease;
+  letter-spacing: 0.5px;
+}
+
+.coupon-code-pill.copied {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(217, 70, 239, 0.1));
+  color: #7c3aed;
+  border-color: rgba(139, 92, 246, 0.25);
+}
+
+/* ============================================
+   Problem/Support Tab — Glassmorphic WOW
+   ============================================ */
+.problem-tab {
+  background: transparent;
+  position: relative;
+  z-index: 1;
+}
+
+.problem-header-title {
+  font-size: 26px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #db2777 0%, #ec4899 50%, #f472b6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.problem-brand-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 auto;
+  padding: 6px 14px 6px 6px;
+  height: 46px;
+  max-width: 320px;
+  border-radius: 60px;
+  background: linear-gradient(135deg, rgba(244, 114, 182, 0.15), rgba(236, 72, 153, 0.08));
+  border: 1px solid rgba(244, 114, 182, 0.25);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.problem-input {
+  width: 100%;
+  height: 60px;
+  border-radius: 60px;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  padding: 0 24px;
+  font-size: 16px;
+  color: #1a1a2e;
+  outline: none;
+  transition: all 0.3s ease;
+  direction: rtl;
+}
+
+.problem-input:focus {
+  border-color: rgba(244, 114, 182, 0.4);
+  box-shadow: 0 0 0 3px rgba(244, 114, 182, 0.08), 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+.problem-input::placeholder {
+  color: #999;
+}
+
+.problem-textarea {
+  width: 100%;
+  min-height: 140px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  padding: 18px 24px;
+  font-size: 16px;
+  color: #1a1a2e;
+  outline: none;
+  resize: none;
+  transition: all 0.3s ease;
+  direction: rtl;
+}
+
+.problem-textarea:focus {
+  border-color: rgba(244, 114, 182, 0.4);
+  box-shadow: 0 0 0 3px rgba(244, 114, 182, 0.08), 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+.problem-textarea::placeholder {
+  color: #999;
+}
+
+.problem-btn-submit {
+  height: 53px;
+  border-radius: 60px;
+  background: linear-gradient(135deg, #8b5cf6 0%, #d946ef 50%, #f472b6 100%);
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.25);
+}
+
+.problem-btn-submit:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(139, 92, 246, 0.35);
+}
+
+.problem-btn-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.problem-btn-back {
+  height: 53px;
+  border-radius: 60px;
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  color: #666;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.problem-btn-back:hover {
+  background: rgba(255, 255, 255, 0.65);
+  border-color: rgba(200, 170, 255, 0.3);
+}
+
+.problem-success-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+  background: linear-gradient(135deg, #8b5cf6 0%, #d946ef 50%, #f472b6 100%);
+  box-shadow: 0 8px 32px rgba(139, 92, 246, 0.3);
+  animation: successPop 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes successPop {
+  0% { transform: scale(0.5); opacity: 0; }
+  60% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
 @media (max-width: 768px) {
   .chat-messages-scroll {
     -ms-overflow-style: none;
@@ -1638,29 +2269,21 @@ h1, h2, h3, h4, h5, h6 {
 .chat-input-pill::after {
   content: '';
   position: absolute;
-  bottom: -80px;
-  left: -30%;
-  right: -30%;
-  height: 200px;
-  background: radial-gradient(ellipse 100% 100% at center,
-    rgba(139, 92, 246, 0.8) 0%,
-    rgba(217, 70, 239, 0.6) 15%,
-    rgba(244, 114, 182, 0.45) 30%,
-    rgba(255, 180, 200, 0.3) 45%,
-    rgba(255, 200, 220, 0.12) 65%,
-    transparent 85%);
-  filter: blur(40px);
+  bottom: -60px;
+  left: -10%;
+  right: -10%;
+  height: 180px;
+  background: linear-gradient(to left,
+    rgba(139, 92, 246, 0.7) 5%,
+    rgba(168, 85, 247, 0.6) 20%,
+    rgba(217, 70, 239, 0.5) 40%,
+    rgba(244, 114, 182, 0.45) 60%,
+    rgba(255, 180, 200, 0.35) 80%,
+    rgba(255, 200, 220, 0.25) 95%);
+  filter: blur(35px);
   pointer-events: none;
   z-index: -1;
   opacity: 1;
-  background: linear-gradient(to left,
-    rgba(139, 92, 246, 0.8) 0%,
-    rgba(168, 85, 247, 0.65) 20%,
-    rgba(217, 70, 239, 0.55) 40%,
-    rgba(244, 114, 182, 0.45) 60%,
-    rgba(255, 180, 200, 0.35) 80%,
-    rgba(255, 200, 220, 0.25) 100%);
-  filter: blur(40px);
   animation: inputGlowPulse 5s ease-in-out infinite alternate;
 }
 
