@@ -12,10 +12,12 @@ interface DiscoveryTabProps {
   username: string;
   influencerName: string;
   sessionId?: string;
+  initialCategory?: string | null;
   onAskInChat: (message: string) => void;
+  onCategoryOpened?: () => void;
 }
 
-export default function DiscoveryTab({ username, influencerName, sessionId, onAskInChat }: DiscoveryTabProps) {
+export default function DiscoveryTab({ username, influencerName, sessionId, initialCategory, onAskInChat, onCategoryOpened }: DiscoveryTabProps) {
   const {
     categories,
     activeList,
@@ -36,6 +38,18 @@ export default function DiscoveryTab({ username, influencerName, sessionId, onAs
   useEffect(() => {
     loadCategories();
   }, [loadCategories]);
+
+  // Auto-open initial category if passed from empty state cards
+  useEffect(() => {
+    if (initialCategory && categories.length > 0) {
+      if (initialCategory === 'questions') {
+        loadQuestions();
+      } else {
+        loadList(initialCategory);
+      }
+      onCategoryOpened?.();
+    }
+  }, [initialCategory, categories.length, loadList, loadQuestions, onCategoryOpened]);
 
   // Handle "ask about this" — switch to chat and send message
   const handleAskAbout = (item: DiscoveryItem) => {

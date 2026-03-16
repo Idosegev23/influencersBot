@@ -31,6 +31,8 @@ import {
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { getInfluencerByUsername, getBrandsByInfluencer, getContentByInfluencer, type Brand } from '@/lib/supabase';
+import { CategoryCard } from '@/components/chat/discovery/CategoryCard';
+import type { DiscoveryCategoryAvailability } from '@/lib/discovery/types';
 
 const DiscoveryTab = dynamic(() => import('@/components/chat/discovery/DiscoveryTab'), { ssr: false });
 import { applyTheme, getGoogleFontsUrl } from '@/lib/theme';
@@ -171,6 +173,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   
   const [isMobile, setIsMobile] = useState(false);
+  const [discoveryCategories, setDiscoveryCategories] = useState<DiscoveryCategoryAvailability[]>([]);
+  const [initialDiscoverySlug, setInitialDiscoverySlug] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -363,6 +367,14 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     }
     
     loadData();
+
+    // Preload discovery categories for the empty state
+    fetch(`/api/discovery/categories?username=${encodeURIComponent(username)}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.categories) setDiscoveryCategories(data.categories.filter((c: DiscoveryCategoryAvailability) => c.available));
+      })
+      .catch(() => {});
   }, [username]);
 
   // Scroll to bottom on new messages
@@ -928,6 +940,33 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           </button>
                         ))}
                       </motion.div>
+
+                      {/* Discovery category cards — "גלו עוד" */}
+                      {discoveryCategories.length > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.4, delay: 0.55 }}
+                          className={`${isMobile ? 'w-[363px]' : 'w-[600px]'} max-w-full`}
+                        >
+                          <p className="text-center text-[14px] mb-3" style={{ color: '#676767' }}>
+                            גלו עוד
+                          </p>
+                          <div className="grid grid-cols-3 gap-2">
+                            {discoveryCategories.slice(0, 6).map((cat, i) => (
+                              <CategoryCard
+                                key={cat.slug}
+                                category={cat}
+                                index={i}
+                                onTap={(slug) => {
+                                  setInitialDiscoverySlug(slug);
+                                  setActiveTab('discover');
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
                     </div>
                   ) : (
                     <div className={`${isMobile ? 'flex flex-col justify-end min-h-full' : 'max-w-[700px] mx-auto'} space-y-4`}>
@@ -1627,12 +1666,14 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   username={username}
                   influencerName={influencer.display_name || ''}
                   sessionId={sessionId || undefined}
+                  initialCategory={initialDiscoverySlug}
                   onAskInChat={(message) => {
                     setInputValue(message);
                     setActiveTab('chat');
                     // Auto-send after state update propagates
                     setTimeout(() => handleSendMessage(), 150);
                   }}
+                  onCategoryOpened={() => setInitialDiscoverySlug(null)}
                 />
               </motion.div>
             ) : null}
