@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Loader2, Sparkles } from 'lucide-react';
 import { useDiscoveryAll, type DiscoveryRow as DiscoveryRowType } from '@/hooks/useDiscoveryAll';
 import { useDiscovery } from '@/hooks/useDiscovery';
 import { DiscoveryRow } from './DiscoveryRow';
@@ -74,36 +74,44 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
   };
 
   return (
-    <div className="h-full overflow-y-auto" style={{ backgroundColor: '#f4f5f7' }}>
+    <div
+      className="h-full overflow-y-auto"
+      style={{
+        background: 'linear-gradient(180deg, #0a0a1a 0%, #141428 40%, #0d0d1f 100%)',
+      }}
+    >
       {/* Header */}
-      <div className="px-4 pt-4 pb-2" dir="rtl">
-        <h2 className="text-[22px] font-bold" style={{ color: '#0c1013' }}>
-          גלו תוכן ✨
-        </h2>
-        <p className="text-[13px] mt-0.5" style={{ color: '#676767' }}>
+      <div className="px-4 pt-5 pb-3" dir="rtl">
+        <div className="flex items-center gap-2 mb-1">
+          <Sparkles className="w-5 h-5" style={{ color: '#e5a00d' }} />
+          <h2 className="text-[24px] font-bold text-white tracking-tight">
+            גלו תוכן
+          </h2>
+        </div>
+        <p className="text-[13px] text-white/40">
           הרשימות הכי מעניינות של {influencerName}
         </p>
       </div>
 
       {/* Loading state */}
       {loading && (
-        <div className="flex flex-col items-center justify-center py-16 gap-3">
-          <Loader2 className="w-7 h-7 animate-spin" style={{ color: '#999' }} />
-          <p className="text-[14px]" style={{ color: '#999' }}>טוען תוכן...</p>
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <Loader2 className="w-8 h-8 animate-spin text-white/30" />
+          <p className="text-[14px] text-white/30">טוען תוכן...</p>
         </div>
       )}
 
       {/* Error state */}
       {error && !loading && (
-        <div className="px-4 py-12 text-center">
-          <p className="text-[14px]" style={{ color: '#999' }}>{error}</p>
+        <div className="px-4 py-16 text-center">
+          <p className="text-[14px] text-white/40">{error}</p>
         </div>
       )}
 
       {/* Netflix rows */}
       {!loading && rows.length > 0 && (
-        <div className="pt-2">
-          {rows.map((row) => (
+        <div className="pt-1 pb-4">
+          {rows.map((row, rowIdx) => (
             <DiscoveryRow
               key={row.category.slug}
               slug={row.category.slug}
@@ -120,29 +128,32 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
 
       {/* Empty state */}
       {!loading && rows.length === 0 && !error && (
-        <div className="px-4 py-12 text-center">
-          <p className="text-[16px] mb-1" style={{ color: '#999' }}>🔍</p>
-          <p className="text-[14px]" style={{ color: '#999' }}>אין רשימות זמינות כרגע</p>
+        <div className="px-4 py-16 text-center">
+          <p className="text-[28px] mb-2 opacity-30">🔍</p>
+          <p className="text-[14px] text-white/30">אין רשימות זמינות כרגע</p>
         </div>
       )}
 
       {/* Questions section (expandable) */}
-      <div className="mt-2 mx-4 mb-32">
+      <div className="mt-1 mx-4 mb-32">
         <button
           onClick={() => setShowQuestions(!showQuestions)}
-          className="w-full flex items-center justify-between rounded-[20px] p-4 transition-colors"
-          style={{ backgroundColor: '#ffffff', border: '1px solid #e5e5ea' }}
+          className="w-full flex items-center justify-between rounded-xl p-4 transition-colors"
+          style={{
+            backgroundColor: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.1)',
+          }}
           dir="rtl"
         >
           <div className="flex items-center gap-2">
             <span className="text-[16px]">❓</span>
-            <span className="text-[15px] font-semibold" style={{ color: '#0c1013' }}>
+            <span className="text-[15px] font-semibold text-white/80">
               שאלות שתמיד רציתם לשאול
             </span>
           </div>
           {showQuestions
-            ? <ChevronUp className="w-5 h-5" style={{ color: '#676767' }} />
-            : <ChevronDown className="w-5 h-5" style={{ color: '#676767' }} />
+            ? <ChevronUp className="w-5 h-5 text-white/40" />
+            : <ChevronDown className="w-5 h-5 text-white/40" />
           }
         </button>
 

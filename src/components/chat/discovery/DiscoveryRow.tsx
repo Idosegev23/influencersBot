@@ -1,5 +1,8 @@
 'use client';
 
+import { useRef } from 'react';
+import { motion } from 'framer-motion';
+import { ChevronLeft } from 'lucide-react';
 import { DiscoveryCard } from './DiscoveryCard';
 import type { DiscoveryItem } from '@/lib/discovery/types';
 
@@ -14,24 +17,46 @@ interface DiscoveryRowProps {
 }
 
 export function DiscoveryRow({ title, subtitle, color, items, onItemClick, slug }: DiscoveryRowProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const scrollLeft = () => {
+    scrollRef.current?.scrollBy({ left: -240, behavior: 'smooth' });
+  };
+
   return (
-    <div className="mb-5">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="mb-6"
+    >
       {/* Category header */}
-      <div className="px-4 mb-2" dir="rtl">
-        <h3 className="text-[16px] font-bold leading-tight" style={{ color: '#0c1013' }}>
-          {title}
-        </h3>
-        {subtitle && (
-          <p className="text-[12px] mt-0.5" style={{ color: '#676767' }}>
-            {subtitle}
-          </p>
-        )}
+      <div className="flex items-center justify-between px-4 mb-2.5" dir="rtl">
+        <div>
+          <h3 className="text-[17px] font-bold leading-tight text-white">
+            {title}
+          </h3>
+          {subtitle && (
+            <p className="text-[12px] mt-0.5 text-white/50">
+              {subtitle}
+            </p>
+          )}
+        </div>
+        {/* Scroll hint arrow */}
+        <button
+          onClick={scrollLeft}
+          className="w-8 h-8 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors"
+        >
+          <ChevronLeft className="w-4 h-4 text-white/70" />
+        </button>
       </div>
 
       {/* Horizontal scroll */}
       <div
-        className="flex gap-3 overflow-x-auto scrollbar-hide snap-x snap-mandatory px-4 pb-1"
+        ref={scrollRef}
+        className="flex gap-3 overflow-x-auto scrollbar-hide snap-x snap-mandatory px-4 pb-2"
         dir="rtl"
+        style={{ scrollPaddingInlineStart: 16 }}
       >
         {items.map((item, idx) => (
           <DiscoveryCard
@@ -43,6 +68,6 @@ export function DiscoveryRow({ title, subtitle, color, items, onItemClick, slug 
           />
         ))}
       </div>
-    </div>
+    </motion.div>
   );
 }
