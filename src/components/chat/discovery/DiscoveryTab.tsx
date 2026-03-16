@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, ChevronUp, Loader2, Sparkles } from 'lucide-react';
-import { useDiscoveryAll, type DiscoveryRow as DiscoveryRowType } from '@/hooks/useDiscoveryAll';
+import { useDiscoveryAll } from '@/hooks/useDiscoveryAll';
 import { useDiscovery } from '@/hooks/useDiscovery';
 import { DiscoveryRow } from './DiscoveryRow';
 import { QuestionsView } from './QuestionsView';
@@ -31,7 +31,6 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
   const [showQuestions, setShowQuestions] = useState(false);
   const questionsLoadedRef = useRef(false);
 
-  // Load questions when section is expanded
   useEffect(() => {
     if (showQuestions && !questionsLoadedRef.current) {
       questionsLoadedRef.current = true;
@@ -39,7 +38,6 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
     }
   }, [showQuestions, loadQuestions]);
 
-  // Handle initial category from empty state pills
   useEffect(() => {
     if (initialCategory === 'questions') {
       setShowQuestions(true);
@@ -49,13 +47,11 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
     }
   }, [initialCategory, onCategoryOpened]);
 
-  // Handle card click → send enriched message to chat
   const handleItemClick = (item: DiscoveryItem, categoryTitle: string, categorySlug: string) => {
     const title = item.aiTitle || item.captionExcerpt;
     const truncated = title.length > 80 ? title.slice(0, 80) + '...' : title;
     const visibleMsg = `ספרי לי עוד על: ${truncated}`;
 
-    // Build enriched context from the row's items
     const row = rows.find(r => r.category.slug === categorySlug);
     let enrichedData: string | undefined;
     if (row) {
@@ -74,44 +70,39 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
   };
 
   return (
-    <div
-      className="h-full overflow-y-auto"
-      style={{
-        background: 'linear-gradient(180deg, #0a0a1a 0%, #141428 40%, #0d0d1f 100%)',
-      }}
-    >
+    <div className="h-full overflow-y-auto" style={{ backgroundColor: '#f4f5f7' }}>
       {/* Header */}
       <div className="px-4 pt-5 pb-3" dir="rtl">
-        <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-center gap-2 mb-0.5">
           <Sparkles className="w-5 h-5" style={{ color: '#e5a00d' }} />
-          <h2 className="text-[24px] font-bold text-white tracking-tight">
+          <h2 className="text-[22px] font-bold" style={{ color: '#0c1013' }}>
             גלו תוכן
           </h2>
         </div>
-        <p className="text-[13px] text-white/40">
+        <p className="text-[13px]" style={{ color: '#676767' }}>
           הרשימות הכי מעניינות של {influencerName}
         </p>
       </div>
 
-      {/* Loading state */}
+      {/* Loading */}
       {loading && (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-white/30" />
-          <p className="text-[14px] text-white/30">טוען תוכן...</p>
+          <Loader2 className="w-7 h-7 animate-spin" style={{ color: '#bbb' }} />
+          <p className="text-[14px]" style={{ color: '#999' }}>טוען תוכן...</p>
         </div>
       )}
 
-      {/* Error state */}
+      {/* Error */}
       {error && !loading && (
         <div className="px-4 py-16 text-center">
-          <p className="text-[14px] text-white/40">{error}</p>
+          <p className="text-[14px]" style={{ color: '#999' }}>{error}</p>
         </div>
       )}
 
-      {/* Netflix rows */}
+      {/* Marquee rows */}
       {!loading && rows.length > 0 && (
-        <div className="pt-1 pb-4">
-          {rows.map((row, rowIdx) => (
+        <div className="pt-1 pb-4 overflow-hidden">
+          {rows.map((row, idx) => (
             <DiscoveryRow
               key={row.category.slug}
               slug={row.category.slug}
@@ -121,39 +112,37 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
               icon={row.category.icon}
               items={row.items}
               onItemClick={handleItemClick}
+              reverse={idx % 2 === 1}
             />
           ))}
         </div>
       )}
 
-      {/* Empty state */}
+      {/* Empty */}
       {!loading && rows.length === 0 && !error && (
         <div className="px-4 py-16 text-center">
           <p className="text-[28px] mb-2 opacity-30">🔍</p>
-          <p className="text-[14px] text-white/30">אין רשימות זמינות כרגע</p>
+          <p className="text-[14px]" style={{ color: '#999' }}>אין רשימות זמינות כרגע</p>
         </div>
       )}
 
-      {/* Questions section (expandable) */}
-      <div className="mt-1 mx-4 mb-32">
+      {/* Questions */}
+      <div className="mt-2 mx-4 mb-32">
         <button
           onClick={() => setShowQuestions(!showQuestions)}
-          className="w-full flex items-center justify-between rounded-xl p-4 transition-colors"
-          style={{
-            backgroundColor: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.1)',
-          }}
+          className="w-full flex items-center justify-between rounded-[20px] p-4 transition-colors"
+          style={{ backgroundColor: '#ffffff', border: '1px solid #e5e5ea' }}
           dir="rtl"
         >
           <div className="flex items-center gap-2">
             <span className="text-[16px]">❓</span>
-            <span className="text-[15px] font-semibold text-white/80">
+            <span className="text-[15px] font-semibold" style={{ color: '#0c1013' }}>
               שאלות שתמיד רציתם לשאול
             </span>
           </div>
           {showQuestions
-            ? <ChevronUp className="w-5 h-5 text-white/40" />
-            : <ChevronDown className="w-5 h-5 text-white/40" />
+            ? <ChevronUp className="w-5 h-5" style={{ color: '#676767' }} />
+            : <ChevronDown className="w-5 h-5" style={{ color: '#676767' }} />
           }
         </button>
 
