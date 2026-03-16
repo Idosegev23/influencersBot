@@ -3,7 +3,12 @@
 import { useEffect, useRef } from 'react';
 import { gsap } from 'gsap';
 
-const GLOW = '139, 92, 246';
+/* Purple→Pink gradient palette */
+const PURPLE = '139, 92, 246';   // #8b5cf6
+const PINK   = '217, 70, 239';   // #d946ef
+const ROSE   = '244, 114, 182';  // #f472b6
+const COLORS = [PURPLE, PINK, ROSE];
+
 const SPOT_R = 400;
 const PARTICLES = 12;
 
@@ -85,8 +90,9 @@ export function useMagicBento(
         for (let i = 0; i < PARTICLES; i++) {
           const tid = setTimeout(() => {
             if (!card.isConnected) return;
+            const c = COLORS[i % COLORS.length];
             const p = document.createElement('div');
-            p.style.cssText = `position:absolute;width:3px;height:3px;border-radius:50%;background:rgba(${GLOW},0.7);box-shadow:0 0 5px rgba(${GLOW},0.4);pointer-events:none;z-index:50;left:${Math.random() * width}px;top:${Math.random() * height}px;`;
+            p.style.cssText = `position:absolute;width:3px;height:3px;border-radius:50%;background:rgba(${c},0.7);box-shadow:0 0 5px rgba(${c},0.4);pointer-events:none;z-index:50;left:${Math.random() * width}px;top:${Math.random() * height}px;`;
             card.appendChild(p);
             ps.push(p);
 
@@ -128,7 +134,7 @@ export function useMagicBento(
           Math.hypot(x - r.width, y - r.height)
         );
         const rip = document.createElement('div');
-        rip.style.cssText = `position:absolute;width:${m * 2}px;height:${m * 2}px;border-radius:50%;background:radial-gradient(circle,rgba(${GLOW},0.2) 0%,rgba(${GLOW},0.08) 35%,transparent 70%);left:${x - m}px;top:${y - m}px;pointer-events:none;z-index:100;`;
+        rip.style.cssText = `position:absolute;width:${m * 2}px;height:${m * 2}px;border-radius:50%;background:radial-gradient(circle,rgba(${PURPLE},0.2) 0%,rgba(${PINK},0.12) 25%,rgba(${ROSE},0.05) 45%,transparent 70%);left:${x - m}px;top:${y - m}px;pointer-events:none;z-index:100;`;
         card.appendChild(rip);
         gsap.fromTo(rip,
           { scale: 0, opacity: 1 },

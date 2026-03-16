@@ -1702,9 +1702,10 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .bt-bento:hover {
-  border-color: rgba(139,92,246,0.25);
+  border-color: rgba(217,70,239,0.2);
   box-shadow:
-    0 4px 20px rgba(139,92,246,0.1),
+    0 4px 20px rgba(139,92,246,0.08),
+    0 0 15px rgba(217,70,239,0.06),
     0 0 0 1px rgba(255,255,255,0.2) inset;
 }
 
@@ -1718,7 +1719,7 @@ h1, h2, h3, h4, h5, h6 {
   pointer-events: none;
 }
 
-/* Border glow — follows cursor */
+/* Border glow — purple→pink gradient follows cursor */
 .bt-bento::after {
   content: '';
   position: absolute;
@@ -1726,8 +1727,9 @@ h1, h2, h3, h4, h5, h6 {
   padding: 4px;
   background: radial-gradient(
     var(--glow-radius) circle at var(--glow-x) var(--glow-y),
-    rgba(139,92,246, calc(var(--glow-intensity) * 0.7)) 0%,
-    rgba(139,92,246, calc(var(--glow-intensity) * 0.35)) 30%,
+    rgba(139,92,246, calc(var(--glow-intensity) * 0.6)) 0%,
+    rgba(217,70,239, calc(var(--glow-intensity) * 0.4)) 25%,
+    rgba(244,114,182, calc(var(--glow-intensity) * 0.15)) 45%,
     transparent 60%
   );
   border-radius: inherit;
@@ -1743,7 +1745,7 @@ h1, h2, h3, h4, h5, h6 {
   z-index: 8;
 }
 
-/* Global spotlight */
+/* Global spotlight — purple→pink */
 .bt-spotlight {
   position: fixed;
   width: 600px;
@@ -1751,10 +1753,10 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: 50%;
   pointer-events: none;
   background: radial-gradient(circle,
-    rgba(139,92,246,0.1) 0%,
-    rgba(139,92,246,0.05) 20%,
-    rgba(139,92,246,0.02) 40%,
-    transparent 60%
+    rgba(139,92,246,0.08) 0%,
+    rgba(217,70,239,0.05) 18%,
+    rgba(244,114,182,0.02) 35%,
+    transparent 55%
   );
   z-index: 200;
   opacity: 0;
