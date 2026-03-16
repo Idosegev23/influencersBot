@@ -12,14 +12,13 @@ interface DiscoveryRowProps {
   onItemClick: (item: DiscoveryItem, categoryTitle: string, categorySlug: string) => void;
   slug: string;
   reverse?: boolean;
-  /** Duration in seconds — vary per row for different speeds */
   duration?: number;
 }
 
 export function DiscoveryRow({ title, subtitle, color, items, onItemClick, slug, reverse = false, duration = 30 }: DiscoveryRowProps) {
   return (
     <div className="mb-5">
-      {/* Category header — outside the marquee container, never covered by fades */}
+      {/* Category header */}
       <div className="px-4 mb-2" dir="rtl">
         <h3 className="text-[16px] font-bold leading-tight" style={{ color: '#0c1013' }}>
           {title}
@@ -36,7 +35,9 @@ export function DiscoveryRow({ title, subtitle, color, items, onItemClick, slug,
         <Marquee
           reverse={reverse}
           pauseOnHover
-          className={`[--duration:${duration}s] [--gap:0.75rem]`}
+          duration={duration}
+          repeat={4}
+          className="[--gap:0.75rem]"
         >
           {items.map((item, idx) => (
             <DiscoveryCard
@@ -48,7 +49,7 @@ export function DiscoveryRow({ title, subtitle, color, items, onItemClick, slug,
           ))}
         </Marquee>
 
-        {/* Fade edges — only over the marquee, not the title */}
+        {/* Fade edges */}
         <div
           className="pointer-events-none absolute inset-y-0 left-0 w-1/6 z-10"
           style={{ background: 'linear-gradient(to right, #f4f5f7, transparent)' }}
