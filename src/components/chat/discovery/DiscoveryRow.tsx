@@ -12,13 +12,15 @@ interface DiscoveryRowProps {
   onItemClick: (item: DiscoveryItem, categoryTitle: string, categorySlug: string) => void;
   slug: string;
   reverse?: boolean;
+  /** Duration in seconds — vary per row for different speeds */
+  duration?: number;
 }
 
-export function DiscoveryRow({ title, subtitle, color, items, onItemClick, slug, reverse = false }: DiscoveryRowProps) {
+export function DiscoveryRow({ title, subtitle, color, items, onItemClick, slug, reverse = false, duration = 30 }: DiscoveryRowProps) {
   return (
-    <div className="mb-4">
-      {/* Category header — above the scroll, with z-index so fades don't cover it */}
-      <div className="relative z-20 px-4 mb-2" dir="rtl">
+    <div className="mb-5">
+      {/* Category header — outside the marquee container, never covered by fades */}
+      <div className="px-4 mb-2" dir="rtl">
         <h3 className="text-[16px] font-bold leading-tight" style={{ color: '#0c1013' }}>
           {title}
         </h3>
@@ -29,21 +31,33 @@ export function DiscoveryRow({ title, subtitle, color, items, onItemClick, slug,
         )}
       </div>
 
-      {/* Marquee */}
-      <Marquee
-        reverse={reverse}
-        pauseOnHover
-        className="[--duration:30s] [--gap:0.75rem]"
-      >
-        {items.map((item, idx) => (
-          <DiscoveryCard
-            key={item.postId || item.shortcode || `${slug}-${idx}`}
-            item={item}
-            color={color}
-            onClick={(clickedItem) => onItemClick(clickedItem, title, slug)}
-          />
-        ))}
-      </Marquee>
+      {/* Marquee with per-row fade edges */}
+      <div className="relative overflow-hidden">
+        <Marquee
+          reverse={reverse}
+          pauseOnHover
+          className={`[--duration:${duration}s] [--gap:0.75rem]`}
+        >
+          {items.map((item, idx) => (
+            <DiscoveryCard
+              key={item.postId || item.shortcode || `${slug}-${idx}`}
+              item={item}
+              color={color}
+              onClick={(clickedItem) => onItemClick(clickedItem, title, slug)}
+            />
+          ))}
+        </Marquee>
+
+        {/* Fade edges — only over the marquee, not the title */}
+        <div
+          className="pointer-events-none absolute inset-y-0 left-0 w-1/6 z-10"
+          style={{ background: 'linear-gradient(to right, #f4f5f7, transparent)' }}
+        />
+        <div
+          className="pointer-events-none absolute inset-y-0 right-0 w-1/6 z-10"
+          style={{ background: 'linear-gradient(to left, #f4f5f7, transparent)' }}
+        />
+      </div>
     </div>
   );
 }

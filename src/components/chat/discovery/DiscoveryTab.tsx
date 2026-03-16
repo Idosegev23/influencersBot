@@ -99,31 +99,27 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
         </div>
       )}
 
-      {/* Marquee rows — single relative container with side fades */}
+      {/* Marquee rows — each row has its own fade edges */}
       {!loading && rows.length > 0 && (
-        <div className="relative flex w-full flex-col items-center justify-center overflow-hidden">
-          {rows.map((row, idx) => (
-            <DiscoveryRow
-              key={row.category.slug}
-              slug={row.category.slug}
-              title={row.category.title}
-              subtitle={row.category.subtitle}
-              color={row.category.color}
-              items={row.items}
-              onItemClick={handleItemClick}
-              reverse={idx % 2 === 1}
-            />
-          ))}
-
-          {/* Side fade overlays — exactly like MagicUI demo */}
-          <div
-            className="pointer-events-none absolute inset-y-0 left-0 w-1/6 z-10"
-            style={{ background: 'linear-gradient(to right, #f4f5f7, transparent)' }}
-          />
-          <div
-            className="pointer-events-none absolute inset-y-0 right-0 w-1/6 z-10"
-            style={{ background: 'linear-gradient(to left, #f4f5f7, transparent)' }}
-          />
+        <div className="pt-1 pb-4">
+          {rows.map((row, idx) => {
+            // Different speed per row so they don't move in sync
+            const speeds = [28, 38, 22, 34, 26, 42, 30, 36];
+            const duration = speeds[idx % speeds.length];
+            return (
+              <DiscoveryRow
+                key={row.category.slug}
+                slug={row.category.slug}
+                title={row.category.title}
+                subtitle={row.category.subtitle}
+                color={row.category.color}
+                items={row.items}
+                onItemClick={handleItemClick}
+                reverse={idx % 2 === 1}
+                duration={duration}
+              />
+            );
+          })}
         </div>
       )}
 
