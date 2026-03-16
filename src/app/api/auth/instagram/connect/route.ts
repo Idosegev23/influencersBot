@@ -9,15 +9,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const INSTAGRAM_APP_ID = process.env.INSTAGRAM_APP_ID || process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID || '';
-const REDIRECT_URI = process.env.INSTAGRAM_REDIRECT_URI || 'https://influencers-bot.vercel.app/api/auth/instagram/callback';
 
 // Scopes to request — these are the permissions we need
 const SCOPES = [
   'instagram_business_basic',
   'instagram_business_manage_messages',
   'instagram_business_manage_comments',
-  // Add these when needed:
-  // 'instagram_business_content_publish',
+  'instagram_business_content_publish',
+  'instagram_business_manage_insights',
 ].join(',');
 
 export async function GET(req: NextRequest) {
@@ -30,6 +29,10 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // Build redirect_uri dynamically from request origin — must match EXACTLY in callback
+  const origin = req.nextUrl.origin;
+  const redirectUri = `${origin}/api/auth/instagram/callback`;
+
   // State parameter — passed through OAuth flow and returned in callback
   // Contains the accountId so we can link the connection to the right account
   const state = encodeURIComponent(JSON.stringify({ accountId }));
@@ -37,7 +40,7 @@ export async function GET(req: NextRequest) {
   // Build Instagram OAuth URL
   const authUrl = new URL('https://www.instagram.com/oauth/authorize');
   authUrl.searchParams.set('client_id', INSTAGRAM_APP_ID);
-  authUrl.searchParams.set('redirect_uri', REDIRECT_URI);
+  authUrl.searchParams.set('redirect_uri', redirectUri);
   authUrl.searchParams.set('response_type', 'code');
   authUrl.searchParams.set('scope', SCOPES);
   authUrl.searchParams.set('state', state);

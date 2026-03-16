@@ -18,7 +18,6 @@ import { createClient } from '@/lib/supabase/server';
 
 const INSTAGRAM_APP_ID = process.env.INSTAGRAM_APP_ID || process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID || '';
 const INSTAGRAM_APP_SECRET = process.env.INSTAGRAM_APP_SECRET || '';
-const REDIRECT_URI = process.env.INSTAGRAM_REDIRECT_URI || 'https://influencers-bot.vercel.app/api/auth/instagram/callback';
 const GRAPH_API_VERSION = 'v22.0';
 const FB_GRAPH_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
 
@@ -51,9 +50,13 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // Build redirect_uri dynamically — must match EXACTLY what connect route sent
+    const origin = req.nextUrl.origin;
+    const redirectUri = `${origin}/api/auth/instagram/callback`;
+
     // 1. Exchange authorization code for short-lived access token
     console.log('[IG OAuth] Exchanging code for short-lived token...');
-    const shortLivedToken = await exchangeCodeForToken(code);
+    const shortLivedToken = await exchangeCodeForToken(code, redirectUri);
 
     // 2. Exchange short-lived token for long-lived token (60 days)
     console.log('[IG OAuth] Exchanging for long-lived token...');
@@ -140,12 +143,12 @@ interface LongLivedTokenResponse {
 /**
  * Exchange authorization code for short-lived access token
  */
-async function exchangeCodeForToken(code: string): Promise<ShortLivedTokenResponse> {
+async function exchangeCodeForToken(code: string, redirectUri: string): Promise<ShortLivedTokenResponse> {
   const params = new URLSearchParams({
     client_id: INSTAGRAM_APP_ID,
     client_secret: INSTAGRAM_APP_SECRET,
     grant_type: 'authorization_code',
-    redirect_uri: REDIRECT_URI,
+    redirect_uri: redirectUri,
     code,
   });
 
