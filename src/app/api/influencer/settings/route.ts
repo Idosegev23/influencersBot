@@ -91,6 +91,11 @@ export async function POST(req: NextRequest) {
       updatedConfig.whatsapp_enabled = body.whatsapp_enabled;
     }
 
+    // Persona preferences stored in config (emoji_style has no DB column)
+    if (body.persona?.emoji_style !== undefined) {
+      updatedConfig.persona_emoji_style = body.persona.emoji_style;
+    }
+
     // ── Write config back ──
     const { error: updateErr } = await supabase
       .from('accounts')
@@ -112,7 +117,6 @@ export async function POST(req: NextRequest) {
       if (body.persona.style !== undefined) personaUpdate.response_style = body.persona.style;
       if (body.persona.interests !== undefined) personaUpdate.topics = body.persona.interests;
       if (body.persona.signature_phrases !== undefined) personaUpdate.common_phrases = body.persona.signature_phrases;
-      if (body.persona.emoji_style !== undefined) personaUpdate.emoji_style = body.persona.emoji_style;
       if (body.persona.language !== undefined) personaUpdate.language = body.persona.language;
 
       if (Object.keys(personaUpdate).length > 0) {

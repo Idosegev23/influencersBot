@@ -165,9 +165,10 @@ export default function SettingsPage({
           setPersonaStyle(inf.persona.style || '');
           setPersonaInterests(inf.persona.interests || []);
           setPersonaPhrases(inf.persona.signature_phrases || []);
-          setPersonaEmojiStyle(inf.persona.emoji_style || 'minimal');
           setPersonaLanguage(inf.persona.language || 'he');
         }
+        // emoji_style stored in config (no DB column)
+        if (rawConfig.persona_emoji_style) setPersonaEmojiStyle(rawConfig.persona_emoji_style);
       } catch (error) {
         console.error('Error loading data:', error);
       } finally {

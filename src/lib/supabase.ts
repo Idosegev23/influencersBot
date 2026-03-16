@@ -123,7 +123,6 @@ export async function getInfluencerByUsername(username: string): Promise<Influen
         response_style,
         topics,
         common_phrases,
-        emoji_style,
         language,
         created_at,
         updated_at
@@ -159,7 +158,7 @@ export async function getInfluencerByUsername(username: string): Promise<Influen
     console.log('[getInfluencerByUsername] Fallback succeeded for @' + username + ' — fetching relations separately');
     const [{ data: persona }, { data: history }] = await Promise.all([
       supabase.from('chatbot_persona')
-        .select('id, name, instagram_username, instagram_followers, tone, response_style, topics, common_phrases, created_at, updated_at')
+        .select('id, name, instagram_username, instagram_followers, tone, response_style, topics, common_phrases, language, created_at, updated_at')
         .eq('account_id', fallback.id),
       supabase.from('instagram_profile_history')
         .select('username, full_name, bio, followers_count, profile_pic_url, is_verified, category, snapshot_date')
@@ -232,7 +231,6 @@ export async function getInfluencerByUsername(username: string): Promise<Influen
       style: persona.response_style || '',
       interests: persona.topics || [],
       signature_phrases: persona.common_phrases || [],
-      emoji_style: persona.emoji_style || 'minimal',
       language: persona.language || 'he',
     } : null,
     
