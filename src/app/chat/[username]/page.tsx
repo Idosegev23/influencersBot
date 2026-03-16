@@ -749,9 +749,9 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       <link href={getGoogleFontsUrl(influencer.theme)} rel="stylesheet" />
       <meta name="theme-color" content="#f4f5f7" />
       
-      <main className="chat-page flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--color-background)' }}>
+      <main className="chat-page flex flex-col overflow-hidden" style={{ position: 'relative' }}>
         {/* Header */}
-        <header className={`sticky top-0 z-50 ${isMobile ? 'glass header-border px-4 h-[68px] flex items-center' : 'px-4 py-[10px]'}`}>
+        <header className={`sticky top-0 z-50 ${isMobile ? 'glass header-border px-4 h-[68px] flex items-center' : 'px-4 py-[10px]'}`} style={{ position: 'sticky', zIndex: 50, isolation: 'isolate' }}>
           {isMobile ? (
             /* ---- Mobile Header ---- */
             <div className="w-full flex items-center justify-between">
@@ -781,7 +781,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
             </div>
           ) : (
             /* ---- Desktop Header (Figma pill) ---- */
-            <div className="max-w-[700px] mx-auto bg-white rounded-full h-[69px] flex items-center justify-between px-3 flex-nowrap overflow-hidden">
+            <div className="max-w-[700px] mx-auto rounded-full h-[69px] flex items-center justify-between px-3 flex-nowrap overflow-hidden chat-header-glow" style={{ background: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(24px) saturate(1.6)', WebkitBackdropFilter: 'blur(24px) saturate(1.6)', border: '1px solid rgba(255,255,255,0.7)', boxShadow: '0 4px 30px rgba(0,0,0,0.06)' }}>
               {/* Right side: Avatar + Name */}
               <div className="flex items-center gap-2.5 min-w-0 flex-shrink">
                 <div onClick={handleAvatarTap} className="cursor-pointer select-none relative">
@@ -804,36 +804,36 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
 
               {/* Left side: Tab pills */}
               <div className="flex items-center gap-2 flex-shrink-0">
-              <div className="flex items-center gap-[5px] bg-white rounded-full p-[6px]">
+              <div className="flex items-center gap-[5px] rounded-full p-[6px]" style={{ background: 'rgba(255,255,255,0.3)' }}>
                 {/* Tabs in RTL order: צ'אט first (rightmost), then קופונים, then בעיה בהזמנה (leftmost) */}
                 <button
                   onClick={() => setActiveTab('chat')}
-                  className={`flex items-center gap-[6px] px-[11px] py-[6px] rounded-full transition-all ${activeTab === 'chat' ? 'bg-[#dbe4f5]' : ''}`}
-                  style={{ color: activeTab === 'chat' ? '#0c1013' : '#676767', fontSize: '16px', fontWeight: activeTab === 'chat' ? 700 : 400 }}
+                  className={`flex items-center gap-[6px] px-[11px] py-[6px] rounded-full transition-all`}
+                  style={{ color: activeTab === 'chat' ? '#6d28d9' : '#676767', fontSize: '16px', fontWeight: activeTab === 'chat' ? 700 : 400, background: activeTab === 'chat' ? 'rgba(139, 92, 246, 0.12)' : 'transparent' }}
                 >
                   <span>צ׳אט</span>
                   <MessageCircle className="w-[18px] h-[18px]" />
                 </button>
                 <button
                   onClick={() => setActiveTab('coupons')}
-                  className={`flex items-center gap-[6px] px-[13px] py-[6px] rounded-full transition-all ${activeTab === 'coupons' ? 'bg-[#e5f2d6]' : ''}`}
-                  style={{ color: activeTab === 'coupons' ? '#0c1013' : '#676767', fontSize: '16px', fontWeight: activeTab === 'coupons' ? 700 : 400 }}
+                  className={`flex items-center gap-[6px] px-[13px] py-[6px] rounded-full transition-all`}
+                  style={{ color: activeTab === 'coupons' ? '#059669' : '#676767', fontSize: '16px', fontWeight: activeTab === 'coupons' ? 700 : 400, background: activeTab === 'coupons' ? 'rgba(16, 185, 129, 0.12)' : 'transparent' }}
                 >
                   <span>קופונים</span>
                   <Ticket className="w-[18px] h-[18px]" />
                 </button>
                 <button
                   onClick={() => setActiveTab('problem')}
-                  className={`flex items-center gap-[6px] px-[13px] py-[6px] rounded-full transition-all ${activeTab === 'problem' ? 'bg-[#ffd6d7]' : ''}`}
-                  style={{ color: activeTab === 'problem' ? '#0c1013' : '#676767', fontSize: '16px', fontWeight: activeTab === 'problem' ? 700 : 400 }}
+                  className={`flex items-center gap-[6px] px-[13px] py-[6px] rounded-full transition-all`}
+                  style={{ color: activeTab === 'problem' ? '#db2777' : '#676767', fontSize: '16px', fontWeight: activeTab === 'problem' ? 700 : 400, background: activeTab === 'problem' ? 'rgba(244, 114, 182, 0.12)' : 'transparent' }}
                 >
                   <span>בעיה בהזמנה</span>
                   <AlertCircle className="w-[18px] h-[18px]" />
                 </button>
                 <button
                   onClick={() => setActiveTab('discover')}
-                  className={`flex items-center gap-[6px] px-[11px] py-[6px] rounded-full transition-all ${activeTab === 'discover' ? 'bg-[#e8daf7]' : ''}`}
-                  style={{ color: activeTab === 'discover' ? '#0c1013' : '#676767', fontSize: '16px', fontWeight: activeTab === 'discover' ? 700 : 400 }}
+                  className={`flex items-center gap-[6px] px-[11px] py-[6px] rounded-full transition-all`}
+                  style={{ color: activeTab === 'discover' ? '#7c3aed' : '#676767', fontSize: '16px', fontWeight: activeTab === 'discover' ? 700 : 400, background: activeTab === 'discover' ? 'rgba(168, 85, 247, 0.12)' : 'transparent' }}
                 >
                   <span>גלו</span>
                   <Compass className="w-[18px] h-[18px]" />
@@ -845,7 +845,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
         </header>
 
         {/* Main Content */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden" style={{ position: 'relative', zIndex: 1 }}>
           <AnimatePresence mode="wait">
             {activeTab === 'chat' ? (
               <motion.div
@@ -1328,7 +1328,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 {/* Chat Input — hidden in empty state (shown inline above) */}
                 <div
                   className={`flex-shrink-0 pt-3 chat-input-gradient ${messages.length === 0 ? 'hidden' : (isMobile ? 'px-[15px] pb-[calc(max(8px,env(safe-area-inset-bottom))+60px)]' : 'px-6 pb-6')}`}
-                  style={{ background: '#f4f5f7' }}
+                  style={{ background: 'transparent' }}
                 >
                   <div className={`mx-auto ${isMobile ? 'max-w-2xl' : 'max-w-[670px]'}`}>
                     <div className="chat-input-pill">
@@ -1370,11 +1370,11 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className={`h-full overflow-y-auto ${isMobile ? 'pb-32' : 'pb-8'}`}
-                style={{ background: '#f4f5f7' }}
+                style={{ background: 'transparent' }}
               >
                 <div className="px-4 py-6">
                   <div className={`mx-auto ${isMobile ? 'max-w-2xl' : 'max-w-[700px]'}`}>
-                    <h2 className="font-semibold mb-1 text-center" style={{ fontSize: '26px', color: '#0c1013', lineHeight: '30px' }}>קופונים</h2>
+                    <h2 className="font-semibold mb-1 text-center" style={{ fontSize: '26px', color: '#1a1a2e', lineHeight: '30px' }}>קופונים</h2>
                     <p className="mb-6 text-center" style={{ fontSize: '16px', color: '#676767' }}>טקסט קצר על הקופונים</p>
                     <div className={`${isMobile ? 'flex flex-col gap-3' : 'grid grid-cols-2 gap-4'}`}>
                       {brands.map((brand) => (
@@ -1427,7 +1427,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className={`h-full overflow-y-auto ${isMobile ? 'pb-32' : 'pb-8'}`}
-                style={{ background: '#f4f5f7' }}
+                style={{ background: 'transparent' }}
               >
                 <div className="px-4 py-6">
                   <div className={`mx-auto ${isMobile ? 'max-w-2xl' : 'max-w-[700px]'}`}>

@@ -45,6 +45,7 @@ export default function ChatbotSettingsPage() {
   const [showProgress, setShowProgress] = useState(false);
   const [accountId, setAccountId] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [showLivePreview, setShowLivePreview] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -158,9 +159,19 @@ export default function ChatbotSettingsPage() {
     >
       <div className="max-w-6xl mx-auto space-y-8 animate-slide-up">
         {/* Header */}
-        <div>
-          <h1 className="text-4xl font-bold" style={{ color: 'var(--dash-text)' }}>הגדרות צ'אטבוט</h1>
-          <p className="mt-2" style={{ color: 'var(--dash-text-2)' }}>ניהול הפרסונה והמידע של הצ'אטבוט שלך</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-4xl font-bold" style={{ color: 'var(--dash-text)' }}>הגדרות צ'אטבוט</h1>
+            <p className="mt-2" style={{ color: 'var(--dash-text-2)' }}>ניהול הפרסונה והמידע של הצ'אטבוט שלך</p>
+          </div>
+          <button
+            onClick={() => setShowLivePreview(true)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90"
+            style={{ backgroundColor: 'var(--color-primary)', color: '#fff' }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            צפייה חיה
+          </button>
         </div>
 
         {/* Statistics Cards */}
@@ -342,6 +353,61 @@ export default function ChatbotSettingsPage() {
           </div>
         </div>
       </div>
+
+      {/* Live Preview Modal */}
+      {showLivePreview && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center"
+          style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setShowLivePreview(false)}
+        >
+          <div
+            className="relative flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between w-[390px] mb-3 px-1">
+              <span className="text-sm font-medium text-white/80">
+                צפייה חיה — כך העוקבים רואים את הצ׳אט
+              </span>
+              <div className="flex items-center gap-2">
+                <a
+                  href={`/chat/${username}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-white/60 hover:text-white transition-colors underline"
+                >
+                  פתח בטאב חדש
+                </a>
+                <button
+                  onClick={() => setShowLivePreview(false)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 transition-all"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            <div
+              className="rounded-[40px] overflow-hidden shadow-2xl"
+              style={{ width: 390, height: 760, border: '8px solid #1a1a1a', backgroundColor: '#1a1a1a' }}
+            >
+              <div className="relative flex justify-center" style={{ backgroundColor: '#1a1a1a', height: 30 }}>
+                <div className="absolute top-0 rounded-b-2xl" style={{ width: 120, height: 24, backgroundColor: '#1a1a1a' }} />
+              </div>
+              <iframe
+                src={`/chat/${username}?preview=1&t=${Date.now()}`}
+                className="w-full border-0"
+                style={{ height: 'calc(100% - 30px)', borderRadius: '0 0 32px 32px', backgroundColor: '#f4f5f7' }}
+                title="תצוגה מקדימה חיה"
+              />
+            </div>
+
+            <p className="text-xs text-white/50 mt-3">
+              זה הצ׳אט כמו שהעוקבים שלך רואים אותו — נסו לשלוח הודעה
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

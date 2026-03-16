@@ -117,6 +117,7 @@ export default function SettingsPage({
 
   // Preview state
   const [showPreview, setShowPreview] = useState(false);
+  const [showLivePreview, setShowLivePreview] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -297,6 +298,14 @@ export default function SettingsPage({
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
         {/* Top Actions */}
         <div className="flex items-center justify-end gap-2 mb-8 animate-slide-up">
+          <button
+            onClick={() => setShowLivePreview(true)}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium transition-all btn-ghost"
+            style={{ border: '1px solid var(--color-primary)', color: 'var(--color-primary)' }}
+          >
+            <Globe className="w-4 h-4" />
+            צפייה חיה
+          </button>
           <button
             onClick={() => setShowPreview(!showPreview)}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-all ${
@@ -1110,6 +1119,79 @@ export default function SettingsPage({
           )}
         </div>
       </main>
+
+      {/* Live Preview Modal */}
+      {showLivePreview && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center"
+          style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setShowLivePreview(false)}
+        >
+          <div
+            className="relative flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Phone frame header */}
+            <div className="flex items-center justify-between w-[390px] mb-3 px-1">
+              <span className="text-sm font-medium text-white/80">
+                צפייה חיה — {influencer.display_name}
+              </span>
+              <div className="flex items-center gap-2">
+                <a
+                  href={`/chat/${username}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-white/60 hover:text-white transition-colors underline"
+                >
+                  פתח בטאב חדש
+                </a>
+                <button
+                  onClick={() => setShowLivePreview(false)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 transition-all"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Phone frame */}
+            <div
+              className="rounded-[40px] overflow-hidden shadow-2xl"
+              style={{
+                width: 390,
+                height: 760,
+                border: '8px solid #1a1a1a',
+                backgroundColor: '#1a1a1a',
+              }}
+            >
+              {/* Notch */}
+              <div className="relative flex justify-center" style={{ backgroundColor: '#1a1a1a', height: 30 }}>
+                <div
+                  className="absolute top-0 rounded-b-2xl"
+                  style={{ width: 120, height: 24, backgroundColor: '#1a1a1a' }}
+                />
+              </div>
+
+              {/* Iframe */}
+              <iframe
+                src={`/chat/${username}?preview=1&t=${Date.now()}`}
+                className="w-full border-0"
+                style={{
+                  height: 'calc(100% - 30px)',
+                  borderRadius: '0 0 32px 32px',
+                  backgroundColor: '#f4f5f7',
+                }}
+                title="תצוגה מקדימה חיה"
+              />
+            </div>
+
+            {/* Hint */}
+            <p className="text-xs text-white/50 mt-3">
+              זה הצ׳אט כמו שהעוקבים שלך רואים אותו — נסו לשלוח הודעה
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -18,8 +18,8 @@ interface DiscoveryRowProps {
 export function DiscoveryRow({ title, subtitle, color, items, onItemClick, slug, reverse = false, duration = 30 }: DiscoveryRowProps) {
   return (
     <div className="mb-5">
-      {/* Category header */}
-      <div className="px-4 mb-2" dir="rtl">
+      {/* Category header — centered like the marquee */}
+      <div className="w-[60%] mx-auto mb-2" dir="rtl">
         <h3 className="text-[16px] font-bold leading-tight" style={{ color: '#0c1013' }}>
           {title}
         </h3>
@@ -30,14 +30,14 @@ export function DiscoveryRow({ title, subtitle, color, items, onItemClick, slug,
         )}
       </div>
 
-      {/* Marquee with per-row fade edges */}
-      <div className="relative overflow-hidden">
+      {/* Centered marquee container with fade edges */}
+      <div className="w-[60%] mx-auto relative overflow-hidden">
         <Marquee
           reverse={reverse}
           pauseOnHover
           duration={duration}
-          repeat={4}
-          className="[--gap:0.75rem]"
+          repeat={10}
+          gap="0.75rem"
         >
           {items.map((item, idx) => (
             <DiscoveryCard
@@ -51,11 +51,11 @@ export function DiscoveryRow({ title, subtitle, color, items, onItemClick, slug,
 
         {/* Fade edges */}
         <div
-          className="pointer-events-none absolute inset-y-0 left-0 w-1/6 z-10"
+          className="pointer-events-none absolute inset-y-0 left-0 w-1/5 z-10"
           style={{ background: 'linear-gradient(to right, #f4f5f7, transparent)' }}
         />
         <div
-          className="pointer-events-none absolute inset-y-0 right-0 w-1/6 z-10"
+          className="pointer-events-none absolute inset-y-0 right-0 w-1/5 z-10"
           style={{ background: 'linear-gradient(to left, #f4f5f7, transparent)' }}
         />
       </div>

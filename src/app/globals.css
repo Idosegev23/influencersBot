@@ -218,12 +218,52 @@ h1, h2, h3, h4, h5, h6 {
   --color-background: #f4f5f7;
   --color-surface: #f5f5f7;
   --color-text: #1c1c1e;
-  --color-border: #e5e5ea;
+  --color-border: rgba(255, 255, 255, 0.5);
   --chat-bot-bg: transparent;
   --chat-bot-border: transparent;
   background: #f4f5f7;
   height: 100vh;
   height: 100dvh;
+  position: relative;
+}
+
+/* Plissé — colored gradient lines (purple → pink) */
+.chat-page::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(to left,
+    rgba(180, 120, 255, 0.18) 0%,
+    rgba(200, 140, 255, 0.12) 25%,
+    rgba(230, 130, 220, 0.1) 50%,
+    rgba(255, 150, 200, 0.12) 75%,
+    rgba(255, 170, 190, 0.18) 100%);
+  pointer-events: none;
+  z-index: 0;
+  mask-image: radial-gradient(ellipse 70% 55% at 50% 50%, black 0%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 70% 55% at 50% 50%, black 0%, transparent 75%);
+}
+
+.chat-page::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(90deg,
+      rgba(255, 255, 255, 0.45) 0px,
+      rgba(255, 255, 255, 0.2) 1px,
+      transparent 2px,
+      transparent 14px,
+      rgba(0, 0, 0, 0.015) 15px,
+      transparent 16px,
+      transparent 30px,
+      rgba(255, 255, 255, 0.2) 31px,
+      rgba(255, 255, 255, 0.45) 32px
+    );
+  pointer-events: none;
+  z-index: 0;
+  mask-image: radial-gradient(ellipse 75% 60% at 50% 50%, black 0%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse 75% 60% at 50% 50%, black 0%, transparent 70%);
 }
 
 /* ============================================
@@ -640,11 +680,15 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .chat-page .glass {
-  background: #f4f5f7;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  border-bottom: none;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.04);
+  position: relative;
 }
+
+/* Mobile header glow removed per design feedback */
 
 .dark .glass {
   background: rgba(10, 9, 18, 0.82);
@@ -654,21 +698,24 @@ h1, h2, h3, h4, h5, h6 {
    Chat Bubbles
    ============================================ */
 .chat-bubble-user {
-  background: #0c1013;
-  border-radius: 30px;
+  background: linear-gradient(135deg, #2d2b3d 0%, #1a1a2e 100%);
+  border-radius: 22px 22px 4px 22px;
   color: white;
   font-size: 16px;
-  padding: 9px 12px;
+  padding: 12px 18px;
+  box-shadow: 0 2px 12px rgba(30, 20, 60, 0.15);
 }
 
 .chat-bubble-assistant {
-  background: transparent;
-  border-radius: 0;
-  color: #0c1013;
-  border: none;
-  box-shadow: none;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border-radius: 22px 22px 22px 4px;
+  color: #1a1a2e;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.04);
   font-size: 16px;
-  padding: 3px;
+  padding: 12px 18px;
 }
 
 /* ============================================
@@ -1161,16 +1208,18 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   gap: 5px;
   padding: 10px 16px;
-  background: #ffffff;
-  border: 1px solid var(--color-border);
-  border-radius: 4px 20px 20px 20px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 22px 22px 22px 4px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
 }
 
 .typing-dot {
   width: 6px;
   height: 6px;
-  background: color-mix(in srgb, var(--color-primary) 45%, #c7c7cc);
+  background: linear-gradient(135deg, #8b5cf6, #d946ef);
   border-radius: 50%;
   animation: typingWave 1.4s infinite ease-in-out both;
 }
@@ -1522,7 +1571,9 @@ h1, h2, h3, h4, h5, h6 {
    Chat Page Enhancements
    ============================================ */
 .chat-bg {
-  background: #f4f5f7;
+  background: transparent;
+  position: relative;
+  z-index: 1;
 }
 
 @media (max-width: 768px) {
@@ -1544,21 +1595,26 @@ h1, h2, h3, h4, h5, h6 {
 
 .header-border {
   border-bottom: none;
-  box-shadow: 0 1px 0 0 rgba(0, 0, 0, 0.04), 0 2px 8px -2px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+}
+
+/* Desktop header glow removed per design feedback */
+.chat-header-glow {
+  position: relative;
 }
 
 .status-dot {
   width: 10px;
   height: 10px;
-  background: #22c55e;
+  background: linear-gradient(135deg, #8b5cf6, #d946ef);
   border-radius: 50%;
-  border: 2px solid var(--color-background);
+  border: 2px solid rgba(255, 255, 255, 0.8);
   animation: statusPulse 2s infinite;
 }
 
 @keyframes statusPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
-  50% { box-shadow: 0 0 0 4px rgba(34, 197, 94, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4); }
+  50% { box-shadow: 0 0 0 4px rgba(139, 92, 246, 0); }
 }
 
 .chat-input-pill {
@@ -1566,16 +1622,52 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   align-items: center;
   min-height: 60px;
-  background: #ffffff;
-  border: none;
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(24px) saturate(1.5);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  border: 1px solid rgba(255, 255, 255, 0.7);
   border-radius: 60px;
-  box-shadow: 0px 6px 20px rgba(0, 0, 0, 0.1);
-  transition: box-shadow 0.2s ease;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(255, 255, 255, 0.3) inset;
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
   padding: 8px 10px 8px 8px;
 }
 
-.chat-input-pill:focus-within {
-  box-shadow: 0px 6px 20px rgba(0, 0, 0, 0.14);
+/* No visual change on focus — same look always */
+
+/* Gradient glow from input pill — always visible, right-to-left gradient */
+.chat-input-pill::after {
+  content: '';
+  position: absolute;
+  bottom: -80px;
+  left: -30%;
+  right: -30%;
+  height: 200px;
+  background: radial-gradient(ellipse 100% 100% at center,
+    rgba(139, 92, 246, 0.8) 0%,
+    rgba(217, 70, 239, 0.6) 15%,
+    rgba(244, 114, 182, 0.45) 30%,
+    rgba(255, 180, 200, 0.3) 45%,
+    rgba(255, 200, 220, 0.12) 65%,
+    transparent 85%);
+  filter: blur(40px);
+  pointer-events: none;
+  z-index: -1;
+  opacity: 1;
+  background: linear-gradient(to left,
+    rgba(139, 92, 246, 0.8) 0%,
+    rgba(168, 85, 247, 0.65) 20%,
+    rgba(217, 70, 239, 0.55) 40%,
+    rgba(244, 114, 182, 0.45) 60%,
+    rgba(255, 180, 200, 0.35) 80%,
+    rgba(255, 200, 220, 0.25) 100%);
+  filter: blur(40px);
+  animation: inputGlowPulse 5s ease-in-out infinite alternate;
+}
+
+@keyframes inputGlowPulse {
+  0% { opacity: 0.9; transform: scaleX(0.97); }
+  50% { opacity: 1; transform: scaleX(1.05); }
+  100% { opacity: 0.92; transform: scaleX(0.98); }
 }
 
 .chat-input-pill textarea {
@@ -1598,26 +1690,29 @@ h1, h2, h3, h4, h5, h6 {
 
 .chat-input-pill .send-btn {
   flex-shrink: 0;
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #0c1013;
+  background: linear-gradient(135deg, #8b5cf6 0%, #d946ef 50%, #f472b6 100%);
   color: white;
   border: none;
   cursor: pointer;
-  transition: opacity 0.2s, transform 0.2s;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  box-shadow: 0 2px 10px rgba(139, 92, 246, 0.3);
 }
 
 .chat-input-pill .send-btn:hover:not(:disabled) {
-  transform: scale(1.06);
+  transform: scale(1.1);
+  box-shadow: 0 4px 18px rgba(139, 92, 246, 0.4);
 }
 
 .chat-input-pill .send-btn:disabled {
-  opacity: 0.3;
+  opacity: 0.25;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .avatar-ring {
@@ -1645,20 +1740,22 @@ h1, h2, h3, h4, h5, h6 {
   gap: 6px;
   padding: 10px 18px;
   font-size: 13px;
-  background: #ffffff;
-  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.65);
   border-radius: 9999px;
-  color: var(--color-text);
-  transition: all 0.2s ease;
+  color: #3a3550;
+  transition: all 0.25s ease;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .suggestion-pill:hover {
-  border-color: color-mix(in srgb, var(--color-primary) 40%, var(--color-border));
-  background: color-mix(in srgb, var(--color-primary) 4%, #ffffff);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  border-color: rgba(200, 170, 255, 0.5);
+  background: rgba(255, 255, 255, 0.75);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.1);
 }
 
 .pb-safe {
@@ -1686,11 +1783,17 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   gap: 5px;
   padding: 6px;
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(24px) saturate(1.5);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
   border-radius: 60px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.08);
   pointer-events: auto;
+  position: relative;
 }
+
+/* Mobile tab bar glow removed per design feedback */
 
 .mobile-tab-btn {
   display: flex;
@@ -1709,26 +1812,26 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .mobile-tab-btn.active-chat {
-  background: #dbe4f5;
-  color: #0c1013;
+  background: rgba(139, 92, 246, 0.12);
+  color: #6d28d9;
   font-weight: 700;
 }
 
 .mobile-tab-btn.active-coupons {
-  background: #e5f2d6;
-  color: #0c1013;
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
   font-weight: 700;
 }
 
 .mobile-tab-btn.active-problem {
-  background: #ffd6d7;
-  color: #0c1013;
+  background: rgba(244, 114, 182, 0.12);
+  color: #db2777;
   font-weight: 700;
 }
 
 .mobile-tab-btn.active-discover {
-  background: #e8daf7;
-  color: #0c1013;
+  background: rgba(168, 85, 247, 0.12);
+  color: #7c3aed;
   font-weight: 700;
 }
 
@@ -1738,44 +1841,50 @@ h1, h2, h3, h4, h5, h6 {
     background: #f4f5f7 !important;
   }
   .chat-page {
-    background: #f4f5f7 !important;
+    background: transparent !important;
   }
   .chat-page .glass {
-    background: #f4f5f7 !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    border-bottom: 1px solid #d9d9d9 !important;
+    background: rgba(255, 255, 255, 0.45) !important;
+    backdrop-filter: blur(20px) saturate(1.5) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(1.5) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.5) !important;
   }
   .chat-bg {
-    background: #f4f5f7 !important;
+    background: transparent !important;
   }
 
   .mobile-chat .chat-input-pill {
-    border: none !important;
+    border: 1px solid rgba(255, 255, 255, 0.6) !important;
     border-radius: 60px !important;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1) !important;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06) !important;
+    background: rgba(255, 255, 255, 0.6) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
   }
 
   .mobile-chat .chat-input-pill .send-btn {
-    background: #0c1013 !important;
-    width: 38px !important;
-    height: 38px !important;
+    background: linear-gradient(135deg, #8b5cf6 0%, #d946ef 50%, #f472b6 100%) !important;
+    width: 40px !important;
+    height: 40px !important;
+    box-shadow: 0 2px 10px rgba(139, 92, 246, 0.3) !important;
   }
 
   .mobile-chat .suggestion-pill {
-    background: #ffffff !important;
-    border: none !important;
+    background: rgba(255, 255, 255, 0.5) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.6) !important;
     border-radius: 23px !important;
-    padding: 6px 15px !important;
+    padding: 8px 15px !important;
     font-size: 13px !important;
-    color: #676767 !important;
-    box-shadow: none !important;
+    color: #3a3550 !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
   }
 
   .mobile-chat .suggestion-pill:hover {
-    background: #f0f0f2 !important;
+    background: rgba(255, 255, 255, 0.7) !important;
     transform: none !important;
-    box-shadow: none !important;
+    box-shadow: 0 2px 12px rgba(139, 92, 246, 0.08) !important;
   }
 
   .mobile-chat .bot-avatar-inline {
@@ -1783,8 +1892,10 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .mobile-chat .typing-indicator {
-    background: transparent !important;
-    border: none !important;
+    background: rgba(255, 255, 255, 0.45) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.5) !important;
     box-shadow: none !important;
   }
 
@@ -1793,7 +1904,7 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .mobile-chat .chat-input-gradient {
-    background: linear-gradient(to top, #f4f5f7 60%, rgba(244, 245, 247, 0)) !important;
+    background: linear-gradient(to top, rgba(244, 245, 247, 0.9) 40%, transparent 100%) !important;
   }
 }
 
@@ -1803,16 +1914,20 @@ h1, h2, h3, h4, h5, h6 {
   gap: 12px;
   width: 100%;
   padding: 13px 16px;
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-radius: 60px;
   height: 73px;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.6);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.25s ease;
 }
 
 .mobile-brand-row:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.08);
+  border-color: rgba(200, 170, 255, 0.4);
 }
 
 .mobile-brand-row .brand-logo {

@@ -12,6 +12,8 @@ interface MarqueeProps extends ComponentPropsWithoutRef<'div'> {
   repeat?: number;
   /** Animation duration in seconds */
   duration?: number;
+  /** Gap between items (CSS value, e.g. '0.75rem') */
+  gap?: string;
 }
 
 export function Marquee({
@@ -22,6 +24,7 @@ export function Marquee({
   vertical = false,
   repeat = 4,
   duration = 40,
+  gap = '1rem',
   style,
   ...props
 }: MarqueeProps) {
@@ -29,7 +32,7 @@ export function Marquee({
     <div
       {...props}
       className={cn(
-        'group flex overflow-hidden p-2 [--gap:1rem] gap-[var(--gap)]',
+        'group flex overflow-hidden py-2 gap-[var(--gap)]',
         {
           'flex-row': !vertical,
           'flex-col': vertical,
@@ -38,6 +41,7 @@ export function Marquee({
       )}
       style={{
         '--duration': `${duration}s`,
+        '--gap': gap,
         ...style,
       } as React.CSSProperties}
     >
@@ -46,7 +50,7 @@ export function Marquee({
         .map((_, i) => (
           <div
             key={i}
-            className={cn('flex shrink-0 justify-around gap-[var(--gap)]', {
+            className={cn('flex shrink-0 gap-[var(--gap)]', {
               'animate-marquee flex-row': !vertical,
               'animate-marquee-vertical flex-col': vertical,
               'group-hover:[animation-play-state:paused]': pauseOnHover,

@@ -32,58 +32,60 @@ export function DiscoveryCard({ item, color, onClick }: DiscoveryCardProps) {
   return (
     <button
       onClick={() => onClick(item)}
-      className="relative flex-shrink-0 cursor-pointer overflow-hidden rounded-2xl border border-gray-950/[.08] bg-white hover:shadow-lg hover:scale-[1.03] active:scale-[0.98] transition-all duration-200"
-      style={{ width: 220, height: 170 }}
+      className="relative flex-shrink-0 cursor-pointer overflow-hidden rounded-2xl border border-gray-950/[.08] hover:shadow-lg hover:scale-[1.03] active:scale-[0.98] transition-all duration-200"
+      style={{ width: 140, height: 240 }}
     >
-      {/* Image — top portion */}
-      <div className="relative w-full" style={{ height: 110 }}>
-        {thumbnailSrc ? (
-          <img
-            src={thumbnailSrc}
-            alt=""
-            className="w-full h-full object-cover"
-            loading="lazy"
-          />
-        ) : (
-          <div
-            className="w-full h-full flex items-center justify-center"
-            style={{ background: `linear-gradient(135deg, ${color}30, ${color}10)` }}
-          >
-            <span className="text-3xl opacity-25">📷</span>
-          </div>
-        )}
-
-        {/* Play icon for reels */}
-        {isReel && (
-          <div className="absolute top-2 left-2 w-6 h-6 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center">
-            <Play className="w-3 h-3 text-white fill-white ml-0.5" />
-          </div>
-        )}
-
-        {/* Rank badge */}
+      {/* Full-bleed image — 9:16 portrait ratio */}
+      {thumbnailSrc ? (
+        <img
+          src={thumbnailSrc}
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover"
+          loading="lazy"
+        />
+      ) : (
         <div
-          className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold text-white shadow-sm"
-          style={{ backgroundColor: color }}
+          className="absolute inset-0 w-full h-full flex items-center justify-center"
+          style={{ background: `linear-gradient(135deg, ${color}30, ${color}10)` }}
         >
-          {item.rank}
+          <span className="text-3xl opacity-25">📷</span>
         </div>
+      )}
 
-        {/* Metric badge */}
-        {metricText && (
-          <div
-            className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold text-white"
-            style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}
-          >
-            {metricText} {item.metricLabel}
-          </div>
-        )}
+      {/* Dark gradient from bottom for text readability */}
+      <div
+        className="absolute inset-0"
+        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.25) 40%, transparent 70%)' }}
+      />
+
+      {/* Play icon for reels */}
+      {isReel && (
+        <div className="absolute top-2.5 left-2.5 w-7 h-7 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center">
+          <Play className="w-3.5 h-3.5 text-white fill-white ml-0.5" />
+        </div>
+      )}
+
+      {/* Rank badge */}
+      <div
+        className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-bold text-white shadow-md"
+        style={{ backgroundColor: color }}
+      >
+        {item.rank}
       </div>
 
-      {/* Title — bottom portion */}
-      <div className="px-3 py-2" dir="rtl">
-        <p className="text-[12px] font-semibold leading-snug line-clamp-2" style={{ color: '#1a1a1a' }}>
+      {/* Bottom content — title + metric overlaid on image */}
+      <div className="absolute bottom-0 left-0 right-0 px-3 pb-3 pt-8" dir="rtl">
+        <p className="text-[13px] font-bold leading-snug line-clamp-2 text-white drop-shadow-md">
           {displayTitle}
         </p>
+        {metricText && (
+          <span
+            className="inline-block mt-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full text-white"
+            style={{ backgroundColor: `${color}cc` }}
+          >
+            {metricText} {item.metricLabel}
+          </span>
+        )}
       </div>
     </button>
   );
