@@ -31,7 +31,6 @@ import {
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { getInfluencerByUsername, getBrandsByInfluencer, getContentByInfluencer, type Brand } from '@/lib/supabase';
-import { CategoryCard } from '@/components/chat/discovery/CategoryCard';
 import type { DiscoveryCategoryAvailability } from '@/lib/discovery/types';
 
 const DiscoveryTab = dynamic(() => import('@/components/chat/discovery/DiscoveryTab'), { ssr: false });
@@ -722,12 +721,6 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const greetingMessage = influencer.greeting_message || 
     `היי! אני העוזר של ${influencer.display_name.split(' ')[0]}`;
   
-  const suggestedQuestions = (influencer.suggested_questions && influencer.suggested_questions.length > 0)
-    ? influencer.suggested_questions
-    : influencer.influencer_type === 'food'
-      ? ['מה הקופון הכי שווה?', 'יש מתכון מהיר?', 'מה התחליף לביצים?']
-      : ['מה הקופון הכי שווה?', 'יש המלצה?', 'איפה קונים את זה?'];
-  
   // Check if branding should be hidden (white label)
   const hideBranding = influencer.hide_branding || false;
 
@@ -920,51 +913,60 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         </div>
                       </motion.div>
 
-                      {/* Suggestion pills below input */}
-                      <motion.div
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.4, delay: 0.4 }}
-                        className={`flex flex-wrap gap-2.5 justify-center mb-8 ${isMobile ? 'max-w-md' : 'max-w-[600px]'}`}
-                      >
-                        {suggestedQuestions.slice(0, 3).map((q, i) => (
-                          <button
-                            key={i}
-                            onClick={() => {
-                              setInputValue(q);
-                              inputRef.current?.focus();
-                            }}
-                            className="suggestion-pill"
-                          >
-                            {q}
-                          </button>
-                        ))}
-                      </motion.div>
-
-                      {/* Discovery category cards — "גלו עוד" */}
+                      {/* Discovery category cards */}
                       {discoveryCategories.length > 0 && (
                         <motion.div
                           initial={{ opacity: 0, y: 8 }}
                           animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.4, delay: 0.55 }}
+                          transition={{ duration: 0.4, delay: 0.4 }}
                           className={`${isMobile ? 'w-[363px]' : 'w-[600px]'} max-w-full`}
                         >
-                          <p className="text-center text-[14px] mb-3" style={{ color: '#676767' }}>
-                            גלו עוד
-                          </p>
                           <div className="grid grid-cols-3 gap-2">
                             {discoveryCategories.slice(0, 6).map((cat, i) => (
-                              <CategoryCard
+                              <motion.button
                                 key={cat.slug}
-                                category={cat}
-                                index={i}
-                                onTap={(slug) => {
-                                  setInitialDiscoverySlug(slug);
-                                  setActiveTab('discover');
+                                initial={{ opacity: 0, y: 8 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.45 + i * 0.05, duration: 0.3 }}
+                                whileTap={{ scale: 0.96 }}
+                                onClick={() => {
+                                  const msg = `ספרי לי על ${cat.title}`;
+                                  setInputValue(msg);
+                                  setTimeout(() => handleSendMessage(), 150);
                                 }}
-                              />
+                                className="w-full text-right rounded-[16px] p-3 transition-all hover:shadow-sm"
+                                style={{
+                                  backgroundColor: '#ffffff',
+                                  border: '1px solid #e5e5ea',
+                                }}
+                              >
+                                <div
+                                  className="w-8 h-8 rounded-full flex items-center justify-center mb-2"
+                                  style={{ backgroundColor: `${cat.color}15` }}
+                                >
+                                  <span className="text-[14px]" style={{ color: cat.color }}>
+                                    {cat.icon === 'Play' ? '▶' : cat.icon === 'Heart' ? '♥' : cat.icon === 'MessageCircle' ? '💬' : cat.icon === 'TrendingUp' ? '📈' : cat.icon === 'Flame' ? '🔥' : cat.icon === 'Film' ? '🎬' : cat.icon === 'Lightbulb' ? '💡' : cat.icon === 'ShoppingBag' ? '🛍' : cat.icon === 'Star' ? '⭐' : cat.icon === 'MessageSquare' ? '❓' : cat.icon === 'Camera' ? '📷' : cat.icon === 'MapPin' ? '📍' : '•'}
+                                  </span>
+                                </div>
+                                <p className="text-[12px] font-medium leading-tight" style={{ color: '#0c1013' }}>
+                                  {cat.title}
+                                </p>
+                              </motion.button>
                             ))}
                           </div>
+
+                          {/* "גלו עוד" link → opens discovery tab */}
+                          <motion.button
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.7, duration: 0.3 }}
+                            onClick={() => setActiveTab('discover')}
+                            className="mt-3 mx-auto flex items-center gap-1 text-[13px] font-medium transition-opacity hover:opacity-70"
+                            style={{ color: '#676767' }}
+                          >
+                            <Compass className="w-3.5 h-3.5" />
+                            <span>גלו עוד</span>
+                          </motion.button>
                         </motion.div>
                       )}
                     </div>
