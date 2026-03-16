@@ -29,7 +29,7 @@ const openai = new OpenAI({
 
 // Model Configuration
 const GEMINI_MODEL = 'gemini-3-flash-preview'; // ⚡ Primary: Gemini 3 Flash
-const OPENAI_FALLBACK_MODEL = 'gpt-5.2'; // ⚡ Fallback: OpenAI GPT-5.2
+const OPENAI_FALLBACK_MODEL = 'gpt-5.4'; // ⚡ Fallback: OpenAI GPT-5.4
 const MAX_TOKENS = 2048;
 
 // ============================================
