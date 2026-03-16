@@ -99,9 +99,9 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
         </div>
       )}
 
-      {/* Marquee rows */}
+      {/* Marquee rows — single relative container with side fades */}
       {!loading && rows.length > 0 && (
-        <div className="pt-1 pb-4 overflow-hidden">
+        <div className="relative flex w-full flex-col items-center justify-center overflow-hidden">
           {rows.map((row, idx) => (
             <DiscoveryRow
               key={row.category.slug}
@@ -109,12 +109,21 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
               title={row.category.title}
               subtitle={row.category.subtitle}
               color={row.category.color}
-              icon={row.category.icon}
               items={row.items}
               onItemClick={handleItemClick}
               reverse={idx % 2 === 1}
             />
           ))}
+
+          {/* Side fade overlays — exactly like MagicUI demo */}
+          <div
+            className="pointer-events-none absolute inset-y-0 left-0 w-1/6 z-10"
+            style={{ background: 'linear-gradient(to right, #f4f5f7, transparent)' }}
+          />
+          <div
+            className="pointer-events-none absolute inset-y-0 right-0 w-1/6 z-10"
+            style={{ background: 'linear-gradient(to left, #f4f5f7, transparent)' }}
+          />
         </div>
       )}
 
