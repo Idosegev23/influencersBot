@@ -12,7 +12,9 @@ import {
   MessageCircle,
   BarChart3,
   Settings,
-  ArrowRight
+  ArrowRight,
+  Link2,
+  Plus,
 } from 'lucide-react';
 
 interface Influencer {
@@ -34,6 +36,14 @@ export default function InfluencersListPage() {
   const [influencers, setInfluencers] = useState<Influencer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
+
+  function copyIgLink(accountId: string) {
+    const link = `${window.location.origin}/api/auth/instagram/connect?accountId=${accountId}`;
+    navigator.clipboard.writeText(link);
+    setCopiedLinkId(accountId);
+    setTimeout(() => setCopiedLinkId(null), 2000);
+  }
 
   useEffect(() => {
     loadInfluencers();
@@ -80,12 +90,21 @@ export default function InfluencersListPage() {
             </div>
           </div>
 
-          <Link
-            href="/admin/dashboard"
-            className="btn-ghost text-sm"
-          >
-            חזרה לדאשבורד
-          </Link>
+          <div className="flex gap-2">
+            <Link
+              href="/admin/add"
+              className="btn-primary flex items-center gap-1.5 text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              הוספת חשבון
+            </Link>
+            <Link
+              href="/admin/dashboard"
+              className="btn-ghost text-sm"
+            >
+              חזרה לדאשבורד
+            </Link>
+          </div>
         </div>
 
         {/* Search */}
@@ -168,13 +187,27 @@ export default function InfluencersListPage() {
                   <Eye className="w-4 h-4" />
                   צפייה
                 </Link>
+                <button
+                  onClick={(e) => { e.stopPropagation(); copyIgLink(inf.id); }}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 text-sm rounded-xl transition-all"
+                  style={{
+                    background: copiedLinkId === inf.id ? 'rgba(94, 234, 212, 0.1)' : 'rgba(225, 48, 108, 0.06)',
+                    border: copiedLinkId === inf.id ? '1px solid rgba(94, 234, 212, 0.2)' : '1px solid rgba(225, 48, 108, 0.15)',
+                    color: copiedLinkId === inf.id ? '#5eead4' : '#ede9f8',
+                  }}
+                >
+                  {copiedLinkId === inf.id ? (
+                    <><CheckCircle className="w-4 h-4" /> הועתק!</>
+                  ) : (
+                    <><Link2 className="w-4 h-4" style={{ color: '#E1306C' }} /> קישור IG</>
+                  )}
+                </button>
                 <Link
                   href={`/admin/chatbot-persona/${inf.id}`}
-                  className="btn-ghost flex-1 flex items-center justify-center gap-1.5 py-2 text-sm"
+                  className="btn-ghost flex items-center justify-center gap-1.5 py-2 text-sm px-3"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <Settings className="w-4 h-4" />
-                  הגדרות
                 </Link>
               </div>
             </div>
