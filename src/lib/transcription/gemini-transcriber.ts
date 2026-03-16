@@ -307,6 +307,158 @@ export async function transcribeVideo(
 }
 
 // ============================================
+// Image OCR via Gemini Vision
+// ============================================
+
+export interface ImageOcrInput {
+  source_type: 'post' | 'highlight_item' | 'story';
+  source_id: string;
+  image_url: string;
+}
+
+export interface ImageOcrOutput {
+  success: boolean;
+  transcription?: TranscriptionResult;
+  error?: string;
+  tokens_used?: number;
+  processing_cost?: number;
+}
+
+/**
+ * Download image and convert to base64
+ */
+async function downloadImageAsBase64(url: string): Promise<{ data: string; mimeType: string }> {
+  console.log(`[Vision] Downloading image from: ${url.substring(0, 50)}...`);
+
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(30000), // 30s timeout for image download
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to download image: ${response.status}`);
+  }
+
+  const contentType = response.headers.get('content-type') || 'image/jpeg';
+  const arrayBuffer = await response.arrayBuffer();
+  const base64 = Buffer.from(arrayBuffer).toString('base64');
+
+  console.log(`[Vision] Downloaded ${(arrayBuffer.byteLength / 1024).toFixed(1)}KB`);
+
+  return { data: base64, mimeType: contentType };
+}
+
+/**
+ * Extract text and visual description from an image using Gemini Vision
+ */
+export async function transcribeImage(
+  input: ImageOcrInput
+): Promise<ImageOcrOutput> {
+  console.log(`[Vision] Starting OCR for ${input.source_type}:${input.source_id}`);
+
+  const startTime = Date.now();
+
+  try {
+    const { data: imageData, mimeType } = await downloadImageAsBase64(input.image_url);
+
+    const genAI = getGeminiClient();
+
+    const prompt = `אתה מומחה לניתוח תמונות מאינסטגרם. נתח את התמונה וחלץ את כל המידע הרלוונטי:
+
+הנחיות — OCR (טקסט בתמונה):
+1. חלץ כל טקסט שמופיע בתמונה: כותרות, טקסט overlay, שמות מוצרים, מחירים, כתוביות
+2. אם הטקסט קטן או לא ברור — השתמש ביכולות הראייה שלך לזהות אותו
+3. שמור על דיוק מקסימלי — אל תוסיף מידע שלא קיים בתמונה
+
+הנחיות — תיאור ויזואלי:
+4. תאר בקצרה מה מופיע בתמונה (מוצרים, אנשים, מיקום, סגנון)
+5. זהה מותגים או לוגואים אם יש
+6. זהה את השפה הראשית של הטקסט בתמונה
+
+פורמט התשובה — JSON בלבד:
+{
+  "transcription_text": "תיאור מלא של התמונה כולל כל הטקסט שנמצא",
+  "language": "he/en/ar/ru/other",
+  "on_screen_text": ["טקסט 1 מהתמונה", "טקסט 2 מהתמונה"],
+  "speakers": [],
+  "confidence": 0.95
+}
+
+אם אין טקסט בתמונה:
+{
+  "transcription_text": "תיאור ויזואלי של התמונה",
+  "language": "none",
+  "on_screen_text": [],
+  "speakers": [],
+  "confidence": 1.0
+}
+
+חשוב: החזר רק JSON תקין, ללא טקסט נוסף.`;
+
+    console.log(`[Vision] Calling Gemini 3 Flash for image OCR...`);
+
+    const response = await callGeminiWithRetry(
+      genAI,
+      'gemini-3-flash-preview',
+      [
+        {
+          parts: [
+            { text: prompt },
+            {
+              inlineData: {
+                mimeType,
+                data: imageData,
+              },
+            },
+          ],
+        },
+      ],
+      {
+        temperature: 0.3,
+        responseMimeType: 'application/json',
+      }
+    );
+
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.log(`[Vision] Gemini responded in ${elapsed}s`);
+
+    const text = response.text || '';
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('No valid JSON in response');
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]) as TranscriptionResult;
+
+    if (typeof parsed.transcription_text !== 'string') parsed.transcription_text = '';
+    if (!parsed.language) parsed.language = 'unknown';
+    if (!Array.isArray(parsed.on_screen_text)) parsed.on_screen_text = [];
+    if (!Array.isArray(parsed.speakers)) parsed.speakers = [];
+    if (typeof parsed.confidence !== 'number') parsed.confidence = 0.8;
+
+    const tokensUsed = 300; // ~300 tokens per image
+    const processingCost = tokensUsed * 0.000002;
+
+    console.log(`[Vision] Success: ${parsed.transcription_text.length} chars, OCR items: ${parsed.on_screen_text.length}`);
+
+    return {
+      success: true,
+      transcription: parsed,
+      tokens_used: tokensUsed,
+      processing_cost: processingCost,
+    };
+
+  } catch (error: any) {
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.error(`[Vision] Failed after ${elapsed}s:`, error.message);
+
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
+// ============================================
 // Database Functions
 // ============================================
 

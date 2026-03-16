@@ -432,62 +432,12 @@ export class NewScanOrchestrator {
       }
 
       // ==========================================
-      // STEP 9: Transcribe Reels
+      // STEP 9: Transcription skipped — handled by Gemini in processing phase
       // ==========================================
-      if (fullConfig.transcribeReels) {
-        await this.rateLimiter.waitRandom('before transcription');
-        report('transcription', 'running', 90, 'מתמלל רילס...');
-
-        // Get video URLs from posts
-        const videoUrls = posts
-          .filter(p => p.media_type === 'video')
-          .flatMap(p => p.media_urls)
-          .filter(Boolean);
-
-        if (videoUrls.length > 0) {
-          try {
-            const transcripts = await this.client.getBatchTranscripts(videoUrls);
-
-            // Save transcriptions
-            for (const transcript of transcripts) {
-              // Find the post this belongs to
-              const post = posts.find(p => p.media_urls.includes(transcript.media_url));
-              
-              if (post) {
-                const { data: postRecord } = await this.supabase
-                  .from('instagram_posts')
-                  .select('id')
-                  .eq('account_id', accountId)
-                  .eq('shortcode', post.shortcode)
-                  .single();
-
-                if (postRecord) {
-                  await this.supabase.from('instagram_transcriptions').upsert({
-                    account_id: accountId,
-                    source_type: 'reel',
-                    source_id: postRecord.id,
-                    video_url: transcript.media_url,
-                    transcription_text: transcript.transcript,
-                    language: transcript.language || 'he',
-                    processing_status: 'completed',
-                    processed_at: new Date().toISOString(),
-                  }, {
-                    onConflict: 'source_type,source_id',
-                  });
-
-                  stats.transcriptsCount++;
-                }
-              }
-            }
-
-            report('transcription', 'completed', 95, `✓ ${stats.transcriptsCount} תמלולים`);
-          } catch (error: any) {
-            report('transcription', 'failed', 95, `שגיאה בתמלול: ${error.message}`);
-          }
-        } else {
-          report('transcription', 'completed', 95, 'אין רילס לתמלול');
-        }
-      }
+      // All transcription (video + image OCR) is done via Gemini 3 Flash
+      // in the content-processor-orchestrator after the scan completes.
+      // ScrapeCreators transcript API is NOT used.
+      report('transcription', 'completed', 95, '⏭️ תמלול יתבצע ע"י Gemini בשלב העיבוד');
 
       // ==========================================
       // STEP 10: Update Account

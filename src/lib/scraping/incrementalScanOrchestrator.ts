@@ -267,58 +267,12 @@ export class IncrementalScanOrchestrator {
       }
 
       // ==========================================
-      // STEP 5: Transcribe new reels
+      // STEP 5: Transcription skipped — handled by Gemini in processing phase
+      // All transcription (video + image OCR) is done via Gemini 3 Flash
+      // in the content-processor-orchestrator after the scan completes.
+      // ScrapeCreators transcript API is NOT used.
       // ==========================================
-      if (fullConfig.transcribeNewReels && newPosts.length > 0) {
-        console.log(`[Step 5] Transcribing new reels...`);
-        
-        const videoUrls = newPosts
-          .filter(p => p.media_type === 'video')
-          .flatMap(p => p.media_urls)
-          .filter(Boolean);
-
-        if (videoUrls.length > 0) {
-          try {
-            const transcripts = await this.client.getBatchTranscripts(videoUrls);
-
-            for (const transcript of transcripts) {
-              const post = newPosts.find(p => p.media_urls.includes(transcript.media_url));
-              
-              if (post) {
-                const { data: postRecord } = await this.supabase
-                  .from('instagram_posts')
-                  .select('id')
-                  .eq('account_id', accountId)
-                  .eq('shortcode', post.shortcode)
-                  .single();
-
-                if (postRecord) {
-                  await this.supabase.from('instagram_transcriptions').upsert({
-                    account_id: accountId,
-                    source_type: 'reel',
-                    source_id: postRecord.id,
-                    video_url: transcript.media_url,
-                    transcription_text: transcript.transcript,
-                    language: transcript.language || 'he',
-                    processing_status: 'completed',
-                    processed_at: new Date().toISOString(),
-                  }, {
-                    onConflict: 'source_type,source_id',
-                  });
-
-                  stats.transcriptsCreated++;
-                }
-              }
-            }
-
-            console.log(`[Step 5] ✓ Created ${stats.transcriptsCreated} transcripts`);
-          } catch (error: any) {
-            console.error(`[Step 5] Transcription error:`, error.message);
-          }
-        } else {
-          console.log(`[Step 5] No new videos to transcribe`);
-        }
-      }
+      console.log(`[Step 5] ⏭️ Transcription deferred to Gemini processing phase`);
 
       // ==========================================
       // STEP 6: Build RAG vectors for new content

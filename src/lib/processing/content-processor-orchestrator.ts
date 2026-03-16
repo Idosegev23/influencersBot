@@ -4,7 +4,8 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
-import { transcribeVideo, saveTranscription, getAllTranscriptions } from '@/lib/transcription/gemini-transcriber';
+import { transcribeVideo, transcribeImage, saveTranscription, getAllTranscriptions } from '@/lib/transcription/gemini-transcriber';
+import type { ImageOcrInput } from '@/lib/transcription/gemini-transcriber';
 import { buildPersonaWithGemini, savePersonaToDatabase } from '@/lib/ai/gemini-persona-builder';
 import { preprocessInstagramData } from '@/lib/scraping/preprocessing';
 import { ingestAllForAccount } from '@/lib/rag/ingest';
@@ -501,7 +502,14 @@ async function transcribeAllVideos(
     duration?: number;
   }> = [];
 
-  // From posts (reels/videos)
+  // Collect all image URLs for OCR
+  const imagesToOcr: Array<{
+    sourceType: 'post' | 'highlight_item';
+    sourceId: string;
+    imageUrl: string;
+  }> = [];
+
+  // From posts
   if (content.posts && Array.isArray(content.posts)) {
     for (const post of content.posts) {
       if (post.type === 'reel' || post.type === 'video') {
@@ -517,11 +525,23 @@ async function transcribeAllVideos(
             duration: post.video_duration,
           });
         }
+      } else if (post.type === 'image' || post.type === 'carousel' || post.type === 'sidecar') {
+        // Image posts — send to Gemini Vision for OCR
+        const imageUrl = post.thumbnail_url
+          || (Array.isArray(post.media_urls) ? (post.media_urls[0]?.url || post.media_urls[0]) : post.media_urls);
+
+        if (imageUrl && typeof imageUrl === 'string') {
+          imagesToOcr.push({
+            sourceType: 'post',
+            sourceId: post.id,
+            imageUrl,
+          });
+        }
       }
     }
   }
 
-  // From highlights (video stories)
+  // From highlights
   if (content.highlights && Array.isArray(content.highlights)) {
     for (const item of content.highlights) {
       if (item.media_type === 'video' && item.media_url) {
@@ -531,11 +551,17 @@ async function transcribeAllVideos(
           videoUrl: item.media_url,
           duration: item.video_duration,
         });
+      } else if (item.media_type === 'image' && item.media_url) {
+        imagesToOcr.push({
+          sourceType: 'highlight_item',
+          sourceId: item.id,
+          imageUrl: item.media_url,
+        });
       }
     }
   }
 
-  console.log(`   Found ${videosToTranscribe.length} videos`);
+  console.log(`   Found ${videosToTranscribe.length} videos + ${imagesToOcr.length} images`);
 
   // Limit to max (999 = all videos)
   const toProcess = videosToTranscribe.slice(0, maxVideos || 999);
@@ -682,10 +708,99 @@ async function transcribeAllVideos(
     console.log(`   ✓ Batch ${batchNum}/${batches.length} complete: ${result.succeeded} succeeded, ${result.failed} failed`);
   }
   
-  console.log(`\n   🎉 All transcriptions complete!`);
+  console.log(`\n   🎉 Video transcriptions complete!`);
   console.log(`      Total: ${toProcess.length}`);
   console.log(`      Succeeded: ${result.succeeded}`);
   console.log(`      Failed: ${result.failed}`);
+
+  // ==========================================
+  // IMAGE OCR via Gemini Vision
+  // ==========================================
+  if (imagesToOcr.length > 0) {
+    console.log(`\n   🖼️ Starting image OCR: ${imagesToOcr.length} images...`);
+
+    const IMAGE_BATCH_SIZE = 5;
+    const imageBatches: typeof imagesToOcr[] = [];
+    for (let i = 0; i < imagesToOcr.length; i += IMAGE_BATCH_SIZE) {
+      imageBatches.push(imagesToOcr.slice(i, i + IMAGE_BATCH_SIZE));
+    }
+
+    let imageProcessedCount = 0;
+
+    for (let batchIdx = 0; batchIdx < imageBatches.length; batchIdx++) {
+      const batch = imageBatches[batchIdx];
+
+      const batchPromises = batch.map(async (image, imgIdx) => {
+        const globalIdx = batchIdx * IMAGE_BATCH_SIZE + imgIdx;
+        const progressNum = globalIdx + 1;
+
+        try {
+          // Check if already processed
+          const supabase = await createClient();
+          const { data: existing } = await supabase
+            .from('instagram_transcriptions')
+            .select('id')
+            .eq('source_type', image.sourceType)
+            .eq('source_id', image.sourceId)
+            .eq('processing_status', 'completed')
+            .maybeSingle();
+
+          if (existing) {
+            console.log(`   [IMG ${progressNum}/${imagesToOcr.length}] ⏭️ Already processed`);
+            return { success: true, transcriptionId: existing.id, skipped: true };
+          }
+
+          console.log(`   [IMG ${progressNum}/${imagesToOcr.length}] 🖼️ OCR ${image.sourceType}:${image.sourceId}...`);
+
+          const ocrResult = await transcribeImage({
+            source_type: image.sourceType,
+            source_id: image.sourceId,
+            image_url: image.imageUrl,
+          });
+
+          if (ocrResult.success && ocrResult.transcription) {
+            const savedId = await saveTranscription(
+              accountId,
+              {
+                source_type: image.sourceType,
+                source_id: image.sourceId,
+                video_url: image.imageUrl, // reuse field for image URL
+                video_duration: undefined,
+              },
+              ocrResult
+            );
+
+            console.log(`   [IMG ${progressNum}/${imagesToOcr.length}] ✅ OCR done (${savedId})`);
+            return { success: true, transcriptionId: savedId, skipped: false };
+          } else {
+            console.log(`   [IMG ${progressNum}/${imagesToOcr.length}] ❌ Failed: ${ocrResult.error}`);
+            return { success: false, error: ocrResult.error, sourceId: image.sourceId };
+          }
+        } catch (error: any) {
+          console.error(`   [IMG ${progressNum}/${imagesToOcr.length}] ❌ Error: ${error.message}`);
+          return { success: false, error: error.message, sourceId: image.sourceId };
+        }
+      });
+
+      const batchResults = await Promise.all(batchPromises);
+
+      for (const batchResult of batchResults) {
+        if (batchResult.success) {
+          result.succeeded++;
+          if (batchResult.transcriptionId) {
+            result.transcriptionIds.push(batchResult.transcriptionId);
+          }
+        } else {
+          result.failed++;
+          result.errors.push(`Image ${batchResult.sourceId}: ${batchResult.error}`);
+        }
+      }
+
+      imageProcessedCount += batch.length;
+    }
+
+    console.log(`\n   🎉 Image OCR complete! Processed: ${imageProcessedCount}`);
+  }
 
   return result;
 }
