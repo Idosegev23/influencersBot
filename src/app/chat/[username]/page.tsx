@@ -851,6 +851,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   <span>בעיה בהזמנה</span>
                   <AlertCircle className="w-[18px] h-[18px]" />
                 </button>
+                {username === 'the_dekel' && (
                 <button
                   onClick={() => setActiveTab('discover')}
                   className={`flex items-center gap-[6px] px-[11px] py-[6px] rounded-full transition-all`}
@@ -859,6 +860,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   <span>גלו</span>
                   <Compass className="w-[18px] h-[18px]" />
                 </button>
+                )}
               </div>
               </div>
             </div>
@@ -967,8 +969,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         </div>
                       </motion.div>
 
-                      {/* Discovery category pills */}
-                      {discoveryCategories.length > 0 && (
+                      {/* Discovery category pills — only for the_dekel */}
+                      {username === 'the_dekel' && discoveryCategories.length > 0 && (
                         <motion.div
                           initial={{ opacity: 0, y: 8 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -1726,6 +1728,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 <AlertCircle className="w-[18px] h-[18px]" />
                 <span>בעיה בהזמנה</span>
               </button>
+              {username === 'the_dekel' && (
               <button
                 onClick={() => setActiveTab('discover')}
                 className={`mobile-tab-btn ${activeTab === 'discover' ? 'active-discover' : ''}`}
@@ -1733,6 +1736,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 <Compass className="w-[18px] h-[18px]" />
                 <span>גלו</span>
               </button>
+              )}
             </div>
           </div>
         )}
