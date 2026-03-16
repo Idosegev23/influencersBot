@@ -9,28 +9,33 @@ import {
   ArchetypeOutput,
   GuardrailRule
 } from './types';
-import { GoogleGenAI } from '@google/genai';
 import OpenAI from 'openai';
 import type { ResponseStreamEvent } from 'openai/resources/responses/responses';
 import { buildPersonalityFromDB, type PersonalityConfig } from '../personality-wrapper';
 import { compactKnowledgeContext } from '@/lib/rag/compact-knowledge-context';
 
-// Initialize Gemini (primary)
-function getGeminiClient(): GoogleGenAI {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
-  if (!apiKey) throw new Error('GEMINI_API_KEY is required');
-  return new GoogleGenAI(apiKey);
-}
-
-// Initialize OpenAI (fallback)
+// Initialize OpenAI
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 // Model Configuration
-const GEMINI_MODEL = 'gemini-3-flash-preview'; // ⚡ Primary: Gemini 3 Flash
-const OPENAI_FALLBACK_MODEL = 'gpt-5.2'; // ⚡ Fallback: OpenAI GPT-5.2
-const MAX_TOKENS = 2048;
+const CHAT_MODEL = 'gpt-5.4'; // ⚡ GPT-5.4 — strongest model with better persona adherence
+const FALLBACK_MODEL = 'gpt-5.2'; // ⚡ Reliable fallback
+const NANO_MODEL = 'gpt-5-nano'; // ⚡ Fastest + cheapest for simple queries
+const MAX_TOKENS = 2048; // Enough for full Hebrew recipes, routines, and detailed content
+
+// Map decision engine model tiers to actual OpenAI model names
+function resolveModel(tier?: 'nano' | 'standard' | 'full'): { primary: string; fallback: string } {
+  switch (tier) {
+    case 'nano':
+      return { primary: NANO_MODEL, fallback: CHAT_MODEL };
+    case 'full':
+    case 'standard':
+    default:
+      return { primary: CHAT_MODEL, fallback: FALLBACK_MODEL };
+  }
+}
 
 // ============================================
 // Base Archetype Class
@@ -458,10 +463,23 @@ ${(input.mode === 'widget' || input.mode === 'dm') ? `📌 ${input.mode === 'wid
 ענה בעברית. אם השאלה רחבה — שאל/י שאלה מכוונת (עם רמז קצר למה שיש לך). אם ברור מה רוצים — תן/י תשובה מלאה.
 🚨 אל תמציא תוכן שלא מופיע בבסיס הידע.`;
 
-      // Build conversation history for Gemini (always manual — no server-side chaining)
+      // Resolve model based on decision engine's modelStrategy
+      const { primary: primaryModel, fallback: fallbackModel } = resolveModel(input.modelTier);
+
+      // Context chaining via OpenAI Responses API
+      // Always try to keep the chain alive — the model manages server-side context
+      // and handles topic transitions naturally
+      const previousResponseId = input.previousResponseId || null;
+
+      // Build input for Responses API
+      // When we have previous_response_id, OpenAI manages context server-side.
+      // We only send the new user message + fresh KB context.
+      // When no previous_response_id (first message), we include
+      // conversation history manually so the model has context.
       const inputMessages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
 
-      if (input.conversationHistory?.length) {
+      if (!previousResponseId && input.conversationHistory?.length) {
+        // No chain: include full history (already limited to 10 messages from DB)
         for (const m of input.conversationHistory) {
           inputMessages.push({ role: m.role, content: m.content });
         }
@@ -470,41 +488,15 @@ ${(input.mode === 'widget' || input.mode === 'dm') ? `📌 ${input.mode === 'wid
       // Always add the current user message with KB context
       inputMessages.push({ role: 'user', content: userPrompt });
 
-      // Convert to Gemini format
-      const geminiContents = inputMessages.map(m => ({
-        role: m.role === 'assistant' ? 'model' as const : 'user' as const,
-        parts: [{ text: m.content }],
-      }));
-
       // === STREAMING MODE (when onToken callback is provided) ===
       if (input.onToken) {
-        console.log(`[BaseArchetype] Using Gemini STREAMING with ${GEMINI_MODEL}`);
+        console.log(`[BaseArchetype] Using Responses API STREAMING with ${primaryModel}${previousResponseId ? ' + context chain' : ''}`);
         try {
-          const result = await this.streamGeminiResponse({
-            model: GEMINI_MODEL,
-            systemInstruction: instructions,
-            contents: geminiContents,
-            onToken: input.onToken,
-          });
-
-          if (result.text) {
-            return {
-              text: this.replaceName(result.text, influencerName),
-              responseId: null,
-            };
-          }
-          throw new Error('Empty streaming response from Gemini');
-
-        } catch (geminiError: any) {
-          console.warn(`[BaseArchetype] Gemini (${GEMINI_MODEL}) failed, trying OpenAI fallback:`, geminiError.message);
-
-          // Fallback to OpenAI streaming
-          const openaiMessages = inputMessages;
           const result = await this.streamResponsesAPI({
-            model: OPENAI_FALLBACK_MODEL,
+            model: primaryModel,
             instructions,
-            input: openaiMessages,
-            previousResponseId: input.previousResponseId || null,
+            input: inputMessages,
+            previousResponseId,
             onToken: input.onToken,
           });
 
@@ -514,37 +506,54 @@ ${(input.mode === 'widget' || input.mode === 'dm') ? `📌 ${input.mode === 'wid
               responseId: result.responseId,
             };
           }
-          throw new Error('Empty streaming response from OpenAI fallback');
+          throw new Error('Empty streaming response from primary model');
+
+        } catch (primaryError) {
+          console.warn(`[BaseArchetype] Primary model (${primaryModel}) failed, trying fallback:`, primaryError);
+
+          // Fallback: no previous_response_id (chain is model-specific)
+          const result = await this.streamResponsesAPI({
+            model: fallbackModel,
+            instructions,
+            input: inputMessages,
+            previousResponseId: null,
+            onToken: input.onToken,
+          });
+
+          if (result.text) {
+            return {
+              text: this.replaceName(result.text, influencerName),
+              responseId: result.responseId,
+            };
+          }
+          throw new Error('Empty streaming response from fallback model');
         }
       }
 
       // === BLOCKING MODE (backward compatible, no onToken) ===
       try {
-        const genAI = getGeminiClient();
-        const response = await genAI.models.generateContent({
-          model: GEMINI_MODEL,
-          contents: geminiContents,
-          config: {
-            systemInstruction: instructions,
-            maxOutputTokens: MAX_TOKENS,
-            temperature: 0.7,
-          },
+        const response = await openai.responses.create({
+          model: primaryModel,
+          instructions,
+          input: inputMessages,
+          ...(previousResponseId ? { previous_response_id: previousResponseId } : {}),
+          max_output_tokens: MAX_TOKENS,
+          reasoning: { effort: 'low' },
         });
 
-        const text = response.text || '';
-        if (text) {
+        if (response.output_text) {
           return {
-            text: this.replaceName(text, influencerName),
-            responseId: null,
+            text: this.replaceName(response.output_text, influencerName),
+            responseId: response.id,
           };
         }
-        throw new Error('Empty response from Gemini');
+        throw new Error('Empty response from primary model');
 
-      } catch (geminiError: any) {
-        console.warn(`[BaseArchetype] Gemini failed, trying OpenAI fallback (${OPENAI_FALLBACK_MODEL}):`, geminiError.message);
+      } catch (primaryError) {
+        console.warn(`[BaseArchetype] Primary model (${primaryModel}) failed, trying fallback (${fallbackModel}):`, primaryError);
 
         const fallbackResponse = await openai.responses.create({
-          model: OPENAI_FALLBACK_MODEL,
+          model: fallbackModel,
           instructions,
           input: inputMessages,
           max_output_tokens: MAX_TOKENS,
@@ -557,7 +566,7 @@ ${(input.mode === 'widget' || input.mode === 'dm') ? `📌 ${input.mode === 'wid
             responseId: fallbackResponse.id,
           };
         }
-        throw new Error('Empty response from OpenAI fallback');
+        throw new Error('Empty response from fallback model');
       }
 
     } catch (error) {
@@ -570,41 +579,7 @@ ${(input.mode === 'widget' || input.mode === 'dm') ? `📌 ${input.mode === 'wid
   }
 
   /**
-   * Stream response using Gemini generateContentStream
-   */
-  private async streamGeminiResponse(params: {
-    model: string;
-    systemInstruction: string;
-    contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }>;
-    onToken: (token: string) => void;
-  }): Promise<{ text: string; responseId: string | null }> {
-    const genAI = getGeminiClient();
-
-    const response = await genAI.models.generateContentStream({
-      model: params.model,
-      contents: params.contents,
-      config: {
-        systemInstruction: params.systemInstruction,
-        maxOutputTokens: MAX_TOKENS,
-        temperature: 0.7,
-      },
-    });
-
-    let fullContent = '';
-
-    for await (const chunk of response) {
-      const text = chunk.text || '';
-      if (text) {
-        fullContent += text;
-        params.onToken(text);
-      }
-    }
-
-    return { text: fullContent, responseId: null };
-  }
-
-  /**
-   * Stream response using OpenAI Responses API (fallback)
+   * Stream response using OpenAI Responses API
    */
   private async streamResponsesAPI(params: {
     model: string;
