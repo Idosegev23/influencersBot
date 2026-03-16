@@ -16,13 +16,12 @@ interface DiscoveryRowProps {
 }
 
 export function DiscoveryRow({ title, subtitle, color, items, onItemClick, slug, reverse = false }: DiscoveryRowProps) {
-  // Speed based on item count — more items = slower (longer to loop)
   const speed = Math.max(25, items.length * 8);
 
   return (
-    <div className="mb-5">
+    <div className="mb-6">
       {/* Category header */}
-      <div className="px-4 mb-2" dir="rtl">
+      <div className="px-4 mb-2.5" dir="rtl">
         <h3 className="text-[16px] font-bold leading-tight" style={{ color: '#0c1013' }}>
           {title}
         </h3>
@@ -33,23 +32,36 @@ export function DiscoveryRow({ title, subtitle, color, items, onItemClick, slug,
         )}
       </div>
 
-      {/* Marquee scroll */}
-      <Marquee
-        reverse={reverse}
-        pauseOnHover
-        duration={speed}
-        repeat={3}
-        className="[--gap:0.75rem]"
-      >
-        {items.map((item, idx) => (
-          <DiscoveryCard
-            key={item.postId || item.shortcode || `${slug}-${idx}`}
-            item={item}
-            color={color}
-            onClick={(clickedItem) => onItemClick(clickedItem, title, slug)}
-          />
-        ))}
-      </Marquee>
+      {/* Marquee with fade edges */}
+      <div className="relative flex w-full items-center overflow-hidden">
+        <Marquee
+          reverse={reverse}
+          pauseOnHover
+          duration={speed}
+          repeat={4}
+          className="[--gap:0.75rem]"
+        >
+          {items.map((item, idx) => (
+            <DiscoveryCard
+              key={item.postId || item.shortcode || `${slug}-${idx}`}
+              item={item}
+              color={color}
+              onClick={(clickedItem) => onItemClick(clickedItem, title, slug)}
+            />
+          ))}
+        </Marquee>
+
+        {/* Left fade */}
+        <div
+          className="pointer-events-none absolute inset-y-0 left-0 w-[60px] z-10"
+          style={{ background: 'linear-gradient(to right, #f4f5f7, transparent)' }}
+        />
+        {/* Right fade */}
+        <div
+          className="pointer-events-none absolute inset-y-0 right-0 w-[60px] z-10"
+          style={{ background: 'linear-gradient(to left, #f4f5f7, transparent)' }}
+        />
+      </div>
     </div>
   );
 }
