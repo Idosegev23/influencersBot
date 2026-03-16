@@ -20,6 +20,19 @@ export interface ManualKnowledgeEntry {
   content: string;
 }
 
+export interface DiscoveryListSummary {
+  slug: string;
+  title: string;
+  items: Array<{
+    rank: number;
+    title: string;
+    summary?: string;
+    metricValue?: number;
+    metricLabel?: string;
+    postUrl?: string;
+  }>;
+}
+
 export interface KnowledgeBase {
   posts: InstagramPost[];
   highlights: InstagramHighlight[];
@@ -29,6 +42,7 @@ export interface KnowledgeBase {
   websites: WebsiteContent[];
   transcriptions: VideoTranscription[];
   manualKnowledge?: ManualKnowledgeEntry[];
+  discoveryLists?: DiscoveryListSummary[];
 }
 
 export interface VideoTranscription {
@@ -206,6 +220,7 @@ export async function retrieveKnowledge(
     partnerships: fetchRelevantPartnerships(supabase, accountId, [], userMessage),
     insights: fetchRelevantInsights(supabase, accountId, archetype, 3),
     manualKnowledge: fetchManualKnowledge(supabase, accountId),
+    discoveryLists: fetchRelevantDiscoveryLists(supabase, accountId, userMessage, 3),
   };
 
   // Content search — RAG vector search OR FTS fallback
@@ -233,6 +248,7 @@ export async function retrieveKnowledge(
   const partnerships: Partnership[] = results.partnerships || [];
   const insights: ConversationInsight[] = results.insights || [];
   const manualKnowledge: ManualKnowledgeEntry[] = results.manualKnowledge || [];
+  const discoveryLists: DiscoveryListSummary[] = results.discoveryLists || [];
 
   let posts: InstagramPost[] = [];
   let transcriptions: VideoTranscription[] = [];
@@ -263,6 +279,9 @@ export async function retrieveKnowledge(
   console.log(`  - Websites: ${mergedWebsites.length} (${directWebsites.length} direct + ${ragWebsites.length} RAG)`);
   console.log(`  - Coupons: ${coupons.length}, Partnerships: ${partnerships.length}`);
   console.log(`  - Transcriptions: ${transcriptions.length}, Insights: ${insights.length}`);
+  if (discoveryLists.length > 0) {
+    console.log(`  - Discovery lists: ${discoveryLists.length}`);
+  }
   if (manualKnowledge.length > 0) {
     console.log(`  - Manual knowledge: ${manualKnowledge.length}`);
   }
@@ -275,6 +294,7 @@ export async function retrieveKnowledge(
     insights,
     websites: mergedWebsites,
     transcriptions,
+    discoveryLists: discoveryLists.length > 0 ? discoveryLists : undefined,
     manualKnowledge,
   };
 }
@@ -330,6 +350,90 @@ function mergeWebsites(
   }
 
   return merged;
+}
+
+/**
+ * Fetch discovery lists that may be relevant to the user's query.
+ * Searches discovery_lists by title/slug keyword overlap.
+ */
+async function fetchRelevantDiscoveryLists(
+  supabase: any,
+  accountId: string,
+  userMessage: string,
+  limit: number = 3
+): Promise<DiscoveryListSummary[]> {
+  try {
+    // Fetch all cached discovery lists for this account
+    const { data: rows, error } = await supabase
+      .from('discovery_lists')
+      .select('category_slug, title_he, items, item_count')
+      .eq('account_id', accountId)
+      .order('updated_at', { ascending: false })
+      .limit(20);
+
+    if (error || !rows || rows.length === 0) return [];
+
+    // Simple keyword matching to find relevant lists
+    const queryWords = userMessage
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, '')
+      .split(/\s+/)
+      .filter(w => w.length > 2);
+
+    // Discovery keyword hints for matching
+    const DISCOVERY_KEYWORDS: Record<string, string[]> = {
+      'viral-videos': ['ויראלי', 'ויראליים', 'צפיות', 'נצפה', 'viral', 'views', 'פופולרי'],
+      'most-liked': ['לייק', 'לייקים', 'אהוב', 'liked', 'popular', 'אהבו'],
+      'most-commented': ['תגובות', 'תגובה', 'comments', 'commented', 'דיון'],
+      'highest-engagement': ['מעורבות', 'אינגייג', 'engagement', 'אינטראקציה'],
+      'recent-hits': ['חדש', 'אחרון', 'recent', 'new', 'אחרונים'],
+      'best-reels': ['רילס', 'reels', 'סרטון', 'סרטונים', 'וידאו', 'video'],
+      'best-tips': ['טיפ', 'טיפים', 'tips', 'עצה', 'המלצה', 'המלצות'],
+      'behind-scenes': ['מאחורי', 'behind', 'scenes', 'אישי', 'פרטי'],
+      'best-products': ['מוצר', 'מוצרים', 'products', 'מומלץ', 'שווה'],
+      'best-places': ['מקום', 'מקומות', 'places', 'מסעדה', 'חנות'],
+    };
+
+    const scored = rows.map((row: any) => {
+      let score = 0;
+      const titleLower = (row.title_he || '').toLowerCase();
+
+      // Check query words against title
+      for (const word of queryWords) {
+        if (titleLower.includes(word)) score += 3;
+      }
+
+      // Check keyword hints
+      const hints = DISCOVERY_KEYWORDS[row.category_slug] || [];
+      for (const word of queryWords) {
+        if (hints.some(h => h.includes(word) || word.includes(h))) score += 2;
+      }
+
+      return { row, score };
+    });
+
+    // Return only lists with some relevance, sorted by score
+    const relevant = scored
+      .filter(s => s.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+
+    return relevant.map(({ row }) => ({
+      slug: row.category_slug,
+      title: row.title_he || row.category_slug,
+      items: (row.items || []).slice(0, 5).map((item: any, idx: number) => ({
+        rank: idx + 1,
+        title: item.aiTitle || item.captionExcerpt || '',
+        summary: item.aiSummary || undefined,
+        metricValue: item.metricValue || undefined,
+        metricLabel: item.metricLabel || undefined,
+        postUrl: item.postUrl || undefined,
+      })),
+    }));
+  } catch (err) {
+    console.error('[Knowledge Retrieval] fetchRelevantDiscoveryLists failed:', err);
+    return [];
+  }
 }
 
 /**
@@ -1259,6 +1363,7 @@ export function hasRelevantKnowledge(kb: KnowledgeBase): boolean {
     kb.insights.length > 0 ||
     kb.websites.length > 0 ||
     kb.transcriptions.length > 0 ||
-    (kb.manualKnowledge?.length ?? 0) > 0
+    (kb.manualKnowledge?.length ?? 0) > 0 ||
+    (kb.discoveryLists?.length ?? 0) > 0
   );
 }

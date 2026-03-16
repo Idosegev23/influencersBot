@@ -224,7 +224,6 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     isStreaming: isStreamActive,
     meta: streamMeta,
     cards: streamCards,
-    thinkingText: streamThinkingText,
     text: streamText,
     sendMessage: sendStreamMessage,
     cancel: cancelStream,
@@ -913,56 +912,71 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         </div>
                       </motion.div>
 
-                      {/* Discovery category cards */}
+                      {/* Discovery category pills */}
                       {discoveryCategories.length > 0 && (
                         <motion.div
                           initial={{ opacity: 0, y: 8 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.4, delay: 0.4 }}
-                          className={`${isMobile ? 'w-[363px]' : 'w-[600px]'} max-w-full`}
+                          className={`flex flex-wrap gap-2 justify-center ${isMobile ? 'max-w-md' : 'max-w-[600px]'}`}
                         >
-                          <div className="grid grid-cols-3 gap-2">
-                            {discoveryCategories.slice(0, 6).map((cat, i) => (
-                              <motion.button
-                                key={cat.slug}
-                                initial={{ opacity: 0, y: 8 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.45 + i * 0.05, duration: 0.3 }}
-                                whileTap={{ scale: 0.96 }}
-                                onClick={() => {
-                                  const msg = `ספרי לי על ${cat.title}`;
-                                  setInputValue(msg);
-                                  setTimeout(() => handleSendMessage(), 150);
-                                }}
-                                className="w-full text-right rounded-[16px] p-3 transition-all hover:shadow-sm"
-                                style={{
-                                  backgroundColor: '#ffffff',
-                                  border: '1px solid #e5e5ea',
-                                }}
-                              >
-                                <div
-                                  className="w-8 h-8 rounded-full flex items-center justify-center mb-2"
-                                  style={{ backgroundColor: `${cat.color}15` }}
-                                >
-                                  <span className="text-[14px]" style={{ color: cat.color }}>
-                                    {cat.icon === 'Play' ? '▶' : cat.icon === 'Heart' ? '♥' : cat.icon === 'MessageCircle' ? '💬' : cat.icon === 'TrendingUp' ? '📈' : cat.icon === 'Flame' ? '🔥' : cat.icon === 'Film' ? '🎬' : cat.icon === 'Lightbulb' ? '💡' : cat.icon === 'ShoppingBag' ? '🛍' : cat.icon === 'Star' ? '⭐' : cat.icon === 'MessageSquare' ? '❓' : cat.icon === 'Camera' ? '📷' : cat.icon === 'MapPin' ? '📍' : '•'}
-                                  </span>
-                                </div>
-                                <p className="text-[12px] font-medium leading-tight" style={{ color: '#0c1013' }}>
-                                  {cat.title}
-                                </p>
-                              </motion.button>
-                            ))}
-                          </div>
+                          {discoveryCategories.slice(0, 6).map((cat, i) => (
+                            <motion.button
+                              key={cat.slug}
+                              initial={{ opacity: 0, y: 6 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: 0.45 + i * 0.05, duration: 0.3 }}
+                              whileTap={{ scale: 0.96 }}
+                              onClick={async () => {
+                                if (isTyping || isStreamActive) return;
+                                const visibleMsg = `ספרי לי על ${cat.title}`;
+                                // Show clean message in UI
+                                const userMsg: Message = { id: Date.now().toString(), role: 'user', content: visibleMsg };
+                                setMessages(prev => [...prev, userMsg]);
+                                setIsTyping(true);
 
-                          {/* "גלו עוד" link → opens discovery tab */}
+                                // Fetch discovery list data to enrich the message for the LLM
+                                let enrichedMsg = visibleMsg;
+                                try {
+                                  const res = await fetch(`/api/discovery/list?username=${encodeURIComponent(username)}&slug=${encodeURIComponent(cat.slug)}`);
+                                  if (res.ok) {
+                                    const listData = await res.json();
+                                    const items = (listData.items || []).slice(0, 10);
+                                    const contextLines = items.map((item: any, idx: number) => {
+                                      const title = item.aiTitle || item.captionExcerpt || '';
+                                      const summary = item.aiSummary || '';
+                                      const metric = item.metricValue && item.metricLabel ? ` (${item.metricLabel}: ${item.metricValue.toLocaleString()})` : '';
+                                      return `${idx + 1}. ${title}${metric}${summary ? ' — ' + summary : ''}`;
+                                    }).join('\n');
+                                    enrichedMsg = `[הנתונים מתוך הרשימה "${cat.title}":\n${contextLines}]\n\n${visibleMsg}`;
+                                  }
+                                } catch { /* fallback to plain message */ }
+
+                                // Send via streaming
+                                const assistantMessageId = (Date.now() + 1).toString();
+                                setStreamingMessageId(assistantMessageId);
+                                setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant', content: '' }]);
+                                setIsTyping(false);
+                                await sendStreamMessage({
+                                  message: enrichedMsg,
+                                  username,
+                                  sessionId: sessionId || undefined,
+                                  previousResponseId: responseId || undefined,
+                                  clientMessageId: assistantMessageId,
+                                });
+                              }}
+                              className="suggestion-pill"
+                            >
+                              {cat.title}
+                            </motion.button>
+                          ))}
                           <motion.button
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: 0.7, duration: 0.3 }}
+                            initial={{ opacity: 0, y: 6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.75, duration: 0.3 }}
+                            whileTap={{ scale: 0.96 }}
                             onClick={() => setActiveTab('discover')}
-                            className="mt-3 mx-auto flex items-center gap-1 text-[13px] font-medium transition-opacity hover:opacity-70"
-                            style={{ color: '#676767' }}
+                            className="suggestion-pill flex items-center gap-1"
                           >
                             <Compass className="w-3.5 h-3.5" />
                             <span>גלו עוד</span>
@@ -1015,17 +1029,6 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                   <p className="text-sm whitespace-pre-wrap">{displayContent}</p>
                                 ) : (
                                   <div className="text-sm markdown-content">
-                                    {/* Show thinking text or typing indicator when streaming starts but no text yet */}
-                                    {isStreamingThis && !displayContent && (
-                                      streamThinkingText ? (
-                                        <p className="text-sm whitespace-pre-wrap animate-pulse">{streamThinkingText}</p>
-                                      ) : (
-                                        <div className="flex items-center gap-1 text-gray-400">
-                                          <Loader2 className="w-4 h-4 animate-spin" />
-                                          <span>מקליד...</span>
-                                        </div>
-                                      )
-                                    )}
                                     {displayContent && (
                                       <ReactMarkdown
                                         components={{

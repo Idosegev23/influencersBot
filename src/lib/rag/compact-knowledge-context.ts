@@ -268,6 +268,26 @@ export function compactKnowledgeContext(
     sectionCounts.websites = items.length;
   }
 
+  // 8. Discovery Lists (curated ranked lists)
+  if (kb.discoveryLists && kb.discoveryLists.length > 0) {
+    let section = `\n🔍 **רשימות גלו (${kb.discoveryLists.length}) — נתונים מאומתים ומדורגים:**\n`;
+    for (const list of kb.discoveryLists) {
+      section += `\n📋 ${list.title}:\n`;
+      for (const item of list.items) {
+        section += `  ${item.rank}. ${item.title}`;
+        if (item.metricValue && item.metricLabel) {
+          section += ` (${item.metricLabel}: ${item.metricValue.toLocaleString()})`;
+        }
+        if (item.postUrl) section += ` | URL: ${item.postUrl}`;
+        if (item.summary) section += `\n     ${truncate(item.summary, 200)}`;
+        section += '\n';
+      }
+    }
+    section += `⚠️ הנתונים ברשימות אלו מאומתים — השתמש בהם בביטחון כשהשאלה רלוונטית.\n`;
+    context += section;
+    sectionCounts.discoveryLists = kb.discoveryLists.length;
+  }
+
   // --- Hard cap on total size ---
   if (context.length > opts.maxTotalChars) {
     context = context.substring(0, opts.maxTotalChars - 20) + '\n...(נחתך)\n';
@@ -309,5 +329,6 @@ function measureKB(kb: KnowledgeBase): number {
   kb.partnerships?.forEach(p => { size += (p.brand_name || '').length + (p.description || '').length; });
   kb.insights?.forEach(i => { size += (i.content || '').length; });
   kb.websites?.forEach(w => { size += (w.content || '').length + (w.title || '').length; });
+  kb.discoveryLists?.forEach(d => { d.items.forEach(i => { size += (i.title || '').length + (i.summary || '').length; }); });
   return size;
 }
