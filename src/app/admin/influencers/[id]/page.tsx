@@ -15,6 +15,10 @@ import {
   Upload,
   Trash2,
   Loader2,
+  Instagram,
+  Copy,
+  Link2,
+  ExternalLink,
 } from 'lucide-react';
 
 interface AdminDocument {
@@ -72,11 +76,15 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
   const [documents, setDocuments] = useState<AdminDocument[]>([]);
   const [docsLoading, setDocsLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [igConnection, setIgConnection] = useState<{ ig_username: string; is_active: boolean; connected_at: string } | null>(null);
+  const [copiedId, setCopiedId] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadInfluencer();
     loadDocuments();
+    loadIgConnection();
   }, [id]);
 
   async function loadDocuments() {
@@ -93,6 +101,26 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
       setDocsLoading(false);
     }
   }
+
+  async function loadIgConnection() {
+    try {
+      const res = await fetch(`/api/admin/ig-connection?accountId=${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setIgConnection(data.connection || null);
+      }
+    } catch (error) {
+      console.error('Error loading IG connection:', error);
+    }
+  }
+
+  function copyToClipboard(text: string, type: 'id' | 'link') {
+    navigator.clipboard.writeText(text);
+    if (type === 'id') { setCopiedId(true); setTimeout(() => setCopiedId(false), 2000); }
+    else { setCopiedLink(true); setTimeout(() => setCopiedLink(false), 2000); }
+  }
+
+  const igConnectLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/api/auth/instagram/connect?accountId=${id}`;
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
@@ -462,6 +490,75 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
                     />
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Instagram Connection */}
+            <div className="admin-card p-6">
+              <h2 className="text-lg font-bold mb-4 flex items-center gap-2" style={{ color: '#ede9f8' }}>
+                <Instagram className="w-5 h-5" style={{ color: '#E1306C' }} />
+                חיבור אינסטגרם
+              </h2>
+
+              {/* Connection Status */}
+              <div className="p-3 rounded-xl mb-4" style={igConnection?.is_active
+                ? { background: 'rgba(94, 234, 212, 0.06)', border: '1px solid rgba(94, 234, 212, 0.15)' }
+                : { background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }
+              }>
+                <div className="flex items-center gap-2">
+                  {igConnection?.is_active ? (
+                    <>
+                      <CheckCircle className="w-4 h-4" style={{ color: '#5eead4' }} />
+                      <span className="text-sm font-medium" style={{ color: '#5eead4' }}>
+                        מחובר — @{igConnection.ig_username}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle className="w-4 h-4" style={{ color: 'rgba(237, 233, 248, 0.35)' }} />
+                      <span className="text-sm" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>
+                        לא מחובר
+                      </span>
+                    </>
+                  )}
+                </div>
+                {igConnection?.connected_at && (
+                  <div className="text-xs mt-1 mr-6" style={{ color: 'rgba(237, 233, 248, 0.25)' }}>
+                    חובר ב-{new Date(igConnection.connected_at).toLocaleDateString('he-IL')}
+                  </div>
+                )}
+              </div>
+
+              {/* Copy Account ID */}
+              <div className="space-y-2">
+                <button
+                  onClick={() => copyToClipboard(id, 'id')}
+                  className="w-full flex items-center justify-between gap-2 p-3 rounded-xl text-sm transition-all"
+                  style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.06)' }}
+                >
+                  <div className="flex items-center gap-2" style={{ color: '#ede9f8' }}>
+                    <Copy className="w-4 h-4" />
+                    <span>העתק Account ID</span>
+                  </div>
+                  <span className="text-xs font-mono" style={{ color: copiedId ? '#5eead4' : 'rgba(237, 233, 248, 0.3)' }}>
+                    {copiedId ? 'הועתק!' : id.slice(0, 8) + '...'}
+                  </span>
+                </button>
+
+                {/* Copy OAuth Link */}
+                <button
+                  onClick={() => copyToClipboard(igConnectLink, 'link')}
+                  className="w-full flex items-center justify-between gap-2 p-3 rounded-xl text-sm transition-all"
+                  style={{ background: 'rgba(225, 48, 108, 0.06)', border: '1px solid rgba(225, 48, 108, 0.15)' }}
+                >
+                  <div className="flex items-center gap-2" style={{ color: '#ede9f8' }}>
+                    <Link2 className="w-4 h-4" style={{ color: '#E1306C' }} />
+                    <span>העתק קישור התחברות</span>
+                  </div>
+                  <span className="text-xs" style={{ color: copiedLink ? '#5eead4' : 'rgba(237, 233, 248, 0.3)' }}>
+                    {copiedLink ? 'הועתק!' : ''}
+                  </span>
+                </button>
               </div>
             </div>
 
