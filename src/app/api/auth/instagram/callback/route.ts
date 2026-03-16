@@ -28,18 +28,25 @@ export async function GET(req: NextRequest) {
   const error = searchParams.get('error');
   const state = searchParams.get('state'); // Contains accountId if we passed it
 
+  // Parse state to get accountId for redirect
+  let accountId = '';
+  if (state) {
+    try { accountId = JSON.parse(decodeURIComponent(state)).accountId || ''; } catch {}
+  }
+  const redirectBase = accountId ? `/admin/influencers/${accountId}` : '/admin/influencers';
+
   // Handle user declining permissions
   if (error) {
     console.error('[IG OAuth] User denied permissions:', error);
     return NextResponse.redirect(
-      new URL(`/dashboard/settings?ig_error=${encodeURIComponent(error)}`, req.url),
+      new URL(`${redirectBase}?ig_error=${encodeURIComponent(error)}`, req.url),
     );
   }
 
   if (!code) {
     console.error('[IG OAuth] No authorization code received');
     return NextResponse.redirect(
-      new URL('/dashboard/settings?ig_error=no_code', req.url),
+      new URL(`${redirectBase}?ig_error=no_code`, req.url),
     );
   }
 
@@ -58,7 +65,7 @@ export async function GET(req: NextRequest) {
 
     // 4. Save to database
     console.log('[IG OAuth] Saving connection to database...');
-    const supabase = createClient();
+    const supabase = await createClient();
 
     const connectionData = {
       ig_business_account_id: igAccount.ig_id,
@@ -101,15 +108,15 @@ export async function GET(req: NextRequest) {
 
     console.log(`[IG OAuth] Successfully connected @${igAccount.username} (${igAccount.ig_id})`);
 
-    // Redirect to success page
+    // Redirect to success page — back to the account's admin page
     return NextResponse.redirect(
-      new URL(`/dashboard/settings?ig_connected=${encodeURIComponent(igAccount.username)}`, req.url),
+      new URL(`${redirectBase}?ig_connected=${encodeURIComponent(igAccount.username)}`, req.url),
     );
 
   } catch (error: any) {
     console.error('[IG OAuth] Error:', error.message);
     return NextResponse.redirect(
-      new URL(`/dashboard/settings?ig_error=${encodeURIComponent(error.message)}`, req.url),
+      new URL(`${redirectBase}?ig_error=${encodeURIComponent(error.message)}`, req.url),
     );
   }
 }
