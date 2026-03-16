@@ -5,6 +5,7 @@ import { Loader2, ChevronDown, ChevronUp, Play } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDiscoveryAll } from '@/hooks/useDiscoveryAll';
 import { useDiscovery } from '@/hooks/useDiscovery';
+import { useMagicBento } from './useMagicBento';
 import { QuestionsView } from './QuestionsView';
 import { getProxiedImageUrl, getProxiedImageByShortcode } from '@/lib/image-utils';
 import type { DiscoveryItem } from '@/lib/discovery/types';
@@ -40,6 +41,7 @@ export default function DiscoveryTab({
   const [filter, setFilter] = useState<string | null>(null);
   const [showQ, setShowQ] = useState(false);
   const qLoaded = useRef(false);
+  const feedRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (showQ && !qLoaded.current) { qLoaded.current = true; loadQuestions(); }
@@ -63,6 +65,8 @@ export default function DiscoveryTab({
   }, [onAskInChat]);
 
   const visible = filter ? rows.filter(r => r.category.slug === filter) : rows;
+
+  useMagicBento(feedRef, visible.length);
 
   return (
     <div className="bt-page" dir="rtl">
@@ -93,7 +97,7 @@ export default function DiscoveryTab({
             ))}
           </nav>
 
-          <div className="bt-feed">
+          <div className="bt-feed" ref={feedRef}>
             {visible.map((row, ri) => {
               const count = Math.min(row.items.length, 3);
               const lay = LAYOUTS[ri % 3];

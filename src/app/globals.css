@@ -1591,10 +1591,10 @@ h1, h2, h3, h4, h5, h6 {
 /* ── Title — gradient text ── */
 
 .bt-title {
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 800;
   letter-spacing: -0.4px;
-  margin: 16px 0 0;
+  margin: 18px 0 0;
   background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 40%, #a78bfa 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -1660,20 +1660,20 @@ h1, h2, h3, h4, h5, h6 {
 .bt-section { display: flex; flex-direction: column; }
 
 .bt-label {
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 700;
   color: #1a1a2e;
-  margin: 0 0 6px;
+  margin: 0 0 8px;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   line-height: 1.3;
 }
 
 .bt-label::before {
   content: '';
-  width: 2.5px;
-  height: 11px;
+  width: 3px;
+  height: 14px;
   border-radius: 3px;
   background: linear-gradient(to bottom, #8b5cf6, #d946ef);
   flex-shrink: 0;
@@ -1694,6 +1694,18 @@ h1, h2, h3, h4, h5, h6 {
     0 2px 12px rgba(0,0,0,0.05),
     0 0 0 1px rgba(255,255,255,0.15) inset;
   position: relative;
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+  --glow-x: 50%;
+  --glow-y: 50%;
+  --glow-intensity: 0;
+  --glow-radius: 400px;
+}
+
+.bt-bento:hover {
+  border-color: rgba(139,92,246,0.25);
+  box-shadow:
+    0 4px 20px rgba(139,92,246,0.1),
+    0 0 0 1px rgba(255,255,255,0.2) inset;
 }
 
 .bt-bento::before {
@@ -1704,6 +1716,50 @@ h1, h2, h3, h4, h5, h6 {
   background: linear-gradient(90deg, transparent, rgba(255,255,255,0.75), transparent);
   z-index: 10;
   pointer-events: none;
+}
+
+/* Border glow — follows cursor */
+.bt-bento::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 4px;
+  background: radial-gradient(
+    var(--glow-radius) circle at var(--glow-x) var(--glow-y),
+    rgba(139,92,246, calc(var(--glow-intensity) * 0.7)) 0%,
+    rgba(139,92,246, calc(var(--glow-intensity) * 0.35)) 30%,
+    transparent 60%
+  );
+  border-radius: inherit;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 8;
+}
+
+/* Global spotlight */
+.bt-spotlight {
+  position: fixed;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle,
+    rgba(139,92,246,0.1) 0%,
+    rgba(139,92,246,0.05) 20%,
+    rgba(139,92,246,0.02) 40%,
+    transparent 60%
+  );
+  z-index: 200;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  will-change: transform, opacity;
 }
 
 /* ── 1 item ── */
