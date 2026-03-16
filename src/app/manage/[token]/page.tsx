@@ -107,6 +107,9 @@ export default function ManagePage() {
   const [welcomeMessage, setWelcomeMessage] = useState('');
   const [widgetPosition, setWidgetPosition] = useState<'bottom-right' | 'bottom-left'>('bottom-right');
 
+  // Live preview state
+  const [showLivePreview, setShowLivePreview] = useState(false);
+
   // ============================================
   // Auth
   // ============================================
@@ -473,6 +476,13 @@ export default function ManagePage() {
                 {saveMsg}
               </span>
             )}
+            <button
+              onClick={() => setShowLivePreview(true)}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              צפייה חיה
+            </button>
           </div>
         </div>
       </header>
@@ -1064,6 +1074,66 @@ export default function ManagePage() {
           </div>
         )}
       </main>
+
+      {/* Live Preview Modal */}
+      {showLivePreview && accountId && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setShowLivePreview(false)}
+        >
+          <div
+            className="relative flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top bar */}
+            <div className="flex items-center justify-between w-[390px] mb-3 px-1">
+              <span className="text-sm font-medium text-white/80">
+                צפייה חיה — {displayName || 'ווידג׳ט'}
+              </span>
+              <div className="flex items-center gap-2">
+                <a
+                  href={`/widget-preview?accountId=${accountId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-white/60 hover:text-white transition-colors underline"
+                >
+                  פתח בטאב חדש
+                </a>
+                <button
+                  onClick={() => setShowLivePreview(false)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 transition-all"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Phone frame */}
+            <div
+              className="rounded-[40px] overflow-hidden shadow-2xl"
+              style={{ width: 390, height: 760, border: '8px solid #1a1a1a', backgroundColor: '#1a1a1a' }}
+            >
+              {/* Notch */}
+              <div className="relative flex justify-center" style={{ backgroundColor: '#1a1a1a', height: 30 }}>
+                <div className="absolute top-0 rounded-b-2xl" style={{ width: 120, height: 24, backgroundColor: '#1a1a1a' }} />
+              </div>
+
+              {/* Iframe */}
+              <iframe
+                src={`/widget-preview?accountId=${accountId}&t=${Date.now()}`}
+                className="w-full border-0"
+                style={{ height: 'calc(100% - 30px)', borderRadius: '0 0 32px 32px', backgroundColor: '#f8f9fa' }}
+                title="תצוגה מקדימה — ווידג׳ט"
+              />
+            </div>
+
+            <p className="text-xs text-white/50 mt-3">
+              לחצו על הבועה בתוך הטלפון כדי לפתוח את הווידג׳ט
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
