@@ -1679,10 +1679,10 @@ h1, h2, h3, h4, h5, h6 {
 .mobile-tab-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 13px;
+  gap: 4px;
+  padding: 6px 10px;
   border-radius: 60px;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 400;
   color: #676767;
   background: transparent;
@@ -1706,6 +1706,12 @@ h1, h2, h3, h4, h5, h6 {
 
 .mobile-tab-btn.active-problem {
   background: #ffd6d7;
+  color: #0c1013;
+  font-weight: 700;
+}
+
+.mobile-tab-btn.active-discover {
+  background: #e8daf7;
   color: #0c1013;
   font-weight: 700;
 }

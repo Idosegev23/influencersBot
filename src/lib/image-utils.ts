@@ -7,8 +7,8 @@
  */
 export function isInstagramUrl(url: string): boolean {
   if (!url) return false;
-  return url.includes('cdninstagram.com') || 
-         url.includes('fbcdn.net') || 
+  return url.includes('cdninstagram.com') ||
+         url.includes('fbcdn.net') ||
          url.includes('instagram.com');
 }
 
@@ -16,16 +16,26 @@ export function isInstagramUrl(url: string): boolean {
  * Convert Instagram URL to our proxy URL
  * This bypasses CORS and 403 issues
  */
-export function getProxiedImageUrl(url: string): string {
+export function getProxiedImageUrl(url: string, shortcode?: string): string {
   if (!url) return '/icons/icon.svg';
-  
+
   // If it's already our storage URL, return as-is
   if (url.includes('supabase') || url.includes('localhost') || !isInstagramUrl(url)) {
     return url;
   }
-  
-  // Use our image proxy
-  return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+
+  // Use our image proxy with optional shortcode fallback
+  const params = new URLSearchParams({ url });
+  if (shortcode) params.set('shortcode', shortcode);
+  return `/api/image-proxy?${params.toString()}`;
+}
+
+/**
+ * Get proxy URL from shortcode only (no CDN URL needed)
+ */
+export function getProxiedImageByShortcode(shortcode: string): string {
+  if (!shortcode) return '/icons/icon.svg';
+  return `/api/image-proxy?shortcode=${encodeURIComponent(shortcode)}`;
 }
 
 /**
@@ -35,7 +45,7 @@ export function getAvatarUrl(url: string | null | undefined, fallbackInitial?: s
   if (!url) {
     return '/icons/icon.svg';
   }
-  
+
   return getProxiedImageUrl(url);
 }
 

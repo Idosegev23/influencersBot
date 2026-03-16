@@ -27,8 +27,12 @@ import {
   RotateCcw,
   CheckCircle,
   ArrowRight,
+  Compass,
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { getInfluencerByUsername, getBrandsByInfluencer, getContentByInfluencer, type Brand } from '@/lib/supabase';
+
+const DiscoveryTab = dynamic(() => import('@/components/chat/discovery/DiscoveryTab'), { ssr: false });
 import { applyTheme, getGoogleFontsUrl } from '@/lib/theme';
 import { getProxiedImageUrl } from '@/lib/image-utils';
 import { BrandCards } from '@/components/chat/BrandCards';
@@ -135,7 +139,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   
-  const [activeTab, setActiveTab] = useState<'chat' | 'coupons' | 'problem'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'coupons' | 'problem' | 'discover'>('chat');
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -801,6 +805,14 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 >
                   <span>בעיה בהזמנה</span>
                   <AlertCircle className="w-[18px] h-[18px]" />
+                </button>
+                <button
+                  onClick={() => setActiveTab('discover')}
+                  className={`flex items-center gap-[6px] px-[11px] py-[6px] rounded-full transition-all ${activeTab === 'discover' ? 'bg-[#e8daf7]' : ''}`}
+                  style={{ color: activeTab === 'discover' ? '#0c1013' : '#676767', fontSize: '16px', fontWeight: activeTab === 'discover' ? 700 : 400 }}
+                >
+                  <span>גלו</span>
+                  <Compass className="w-[18px] h-[18px]" />
                 </button>
               </div>
               </div>
@@ -1603,6 +1615,26 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   </div>
                 </div>
               </motion.div>
+            ) : activeTab === 'discover' ? (
+              <motion.div
+                key="discover"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="h-full"
+              >
+                <DiscoveryTab
+                  username={username}
+                  influencerName={influencer.display_name || ''}
+                  sessionId={sessionId || undefined}
+                  onAskInChat={(message) => {
+                    setInputValue(message);
+                    setActiveTab('chat');
+                    // Auto-send after state update propagates
+                    setTimeout(() => handleSendMessage(), 150);
+                  }}
+                />
+              </motion.div>
             ) : null}
           </AnimatePresence>
         </div>
@@ -1631,6 +1663,13 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
               >
                 <AlertCircle className="w-[18px] h-[18px]" />
                 <span>בעיה בהזמנה</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('discover')}
+                className={`mobile-tab-btn ${activeTab === 'discover' ? 'active-discover' : ''}`}
+              >
+                <Compass className="w-[18px] h-[18px]" />
+                <span>גלו</span>
               </button>
             </div>
           </div>
