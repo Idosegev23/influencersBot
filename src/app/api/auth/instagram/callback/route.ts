@@ -39,14 +39,14 @@ export async function GET(req: NextRequest) {
   if (error) {
     console.error('[IG OAuth] User denied permissions:', error);
     return NextResponse.redirect(
-      new URL(`${redirectBase}?ig_error=${encodeURIComponent(error)}`, req.url),
+      new URL(`/instagram/connected?error=${encodeURIComponent(error)}`, req.url),
     );
   }
 
   if (!code) {
     console.error('[IG OAuth] No authorization code received');
     return NextResponse.redirect(
-      new URL(`${redirectBase}?ig_error=no_code`, req.url),
+      new URL(`/instagram/connected?error=no_code`, req.url),
     );
   }
 
@@ -108,15 +108,15 @@ export async function GET(req: NextRequest) {
 
     console.log(`[IG OAuth] Successfully connected @${igAccount.username} (${igAccount.ig_id})`);
 
-    // Redirect to success page — back to the account's admin page
+    // Redirect influencer to a simple "thank you" page (not admin dashboard)
     return NextResponse.redirect(
-      new URL(`${redirectBase}?ig_connected=${encodeURIComponent(igAccount.username)}`, req.url),
+      new URL(`/instagram/connected?username=${encodeURIComponent(igAccount.username)}`, req.url),
     );
 
   } catch (error: any) {
     console.error('[IG OAuth] Error:', error.message);
     return NextResponse.redirect(
-      new URL(`${redirectBase}?ig_error=${encodeURIComponent(error.message)}`, req.url),
+      new URL(`/instagram/connected?error=${encodeURIComponent(error.message)}`, req.url),
     );
   }
 }
