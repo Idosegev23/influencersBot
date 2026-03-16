@@ -123,6 +123,8 @@ export async function getInfluencerByUsername(username: string): Promise<Influen
         response_style,
         topics,
         common_phrases,
+        emoji_style,
+        language,
         created_at,
         updated_at
       ),
@@ -225,13 +227,29 @@ export async function getInfluencerByUsername(username: string): Promise<Influen
     // Persona
     persona_name: persona?.name,
     has_persona: !!persona,
+    persona: persona ? {
+      tone: persona.tone || '',
+      style: persona.response_style || '',
+      interests: persona.topics || [],
+      signature_phrases: persona.common_phrases || [],
+      emoji_style: persona.emoji_style || 'minimal',
+      language: persona.language || 'he',
+    } : null,
     
     // Additional config fields
     greeting_message: config.greeting_message,
     suggested_questions: config.suggested_questions,
-    
+    hide_branding: config.hide_branding,
+    custom_logo_url: config.custom_logo_url,
+    scrape_settings: config.scrape_settings,
+    phone_number: config.phone_number,
+    whatsapp_enabled: config.whatsapp_enabled,
+
     // Security config for authentication
     security_config: account.security_config,
+
+    // Raw config for settings page (widget sub-object etc.)
+    _rawConfig: config,
   } as any;
 }
 

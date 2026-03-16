@@ -36,7 +36,6 @@ import {
 } from 'lucide-react';
 import {
   getInfluencerByUsername,
-  updateInfluencer,
   getProductsByInfluencer,
   getContentByInfluencer,
 } from '@/lib/supabase';
@@ -100,6 +99,10 @@ export default function SettingsPage({
   const [hideBranding, setHideBranding] = useState(false);
   const [customLogoUrl, setCustomLogoUrl] = useState('');
 
+  // Widget-specific state (what widget.js actually reads)
+  const [widgetPosition, setWidgetPosition] = useState<'bottom-right' | 'bottom-left'>('bottom-right');
+  const [widgetPlaceholder, setWidgetPlaceholder] = useState('שאלו משהו...');
+
   // Phone & WhatsApp state
   const [phoneNumber, setPhoneNumber] = useState('');
   const [whatsappEnabled, setWhatsappEnabled] = useState(false);
@@ -147,6 +150,15 @@ export default function SettingsPage({
         if (inf.scrape_settings) setScrapeSettings(inf.scrape_settings);
         if (inf.phone_number) setPhoneNumber(inf.phone_number);
         if (inf.whatsapp_enabled) setWhatsappEnabled(inf.whatsapp_enabled);
+
+        // Load widget-specific settings from raw account config
+        const rawConfig = (inf as any)._rawConfig || {};
+        const w = rawConfig.widget || {};
+        if (w.position) setWidgetPosition(w.position);
+        if (w.placeholder) setWidgetPlaceholder(w.placeholder);
+        // If widget has its own welcomeMessage and greeting is empty, use it
+        if (!inf.greeting_message && w.welcomeMessage) setGreetingMessage(w.welcomeMessage);
+
         // Load persona settings
         if (inf.persona) {
           setPersonaTone(inf.persona.tone || '');
@@ -171,27 +183,41 @@ export default function SettingsPage({
 
     setSaving(true);
     try {
-      // Build persona object
-      const updatedPersona = {
-        tone: personaTone,
-        style: personaStyle,
-        interests: personaInterests,
-        signature_phrases: personaPhrases,
-        emoji_style: personaEmojiStyle,
-        language: personaLanguage,
-      };
-
-      await updateInfluencer(influencer.id, {
-        theme,
-        greeting_message: greetingMessage,
-        suggested_questions: suggestedQuestions,
-        hide_branding: hideBranding,
-        custom_logo_url: customLogoUrl || null,
-        scrape_settings: scrapeSettings,
-        phone_number: phoneNumber || null,
-        whatsapp_enabled: whatsappEnabled,
-        persona: updatedPersona,
+      const res = await fetch('/api/influencer/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username,
+          theme,
+          greeting_message: greetingMessage,
+          suggested_questions: suggestedQuestions,
+          hide_branding: hideBranding,
+          custom_logo_url: customLogoUrl || null,
+          scrape_settings: scrapeSettings,
+          phone_number: phoneNumber || null,
+          whatsapp_enabled: whatsappEnabled,
+          persona: {
+            tone: personaTone,
+            style: personaStyle,
+            interests: personaInterests,
+            signature_phrases: personaPhrases,
+            emoji_style: personaEmojiStyle,
+            language: personaLanguage,
+          },
+          // Widget-specific config (read by widget.js via /api/widget/config)
+          widget: {
+            primaryColor: theme.colors.primary,
+            welcomeMessage: greetingMessage,
+            placeholder: widgetPlaceholder,
+            position: widgetPosition,
+          },
+        }),
       });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to save');
+      }
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (error) {
@@ -534,6 +560,64 @@ export default function SettingsPage({
                     + הוסף שאלה
                   </button>
                 )}
+              </div>
+            </div>
+
+            {/* Widget Settings */}
+            <div
+              className="glass-card rounded-2xl p-6 animate-slide-up"
+              style={{ borderColor: 'var(--dash-glass-border)' }}
+            >
+              <h2 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
+                <Globe className="w-5 h-5" style={{ color: 'var(--color-info)' }} />
+                הגדרות ווידג&apos;ט
+              </h2>
+              <p className="text-sm mb-6" style={{ color: 'var(--dash-text-3)' }}>
+                הגדרות אלה משפיעות על הווידג&apos;ט שמוטמע באתר שלכם בלבד (לא על דף הצ&apos;אט)
+              </p>
+
+              <div className="space-y-6 relative z-10">
+                {/* Widget Position */}
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>מיקום הווידג&apos;ט</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { value: 'bottom-right' as const, label: 'ימין למטה', icon: '↘' },
+                      { value: 'bottom-left' as const, label: 'שמאל למטה', icon: '↙' },
+                    ].map((pos) => (
+                      <button
+                        key={pos.value}
+                        type="button"
+                        onClick={() => setWidgetPosition(pos.value)}
+                        className={`flex items-center justify-center gap-2 p-3 rounded-full border transition-all ${
+                          widgetPosition === pos.value ? 'pill pill-purple' : 'pill pill-neutral'
+                        }`}
+                      >
+                        <span className="text-lg">{pos.icon}</span>
+                        <span className="text-sm">{pos.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Widget Placeholder */}
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>טקסט Placeholder בשדה הקלט</label>
+                  <input
+                    type="text"
+                    value={widgetPlaceholder}
+                    onChange={(e) => setWidgetPlaceholder(e.target.value)}
+                    className="w-full rounded-xl px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
+                    placeholder="שאלו משהו..."
+                  />
+                </div>
+
+                <div className="p-4 rounded-xl glass-subtle" style={{ background: 'color-mix(in srgb, var(--color-info) 10%, transparent)', border: '1px solid var(--dash-glass-border)' }}>
+                  <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>
+                    <strong>💡</strong> הצבע הראשי, הודעת הפתיחה והשאלות המוצעות נלקחים מההגדרות למעלה ומשפיעים גם על הווידג&apos;ט.
+                  </p>
+                </div>
               </div>
             </div>
 
