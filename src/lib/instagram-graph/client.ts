@@ -213,6 +213,218 @@ export async function sendLongInstagramDM(
   return results;
 }
 
+/**
+ * Send a long text message with quick reply buttons on the last chunk
+ * Quick replies only attach to the final message (Instagram shows them below the latest message)
+ */
+export async function sendLongInstagramDMWithQuickReplies(
+  recipientId: string,
+  text: string,
+  quickReplies: Array<{ title: string; payload: string }>,
+  igAccountId: string,
+  accessToken?: string,
+  delayBetweenMs: number = 500,
+): Promise<IGSendMessageResponse[]> {
+  const chunks = splitMessageForInstagram(text);
+  const results: IGSendMessageResponse[] = [];
+
+  for (let i = 0; i < chunks.length; i++) {
+    if (i > 0) {
+      await new Promise(resolve => setTimeout(resolve, delayBetweenMs));
+    }
+
+    const isLastChunk = i === chunks.length - 1;
+
+    if (isLastChunk && quickReplies.length > 0) {
+      // Attach quick replies to last chunk
+      const result = await sendInstagramQuickReply(
+        recipientId, chunks[i], quickReplies, igAccountId, accessToken,
+      );
+      results.push(result);
+    } else {
+      const result = await sendInstagramDM(recipientId, chunks[i], igAccountId, accessToken);
+      results.push(result);
+    }
+  }
+
+  return results;
+}
+
+// ============================================
+// Rich Messages — Generic Template, Reactions, Media Share
+// ============================================
+
+export interface GenericTemplateElement {
+  title: string;             // max 80 chars
+  subtitle?: string;         // max 80 chars
+  image_url?: string;
+  default_action?: {
+    type: 'web_url';
+    url: string;
+  };
+  buttons?: Array<{
+    type: 'web_url' | 'postback';
+    title: string;           // max 20 chars
+    url?: string;            // for web_url
+    payload?: string;        // for postback
+  }>;
+}
+
+/**
+ * Send a Generic Template (structured card or horizontal carousel)
+ * Up to 10 elements, each with image + title + subtitle + up to 3 buttons
+ * Mobile-only — desktop Instagram won't render these
+ */
+export async function sendGenericTemplate(
+  recipientId: string,
+  elements: GenericTemplateElement[],
+  igAccountId: string,
+  accessToken?: string,
+): Promise<IGSendMessageResponse> {
+  const url = `${GRAPH_API_BASE}/${igAccountId}/messages`;
+
+  return graphRequest<IGSendMessageResponse>(url, 'POST', {
+    recipient: { id: recipientId },
+    message: {
+      attachment: {
+        type: 'template',
+        payload: {
+          template_type: 'generic',
+          elements: elements.slice(0, 10), // Instagram max 10 elements
+        },
+      },
+    },
+  }, accessToken);
+}
+
+/**
+ * Send a reaction (emoji) to a message
+ */
+export async function sendReaction(
+  recipientId: string,
+  messageId: string,
+  reaction: string,
+  igAccountId: string,
+  accessToken?: string,
+): Promise<void> {
+  const url = `${GRAPH_API_BASE}/${igAccountId}/messages`;
+
+  await graphRequest(url, 'POST', {
+    recipient: { id: recipientId },
+    sender_action: 'react',
+    payload: {
+      message_id: messageId,
+      reaction,
+    },
+  }, accessToken);
+}
+
+/**
+ * Share an influencer's own Instagram post via DM
+ * The app user must own the post
+ */
+export async function sendMediaShare(
+  recipientId: string,
+  postId: string,
+  igAccountId: string,
+  accessToken?: string,
+): Promise<IGSendMessageResponse> {
+  const url = `${GRAPH_API_BASE}/${igAccountId}/messages`;
+
+  return graphRequest<IGSendMessageResponse>(url, 'POST', {
+    recipient: { id: recipientId },
+    message: {
+      attachment: {
+        type: 'MEDIA_SHARE',
+        payload: { id: postId },
+      },
+    },
+  }, accessToken);
+}
+
+// ============================================
+// Ice Breakers & Persistent Menu (one-time config)
+// ============================================
+
+/**
+ * Set Ice Breakers — up to 4 FAQ questions shown when user opens DM for first time
+ * Uses Facebook Graph API (not Instagram Graph API)
+ */
+export async function setIceBreakers(
+  igAccountId: string,
+  questions: Array<{ question: string; payload: string }>,
+  accessToken: string,
+): Promise<void> {
+  const url = `${FB_GRAPH_API_BASE}/${igAccountId}/messenger_profile`;
+
+  await graphRequest(url, 'POST', {
+    platform: 'instagram',
+    ice_breakers: [
+      {
+        call_to_actions: questions.slice(0, 4).map(q => ({
+          question: q.question,
+          payload: q.payload,
+        })),
+      },
+    ],
+  }, accessToken);
+}
+
+/**
+ * Set Persistent Menu — always-visible menu in DM conversation
+ * Uses Facebook Graph API, max 5 items recommended
+ */
+export async function setPersistentMenu(
+  _igAccountId: string,
+  menuItems: Array<{
+    type: 'postback' | 'web_url';
+    title: string;
+    payload?: string;
+    url?: string;
+  }>,
+  accessToken: string,
+): Promise<void> {
+  const url = `${FB_GRAPH_API_BASE}/me/messenger_profile`;
+
+  await graphRequest(url, 'POST', {
+    platform: 'instagram',
+    persistent_menu: [
+      {
+        locale: 'default',
+        call_to_actions: menuItems.slice(0, 5),
+      },
+    ],
+  }, accessToken);
+}
+
+/**
+ * Delete Ice Breakers configuration
+ */
+export async function deleteIceBreakers(
+  igAccountId: string,
+  accessToken: string,
+): Promise<void> {
+  const url = `${FB_GRAPH_API_BASE}/${igAccountId}/messenger_profile`;
+
+  await graphRequest(url, 'DELETE', {
+    fields: ['ice_breakers'],
+  }, accessToken);
+}
+
+/**
+ * Delete Persistent Menu configuration
+ */
+export async function deletePersistentMenu(
+  accessToken: string,
+): Promise<void> {
+  const url = `${FB_GRAPH_API_BASE}/me/messenger_profile`;
+
+  await graphRequest(url, 'DELETE', {
+    fields: ['persistent_menu'],
+    platform: 'instagram',
+  }, accessToken);
+}
+
 // ============================================
 // Profile & Media
 // ============================================
@@ -257,6 +469,113 @@ export async function getStories(
   const url = `${GRAPH_API_BASE}/${igUserId}/stories?fields=id,media_type,media_url,timestamp`;
   const result = await graphRequest<{ data: any[] }>(url, 'GET', undefined, accessToken);
   return result.data || [];
+}
+
+// ============================================
+// Content Fetching — Posts, Comments, Insights
+// ============================================
+
+export interface IGMediaItem {
+  id: string;
+  caption?: string;
+  media_type: 'IMAGE' | 'VIDEO' | 'CAROUSEL_ALBUM';
+  media_url?: string;
+  thumbnail_url?: string;
+  timestamp: string;
+  like_count?: number;
+  comments_count?: number;
+  permalink?: string;
+  children?: { data: Array<{ id: string; media_type: string; media_url: string }> };
+}
+
+export interface IGComment {
+  id: string;
+  text: string;
+  username: string;
+  timestamp: string;
+  like_count?: number;
+}
+
+/**
+ * Get all media (posts/reels) for an account — handles pagination
+ */
+export async function getAllMedia(
+  igUserId: string,
+  accessToken: string,
+  limit: number = 500,
+  delayMs: number = 500,
+): Promise<IGMediaItem[]> {
+  const allMedia: IGMediaItem[] = [];
+  const fields = 'id,caption,media_type,media_url,thumbnail_url,timestamp,like_count,comments_count,permalink';
+  let url: string | null = `${GRAPH_API_BASE}/${igUserId}/media?fields=${fields}&limit=25`;
+
+  while (url && allMedia.length < limit) {
+    const result = await graphRequest<{ data: IGMediaItem[]; paging?: { next?: string } }>(
+      url, 'GET', undefined, accessToken
+    );
+    allMedia.push(...(result.data || []));
+    url = result.paging?.next || null;
+
+    if (url) await new Promise(r => setTimeout(r, delayMs));
+    console.log(`  [Graph] Fetched ${allMedia.length} media items...`);
+  }
+
+  return allMedia.slice(0, limit);
+}
+
+/**
+ * Get carousel children (individual media items in a carousel post)
+ */
+export async function getCarouselChildren(
+  mediaId: string,
+  accessToken: string,
+): Promise<Array<{ id: string; media_type: string; media_url: string }>> {
+  const url = `${GRAPH_API_BASE}/${mediaId}/children?fields=id,media_type,media_url`;
+  const result = await graphRequest<{ data: any[] }>(url, 'GET', undefined, accessToken);
+  return result.data || [];
+}
+
+/**
+ * Get comments for a media item — handles pagination
+ */
+export async function getMediaComments(
+  mediaId: string,
+  accessToken: string,
+  limit: number = 50,
+): Promise<IGComment[]> {
+  const allComments: IGComment[] = [];
+  let url: string | null = `${GRAPH_API_BASE}/${mediaId}/comments?fields=id,text,username,timestamp,like_count&limit=25`;
+
+  while (url && allComments.length < limit) {
+    const result = await graphRequest<{ data: IGComment[]; paging?: { next?: string } }>(
+      url, 'GET', undefined, accessToken
+    );
+    allComments.push(...(result.data || []));
+    url = result.paging?.next || null;
+  }
+
+  return allComments.slice(0, limit);
+}
+
+/**
+ * Get full profile with correct v22.0 field names
+ */
+export async function getFullProfile(
+  igUserId: string,
+  accessToken: string,
+): Promise<{
+  id: string;
+  name: string;
+  username: string;
+  biography: string;
+  followers_count: number;
+  media_count: number;
+  profile_picture_url: string;
+  website?: string;
+}> {
+  const fields = 'id,name,username,biography,followers_count,media_count,profile_picture_url,website';
+  const url = `${GRAPH_API_BASE}/${igUserId}?fields=${fields}`;
+  return graphRequest(url, 'GET', undefined, accessToken);
 }
 
 // ============================================

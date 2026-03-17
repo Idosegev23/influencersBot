@@ -14,7 +14,14 @@ import { createClient } from '@/lib/supabase/server';
 import { processSandwichMessageWithMetadata } from '@/lib/chatbot/sandwichBot';
 import { buildPersonalityFromDB } from '@/lib/chatbot/personality-wrapper';
 import { updateRollingSummary, shouldUpdateSummary } from '@/lib/chatbot/conversation-memory';
-import { sendLongInstagramDM, type IGMessagingEvent } from './client';
+import {
+  sendLongInstagramDM,
+  sendLongInstagramDMWithQuickReplies,
+  sendGenericTemplate,
+  sendReaction,
+  type IGMessagingEvent,
+  type GenericTemplateElement,
+} from './client';
 
 // ============================================
 // Types
@@ -135,19 +142,52 @@ export async function processInstagramGraphDM(
     }
     responseId = sandwichResult.responseId || null;
 
-    // Strip suggestions and markdown — DM doesn't support them
-    fullText = fullText.replace(/<<SUGGESTIONS>>[\s\S]*?<<\/SUGGESTIONS>>/g, '').trim();
-    fullText = stripMarkdownForDM(fullText);
+    // Extract suggestions for quick reply buttons, then strip markdown
+    const { cleanText, suggestions } = parseSuggestionsFromResponse(fullText);
+    fullText = stripMarkdownForDM(cleanText);
+
+    const archetype = sandwichResult.metadata?.archetype || 'general';
 
     console.log(`[IG Graph DM] SandwichBot response for sender ${senderId}:`, {
-      archetype: sandwichResult.metadata.archetype,
+      archetype,
       confidence: sandwichResult.metadata.confidence,
       responseLength: fullText.length,
+      suggestions: suggestions.length,
     });
 
-    // 6. Send reply via Instagram Graph API (auto-splits for 1000 char limit)
+    // 6. Send reply via Instagram Graph API
     const accessToken = await getAccessTokenForAccount(supabase, accountId);
-    await sendLongInstagramDM(senderId, fullText, igAccountId, accessToken || undefined);
+
+    // Convert suggestions to Instagram quick reply buttons (max 13, 20 chars each)
+    const quickReplies = suggestions
+      .slice(0, 13)
+      .map(s => ({ title: truncateForIG(s, 20), payload: s }));
+
+    if (quickReplies.length > 0) {
+      await sendLongInstagramDMWithQuickReplies(
+        senderId, fullText, quickReplies, igAccountId, accessToken || undefined,
+      );
+    } else {
+      await sendLongInstagramDM(senderId, fullText, igAccountId, accessToken || undefined);
+    }
+
+    // 6b. React with ❤️ to the user's message (fire-and-forget)
+    if (messageId) {
+      sendReaction(senderId, messageId, '❤️', igAccountId, accessToken || undefined).catch(() => {});
+    }
+
+    // 6c. Send rich cards based on archetype (Phase 2+3+5)
+    await sendRichCardsIfRelevant({
+      archetype,
+      messageText,
+      senderId,
+      accountId,
+      igAccountId,
+      accessToken: accessToken || undefined,
+      supabase,
+    }).catch(err => {
+      console.error('[IG Graph DM] Rich cards error (non-blocking):', err.message);
+    });
 
     // 7. Save messages + update session
     const msgCount = (session?.message_count || 0) + 2;
@@ -312,4 +352,252 @@ function stripMarkdownForDM(text: string): string {
     .replace(/`([^`]+)`/g, '$1')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+// ============================================
+// Suggestion Parsing & Rich Message Helpers
+// ============================================
+
+/**
+ * Parse <<SUGGESTIONS>> tags from SandwichBot response
+ * Returns clean text (without tags) + array of suggestion strings
+ */
+function parseSuggestionsFromResponse(text: string): { cleanText: string; suggestions: string[] } {
+  const match = text.match(/<<SUGGESTIONS>>([\s\S]*?)<<\/SUGGESTIONS>>/);
+  const cleanText = text.replace(/<<SUGGESTIONS>>[\s\S]*?<<\/SUGGESTIONS>>/g, '').trim();
+  if (!match) return { cleanText, suggestions: [] };
+  const suggestions = match[1].split('|').map((s: string) => s.trim()).filter(Boolean);
+  return { cleanText, suggestions };
+}
+
+/**
+ * Truncate text for Instagram limits (titles, buttons)
+ */
+function truncateForIG(text: string, limit: number): string {
+  if (text.length <= limit) return text;
+  return text.slice(0, limit - 1) + '…';
+}
+
+// ============================================
+// Rich Cards — Coupons, Products, Issues
+// ============================================
+
+/** Keywords that indicate a product issue */
+const ISSUE_KEYWORDS = ['בעיה', 'לא עובד', 'שבור', 'החלפה', 'החזרה', 'תקלה', 'פגום', 'לא מרוצ', 'נהרס'];
+
+/** Keywords that indicate product discovery */
+const PRODUCT_KEYWORDS = ['מוצר', 'ממליצ', 'שווה', 'לקנות', 'אהבת', 'גלו', 'המלצ', 'הכי טוב', 'מומלץ'];
+
+/**
+ * Send rich cards (Generic Template) based on archetype and message content
+ * Called after text response — cards are supplementary visual enhancement
+ */
+async function sendRichCardsIfRelevant(params: {
+  archetype: string;
+  messageText: string;
+  senderId: string;
+  accountId: string;
+  igAccountId: string;
+  accessToken?: string;
+  supabase: any;
+}): Promise<void> {
+  const { archetype, messageText, senderId, accountId, igAccountId, accessToken, supabase } = params;
+  const lowerMessage = messageText.toLowerCase();
+
+  // --- Product Issue Cards ---
+  const isProductIssue = ISSUE_KEYWORDS.some(kw => lowerMessage.includes(kw));
+  if (isProductIssue) {
+    const issueCards = buildProductIssueCards(supabase, accountId);
+    const elements = await issueCards;
+    if (elements.length > 0) {
+      await sendGenericTemplate(senderId, elements, igAccountId, accessToken);
+    }
+    return; // Don't also send coupon/product cards for issues
+  }
+
+  // --- Coupon Cards ---
+  if (archetype === 'coupons') {
+    const couponElements = await buildCouponCards(supabase, accountId);
+    if (couponElements.length > 0) {
+      await sendGenericTemplate(senderId, couponElements, igAccountId, accessToken);
+    }
+    return;
+  }
+
+  // --- Product Discovery Carousel ---
+  const isProductQuery = PRODUCT_KEYWORDS.some(kw => lowerMessage.includes(kw));
+  const isContentArchetype = !['general', 'coupons'].includes(archetype);
+  if (isProductQuery && isContentArchetype) {
+    const productElements = await buildProductCarousel(supabase, accountId);
+    if (productElements.length > 0) {
+      await sendGenericTemplate(senderId, productElements, igAccountId, accessToken);
+    }
+  }
+}
+
+/**
+ * Build coupon card elements for Generic Template
+ * Queries active coupons + partnership brand info
+ */
+async function buildCouponCards(
+  supabase: any,
+  accountId: string,
+): Promise<GenericTemplateElement[]> {
+  // Fetch active coupons with partnership info
+  const { data: coupons } = await supabase
+    .from('coupons')
+    .select('code, description, discount_type, discount_value, tracking_url, partnership_id')
+    .eq('account_id', accountId)
+    .eq('is_active', true)
+    .or('end_date.is.null,end_date.gte.' + new Date().toISOString())
+    .limit(5);
+
+  if (!coupons?.length) return [];
+
+  // Batch fetch partnership info for brand names + logos + links
+  const partnershipIds = [...new Set(coupons.map((c: any) => c.partnership_id).filter(Boolean))];
+  let partnerships: Record<string, any> = {};
+
+  if (partnershipIds.length > 0) {
+    const { data: partnerData } = await supabase
+      .from('partnerships')
+      .select('id, brand_name, link, short_link, brand_logo_id')
+      .in('id', partnershipIds);
+
+    if (partnerData) {
+      // Fetch brand logo URLs
+      const logoIds = partnerData.map((p: any) => p.brand_logo_id).filter(Boolean);
+      let logos: Record<string, string> = {};
+      if (logoIds.length > 0) {
+        const { data: logoData } = await supabase
+          .from('brand_logos')
+          .select('id, url')
+          .in('id', logoIds);
+        if (logoData) {
+          logos = Object.fromEntries(logoData.map((l: any) => [l.id, l.url]));
+        }
+      }
+
+      partnerships = Object.fromEntries(
+        partnerData.map((p: any) => [p.id, { ...p, logo_url: logos[p.brand_logo_id] }])
+      );
+    }
+  }
+
+  return coupons.map((coupon: any) => {
+    const partner = partnerships[coupon.partnership_id] || {};
+    const brandName = partner.brand_name || 'קופון';
+    const discount = formatDiscount(coupon.discount_type, coupon.discount_value);
+    const link = coupon.tracking_url || partner.short_link || partner.link;
+
+    const element: GenericTemplateElement = {
+      title: truncateForIG(brandName, 80),
+      subtitle: truncateForIG(`${discount} | קוד: ${coupon.code}`, 80),
+    };
+
+    if (partner.logo_url) {
+      element.image_url = partner.logo_url;
+    }
+
+    const buttons: GenericTemplateElement['buttons'] = [];
+    if (link) {
+      buttons.push({ type: 'web_url', title: truncateForIG('לחנות 🛍️', 20), url: link });
+    }
+    buttons.push({
+      type: 'postback',
+      title: truncateForIG('עוד פרטים', 20),
+      payload: `coupon_details_${coupon.code}`,
+    });
+    element.buttons = buttons;
+
+    return element;
+  });
+}
+
+/**
+ * Build product carousel from Instagram posts with images
+ */
+async function buildProductCarousel(
+  supabase: any,
+  accountId: string,
+): Promise<GenericTemplateElement[]> {
+  const { data: posts } = await supabase
+    .from('instagram_posts')
+    .select('id, caption, media_url, permalink, likes_count')
+    .eq('account_id', accountId)
+    .not('media_url', 'is', null)
+    .order('likes_count', { ascending: false })
+    .limit(5);
+
+  if (!posts?.length) return [];
+
+  return posts
+    .filter((p: any) => p.media_url)
+    .map((post: any) => {
+      const caption = post.caption || '';
+      const firstLine = caption.split('\n')[0] || 'פוסט';
+
+      const element: GenericTemplateElement = {
+        title: truncateForIG(firstLine, 80),
+        image_url: post.media_url,
+      };
+
+      if (post.permalink) {
+        element.default_action = { type: 'web_url', url: post.permalink };
+        element.buttons = [
+          { type: 'web_url', title: truncateForIG('צפה בפוסט ⟩', 20), url: post.permalink },
+        ];
+      }
+
+      return element;
+    });
+}
+
+/**
+ * Build product issue cards with action buttons
+ */
+async function buildProductIssueCards(
+  supabase: any,
+  accountId: string,
+): Promise<GenericTemplateElement[]> {
+  // Try to find brand contact info from active partnerships
+  const { data: activePartnership } = await supabase
+    .from('partnerships')
+    .select('brand_name, brand_contact_email, brand_contact_phone, link')
+    .eq('account_id', accountId)
+    .eq('is_active', true)
+    .limit(1)
+    .single();
+
+  const buttons: GenericTemplateElement['buttons'] = [
+    { type: 'postback', title: truncateForIG('החלפה/החזרה', 20), payload: 'product_issue_return' },
+    { type: 'postback', title: truncateForIG('בעיה באיכות', 20), payload: 'product_issue_quality' },
+  ];
+
+  // Add brand contact link if available
+  if (activePartnership?.link) {
+    buttons.push({
+      type: 'web_url',
+      title: truncateForIG('שירות לקוחות', 20),
+      url: activePartnership.link,
+    });
+  }
+
+  return [{
+    title: 'צריכה עזרה עם מוצר?',
+    subtitle: 'בחרי מה הכי מתאים:',
+    buttons,
+  }];
+}
+
+/**
+ * Format discount for display
+ */
+function formatDiscount(type: string, value: number): string {
+  switch (type) {
+    case 'percentage': return `${value}% הנחה`;
+    case 'fixed': return `₪${value} הנחה`;
+    case 'free_shipping': return 'משלוח חינם';
+    default: return `${value} הנחה`;
+  }
 }

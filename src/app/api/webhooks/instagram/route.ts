@@ -157,9 +157,19 @@ async function handleMessagingEvent(event: IGMessagingEvent, igAccountId: string
     return;
   }
 
-  // Postback (button click)
+  // Postback (button click from quick replies, ice breakers, persistent menu, generic template)
   if (event.postback) {
     console.log(`[IG Webhook] Postback from ${event.sender.id}: ${event.postback.payload}`);
+    // Route postback as a new message through the DM handler
+    const syntheticEvent: IGMessagingEvent = {
+      sender: event.sender,
+      recipient: event.recipient,
+      timestamp: event.timestamp,
+      message: { mid: `postback_${Date.now()}`, text: event.postback.title },
+    };
+    await processInstagramGraphDM(syntheticEvent, igAccountId).catch(err => {
+      console.error('[IG Webhook] Postback processing error:', err);
+    });
     return;
   }
 
@@ -217,13 +227,45 @@ async function handleChangeEvent(change: any, igAccountId: string) {
       console.log(`[IG Webhook] Reaction (change) from ${value?.sender?.id}: ${value?.reaction?.reaction}`);
       break;
 
+    case 'messaging_postbacks': {
+      // Ice breaker / persistent menu / generic template button taps
+      if (value?.postback?.title && value?.sender) {
+        console.log(`[IG Webhook] Postback (change) from ${value.sender.id}: ${value.postback.payload}`);
+        const syntheticEvent: IGMessagingEvent = {
+          sender: value.sender,
+          recipient: value.recipient,
+          timestamp: Number(value.timestamp) || Date.now(),
+          message: { mid: `postback_${Date.now()}`, text: value.postback.title },
+        };
+        await processInstagramGraphDM(syntheticEvent, igAccountId).catch(err => {
+          console.error('[IG Webhook] Postback (change) processing error:', err);
+        });
+      }
+      break;
+    }
+
     case 'comments':
       console.log(`[IG Webhook] New comment on ${value.media?.id}: "${value.text?.slice(0, 50)}"`);
       break;
 
-    case 'story_insights':
+    case 'story_insights': {
       console.log(`[IG Webhook] Story insights for ${igAccountId}:`, value);
+      try {
+        const { saveStoryInsights } = await import('@/lib/instagram-graph/story-processor');
+        await saveStoryInsights(igAccountId, {
+          media_id: value.media_id,
+          impressions: value.impressions,
+          reach: value.reach,
+          replies: value.replies,
+          exits: value.exits,
+          taps_forward: value.taps_forward,
+          taps_back: value.taps_back,
+        });
+      } catch (err: any) {
+        console.error(`[IG Webhook] Failed to save story insights: ${err.message}`);
+      }
       break;
+    }
 
     case 'live_comments':
       console.log(`[IG Webhook] Live comment on ${igAccountId}`);
