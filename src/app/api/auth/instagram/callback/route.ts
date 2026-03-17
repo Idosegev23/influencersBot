@@ -184,7 +184,7 @@ async function exchangeLongLivedToken(shortLivedToken: string): Promise<LongLive
     access_token: shortLivedToken,
   });
 
-  const response = await fetch(`${FB_GRAPH_BASE}/access_token?${params.toString()}`);
+  const response = await fetch(`https://graph.instagram.com/access_token?${params.toString()}`);
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: { message: 'Unknown error' } }));
