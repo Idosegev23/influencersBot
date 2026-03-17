@@ -91,7 +91,7 @@ const nextConfig: NextConfig = {
       },
       {
         // All other routes: full security headers including X-Frame-Options
-        source: '/((?!api/widget|api/admin/proxy|blob-animation|manage).*)',
+        source: '/((?!api/widget|api/admin/proxy|blob-animation|manage|widget-preview).*)',
         headers: securityHeaders,
       },
     ];
