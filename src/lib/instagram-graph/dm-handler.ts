@@ -156,13 +156,11 @@ export async function processInstagramGraphDM(
         session_id: sessionUUID,
         role: 'user',
         content: messageText,
-        metadata: { source: 'instagram_graph', message_id: messageId, sender_id: senderId },
       }),
       supabase.from('chat_messages').insert({
         session_id: sessionUUID,
         role: 'assistant',
         content: fullText,
-        metadata: { source: 'instagram_graph' },
       }),
       supabase
         .from('chat_sessions')

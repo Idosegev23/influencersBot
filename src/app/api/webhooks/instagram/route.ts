@@ -12,6 +12,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { processInstagramGraphDM } from '@/lib/instagram-graph/dm-handler';
 import { verifyWebhookSignature, type IGWebhookPayload, type IGMessagingEvent } from '@/lib/instagram-graph/client';
 
+// Allow up to 60 seconds for DM processing (AI response generation)
+export const maxDuration = 60;
+
 // ============================================
 // Environment
 // ============================================
@@ -117,9 +120,9 @@ async function handleMessagingEvent(event: IGMessagingEvent, igAccountId: string
   if (event.message && !event.message.is_echo) {
     console.log(`[IG Webhook] New message from ${event.sender.id}: "${event.message.text?.slice(0, 50) || '[media]'}"`);
 
-    // Process DM asynchronously — return 200 immediately
-    processInstagramGraphDM(event, igAccountId).catch(err => {
-      console.error('[IG Webhook] Async DM processing error:', err);
+    // Await DM processing — serverless functions kill fire-and-forget promises
+    await processInstagramGraphDM(event, igAccountId).catch(err => {
+      console.error('[IG Webhook] DM processing error:', err);
     });
     return;
   }
@@ -181,8 +184,8 @@ async function handleChangeEvent(change: any, igAccountId: string) {
           message: value.message,
         };
 
-        processInstagramGraphDM(messagingEvent, igAccountId).catch(err => {
-          console.error('[IG Webhook] Async DM processing error (change):', err);
+        await processInstagramGraphDM(messagingEvent, igAccountId).catch(err => {
+          console.error('[IG Webhook] DM processing error (change):', err);
         });
       } else {
         console.log(`[IG Webhook] Messages change event (no message body):`, JSON.stringify(value).slice(0, 200));
