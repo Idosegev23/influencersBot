@@ -29,9 +29,8 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Build redirect_uri dynamically from request origin — must match EXACTLY in callback
-  const origin = req.nextUrl.origin;
-  const redirectUri = `${origin}/api/auth/instagram/callback`;
+  // Hardcoded redirect_uri — MUST match exactly in Meta Developer Console + callback route
+  const redirectUri = 'https://influencers-bot.vercel.app/api/auth/instagram/callback';
 
   // State parameter — passed through OAuth flow and returned in callback
   // Contains the accountId so we can link the connection to the right account
