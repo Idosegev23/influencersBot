@@ -9,6 +9,7 @@
  * - תומך ב-rich messages (quick replies, images)
  */
 
+import { randomUUID } from 'crypto';
 import { createClient } from '@/lib/supabase/server';
 import { processSandwichMessageWithMetadata } from '@/lib/chatbot/sandwichBot';
 import { buildPersonalityFromDB } from '@/lib/chatbot/personality-wrapper';
@@ -66,9 +67,10 @@ export async function processInstagramGraphDM(
       return { success: false, error: `No account mapped for IG ${igAccountId}` };
     }
 
-    // 2. Get or create DM session (keyed by sender + account)
-    const sessionKey = `dm_ig_graph_${senderId}_${accountId}`;
-    const session = await getOrCreateSession(supabase, sessionKey, accountId, senderId);
+    // 2. Get or create DM session (keyed by sender + account via thread_id)
+    const threadId = `dm_ig_graph_${senderId}_${accountId}`;
+    const session = await getOrCreateSession(supabase, threadId, accountId, senderId);
+    const sessionUUID = session.id; // actual UUID from DB
 
     // 3. Load account info + conversation history + personality
     const [accountData, historyData] = await Promise.all([
@@ -81,7 +83,7 @@ export async function processInstagramGraphDM(
       supabase
         .from('chat_messages')
         .select('role, content')
-        .eq('session_id', sessionKey)
+        .eq('session_id', sessionUUID)
         .order('created_at', { ascending: false })
         .limit(10)
         .then(r => r.data),
@@ -151,13 +153,13 @@ export async function processInstagramGraphDM(
     const msgCount = (session?.message_count || 0) + 2;
     await Promise.all([
       supabase.from('chat_messages').insert({
-        session_id: sessionKey,
+        session_id: sessionUUID,
         role: 'user',
         content: messageText,
         metadata: { source: 'instagram_graph', message_id: messageId, sender_id: senderId },
       }),
       supabase.from('chat_messages').insert({
-        session_id: sessionKey,
+        session_id: sessionUUID,
         role: 'assistant',
         content: fullText,
         metadata: { source: 'instagram_graph' },
@@ -168,13 +170,13 @@ export async function processInstagramGraphDM(
           ...(responseId ? { last_response_id: responseId } : {}),
           message_count: msgCount,
         })
-        .eq('id', sessionKey),
+        .eq('id', sessionUUID),
     ]);
 
     // 8. Update rolling summary if needed (fire-and-forget)
     if (shouldUpdateSummary(msgCount)) {
       updateRollingSummary(
-        sessionKey,
+        sessionUUID,
         [...conversationHistory, { role: 'user', content: messageText }, { role: 'assistant', content: fullText }],
       ).catch(err => console.error('[IG Graph DM] Summary update failed:', err));
     }
@@ -244,30 +246,37 @@ async function resolveAccountFromIGId(
 
 /**
  * Get or create a DM session
+ * Uses thread_id (text) for lookup, id is a proper UUID
  */
 async function getOrCreateSession(
   supabase: any,
-  sessionId: string,
+  threadId: string,
   accountId: string,
   senderId: string,
 ): Promise<any> {
+  // Look up by thread_id (text column)
   const { data: session } = await supabase
     .from('chat_sessions')
     .select('*')
-    .eq('id', sessionId)
+    .eq('thread_id', threadId)
     .single();
 
   if (session) return session;
 
-  // Create new session
-  await supabase.from('chat_sessions').insert({
-    id: sessionId,
-    account_id: accountId,
-    message_count: 0,
-    metadata: { source: 'instagram_graph', ig_sender_id: senderId },
-  });
+  // Create new session with proper UUID
+  const newId = randomUUID();
+  const { data: newSession } = await supabase
+    .from('chat_sessions')
+    .insert({
+      id: newId,
+      thread_id: threadId,
+      account_id: accountId,
+      message_count: 0,
+    })
+    .select('*')
+    .single();
 
-  return { message_count: 0 };
+  return newSession || { id: newId, message_count: 0 };
 }
 
 /**
