@@ -357,7 +357,8 @@ export async function setIceBreakers(
 ): Promise<void> {
   const url = `${GRAPH_API_BASE}/${igAccountId}/messenger_profile`;
 
-  // Flat array of {question, payload} — NOT nested in call_to_actions
+  // Flat format: array of {question, payload} — works with Instagram Login tokens
+  // Both flat and nested (with locale) formats are valid; flat is simpler
   await graphRequest(url, 'POST', {
     platform: 'instagram',
     ice_breakers: questions.slice(0, 4).map(q => ({
@@ -365,6 +366,28 @@ export async function setIceBreakers(
       payload: q.payload,
     })),
   }, accessToken);
+}
+
+/**
+ * Get current Ice Breakers configuration (for verification)
+ */
+export async function getIceBreakers(
+  igAccountId: string,
+  accessToken: string,
+): Promise<any> {
+  const url = `${GRAPH_API_BASE}/${igAccountId}/messenger_profile?fields=ice_breakers`;
+  return graphRequest(url, 'GET', undefined, accessToken);
+}
+
+/**
+ * Get current Persistent Menu configuration (for verification)
+ */
+export async function getPersistentMenu(
+  igAccountId: string,
+  accessToken: string,
+): Promise<any> {
+  const url = `${GRAPH_API_BASE}/${igAccountId}/messenger_profile?fields=persistent_menu`;
+  return graphRequest(url, 'GET', undefined, accessToken);
 }
 
 /**

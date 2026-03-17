@@ -523,29 +523,30 @@ async function buildProductCarousel(
 ): Promise<GenericTemplateElement[]> {
   const { data: posts } = await supabase
     .from('instagram_posts')
-    .select('id, caption, media_url, permalink, likes_count')
+    .select('id, caption, media_urls, post_url, thumbnail_url, likes_count')
     .eq('account_id', accountId)
-    .not('media_url', 'is', null)
+    .not('media_urls', 'is', null)
     .order('likes_count', { ascending: false })
     .limit(5);
 
   if (!posts?.length) return [];
 
   return posts
-    .filter((p: any) => p.media_url)
+    .filter((p: any) => p.media_urls?.length > 0 || p.thumbnail_url)
     .map((post: any) => {
       const caption = post.caption || '';
       const firstLine = caption.split('\n')[0] || 'פוסט';
+      const imageUrl = post.media_urls?.[0] || post.thumbnail_url;
 
       const element: GenericTemplateElement = {
         title: truncateForIG(firstLine, 80),
-        image_url: post.media_url,
+        ...(imageUrl ? { image_url: imageUrl } : {}),
       };
 
-      if (post.permalink) {
-        element.default_action = { type: 'web_url', url: post.permalink };
+      if (post.post_url) {
+        element.default_action = { type: 'web_url', url: post.post_url };
         element.buttons = [
-          { type: 'web_url', title: truncateForIG('צפה בפוסט ⟩', 20), url: post.permalink },
+          { type: 'web_url', title: truncateForIG('צפה בפוסט ⟩', 20), url: post.post_url },
         ];
       }
 

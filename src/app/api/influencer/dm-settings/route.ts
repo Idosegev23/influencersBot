@@ -10,7 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { setIceBreakers, setPersistentMenu } from '@/lib/instagram-graph/client';
+import { setIceBreakers, setPersistentMenu, getIceBreakers, getPersistentMenu } from '@/lib/instagram-graph/client';
 
 // ============================================
 // Default Configurations
@@ -135,6 +135,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   const accountId = req.nextUrl.searchParams.get('accountId');
+  const verify = req.nextUrl.searchParams.get('verify') === 'true';
 
   if (!accountId) {
     return NextResponse.json({ error: 'accountId is required' }, { status: 400 });
@@ -150,6 +151,29 @@ export async function GET(req: NextRequest) {
 
   const dmSettings = accountData?.config?.dm_settings || null;
 
+  // Optionally verify actual config from Meta API
+  let liveConfig: any = null;
+  if (verify) {
+    const { data: connection } = await supabase
+      .from('ig_graph_connections')
+      .select('ig_business_account_id, access_token')
+      .eq('account_id', accountId)
+      .eq('is_active', true)
+      .single();
+
+    if (connection?.access_token) {
+      try {
+        const [iceBreakersLive, menuLive] = await Promise.all([
+          getIceBreakers(connection.ig_business_account_id, connection.access_token).catch(() => null),
+          getPersistentMenu(connection.ig_business_account_id, connection.access_token).catch(() => null),
+        ]);
+        liveConfig = { ice_breakers: iceBreakersLive, persistent_menu: menuLive };
+      } catch {
+        liveConfig = { error: 'Failed to fetch live config from Meta API' };
+      }
+    }
+  }
+
   return NextResponse.json({
     configured: !!dmSettings,
     settings: dmSettings,
@@ -157,5 +181,6 @@ export async function GET(req: NextRequest) {
       ice_breakers: DEFAULT_ICE_BREAKERS,
       persistent_menu: DEFAULT_PERSISTENT_MENU,
     },
+    ...(liveConfig ? { live_config: liveConfig } : {}),
   });
 }
