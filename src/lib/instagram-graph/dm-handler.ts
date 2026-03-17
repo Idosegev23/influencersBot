@@ -391,16 +391,16 @@ const ISSUE_KEYWORDS = ['בעיה', 'לא עובד', 'שבור', 'החלפה', '
 const PRODUCT_KEYWORDS = ['מוצר', 'ממליצ', 'שווה', 'לקנות', 'אהבת', 'גלו', 'המלצ', 'הכי טוב', 'מומלץ'];
 
 /** Postback payloads from persistent menu & ice breakers that force specific rich cards */
-const MENU_POSTBACK_MAP: Record<string, 'discover' | 'coupons' | 'issue'> = {
+const MENU_POSTBACK_MAP: Record<string, 'discover' | 'coupons' | 'issue' | 'brand_select'> = {
   menu_discover: 'discover',
   menu_coupons: 'coupons',
   menu_products: 'discover',
-  menu_product_issue: 'issue',
-  menu_chat: 'discover', // fallback: show what we have
+  menu_product_issue: 'brand_select', // Show brand selection first (like social chat)
+  menu_chat: 'discover',
   icebreaker_coupon: 'coupons',
   icebreaker_best_product: 'discover',
   icebreaker_whats_new: 'discover',
-  icebreaker_product_issue: 'issue',
+  icebreaker_product_issue: 'brand_select', // Show brand selection first
   product_issue_return: 'issue',
   product_issue_quality: 'issue',
 };
@@ -423,7 +423,11 @@ async function sendRichCardsIfRelevant(params: {
   const lowerMessage = messageText.toLowerCase();
 
   // --- Menu / Ice Breaker postback: force specific rich cards ---
-  const forcedAction = postbackPayload ? MENU_POSTBACK_MAP[postbackPayload] : undefined;
+  // Check for dynamic brand_issue_* payload first
+  const isBrandIssue = postbackPayload?.startsWith('brand_issue_');
+  const forcedAction = isBrandIssue
+    ? 'issue' as const
+    : (postbackPayload ? MENU_POSTBACK_MAP[postbackPayload] : undefined);
 
   if (forcedAction === 'discover') {
     const productElements = await buildProductCarousel(supabase, accountId);
@@ -448,8 +452,25 @@ async function sendRichCardsIfRelevant(params: {
     return;
   }
 
+  // Brand selection step — show brands as carousel (like social chat's problem tab step 1)
+  if (forcedAction === 'brand_select') {
+    const brandElements = await buildBrandSelectionForIssue(supabase, accountId);
+    if (brandElements.length > 0) {
+      await sendGenericTemplate(senderId, brandElements, igAccountId, accessToken);
+    } else {
+      // No brands — fall back to generic issue card
+      const issueElements = await buildProductIssueCards(supabase, accountId);
+      if (issueElements.length > 0) {
+        await sendGenericTemplate(senderId, issueElements, igAccountId, accessToken);
+      }
+    }
+    return;
+  }
+
   if (forcedAction === 'issue') {
-    const issueElements = await buildProductIssueCards(supabase, accountId);
+    // If brand-specific issue, extract brand name from payload
+    const brandName = isBrandIssue ? decodeURIComponent(postbackPayload!.replace('brand_issue_', '')) : undefined;
+    const issueElements = await buildProductIssueCards(supabase, accountId, brandName);
     if (issueElements.length > 0) {
       await sendGenericTemplate(senderId, issueElements, igAccountId, accessToken);
     }
@@ -458,12 +479,18 @@ async function sendRichCardsIfRelevant(params: {
 
   // --- Keyword-based detection (organic messages, not postbacks) ---
 
-  // Product Issue Cards
+  // Product Issue — show brand selection (like social chat's problem tab)
   const isProductIssue = ISSUE_KEYWORDS.some(kw => lowerMessage.includes(kw));
   if (isProductIssue) {
-    const elements = await buildProductIssueCards(supabase, accountId);
-    if (elements.length > 0) {
-      await sendGenericTemplate(senderId, elements, igAccountId, accessToken);
+    const brandElements = await buildBrandSelectionForIssue(supabase, accountId);
+    if (brandElements.length > 0) {
+      await sendGenericTemplate(senderId, brandElements, igAccountId, accessToken);
+    } else {
+      // No brands — show generic issue card
+      const elements = await buildProductIssueCards(supabase, accountId);
+      if (elements.length > 0) {
+        await sendGenericTemplate(senderId, elements, igAccountId, accessToken);
+      }
     }
     return;
   }
@@ -523,10 +550,10 @@ async function buildCouponCards(
       if (logoIds.length > 0) {
         const { data: logoData } = await supabase
           .from('brand_logos')
-          .select('id, url')
+          .select('id, logo_url')
           .in('id', logoIds);
         if (logoData) {
-          logos = Object.fromEntries(logoData.map((l: any) => [l.id, l.url]));
+          logos = Object.fromEntries(logoData.map((l: any) => [l.id, l.logo_url]));
         }
       }
 
@@ -607,20 +634,83 @@ async function buildProductCarousel(
 }
 
 /**
+ * Build brand selection carousel for issue flow (like social chat's "בעיה בהזמנה" tab step 1)
+ * Shows each brand as a card with "בחר" button
+ */
+async function buildBrandSelectionForIssue(
+  supabase: any,
+  accountId: string,
+): Promise<GenericTemplateElement[]> {
+  const { data: partnerships } = await supabase
+    .from('partnerships')
+    .select('id, brand_name, brand_logo_id, link')
+    .eq('account_id', accountId)
+    .eq('is_active', true)
+    .limit(10);
+
+  if (!partnerships?.length) return [];
+
+  // Deduplicate by brand name
+  const seen = new Set<string>();
+  const unique = partnerships.filter((p: any) => {
+    const key = p.brand_name.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  // Fetch logos
+  const logoIds = unique.map((p: any) => p.brand_logo_id).filter(Boolean);
+  let logos: Record<string, string> = {};
+  if (logoIds.length > 0) {
+    const { data: logoData } = await supabase
+      .from('brand_logos')
+      .select('id, logo_url')
+      .in('id', logoIds);
+    if (logoData) {
+      logos = Object.fromEntries(logoData.map((l: any) => [l.id, l.logo_url]));
+    }
+  }
+
+  return unique.slice(0, 10).map((p: any) => {
+    const logoUrl = logos[p.brand_logo_id];
+    const element: GenericTemplateElement = {
+      title: truncateForIG(p.brand_name, 80),
+      subtitle: 'לחצו לפתיחת פנייה',
+      buttons: [{
+        type: 'postback',
+        title: truncateForIG('בחר מותג', 20),
+        payload: `brand_issue_${encodeURIComponent(p.brand_name)}`,
+      }],
+    };
+    if (logoUrl) element.image_url = logoUrl;
+    return element;
+  });
+}
+
+/**
  * Build product issue cards with action buttons
+ * If brandName is provided, shows brand-specific options
  */
 async function buildProductIssueCards(
   supabase: any,
   accountId: string,
+  brandName?: string,
 ): Promise<GenericTemplateElement[]> {
-  // Try to find brand contact info from active partnerships
-  const { data: activePartnership } = await supabase
+  // Find the specific brand or fallback to first active partnership
+  let partnershipQuery = supabase
     .from('partnerships')
     .select('brand_name, brand_contact_email, brand_contact_phone, link')
     .eq('account_id', accountId)
-    .eq('is_active', true)
-    .limit(1)
-    .single();
+    .eq('is_active', true);
+
+  if (brandName) {
+    partnershipQuery = partnershipQuery.ilike('brand_name', brandName);
+  }
+
+  const { data: activePartnership } = await partnershipQuery.limit(1).single();
+
+  const displayBrand = activePartnership?.brand_name || brandName || 'המוצר';
 
   const buttons: GenericTemplateElement['buttons'] = [
     { type: 'postback', title: truncateForIG('החלפה/החזרה', 20), payload: 'product_issue_return' },
@@ -637,7 +727,7 @@ async function buildProductIssueCards(
   }
 
   return [{
-    title: 'צריכה עזרה עם מוצר?',
+    title: truncateForIG(`פנייה בנושא ${displayBrand}`, 80),
     subtitle: 'בחרי מה הכי מתאים:',
     buttons,
   }];
