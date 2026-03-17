@@ -66,11 +66,14 @@ export async function GET(req: NextRequest) {
     const igAccount = await getIGBusinessAccount(longLivedToken.access_token);
 
     // 4. Save to database
-    console.log('[IG OAuth] Saving connection to database...');
+    // IMPORTANT: Use user_id from token exchange (IGBA ID) — this matches webhook entry.id
+    // The /me endpoint returns a different app-scoped user ID
+    const igbaId = shortLivedToken.user_id || igAccount.ig_id;
+    console.log('[IG OAuth] Saving connection to database...', { igbaId, meId: igAccount.ig_id });
     const supabase = await createClient();
 
     const connectionData = {
-      ig_business_account_id: igAccount.ig_id,
+      ig_business_account_id: igbaId,
       ig_username: igAccount.username,
       ig_name: igAccount.name,
       ig_profile_pic: igAccount.profile_picture_url,
@@ -101,14 +104,14 @@ export async function GET(req: NextRequest) {
           await supabase
             .from('ig_graph_connections')
             .update({ account_id: stateData.accountId })
-            .eq('ig_business_account_id', igAccount.ig_id);
+            .eq('ig_business_account_id', igbaId);
         }
       } catch {
         // State parsing failed — not critical
       }
     }
 
-    console.log(`[IG OAuth] Successfully connected @${igAccount.username} (${igAccount.ig_id})`);
+    console.log(`[IG OAuth] Successfully connected @${igAccount.username} (${igbaId})`);
 
     // Redirect influencer to a simple "thank you" page (not admin dashboard)
     return NextResponse.redirect(
