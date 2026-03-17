@@ -82,13 +82,18 @@ export async function POST(req: NextRequest) {
 
     console.log(`[IG Webhook] Received ${payload.entry?.length || 0} entries`);
 
-    // 4. Process each entry
+    // 4. Process each entry — deduplicate message IDs across messaging + changes
+    const processedMids = new Set<string>();
+
     for (const entry of payload.entry || []) {
       const igAccountId = entry.id;
 
       // ---- Messaging Events (DMs) ----
       if (entry.messaging?.length) {
         for (const event of entry.messaging) {
+          const mid = event.message?.mid;
+          if (mid && processedMids.has(mid)) continue;
+          if (mid) processedMids.add(mid);
           await handleMessagingEvent(event, igAccountId);
         }
       }
@@ -96,6 +101,13 @@ export async function POST(req: NextRequest) {
       // ---- Change Events (comments, story_insights, etc.) ----
       if (entry.changes?.length) {
         for (const change of entry.changes) {
+          // Skip DM changes if already processed via messaging
+          const mid = change.value?.message?.mid;
+          if (mid && processedMids.has(mid)) {
+            console.log(`[IG Webhook] Skipping duplicate message ${mid} (already processed via messaging)`);
+            continue;
+          }
+          if (mid) processedMids.add(mid);
           await handleChangeEvent(change, igAccountId);
         }
       }
