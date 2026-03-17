@@ -14,6 +14,10 @@
       "schedule": "0 */6 * * *"
     },
     {
+      "path": "/api/cron/poll-stories",
+      "schedule": "*/30 * * * *"
+    },
+    {
       "path": "/api/cron/daily-scan",
       "schedule": "*/10 1-4 * * *"
     },
