@@ -45,7 +45,7 @@ export function LeadCapturePopup({ username, sessionId, onClose, onSubmit }: Lea
 
       setSuccess({ serialNumber: data.serialNumber, firstName: data.firstName });
 
-      // Auto-close after showing success
+      // Auto-submit after showing success briefly
       setTimeout(() => {
         onSubmit({
           firstName: data.firstName,
@@ -53,7 +53,7 @@ export function LeadCapturePopup({ username, sessionId, onClose, onSubmit }: Lea
           serialNumber: data.serialNumber,
           leadId: data.leadId,
         });
-      }, 2500);
+      }, 1800);
     } catch {
       setError('שגיאה בחיבור');
     } finally {
@@ -99,19 +99,10 @@ export function LeadCapturePopup({ username, sessionId, onClose, onSubmit }: Lea
                 <CheckCircle className="w-14 h-14 mx-auto mb-4" style={{ color: '#34c759' }} />
               </motion.div>
               <h3 className="text-[20px] font-bold mb-2" style={{ color: '#0c1013' }}>
-                {success.firstName}, נרשמת בהצלחה!
+                {success.firstName}, נרשמת בהצלחה! 🎉
               </h3>
-              <p className="text-[14px] mb-3" style={{ color: '#676767' }}>
-                המספר הסידורי שלך:
-              </p>
-              <div
-                className="inline-block px-5 py-2.5 rounded-full text-[18px] font-bold"
-                style={{ backgroundColor: '#f4f5f7', color: '#0c1013' }}
-              >
-                {success.serialNumber}
-              </div>
-              <p className="text-[12px] mt-3" style={{ color: '#999' }}>
-                שמרו את המספר — הוא מזהה אתכם בכניסות הבאות
+              <p className="text-[14px]" style={{ color: '#676767' }}>
+                מעכשיו אפנה אליך בשם
               </p>
             </div>
           ) : (

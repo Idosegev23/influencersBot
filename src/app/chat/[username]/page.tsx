@@ -1766,6 +1766,13 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
               setLeadInfo({ firstName: data.firstName, serialNumber: data.serialNumber });
               setShowLeadPopup(false);
               try { localStorage.setItem(`chat_lead_${username}`, JSON.stringify({ firstName: data.firstName, serialNumber: data.serialNumber })); } catch {}
+              // Add a personalized greeting from the bot
+              const greetingMessage: Message = {
+                id: `lead-greeting-${Date.now()}`,
+                role: 'assistant',
+                content: `היי ${data.firstName}! שמחה שנרשמת 🥰 מעכשיו אני יכולה להתאים לך תוכן אישית. מה תרצה לדעת?`,
+              };
+              setMessages((prev) => [...prev, greetingMessage]);
             }}
           />
         )}

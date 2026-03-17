@@ -13,7 +13,7 @@ import { createClient } from '@/lib/supabase/server';
 
 export interface ContentMetadata {
   id: string;
-  type: 'post' | 'transcription' | 'highlight' | 'story';
+  type: 'post' | 'transcription' | 'highlight' | 'story' | 'coupon';
   title: string; // Short preview
   date: string;
   relevanceScore?: number;
@@ -88,6 +88,50 @@ export async function searchContentByQuery(
       date: r.created_at,
       relevanceScore: r.relevance,
     })));
+  }
+
+  // Also search coupons directly (not included in search_all_content)
+  const couponKeywords = ['קופון', 'קוד', 'הנחה', 'coupon', 'discount', 'code', 'קודים', 'קופונים'];
+  const queryLower = userQuery.toLowerCase();
+  const isCouponQuery = couponKeywords.some(k => queryLower.includes(k));
+
+  if (isCouponQuery) {
+    const { data: coupons } = await supabase
+      .from('coupons')
+      .select('id, code, description, discount_type, discount_value, is_active, created_at')
+      .eq('account_id', accountId)
+      .eq('is_active', true);
+
+    if (coupons && coupons.length > 0) {
+      metadata.push(...coupons.map(c => ({
+        id: c.id,
+        type: 'coupon' as const,
+        title: `🎟️ קוד: ${c.code} — ${c.description || ''} (${c.discount_value}${c.discount_type === 'percentage' ? '%' : '₪'} הנחה)`,
+        date: c.created_at,
+        relevanceScore: 1.0, // High relevance — user explicitly asked
+      })));
+      console.log(`[Hybrid Stage 1] 🎟️ Added ${coupons.length} active coupons`);
+    }
+  }
+
+  // Always load coupons as context even for non-coupon queries (they're small)
+  if (!isCouponQuery) {
+    const { data: coupons } = await supabase
+      .from('coupons')
+      .select('id, code, description, discount_type, discount_value, is_active, created_at')
+      .eq('account_id', accountId)
+      .eq('is_active', true)
+      .limit(10);
+
+    if (coupons && coupons.length > 0) {
+      metadata.push(...coupons.map(c => ({
+        id: c.id,
+        type: 'coupon' as const,
+        title: `🎟️ קוד: ${c.code} — ${c.description || ''} (${c.discount_value}${c.discount_type === 'percentage' ? '%' : '₪'} הנחה)`,
+        date: c.created_at,
+        relevanceScore: 0.3,
+      })));
+    }
   }
 
   console.log(`[Hybrid Stage 1] ✅ Found ${metadata.length} relevant items (indexed search!)`);
@@ -221,6 +265,7 @@ export function formatMetadataForAI(metadata: ContentMetadata[]): string {
   const transcriptionsMeta = metadata.filter(m => m.type === 'transcription');
   const highlightsMeta = metadata.filter(m => m.type === 'highlight');
   const storiesMeta = metadata.filter(m => m.type === 'story');
+  const couponsMeta = metadata.filter(m => m.type === 'coupon');
 
   if (postsMeta.length > 0) {
     prompt += `📸 **פוסטים (${postsMeta.length}):**\n`;
@@ -250,6 +295,14 @@ export function formatMetadataForAI(metadata: ContentMetadata[]): string {
     prompt += `📱 **סטוריז פעילים (${storiesMeta.length}):**\n`;
     storiesMeta.forEach((s, i) => {
       prompt += `${i + 1}. [ID: ${s.id}] ${s.title}\n`;
+    });
+    prompt += '\n';
+  }
+
+  if (couponsMeta.length > 0) {
+    prompt += `🎟️ **קופונים פעילים (${couponsMeta.length}):**\n`;
+    couponsMeta.forEach((c, i) => {
+      prompt += `${i + 1}. ${c.title}\n`;
     });
     prompt += '\n';
   }

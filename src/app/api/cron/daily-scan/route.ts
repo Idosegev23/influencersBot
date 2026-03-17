@@ -1,9 +1,10 @@
 /**
  * GET /api/cron/daily-scan
- * סריקה יומית ב-3:00 לפנות בוקר (01:00 UTC)
- * יוצר jobs לכל החשבונות הפעילים שצריכים סריקה ומריץ אותם
+ * סריקה יומית — סורק חשבון **אחד** בכל הרצה
+ * הקרון רץ כל 10 דקות בחלון 01:00-04:59 UTC (03:00-06:59 שעון ישראל)
+ * כך כל חשבון מקבל 10 דקות שלמות ולא מתחרה עם אחרים
  *
- * Vercel Pro: maxDuration = 600s (10 min) — enough for sequential scans
+ * Vercel Pro: maxDuration = 600s (10 min)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -11,7 +12,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getScanJobsRepo } from '@/lib/db/repositories/scanJobsRepo';
 import { runScanJob } from '@/lib/scraping/runScanJob';
 
-// Vercel Pro: allow up to 10 minutes for sequential scans
+// Vercel Pro: allow up to 10 minutes per single account scan
 export const maxDuration = 600;
 
 export async function GET(req: NextRequest) {
@@ -27,12 +28,12 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    console.log('[Cron] Starting daily scan...');
+    console.log('[Cron] Starting daily scan (single-account mode)...');
 
     const supabase = await createClient();
     const repo = getScanJobsRepo();
 
-    // Get ALL active creator accounts — not just those with persona
+    // Get ALL active creator accounts
     const { data: activeAccounts, error: accountsError } = await supabase
       .from('accounts')
       .select('id, config, status')
@@ -63,17 +64,16 @@ export async function GET(req: NextRequest) {
           (a.config as any)?.username ||
           null,
       }))
-      .filter(a => a.instagram_username); // Skip accounts with no username at all
+      .filter(a => a.instagram_username);
 
     if (accounts.length === 0) {
       return NextResponse.json({
         message: 'No active accounts found',
-        jobsCreated: 0,
+        scanned: null,
       });
     }
 
     // Pre-check: get last scan time per account and sort oldest-first
-    // This ensures stale accounts get priority when we hit the time budget
     const accountsWithLastScan = await Promise.all(
       accounts.map(async (account) => {
         const recentJobs = await repo.getRecentJobs(account.instagram_username, 1);
@@ -85,14 +85,14 @@ export async function GET(req: NextRequest) {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
 
-    // Filter to accounts that need scanning, then sort oldest scan first
+    // Filter to accounts that need scanning, then sort by priority
     const accountsToScan = accountsWithLastScan
       .filter(a => {
-        const shouldScan =
+        return (
           !a.lastJob ||
           new Date(a.lastJob.created_at) < yesterday ||
-          a.lastJob.status === 'failed';
-        return shouldScan;
+          a.lastJob.status === 'failed'
+        );
       })
       .sort((a, b) => {
         // No scan at all → highest priority
@@ -106,68 +106,63 @@ export async function GET(req: NextRequest) {
       });
 
     const skippedCount = accounts.length - accountsToScan.length;
-    console.log(`[Cron] ${accountsToScan.length} accounts need scanning, ${skippedCount} skipped (recent). Order: ${accountsToScan.map(a => a.instagram_username).join(', ')}`);
 
-    // Time budget: stop 30s before maxDuration to return a clean response
-    const startTime = Date.now();
-    const TIME_BUDGET_MS = (maxDuration - 30) * 1000; // 570s
-
-    let jobsCreated = 0;
-    let jobsCompleted = 0;
-    let jobsFailed = 0;
-    const results: Array<{ username: string; status: string }> = [];
-
-    for (const account of accountsToScan) {
-      // Check time budget before starting a new scan
-      const elapsed = Date.now() - startTime;
-      if (elapsed > TIME_BUDGET_MS) {
-        const remaining = accountsToScan.length - jobsCreated;
-        console.log(`[Cron] ⏰ Time budget reached after ${Math.round(elapsed / 1000)}s. ${remaining} accounts deferred to next run.`);
-        results.push({ username: account.instagram_username, status: 'deferred (time budget)' });
-        continue;
-      }
-
-      const job = await repo.create({
-        username: account.instagram_username,
-        account_id: account.id,
-        priority: 50,
-        requested_by: 'cron:daily-scan',
-        config: {
-          postsLimit: 10,
-          commentsPerPost: 2,
-          maxWebsitePages: 0,
-          samplesPerHighlight: 0,
-          transcribeReels: true,
-        },
+    // Pick ONLY the top-priority account
+    if (accountsToScan.length === 0) {
+      console.log(`[Cron] All ${accounts.length} accounts are up-to-date. Nothing to scan.`);
+      return NextResponse.json({
+        success: true,
+        message: 'All accounts up-to-date',
+        totalAccounts: accounts.length,
+        scanned: null,
+        pending: 0,
       });
-
-      jobsCreated++;
-
-      // Run scan and AWAIT it (don't fire-and-forget — Vercel kills the process)
-      try {
-        await runScanJob(job.id);
-        jobsCompleted++;
-        results.push({ username: account.instagram_username, status: 'completed' });
-        console.log(`[Cron] ✅ ${account.instagram_username} scan completed`);
-      } catch (err: any) {
-        jobsFailed++;
-        results.push({ username: account.instagram_username, status: `failed: ${err.message?.substring(0, 100)}` });
-        console.error(`[Cron] ❌ ${account.instagram_username} scan failed:`, err.message);
-      }
     }
 
-    console.log(`[Cron] Daily scan done: ${jobsCompleted} completed, ${jobsFailed} failed, ${skippedCount} skipped (recent)`);
+    const account = accountsToScan[0];
+    const pendingCount = accountsToScan.length - 1;
+
+    console.log(`[Cron] Scanning @${account.instagram_username} (${pendingCount} more pending). Last scan: ${account.lastJob?.created_at || 'never'}`);
+
+    const job = await repo.create({
+      username: account.instagram_username,
+      account_id: account.id,
+      priority: 50,
+      requested_by: 'cron:daily-scan',
+      config: {
+        postsLimit: 20,
+        commentsPerPost: 3,
+        maxWebsitePages: 0,
+        samplesPerHighlight: 999,
+        transcribeReels: true,
+      },
+    });
+
+    let status = 'completed';
+    let error: string | undefined;
+
+    try {
+      await runScanJob(job.id);
+      console.log(`[Cron] ✅ @${account.instagram_username} scan completed`);
+    } catch (err: any) {
+      status = 'failed';
+      error = err.message?.substring(0, 200);
+      console.error(`[Cron] ❌ @${account.instagram_username} scan failed:`, err.message);
+    }
 
     return NextResponse.json({
-      success: true,
-      message: `Scanned ${jobsCompleted}/${jobsCreated} accounts`,
-      accountsChecked: accounts.length,
-      needsScan: accountsToScan.length,
-      skippedRecent: skippedCount,
-      jobsCreated,
-      jobsCompleted,
-      jobsFailed,
-      results,
+      success: status === 'completed',
+      message: `Scanned @${account.instagram_username}: ${status}`,
+      totalAccounts: accounts.length,
+      scanned: {
+        username: account.instagram_username,
+        accountId: account.id,
+        jobId: job.id,
+        status,
+        error,
+      },
+      pending: pendingCount,
+      upToDate: skippedCount,
     });
 
   } catch (error: any) {

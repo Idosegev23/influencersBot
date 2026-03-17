@@ -39,14 +39,21 @@ interface ExtractionResult {
 // "X% הנחה עם הקוד CODE" or "X% הנחה קוד CODE"
 const PATTERN_PERCENT_CODE = /(\d+)%?\s*הנחה\s+(?:עם\s+)?(?:ה)?קוד\s+([A-Za-z][\w]*\d*)/gi;
 
-// "קוד הנחה CODE" or "קוד CODE"
-const PATTERN_CODE_LABEL = /קוד\s+(?:הנחה\s+)?([A-Za-z][\w]{2,}\d*)/gi;
+// "קוד הנחה CODE" or "קוד CODE" (also matches "הקוד CODE")
+const PATTERN_CODE_LABEL = /(?:ה)?קוד\s+(?:הנחה\s+)?([A-Za-z][\w]{2,}\d*)/gi;
 
 // "-₪X עם הקוד CODE" or "₪X הנחה עם הקוד CODE"
 const PATTERN_SHEKEL_CODE = /[-]?\s*₪?\s*(\d[\d,]*)\s*₪?\s*(?:הנחה\s+)?עם\s+(?:ה)?קוד\s+([A-Za-z][\w]*)/gi;
 
 // "X% הנחה בקניית N פריטים קוד CODE"
 const PATTERN_TIERED = /(\d+)%\s*הנחה\s+בקניית\s+(\d+)\s+פריטים?\s*(?:ומעלה\s+)?קוד\s+([A-Za-z][\w]*\d*)/gi;
+
+// Standalone code near "עם הקוד" or "הנחה" (items separated in screen text array)
+// Matches: "עם הקוד CODE" or "הנחה ... CODE" where CODE is ALL-CAPS with digits
+const PATTERN_STANDALONE_CODE = /(?:עם\s+)?(?:ה)?קוד\s*[\s,]*([A-Z][A-Z0-9]{2,})/gi;
+
+// "Xדולר הנחה" near a standalone code
+const PATTERN_DOLLAR_DISCOUNT = /(\d+)\s*דולר\s*(?:לאדם\s+)?הנחה/gi;
 
 // URL patterns in on_screen_text
 const PATTERN_URL = /([a-zA-Z0-9-]+\.(?:co\.il|com|co|io))/gi;
@@ -126,20 +133,32 @@ export async function extractCouponsFromContent(accountId: string): Promise<Extr
     return result;
   }
 
-  if (!transcriptions || transcriptions.length === 0) {
-    console.log('[Coupon Extractor] No transcriptions found');
-    return result;
+  // 1b. Load all post captions (coupons often appear in captions too)
+  const { data: posts, error: postError } = await supabase
+    .from('instagram_posts')
+    .select('id, caption, mentions')
+    .eq('account_id', accountId)
+    .not('caption', 'is', null);
+
+  if (postError) {
+    result.errors.push(`Failed to load posts: ${postError.message}`);
   }
 
-  console.log(`[Coupon Extractor] Scanning ${transcriptions.length} transcriptions...`);
+  const txCount = transcriptions?.length || 0;
+  const postCount = posts?.length || 0;
+  console.log(`[Coupon Extractor] Scanning ${txCount} transcriptions + ${postCount} post captions...`);
+
+  if (txCount === 0 && postCount === 0) {
+    console.log('[Coupon Extractor] No content found');
+    return result;
+  }
 
   // 2. Extract coupons from each transcription
   const allExtracted: ExtractedCoupon[] = [];
 
-  for (const tx of transcriptions) {
-    const screenText = Array.isArray(tx.on_screen_text)
-      ? tx.on_screen_text.join(' ')
-      : (tx.on_screen_text || '');
+  for (const tx of (transcriptions || [])) {
+    // Flatten on_screen_text array into clean text — strip JSON artifacts
+    const screenText = normalizeScreenText(tx.on_screen_text);
     const spokenText = tx.transcription_text || '';
 
     // Extract brand context from this transcription
@@ -147,6 +166,17 @@ export async function extractCouponsFromContent(accountId: string): Promise<Extr
 
     // Extract coupon codes with patterns
     const coupons = extractCodesFromText(screenText, spokenText, brandContext, tx.source_id);
+    allExtracted.push(...coupons);
+  }
+
+  // 2b. Extract coupons from post captions
+  for (const post of (posts || [])) {
+    const captionText = post.caption || '';
+    const mentionText = Array.isArray(post.mentions) ? post.mentions.join(' ') : '';
+    const combined = `${captionText} ${mentionText}`;
+
+    const brandContext = extractBrandContext(combined);
+    const coupons = extractCodesFromText(combined, '', brandContext, post.id);
     allExtracted.push(...coupons);
   }
 
@@ -283,6 +313,28 @@ interface BrandContext {
   brandNames: string[];
 }
 
+/**
+ * Flatten on_screen_text (JSON array or string) into clean searchable text.
+ * The Gemini transcriber stores screen text as a JSON array of strings like:
+ * ["קוד einav", "לובשת os", "קישור לג'קט 🔗"]
+ * We join them with spaces and strip JSON artifacts.
+ */
+function normalizeScreenText(raw: any): string {
+  if (!raw) return '';
+  if (typeof raw === 'string') {
+    // Try to parse as JSON array
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.join(' ');
+    } catch {}
+    return raw;
+  }
+  if (Array.isArray(raw)) {
+    return raw.map(item => typeof item === 'string' ? item : String(item)).join(' ');
+  }
+  return String(raw);
+}
+
 function extractBrandContext(screenText: string): BrandContext {
   const handles: string[] = [];
   const urls: string[] = [];
@@ -400,6 +452,51 @@ function extractCodesFromText(
         discountType: 'percentage',
         brandHint, brandUrl, brandHandle,
         description: `קוד הנחה ${code}`,
+        sourceId,
+      });
+    }
+  }
+
+  // Pattern 5: Standalone ALL-CAPS code near "עם הקוד" (common in screen text arrays)
+  regex = new RegExp(PATTERN_STANDALONE_CODE.source, 'gi');
+  while ((match = regex.exec(screenText)) !== null) {
+    const code = match[1];
+    if (isValidCode(code) && !seenCodes.has(code.toLowerCase())) {
+      seenCodes.add(code.toLowerCase());
+      // Check if there's a dollar/shekel discount nearby
+      let discountValue = 0;
+      let discountType: 'percentage' | 'fixed' = 'percentage';
+      const dollarMatch = screenText.match(PATTERN_DOLLAR_DISCOUNT);
+      if (dollarMatch) {
+        const dollarVal = dollarMatch[0].match(/(\d+)/);
+        if (dollarVal) {
+          discountValue = parseInt(dollarVal[1], 10);
+          discountType = 'fixed';
+        }
+      }
+      results.push({
+        code,
+        discountValue,
+        discountType,
+        brandHint, brandUrl, brandHandle,
+        description: discountValue > 0 ? `${discountValue} הנחה עם הקוד ${code}` : `קוד הנחה ${code}`,
+        sourceId,
+      });
+    }
+  }
+
+  // Pattern 6: Also search in spoken text (same patterns)
+  regex = new RegExp(PATTERN_CODE_LABEL.source, 'gi');
+  while ((match = regex.exec(spokenText)) !== null) {
+    const code = match[1];
+    if (isValidCode(code) && !seenCodes.has(code.toLowerCase())) {
+      seenCodes.add(code.toLowerCase());
+      results.push({
+        code,
+        discountValue: 0,
+        discountType: 'percentage',
+        brandHint, brandUrl, brandHandle,
+        description: `קוד הנחה ${code} (מהדיבור)`,
         sourceId,
       });
     }

@@ -15,7 +15,7 @@
     },
     {
       "path": "/api/cron/daily-scan",
-      "schedule": "0 1 * * *"
+      "schedule": "*/10 1-4 * * *"
     },
     {
       "path": "/api/cron/daily-persona-update",
