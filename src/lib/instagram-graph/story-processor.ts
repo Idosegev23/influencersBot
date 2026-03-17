@@ -105,25 +105,43 @@ async function processAccountStories(
 
   console.log(`[Story Processor] @${username}: found ${stories.length} active stories`);
 
-  // 2. Check which stories we already have
+  // 2. Check which stories we already have (and which need transcription)
   const storyIds = stories.map((s: any) => s.id);
   const { data: existing } = await supabase
     .from('instagram_stories')
-    .select('story_id')
+    .select('id, story_id, transcription_status, media_type, media_url')
     .eq('account_id', accountId)
     .in('story_id', storyIds);
 
-  const existingIds = new Set((existing || []).map((e: any) => e.story_id));
+  const existingMap = new Map((existing || []).map((e: any) => [e.story_id, e]));
 
-  // 3. Process new stories
+  // 3. Process stories — new ones + existing ones that weren't transcribed
   for (const story of stories) {
-    if (existingIds.has(story.id)) continue; // Already processed
-
-    result.storiesNew++;
     const mediaType = story.media_type === 'VIDEO' ? 'video' : 'image';
+    const existingStory = existingMap.get(story.id);
+
+    if (existingStory) {
+      // Already in DB — check if it needs transcription
+      const needsTranscription = !existingStory.transcription_status
+        || existingStory.transcription_status === 'pending'
+        || existingStory.transcription_status === 'not_applicable';
+
+      if (needsTranscription && story.media_url) {
+        console.log(`[Story Processor] @${username}: re-transcribing story ${story.id} (was ${existingStory.transcription_status})`);
+        try {
+          await transcribeStory(accountId, existingStory.id, story.id, story.media_url, mediaType as 'image' | 'video');
+          result.storiesTranscribed++;
+        } catch (err: any) {
+          result.errors.push(`Transcribe story ${story.id}: ${err.message}`);
+        }
+      }
+      continue;
+    }
+
+    // New story — save to DB
+    result.storiesNew++;
     const expiresAt = new Date(new Date(story.timestamp).getTime() + 24 * 60 * 60 * 1000);
 
-    // Save to DB
     const { data: savedStory, error: saveErr } = await supabase
       .from('instagram_stories')
       .insert({
@@ -147,7 +165,7 @@ async function processAccountStories(
 
     console.log(`[Story Processor] @${username}: new story ${story.id} (${mediaType})`);
 
-    // 4. Transcribe immediately
+    // Transcribe immediately
     try {
       await transcribeStory(accountId, savedStory!.id, story.id, story.media_url, mediaType);
       result.storiesTranscribed++;
@@ -156,8 +174,8 @@ async function processAccountStories(
     }
   }
 
-  // 5. Index new stories into RAG (fire-and-forget for speed)
-  if (result.storiesNew > 0) {
+  // 5. Index to RAG if anything was transcribed
+  if (result.storiesNew > 0 || result.storiesTranscribed > 0) {
     indexStoriesToRag(accountId).catch(err => {
       console.error(`[Story Processor] RAG indexing failed for ${accountId}:`, err.message);
     });
