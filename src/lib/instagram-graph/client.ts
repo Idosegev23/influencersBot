@@ -134,7 +134,7 @@ export async function sendInstagramDM(
   igAccountId: string,
   accessToken?: string,
 ): Promise<IGSendMessageResponse> {
-  const url = `${FB_GRAPH_API_BASE}/${igAccountId}/messages`;
+  const url = `${GRAPH_API_BASE}/${igAccountId}/messages`;
 
   return graphRequest<IGSendMessageResponse>(url, 'POST', {
     recipient: { id: recipientId },
@@ -152,7 +152,7 @@ export async function sendInstagramQuickReply(
   igAccountId: string,
   accessToken?: string,
 ): Promise<IGSendMessageResponse> {
-  const url = `${FB_GRAPH_API_BASE}/${igAccountId}/messages`;
+  const url = `${GRAPH_API_BASE}/${igAccountId}/messages`;
 
   return graphRequest<IGSendMessageResponse>(url, 'POST', {
     recipient: { id: recipientId },
@@ -176,7 +176,7 @@ export async function sendInstagramImage(
   igAccountId: string,
   accessToken?: string,
 ): Promise<IGSendMessageResponse> {
-  const url = `${FB_GRAPH_API_BASE}/${igAccountId}/messages`;
+  const url = `${GRAPH_API_BASE}/${igAccountId}/messages`;
 
   return graphRequest<IGSendMessageResponse>(url, 'POST', {
     recipient: { id: recipientId },
