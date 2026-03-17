@@ -158,7 +158,7 @@ export async function chatWithGemini(input: {
   context: string; // Products, partnerships, coupons
   conversationHistory?: Array<{ role: 'user' | 'model'; text: string }>;
 }) {
-  const model = genAI.getGenerativeModel({ model: GEMINI_MODELS.CHAT_RESPONSES });
+  const model = genAI.getGenerativeModel({ model: AI_MODELS.CHAT_RESPONSES });
 
   // Build system instructions from persona
   const systemInstructions = buildSystemInstructions(input.persona);
@@ -204,7 +204,7 @@ export async function streamChatWithGemini(input: {
   conversationHistory?: Array<{ role: 'user' | 'model'; text: string }>;
   onDelta: (text: string) => void;
 }) {
-  const model = genAI.getGenerativeModel({ model: GEMINI_MODELS.CHAT_RESPONSES });
+  const model = genAI.getGenerativeModel({ model: AI_MODELS.CHAT_RESPONSES });
 
   // Build system instructions from persona
   const systemInstructions = buildSystemInstructions(input.persona);
