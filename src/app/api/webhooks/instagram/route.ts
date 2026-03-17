@@ -161,14 +161,53 @@ async function handleChangeEvent(change: any, igAccountId: string) {
   const { field, value } = change;
 
   switch (field) {
+    // ---- Instagram Business Login: DMs arrive as changes, not messaging ----
+    case 'messages': {
+      // value contains: sender, recipient, timestamp, message
+      if (value?.message && value?.sender) {
+        const isEcho = value.message.is_echo === true;
+        if (isEcho) {
+          console.log(`[IG Webhook] Echo message (change): ${value.message.mid}`);
+          break;
+        }
+
+        console.log(`[IG Webhook] New DM (change) from ${value.sender.id}: "${value.message?.text?.slice(0, 50) || '[media]'}"`);
+
+        // Convert to IGMessagingEvent format for the DM handler
+        const messagingEvent: IGMessagingEvent = {
+          sender: value.sender,
+          recipient: value.recipient,
+          timestamp: Number(value.timestamp) || Date.now(),
+          message: value.message,
+        };
+
+        processInstagramGraphDM(messagingEvent, igAccountId).catch(err => {
+          console.error('[IG Webhook] Async DM processing error (change):', err);
+        });
+      } else {
+        console.log(`[IG Webhook] Messages change event (no message body):`, JSON.stringify(value).slice(0, 200));
+      }
+      break;
+    }
+
+    case 'message_edit':
+      console.log(`[IG Webhook] Message edited (change): ${value?.message?.mid || JSON.stringify(value).slice(0, 100)}`);
+      break;
+
+    case 'messaging_seen':
+      console.log(`[IG Webhook] Messages seen by ${value?.sender?.id || 'unknown'}`);
+      break;
+
+    case 'message_reactions':
+      console.log(`[IG Webhook] Reaction (change) from ${value?.sender?.id}: ${value?.reaction?.reaction}`);
+      break;
+
     case 'comments':
       console.log(`[IG Webhook] New comment on ${value.media?.id}: "${value.text?.slice(0, 50)}"`);
-      // Could trigger auto-reply to comments
       break;
 
     case 'story_insights':
       console.log(`[IG Webhook] Story insights for ${igAccountId}:`, value);
-      // Could store in instagram_stories table
       break;
 
     case 'live_comments':
@@ -176,6 +215,6 @@ async function handleChangeEvent(change: any, igAccountId: string) {
       break;
 
     default:
-      console.log(`[IG Webhook] Unhandled change field: ${field}`);
+      console.log(`[IG Webhook] Unhandled change field: ${field}`, JSON.stringify(value).slice(0, 200));
   }
 }
