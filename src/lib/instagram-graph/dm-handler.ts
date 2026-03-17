@@ -56,7 +56,7 @@ export async function processInstagramGraphDM(
 
   console.log(`[IG Graph DM] Processing DM from ${senderId}: "${messageText.slice(0, 50)}..."`);
 
-  const supabase = createClient();
+  const supabase = await createClient();
 
   try {
     // 1. Find which influencer account this IG account belongs to
@@ -74,7 +74,7 @@ export async function processInstagramGraphDM(
     const [accountData, historyData] = await Promise.all([
       supabase
         .from('accounts')
-        .select('username, display_name')
+        .select('config')
         .eq('id', accountId)
         .single()
         .then(r => r.data),
@@ -87,8 +87,9 @@ export async function processInstagramGraphDM(
         .then(r => r.data),
     ]);
 
-    const username = accountData?.username || 'influencer';
-    const influencerName = accountData?.display_name || accountData?.username || 'Influencer';
+    const config = accountData?.config || {};
+    const username = config.username || 'influencer';
+    const influencerName = config.display_name || config.username || 'Influencer';
 
     const conversationHistory = (historyData || [])
       .reverse()
@@ -230,7 +231,8 @@ async function resolveAccountFromIGId(
   const { data: accounts } = await supabase
     .from('accounts')
     .select('id')
-    .eq('account_type', 'instagram')
+    .eq('type', 'creator')
+    .eq('status', 'active')
     .limit(2);
 
   if (accounts?.length === 1) {

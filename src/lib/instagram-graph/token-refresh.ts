@@ -6,8 +6,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 
-const GRAPH_API_VERSION = 'v22.0';
-const FB_GRAPH_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
+const IG_GRAPH_BASE = 'https://graph.instagram.com';
 
 /**
  * Refresh all tokens that expire within the next 7 days
@@ -17,7 +16,7 @@ export async function refreshExpiringTokens(): Promise<{
   failed: number;
   errors: string[];
 }> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
   // Find tokens expiring within 7 days
@@ -51,7 +50,7 @@ export async function refreshExpiringTokens(): Promise<{
         access_token: conn.access_token,
       });
 
-      const response = await fetch(`${FB_GRAPH_BASE}/refresh_access_token?${params.toString()}`);
+      const response = await fetch(`${IG_GRAPH_BASE}/refresh_access_token?${params.toString()}`);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
