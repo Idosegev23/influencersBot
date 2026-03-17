@@ -143,6 +143,13 @@ interface LongLivedTokenResponse {
  * Exchange authorization code for short-lived access token
  */
 async function exchangeCodeForToken(code: string, redirectUri: string): Promise<ShortLivedTokenResponse> {
+  console.log('[IG OAuth] Token exchange params:', {
+    client_id: INSTAGRAM_APP_ID,
+    redirect_uri: redirectUri,
+    code: code.slice(0, 20) + '...',
+    has_secret: !!INSTAGRAM_APP_SECRET,
+  });
+
   const params = new URLSearchParams({
     client_id: INSTAGRAM_APP_ID,
     client_secret: INSTAGRAM_APP_SECRET,
@@ -157,8 +164,11 @@ async function exchangeCodeForToken(code: string, redirectUri: string): Promise<
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error_message: 'Unknown error' }));
-    throw new Error(`Token exchange failed: ${error.error_message || JSON.stringify(error)}`);
+    const errorText = await response.text();
+    console.error('[IG OAuth] Token exchange failed:', response.status, errorText);
+    let errorMsg = 'Unknown error';
+    try { errorMsg = JSON.parse(errorText).error_message || errorText; } catch { errorMsg = errorText; }
+    throw new Error(`Token exchange failed: ${errorMsg}`);
   }
 
   return response.json();
