@@ -24,9 +24,9 @@ const DEFAULT_ICE_BREAKERS = [
 ];
 
 const DEFAULT_PERSISTENT_MENU = [
+  { type: 'postback' as const, title: 'גלו מוצרים ⭐', payload: 'menu_discover' },
   { type: 'postback' as const, title: 'קופונים והנחות 🎁', payload: 'menu_coupons' },
-  { type: 'postback' as const, title: 'מוצרים מומלצים ⭐', payload: 'menu_products' },
-  { type: 'postback' as const, title: 'דברו איתי 💬', payload: 'menu_chat' },
+  { type: 'postback' as const, title: 'בעיה במוצר 🛍️', payload: 'menu_product_issue' },
 ];
 
 // ============================================

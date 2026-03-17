@@ -161,11 +161,16 @@ async function handleMessagingEvent(event: IGMessagingEvent, igAccountId: string
   if (event.postback) {
     console.log(`[IG Webhook] Postback from ${event.sender.id}: ${event.postback.payload}`);
     // Route postback as a new message through the DM handler
+    // Pass payload via quick_reply so dm-handler can trigger the right rich cards
     const syntheticEvent: IGMessagingEvent = {
       sender: event.sender,
       recipient: event.recipient,
       timestamp: event.timestamp,
-      message: { mid: `postback_${Date.now()}`, text: event.postback.title },
+      message: {
+        mid: `postback_${Date.now()}`,
+        text: event.postback.title,
+        quick_reply: { payload: event.postback.payload },
+      },
     };
     await processInstagramGraphDM(syntheticEvent, igAccountId).catch(err => {
       console.error('[IG Webhook] Postback processing error:', err);
@@ -235,7 +240,11 @@ async function handleChangeEvent(change: any, igAccountId: string) {
           sender: value.sender,
           recipient: value.recipient,
           timestamp: Number(value.timestamp) || Date.now(),
-          message: { mid: `postback_${Date.now()}`, text: value.postback.title },
+          message: {
+            mid: `postback_${Date.now()}`,
+            text: value.postback.title,
+            quick_reply: { payload: value.postback.payload },
+          },
         };
         await processInstagramGraphDM(syntheticEvent, igAccountId).catch(err => {
           console.error('[IG Webhook] Postback (change) processing error:', err);

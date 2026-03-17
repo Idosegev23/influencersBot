@@ -407,8 +407,9 @@ export async function setPersistentMenu(
 ): Promise<void> {
   const url = `${GRAPH_API_BASE}/${igAccountId}/messenger_profile`;
 
+  // Per official docs: no "platform" field needed for persistent_menu
+  // https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api/persistent-menu/
   await graphRequest(url, 'POST', {
-    platform: 'instagram',
     persistent_menu: [
       {
         locale: 'default',

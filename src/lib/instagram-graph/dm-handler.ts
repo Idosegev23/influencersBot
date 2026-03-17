@@ -50,6 +50,7 @@ export async function processInstagramGraphDM(
   const recipientId = event.recipient.id; // Our IG account
   const messageText = event.message?.text;
   const messageId = event.message?.mid;
+  const postbackPayload = event.message?.quick_reply?.payload; // Carries postback/menu payload
 
   // Skip echo messages (messages we sent)
   if (event.message?.is_echo) {
@@ -176,10 +177,11 @@ export async function processInstagramGraphDM(
       sendReaction(senderId, messageId, '❤️', igAccountId, accessToken || undefined).catch(() => {});
     }
 
-    // 6c. Send rich cards based on archetype (Phase 2+3+5)
+    // 6c. Send rich cards based on archetype or postback (Phase 2+3+5)
     await sendRichCardsIfRelevant({
       archetype,
       messageText,
+      postbackPayload,
       senderId,
       accountId,
       igAccountId,
@@ -388,34 +390,85 @@ const ISSUE_KEYWORDS = ['בעיה', 'לא עובד', 'שבור', 'החלפה', '
 /** Keywords that indicate product discovery */
 const PRODUCT_KEYWORDS = ['מוצר', 'ממליצ', 'שווה', 'לקנות', 'אהבת', 'גלו', 'המלצ', 'הכי טוב', 'מומלץ'];
 
+/** Postback payloads from persistent menu & ice breakers that force specific rich cards */
+const MENU_POSTBACK_MAP: Record<string, 'discover' | 'coupons' | 'issue'> = {
+  menu_discover: 'discover',
+  menu_coupons: 'coupons',
+  menu_products: 'discover',
+  menu_product_issue: 'issue',
+  menu_chat: 'discover', // fallback: show what we have
+  icebreaker_coupon: 'coupons',
+  icebreaker_best_product: 'discover',
+  icebreaker_whats_new: 'discover',
+  icebreaker_product_issue: 'issue',
+  product_issue_return: 'issue',
+  product_issue_quality: 'issue',
+};
+
 /**
- * Send rich cards (Generic Template) based on archetype and message content
+ * Send rich cards (Generic Template) based on archetype, message content, or postback payload
  * Called after text response — cards are supplementary visual enhancement
  */
 async function sendRichCardsIfRelevant(params: {
   archetype: string;
   messageText: string;
+  postbackPayload?: string;
   senderId: string;
   accountId: string;
   igAccountId: string;
   accessToken?: string;
   supabase: any;
 }): Promise<void> {
-  const { archetype, messageText, senderId, accountId, igAccountId, accessToken, supabase } = params;
+  const { archetype, messageText, postbackPayload, senderId, accountId, igAccountId, accessToken, supabase } = params;
   const lowerMessage = messageText.toLowerCase();
 
-  // --- Product Issue Cards ---
+  // --- Menu / Ice Breaker postback: force specific rich cards ---
+  const forcedAction = postbackPayload ? MENU_POSTBACK_MAP[postbackPayload] : undefined;
+
+  if (forcedAction === 'discover') {
+    const productElements = await buildProductCarousel(supabase, accountId);
+    if (productElements.length > 0) {
+      await sendGenericTemplate(senderId, productElements, igAccountId, accessToken);
+    }
+    return;
+  }
+
+  if (forcedAction === 'coupons') {
+    const couponElements = await buildCouponCards(supabase, accountId);
+    if (couponElements.length > 0) {
+      await sendGenericTemplate(senderId, couponElements, igAccountId, accessToken);
+    } else {
+      // No coupons in DB — send a friendly button template instead
+      await sendGenericTemplate(senderId, [{
+        title: 'אין קופונים פעילים כרגע',
+        subtitle: 'עקבו אחרינו — קופונים חדשים בקרוב!',
+        buttons: [{ type: 'postback', title: 'גלו מוצרים ⭐', payload: 'menu_discover' }],
+      }], igAccountId, accessToken);
+    }
+    return;
+  }
+
+  if (forcedAction === 'issue') {
+    const issueElements = await buildProductIssueCards(supabase, accountId);
+    if (issueElements.length > 0) {
+      await sendGenericTemplate(senderId, issueElements, igAccountId, accessToken);
+    }
+    return;
+  }
+
+  // --- Keyword-based detection (organic messages, not postbacks) ---
+
+  // Product Issue Cards
   const isProductIssue = ISSUE_KEYWORDS.some(kw => lowerMessage.includes(kw));
   if (isProductIssue) {
-    const issueCards = buildProductIssueCards(supabase, accountId);
-    const elements = await issueCards;
+    const elements = await buildProductIssueCards(supabase, accountId);
     if (elements.length > 0) {
       await sendGenericTemplate(senderId, elements, igAccountId, accessToken);
     }
-    return; // Don't also send coupon/product cards for issues
+    return;
   }
 
-  // --- Coupon Cards ---
+  // Coupon Cards
   if (archetype === 'coupons') {
     const couponElements = await buildCouponCards(supabase, accountId);
     if (couponElements.length > 0) {
@@ -424,10 +477,9 @@ async function sendRichCardsIfRelevant(params: {
     return;
   }
 
-  // --- Product Discovery Carousel ---
+  // Product Discovery Carousel
   const isProductQuery = PRODUCT_KEYWORDS.some(kw => lowerMessage.includes(kw));
-  const isContentArchetype = !['general', 'coupons'].includes(archetype);
-  if (isProductQuery && isContentArchetype) {
+  if (isProductQuery) {
     const productElements = await buildProductCarousel(supabase, accountId);
     if (productElements.length > 0) {
       await sendGenericTemplate(senderId, productElements, igAccountId, accessToken);
