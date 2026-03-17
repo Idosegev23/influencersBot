@@ -15,6 +15,7 @@ import {
   ArrowRight,
   Link2,
   Plus,
+  Instagram,
 } from 'lucide-react';
 
 interface Influencer {
@@ -23,6 +24,12 @@ interface Influencer {
   displayName: string;
   type: string;
   status: string;
+  igConnection: {
+    username: string;
+    isActive: boolean;
+    connectedAt: string;
+    tokenExpired: boolean;
+  } | null;
   stats: {
     posts: number;
     transcriptions: number;
@@ -134,6 +141,26 @@ export default function InfluencersListPage() {
                     {inf.displayName}
                   </h3>
                   <p className="text-sm" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>@{inf.username}</p>
+                  {/* IG Connection Badge */}
+                  {inf.igConnection ? (
+                    <div className="flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full text-xs" style={{
+                      background: inf.igConnection.tokenExpired ? 'rgba(224, 164, 148, 0.1)' : 'rgba(225, 48, 108, 0.1)',
+                      border: inf.igConnection.tokenExpired ? '1px solid rgba(224, 164, 148, 0.2)' : '1px solid rgba(225, 48, 108, 0.2)',
+                      color: inf.igConnection.tokenExpired ? '#e0a494' : '#E1306C',
+                    }}>
+                      <Instagram className="w-3 h-3" />
+                      <span>{inf.igConnection.tokenExpired ? 'טוקן פג' : 'מחובר'}</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full text-xs" style={{
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      border: '1px solid rgba(255, 255, 255, 0.06)',
+                      color: 'rgba(237, 233, 248, 0.25)',
+                    }}>
+                      <Instagram className="w-3 h-3" />
+                      <span>לא מחובר</span>
+                    </div>
+                  )}
                 </div>
                 {inf.stats.hasGemini ? (
                   <CheckCircle className="w-5 h-5 flex-shrink-0" style={{ color: '#5eead4' }} />

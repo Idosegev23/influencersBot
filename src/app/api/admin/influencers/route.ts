@@ -30,15 +30,17 @@ export async function GET() {
       const config = account.config || {};
       const persona = (account.chatbot_persona as any)?.[0];
 
-      // Get stats
+      // Get stats + IG connection
       const [
         { count: postsCount },
         { count: transCount },
-        { count: couponsCount }
+        { count: couponsCount },
+        { data: igConn }
       ] = await Promise.all([
         supabase.from('instagram_posts').select('*', { count: 'exact', head: true }).eq('account_id', account.id),
         supabase.from('instagram_transcriptions').select('*', { count: 'exact', head: true }).eq('account_id', account.id).eq('processing_status', 'completed'),
-        supabase.from('coupons').select('*', { count: 'exact', head: true }).eq('account_id', account.id).eq('is_active', true)
+        supabase.from('coupons').select('*', { count: 'exact', head: true }).eq('account_id', account.id).eq('is_active', true),
+        supabase.from('ig_graph_connections').select('ig_username, is_active, connected_at, token_expires_at').eq('account_id', account.id).maybeSingle()
       ]);
 
       return {
@@ -47,6 +49,12 @@ export async function GET() {
         displayName: config.display_name || config.username || 'Unknown',
         type: config.influencer_type || 'other',
         status: account.status,
+        igConnection: igConn ? {
+          username: igConn.ig_username,
+          isActive: igConn.is_active,
+          connectedAt: igConn.connected_at,
+          tokenExpired: igConn.token_expires_at ? new Date(igConn.token_expires_at) < new Date() : false,
+        } : null,
         stats: {
           posts: postsCount || 0,
           transcriptions: transCount || 0,
