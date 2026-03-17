@@ -357,16 +357,13 @@ export async function setIceBreakers(
 ): Promise<void> {
   const url = `${GRAPH_API_BASE}/${igAccountId}/messenger_profile`;
 
+  // Flat array of {question, payload} — NOT nested in call_to_actions
   await graphRequest(url, 'POST', {
     platform: 'instagram',
-    ice_breakers: [
-      {
-        call_to_actions: questions.slice(0, 4).map(q => ({
-          question: q.question,
-          payload: q.payload,
-        })),
-      },
-    ],
+    ice_breakers: questions.slice(0, 4).map(q => ({
+      question: q.question,
+      payload: q.payload,
+    })),
   }, accessToken);
 }
 
