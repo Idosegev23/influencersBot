@@ -348,14 +348,14 @@ export async function sendMediaShare(
 
 /**
  * Set Ice Breakers — up to 4 FAQ questions shown when user opens DM for first time
- * Uses Facebook Graph API (not Instagram Graph API)
+ * For Instagram Business Login tokens, uses graph.instagram.com
  */
 export async function setIceBreakers(
   igAccountId: string,
   questions: Array<{ question: string; payload: string }>,
   accessToken: string,
 ): Promise<void> {
-  const url = `${FB_GRAPH_API_BASE}/${igAccountId}/messenger_profile`;
+  const url = `${GRAPH_API_BASE}/${igAccountId}/messenger_profile`;
 
   await graphRequest(url, 'POST', {
     platform: 'instagram',
@@ -372,10 +372,11 @@ export async function setIceBreakers(
 
 /**
  * Set Persistent Menu — always-visible menu in DM conversation
- * Uses Facebook Graph API, max 5 items recommended
+ * For Instagram Business Login tokens, uses graph.instagram.com
+ * Max 5 items recommended
  */
 export async function setPersistentMenu(
-  _igAccountId: string,
+  igAccountId: string,
   menuItems: Array<{
     type: 'postback' | 'web_url';
     title: string;
@@ -384,7 +385,7 @@ export async function setPersistentMenu(
   }>,
   accessToken: string,
 ): Promise<void> {
-  const url = `${FB_GRAPH_API_BASE}/me/messenger_profile`;
+  const url = `${GRAPH_API_BASE}/${igAccountId}/messenger_profile`;
 
   await graphRequest(url, 'POST', {
     platform: 'instagram',
@@ -404,7 +405,7 @@ export async function deleteIceBreakers(
   igAccountId: string,
   accessToken: string,
 ): Promise<void> {
-  const url = `${FB_GRAPH_API_BASE}/${igAccountId}/messenger_profile`;
+  const url = `${GRAPH_API_BASE}/${igAccountId}/messenger_profile`;
 
   await graphRequest(url, 'DELETE', {
     fields: ['ice_breakers'],
@@ -415,9 +416,10 @@ export async function deleteIceBreakers(
  * Delete Persistent Menu configuration
  */
 export async function deletePersistentMenu(
+  igAccountId: string,
   accessToken: string,
 ): Promise<void> {
-  const url = `${FB_GRAPH_API_BASE}/me/messenger_profile`;
+  const url = `${GRAPH_API_BASE}/${igAccountId}/messenger_profile`;
 
   await graphRequest(url, 'DELETE', {
     fields: ['persistent_menu'],
