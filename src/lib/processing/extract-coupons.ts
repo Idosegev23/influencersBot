@@ -73,6 +73,10 @@ const CODE_BLOCKLIST = new Set([
   'lenor', 'ariel', 'philips', 'sonicare', 'magnus', 'zohara', 'delta',
   'prada', 'gucci', 'dior', 'chanel', 'huggies', 'disney', 'tommy',
   'emily', 'story', 'alma',
+  // Short common words that get false-matched
+  'black', 'white', 'blue', 'pink', 'gold', 'silver',
+  // OCR errors (cinav = einav, etc.)
+  'cinav',
 ]);
 
 // ============================================
@@ -93,6 +97,11 @@ const HANDLE_TO_BRAND: Record<string, string> = {
   'cattleya_eyewear': 'קטאליה',
   'opticana_official': 'אופטיקנה',
   'storyonline': 'סטורי',
+  'flyingcarpet_il': 'השטיח המעופף',
+  'ksp_co_il': 'KSP',
+  'kspcoil': 'KSP',
+  'foodappeal_official': 'Food Appeal',
+  'foodappeal': 'Food Appeal',
 };
 
 const URL_TO_BRAND: Record<string, string> = {
@@ -104,6 +113,69 @@ const URL_TO_BRAND: Record<string, string> = {
   'candle-club.com': 'קנדל קלאב',
   'storyonline.co.il': 'סטורי',
   'dagdag.co.il': 'דג דג',
+  'flyingcarpet.co.il': 'השטיח המעופף',
+};
+
+// Hebrew brand name recognition — maps Hebrew text to canonical brand name
+// Used when "בשיתוף בראון" appears (no @handle, just Hebrew name)
+const HEBREW_BRAND_NAMES: Record<string, string> = {
+  'בראון': 'בראון',
+  'פיליפס': 'פיליפס',
+  'סוניקייר': 'סוניקייר',
+  'דלתא': 'דלתא',
+  'מגנוס': 'מגנוס',
+  'זוהרה': 'זוהרה',
+  'אדיקט': 'אדיקט אונליין',
+  'אדיקט אונליין': 'אדיקט אונליין',
+  'פנדה': 'פנדה',
+  'לה בוטה': 'לה בוטה',
+  'קנדל קלאב': 'קנדל קלאב',
+  'סטורי': 'סטורי',
+  'דג דג': 'דג דג',
+  'קטאליה': 'קטאליה',
+  'אופטיקנה': 'אופטיקנה',
+  'לנור': 'לנור',
+  'אריאל': 'אריאל',
+  'השטיח המעופף': 'השטיח המעופף',
+  'פוקס': 'פוקס',
+  'קסטרו': 'קסטרו',
+  'רנואר': 'רנואר',
+  'גולברי': 'גולברי',
+  'הוניגמן': 'הוניגמן',
+  'טרמינל': 'טרמינל איקס',
+  'טרמינל איקס': 'טרמינל איקס',
+  'סופר פארם': 'סופר פארם',
+  'שופרסל': 'שופרסל',
+  'סלקום': 'סלקום',
+  'פרטנר': 'פרטנר',
+  'איקאה': 'איקאה',
+  'הום סנטר': 'הום סנטר',
+  'עדיקה': 'עדיקה',
+  'שילב': 'שילב',
+  'באגס': 'באגס',
+  'האגיס': 'האגיס',
+  'סימילאק': 'סימילאק',
+  'מטרנה': 'מטרנה',
+  'נספרסו': 'נספרסו',
+};
+
+// Also recognize English brand names written in Hebrew context
+const ENGLISH_BRAND_KEYWORDS: Record<string, string> = {
+  'braun': 'בראון',
+  'philips': 'פיליפס',
+  'sonicare': 'סוניקייר',
+  'delta': 'דלתא',
+  'magnus': 'מגנוס',
+  'fox': 'פוקס',
+  'castro': 'קסטרו',
+  'renuar': 'רנואר',
+  'golbary': 'גולברי',
+  'honigman': 'הוניגמן',
+  'ikea': 'איקאה',
+  'ksp': 'KSP',
+  'nespresso': 'נספרסו',
+  'addict': 'אדיקט אונליין',
+  'pandazzz': 'פנדה',
 };
 
 // ============================================
@@ -340,11 +412,10 @@ function extractBrandContext(screenText: string): BrandContext {
   const urls: string[] = [];
   const brandNames: string[] = [];
 
-  // Extract @handles
+  // Extract @handles from "בשיתוף @brand"
   let match;
   const collabRegex = new RegExp(PATTERN_COLLAB.source, 'gi');
   while ((match = collabRegex.exec(screenText)) !== null) {
-    const handle = match[1].toLowerCase().replace(/_?official$/, '').replace(/_?israel$/, '');
     handles.push(match[1]);
     if (HANDLE_TO_BRAND[match[1].toLowerCase()]) {
       brandNames.push(HANDLE_TO_BRAND[match[1].toLowerCase()]);
@@ -361,6 +432,26 @@ function extractBrandContext(screenText: string): BrandContext {
     }
   }
 
+  // Extract Hebrew brand names after collaboration keywords
+  // Matches: "בשיתוף בראון", "בשיתוף עם בראון", "בחסות בראון", "בשת״פ עם דלתא"
+  const hebrewCollabRegex = /(?:בשיתוף|בחסות|בשת"פ|בשת״פ|בהפקת|sponsored\s+by)\s+(?:עם\s+)?([א-ת][א-ת\s]{1,20})/gi;
+  while ((match = hebrewCollabRegex.exec(screenText)) !== null) {
+    const rawName = match[1].trim();
+    // Try to match against known Hebrew brand names (longest match first)
+    const matched = matchHebrewBrand(rawName);
+    if (matched && !brandNames.includes(matched)) {
+      brandNames.push(matched);
+    }
+  }
+
+  // Also check for English brand names in context (e.g., "Braun" appearing anywhere)
+  const textLower = screenText.toLowerCase();
+  for (const [eng, heb] of Object.entries(ENGLISH_BRAND_KEYWORDS)) {
+    if (textLower.includes(eng) && !brandNames.includes(heb)) {
+      brandNames.push(heb);
+    }
+  }
+
   // Extract URLs
   const urlRegex = new RegExp(PATTERN_URL.source, 'gi');
   while ((match = urlRegex.exec(screenText)) !== null) {
@@ -372,6 +463,26 @@ function extractBrandContext(screenText: string): BrandContext {
   }
 
   return { handles, urls, brandNames };
+}
+
+/**
+ * Match a Hebrew text fragment against known brand names.
+ * Tries longest known brand first for multi-word brands like "לה בוטה".
+ */
+function matchHebrewBrand(text: string): string | null {
+  const textTrimmed = text.trim();
+
+  // Sort by length descending so "אדיקט אונליין" matches before "אדיקט"
+  const sortedBrands = Object.keys(HEBREW_BRAND_NAMES)
+    .sort((a, b) => b.length - a.length);
+
+  for (const brand of sortedBrands) {
+    if (textTrimmed.startsWith(brand)) {
+      return HEBREW_BRAND_NAMES[brand];
+    }
+  }
+
+  return null;
 }
 
 function extractCodesFromText(
@@ -392,11 +503,14 @@ function extractCodesFromText(
   let regex = new RegExp(PATTERN_PERCENT_CODE.source, 'gi');
   while ((match = regex.exec(screenText)) !== null) {
     const code = match[2];
+    const pctValue = parseInt(match[1], 10);
+    // Skip if > 100% — likely a price or OCR error
+    if (pctValue > 100) continue;
     if (isValidCode(code) && !seenCodes.has(code.toLowerCase())) {
       seenCodes.add(code.toLowerCase());
       results.push({
         code,
-        discountValue: parseInt(match[1], 10),
+        discountValue: pctValue,
         discountType: 'percentage',
         brandHint, brandUrl, brandHandle,
         description: match[0].trim(),
@@ -427,11 +541,14 @@ function extractCodesFromText(
   regex = new RegExp(PATTERN_SHEKEL_CODE.source, 'gi');
   while ((match = regex.exec(screenText)) !== null) {
     const code = match[2];
+    const shekelValue = parseInt(match[1].replace(',', ''), 10);
+    // Skip if value > 500₪ — likely a price, not a discount
+    if (shekelValue > 500) continue;
     if (isValidCode(code) && !seenCodes.has(code.toLowerCase())) {
       seenCodes.add(code.toLowerCase());
       results.push({
         code,
-        discountValue: parseInt(match[1].replace(',', ''), 10),
+        discountValue: shekelValue,
         discountType: 'fixed',
         brandHint, brandUrl, brandHandle,
         description: `₪${match[1]} הנחה עם הקוד ${code}`,
