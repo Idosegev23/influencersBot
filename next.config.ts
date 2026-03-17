@@ -85,8 +85,13 @@ const nextConfig: NextConfig = {
         headers: headersWithoutFrame,
       },
       {
+        // Manage routes: allow iframe embedding (live preview)
+        source: '/manage/:path*',
+        headers: headersWithoutFrame,
+      },
+      {
         // All other routes: full security headers including X-Frame-Options
-        source: '/((?!api/widget|api/admin/proxy|blob-animation).*)',
+        source: '/((?!api/widget|api/admin/proxy|blob-animation|manage).*)',
         headers: securityHeaders,
       },
     ];
