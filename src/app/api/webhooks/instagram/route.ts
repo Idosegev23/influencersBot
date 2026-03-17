@@ -145,7 +145,12 @@ async function handleMessagingEvent(event: IGMessagingEvent, igAccountId: string
   // Postback (button click)
   if (event.postback) {
     console.log(`[IG Webhook] Postback from ${event.sender.id}: ${event.postback.payload}`);
-    // Could route to specific handler based on payload
+    return;
+  }
+
+  // Message edit — log but don't process
+  if ((event as any).message_edit) {
+    console.log(`[IG Webhook] Message edited: ${(event as any).message_edit.mid}`);
     return;
   }
 
