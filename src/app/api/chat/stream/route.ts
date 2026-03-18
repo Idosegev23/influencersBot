@@ -207,6 +207,63 @@ export async function POST(req: NextRequest) {
         pm.data.accountId = accountId;
         if (fromSuggestion) pm.data.fromSuggestion = true;
 
+        // === EARLY SUGGESTION CACHE CHECK (before heavy parallel block) ===
+        // Saves ~2s by skipping session/history/personality/understanding/decision/policy
+        if (fromSuggestion && accountId) {
+          const earlyCacheStart = Date.now();
+          const cachedResponse = await getCachedSuggestionResponse(accountId, message);
+          const earlyCacheMs = Date.now() - earlyCacheStart;
+          if (cachedResponse) {
+            const latencyMs = Date.now() - startedAt;
+            console.log(`[Stream] Suggestion cache HIT (early) — ${latencyMs}ms total (cache lookup: ${earlyCacheMs}ms)`);
+
+            // Create/validate session for saving messages
+            let earlySessionId = rawSessionId;
+            if (!earlySessionId || !isValidSessionId(earlySessionId)) {
+              const session = await createChatSession(influencer.id);
+              earlySessionId = session?.id;
+            }
+
+            controller.enqueue(encodeEvent({
+              type: 'meta',
+              traceId,
+              requestId,
+              decisionId: 'cached',
+              sessionId: earlySessionId,
+              anonId: `anon_${earlySessionId?.slice(0, 8) || 'guest'}`,
+              uiDirectives: {},
+            }));
+            controller.enqueue(encodeEvent({ type: 'delta', text: cachedResponse }));
+            controller.enqueue(encodeEvent({
+              type: 'done',
+              responseId: null,
+              latencyMs,
+              tokens: { input: 0, output: 0 },
+              fullText: cachedResponse,
+            }));
+
+            // Save messages in after() to not block response
+            after(async () => {
+              try {
+                await Promise.all([
+                  saveChatMessage(earlySessionId, 'user', message),
+                  saveChatMessage(earlySessionId, 'assistant', cachedResponse),
+                ]);
+              } catch (err: any) {
+                console.error('[Stream] after() save failed (cached):', err.message);
+              }
+            });
+
+            pm.set('totalMs', latencyMs);
+            pm.data.fromSuggestion = true;
+            logPipelineMetrics(pm);
+            recordMetrics(pm);
+            controller.close();
+            return;
+          }
+          console.log(`[Stream] Early suggestion cache MISS (${earlyCacheMs}ms) — continuing full pipeline`);
+        }
+
         // === SESSION ===
         let currentSessionId = rawSessionId;
         if (!currentSessionId || !isValidSessionId(currentSessionId)) {
@@ -626,39 +683,8 @@ export async function POST(req: NextRequest) {
         let responseId: string | null = null;
         let tokenInfo = { input: 0, output: 0 };
 
-        // === CHECK SUGGESTION CACHE (DB-based, shared across instances) ===
-        if (fromSuggestion && accountId) {
-          const cachedResponse = await getCachedSuggestionResponse(accountId, message);
-          if (cachedResponse) {
-            console.log(`[Stream] Suggestion cache HIT (${Date.now() - startedAt}ms total)`);
-            fullText = cachedResponse;
-            controller.enqueue(encodeEvent({ type: 'delta', text: fullText }));
-            // Skip to done — save messages, etc.
-            const latencyMs = Date.now() - startedAt;
-            controller.enqueue(encodeEvent({
-              type: 'done',
-              responseId: null,
-              latencyMs,
-              tokens: tokenInfo,
-              fullText,
-            }));
-
-            await Promise.all([
-              saveChatMessage(currentSessionId, 'user', message),
-              saveChatMessage(currentSessionId, 'assistant', fullText),
-            ]);
-
-            await completeIdempotencyKey(idempotencyKey!, { response: fullText });
-            await releaseLock(currentSessionId, requestId);
-            pm.set('totalMs', latencyMs);
-            pm.data.fromSuggestion = true;
-            logPipelineMetrics(pm);
-            recordMetrics(pm);
-            controller.close();
-            return;
-          }
-          console.log(`[Stream] Suggestion cache MISS — running full pipeline`);
-        }
+        // NOTE: Suggestion cache check moved BEFORE parallel block (early exit above)
+        // If we're here with fromSuggestion=true, it was a cache MISS
 
         try {
           // Process with Sandwich Bot (all 3 layers!) with REAL streaming

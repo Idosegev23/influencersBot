@@ -110,8 +110,8 @@ export async function prewarmSuggestionCache(
     return;
   }
 
-  // Run uncached suggestions in parallel (max 2 concurrent to avoid API overload)
-  const CONCURRENCY = 2;
+  // Run uncached suggestions in parallel (max 3 concurrent — prewarm is fire-and-forget so OK to be aggressive)
+  const CONCURRENCY = 3;
   for (let i = 0; i < uncached.length; i += CONCURRENCY) {
     const batch = uncached.slice(i, i + CONCURRENCY);
     const results = await Promise.allSettled(
