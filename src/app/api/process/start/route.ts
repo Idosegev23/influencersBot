@@ -74,6 +74,7 @@ async function runProcessingInBackground(
       accountId,
       transcribeVideos: options.transcribeVideos,
       maxVideosToTranscribe: options.maxVideos,
+      buildRagIndex: true,
       buildPersona: options.buildPersona,
       priority: 'normal',
     });

@@ -60,7 +60,7 @@ function getGeminiClient(): GoogleGenAI {
     throw new Error('GEMINI_API_KEY or GOOGLE_GEMINI_API_KEY is required');
   }
   
-  return new GoogleGenAI(apiKey);
+  return new GoogleGenAI({ apiKey });
 }
 
 // ============================================

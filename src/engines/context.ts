@@ -9,14 +9,16 @@
  * CRITICAL: This contract must be respected by all engines.
  */
 
-import type { 
-  AccountMode, 
-  AccountPlan, 
-  Channel, 
+import type {
+  AccountMode,
+  AccountPlan,
+  Channel,
   SecurityLevel,
   ModelTier,
   Session,
 } from './types';
+
+export type { AccountMode } from './types';
 
 // ============================================
 // Account Context (STABLE - loaded once per session)

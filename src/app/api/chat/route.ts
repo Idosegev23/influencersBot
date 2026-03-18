@@ -396,7 +396,7 @@ export async function POST(req: NextRequest) {
           
           // Map session state to support flow state
           let supportState = null;
-          if (session?.state) {
+          if (engineContext?.session?.state) {
             const stateMap: Record<string, 'detect' | 'brand' | 'name' | 'order' | 'problem' | 'phone' | 'complete'> = {
               'Support.CollectBrand': 'detect', // Start fresh
               'Support.CollectName': 'brand',
@@ -405,8 +405,8 @@ export async function POST(req: NextRequest) {
               'Support.CollectPhone': 'problem',
               'Support.Complete': 'complete',
             };
-            const step = stateMap[session.state] || 'detect';
-            supportState = { step, data: session.metadata || {} };
+            const step = stateMap[engineContext.session.state] || 'detect';
+            supportState = { step, data: (engineContext.session as any).metadata || {} };
           }
           
           const supportResult = await processSupportFlow(

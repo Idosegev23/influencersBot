@@ -534,7 +534,7 @@ export default function OnboardingChecklistPage() {
   }
 
   // ─── Save info ───
-  const saveRef = useRef<ReturnType<typeof setTimeout>>();
+  const saveRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   function saveBrandInfo(name: string, domain: string, noteVal: string) {
     if (!currentId) return;
     clearTimeout(saveRef.current);

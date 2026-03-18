@@ -337,8 +337,8 @@ export async function runInfluencerScrapeOrchestration(
         for (const url of urls) {
           try {
             const websiteResult = await crawlWebsite(url, fullConfig.maxWebsitePages);
-            const saved = await saveWebsiteData(accountId, websiteResult, sessionId);
-            stats.websitePagesSaved += saved.pagesSaved;
+            const saved = await saveWebsiteData(accountId, accountId, websiteResult, sessionId);
+            if (saved) stats.websitePagesSaved += websiteResult.pages.length;
           } catch (error: any) {
             console.error(`[Orchestrator] Failed to crawl ${url}:`, error.message);
           }

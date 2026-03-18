@@ -5,7 +5,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { buildPersonaWithGemini, savePersonaToDatabase } from '../src/lib/ai/gemini-persona-builder';
-import type { PreprocessedData } from '../src/lib/ai/gemini-persona-builder';
+import type { PreprocessedData } from '../src/lib/scraping/preprocessing';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY!;
@@ -82,7 +82,7 @@ async function main() {
   // 3. Build preprocessed data structure
   console.log('\n🔄 Preparing data for persona generation...');
   
-  const preprocessedData: PreprocessedData = {
+  const preprocessedData = ({
     stats: {
       totalPosts: posts.length,
       totalComments: posts.reduce((sum, p) => sum + (p.comments_count || 0), 0),
@@ -130,7 +130,7 @@ async function main() {
     },
     websites: [],
     transcriptions: [],
-  };
+  }) as any as PreprocessedData;
 
   console.log(`✅ Preprocessed data ready`);
   console.log(`📊 Total terms: ${preprocessedData.topTerms.length}`);
@@ -156,7 +156,8 @@ async function main() {
 
   // 5. Save to database
   console.log('\n💾 Saving persona to database...');
-  await savePersonaToDatabase(account.id, persona);
+  const supabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  await savePersonaToDatabase(supabaseClient, account.id, persona, preprocessedData, JSON.stringify(persona));
 
   console.log('\n============================================================');
   console.log('🎉 [Rebuild Persona] Completed successfully!');

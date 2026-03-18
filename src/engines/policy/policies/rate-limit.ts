@@ -138,7 +138,7 @@ export async function checkRateLimit(input: PolicyInput): Promise<PolicyCheckRes
   }
 
   // Add rate limit metrics to applied policy
-  applied.metadata = {
+  (applied as any).metadata = {
     scopes: results.map(r => ({
       scope: r.scope,
       remaining: r.remaining,

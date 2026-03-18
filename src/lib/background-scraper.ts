@@ -155,7 +155,7 @@ export async function runBackgroundScrape(
     if (!GEMINI_KEY) {
       throw new Error('GEMINI_API_KEY or GOOGLE_GEMINI_API_KEY is required');
     }
-    const genAI = new GoogleGenAI(GEMINI_KEY);
+    const genAI = new GoogleGenAI({ apiKey: GEMINI_KEY });
     
     const prompt = `IMPORTANT: You MUST respond with ONLY valid JSON. No text before or after the JSON. No explanations. No markdown.
 
@@ -329,7 +329,11 @@ Example response:
       });
 
       const personaStartTime = Date.now();
-      persona = await generatePersonaFromPosts(posts as any);
+      persona = await generatePersonaFromPosts(
+        posts as any,
+        { fullName: influencer.full_name || username, biography: '' },
+        influencer.influencer_type || 'other'
+      );
 
       if (persona) {
         await supabase.from('chatbot_persona').upsert(
@@ -345,7 +349,12 @@ Example response:
       }
 
       console.log(`⏱️ [${username}] Generating greeting...`);
-      greeting = await generateGreetingAndQuestions(influencer.username, posts as any);
+      greeting = await generateGreetingAndQuestions(
+        influencer.full_name || influencer.username,
+        influencer.influencer_type || 'other',
+        persona!,
+        []
+      );
 
       if (greeting) {
         await supabase.from('chatbot_persona').update({
@@ -380,7 +389,7 @@ Example response:
       full_name: String(profile?.ownerFullName || profile?.fullName || influencer.full_name),
       followers_count: Number(profile?.followersCount) || influencer.followers_count,
       avatar_url: avatarUrl || influencer.avatar_url,
-      last_scraped_at: new Date().toISOString(),
+      last_synced_at: new Date().toISOString(),
     });
 
     const overallElapsed = ((Date.now() - overallStartTime) / 1000).toFixed(2);
@@ -408,8 +417,8 @@ Example response:
         posts: posts.length,
         reels: reels.length,
         profile: {
-          name: profile?.ownerFullName || profile?.fullName || '',
-          followers: profile?.followersCount || 0,
+          name: String(profile?.ownerFullName || profile?.fullName || ''),
+          followers: Number(profile?.followersCount || 0),
           avatarUrl,
         },
         personaGenerated: !!persona,

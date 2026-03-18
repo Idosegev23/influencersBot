@@ -177,10 +177,11 @@ describe('Feature Flag Gating', () => {
 
   it('checks flag as string comparison', () => {
     // The flag check is `=== 'true'` not truthy
-    expect('true' === 'true').toBe(true);
-    expect('false' === 'true').toBe(false);
-    expect(undefined === 'true').toBe(false);
-    expect('' === 'true').toBe(false);
+    const check = (v: string | undefined) => v === 'true';
+    expect(check('true')).toBe(true);
+    expect(check('false')).toBe(false);
+    expect(check(undefined)).toBe(false);
+    expect(check('')).toBe(false);
   });
 });
 

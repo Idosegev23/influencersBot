@@ -218,7 +218,7 @@ export async function redisSlidingWindowRateLimit(args: {
       // Get oldest entry in window
       const oldest = await client.zrange(key, 0, 0, { withScores: true });
       if (oldest.length > 0) {
-        const oldestTime = oldest[0].score as number;
+        const oldestTime = (oldest[0] as any).score as number;
         retryAfterMs = Math.max(0, oldestTime + windowMs - now);
       }
     }
@@ -294,7 +294,7 @@ export function isRedisAvailable(): boolean {
 export const redis = {
   get: redisGet,
   set: redisSet,
-  setex: async (key: string, ttl: number, value: unknown) => redisSet(key, value, { ttl }),
+  setex: async (key: string, ttl: number, value: unknown) => redisSet(key, value, ttl),
   del: redisDel,
   exists: redisExists,
   ttl: redisTtl,

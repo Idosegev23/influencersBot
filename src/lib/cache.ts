@@ -24,7 +24,7 @@ interface CacheEntry<T> {
   staleAt?: number; // For stale-while-revalidate
 }
 
-interface CacheOptions {
+export interface CacheOptions {
   ttlMs: number;
   tags?: string[];
   version?: string;
@@ -40,7 +40,7 @@ interface CacheStats {
   hitRate: number;
 }
 
-interface WrapResult<T> {
+export interface WrapResult<T> {
   value: T;
   fromCache: boolean;
   stale: boolean;

@@ -192,19 +192,22 @@ export default function AudiencePage() {
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <GrowthChart data={data.conversationsOverTime} />
+        <GrowthChart data={data.conversationsOverTime.map(d => ({ date: d.date, followers: d.count, growth: 0 }))} />
         <EngagementMetrics
-          avgMessages={data.overview.avgMessagesPerSession}
-          conversionRate={data.overview.conversionRate}
-          satisfactionRate={data.overview.satisfactionRate}
+          likesRate={data.overview.conversionRate}
+          commentsRate={data.overview.satisfactionRate}
+          sharesRate={0}
+          savesRate={0}
+          reach={data.overview.totalConversations}
+          impressions={data.overview.totalMessages}
         />
       </div>
 
       {/* Demographics (placeholder) */}
-      <DemographicsChart />
+      <DemographicsChart ageGroups={[]} gender={[]} locations={[]} />
 
       {/* Top Content (placeholder) */}
-      <TopContent />
+      <TopContent content={[]} />
     </div>
   );
 }

@@ -59,7 +59,7 @@ export interface PipelineMetricsData {
   suggestionFallbackTriggered: boolean;
 
   // Path
-  retrievalPath: 'rag' | 'fts' | 'greeting_skip' | 'followup_skip';
+  retrievalPath: 'rag' | 'fts' | 'rag+direct' | 'greeting_skip' | 'followup_skip';
   archetype: string;
 }
 

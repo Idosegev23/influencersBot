@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/server';
 import { requireInfluencerAuth } from '@/lib/auth/influencer-auth';
+
+async function syncInstagramAndRegeneratePersona(accountId: string, instagramUsername: string) {
+  const { runInfluencerScrapeOrchestration } = await import('@/lib/scraping/influencer-scrape-orchestrator');
+  await runInfluencerScrapeOrchestration(instagramUsername, accountId, { processWithGemini: true });
+}
 
 /**
  * GET /api/influencer/chatbot/persona

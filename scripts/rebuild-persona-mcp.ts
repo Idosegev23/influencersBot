@@ -4,7 +4,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { buildPersonaWithGemini, savePersonaToDatabase } from '../src/lib/ai/gemini-persona-builder';
-import type { PreprocessedData } from '../src/lib/ai/gemini-persona-builder';
+import type { PreprocessedData } from '../src/lib/scraping/preprocessing';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY!;
@@ -78,7 +78,7 @@ async function main() {
     console.log(`🎬 Transcriptions: ${transcriptions?.length || 0}`);
 
     // Build minimal preprocessed data
-    preprocessedData = {
+    preprocessedData = ({
       stats: {
         totalPosts: posts?.length || 0,
         totalComments: posts?.reduce((sum, p) => sum + (p.comments_count || 0), 0) || 0,
@@ -128,11 +128,11 @@ async function main() {
         text: t.transcription || '',
         media_id: t.media_id,
       })) || [],
-    };
+    }) as any as PreprocessedData;
   }
 
   console.log(`✅ Preprocessing data ready`);
-  console.log(`📊 Stats: ${preprocessedData.stats.totalPosts} posts, ${preprocessedData.stats.totalLikes} likes`);
+  console.log(`📊 Stats: ${preprocessedData.stats.totalPosts} posts`);
   console.log(`📊 Transcriptions: ${preprocessedData.transcriptions?.length || 0}`);
 
   // 3. Build persona with GPT-5.2 Pro
@@ -156,7 +156,8 @@ async function main() {
 
   // 4. Save to database
   console.log('\n💾 Saving persona to database...');
-  await savePersonaToDatabase(ACCOUNT_ID, personaData);
+  const supabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  await savePersonaToDatabase(supabaseClient, ACCOUNT_ID, personaData, preprocessedData, JSON.stringify(personaData));
 
   console.log('\n============================================================');
   console.log('🎉 [Rebuild Persona] Completed successfully!');

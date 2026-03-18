@@ -29,7 +29,7 @@ const PROGRESS_TTL = 300; // 5 minutes
  */
 export async function initProgress(username: string): Promise<void> {
   // Check if Redis is available
-  if (!redis.isConfigured) {
+  if (!redis.isAvailable()) {
     // Redis not configured, skip progress tracking silently
     return;
   }
@@ -63,7 +63,7 @@ export async function updateProgress(
   updates: Partial<ScrapeProgress>
 ): Promise<void> {
   // Check if Redis is available
-  if (!redis.isConfigured) {
+  if (!redis.isAvailable()) {
     // Redis not configured, skip progress tracking silently
     return;
   }
@@ -71,7 +71,7 @@ export async function updateProgress(
   const key = `scrape_progress:${username}`;
   
   try {
-    const current = await redis.get(key);
+    const current = await redis.get<string>(key);
     
     if (!current) {
       // Progress doesn't exist yet, initialize it first
@@ -79,7 +79,7 @@ export async function updateProgress(
       await initProgress(username);
       
       // Now apply the updates (without recursion)
-      const freshData = await redis.get(key);
+      const freshData = await redis.get<string>(key);
       if (!freshData) {
         console.warn(`Failed to initialize progress for ${username}`);
         return;
@@ -111,13 +111,13 @@ export async function updateProgress(
  */
 export async function getProgress(username: string): Promise<ScrapeProgress | null> {
   // Check if Redis is available
-  if (!redis.isConfigured) {
+  if (!redis.isAvailable()) {
     return null;
   }
 
   try {
     const key = `scrape_progress:${username}`;
-    const data = await redis.get(key);
+    const data = await redis.get<string>(key);
     
     if (!data) return null;
     
@@ -161,7 +161,7 @@ export async function failProgress(username: string, error: string): Promise<voi
  */
 export async function deleteProgress(username: string): Promise<void> {
   // Check if Redis is available
-  if (!redis.isConfigured) {
+  if (!redis.isAvailable()) {
     return;
   }
 

@@ -13,6 +13,8 @@
 
 import type { AccountMode, SecurityLevel, ModelTier } from './types';
 
+export type { AccountMode } from './types';
+
 // ============================================
 // Event Types
 // ============================================

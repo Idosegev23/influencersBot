@@ -8,11 +8,15 @@ interface Communication {
   id: string;
   brand_name: string;
   subject: string;
-  category: 'financial' | 'legal' | 'partnership_issue' | 'general';
-  status: 'open' | 'closed';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
+  category: string;
+  status: string;
+  priority: string;
   created_at: string;
   unread_count: number;
+  last_message_at?: string;
+  last_message_by?: string;
+  message_count?: number;
+  due_date?: string;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -206,7 +210,7 @@ export default function CommunicationsPage() {
         {/* Communications List */}
         {!error && communications.length > 0 && (
           <CommunicationsList
-            communications={filteredCommunications}
+            communications={filteredCommunications as any}
             username={username}
           />
         )}

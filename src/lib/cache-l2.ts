@@ -25,13 +25,16 @@ interface L2CacheEntry<T> {
   source: 'db' | 'redis';
 }
 
-interface L2CacheOptions extends CacheOptions {
+interface L2CacheOptions {
+  ttlMs?: number;
+  tags?: string[];
   version?: string;
   skipL1?: boolean;
   skipL2?: boolean;
+  staleWhileRevalidateMs?: number;
 }
 
-interface L2Metrics {
+export interface L2Metrics {
   l1Hit: boolean;
   l2Hit: boolean;
   source: 'l1' | 'l2' | 'db';
@@ -83,10 +86,10 @@ export async function l2CacheWrap<T>(
   
   // Try L1 (in-memory)
   if (!options.skipL1) {
-    const l1Value = cacheGet<T>(key);
-    if (l1Value !== undefined) {
+    const l1Result = cacheGet<T>(key);
+    if (l1Result !== null) {
       return {
-        value: l1Value,
+        value: l1Result.value,
         metrics: { l1Hit: true, l2Hit: false, source: 'l1', latencyMs: Date.now() - start },
       };
     }
@@ -208,7 +211,7 @@ export async function invalidateAccountCache(accountId: string): Promise<void> {
   ];
   
   // L1
-  keys.forEach(k => cacheDel(k));
+  keys.forEach(k => cacheDelete(k));
   
   // L2
   if (isRedisAvailable()) {

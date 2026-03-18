@@ -566,18 +566,42 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
             <div className="admin-card p-6">
               <h2 className="text-lg font-bold mb-4" style={{ color: '#ede9f8' }}>פעולות</h2>
               <div className="space-y-2">
-                <Link
-                  href={`/manage/123456?account=${id}`}
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await fetch('/api/admin/websites', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ accountId: id }),
+                      });
+                      const data = await res.json();
+                      if (data.token) {
+                        window.open(`/manage/${data.token}`, '_blank');
+                      } else {
+                        alert('שגיאה ביצירת קישור ניהול');
+                      }
+                    } catch {
+                      alert('שגיאה ביצירת קישור ניהול');
+                    }
+                  }}
                   className="btn-primary block w-full text-center text-sm py-2.5"
                 >
                   דף ניהול
-                </Link>
-                <Link
-                  href={`/api/process/start?accountId=${id}`}
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!confirm('להתחיל תמלול מלא? זה עלול לקחת כמה דקות.')) return;
+                    try {
+                      await fetch(`/api/process/start?accountId=${id}`, { method: 'POST' });
+                      alert('תמלול מלא הותחל');
+                    } catch {
+                      alert('שגיאה בהפעלת תמלול');
+                    }
+                  }}
                   className="btn-coral block w-full text-center text-sm py-2.5"
                 >
                   תמלול מלא
-                </Link>
+                </button>
               </div>
             </div>
           </div>

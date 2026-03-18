@@ -173,15 +173,15 @@ export class NewScanOrchestrator {
             const picBuffer = Buffer.from(await picRes.arrayBuffer());
             const picType = picRes.headers.get('content-type') || 'image/jpeg';
             const picExt = picType.includes('png') ? 'png' : 'jpg';
-            await supabase.storage.from('avatars').upload(
+            await this.supabase.storage.from('avatars').upload(
               `${accountId}/profile.${picExt}`, picBuffer,
               { contentType: picType, upsert: true }
             );
-            const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(`${accountId}/profile.${picExt}`);
+            const { data: urlData } = this.supabase.storage.from('avatars').getPublicUrl(`${accountId}/profile.${picExt}`);
             if (urlData?.publicUrl) {
-              const { data: acct } = await supabase.from('accounts').select('config').eq('id', accountId).single();
+              const { data: acct } = await this.supabase.from('accounts').select('config').eq('id', accountId).single();
               if (acct) {
-                await supabase.from('accounts').update({ config: { ...acct.config, avatar_url: urlData.publicUrl } }).eq('id', accountId);
+                await this.supabase.from('accounts').update({ config: { ...acct.config, avatar_url: urlData.publicUrl } }).eq('id', accountId);
               }
             }
           }
@@ -408,15 +408,15 @@ export class NewScanOrchestrator {
         await this.rateLimiter.waitRandom('before websites');
         report('websites', 'running', 75, 'סורק אתרים מהביו...');
 
-        const urls = extractUrlsFromBio(profile.bio || '', profile.external_url);
+        const urls = extractUrlsFromBio(profile.bio || '', profile.external_url ? [profile.external_url] : null);
         
         for (const url of urls) {
           try {
             const websiteResult = await crawlWebsite(url, fullConfig.maxWebsitePages);
-            const saved = await saveWebsiteData(accountId, websiteResult, sessionId);
-            
+            const saved = await saveWebsiteData(this.supabase, accountId, websiteResult, sessionId);
+
             stats.websitesCrawled++;
-            stats.websitePagesCount += saved.pagesSaved;
+            if (saved) stats.websitePagesCount += 1;
 
             // Small delay between websites
             await this.rateLimiter.waitFixed(1000, 'between websites');
@@ -544,6 +544,7 @@ async function startProcessingInBackground(
       scanJobId,
       transcribeVideos: transcribeReels,
       maxVideosToTranscribe: 999, // ⚡ Transcribe ALL videos
+      buildRagIndex: true,
       buildPersona: true,
       priority: 'normal',
     });

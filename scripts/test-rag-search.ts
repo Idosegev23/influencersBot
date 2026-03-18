@@ -65,7 +65,7 @@ async function main() {
     const { retrieveKnowledge } = await import('../src/lib/chatbot/knowledge-retrieval');
     const knowledge = await retrieveKnowledge(
       accountId,
-      'base',
+      'general',
       query,
       10,
     );

@@ -6,6 +6,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { getScrapeCreatorsClient } from './scrapeCreatorsClient';
 
+const HIGHLIGHTS_STORIES_ACTOR = 'scrape-creators/highlights';
+
 // ============================================
 // Type Definitions
 // ============================================

@@ -38,7 +38,9 @@ export interface Influencer {
   display_name: string;
   bio?: string;
   avatar_url?: string; // @deprecated Use profile_pic_url
-  profile_pic_url?: string; // NEW: from instagram_profile_history
+  profile_pic_url?: string;
+  profile_image_url?: string; // alias for profile_pic_url
+  full_name?: string;
   followers_count: number;
   following_count?: number;
   posts_count?: number;
@@ -47,6 +49,7 @@ export interface Influencer {
   persona?: InfluencerPersona | null;
   theme?: InfluencerTheme;
   admin_password_hash?: string;
+  security_config?: { admin_password_hash?: string; [key: string]: unknown };
   is_active: boolean;
   last_synced_at?: string | null;
   created_at: string;
@@ -70,6 +73,7 @@ export interface Influencer {
   // Account info
   plan?: string;
   type?: string;
+  mode?: string;
   persona_name?: string;
   has_persona?: boolean;
   has_profile_data?: boolean;
@@ -81,6 +85,15 @@ export interface ScrapeSettings {
   content_types: PostType[];        // Which types to include
   include_comments: boolean;        // Whether to fetch comments
   include_hashtags: boolean;        // Whether to extract hashtags
+  reels_limit?: number;
+}
+
+export interface BrandCardData {
+  brand_name: string;
+  logo_url?: string;
+  coupon_code?: string;
+  link?: string;
+  category?: string;
 }
 
 // Default scrape settings

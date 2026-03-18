@@ -143,9 +143,9 @@ ${metadataPrompt}
     // ============================================
     console.log('\n📥 [Stage 3] AI requested detailed content...');
     
-    const toolCall = message.tool_calls[0];
+    const toolCall = message.tool_calls[0] as any;
     const request: RetrievalRequest = JSON.parse(toolCall.function.arguments);
-    
+
     console.log(`  Posts: ${request.posts?.length || 0}`);
     console.log(`  Transcriptions: ${request.transcriptions?.length || 0}`);
     console.log(`  Highlights: ${request.highlights?.length || 0}`);
@@ -256,7 +256,7 @@ export async function processWithHybridAndPersona(
     }
 
     // Stage 3: Fetch detailed
-    const toolCall = message.tool_calls[0];
+    const toolCall = message.tool_calls[0] as any;
     const request: RetrievalRequest = JSON.parse(toolCall.function.arguments);
     
     console.log(`\n📥 [Stage 3] Fetching: ${request.posts?.length || 0} posts, ${request.transcriptions?.length || 0} transcriptions`);

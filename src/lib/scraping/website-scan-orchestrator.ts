@@ -4,8 +4,16 @@
  */
 
 import { randomUUID } from 'crypto';
-import { crawlWebsiteFull, saveFullCrawlResults } from './website-crawler';
-import type { WebsiteCrawlResult, CrawlProgressCallback } from './website-crawler';
+import { crawlWebsite, saveWebsiteData } from './website-crawler';
+import type { WebsiteData } from './website-crawler';
+
+// Types used by the orchestrator (not exported from website-crawler)
+type WebsiteCrawlResult = WebsiteData & {
+  domain: string;
+  stats: { pagesSucceeded: number; totalWords: number; totalImages: number };
+  pages: Array<{ url: string; title: string; content: string; wordCount: number; imageUrls?: string[]; imageData?: any[] }>;
+};
+type CrawlProgressCallback = (pagesFound: number, status: string, elapsed: number) => void;
 import { getScanJobsRepo } from '@/lib/db/repositories/scanJobsRepo';
 import type { ProgressCallback } from './newScanOrchestrator';
 
@@ -108,10 +116,22 @@ export class WebsiteScanOrchestrator {
           progress('crawl', 'running', pct, `סורק... נמצאו ${pagesFound} דפים (${timeStr})`);
         };
 
-        crawlResult = await crawlWebsiteFull(validatedUrl, {
-          maxPages: fullConfig.maxPages,
-          maxDepth: fullConfig.maxDepth,
-        }, crawlProgress);
+        const rawCrawl = await crawlWebsite(validatedUrl, fullConfig.maxPages);
+        crawlResult = {
+          ...rawCrawl,
+          domain: new URL(validatedUrl).hostname,
+          stats: {
+            pagesSucceeded: rawCrawl.pages.length,
+            totalWords: rawCrawl.pages.reduce((sum, p) => sum + (p.content?.split(/\s+/).length || 0), 0),
+            totalImages: 0,
+          },
+          pages: rawCrawl.pages.map(p => ({
+            ...p,
+            wordCount: p.content?.split(/\s+/).length || 0,
+            imageUrls: [] as string[],
+            imageData: [] as any[],
+          })),
+        };
 
         stats.pagesScraped = crawlResult.stats.pagesSucceeded;
         stats.totalWords = crawlResult.stats.totalWords;
@@ -163,7 +183,9 @@ export class WebsiteScanOrchestrator {
       // ============================================
       progress('save', 'running', 48, 'שומר דפים למסד נתונים...');
 
-      const { saved, failed } = await saveFullCrawlResults(accountId, crawlResult, sessionId);
+      const saveResult = await saveWebsiteData(accountId, accountId, crawlResult, sessionId);
+      const saved = saveResult ? crawlResult.pages.length : 0;
+      const failed = saveResult ? 0 : crawlResult.pages.length;
       stats.pagesSaved = saved;
 
       progress('save', 'completed', 60, `נשמרו ${saved} דפים (${failed} נכשלו)`);

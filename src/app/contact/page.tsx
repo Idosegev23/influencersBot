@@ -18,17 +18,17 @@ export default function ContactPage() {
     e.preventDefault();
     setStatus('loading');
 
-    // Simulate form submission
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    
-    // In production, you would send this to an API endpoint
-    console.log('Contact form submitted:', formData);
-    
-    setStatus('success');
-    setFormData({ name: '', email: '', subject: '', message: '' });
+    try {
+      const mailtoLink = `mailto:support@influencerbot.com?subject=${encodeURIComponent(`[${formData.subject}] פנייה מ-${formData.name}`)}&body=${encodeURIComponent(`שם: ${formData.name}\nאימייל: ${formData.email}\n\n${formData.message}`)}`;
+      window.open(mailtoLink, '_blank');
 
-    // Reset after 3 seconds
-    setTimeout(() => setStatus('idle'), 3000);
+      setStatus('success');
+      setFormData({ name: '', email: '', subject: '', message: '' });
+      setTimeout(() => setStatus('idle'), 3000);
+    } catch {
+      setStatus('error');
+      setTimeout(() => setStatus('idle'), 3000);
+    }
   };
 
   return (

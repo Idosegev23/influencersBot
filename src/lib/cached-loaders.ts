@@ -462,10 +462,11 @@ async function loadBrandsWithL2(
     
     return {
       data: l2Result.value || [],
-      metrics: createCacheMetrics('brands', { 
-        value: l2Result.value, 
-        hit: l2Result.metrics.l1Hit,
+      metrics: createCacheMetrics('brands', {
+        value: l2Result.value,
+        fromCache: l2Result.metrics.l1Hit,
         stale: false,
+        loadTimeMs: l2Result.metrics.latencyMs,
       }),
       l2Metrics: l2Result.metrics,
     };
@@ -499,10 +500,11 @@ async function loadContentWithL2(
     
     return {
       data: l2Result.value || [],
-      metrics: createCacheMetrics('contentIndex', { 
-        value: l2Result.value, 
-        hit: l2Result.metrics.l1Hit,
+      metrics: createCacheMetrics('contentIndex', {
+        value: l2Result.value,
+        fromCache: l2Result.metrics.l1Hit,
         stale: false,
+        loadTimeMs: l2Result.metrics.latencyMs,
       }),
       l2Metrics: l2Result.metrics,
     };

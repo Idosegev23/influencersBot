@@ -292,6 +292,8 @@ export async function trackExperimentExposure(
     metadata: {
       source: 'experiments',
       engineVersion: 'v2',
+      traceId: '',
+      requestId: '',
     },
   });
 }
@@ -319,6 +321,8 @@ export async function trackExperimentConversion(
     metadata: {
       source: 'experiments',
       engineVersion: 'v2',
+      traceId: '',
+      requestId: '',
     },
   });
 }

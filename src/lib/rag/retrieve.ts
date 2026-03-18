@@ -636,10 +636,10 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
   const selectedCandidates = filtered.filter(c => rerankedIds.has(c.id));
 
   // Sort by rerank score
-  const rerankMap = new Map(reranked.map(r => [r.id, r]));
+  const rerankMap = new Map(reranked.map((r: any) => [r.id, r]));
   selectedCandidates.sort((a, b) => {
-    const scoreA = rerankMap.get(a.id)?.score || 0;
-    const scoreB = rerankMap.get(b.id)?.score || 0;
+    const scoreA = (rerankMap.get(a.id) as any)?.score || 0;
+    const scoreB = (rerankMap.get(b.id) as any)?.score || 0;
     return scoreB - scoreA;
   });
 
@@ -662,7 +662,7 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
       title: doc?.title || `${c.entity_type} chunk`,
       excerpt: c.chunk_text.substring(0, 3000),
       updatedAt: c.updated_at,
-      confidence: rerank?.score || c.similarity,
+      confidence: (rerank as any)?.score || c.similarity,
       chunkIndex: c.chunk_index,
       metadata: c.metadata,
     };

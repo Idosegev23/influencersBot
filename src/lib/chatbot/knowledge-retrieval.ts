@@ -768,7 +768,7 @@ async function fetchRelevantHighlights(
     for (const t of trans) {
       const highlightId = itemToHighlight.get(t.source_id);
       if (highlightId) {
-        (transcriptions[highlightId] ??= []).push(t);
+        (transcriptions[highlightId as string] ??= []).push(t);
       }
     }
 
@@ -863,10 +863,10 @@ async function fetchRelevantCoupons(
             }
 
             // Clean and validate link
-            let cleanLink = linkMap.get(c.brand_name?.toLowerCase()) || null;
+            let cleanLink = linkMap.get(c.brand_name?.toLowerCase()) as string | null || null;
             if (cleanLink) {
-              cleanLink = cleanLink.trim().replace(/\s+/g, '');
-              if (!cleanLink.startsWith('http')) {
+              cleanLink = (cleanLink as string).trim().replace(/\s+/g, '');
+              if (!(cleanLink as string).startsWith('http')) {
                 cleanLink = 'https://' + cleanLink;
               }
             }
@@ -876,7 +876,7 @@ async function fetchRelevantCoupons(
               code: c.code,
               discount: discount,
               category: 'general',
-              link: cleanLink,
+              link: cleanLink as string,
               start_date: c.start_date || undefined,
               end_date: c.end_date || undefined,
             });
@@ -935,11 +935,11 @@ async function fetchRelevantCoupons(
           }
           
           allCoupons.push({
-            brand: partnership?.brand_name || 'מותג',
+            brand: (partnership as any)?.brand_name || 'מותג',
             code: c.code,
             discount: discount,
-            category: partnership?.category || 'general',
-            link: partnership?.link,
+            category: (partnership as any)?.category || 'general',
+            link: (partnership as any)?.link,
             start_date: c.start_date || undefined,
             end_date: c.end_date || undefined,
           });

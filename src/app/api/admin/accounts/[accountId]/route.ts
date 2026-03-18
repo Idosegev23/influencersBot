@@ -21,7 +21,7 @@ async function checkAdminAuth(): Promise<boolean> {
  */
 export async function PATCH(
   request: Request,
-  { params }: { params: { accountId: string } }
+  { params }: { params: Promise<{ accountId: string }> }
 ) {
   try {
     const isAdmin = await checkAdminAuth();
@@ -29,7 +29,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { accountId } = params;
+    const { accountId } = await params;
     if (!accountId) {
       return NextResponse.json({ error: 'accountId is required' }, { status: 400 });
     }
@@ -79,12 +79,12 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { accountId: string } }
+  { params }: { params: Promise<{ accountId: string }> }
 ) {
   try {
     // Check admin authentication
     const isAdmin = await checkAdminAuth();
-    
+
     if (!isAdmin) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -92,7 +92,7 @@ export async function DELETE(
       );
     }
 
-    const { accountId } = params;
+    const { accountId } = await params;
 
     if (!accountId) {
       return NextResponse.json(
