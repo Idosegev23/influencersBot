@@ -8,7 +8,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAccountByUsername } from '@/lib/supabase';
 import { generateEmbeddings } from '@/lib/rag/embeddings';
-import { l2CacheWrap } from '@/lib/cache-l2';
+import { cacheWrap } from '@/lib/cache';
 import { createHash } from 'crypto';
 
 export async function GET(request: Request) {
@@ -131,7 +131,7 @@ async function prewarmRagCache(accountId: string, queries: string[]): Promise<vo
   const results = await Promise.allSettled(
     queries.map(async (query, i) => {
       const cacheKey = `rag:vecs:${queryHash(accountId, query)}`;
-      await l2CacheWrap<{ data: any[] | null; error: any }>(
+      await cacheWrap<{ data: any[] | null; error: any }>(
         cacheKey,
         async () => {
           const res = await supabase.rpc('match_document_chunks', {

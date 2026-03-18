@@ -17,8 +17,7 @@ import { createClient } from '@/lib/supabase/server';
 import { generateEmbedding } from './embeddings';
 import { rerankCandidates } from './rerank';
 import { createLogger } from './logger';
-import { cacheWrap, CacheTTL } from '@/lib/cache';
-import { l2CacheWrap } from '@/lib/cache-l2';
+import { cacheWrap } from '@/lib/cache';
 import { getMetrics } from '@/lib/metrics/pipeline-metrics';
 import { createHash } from 'crypto';
 
@@ -293,10 +292,10 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
   pm?.measure('embeddingMs', 'embed_start');
 
   // Step 3b: Vector search (threshold 0.3 — lower for Hebrew brand names)
-  // Cache RPC results by query hash for 3 minutes — repeat/similar queries skip the DB round-trip
+  // Cache RPC results by query hash for 3 minutes (L1 in-memory)
   pm?.mark('rpc_start');
   const cacheKey = `rag:vecs:${queryHash(accountId, baseEnrichedQuery)}`;
-  const { value: cachedVecResult } = await l2CacheWrap<{ data: any[] | null; error: any }>(
+  const cachedVecResult = await cacheWrap<{ data: any[] | null; error: any }>(
     cacheKey,
     async () => {
       const res = await supabase
@@ -312,8 +311,8 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
     },
     { ttlMs: 180_000 } // 3 minutes
   );
-  const initialResults = cachedVecResult.data;
-  const vectorError = cachedVecResult.error;
+  const initialResults = cachedVecResult.value.data;
+  const vectorError = cachedVecResult.value.error;
   pm?.measure('matchDocChunksMs', 'rpc_start');
 
   if (vectorError) {
@@ -742,6 +741,9 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
  * Returns the new terms (not in original query) that are meaningful words.
  */
 function extractKeyTerms(originalQuery: string, expandedQuery: string): string[] {
+  // If no expansion happened, skip — avoids treating entire query as a "term"
+  if (expandedQuery === originalQuery) return [];
+
   const originalWords = new Set(
     originalQuery.toLowerCase().replace(/[?!.,?؟]/g, '').split(/\s+/).filter(w => w.length > 1)
   );
@@ -749,7 +751,7 @@ function extractKeyTerms(originalQuery: string, expandedQuery: string): string[]
     .split(/[,،]+/)  // Split by commas first
     .map(t => t.trim().replace(/^[(\[{]+|[)\]}.!?:]+$/g, ''))  // Strip surrounding punctuation
     .filter(t => {
-      if (t.length < 2) return false;
+      if (t.length < 2 || t.length > 40) return false; // Reject too-short or too-long terms
       if (originalWords.has(t.toLowerCase())) return false;
       // Filter out noise: terms with parentheses, brackets, or mostly punctuation
       if (/[()[\]{}]/.test(t)) return false;
