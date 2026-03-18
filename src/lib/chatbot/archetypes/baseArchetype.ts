@@ -20,9 +20,9 @@ const openai = new OpenAI({
 });
 
 // Model Configuration
-const CHAT_MODEL = 'gpt-5.4'; // ⚡ GPT-5.4 — strongest model with better persona adherence
-const FALLBACK_MODEL = 'gpt-5.2'; // ⚡ Reliable fallback
-const NANO_MODEL = 'gpt-5-nano'; // ⚡ Fastest + cheapest for simple queries
+const CHAT_MODEL = 'gpt-5.4-mini-2026-03-17'; // ⚡ GPT-5.4-mini — 1.9x faster, good quality
+const FALLBACK_MODEL = 'gpt-5.4'; // ⚡ Full 5.4 as fallback for complex queries
+const NANO_MODEL = 'gpt-5.4-nano-2026-03-17'; // ⚡ 2.3x faster, great TTFT for simple queries
 const MAX_TOKENS = 2048; // Enough for full Hebrew recipes, routines, and detailed content
 
 // Map decision engine model tiers to actual OpenAI model names
