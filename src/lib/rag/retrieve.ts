@@ -334,10 +334,12 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
   let candidates = (initialResults || []) as CandidateRow[];
   const initialTopSimilarity = candidates[0]?.similarity || 0;
 
-  // Step 3c: Conditional query expansion — only when top similarity < 0.6
-  // Saves ~600ms Gemini API call on confident matches
+  // Step 3c: Conditional query expansion — only when:
+  // - Top similarity < 0.6 (not confident)
+  // - We actually HAVE some results (expansion can't help if index has nothing)
+  // Saves ~600ms Gemini API call on confident matches or empty indexes
   let expandedQuery = query;
-  if (initialTopSimilarity < 0.6 && query.length <= 100) {
+  if (initialTopSimilarity < 0.6 && candidates.length > 0 && query.length <= 100) {
     pm?.inc('expandQueryCalled');
     pm?.mark('expand_start');
     expandedQuery = await expandQuery(query);
@@ -373,6 +375,10 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
         }, accountId);
       }
     }
+  } else if (candidates.length === 0) {
+    pm?.inc('expandQuerySkippedNoResults');
+    pm?.set('expandQueryMs', 0);
+    log.info('Skipped query expansion (zero vector results — go straight to keyword supplement)', {}, accountId);
   } else if (initialTopSimilarity >= 0.6) {
     pm?.inc('expandQuerySkippedConfident');
     log.info('Skipped query expansion (confident match)', {
@@ -380,10 +386,11 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
     }, accountId);
   }
 
-  // Step 3d: Fallback to lower threshold if zero results at 0.4
-  if (candidates.length === 0) {
+  // Step 3d: Fallback to lower threshold if zero results at 0.3
+  // Skip if expansion already searched at 0.25 (would be duplicate)
+  if (candidates.length === 0 && expandedQuery === query) {
     pm?.set('thresholdUsed', '0.25_fallback');
-    log.info('Zero results at 0.4 threshold, retrying at 0.25', {}, accountId);
+    log.info('Zero results at 0.3 threshold, retrying at 0.25', {}, accountId);
     const { data: fallbackResults } = await supabase
       .rpc('match_document_chunks', {
         p_account_id: accountId,

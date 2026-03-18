@@ -51,6 +51,7 @@ export interface PipelineMetricsData {
   // Decision gates
   expandQueryCalled: boolean;
   expandQuerySkippedConfident: boolean;
+  expandQuerySkippedNoResults: boolean;
   keywordSupplementCalled: boolean;
   keywordSupplementSkipped: boolean;
   thresholdUsed: '0.4' | '0.25_fallback' | '0.4+0.25_expanded';
@@ -95,6 +96,7 @@ export class PipelineMetrics {
       regexFallback: false,
       expandQueryCalled: false,
       expandQuerySkippedConfident: false,
+      expandQuerySkippedNoResults: false,
       keywordSupplementCalled: false,
       keywordSupplementSkipped: false,
       fromSuggestion: false,

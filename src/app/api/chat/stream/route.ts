@@ -62,7 +62,7 @@ import type { EngineContext, AccountContext, SessionContext, UserContext, Knowle
 import { processSandwichMessageWithMetadata } from '@/lib/chatbot/sandwichBot';
 import { buildConversationContext, trimToTokenBudget, updateRollingSummary, shouldUpdateSummary } from '@/lib/chatbot/conversation-memory';
 import { createPipelineMetrics, withMetrics, logPipelineMetrics, recordMetrics } from '@/lib/metrics/pipeline-metrics';
-import { getCachedSuggestionResponse, cacheSuggestionResponse } from '@/lib/suggestion-cache';
+import { getCachedSuggestionResponse, cacheSuggestionResponse, prewarmSuggestionCache } from '@/lib/suggestion-cache';
 import { buildPersonalityFromDB } from '@/lib/chatbot/personality-wrapper';
 
 // ============================================
@@ -789,6 +789,27 @@ export async function POST(req: NextRequest) {
                 },
               }),
             ]);
+
+            // Pre-warm cache for LLM-generated suggestions
+            // Extract <<SUGGESTIONS>> from the response and cache each one
+            // so that NEXT click on these suggestions hits the cache
+            if (accountId && fullText.includes('<<SUGGESTIONS>>')) {
+              try {
+                const sugMatch = fullText.match(/<<SUGGESTIONS>>(.*?)<<\/SUGGESTIONS>>/);
+                if (sugMatch?.[1]) {
+                  const llmSuggestions = sugMatch[1].split('|').map(s => s.trim()).filter(s => s.length > 2);
+                  if (llmSuggestions.length > 0) {
+                    console.log(`[Stream] after() pre-warming ${llmSuggestions.length} LLM suggestions`);
+                    const influencerName = influencer.display_name || influencer.username || username || 'Unknown';
+                    // Fire-and-forget — don't block after() completion
+                    prewarmSuggestionCache(accountId, username, influencerName, llmSuggestions.slice(0, 3))
+                      .catch(err => console.error('[Stream] suggestion prewarm failed:', err.message));
+                  }
+                }
+              } catch (sugErr) {
+                // Non-critical — don't let suggestion extraction errors affect cleanup
+              }
+            }
 
             // Memory V2: Update rolling summary if threshold reached
             if (memoryV2Active && currentSessionId) {
