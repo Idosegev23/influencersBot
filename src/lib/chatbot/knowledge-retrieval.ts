@@ -177,8 +177,7 @@ export async function retrieveKnowledge(
   archetype: ArchetypeType,
   userMessage: string,
   limit: number = 10,
-  rollingSummary?: string,
-  fastMode?: boolean
+  rollingSummary?: string
 ): Promise<KnowledgeBase> {
   const supabase = await createClient();
 
@@ -232,7 +231,6 @@ export async function retrieveKnowledge(
       query: userMessage,
       topK: 12,
       conversationSummary: rollingSummary,
-      fastMode,
     });
   } else {
     contentPromises.posts = fetchRelevantPostsIndexed(supabase, accountId, normalizedQuery, 5);

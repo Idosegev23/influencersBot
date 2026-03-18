@@ -62,6 +62,7 @@ import type { EngineContext, AccountContext, SessionContext, UserContext, Knowle
 import { processSandwichMessageWithMetadata } from '@/lib/chatbot/sandwichBot';
 import { buildConversationContext, trimToTokenBudget, updateRollingSummary, shouldUpdateSummary } from '@/lib/chatbot/conversation-memory';
 import { createPipelineMetrics, withMetrics, logPipelineMetrics, recordMetrics } from '@/lib/metrics/pipeline-metrics';
+import { getCachedSuggestionResponse, cacheSuggestionResponse } from '@/lib/suggestion-cache';
 import { buildPersonalityFromDB } from '@/lib/chatbot/personality-wrapper';
 
 // ============================================
@@ -255,6 +256,7 @@ export async function POST(req: NextRequest) {
         }
 
         // === PARALLEL: Understanding + Lock + Event + Session + History ===
+        const parallelStartMs = Date.now();
         const anonId = `anon_${currentSessionId?.slice(0, 8) || 'guest'}`;
 
         const [understanding, , , sessionData, historyData, personalityConfig] = await Promise.all([
@@ -308,6 +310,8 @@ export async function POST(req: NextRequest) {
           // Personality config (pre-load to avoid DB call inside archetype)
           buildPersonalityFromDB(accountId).catch(() => null),
         ]);
+
+        const parallelMs = Date.now() - parallelStartMs;
 
         let session = sessionData;
 
@@ -554,7 +558,8 @@ export async function POST(req: NextRequest) {
         }
 
         // === USE SANDWICH BOT ===
-        console.log('[Stream] 🥪 Using Sandwich Bot architecture');
+        const preSandwichMs = Date.now() - startedAt;
+        console.log(`[Stream] Pre-sandwich breakdown: total=${preSandwichMs}ms | cache=${cacheLoadMs}ms | parallel=${parallelMs}ms | fromSuggestion=${!!fromSuggestion}`);
 
         // Conversation history was loaded in parallel above (historyData)
         const conversationHistory = (historyData || [])
@@ -623,6 +628,40 @@ export async function POST(req: NextRequest) {
         let responseId: string | null = null;
         let tokenInfo = { input: 0, output: 0 };
 
+        // === CHECK SUGGESTION CACHE (DB-based, shared across instances) ===
+        if (fromSuggestion && accountId) {
+          const cachedResponse = await getCachedSuggestionResponse(accountId, message);
+          if (cachedResponse) {
+            console.log(`[Stream] Suggestion cache HIT (${Date.now() - startedAt}ms total)`);
+            fullText = cachedResponse;
+            controller.enqueue(encodeEvent({ type: 'delta', text: fullText }));
+            // Skip to done — save messages, etc.
+            const latencyMs = Date.now() - startedAt;
+            controller.enqueue(encodeEvent({
+              type: 'done',
+              responseId: null,
+              latencyMs,
+              tokens: tokenInfo,
+              fullText,
+            }));
+
+            await Promise.all([
+              saveChatMessage(currentSessionId, 'user', message),
+              saveChatMessage(currentSessionId, 'assistant', fullText),
+            ]);
+
+            await completeIdempotencyKey(idempotencyKey!, { response: fullText });
+            await releaseLock(currentSessionId, requestId);
+            pm.set('totalMs', latencyMs);
+            pm.data.fromSuggestion = true;
+            logPipelineMetrics(pm);
+            recordMetrics(pm);
+            controller.close();
+            return;
+          }
+          console.log(`[Stream] Suggestion cache MISS — running full pipeline`);
+        }
+
         try {
           // Process with Sandwich Bot (all 3 layers!) with REAL streaming
           const influencerName = influencer.display_name || influencer.username || username || 'Unknown';
@@ -665,6 +704,12 @@ export async function POST(req: NextRequest) {
 
           // Capture Responses API response ID for context chaining
           responseId = sandwichResult.responseId || null;
+
+          // Cache response for future suggestion clicks (fire-and-forget)
+          if (fromSuggestion && accountId && fullText.length > 10) {
+            cacheSuggestionResponse(accountId, message, fullText, sandwichResult.metadata?.archetype)
+              .catch(() => {});
+          }
 
           const streamDurationMs = Date.now() - streamStartMs;
           pm.set('archetype', sandwichResult.metadata.archetype || 'general');

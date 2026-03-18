@@ -7,9 +7,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAccountByUsername } from '@/lib/supabase';
-import { generateEmbeddings } from '@/lib/rag/embeddings';
-import { cacheWrap } from '@/lib/cache';
-import { createHash } from 'crypto';
+import { prewarmSuggestionCache } from '@/lib/suggestion-cache';
 
 export async function GET(request: Request) {
   try {
@@ -85,11 +83,10 @@ export async function GET(request: Request) {
       .select('id', { count: 'exact', head: true })
       .eq('account_id', account.id);
 
-    // Fire-and-forget: pre-warm RAG cache for suggested queries
+    // Fire-and-forget: pre-warm suggestion response cache (DB-based, works across serverless instances)
     const allSuggestions = [...quickReplies, ...topicSuggestions.slice(0, 6)];
-    prewarmRagCache(account.id, allSuggestions).catch(err =>
-      console.error('[Chat Init] Pre-warm failed (non-blocking):', err.message)
-    );
+    prewarmSuggestionCache(account.id, username, displayName, allSuggestions.slice(0, 4))
+      .catch(err => console.error('[Chat Init] Pre-warm failed (non-blocking):', err.message));
 
     return NextResponse.json({
       greeting,
@@ -109,46 +106,3 @@ export async function GET(request: Request) {
   }
 }
 
-// ============================================
-// RAG Pre-warming (fire-and-forget)
-// ============================================
-
-function queryHash(accountId: string, query: string): string {
-  return createHash('md5').update(`${accountId}:${query}`).digest('hex').slice(0, 12);
-}
-
-async function prewarmRagCache(accountId: string, queries: string[]): Promise<void> {
-  if (queries.length === 0) return;
-
-  const start = Date.now();
-
-  // Batch-generate embeddings for all suggestions at once
-  const embeddings = await generateEmbeddings(queries);
-
-  const supabase = await createClient();
-
-  // Run vector searches in parallel, each wrapped in L2 cache
-  const results = await Promise.allSettled(
-    queries.map(async (query, i) => {
-      const cacheKey = `rag:vecs:${queryHash(accountId, query)}`;
-      await cacheWrap<{ data: any[] | null; error: any }>(
-        cacheKey,
-        async () => {
-          const res = await supabase.rpc('match_document_chunks', {
-            p_account_id: accountId,
-            p_embedding: JSON.stringify(embeddings[i]),
-            p_match_count: 20,
-            p_match_threshold: 0.3,
-            p_entity_types: null,
-            p_updated_after: null,
-          });
-          return { data: res.data, error: res.error };
-        },
-        { ttlMs: 180_000 } // 3 minutes — matches retrieve.ts TTL
-      );
-    })
-  );
-
-  const succeeded = results.filter(r => r.status === 'fulfilled').length;
-  console.log(`[Chat Init] Pre-warmed ${succeeded}/${queries.length} RAG queries in ${Date.now() - start}ms`);
-}
