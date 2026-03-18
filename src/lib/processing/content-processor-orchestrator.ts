@@ -9,6 +9,7 @@ import type { ImageOcrInput } from '@/lib/transcription/gemini-transcriber';
 import { buildPersonaWithGemini, savePersonaToDatabase } from '@/lib/ai/gemini-persona-builder';
 import { preprocessInstagramData } from '@/lib/scraping/preprocessing';
 import { ingestAllForAccount } from '@/lib/rag/ingest';
+import { enrichAccountChunks } from '@/lib/rag/enrich';
 import { generateAndSaveChatConfig } from './generate-chat-config';
 import { syncCommerceData } from './sync-commerce-data';
 import { extractCouponsFromContent } from './extract-coupons';
@@ -261,6 +262,25 @@ export async function processAccountContent(
         }
 
         await logProgress('rag_complete', ragSummary);
+
+        // Step 4.5: Enrich RAG chunks (Hebrew summaries, synthetic queries, partnership context)
+        console.log('\n✨ [Step 4.5] Enriching RAG chunks...');
+        await logProgress('enrich_start', '✨ מעשיר chunks עם תרגומים ושאלות סינתטיות...');
+        try {
+          const enrichResult = await enrichAccountChunks(config.accountId);
+          const enrichSummary = [
+            `✨ Enrichment: ${enrichResult.chunksEnriched} enriched`,
+            `${enrichResult.chunksDeleted} tiny deleted`,
+            `${enrichResult.translationsAdded} Hebrew summaries`,
+            `${enrichResult.syntheticQueriesAdded} synthetic queries`,
+            `${enrichResult.partnershipsEnriched} partnerships enriched`,
+          ].join(' • ');
+          console.log(`✅ ${enrichSummary}`);
+          await logProgress('enrich_complete', enrichSummary);
+        } catch (enrichErr: any) {
+          console.error('⚠️ Enrichment failed (non-blocking):', enrichErr.message);
+          await logProgress('enrich_error', `⚠️ Enrichment failed: ${enrichErr.message}`);
+        }
       } catch (error: any) {
         console.error('❌ RAG indexing failed (non-blocking):', error.message);
         result.errors.push(`RAG indexing failed: ${error.message}`);

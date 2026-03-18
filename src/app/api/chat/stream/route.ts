@@ -209,11 +209,22 @@ export async function POST(req: NextRequest) {
 
         // === EARLY SUGGESTION CACHE CHECK (before heavy parallel block) ===
         // Saves ~2s by skipping session/history/personality/understanding/decision/policy
+        // Skip early cache when session has a lead (registered user) — responses should be personalized with their name
         if (fromSuggestion && accountId) {
-          const earlyCacheStart = Date.now();
-          const cachedResponse = await getCachedSuggestionResponse(accountId, message);
-          const earlyCacheMs = Date.now() - earlyCacheStart;
-          if (cachedResponse) {
+          // Quick parallel check: cache + lead_id (single column, no full session load)
+          const [cachedResponse, sessionLeadCheck] = await Promise.all([
+            getCachedSuggestionResponse(accountId, message),
+            (rawSessionId && isValidSessionId(rawSessionId))
+              ? supabase
+                  .from('chat_sessions')
+                  .select('lead_id')
+                  .eq('id', rawSessionId)
+                  .maybeSingle()
+                  .then(r => r.data?.lead_id)
+              : Promise.resolve(null),
+          ]);
+          const earlyCacheMs = Date.now() - startedAt - cacheLoadMs;
+          if (cachedResponse && !sessionLeadCheck) {
             const latencyMs = Date.now() - startedAt;
             console.log(`[Stream] Suggestion cache HIT (early) — ${latencyMs}ms total (cache lookup: ${earlyCacheMs}ms)`);
 
@@ -261,7 +272,11 @@ export async function POST(req: NextRequest) {
             controller.close();
             return;
           }
-          console.log(`[Stream] Early suggestion cache MISS (${earlyCacheMs}ms) — continuing full pipeline`);
+          if (sessionLeadCheck && cachedResponse) {
+            console.log(`[Stream] Suggestion cache HIT skipped — session has lead_id, need personalized response`);
+          } else {
+            console.log(`[Stream] Early suggestion cache MISS (${earlyCacheMs}ms) — continuing full pipeline`);
+          }
         }
 
         // === SESSION ===
