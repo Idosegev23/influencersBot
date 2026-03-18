@@ -180,6 +180,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [initialDiscoverySlug, setInitialDiscoverySlug] = useState<string | null>(null);
   const [showLeadPopup, setShowLeadPopup] = useState(false);
   const [leadInfo, setLeadInfo] = useState<{ firstName: string; serialNumber: string } | null>(null);
+  const [topicSuggestions, setTopicSuggestions] = useState<string[]>([]);
+  const [hasCommercialContent, setHasCommercialContent] = useState(false);
   const userMsgCountRef = useRef(0);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -256,12 +258,18 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       
       if (msgId && done.fullText) {
         const { cleanText, suggestions } = parseSuggestions(done.fullText);
+        // Fall back to random topic suggestions if AI didn't generate any
+        const fallbackSuggestions = suggestions.length > 0
+          ? suggestions
+          : topicSuggestions.length > 0
+            ? topicSuggestions.sort(() => Math.random() - 0.5).slice(0, 3)
+            : undefined;
         setMessages(prev => prev.map(m => {
           if (m.id !== msgId) return m;
           return {
             ...m,
             content: cleanText,
-            suggestions: suggestions.length > 0 ? suggestions : undefined,
+            suggestions: fallbackSuggestions,
             traceId: meta?.traceId,
             decisionId: meta?.decisionId,
             state: meta?.stateTransition?.to,
@@ -380,6 +388,15 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data?.categories) setDiscoveryCategories(data.categories.filter((c: DiscoveryCategoryAvailability) => c.available));
+      })
+      .catch(() => {});
+
+    // Preload topic suggestions + commercial content flag from init API
+    fetch(`/api/chat/init?username=${encodeURIComponent(username)}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.topicSuggestions) setTopicSuggestions(data.topicSuggestions);
+        if (data?.hasCommercialContent) setHasCommercialContent(true);
       })
       .catch(() => {});
 
@@ -620,11 +637,16 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
 
       const rawResponse = data.response || 'מצטער, משהו השתבש. נסה שוב!';
       const { cleanText: cleanResponse, suggestions: parsedSuggestions } = parseSuggestions(rawResponse);
+      const nonStreamFallback = parsedSuggestions.length > 0
+        ? parsedSuggestions
+        : topicSuggestions.length > 0
+          ? topicSuggestions.sort(() => Math.random() - 0.5).slice(0, 3)
+          : undefined;
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: cleanResponse,
-        suggestions: parsedSuggestions.length > 0 ? parsedSuggestions : undefined,
+        suggestions: nonStreamFallback,
         // Engine v2 fields
         uiDirectives: data.uiDirectives,
         cardsPayload: data.cardsPayload,
@@ -967,6 +989,11 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             <Send className="w-4 h-4" />
                           </button>
                         </div>
+                        {hasCommercialContent && (
+                          <p dir="rtl" style={{ color: '#9ca3af', fontSize: '11px', textAlign: 'center', marginTop: '6px', lineHeight: '16px' }}>
+                            העמוד עשוי לכלול תוכן שיווקי ושיתופי פעולה מסחריים
+                          </p>
+                        )}
                       </motion.div>
 
                       {/* Discovery category pills — only for the_dekel */}
@@ -1412,6 +1439,11 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         <Send className="w-4 h-4" />
                       </button>
                     </div>
+                    {hasCommercialContent && (
+                      <p dir="rtl" style={{ color: '#9ca3af', fontSize: '11px', textAlign: 'center', marginTop: '6px', lineHeight: '16px' }}>
+                        העמוד עשוי לכלול תוכן שיווקי ושיתופי פעולה מסחריים
+                      </p>
+                    )}
                   </div>
                 </div>
               </motion.div>

@@ -491,7 +491,7 @@ ${userNameLine}
 
       // === STREAMING MODE (when onToken callback is provided) ===
       if (input.onToken) {
-        console.log(`[BaseArchetype] Using Responses API STREAMING with ${primaryModel}${previousResponseId ? ' + context chain' : ''}`);
+        console.log(`[Model] 🚀 Streaming | model=${primaryModel} | fallback=${fallbackModel} | tier=${input.modelTier || 'default'}${previousResponseId ? ' | chained' : ''}`);
         try {
           const result = await this.streamResponsesAPI({
             model: primaryModel,
@@ -510,7 +510,7 @@ ${userNameLine}
           throw new Error('Empty streaming response from primary model');
 
         } catch (primaryError) {
-          console.warn(`[BaseArchetype] Primary model (${primaryModel}) failed, trying fallback:`, primaryError);
+          console.warn(`[Model] ⚠️ ${primaryModel} FAILED, falling back to ${fallbackModel}:`, primaryError);
 
           // Fallback: no previous_response_id (chain is model-specific)
           const result = await this.streamResponsesAPI({
@@ -532,7 +532,9 @@ ${userNameLine}
       }
 
       // === BLOCKING MODE (backward compatible, no onToken) ===
+      console.log(`[Model] 🔄 Blocking | model=${primaryModel} | fallback=${fallbackModel} | tier=${input.modelTier || 'default'}`);
       try {
+        const blockStart = Date.now();
         const response = await openai.responses.create({
           model: primaryModel,
           instructions,
@@ -541,6 +543,10 @@ ${userNameLine}
           max_output_tokens: MAX_TOKENS,
           reasoning: { effort: 'low' },
         });
+
+        const blockMs = Date.now() - blockStart;
+        const usage = (response as any).usage;
+        console.log(`[Model] ✅ ${primaryModel} | Total: ${blockMs}ms | Tokens: ${usage?.input_tokens || 0}→${usage?.output_tokens || 0} | Chars: ${response.output_text?.length || 0}`);
 
         if (response.output_text) {
           return {
@@ -551,8 +557,9 @@ ${userNameLine}
         throw new Error('Empty response from primary model');
 
       } catch (primaryError) {
-        console.warn(`[BaseArchetype] Primary model (${primaryModel}) failed, trying fallback (${fallbackModel}):`, primaryError);
+        console.warn(`[Model] ⚠️ ${primaryModel} FAILED, falling back to ${fallbackModel}:`, primaryError);
 
+        const fbStart = Date.now();
         const fallbackResponse = await openai.responses.create({
           model: fallbackModel,
           instructions,
@@ -560,6 +567,10 @@ ${userNameLine}
           max_output_tokens: MAX_TOKENS,
           reasoning: { effort: 'low' },
         });
+
+        const fbMs = Date.now() - fbStart;
+        const fbUsage = (fallbackResponse as any).usage;
+        console.log(`[Model] ✅ ${fallbackModel} (fallback) | Total: ${fbMs}ms | Tokens: ${fbUsage?.input_tokens || 0}→${fbUsage?.output_tokens || 0} | Chars: ${fallbackResponse.output_text?.length || 0}`);
 
         if (fallbackResponse.output_text) {
           return {
@@ -589,6 +600,9 @@ ${userNameLine}
     previousResponseId: string | null;
     onToken: (token: string) => void;
   }): Promise<{ text: string; responseId: string | null }> {
+    const streamStart = Date.now();
+    let ttftMs: number | null = null;
+
     const stream = await openai.responses.create({
       model: params.model,
       instructions: params.instructions,
@@ -601,19 +615,30 @@ ${userNameLine}
 
     let fullContent = '';
     let responseId: string | null = null;
+    let tokensIn = 0;
+    let tokensOut = 0;
 
     for await (const event of stream as AsyncIterable<ResponseStreamEvent>) {
       if (event.type === 'response.output_text.delta') {
         const delta = (event as any).delta as string;
         if (delta) {
+          if (ttftMs === null) ttftMs = Date.now() - streamStart;
           fullContent += delta;
           params.onToken(delta);
         }
       }
       if (event.type === 'response.completed') {
         responseId = (event as any).response?.id || null;
+        const usage = (event as any).response?.usage;
+        if (usage) {
+          tokensIn = usage.input_tokens || 0;
+          tokensOut = usage.output_tokens || 0;
+        }
       }
     }
+
+    const totalMs = Date.now() - streamStart;
+    console.log(`[Model] ✅ ${params.model} | TTFT: ${ttftMs}ms | Total: ${totalMs}ms | Tokens: ${tokensIn}→${tokensOut} | Chars: ${fullContent.length}`);
 
     return { text: fullContent, responseId };
   }

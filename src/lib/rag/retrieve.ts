@@ -18,7 +18,14 @@ import { generateEmbedding } from './embeddings';
 import { rerankCandidates } from './rerank';
 import { createLogger } from './logger';
 import { cacheWrap, CacheTTL } from '@/lib/cache';
+import { l2CacheWrap } from '@/lib/cache-l2';
 import { getMetrics } from '@/lib/metrics/pipeline-metrics';
+import { createHash } from 'crypto';
+
+/** Short hash for cache keys */
+function queryHash(accountId: string, query: string): string {
+  return createHash('md5').update(`${accountId}:${query}`).digest('hex').slice(0, 12);
+}
 import type {
   EntityType,
   QueryType,
@@ -286,16 +293,27 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
   pm?.measure('embeddingMs', 'embed_start');
 
   // Step 3b: Vector search (threshold 0.3 — lower for Hebrew brand names)
+  // Cache RPC results by query hash for 3 minutes — repeat/similar queries skip the DB round-trip
   pm?.mark('rpc_start');
-  const { data: initialResults, error: vectorError } = await supabase
-    .rpc('match_document_chunks', {
-      p_account_id: accountId,
-      p_embedding: JSON.stringify(baseEmbedding),
-      p_match_count: 20,
-      p_match_threshold: 0.3,
-      p_entity_types: entityTypes,
-      p_updated_after: timeWindow?.after || null,
-    });
+  const cacheKey = `rag:vecs:${queryHash(accountId, baseEnrichedQuery)}`;
+  const { value: cachedVecResult } = await l2CacheWrap<{ data: any[] | null; error: any }>(
+    cacheKey,
+    async () => {
+      const res = await supabase
+        .rpc('match_document_chunks', {
+          p_account_id: accountId,
+          p_embedding: JSON.stringify(baseEmbedding),
+          p_match_count: 20,
+          p_match_threshold: 0.3,
+          p_entity_types: entityTypes,
+          p_updated_after: timeWindow?.after || null,
+        });
+      return { data: res.data, error: res.error };
+    },
+    { ttlMs: 180_000 } // 3 minutes
+  );
+  const initialResults = cachedVecResult.data;
+  const vectorError = cachedVecResult.error;
   pm?.measure('matchDocChunksMs', 'rpc_start');
 
   if (vectorError) {
