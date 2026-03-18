@@ -46,6 +46,9 @@ export default function ChatbotSettingsPage() {
   const [accountId, setAccountId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [showLivePreview, setShowLivePreview] = useState(false);
+  const [dmBotEnabled, setDmBotEnabled] = useState<boolean | null>(null);
+  const [dmToggleLoading, setDmToggleLoading] = useState(false);
+  const [igConnection, setIgConnection] = useState<{ connected: boolean; ig_username?: string } | null>(null);
 
   useEffect(() => {
     loadData();
@@ -55,10 +58,17 @@ export default function ChatbotSettingsPage() {
     setLoading(true);
     try {
       // Load account info
+      let loadedAccountId = '';
       const accountRes = await fetch(`/api/influencer/profile?username=${username}`);
       if (accountRes.ok) {
         const accountData = await accountRes.json();
-        setAccountId(accountData.account?.id || '');
+        loadedAccountId = accountData.account?.id || '';
+        setAccountId(loadedAccountId);
+      }
+
+      // Load DM settings
+      if (loadedAccountId) {
+        loadDmSettings(loadedAccountId);
       }
 
       // Load stats
@@ -70,6 +80,39 @@ export default function ChatbotSettingsPage() {
       console.error('Error loading data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadDmSettings = async (accId: string) => {
+    try {
+      const res = await fetch(`/api/influencer/dm-settings?accountId=${accId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setDmBotEnabled(data.dm_bot_enabled ?? true);
+        setIgConnection(data.ig_connection || { connected: false });
+      }
+    } catch (error) {
+      console.error('Error loading DM settings:', error);
+    }
+  };
+
+  const toggleDmBot = async () => {
+    if (!accountId || dmToggleLoading) return;
+    setDmToggleLoading(true);
+    try {
+      const newState = !dmBotEnabled;
+      const res = await fetch('/api/influencer/dm-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId, dm_bot_enabled: newState }),
+      });
+      if (res.ok) {
+        setDmBotEnabled(newState);
+      }
+    } catch (error) {
+      console.error('Error toggling DM bot:', error);
+    } finally {
+      setDmToggleLoading(false);
     }
   };
 
@@ -173,6 +216,76 @@ export default function ChatbotSettingsPage() {
             צפייה חיה
           </button>
         </div>
+
+        {/* DM Bot Toggle */}
+        {igConnection && (
+          <div
+            className="rounded-xl border p-6"
+            style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div
+                  className="w-12 h-12 rounded-full flex items-center justify-center text-2xl"
+                  style={{ background: 'rgba(255,255,255,0.05)' }}
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+                    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+                    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold" style={{ color: 'var(--dash-text)' }}>
+                    בוט DM באינסטגרם
+                  </h2>
+                  {igConnection.connected ? (
+                    <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>
+                      מחובר ל-<span className="font-medium" style={{ color: 'var(--dash-text)' }}>@{igConnection.ig_username}</span>
+                    </p>
+                  ) : (
+                    <p className="text-sm" style={{ color: 'var(--color-warning, #f59e0b)' }}>
+                      אין חיבור אינסטגרם פעיל
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {igConnection.connected && dmBotEnabled !== null && (
+                <div className="flex items-center gap-3">
+                  <span
+                    className="text-sm font-medium"
+                    style={{ color: dmBotEnabled ? 'var(--color-success, #22c55e)' : 'var(--dash-text-3)' }}
+                  >
+                    {dmBotEnabled ? 'פעיל' : 'כבוי'}
+                  </span>
+                  <button
+                    onClick={toggleDmBot}
+                    disabled={dmToggleLoading}
+                    className="relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none"
+                    style={{
+                      backgroundColor: dmBotEnabled ? 'var(--color-primary)' : 'rgba(255,255,255,0.15)',
+                      opacity: dmToggleLoading ? 0.5 : 1,
+                    }}
+                  >
+                    <span
+                      className="inline-block h-5 w-5 rounded-full bg-white shadow-md transition-transform duration-200"
+                      style={{ transform: dmBotEnabled ? 'translateX(24px)' : 'translateX(4px)' }}
+                    />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {igConnection.connected && dmBotEnabled !== null && (
+              <p className="mt-3 text-xs" style={{ color: 'var(--dash-text-3)' }}>
+                {dmBotEnabled
+                  ? 'הבוט עונה אוטומטית על הודעות DM באינסטגרם. כבה כדי לענות ידנית.'
+                  : 'הבוט כבוי — הודעות DM לא ייענו אוטומטית.'}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

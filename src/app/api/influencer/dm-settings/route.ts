@@ -1,11 +1,13 @@
 /**
- * Instagram DM Settings — Ice Breakers + Persistent Menu
- * POST /api/influencer/dm-settings — Configure DM experience for an Instagram account
- * GET  /api/influencer/dm-settings — Get current DM settings
+ * Instagram DM Settings — Bot Toggle + Ice Breakers + Persistent Menu
+ * POST  /api/influencer/dm-settings — Configure DM experience for an Instagram account
+ * GET   /api/influencer/dm-settings — Get current DM settings + bot status
+ * PATCH /api/influencer/dm-settings — Toggle DM bot on/off
  *
  * Sets up:
- * 1. Ice Breakers — 4 FAQ questions shown when user opens DM for first time
- * 2. Persistent Menu — always-visible menu in DM conversation
+ * 1. DM Bot Toggle — enable/disable automated DM responses
+ * 2. Ice Breakers — 4 FAQ questions shown when user opens DM for first time
+ * 3. Persistent Menu — always-visible menu in DM conversation
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -174,13 +176,87 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Get IG connection info for display
+  const { data: connection } = await supabase
+    .from('ig_graph_connections')
+    .select('ig_business_account_id, ig_username, is_active')
+    .eq('account_id', accountId)
+    .eq('is_active', true)
+    .single();
+
+  const dmBotEnabled = accountData?.config?.dm_bot_enabled !== false; // default true
+
   return NextResponse.json({
     configured: !!dmSettings,
+    dm_bot_enabled: dmBotEnabled,
     settings: dmSettings,
+    ig_connection: connection ? {
+      ig_username: connection.ig_username,
+      ig_business_account_id: connection.ig_business_account_id,
+      connected: true,
+    } : { connected: false },
     defaults: {
       ice_breakers: DEFAULT_ICE_BREAKERS,
       persistent_menu: DEFAULT_PERSISTENT_MENU,
     },
     ...(liveConfig ? { live_config: liveConfig } : {}),
   });
+}
+
+// ============================================
+// PATCH — Toggle DM Bot On/Off
+// ============================================
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { accountId, dm_bot_enabled } = body;
+
+    if (!accountId) {
+      return NextResponse.json({ error: 'accountId is required' }, { status: 400 });
+    }
+
+    if (typeof dm_bot_enabled !== 'boolean') {
+      return NextResponse.json({ error: 'dm_bot_enabled must be a boolean' }, { status: 400 });
+    }
+
+    const supabase = await createClient();
+
+    // Get current config
+    const { data: accountData } = await supabase
+      .from('accounts')
+      .select('config')
+      .eq('id', accountId)
+      .single();
+
+    if (!accountData) {
+      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
+    }
+
+    // Update dm_bot_enabled in config
+    const { error } = await supabase
+      .from('accounts')
+      .update({
+        config: {
+          ...accountData.config,
+          dm_bot_enabled,
+        },
+      })
+      .eq('id', accountId);
+
+    if (error) {
+      console.error('[DM Settings] Toggle error:', error);
+      return NextResponse.json({ error: 'Failed to update bot status' }, { status: 500 });
+    }
+
+    console.log(`[DM Settings] Bot ${dm_bot_enabled ? 'enabled' : 'disabled'} for account ${accountId}`);
+
+    return NextResponse.json({
+      success: true,
+      dm_bot_enabled,
+    });
+  } catch (error: any) {
+    console.error('[DM Settings] PATCH error:', error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }

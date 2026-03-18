@@ -98,6 +98,13 @@ export async function processInstagramGraphDM(
     ]);
 
     const config = accountData?.config || {};
+
+    // Check if DM bot is enabled for this account (default: true for backwards compat)
+    if (config.dm_bot_enabled === false) {
+      console.log(`[IG Graph DM] Bot disabled for account ${accountId}, skipping`);
+      return { success: true };
+    }
+
     const username = config.username || 'influencer';
     const influencerName = config.display_name || config.username || 'Influencer';
 
