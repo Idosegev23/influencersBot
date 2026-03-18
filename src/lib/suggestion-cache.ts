@@ -16,8 +16,17 @@ import { createHash } from 'crypto';
 
 const CACHE_TTL_MINUTES = 30;
 
+/** Normalize query before hashing — trim, collapse whitespace, remove punctuation diacritics */
+function normalizeQuery(query: string): string {
+  return query
+    .trim()
+    .replace(/\s+/g, ' ')           // collapse whitespace
+    .replace(/[?!.,؟…]+$/g, '')     // strip trailing punctuation
+    .replace(/^[?!.,؟…]+/g, '');    // strip leading punctuation
+}
+
 function hashQuery(accountId: string, query: string): string {
-  return createHash('md5').update(`${accountId}:${query}`).digest('hex').slice(0, 16);
+  return createHash('md5').update(`${accountId}:${normalizeQuery(query)}`).digest('hex').slice(0, 16);
 }
 
 /**

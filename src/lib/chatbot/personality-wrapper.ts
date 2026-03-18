@@ -344,7 +344,17 @@ export class PersonalityWrapper {
 /**
  * Build personality config from database persona
  */
+// L1 in-memory cache for personality configs (per serverless instance)
+const personalityCache = new Map<string, { config: PersonalityConfig; exp: number }>();
+const PERSONALITY_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 export async function buildPersonalityFromDB(accountId: string): Promise<PersonalityConfig> {
+  // Check L1 cache first
+  const cached = personalityCache.get(accountId);
+  if (cached && cached.exp > Date.now()) {
+    return cached.config;
+  }
+
   const supabase = await createClient();
 
   const { data: persona, error } = await supabase
@@ -384,6 +394,9 @@ export async function buildPersonalityFromDB(accountId: string): Promise<Persona
     boundaries: persona.boundaries || undefined,
     responsePolicy: persona.response_policy || undefined,
   };
+
+  // Store in L1 cache
+  personalityCache.set(accountId, { config, exp: Date.now() + PERSONALITY_CACHE_TTL_MS });
 
   return config;
 }
