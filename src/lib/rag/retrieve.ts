@@ -224,6 +224,7 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
     entityTypes: inputEntityTypes,
     timeWindow: inputTimeWindow,
     metadataFilter,
+    fastMode = false,
   } = input;
 
   const stages = {
@@ -410,9 +411,10 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
   // Only when vector search isn't confident enough — skip on high similarity to save 1-2s
   let keywordSupplementAdded = false;
   const topSimilarityFinal = candidates[0]?.similarity || 0;
-  if (topSimilarityFinal >= 0.7 && candidates.length >= 3) {
+  if (fastMode || (topSimilarityFinal >= 0.7 && candidates.length >= 3)) {
     pm?.inc('keywordSupplementSkipped');
-    log.info('Skipped keyword supplement (confident vector results)', {
+    log.info('Skipped keyword supplement', {
+      reason: fastMode ? 'fastMode' : 'confident',
       topSimilarity: topSimilarityFinal,
       candidateCount: candidates.length,
     }, accountId);
@@ -616,10 +618,10 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
   // - Precision V2 + dominant result (>0.85) AND no keyword supplement
   let reranked;
   const topSimilarity = filtered[0]?.similarity || 0;
-  const skipRerank = filtered.length > 0 && !keywordSupplementAdded && (
+  const skipRerank = fastMode || (filtered.length > 0 && !keywordSupplementAdded && (
     topSimilarity > 0.5 ||
     (process.env.MEMORY_V2_ENABLED === 'true' && topSimilarity > 0.85)
-  );
+  ));
 
   if (skipRerank) {
     // Take top results directly by similarity — no LLM rerank needed

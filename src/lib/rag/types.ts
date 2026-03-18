@@ -97,6 +97,8 @@ export interface RetrieveInput {
   entityTypes?: EntityType[];
   timeWindow?: { after?: string; before?: string };
   metadataFilter?: Record<string, unknown>;
+  /** Skip keyword supplement + LLM rerank for speed (e.g. suggestion clicks) */
+  fastMode?: boolean;
 }
 
 export interface RetrievedSource {

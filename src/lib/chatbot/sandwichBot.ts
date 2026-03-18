@@ -45,6 +45,7 @@ export interface SandwichBotInput {
   previousResponseId?: string | null; // OpenAI Responses API: chain context
   mode?: 'widget' | 'social' | 'dm'; // Widget = sales-oriented, Social = engagement, DM = Instagram direct messages
   widgetConfig?: any; // Widget-specific config from accounts.config.widget
+  fromSuggestion?: boolean; // Suggestion click — use fastMode for RAG
 }
 
 export interface SandwichBotOutput {
@@ -126,7 +127,8 @@ export class SandwichBot {
       input.accountId,
       classification.primaryArchetype,
       knowledgeQuery,
-      input.rollingSummary
+      input.rollingSummary,
+      input.fromSuggestion
     );
 
     // ==========================================
@@ -203,7 +205,8 @@ export class SandwichBot {
     accountId: string,
     archetype: string,
     userMessage: string,
-    rollingSummary?: string
+    rollingSummary?: string,
+    fromSuggestion?: boolean
   ): Promise<KnowledgeBase> {
     console.log(`   → Querying KB for archetype: ${archetype}`);
 
@@ -213,7 +216,8 @@ export class SandwichBot {
       archetype as any,
       userMessage,
       10, // limit
-      rollingSummary
+      rollingSummary,
+      fromSuggestion
     );
 
     // Log what we found
