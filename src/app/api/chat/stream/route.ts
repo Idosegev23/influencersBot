@@ -13,7 +13,7 @@
  * - error: Error information if something fails
  */
 
-import { NextRequest } from 'next/server';
+import { NextRequest, after } from 'next/server';
 import { streamChatWithGemini } from '@/lib/gemini-chat';
 import { 
   createChatSession, 
@@ -315,18 +315,16 @@ export async function POST(req: NextRequest) {
 
         let session = sessionData;
 
-        // === LOAD LEAD NAME (for personalization) ===
-        let leadName: string | undefined;
-        if (session?.lead_id) {
-          try {
-            const { data: lead } = await supabase
-              .from('chat_leads')
-              .select('first_name')
-              .eq('id', session.lead_id)
-              .maybeSingle();
-            if (lead?.first_name) leadName = lead.first_name;
-          } catch {}
-        }
+        // === LEAD NAME (runs in parallel with decision engine below) ===
+        const leadNamePromise = session?.lead_id
+          ? Promise.resolve(
+              supabase
+                .from('chat_leads')
+                .select('first_name')
+                .eq('id', session.lead_id)
+                .maybeSingle()
+            ).then(r => r.data?.first_name as string | undefined).catch(() => undefined)
+          : Promise.resolve(undefined);
 
         // === CHECK IF ALREADY IN SUPPORT FLOW ===
         const isInSupportFlow = session?.state?.startsWith('Support.');
@@ -335,7 +333,7 @@ export async function POST(req: NextRequest) {
           sessionState: session?.state,
           isInSupportFlow,
         });
-        
+
         // === BUILD ENGINE CONTEXT (needed for both decision and policy) ===
         const engineContext: EngineContext = {
           account: {
@@ -669,6 +667,9 @@ export async function POST(req: NextRequest) {
           pm.mark('sandwich_start');
           let firstTokenSent = false;
 
+          // Await lead name (started in parallel with decision engine)
+          const leadName = await leadNamePromise;
+
           const sandwichResult = await processSandwichMessageWithMetadata({
             userMessage: message,
             accountId,
@@ -737,7 +738,7 @@ export async function POST(req: NextRequest) {
           controller.enqueue(encodeEvent({ type: 'delta', text: fullText }));
         }
 
-        // === DONE ===
+        // === DONE — close stream immediately, save in after() ===
         const latencyMs = Date.now() - startedAt;
         controller.enqueue(encodeEvent({
           type: 'done',
@@ -747,65 +748,72 @@ export async function POST(req: NextRequest) {
           fullText,
         }));
 
-        // === SAVE & EVENTS ===
-        await Promise.all([
-          saveChatMessage(currentSessionId, 'user', message),
-          saveChatMessage(currentSessionId, 'assistant', fullText),
-          // Save Responses API response_id for context chaining on next turn
-          responseId
-            ? supabase
-                .from('chat_sessions')
-                .update({ last_response_id: responseId })
-                .eq('id', currentSessionId)
-            : Promise.resolve(),
-          emitEvent({
-            type: 'response_sent',
-            accountId,
-            sessionId: currentSessionId,
-            mode: 'creator',
-            payload: {
-              responseLength: fullText.length,
-              handler: decision.handler,
-              intent: understanding.intent,
-              streaming: true,
-              decisionId: decision.decisionId,
-            },
-            metadata: {
-              source: 'chat',
-              engineVersion: 'v2',
-              traceId,
-              requestId,
-              latencyMs,
-              tokens: tokenInfo,
-            },
-          }),
-        ]);
-
-        // --- Memory V2: Update rolling summary if threshold reached ---
-        if (memoryV2Active && currentSessionId) {
-          try {
-            // conversation-memory (static import)
-            // Use DB message_count (incremented by saveChatMessage above) + 2 for just-saved pair
-            const msgCount = (session?.message_count || 0) + 2;
-            if (shouldUpdateSummary(msgCount)) {
-              // Fire-and-forget: don't block the response
-              updateRollingSummary(
-                currentSessionId,
-                [...conversationHistory, { role: 'user', content: message }, { role: 'assistant', content: fullText }],
-              ).catch(err => console.error('[Memory] Summary update failed:', err));
-            }
-          } catch (memErr) {
-            console.error('[Memory] Summary scheduling failed:', memErr);
-          }
-        }
-
-        // Complete idempotency
-        await completeIdempotencyKey(idempotencyKey, { response: fullText, responseId });
-
-        // Release lock
-        await releaseLock(currentSessionId, requestId);
+        pm.set('totalMs', latencyMs);
+        logPipelineMetrics(pm);
+        recordMetrics(pm);
 
         controller.close();
+
+        // === SAVE & CLEANUP (runs after response via after()) ===
+        // after() keeps the Lambda alive so DB writes complete reliably
+        after(async () => {
+          try {
+            await Promise.all([
+              saveChatMessage(currentSessionId, 'user', message),
+              saveChatMessage(currentSessionId, 'assistant', fullText),
+              responseId
+                ? supabase
+                    .from('chat_sessions')
+                    .update({ last_response_id: responseId })
+                    .eq('id', currentSessionId)
+                : Promise.resolve(),
+              emitEvent({
+                type: 'response_sent',
+                accountId,
+                sessionId: currentSessionId,
+                mode: 'creator',
+                payload: {
+                  responseLength: fullText.length,
+                  handler: decision.handler,
+                  intent: understanding.intent,
+                  streaming: true,
+                  decisionId: decision.decisionId,
+                },
+                metadata: {
+                  source: 'chat',
+                  engineVersion: 'v2',
+                  traceId,
+                  requestId,
+                  latencyMs,
+                  tokens: tokenInfo,
+                },
+              }),
+            ]);
+
+            // Memory V2: Update rolling summary if threshold reached
+            if (memoryV2Active && currentSessionId) {
+              try {
+                const msgCount = (session?.message_count || 0) + 2;
+                if (shouldUpdateSummary(msgCount)) {
+                  await updateRollingSummary(
+                    currentSessionId,
+                    [...conversationHistory, { role: 'user', content: message }, { role: 'assistant', content: fullText }],
+                  ).catch(err => console.error('[Memory] Summary update failed:', err));
+                }
+              } catch (memErr) {
+                console.error('[Memory] Summary scheduling failed:', memErr);
+              }
+            }
+
+            await completeIdempotencyKey(idempotencyKey, { response: fullText, responseId });
+            await releaseLock(currentSessionId, requestId);
+          } catch (afterErr: any) {
+            console.error('[Stream] after() save failed:', afterErr.message);
+            // Still try to release lock
+            await releaseLock(currentSessionId, requestId).catch(() => {});
+            await completeIdempotencyKey(idempotencyKey, { response: fullText, responseId }).catch(() => {});
+          }
+        });
 
       } catch (error: any) {
         console.error('[Stream] Error:', error);

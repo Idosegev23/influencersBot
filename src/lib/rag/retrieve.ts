@@ -407,10 +407,12 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
   }, accountId);
 
   // --- Step 3e: Keyword supplement (hybrid search) ---
-  // Only when vector search isn't confident enough — skip on high similarity to save 1-2s
+  // Only when vector search isn't confident enough — skip on high similarity to save ~700ms
+  // Note: topSimilarityFinal is RAW similarity before heuristic boost (+0.05 recency, +0.03 chunk, +0.25 exact).
+  // A raw 0.55 can become 0.83 after boost. Threshold 0.65 raw = very confident match.
   let keywordSupplementAdded = false;
   const topSimilarityFinal = candidates[0]?.similarity || 0;
-  if (topSimilarityFinal >= 0.7 && candidates.length >= 3) {
+  if (topSimilarityFinal >= 0.65 && candidates.length >= 3) {
     pm?.inc('keywordSupplementSkipped');
     log.info('Skipped keyword supplement (confident vector results)', {
       topSimilarity: topSimilarityFinal,

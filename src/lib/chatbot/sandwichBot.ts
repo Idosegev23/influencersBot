@@ -101,10 +101,11 @@ export class SandwichBot {
 
     // Enrich query with conversation context for follow-up messages
     // e.g. "תני לי את המתכון" → "פסטה רביולי ... תני לי את המתכון"
-    // Always run RAG — even short follow-ups benefit from context-aware retrieval
+    // Skip enrichment for suggestion clicks — they are standalone questions,
+    // and prepending history pollutes the embedding search
     let knowledgeQuery = input.userMessage;
 
-    if (input.userMessage.length < 80) {
+    if (!input.fromSuggestion && input.userMessage.length < 80) {
       const contextParts: string[] = [];
       if (input.rollingSummary) {
         contextParts.push(input.rollingSummary.substring(0, 200));
@@ -120,6 +121,8 @@ export class SandwichBot {
         knowledgeQuery = `${contextParts.join(' ')} ${input.userMessage}`;
         console.log(`   → Enriched query with conversation context (${knowledgeQuery.length} chars)`);
       }
+    } else if (input.fromSuggestion) {
+      console.log(`   → Suggestion click — using raw query (no history enrichment)`);
     }
 
     let knowledgeBase: KnowledgeBase;
