@@ -43,7 +43,7 @@ import {
   hashMessage,
 } from '@/engines';
 
-import { understandMessageWithTimeout } from '@/engines/understanding';
+import { understandMessageFast } from '@/engines/understanding';
 import { 
   decide, 
   getUIDirectivesSummary, 
@@ -258,8 +258,8 @@ export async function POST(req: NextRequest) {
         const anonId = `anon_${currentSessionId?.slice(0, 8) || 'guest'}`;
 
         const [understanding, , , sessionData, historyData, personalityConfig] = await Promise.all([
-          // Understanding: GPT-5 Nano with 600ms timeout, regex fallback
-          understandMessageWithTimeout(message, { timeoutMs: 600, accountId }),
+          // Understanding: instant regex (nano always timed out — saves 600ms)
+          Promise.resolve(understandMessageFast(message)),
           // Lock
           acquireLock(currentSessionId, requestId),
           // Event emission

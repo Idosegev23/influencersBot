@@ -24,7 +24,7 @@ function getClient(): Redis | null {
     const token = process.env.UPSTASH_REDIS_REST_TOKEN;
     
     if (!url || !token) {
-      console.warn('[Redis] Missing UPSTASH_REDIS_REST_URL or UPSTASH_REDIS_REST_TOKEN - Redis disabled');
+      // Redis not configured — L1 in-memory cache used instead
       redisAvailable = false;
       return null;
     }
