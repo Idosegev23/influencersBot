@@ -4,7 +4,7 @@
  * Also fire-and-forget pre-warms RAG cache for suggested queries
  */
 
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAccountByUsername } from '@/lib/supabase';
 import { prewarmSuggestionCache } from '@/lib/suggestion-cache';
@@ -83,10 +83,18 @@ export async function GET(request: Request) {
       .select('id', { count: 'exact', head: true })
       .eq('account_id', account.id);
 
-    // Fire-and-forget: pre-warm suggestion response cache (DB-based, works across serverless instances)
+    // Pre-warm suggestion cache AFTER response is sent (Lambda stays alive via after())
     const allSuggestions = [...quickReplies, ...topicSuggestions.slice(0, 6)];
-    prewarmSuggestionCache(account.id, username, displayName, allSuggestions.slice(0, 4))
-      .catch(err => console.error('[Chat Init] Pre-warm failed (non-blocking):', err.message));
+    const suggestionsToPrewarm = allSuggestions.slice(0, 4);
+    after(async () => {
+      console.log(`[Chat Init] after() starting prewarm for ${suggestionsToPrewarm.length} suggestions`);
+      try {
+        await prewarmSuggestionCache(account.id, username, displayName, suggestionsToPrewarm);
+        console.log(`[Chat Init] after() prewarm completed`);
+      } catch (err: any) {
+        console.error('[Chat Init] after() prewarm failed:', err.message);
+      }
+    });
 
     return NextResponse.json({
       greeting,

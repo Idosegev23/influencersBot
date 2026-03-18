@@ -91,41 +91,57 @@ export async function prewarmSuggestionCache(
   // Import dynamically to avoid circular deps
   const { processSandwichMessageWithMetadata } = await import('@/lib/chatbot/sandwichBot');
 
-  // Process suggestions sequentially to avoid overwhelming the API
+  // Process suggestions in parallel (2 concurrent) for speed
+  const toProcess = suggestions.slice(0, 4);
   let cached = 0;
-  for (const suggestion of suggestions.slice(0, 4)) {
-    try {
-      // Check if already cached and not expired
-      const existing = await getCachedSuggestionResponse(accountId, suggestion);
-      if (existing) {
-        cached++;
-        continue;
-      }
 
-      // Run FULL pipeline — no shortcuts
-      const result = await processSandwichMessageWithMetadata({
-        userMessage: suggestion,
-        accountId,
-        username,
-        influencerName,
-        conversationHistory: [],
-      });
+  // Check which ones are already cached
+  const cacheChecks = await Promise.all(
+    toProcess.map(async (s) => ({
+      suggestion: s,
+      exists: !!(await getCachedSuggestionResponse(accountId, s)),
+    }))
+  );
+  const uncached = cacheChecks.filter(c => !c.exists).map(c => c.suggestion);
+  cached += cacheChecks.filter(c => c.exists).length;
 
-      if (result.response && result.response.length > 10) {
-        await cacheSuggestionResponse(
-          accountId,
-          suggestion,
-          result.response,
-          result.metadata?.archetype
-        );
-        cached++;
-      }
-    } catch (err: any) {
-      console.error(`[SuggestionCache] Failed to pre-warm "${suggestion.slice(0, 30)}":`, err.message);
-    }
+  if (uncached.length === 0) {
+    console.log(`[SuggestionCache] All ${toProcess.length} already cached (${Date.now() - start}ms)`);
+    return;
   }
 
-  console.log(`[SuggestionCache] Pre-warmed ${cached}/${Math.min(suggestions.length, 4)} in ${Date.now() - start}ms`);
+  // Run uncached suggestions in parallel (max 2 concurrent to avoid API overload)
+  const CONCURRENCY = 2;
+  for (let i = 0; i < uncached.length; i += CONCURRENCY) {
+    const batch = uncached.slice(i, i + CONCURRENCY);
+    const results = await Promise.allSettled(
+      batch.map(async (suggestion) => {
+        const result = await processSandwichMessageWithMetadata({
+          userMessage: suggestion,
+          accountId,
+          username,
+          influencerName,
+          conversationHistory: [],
+        });
+        if (result.response && result.response.length > 10) {
+          await cacheSuggestionResponse(
+            accountId,
+            suggestion,
+            result.response,
+            result.metadata?.archetype
+          );
+          return true;
+        }
+        return false;
+      })
+    );
+    cached += results.filter(r => r.status === 'fulfilled' && r.value).length;
+    results.filter(r => r.status === 'rejected').forEach((r, idx) => {
+      console.error(`[SuggestionCache] Failed to pre-warm "${batch[idx]?.slice(0, 30)}":`, (r as PromiseRejectedResult).reason?.message);
+    });
+  }
+
+  console.log(`[SuggestionCache] Pre-warmed ${cached}/${toProcess.length} in ${Date.now() - start}ms`);
 }
 
 /**
