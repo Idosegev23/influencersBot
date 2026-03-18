@@ -407,11 +407,16 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
   }, accountId);
 
   // --- Step 3e: Keyword supplement (hybrid search) ---
-  // ALWAYS run — ensures brand names, Hebrew terms, and specific phrases are found
-  // even when vector search returns confident but off-topic results
+  // Only when vector search isn't confident enough — skip on high similarity to save 1-2s
   let keywordSupplementAdded = false;
   const topSimilarityFinal = candidates[0]?.similarity || 0;
-  {
+  if (topSimilarityFinal >= 0.7 && candidates.length >= 3) {
+    pm?.inc('keywordSupplementSkipped');
+    log.info('Skipped keyword supplement (confident vector results)', {
+      topSimilarity: topSimilarityFinal,
+      candidateCount: candidates.length,
+    }, accountId);
+  } else {
     pm?.inc('keywordSupplementCalled');
     pm?.mark('kw_start');
     const existingIds = new Set(candidates.map(c => c.id));
@@ -445,12 +450,10 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
     // Always search original query terms via ILIKE (catches brand names, Hebrew terms)
     const originalTerms = query.replace(/[?!.,؟]/g, '').split(/\s+/).filter(w => w.length > 2);
 
-    // Bigram/trigram phrase search — search consecutive word pairs/triples from the query
-    // e.g. "פסטה בסיר אחד" → also search "בסיר אחד", "פסטה בסיר"
-    // This catches cases like "פסטה עגבניות בסיר אחד" where the full phrase doesn't match
+    // Bigram phrase search — search consecutive word pairs from the query (max 3)
     const allQueryWords = query.replace(/[?!.,؟]/g, '').split(/\s+/).filter(w => w.length >= 2);
     const phraseSearches = [];
-    for (let i = 0; i < allQueryWords.length - 1; i++) {
+    for (let i = 0; i < Math.min(allQueryWords.length - 1, 3); i++) {
       const bigram = `${allQueryWords[i]} ${allQueryWords[i + 1]}`;
       phraseSearches.push(
         supabase
@@ -482,11 +485,9 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
       }
     }
 
-    // For Hebrew morphology: also search shorter prefixes of long words
-    // e.g. "פנטניות" (6 chars) → also search "פנטני" (5), "פנטנ" (4)
-    // This handles Hebrew suffixes like ות, ים, ה etc.
+    // Hebrew morphology: search shorter prefixes of long words (max 3 terms)
     const allSearchTerms = new Set<string>();
-    for (const term of originalTerms.slice(0, 5)) {
+    for (const term of originalTerms.slice(0, 3)) {
       allSearchTerms.add(term);
       // Add shorter prefixes for Hebrew words (3+ chars prefix)
       if (term.length >= 5) {
@@ -522,7 +523,7 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
 
     if (added > 0) {
       keywordSupplementAdded = true;
-      log.info('Keyword supplement added candidates', { added, keyTerms, originalTerms }, accountId);
+      log.info('Keyword supplement added candidates', { added, keyTerms, originalTerms: originalTerms.slice(0, 5) }, accountId);
     }
     pm?.measure('keywordSupplementMs', 'kw_start');
   }

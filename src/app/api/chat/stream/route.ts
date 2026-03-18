@@ -157,6 +157,7 @@ export async function POST(req: NextRequest) {
           sessionId: rawSessionId,
           previousResponseId,
           clientMessageId,
+          fromSuggestion,
         } = body;
 
         // Validate & sanitize
@@ -203,6 +204,7 @@ export async function POST(req: NextRequest) {
         const content = cachedData.content || [];
         accountId = cachedData.accountId || influencer.id;
         pm.data.accountId = accountId;
+        if (fromSuggestion) pm.data.fromSuggestion = true;
 
         // === SESSION ===
         let currentSessionId = rawSessionId;

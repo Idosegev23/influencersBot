@@ -517,6 +517,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
           sessionId: sessionId || undefined,
           previousResponseId: responseId || undefined,
           clientMessageId: assistantMessageId,
+          fromSuggestion: true,
         });
       }
     }, 0);

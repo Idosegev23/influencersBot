@@ -25,7 +25,7 @@ const openai = new OpenAI({
 });
 
 // Model configuration
-const UNDERSTANDING_MODEL = 'gpt-5-nano'; // Fast and cheap for understanding
+const UNDERSTANDING_MODEL = 'gpt-5.4-nano-2026-03-17'; // Fast and cheap for understanding
 const FALLBACK_MODEL = 'gpt-5';           // Fallback if nano fails
 
 /**

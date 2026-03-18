@@ -58,6 +58,9 @@ export interface PipelineMetricsData {
   topSimilarity: number;
   suggestionFallbackTriggered: boolean;
 
+  // Source
+  fromSuggestion: boolean;
+
   // Path
   retrievalPath: 'rag' | 'fts' | 'rag+direct' | 'greeting_skip' | 'followup_skip';
   archetype: string;
@@ -94,6 +97,7 @@ export class PipelineMetrics {
       expandQuerySkippedConfident: false,
       keywordSupplementCalled: false,
       keywordSupplementSkipped: false,
+      fromSuggestion: false,
       thresholdUsed: '0.4',
       chunksReturned: 0,
       topSimilarity: 0,

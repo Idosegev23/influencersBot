@@ -101,6 +101,7 @@ export function useStreamChat(options: UseStreamChatOptions = {}) {
     sessionId?: string;
     previousResponseId?: string;
     clientMessageId?: string;
+    fromSuggestion?: boolean;
   }) => {
     // Cancel any existing stream
     if (abortControllerRef.current) {
