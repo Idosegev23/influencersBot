@@ -46,13 +46,6 @@ export async function processInstagramGraphDM(
   event: IGMessagingEvent,
   igAccountId: string,
 ): Promise<DMProcessResult> {
-  // ⛔ Global DM kill switch — set to true to disable ALL DM auto-replies
-  const DM_GLOBALLY_DISABLED = true;
-  if (DM_GLOBALLY_DISABLED) {
-    console.log(`[IG Graph DM] DM auto-reply is globally disabled. Skipping.`);
-    return { success: true };
-  }
-
   const senderId = event.sender.id;
   const recipientId = event.recipient.id; // Our IG account
   const messageText = event.message?.text;
@@ -122,9 +115,9 @@ export async function processInstagramGraphDM(
 
     const config = accountData?.config || {};
 
-    // Check if DM bot is enabled for this account (default: true for backwards compat)
-    if (config.dm_bot_enabled === false) {
-      console.log(`[IG Graph DM] Bot disabled for account ${accountId}, skipping`);
+    // Check if DM bot is enabled for this account (default: disabled)
+    if (config.dm_bot_enabled !== true) {
+      console.log(`[IG Graph DM] Bot not enabled for account ${accountId}, skipping`);
       return { success: true };
     }
 
