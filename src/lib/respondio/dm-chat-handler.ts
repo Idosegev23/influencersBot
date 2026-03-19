@@ -31,6 +31,13 @@ interface DMProcessResult {
  * Finds the matching influencer account, runs SandwichBot, and sends the reply
  */
 export async function processInstagramDM(payload: WebhookPayload): Promise<DMProcessResult> {
+  // ⛔ Global DM kill switch — set to true to disable ALL DM auto-replies
+  const DM_GLOBALLY_DISABLED = true;
+  if (DM_GLOBALLY_DISABLED) {
+    console.log(`[DM Handler] DM auto-reply is globally disabled. Skipping.`);
+    return { success: true };
+  }
+
   const { contact, message } = payload.data;
 
   if (!contact?.id || !message?.text) {
