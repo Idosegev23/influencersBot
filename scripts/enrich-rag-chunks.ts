@@ -93,19 +93,30 @@ Options:
 async function enrichAllAccounts(options: any) {
   const supabase = createClient();
 
-  // Find all accounts that have RAG chunks
+  // Find all creator accounts that have RAG chunks
   const { data: accounts } = await supabase
-    .from('document_chunks')
-    .select('account_id')
-    .limit(1000);
+    .from('accounts')
+    .select('id, config')
+    .eq('type', 'creator');
 
-  if (!accounts) {
-    console.log('No accounts with RAG chunks found');
+  if (!accounts || accounts.length === 0) {
+    console.log('No creator accounts found');
     return;
   }
 
-  // Deduplicate account IDs
-  const uniqueIds = [...new Set(accounts.map(a => a.account_id))];
+  // Filter to accounts that actually have chunks (check via count)
+  const uniqueIds: string[] = [];
+  for (const acc of accounts) {
+    const { count } = await supabase
+      .from('document_chunks')
+      .select('id', { count: 'exact', head: true })
+      .eq('account_id', acc.id);
+    if (count && count > 0) {
+      uniqueIds.push(acc.id);
+      const username = (acc.config as any)?.username || acc.id;
+      console.log(`  Found ${count} chunks for ${username}`);
+    }
+  }
   console.log(`\n🚀 Enriching ${uniqueIds.length} accounts\n`);
 
   for (const accountId of uniqueIds) {

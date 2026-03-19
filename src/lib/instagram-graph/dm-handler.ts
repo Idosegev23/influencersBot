@@ -13,7 +13,7 @@ import { randomUUID } from 'crypto';
 import { createClient } from '@/lib/supabase/server';
 import { processSandwichMessageWithMetadata } from '@/lib/chatbot/sandwichBot';
 import { buildPersonalityFromDB } from '@/lib/chatbot/personality-wrapper';
-import { updateRollingSummary, shouldUpdateSummary } from '@/lib/chatbot/conversation-memory';
+import { updateRollingSummary } from '@/lib/chatbot/conversation-memory';
 import {
   sendLongInstagramDM,
   sendLongInstagramDMWithQuickReplies,
@@ -67,6 +67,21 @@ export async function processInstagramGraphDM(
 
   const supabase = await createClient();
 
+  // Dedup: skip if this message ID was already processed (Meta sends duplicate webhooks)
+  if (messageId && !messageId.startsWith('postback_')) {
+    const { data: existing } = await supabase
+      .from('chat_messages')
+      .select('id')
+      .eq('meta_mid', messageId)
+      .limit(1)
+      .maybeSingle();
+
+    if (existing) {
+      console.log(`[IG Graph DM] Skipping duplicate message ${messageId}`);
+      return { success: true };
+    }
+  }
+
   try {
     // 1. Find which influencer account this IG account belongs to
     const accountId = await resolveAccountFromIGId(supabase, igAccountId);
@@ -81,6 +96,7 @@ export async function processInstagramGraphDM(
     const sessionUUID = session.id; // actual UUID from DB
 
     // 3. Load account info + conversation history + personality
+    // DM prioritizes quality over speed — load more history for better understanding
     const [accountData, historyData] = await Promise.all([
       supabase
         .from('accounts')
@@ -93,7 +109,7 @@ export async function processInstagramGraphDM(
         .select('role, content')
         .eq('session_id', sessionUUID)
         .order('created_at', { ascending: false })
-        .limit(10)
+        .limit(20)
         .then(r => r.data),
     ]);
 
@@ -205,6 +221,7 @@ export async function processInstagramGraphDM(
         session_id: sessionUUID,
         role: 'user',
         content: messageText,
+        ...(messageId ? { meta_mid: messageId } : {}),
       }),
       supabase.from('chat_messages').insert({
         session_id: sessionUUID,
@@ -220,13 +237,12 @@ export async function processInstagramGraphDM(
         .eq('id', sessionUUID),
     ]);
 
-    // 8. Update rolling summary if needed (fire-and-forget)
-    if (shouldUpdateSummary(msgCount)) {
-      updateRollingSummary(
-        sessionUUID,
-        [...conversationHistory, { role: 'user', content: messageText }, { role: 'assistant', content: fullText }],
-      ).catch(err => console.error('[IG Graph DM] Summary update failed:', err));
-    }
+    // 8. Update rolling summary — DM prioritizes understanding, so update every exchange
+    // (unlike widget which only updates every 6 messages for speed)
+    updateRollingSummary(
+      sessionUUID,
+      [...conversationHistory, { role: 'user', content: messageText }, { role: 'assistant', content: fullText }],
+    ).catch(err => console.error('[IG Graph DM] Summary update failed:', err));
 
     return {
       success: true,

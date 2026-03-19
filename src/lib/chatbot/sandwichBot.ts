@@ -107,16 +107,33 @@ export class SandwichBot {
 
     if (!input.fromSuggestion && input.userMessage.length < 80) {
       const contextParts: string[] = [];
-      if (input.rollingSummary) {
-        contextParts.push(input.rollingSummary.substring(0, 200));
+
+      if (input.mode === 'dm') {
+        // DM: use last user messages as context (not bot responses which are long/noisy)
+        // This helps follow-ups like "משרה מלאה?" connect to "מנהלת פרויקטים"
+        const recentUserMsgs = (input.conversationHistory || [])
+          .filter(m => m.role === 'user')
+          .slice(-3);
+        for (const msg of recentUserMsgs) {
+          contextParts.push(msg.content.substring(0, 150));
+        }
+        // Add rolling summary for broader context
+        if (input.rollingSummary) {
+          contextParts.push(input.rollingSummary.substring(0, 200));
+        }
+      } else {
+        // Widget: use rolling summary + assistant responses (existing behavior)
+        if (input.rollingSummary) {
+          contextParts.push(input.rollingSummary.substring(0, 200));
+        }
+        const recentAssistants = (input.conversationHistory || [])
+          .filter(m => m.role === 'assistant')
+          .slice(-2);
+        for (const msg of recentAssistants) {
+          contextParts.push(msg.content.substring(0, 300));
+        }
       }
-      // Use last 2 assistant messages for richer context
-      const recentAssistants = (input.conversationHistory || [])
-        .filter(m => m.role === 'assistant')
-        .slice(-2);
-      for (const msg of recentAssistants) {
-        contextParts.push(msg.content.substring(0, 300));
-      }
+
       if (contextParts.length > 0) {
         knowledgeQuery = `${contextParts.join(' ')} ${input.userMessage}`;
         console.log(`   → Enriched query with conversation context (${knowledgeQuery.length} chars)`);
