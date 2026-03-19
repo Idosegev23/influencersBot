@@ -79,6 +79,8 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
   const [igConnection, setIgConnection] = useState<{ ig_username: string; is_active: boolean; connected_at: string } | null>(null);
   const [copiedId, setCopiedId] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [dmBotEnabled, setDmBotEnabled] = useState(false);
+  const [dmToggling, setDmToggling] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -111,6 +113,36 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
       }
     } catch (error) {
       console.error('Error loading IG connection:', error);
+    }
+    // Load DM bot status
+    try {
+      const res = await fetch(`/api/influencer/dm-settings?accountId=${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setDmBotEnabled(data.dm_bot_enabled === true);
+      }
+    } catch (error) {
+      console.error('Error loading DM settings:', error);
+    }
+  }
+
+  async function toggleDmBot() {
+    setDmToggling(true);
+    try {
+      const res = await fetch('/api/influencer/dm-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId: id, dm_bot_enabled: !dmBotEnabled }),
+      });
+      if (res.ok) {
+        setDmBotEnabled(!dmBotEnabled);
+      } else {
+        alert('שגיאה בעדכון הגדרות DM');
+      }
+    } catch {
+      alert('שגיאה בעדכון הגדרות DM');
+    } finally {
+      setDmToggling(false);
     }
   }
 
@@ -528,6 +560,37 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
                   </div>
                 )}
               </div>
+
+              {/* DM Bot Toggle */}
+              {igConnection?.is_active && (
+                <div
+                  className="p-3 rounded-xl mb-4 flex items-center justify-between"
+                  style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.06)' }}
+                >
+                  <div>
+                    <div className="text-sm font-medium" style={{ color: '#ede9f8' }}>בוט DM</div>
+                    <div className="text-xs mt-0.5" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>
+                      תשובות אוטומטיות בהודעות ישירות
+                    </div>
+                  </div>
+                  <button
+                    onClick={toggleDmBot}
+                    disabled={dmToggling}
+                    className="relative w-12 h-6 rounded-full transition-colors duration-200"
+                    style={{
+                      backgroundColor: dmBotEnabled ? '#5eead4' : 'rgba(255, 255, 255, 0.1)',
+                    }}
+                  >
+                    <span
+                      className="absolute top-0.5 w-5 h-5 rounded-full transition-transform duration-200"
+                      style={{
+                        backgroundColor: dmBotEnabled ? '#0f172a' : 'rgba(237, 233, 248, 0.5)',
+                        transform: dmBotEnabled ? 'translateX(26px)' : 'translateX(2px)',
+                      }}
+                    />
+                  </button>
+                </div>
+              )}
 
               {/* Copy Account ID */}
               <div className="space-y-2">
