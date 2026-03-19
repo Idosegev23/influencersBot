@@ -105,7 +105,10 @@ export class SandwichBot {
     // and prepending history pollutes the embedding search
     let knowledgeQuery = input.userMessage;
 
-    if (!input.fromSuggestion && input.userMessage.length < 80) {
+    // Enrich query with context — both for regular messages and suggestion clicks
+    // Suggestions need context too: "שגרת טיפוח פנים" should find hair content if conversation is about hair
+    const shouldEnrich = input.userMessage.length < 80;
+    if (shouldEnrich) {
       const contextParts: string[] = [];
 
       if (input.mode === 'dm') {
@@ -122,24 +125,25 @@ export class SandwichBot {
           contextParts.push(input.rollingSummary.substring(0, 200));
         }
       } else {
-        // Widget: use rolling summary + assistant responses (existing behavior)
+        // Widget: use rolling summary + last user messages for topic continuity
         if (input.rollingSummary) {
           contextParts.push(input.rollingSummary.substring(0, 200));
         }
-        const recentAssistants = (input.conversationHistory || [])
-          .filter(m => m.role === 'assistant')
+        // Use recent user messages (not assistant — too long/noisy for embedding)
+        const recentUserMsgs = (input.conversationHistory || [])
+          .filter(m => m.role === 'user')
           .slice(-2);
-        for (const msg of recentAssistants) {
-          contextParts.push(msg.content.substring(0, 300));
+        for (const msg of recentUserMsgs) {
+          contextParts.push(msg.content.substring(0, 150));
         }
       }
 
       if (contextParts.length > 0) {
         knowledgeQuery = `${contextParts.join(' ')} ${input.userMessage}`;
-        console.log(`   → Enriched query with conversation context (${knowledgeQuery.length} chars)`);
+        console.log(`   → Enriched query with conversation context (${knowledgeQuery.length} chars)${input.fromSuggestion ? ' [suggestion+context]' : ''}`);
+      } else if (input.fromSuggestion) {
+        console.log(`   → Suggestion click — no history available for enrichment`);
       }
-    } else if (input.fromSuggestion) {
-      console.log(`   → Suggestion click — using raw query (no history enrichment)`);
     }
 
     let knowledgeBase: KnowledgeBase;

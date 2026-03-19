@@ -60,10 +60,23 @@ export interface CompactResult {
 // Helpers
 // ============================================
 
-/** Truncate text to maxLen, appending "..." if trimmed */
+/** Truncate text to maxLen at a sentence boundary, appending "..." if trimmed */
 function truncate(text: string, maxLen: number): string {
   if (!text || text.length <= maxLen) return text || '';
-  return text.substring(0, maxLen - 3) + '...';
+  // Try to cut at last sentence boundary (period, question mark, exclamation, newline)
+  const cutZone = text.substring(0, maxLen - 3);
+  const lastSentenceEnd = Math.max(
+    cutZone.lastIndexOf('. '),
+    cutZone.lastIndexOf('.\n'),
+    cutZone.lastIndexOf('? '),
+    cutZone.lastIndexOf('! '),
+    cutZone.lastIndexOf('\n\n'),
+  );
+  // Only use sentence boundary if it keeps at least 60% of the content
+  if (lastSentenceEnd > maxLen * 0.6) {
+    return text.substring(0, lastSentenceEnd + 1) + '...';
+  }
+  return cutZone + '...';
 }
 
 /**

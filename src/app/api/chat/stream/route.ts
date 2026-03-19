@@ -843,7 +843,7 @@ export async function POST(req: NextRequest) {
                     console.log(`[Stream] after() pre-warming ${llmSuggestions.length} LLM suggestions`);
                     const influencerName = influencer.display_name || influencer.username || username || 'Unknown';
                     // Fire-and-forget — don't block after() completion
-                    prewarmSuggestionCache(accountId, username, influencerName, llmSuggestions.slice(0, 3))
+                    prewarmSuggestionCache(accountId, username, influencerName, llmSuggestions.slice(0, 3), [...conversationHistory, { role: 'user' as const, content: message }, { role: 'assistant' as const, content: fullText }])
                       .catch(err => console.error('[Stream] suggestion prewarm failed:', err.message));
                   }
                 }

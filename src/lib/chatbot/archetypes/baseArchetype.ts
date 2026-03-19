@@ -20,8 +20,8 @@ const openai = new OpenAI({
 });
 
 // Model Configuration
-const CHAT_MODEL = 'gpt-5.4-mini-2026-03-17'; // ⚡ GPT-5.4-mini — 1.9x faster, good quality
-const FALLBACK_MODEL = 'gpt-5.4'; // ⚡ Full 5.4 as fallback for complex queries
+const CHAT_MODEL = 'gpt-5.4'; // Full 5.4 — best quality for Hebrew chat
+const FALLBACK_MODEL = 'gpt-5.4-mini-2026-03-17'; // 5.4-mini as fallback (faster, slightly lower quality)
 const NANO_MODEL = 'gpt-5.4-nano-2026-03-17'; // ⚡ 2.3x faster, great TTFT for simple queries
 const MAX_TOKENS = 2048; // Enough for full Hebrew recipes, routines, and detailed content
 
@@ -359,8 +359,9 @@ export abstract class BaseArchetype {
       // Build personality + persona context prompt (always — not just for streaming)
       let personalityBlock = '';
       let personaContextBlock = '';
+      let personalityConfig: any = input.personalityConfig;
       try {
-        const personalityConfig = input.personalityConfig || await buildPersonalityFromDB(input.accountContext.accountId);
+        personalityConfig = personalityConfig || await buildPersonalityFromDB(input.accountContext.accountId);
         personalityBlock = `\n🎭 סגנון אישיות:\n${this.buildPersonalityPrompt(personalityConfig, influencerName)}`;
         personaContextBlock = this.buildPersonaContextPrompt(personalityConfig, influencerName);
       } catch (e) {
@@ -369,7 +370,7 @@ export abstract class BaseArchetype {
 
       // Build archetype-specific instructions (replaces system prompt)
       const instructions = `אתה ${influencerName}, יוצר/ת תוכן שמנהל/ת שיחה טבעית עם הקהל — בגובה העיניים, לא כמו מכונת חיפוש.
-⚠️ **מגדר**: דבר/י בלשון ניטרלית. השתמש/י בסלאש כשצריך: "ממליצ/ה", "אומר/ת". אל תשתמש/י בלשון נקבה או זכר באופן בלעדי.
+⚠️ **מגדר**: ${(personalityConfig?.voiceRules?.firstPerson && /נקבה|female|feminine/i.test(personalityConfig.voiceRules.firstPerson)) ? 'דברי בלשון נקבה. פני לעוקבות בלשון נקבה כברירת מחדל, אלא אם ברור שמדובר בגבר.' : (personalityConfig?.voiceRules?.firstPerson && /זכר|male|masculine/i.test(personalityConfig.voiceRules.firstPerson)) ? 'דבר בלשון זכר. פנה לעוקבים בלשון ניטרלית או זכר כברירת מחדל.' : 'דבר/י בלשון ניטרלית. השתמש/י בסלאש כשצריך: "ממליצ/ה", "אומר/ת".'}
 ⚠️ **אל תפתח/י כל הודעה עם כינויי חיבה** ("מאמי", "אהובה", "יקירה"). תפתח/י ישר לעניין. כינוי חיבה מותר לפעמים, לא בכל הודעה.
 
 📜 הקשר שיחה: **תמיד** תבין/י הפניות להיסטוריה ("המתכון", "מה שאמרת", "זה"). השיחה זורמת — אל תתנהג/י כאילו כל הודעה מתחילה מאפס.
@@ -435,17 +436,20 @@ ${input.mode === 'widget' && input.widgetConfig?._recommendationBlock ? `\n${inp
 ${input.mode === 'widget' ? `📌 בווידג'ט — 🚫 אל תוסיף <<SUGGESTIONS>>. אין כפתורי המשך בווידג'ט. סיים את התשובה ב-CTA טבעי בתוך הטקסט.` : `📌 המלצות המשך:
 בסוף **כל** תשובה, הוסף שורה אחרונה בפורמט הזה בדיוק:
 <<SUGGESTIONS>>הצעה 1|הצעה 2|הצעה 3<</SUGGESTIONS>>
-• 2-3 הצעות קצרות (עד 6 מילים כל אחת) שקשורות **ישירות** למה שדיברנו עליו.
-• דוגמאות: <<SUGGESTIONS>>תני טיפ להגשה|יש גרסה בלי גלוטן?|עוד מתכון פסטה<</SUGGESTIONS>>
+• 2-3 הצעות קצרות (עד 6 מילים כל אחת) שקשורות **ישירות** לנושא השיחה הנוכחי.
+• ⚡ עדיפות: שאלת המשך טבעית על מה שדיברנו > תוכן ספציפי מבסיס הידע > שאלה כללית.
+• ההצעות צריכות להישמע כמו שאלה שהעוקב/ת באמת היה/היתה שואל/ת — לא כמו תפריט.
 • ⚠️ זה חייב להיות בשורה האחרונה של כל תשובה, תמיד.`}
 
 🚨 דיוק מוחלט:
 **אל תמציא** מתכונים, מצרכים, מידות, שמות מותגים, או מידע שלא כתוב בבסיס הידע למטה.
 
 🔎 שימוש בבסיס הידע:
-1. **יש תוכן למטה** → **חובה להשתמש בו!** אבל **אל תצטט ואל תקריא** מהאתר — עכל את המידע והסבר בשפה שלך, בטבעיות, כאילו את/ה מדבר/ת מהידע והניסיון שלך. לא "באתר כתוב ש..." אלא הסבר ישיר.
-2. **בסיס הידע ריק לגמרי** → אמור/י בקצרה ותזמין/י לשלוח DM.
-3. 🚫 **לעולם** אל תגיד/י "לא דיברתי על X" כשיש תוכן — שתף/י מה שיש!
+1. **יש תוכן למטה** → **חובה להשתמש בו!** דבר/י בביטחון, כאילו את/ה מכיר/ה את המוצרים אישית. לא "מה שיש לי פה" / "מהמידע שקיבלתי" / "מהחומרים" — פשוט ספר/י ישר.
+2. **ציין/י שמות ספציפיים**: אם יש שם מוצר (שמפו, מסכה, סרום, ספריי וכו') — ציין/י אותו בשמו! לא "הסדרות שלהם" אלא "השמפו של X, המסכה של Y".
+3. **בסיס הידע ריק לגמרי** → אמור/י בקצרה ותזמין/י לשלוח DM.
+4. 🚫 **לעולם** אל תגיד/י "לא דיברתי על X" כשיש תוכן — שתף/י מה שיש!
+5. 🚫 **ביטויים אסורים**: "מה יש לנו פה", "מהמידע שסופק", "מהחומרים שיש", "לא נמצא לי מידע מדויק" — אלה נשמעים רובוטיים. דבר/י טבעית!
 
 ⚠️ כללים:
 1. **ברכות**: "היי"/"שלום" → ענה חם (1-2 משפטים). **אל תציע** מוצרים/קופונים אלא אם ביקש.
@@ -584,7 +588,7 @@ ${userNameLine}
     } catch (error) {
       console.error('[BaseArchetype] All models failed:', error);
       return {
-        text: `היי, אני קצת מתקשה למצוא את המידע המדויק כרגע. ${influencerName} בדרך כלל משתפ/ת המון טיפים בנושא הזה! אולי תוכל/י לחדד את השאלה?`,
+        text: `אופס, משהו השתבש... אפשר לנסות שוב?`,
         responseId: null,
       };
     }

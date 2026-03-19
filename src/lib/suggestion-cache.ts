@@ -92,7 +92,8 @@ export async function prewarmSuggestionCache(
   accountId: string,
   username: string,
   influencerName: string,
-  suggestions: string[]
+  suggestions: string[],
+  conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>
 ): Promise<void> {
   if (suggestions.length === 0) return;
   const start = Date.now();
@@ -130,7 +131,7 @@ export async function prewarmSuggestionCache(
           accountId,
           username,
           influencerName,
-          conversationHistory: [],
+          conversationHistory: conversationHistory || [],
         });
         if (result.response && result.response.length > 10) {
           await cacheSuggestionResponse(
