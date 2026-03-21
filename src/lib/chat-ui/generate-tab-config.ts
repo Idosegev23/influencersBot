@@ -1,7 +1,15 @@
 /**
- * Generate tab config for an account based on RAG data + archetype + influencer_type.
+ * Generate tab config for an account based on archetype + influencer_type.
  * Called once after RAG ingestion, saves to accounts.config.
  * Used by: scan-account.ts, generate-tab-config script, content-processor
+ *
+ * Tab structure per archetype:
+ *   brand:            צ׳אט | גלו | מוצרים | [מבצעים] | [שירות לקוחות]
+ *   influencer:       צ׳אט | גלו | מתכונים/טיפוח/טיפים | [קופונים] | [בעיה בהזמנה]
+ *   media_news:       צ׳אט | גלו | עדכונים | [קופונים]
+ *   service_provider: צ׳אט | גלו | שירותים
+ *   local_business:   צ׳אט | גלו | מוצרים | [הטבות] | [בעיה בהזמנה]
+ *   tech_creator:     צ׳אט | גלו | סקירות
  */
 
 import { createClient } from '@/lib/supabase/server';
@@ -9,11 +17,8 @@ import { createClient } from '@/lib/supabase/server';
 interface TabConfig {
   id: string;
   label: string;
-  type: 'chat' | 'discover' | 'content' | 'coupons' | 'support';
-  filters?: {
-    topics?: string[];
-    entityTypes?: string[];
-  };
+  type: 'chat' | 'discover' | 'topics' | 'coupons' | 'support';
+  topic?: string; // RAG topic filter for topics-type tabs
 }
 
 interface TabGenerationResult {
@@ -23,9 +28,9 @@ interface TabGenerationResult {
   greeting_message: string;
 }
 
-// ─── Tab label mapping by archetype × influencer_type ───
+// ─── Type-specific tab label by archetype × influencer_type ───
 
-const DISCOVER_LABELS: Record<string, Record<string, string>> = {
+const TOPICS_TAB_LABELS: Record<string, Record<string, string>> = {
   influencer: {
     food: 'מתכונים',
     beauty: 'טיפוח',
@@ -35,18 +40,12 @@ const DISCOVER_LABELS: Record<string, Record<string, string>> = {
     travel: 'יעדים',
     tech: 'סקירות',
     lifestyle: 'המלצות',
-    other: 'גלו',
+    other: 'תוכן',
   },
-  brand: {
-    food: 'מוצרים',
-    beauty: 'מוצרים',
-    parenting: 'מוצרים',
-    fashion: 'קולקציה',
-    other: 'מוצרים',
-  },
+  brand: { _default: 'מוצרים' },
   media_news: { _default: 'עדכונים' },
   service_provider: { _default: 'שירותים' },
-  local_business: { food: 'תפריט', other: 'גלו' },
+  local_business: { _default: 'מוצרים' },
   tech_creator: { _default: 'סקירות' },
 };
 
@@ -86,7 +85,7 @@ const SUBTITLE_TEMPLATES: Record<string, Record<string, string>> = {
   media_news: { _default: 'אני כאן לעזור עם חדשות, עדכונים ובידור' },
   service_provider: { _default: 'אני כאן לעזור עם שירותים, פרויקטים ומידע' },
   local_business: {
-    food: 'אני כאן לעזור עם התפריט, הזמנות ומידע',
+    food: 'אני כאן לעזור עם מוצרים, הזמנות ומידע',
     other: 'אני כאן לעזור עם מידע, מוצרים ושירותים',
   },
   tech_creator: { _default: 'אני כאן לעזור עם סקירות, השוואות והמלצות' },
@@ -126,7 +125,7 @@ function generateGreeting(displayName: string, archetype: string): string {
     case 'service_provider':
       return `היי, אני העוזר של ${firstName}. שאלו אותי על השירותים, הפרויקטים והניסיון שלנו`;
     case 'local_business':
-      return `היי, אני העוזר של ${firstName}. שאלו אותי על התפריט, שעות פתיחה והזמנות`;
+      return `היי, אני העוזר של ${firstName}. שאלו אותי על המוצרים, שעות פתיחה והזמנות`;
     case 'tech_creator':
       return `היי, אני העוזר של ${firstName}. שאלו אותי על סקירות, המלצות וטכנולוגיה`;
     default:
@@ -134,70 +133,9 @@ function generateGreeting(displayName: string, archetype: string): string {
   }
 }
 
-// ─── Content tab definitions per topic ───
-
-const TOPIC_TAB_LABELS: Record<string, string> = {
-  food: 'מתכונים',
-  beauty: 'טיפוח',
-  fashion: 'לוקים',
-  fitness: 'אימונים',
-  travel: 'יעדים',
-  tech: 'סקירות',
-  lifestyle: 'המלצות',
-  health: 'בריאות',
-  home: 'בית',
-  business: 'עסקים',
-  parenting: 'הורות',
-};
-
-/**
- * Build content-type tabs based on available RAG topics.
- * Only adds dedicated content tabs when there are multiple topics with enough data.
- * For single-topic accounts, the discover tab already covers everything.
- */
-function buildContentTabs(
-  archetype: string,
-  influencerType: string,
-  ragTopics: string[],
-  entityTypes: string[],
-  discoverLabel: string,
-): TabConfig[] {
-  // Filter out generic/empty topics and coupon (has its own tab)
-  const meaningfulTopics = ragTopics.filter(t => t && t !== 'coupon' && t !== 'other' && t !== 'general');
-
-  // Only add content tabs if there are 2+ distinct topics
-  if (meaningfulTopics.length < 2) return [];
-
-  // For brands: the discover tab already shows "מוצרים", so skip a duplicate products tab.
-  // Instead, add topic-based content tabs if they have diverse topics.
-  if (archetype === 'brand') {
-    // Brands typically don't need extra content tabs — discover covers products
-    return [];
-  }
-
-  // For influencers and others: create a tab per major topic
-  // Skip topics whose label matches the discover tab label (avoid duplicates)
-  // Limit to max 3 content tabs to keep UI clean
-  const topicTabs: TabConfig[] = [];
-  const sortedTopics = meaningfulTopics
-    .filter(t => TOPIC_TAB_LABELS[t] && TOPIC_TAB_LABELS[t] !== discoverLabel)
-    .slice(0, 3);
-
-  for (const topic of sortedTopics) {
-    topicTabs.push({
-      id: `content_${topic}`,
-      label: TOPIC_TAB_LABELS[topic],
-      type: 'content',
-      filters: { topics: [topic] },
-    });
-  }
-
-  return topicTabs;
-}
-
 /**
  * Generate and save tab config for a single account.
- * Reads RAG entity_types + coupons/partnerships to determine which tabs to show.
+ * Reads coupons/partnerships to determine which conditional tabs to show.
  */
 export async function generateTabConfig(accountId: string): Promise<TabGenerationResult> {
   const supabase = createClient();
@@ -240,23 +178,15 @@ export async function generateTabConfig(accountId: string): Promise<TabGeneratio
   const hasCoupons = (couponCount || 0) > 0 || entityTypes.includes('coupon');
   const hasPartnerships = (partnershipCount || 0) > 0;
 
-  // Get distinct topics from RAG chunks
-  const { data: topicData } = await supabase
-    .from('document_chunks')
-    .select('topic')
-    .eq('account_id', accountId);
-  const ragTopics = [...new Set((topicData || []).map((r: { topic: string }) => r.topic).filter(Boolean))];
-
-  // Build tabs
+  // Build tabs: chat + גלו + type-specific + [coupons] + [support]
   const tabs: TabConfig[] = [{ id: 'chat', label: 'צ׳אט', type: 'chat' }];
 
-  // Discover — always (every account has posts/transcriptions)
-  const discoverLabel = resolveLabel(DISCOVER_LABELS, archetype, influencerType);
-  tabs.push({ id: 'discover', label: discoverLabel, type: 'discover' });
+  // גלו — always present, universal discover tab
+  tabs.push({ id: 'discover', label: 'גלו', type: 'discover' });
 
-  // Content tabs — based on RAG topics (only for archetypes with enough content variety)
-  const contentTabDefs = buildContentTabs(archetype, influencerType, ragTopics, entityTypes, discoverLabel);
-  tabs.push(...contentTabDefs);
+  // Type-specific tab — questions/content organized by archetype
+  const topicsLabel = resolveLabel(TOPICS_TAB_LABELS, archetype, influencerType);
+  tabs.push({ id: 'topics', label: topicsLabel, type: 'topics' });
 
   // Coupons — only if data exists
   if (hasCoupons) {
