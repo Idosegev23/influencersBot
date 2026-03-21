@@ -1,0 +1,505 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "description": "RAG evaluation queries — baseline before Phase 1 re-chunking",
+    "created": "2026-03-19",
+    "total_queries": 50
+  },
+  "queries": [
+    {
+      "id": "da-food-pasta-1",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "food",
+      "query": "יש לך מתכון לפסטה?",
+      "expected_contains": ["פסטה", "בשר", "עגבניות"],
+      "should_not_contain": ["שמפו", "La Beaute", "מסכה לשיער"],
+      "notes": "Basic recipe retrieval"
+    },
+    {
+      "id": "da-food-pasta-specific",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "food",
+      "query": "מה המתכון של הפסטה עם בשר טחון?",
+      "expected_contains": ["בקר טחון", "יין אדום", "עגבניות מרוסקות"],
+      "should_not_contain": ["שמפו", "מחטב"],
+      "notes": "Specific recipe — bolognese"
+    },
+    {
+      "id": "da-food-chicken-1",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "food",
+      "query": "איך מכינים פילה עוף רך?",
+      "expected_contains": ["עוף", "קונקפלור", "סויה"],
+      "should_not_contain": ["זוהרה", "משקפיים"],
+      "notes": "Chicken prep tip — Dorot partnership content"
+    },
+    {
+      "id": "da-food-sandwich-1",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "food",
+      "query": "יש לך מתכון לסנדוויץ'?",
+      "expected_contains": ["חלה", "עוף", "אבוקדו"],
+      "should_not_contain": ["גרביונים", "מברשת שיניים"],
+      "notes": "Sandwich recipe retrieval"
+    },
+    {
+      "id": "da-food-knafeh-1",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "food",
+      "query": "איך מכינים כנאפה?",
+      "expected_contains": ["קדאיף", "חמאה", "מסקרפונה"],
+      "should_not_contain": ["שמפו"],
+      "notes": "Knafeh recipe — שיערות קדאיף is legitimate food content"
+    },
+    {
+      "id": "da-food-dorot-1",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "food",
+      "query": "יש לך מתכון אסיאתי?",
+      "expected_contains": ["מוקפץ", "אסי"],
+      "should_not_contain": ["מחטב", "גרביונים"],
+      "notes": "Asian cooking — Dorot brand content"
+    },
+    {
+      "id": "da-food-dorot-brand",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "food",
+      "query": "מה דעתך על דורות?",
+      "expected_contains": ["דורות", "תיבול"],
+      "should_not_contain": ["משקפיים", "מחטב"],
+      "notes": "Brand-specific query"
+    },
+
+    {
+      "id": "da-cross-hair-1",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "cross-domain",
+      "query": "יש לך משהו לשיער?",
+      "expected_contains": [],
+      "should_not_contain": ["קדאיף", "שערות הקדאיף", "מפרקים אותו"],
+      "notes": "CRITICAL: hair query must NOT return kadaif/food content. danielamit may not have hair products — but noise is the test"
+    },
+    {
+      "id": "da-cross-hair-2",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "cross-domain",
+      "query": "מה את ממליצה לשיער יבש?",
+      "expected_contains": [],
+      "should_not_contain": ["קדאיף", "פסטה", "מתכון"],
+      "notes": "Hair care query — should NOT surface cooking content"
+    },
+    {
+      "id": "da-cross-kitchen-vs-fashion",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "cross-domain",
+      "query": "מה את ממליצה לקנות?",
+      "expected_contains": [],
+      "should_not_contain": [],
+      "notes": "Ambiguous purchase query — should surface diverse products, not only one domain"
+    },
+
+    {
+      "id": "da-fashion-zohara-1",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "fashion",
+      "query": "יש לך המלצה למחטב?",
+      "expected_contains": ["זוהרה", "מחטב"],
+      "should_not_contain": ["מתכון", "פסטה"],
+      "notes": "Shapewear — Zohara partnership",
+      "expected_to_fail": true,
+      "limitation_reason": "Content gap: 13 fashion chunks vs 1160 food — insufficient fashion content from influencer"
+    },
+    {
+      "id": "da-fashion-zohara-tights",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "fashion",
+      "query": "את מכירה גרביונים טובים?",
+      "expected_contains": ["זוהרה", "גרביונים"],
+      "should_not_contain": ["עוף", "בשר"],
+      "notes": "Tights query — Zohara"
+    },
+    {
+      "id": "da-fashion-story-1",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "fashion",
+      "query": "יש לך המלצה לקפוצ'ון?",
+      "expected_contains": ["קפוצ'ון", "סטורי"],
+      "should_not_contain": ["מתכון"],
+      "notes": "Fashion item — Story Online hoodie",
+      "expected_to_fail": true,
+      "limitation_reason": "Content gap: no hoodie/kapuchon content in danielamit's posts or partnerships"
+    },
+    {
+      "id": "da-fashion-sunglasses",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "fashion",
+      "query": "מה את ממליצה למשקפי שמש?",
+      "expected_contains": ["רייבאן"],
+      "should_not_contain": ["מתכון", "פסטה"],
+      "notes": "Sunglasses — Opticana/Ray-Ban partnership",
+      "expected_to_fail": true,
+      "limitation_reason": "Content gap: sunglasses partnerships exist but food chunks (1160) flood results"
+    },
+
+    {
+      "id": "da-coupon-zohara",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "coupon",
+      "query": "יש קוד הנחה לזוהרה?",
+      "expected_contains": ["Danielamit", "זוהרה"],
+      "should_not_contain": [],
+      "notes": "Direct coupon query — should find Danielamit code for Zohara"
+    },
+    {
+      "id": "da-coupon-magnus",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "coupon",
+      "query": "יש קופון למגנוס?",
+      "expected_contains": ["Danielamit", "מגנוס", "18%"],
+      "should_not_contain": [],
+      "notes": "Magnus coupon"
+    },
+    {
+      "id": "da-coupon-sonicare",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "coupon",
+      "query": "יש הנחה על מברשת שיניים?",
+      "expected_contains": ["Daniel30", "סוניקייר"],
+      "should_not_contain": ["מתכון"],
+      "notes": "Sonicare coupon — tests brand name normalization"
+    },
+    {
+      "id": "da-coupon-generic",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "coupon",
+      "query": "יש לך קוד הנחה?",
+      "expected_contains": ["Danielamit"],
+      "should_not_contain": [],
+      "notes": "Generic coupon — should return at least one coupon"
+    },
+    {
+      "id": "da-coupon-opticana",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "coupon",
+      "query": "יש הנחה באופטיקנה?",
+      "expected_contains": ["Danielamit", "אופטיקנה", "10%"],
+      "should_not_contain": [],
+      "notes": "Opticana coupon — Hebrew brand name"
+    },
+    {
+      "id": "da-coupon-panda",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "coupon",
+      "query": "יש קופון לפנדה?",
+      "expected_contains": ["Danielamit", "פנדה", "15%"],
+      "should_not_contain": [],
+      "notes": "Panda coupon"
+    },
+
+    {
+      "id": "da-brand-magnus-products",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "brand",
+      "query": "מה יש במגנוס?",
+      "expected_contains": ["מגנוס", "כלי"],
+      "should_not_contain": [],
+      "notes": "Magnus brand query — kitchen tools"
+    },
+    {
+      "id": "da-brand-papajohns",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "brand",
+      "query": "יש לך שיתוף פעולה עם פיצה?",
+      "expected_contains": ["פאפא ג'ונס"],
+      "should_not_contain": [],
+      "notes": "Pizza brand partnership"
+    },
+    {
+      "id": "da-brand-panda-products",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "brand",
+      "query": "מה את יודעת על פנדה מזרנים?",
+      "expected_contains": ["פנדה", "מזרן"],
+      "should_not_contain": ["מתכון"],
+      "notes": "Panda mattress query"
+    },
+
+    {
+      "id": "da-general-partnerships",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "general",
+      "query": "עם מי יש לך שיתופי פעולה?",
+      "expected_contains": [],
+      "should_not_contain": [],
+      "notes": "General partnerships — should surface multiple brands"
+    },
+    {
+      "id": "da-general-who",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "general",
+      "query": "מי את?",
+      "expected_contains": ["דניאל"],
+      "should_not_contain": [],
+      "notes": "Identity query — should surface persona/bio"
+    },
+    {
+      "id": "da-general-recommend",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "general",
+      "query": "על מה את ממליצה?",
+      "expected_contains": [],
+      "should_not_contain": [],
+      "notes": "Open recommendation — tests diversity of results"
+    },
+
+    {
+      "id": "da-edge-greeting",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "edge",
+      "query": "היי",
+      "expected_contains": [],
+      "should_not_contain": [],
+      "notes": "Greeting — should not crash, minimal retrieval expected"
+    },
+    {
+      "id": "da-edge-outofscope",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "edge",
+      "query": "מה דעתך על המצב הפוליטי?",
+      "expected_contains": [],
+      "should_not_contain": [],
+      "notes": "Out-of-scope — should return few/no relevant results"
+    },
+    {
+      "id": "da-edge-english",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "edge",
+      "query": "Do you have a pasta recipe?",
+      "expected_contains": ["פסטה"],
+      "should_not_contain": [],
+      "notes": "English query for Hebrew content — cross-lingual retrieval"
+    },
+    {
+      "id": "da-edge-typo",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "edge",
+      "query": "יש קופן לזוהארה?",
+      "expected_contains": ["זוהרה"],
+      "should_not_contain": [],
+      "notes": "Typo in brand name — tests fuzzy matching"
+    },
+    {
+      "id": "da-edge-emoji-only",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "edge",
+      "query": "🍝",
+      "expected_contains": [],
+      "should_not_contain": [],
+      "notes": "Emoji-only query — should not crash"
+    },
+    {
+      "id": "da-edge-followup-context",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "edge",
+      "query": "ואיזה תבלינים את שמה?",
+      "expected_contains": [],
+      "should_not_contain": [],
+      "notes": "Follow-up without context — tests graceful degradation"
+    },
+
+    {
+      "id": "da-product-philips",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "product",
+      "query": "מה את חושבת על מברשת שיניים חשמלית?",
+      "expected_contains": ["סוניקייר", "מברשת שיניים"],
+      "should_not_contain": ["מתכון"],
+      "notes": "Specific product — Philips Sonicare toothbrush"
+    },
+    {
+      "id": "da-product-magnus-kitchen",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "product",
+      "query": "איזה סירים את ממליצה?",
+      "expected_contains": ["מגנוס"],
+      "should_not_contain": [],
+      "notes": "Kitchen tools query — Magnus"
+    },
+    {
+      "id": "da-product-addict",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "product",
+      "query": "איפה אפשר לקנות בגדים?",
+      "expected_contains": [],
+      "should_not_contain": ["מתכון", "קדאיף"],
+      "notes": "Clothing query — Addict Online / Story Online"
+    },
+
+    {
+      "id": "ldrs-services-1",
+      "account_id": "de38eac6-d2fb-46a7-ac09-5ec860147ca0",
+      "account_name": "ldrs_group",
+      "domain": "services",
+      "query": "מה אתם מציעים?",
+      "expected_contains": ["influencer", "marketing"],
+      "should_not_contain": ["מתכון", "קופון"],
+      "notes": "LDRS is a service provider — should return agency services"
+    },
+    {
+      "id": "ldrs-services-whitelisting",
+      "account_id": "de38eac6-d2fb-46a7-ac09-5ec860147ca0",
+      "account_name": "ldrs_group",
+      "domain": "services",
+      "query": "מה זה whitelisting?",
+      "expected_contains": ["whitelisting", "influencer"],
+      "should_not_contain": [],
+      "notes": "Technical service concept"
+    },
+    {
+      "id": "ldrs-services-performance",
+      "account_id": "de38eac6-d2fb-46a7-ac09-5ec860147ca0",
+      "account_name": "ldrs_group",
+      "domain": "services",
+      "query": "אתם עושים שיווק ביצועים?",
+      "expected_contains": ["performance"],
+      "should_not_contain": [],
+      "notes": "Performance marketing query"
+    },
+    {
+      "id": "ldrs-casestudy-1",
+      "account_id": "de38eac6-d2fb-46a7-ac09-5ec860147ca0",
+      "account_name": "ldrs_group",
+      "domain": "casestudy",
+      "query": "יש לכם דוגמאות לקמפיינים?",
+      "expected_contains": ["LEADERS"],
+      "should_not_contain": [],
+      "notes": "Case studies query"
+    },
+    {
+      "id": "ldrs-casestudy-tamar",
+      "account_id": "de38eac6-d2fb-46a7-ac09-5ec860147ca0",
+      "account_name": "ldrs_group",
+      "domain": "casestudy",
+      "query": "מה עשיתם עם תמר מג'הול?",
+      "expected_contains": ["TAMAR MAJHUL"],
+      "should_not_contain": [],
+      "notes": "Specific case study"
+    },
+    {
+      "id": "ldrs-hiring",
+      "account_id": "de38eac6-d2fb-46a7-ac09-5ec860147ca0",
+      "account_name": "ldrs_group",
+      "domain": "general",
+      "query": "אתם מגייסים עובדים?",
+      "expected_contains": ["Account Manager"],
+      "should_not_contain": [],
+      "notes": "Job listing retrieval"
+    },
+    {
+      "id": "ldrs-top10",
+      "account_id": "de38eac6-d2fb-46a7-ac09-5ec860147ca0",
+      "account_name": "ldrs_group",
+      "domain": "general",
+      "query": "מי המשפיענים המובילים שלכם?",
+      "expected_contains": ["TOP 10"],
+      "should_not_contain": [],
+      "notes": "Influencer rankings"
+    },
+    {
+      "id": "ldrs-edge-coupon",
+      "account_id": "de38eac6-d2fb-46a7-ac09-5ec860147ca0",
+      "account_name": "ldrs_group",
+      "domain": "edge",
+      "query": "יש לכם קוד הנחה?",
+      "expected_contains": [],
+      "should_not_contain": [],
+      "notes": "LDRS is B2B — no coupons expected. Tests noise filtering."
+    },
+    {
+      "id": "ldrs-edge-recipe",
+      "account_id": "de38eac6-d2fb-46a7-ac09-5ec860147ca0",
+      "account_name": "ldrs_group",
+      "domain": "edge",
+      "query": "יש לכם מתכון לפסטה?",
+      "expected_contains": [],
+      "should_not_contain": [],
+      "notes": "Irrelevant query for agency — should return nothing useful"
+    },
+
+    {
+      "id": "dekel-coupon-1",
+      "account_id": "e5a5076a-faaf-4e67-8bdd-61c15153fb20",
+      "account_name": "the_dekel",
+      "domain": "coupon",
+      "query": "יש לך קוד הנחה?",
+      "expected_contains": [],
+      "should_not_contain": [],
+      "notes": "the_dekel coupon query — verify retrieval works for other accounts"
+    },
+    {
+      "id": "dekel-general-who",
+      "account_id": "e5a5076a-faaf-4e67-8bdd-61c15153fb20",
+      "account_name": "the_dekel",
+      "domain": "general",
+      "query": "מי אתה?",
+      "expected_contains": ["דקל"],
+      "should_not_contain": ["דניאל עמית", "LDRS"],
+      "notes": "Identity query — must return the_dekel content, not danielamit"
+    },
+    {
+      "id": "dekel-content-1",
+      "account_id": "e5a5076a-faaf-4e67-8bdd-61c15153fb20",
+      "account_name": "the_dekel",
+      "domain": "general",
+      "query": "על מה אתה מדבר בסרטונים?",
+      "expected_contains": [],
+      "should_not_contain": ["דניאל עמית"],
+      "notes": "Content overview for the_dekel — tests account isolation"
+    },
+    {
+      "id": "dekel-edge-danielamit-leak",
+      "account_id": "e5a5076a-faaf-4e67-8bdd-61c15153fb20",
+      "account_name": "the_dekel",
+      "domain": "edge",
+      "query": "יש לך מתכון של דניאל עמית?",
+      "expected_contains": [],
+      "should_not_contain": ["דניאל עמית", "פסטה בולונז"],
+      "notes": "CRITICAL: account isolation — the_dekel must NOT return danielamit content"
+    }
+  ]
+}

@@ -93,6 +93,79 @@ export function normalizeText(text: string): string {
 }
 
 /**
+ * Detect if a section is a nutritional info table (numbers + units).
+ * These are low-value for search and waste chunk space.
+ */
+function isNutritionalNoise(section: string): boolean {
+  // Count unit markers typical of nutritional tables
+  const unitMatches = section.match(/(?:גרם|מ״ג|קק״ל|קלוריות|מנה|ערכים תזונתיים)/g);
+  if (!unitMatches || unitMatches.length < 4) return false;
+  // Check ratio of numbers to text — nutritional tables are >30% numbers
+  const digits = (section.match(/\d/g) || []).length;
+  const ratio = digits / section.length;
+  return ratio > 0.15 && unitMatches.length >= 4;
+}
+
+/**
+ * Detect navigation/footer noise (related recipes, category links, boilerplate).
+ */
+function isNavigationNoise(section: string): boolean {
+  const tokens = estimateTokens(section);
+  if (tokens > 200) return false; // Long sections are likely real content
+  const markers = [
+    'מתכונים נוספים', 'שכדאי לכם לנסות', 'תגובות', 'Connect with',
+    'הריני לאשר בזה', 'דואר שיווקי', 'קטגוריות', 'Save my name',
+  ];
+  const markerCount = markers.filter(m => section.includes(m)).length;
+  return markerCount >= 2;
+}
+
+/**
+ * Semantic chunker for website/transcription content.
+ * Step 1: Strip noise (nutritional tables, navigation, duplicated content)
+ * Step 2: Use token-based chunker with larger target (450 tokens, max 512)
+ */
+export function chunkTextSemantic(rawText: string, options?: Partial<ChunkOptions>): Chunk[] {
+  const text = normalizeText(rawText);
+  if (!text) return [];
+
+  // Step 1: Split by paragraph breaks and strip noise
+  const sections = text.split(/\n\n+/);
+  const cleanSections: string[] = [];
+  const seen = new Set<string>();
+
+  for (const section of sections) {
+    const trimmed = section.trim();
+    if (!trimmed) continue;
+
+    // Skip noise
+    if (isNutritionalNoise(trimmed)) continue;
+    if (isNavigationNoise(trimmed)) continue;
+
+    // Deduplicate: skip near-identical sections (common in scraped recipe pages)
+    const fingerprint = trimmed.substring(0, 80);
+    if (seen.has(fingerprint)) continue;
+    seen.add(fingerprint);
+
+    cleanSections.push(trimmed);
+  }
+
+  const cleanText = cleanSections.join('\n\n');
+  if (!cleanText) {
+    // Fallback: if everything was filtered, use original
+    return chunkText(text, { targetTokens: 450, maxTokens: 512, minTokens: 100, overlapRatio: 0.1 });
+  }
+
+  // Step 2: Use token-based chunker with larger chunks
+  return chunkText(cleanText, {
+    targetTokens: 450,
+    maxTokens: 512,
+    minTokens: 100,
+    overlapRatio: 0.1,
+  });
+}
+
+/**
  * Chunk text into overlapping segments.
  */
 export function chunkText(rawText: string, options?: ChunkOptions): Chunk[] {

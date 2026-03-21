@@ -11,9 +11,11 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
-import { chunkText, normalizeText, estimateTokens } from './chunker';
+import { chunkText, chunkTextSemantic, normalizeText, estimateTokens } from './chunker';
 import { generateEmbeddings } from './embeddings';
 import { createLogger } from './logger';
+import { getArchetypeConfig } from './archetypes';
+import { classifyChunkTopics } from './enrich';
 import type {
   EntityType,
   IngestInput,
@@ -46,8 +48,11 @@ export async function ingestDocument(input: IngestInput): Promise<IngestResult> 
     return { documentId: '', chunksCreated: 0, totalTokens: 0, durationMs: Date.now() - startMs };
   }
 
-  // 2. Chunk
-  const chunks = chunkText(normalized);
+  // 2. Chunk — semantic chunking for website/transcription, token-based for structured content
+  const useSemanticChunking = entityType === 'website' || entityType === 'transcription';
+  const chunks = useSemanticChunking
+    ? chunkTextSemantic(normalized)
+    : chunkText(normalized);
   const totalTokens = chunks.reduce((sum, c) => sum + c.tokenCount, 0);
 
   log.info('Chunked document', {
@@ -171,24 +176,41 @@ export async function ingestDocument(input: IngestInput): Promise<IngestResult> 
  */
 export async function ingestAllForAccount(
   accountId: string,
-  options?: { entityTypes?: EntityType[]; batchSize?: number }
+  options?: { entityTypes?: EntityType[]; batchSize?: number; archetype?: string }
 ): Promise<{ total: number; byType: Record<string, number>; errors: string[] }> {
   const supabase = createClient();
   const types = options?.entityTypes || [
     'post', 'transcription', 'partnership', 'coupon', 'knowledge_base', 'website', 'document',
   ];
 
+  const archetypeConfig = getArchetypeConfig(options?.archetype);
   const result = { total: 0, byType: {} as Record<string, number>, errors: [] as string[] };
 
   for (const entityType of types) {
     try {
-      const count = await ingestEntityType(supabase, accountId, entityType);
+      const maxChunks = archetypeConfig.contentBudgets?.[entityType as EntityType];
+      const count = await ingestEntityType(supabase, accountId, entityType, maxChunks);
       result.byType[entityType] = count;
       result.total += count;
+      if (maxChunks) {
+        log.info(`Content budget for ${entityType}: ${count} chunks (max ${maxChunks})`, { accountId }, accountId);
+      }
     } catch (err) {
       const msg = `Failed to ingest ${entityType}: ${err instanceof Error ? err.message : String(err)}`;
       result.errors.push(msg);
       log.error(msg, { accountId, entityType }, accountId);
+    }
+  }
+
+  // --- Post-ingestion: classify topics for newly ingested chunks ---
+  if (result.total > 0) {
+    try {
+      const classified = await classifyChunkTopics(supabase, accountId);
+      log.info(`Topic classification: ${classified} chunks classified`, { accountId }, accountId);
+    } catch (err) {
+      const msg = `Topic classification failed: ${err instanceof Error ? err.message : String(err)}`;
+      result.errors.push(msg);
+      log.error(msg, { accountId }, accountId);
     }
   }
 
@@ -205,9 +227,11 @@ export async function ingestAllForAccount(
 async function ingestEntityType(
   supabase: ReturnType<typeof createClient>,
   accountId: string,
-  entityType: EntityType
+  entityType: EntityType,
+  maxChunks?: number
 ): Promise<number> {
   let count = 0;
+  let totalChunks = 0;
 
   switch (entityType) {
     case 'post': {
@@ -400,21 +424,30 @@ async function ingestEntityType(
 
       if (websites) {
         for (const w of websites) {
+          if (maxChunks && totalChunks >= maxChunks) {
+            log.info(`Content budget reached for website: ${totalChunks}/${maxChunks} chunks, skipping remaining ${websites.length - count} pages`, { accountId }, accountId);
+            break;
+          }
           if (!w.page_content?.trim()) continue;
-          let text = '';
-          if (w.page_title) text += `Title: ${w.page_title}\n`;
-          if (w.page_description) text += `Description: ${w.page_description}\n\n`;
-          text += w.page_content;
+          try {
+            let text = '';
+            if (w.page_title) text += `Title: ${w.page_title}\n`;
+            if (w.page_description) text += `Description: ${w.page_description}\n\n`;
+            text += w.page_content;
 
-          await ingestDocument({
-            accountId,
-            entityType: 'website',
-            sourceId: w.id,
-            title: w.page_title || w.url,
-            text,
-            metadata: { url: w.url },
-          });
-          count++;
+            const docResult = await ingestDocument({
+              accountId,
+              entityType: 'website',
+              sourceId: w.id,
+              title: w.page_title || w.url,
+              text,
+              metadata: { url: w.url },
+            });
+            totalChunks += docResult.chunksCreated;
+            count++;
+          } catch (err) {
+            log.warn(`Skipping website page ${w.id}: ${err instanceof Error ? err.message : String(err)}`, { accountId, url: w.url }, accountId);
+          }
         }
       }
       break;

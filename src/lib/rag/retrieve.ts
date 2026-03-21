@@ -16,6 +16,7 @@ import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@/lib/supabase/server';
 import { generateEmbedding } from './embeddings';
 import { rerankCandidates } from './rerank';
+import { getArchetypeConfig } from './archetypes';
 import { createLogger } from './logger';
 import { cacheWrap } from '@/lib/cache';
 import { getMetrics } from '@/lib/metrics/pipeline-metrics';
@@ -62,6 +63,27 @@ const ENTITY_KEYWORDS: Record<EntityType, string[]> = {
   knowledge_base: ['faq', 'about', 'info', 'question', 'שאלה', 'מידע'],
   document: ['document', 'file', 'pdf', 'contract', 'invoice', 'מסמך', 'קובץ', 'חשבונית'],
   website: ['website', 'site', 'link', 'url', 'page', 'אתר', 'לינק', 'קישור'],
+};
+
+// Topic keywords for cross-domain filtering
+const TOPIC_KEYWORDS: Record<string, string[]> = {
+  food: ['מתכון', 'בישול', 'אוכל', 'מטבח', 'פסטה', 'עוגה', 'מרק', 'סלט', 'בשר', 'עוף', 'דג', 'ירקות',
+    'recipe', 'cooking', 'food', 'pasta', 'cake', 'meat', 'chicken', 'fish',
+    'סנדוויץ', 'כנאפה', 'פנקייק', 'לחם', 'אורז', 'תבלין', 'שום', 'בצל',
+    'סיר', 'מחבת', 'תנור', 'פיצה', 'רוטב', 'לבשל', 'להכין', 'מנה'],
+  beauty: ['שיער', 'עור', 'פנים', 'קרם', 'סרום', 'שמפו', 'מרכך', 'מסכה', 'איפור', 'טיפוח',
+    'hair', 'skin', 'face', 'cream', 'serum', 'shampoo', 'makeup', 'skincare',
+    'לק', 'ציפורניים', 'ריסים', 'גבות'],
+  fashion: ['מחטב', 'גרביונים', 'בגד', 'בגדים', 'שמלה', 'חולצה', 'מכנס', 'נעל', 'קפוצ\'ון', 'משקפי שמש',
+    'fashion', 'dress', 'shirt', 'pants', 'shoes', 'sunglasses', 'tights',
+    'אופנה', 'סטייל', 'לבוש', 'אקססוריז', 'תיק', 'ארנק'],
+  home: ['מזרן', 'מיטה', 'כרית', 'שמיכה', 'ריהוט', 'ספה', 'שולחן', 'מדף',
+    'mattress', 'furniture', 'bed', 'pillow', 'sofa', 'table'],
+  health: ['שיניים', 'מברשת', 'רופא', 'בריאות', 'ספורט', 'כושר', 'ויטמין',
+    'dental', 'toothbrush', 'doctor', 'health', 'fitness', 'vitamin',
+    'Sonicare', 'Philips'],
+  tech: ['טלפון', 'מחשב', 'אפליקציה', 'גאדג\'ט', 'מסך',
+    'phone', 'computer', 'app', 'gadget', 'screen', 'tech'],
 };
 
 const STRUCTURED_INDICATORS = [
@@ -124,6 +146,7 @@ Examples:
 async function classifyQuery(query: string): Promise<{
   queryType: QueryType;
   inferredEntityTypes: EntityType[];
+  inferredTopics: string[];
   timeHint?: { after?: string; before?: string };
 }> {
   const lowerQuery = query.toLowerCase();
@@ -140,6 +163,21 @@ async function classifyQuery(query: string): Promise<{
       inferredTypes.push(type as EntityType);
     }
   }
+
+  // Expand related entity types — coupon ↔ partnership, brand → partnership
+  // Coupon/discount content is often stored as partnership (with coupon codes)
+  const RELATED_TYPES: Partial<Record<EntityType, EntityType[]>> = {
+    coupon: ['partnership'],
+    partnership: ['coupon'],
+  };
+  const expanded = new Set(inferredTypes);
+  for (const t of inferredTypes) {
+    for (const related of (RELATED_TYPES[t] || [])) {
+      expanded.add(related);
+    }
+  }
+  inferredTypes.length = 0;
+  inferredTypes.push(...expanded);
 
   // Time hints
   let timeHint: { after?: string; before?: string } | undefined;
@@ -164,6 +202,23 @@ async function classifyQuery(query: string): Promise<{
     timeHint = { after: yesterdayStart.toISOString(), before: yesterdayEnd.toISOString() };
   }
 
+  // Infer topics from keywords (word-boundary matching to avoid false positives like "לק" in "לקנות")
+  const inferredTopics: string[] = [];
+  const queryWordsForTopic = lowerQuery.replace(/[?!.,؟"']/g, '').split(/\s+/);
+  for (const [topic, keywords] of Object.entries(TOPIC_KEYWORDS)) {
+    if (keywords.some(kw => {
+      const kwLower = kw.toLowerCase();
+      // For short keywords (≤2 chars), require exact word match
+      if (kwLower.length <= 2) {
+        return queryWordsForTopic.includes(kwLower);
+      }
+      // For longer keywords, substring match is OK (handles Hebrew prefixes)
+      return lowerQuery.includes(kwLower);
+    })) {
+      inferredTopics.push(topic);
+    }
+  }
+
   // Determine query type
   // "structured" only when we have both structured indicators AND specific entity types.
   // Without entity types, FTS has nothing to target — vector search is always better.
@@ -174,7 +229,7 @@ async function classifyQuery(query: string): Promise<{
     queryType = 'unstructured';
   }
 
-  return { queryType, inferredEntityTypes: inferredTypes, timeHint };
+  return { queryType, inferredEntityTypes: inferredTypes, inferredTopics, timeHint };
 }
 
 // ============================================
@@ -224,6 +279,7 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
     entityTypes: inputEntityTypes,
     timeWindow: inputTimeWindow,
     metadataFilter,
+    archetype,
   } = input;
 
   const stages = {
@@ -243,6 +299,7 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
     query: query.substring(0, 100),
     queryType: classification.queryType,
     inferredEntityTypes: classification.inferredEntityTypes,
+    inferredTopics: classification.inferredTopics,
     timeHint: classification.timeHint,
   }, accountId);
 
@@ -275,9 +332,13 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
     : null);
 
   const timeWindow = inputTimeWindow || classification.timeHint || null;
+
+  // Topic inference — used for heuristic scoring (penalty for off-topic chunks)
+  // NOT used for RPC filtering (too aggressive, removes relevant results)
+  const inferredTopics = classification.inferredTopics;
   stages.filterMs = Date.now() - filterStart;
 
-  // --- Step 3: Vector search ---
+  // --- Step 3: Vector search + BM25 supplement ---
   const vectorStart = Date.now();
 
   const supabase = createClient();
@@ -291,33 +352,9 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
   const baseEmbedding = await generateEmbedding(baseEnrichedQuery);
   pm?.measure('embeddingMs', 'embed_start');
 
-  // Step 3b: Vector search (threshold 0.3 — lower for Hebrew brand names)
-  // Cache RPC results by query hash for 3 minutes (L1 in-memory)
-  pm?.mark('rpc_start');
-  const cacheKey = `rag:vecs:${queryHash(accountId, baseEnrichedQuery)}`;
-  const cachedVecResult = await cacheWrap<{ data: any[] | null; error: any }>(
-    cacheKey,
-    async () => {
-      const res = await supabase
-        .rpc('match_document_chunks', {
-          p_account_id: accountId,
-          p_embedding: JSON.stringify(baseEmbedding),
-          p_match_count: 20,
-          p_match_threshold: 0.3,
-          p_entity_types: entityTypes,
-          p_updated_after: timeWindow?.after || null,
-        });
-      return { data: res.data, error: res.error };
-    },
-    { ttlMs: 180_000 } // 3 minutes
-  );
-  const initialResults = cachedVecResult.value.data;
-  const vectorError = cachedVecResult.value.error;
-  pm?.measure('matchDocChunksMs', 'rpc_start');
-
-  if (vectorError) {
-    log.error('Vector search failed', { error: vectorError.message }, accountId);
-  }
+  // If embedding timed out (null), skip vector search entirely — fall through to BM25 fallback
+  let initialResults: any[] | null = null;
+  let vectorError: any = null;
 
   type CandidateRow = {
     id: string;
@@ -329,7 +366,40 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
     metadata: Record<string, unknown>;
     similarity: number;
     updated_at: string;
+    topic: string | null;
   };
+
+  if (baseEmbedding) {
+    // Step 3b: Vector search (threshold 0.3 — lower for Hebrew brand names)
+    pm?.mark('rpc_start');
+    const cacheKey = `rag:vecs:${queryHash(accountId, baseEnrichedQuery)}`;
+    const cachedVecResult = await cacheWrap<{ data: any[] | null; error: any }>(
+      cacheKey,
+      async () => {
+        const res = await supabase
+          .rpc('match_document_chunks', {
+            p_account_id: accountId,
+            p_embedding: JSON.stringify(baseEmbedding),
+            p_match_count: 20,
+            p_match_threshold: 0.3,
+            p_entity_types: entityTypes,
+            p_updated_after: timeWindow?.after || null,
+            p_topics: null,
+          });
+        return { data: res.data, error: res.error };
+      },
+      { ttlMs: 180_000 } // 3 minutes
+    );
+    initialResults = cachedVecResult.value.data;
+    vectorError = cachedVecResult.value.error;
+    pm?.measure('matchDocChunksMs', 'rpc_start');
+  } else {
+    log.warn('Embedding returned null (timeout) — skipping vector search, using BM25 fallback', {}, accountId);
+  }
+
+  if (vectorError) {
+    log.error('Vector search failed', { error: vectorError.message }, accountId);
+  }
 
   let candidates = (initialResults || []) as CandidateRow[];
   const initialTopSimilarity = candidates[0]?.similarity || 0;
@@ -337,7 +407,6 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
   // Step 3c: Conditional query expansion — only when:
   // - Top similarity < 0.6 (not confident)
   // - We actually HAVE some results (expansion can't help if index has nothing)
-  // Saves ~600ms Gemini API call on confident matches or empty indexes
   let expandedQuery = query;
   if (initialTopSimilarity < 0.6 && candidates.length > 0 && query.length <= 100) {
     pm?.inc('expandQueryCalled');
@@ -345,13 +414,15 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
     expandedQuery = await expandQuery(query);
     pm?.measure('expandQueryMs', 'expand_start');
     if (expandedQuery !== query) {
-      // Re-embed with expanded terms and search at lower threshold
       const expandedEnriched = conversationSummary
         ? `${expandedQuery}\n\nContext: ${conversationSummary}`
         : expandedQuery;
       const expandedEmbedding = await generateEmbedding(expandedEnriched);
+      if (!expandedEmbedding) {
+        log.warn('Expanded embedding timed out — skipping expansion search', {}, accountId);
+      }
 
-      const { data: expandedResults } = await supabase
+      const { data: expandedResults } = expandedEmbedding ? await supabase
         .rpc('match_document_chunks', {
           p_account_id: accountId,
           p_embedding: JSON.stringify(expandedEmbedding),
@@ -359,9 +430,9 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
           p_match_threshold: 0.25,
           p_entity_types: entityTypes,
           p_updated_after: timeWindow?.after || null,
-        });
+          p_topics: null,
+        }) : { data: null };
 
-      // Merge: add new results not already in candidates
       if (expandedResults?.length) {
         const existingIds = new Set(candidates.map(c => c.id));
         for (const r of expandedResults as CandidateRow[]) {
@@ -378,7 +449,7 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
   } else if (candidates.length === 0) {
     pm?.inc('expandQuerySkippedNoResults');
     pm?.set('expandQueryMs', 0);
-    log.info('Skipped query expansion (zero vector results — go straight to keyword supplement)', {}, accountId);
+    log.info('Skipped query expansion (zero vector results — go straight to BM25 supplement)', {}, accountId);
   } else if (initialTopSimilarity >= 0.6) {
     pm?.inc('expandQuerySkippedConfident');
     log.info('Skipped query expansion (confident match)', {
@@ -387,8 +458,7 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
   }
 
   // Step 3d: Fallback to lower threshold if zero results at 0.3
-  // Skip if expansion already searched at 0.25 (would be duplicate)
-  if (candidates.length === 0 && expandedQuery === query) {
+  if (candidates.length === 0 && expandedQuery === query && baseEmbedding) {
     pm?.set('thresholdUsed', '0.25_fallback');
     log.info('Zero results at 0.3 threshold, retrying at 0.25', {}, accountId);
     const { data: fallbackResults } = await supabase
@@ -399,6 +469,7 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
         p_match_threshold: 0.25,
         p_entity_types: entityTypes,
         p_updated_after: timeWindow?.after || null,
+        p_topics: null,
       });
     if (fallbackResults?.length) {
       candidates = fallbackResults as CandidateRow[];
@@ -413,10 +484,9 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
     bottomSimilarity: candidates[candidates.length - 1]?.similarity,
   }, accountId);
 
-  // --- Step 3e: Keyword supplement (hybrid search) ---
-  // Only when vector search isn't confident enough — skip on high similarity to save ~700ms
-  // Note: topSimilarityFinal is RAW similarity before heuristic boost (+0.05 recency, +0.03 chunk, +0.25 exact).
-  // A raw 0.55 can become 0.83 after boost. Threshold 0.65 raw = very confident match.
+  // --- Step 3e: BM25 keyword supplement (replaces old ILIKE queries) ---
+  // Uses tsvector GIN index for fast full-text search with Hebrew prefix stripping
+  // Only when vector search isn't confident enough
   let keywordSupplementAdded = false;
   const topSimilarityFinal = candidates[0]?.similarity || 0;
   if (topSimilarityFinal >= 0.65 && candidates.length >= 3) {
@@ -431,108 +501,50 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
     const existingIds = new Set(candidates.map(c => c.id));
     let added = 0;
 
-    // Search expanded key terms (if query was expanded)
-    const keyTerms = extractKeyTerms(query, expandedQuery);
-    if (keyTerms.length > 0) {
-      const searches = keyTerms.slice(0, 10).map(term =>
-        supabase
-          .from('document_chunks')
-          .select('id, document_id, entity_type, chunk_index, chunk_text, token_count, metadata, updated_at')
-          .eq('account_id', accountId)
-          .ilike('chunk_text', `%${term}%`)
-          .limit(5)
-      );
-      const results = await Promise.all(searches);
+    // BM25 search via tsvector GIN index — single indexed query replaces multiple ILIKEs
+    // Hebrew prefix stripping handled in the RPC (ב,ל,מ,ה,ו,כ,ש)
+    // Strip enrichment-template words that match nearly all chunks and dilute ranking
+    const BM25_STOP = new Set([
+      'יש', 'לך', 'את', 'מה', 'על', 'עם', 'של', 'זה', 'לא', 'גם', 'כל', 'אם', 'כי', 'או', 'אל',
+      'שיתוף', 'פעולה', 'שותפות', 'אינסטגרם', 'באינסטגרם', 'קמפיין',
+      'המלצה', 'ממליצה', 'ממליץ', 'חושבת', 'יודעת', 'יודע',
+      'איך', 'מכינים', 'מכינה',
+    ]);
+    const bm25Query = query
+      .replace(/[?!.,؟]/g, '')
+      .split(/\s+/)
+      .filter(w => w.length >= 2 && !BM25_STOP.has(w))
+      .join(' ') || query; // fallback to original if all words stripped
 
-      for (const { data } of results) {
-        if (!data) continue;
-        for (const kr of data) {
-          if (!existingIds.has(kr.id)) {
-            existingIds.add(kr.id);
-            candidates.push({ ...kr, similarity: 0.45 });
-            added++;
-          }
-        }
-      }
-    }
+    const { data: bm25Results } = await supabase
+      .rpc('match_chunks_bm25', {
+        p_account_id: accountId,
+        p_query_text: bm25Query,
+        p_limit: 15,
+        p_entity_types: entityTypes,
+        p_topics: null,
+      });
 
-    // Always search original query terms via ILIKE (catches brand names, Hebrew terms)
-    const originalTerms = query.replace(/[?!.,؟]/g, '').split(/\s+/).filter(w => w.length > 2);
-
-    // Bigram phrase search — search consecutive word pairs from the query (max 3)
-    const allQueryWords = query.replace(/[?!.,؟]/g, '').split(/\s+/).filter(w => w.length >= 2);
-    const phraseSearches = [];
-    for (let i = 0; i < Math.min(allQueryWords.length - 1, 3); i++) {
-      const bigram = `${allQueryWords[i]} ${allQueryWords[i + 1]}`;
-      phraseSearches.push(
-        supabase
-          .from('document_chunks')
-          .select('id, document_id, entity_type, chunk_index, chunk_text, token_count, metadata, updated_at')
-          .eq('account_id', accountId)
-          .ilike('chunk_text', `%${bigram}%`)
-          .limit(8)
-      );
-    }
-    if (phraseSearches.length > 0) {
-      const phraseResults = await Promise.all(phraseSearches);
-      for (const { data } of phraseResults) {
-        if (!data) continue;
-        for (const kr of data) {
-          if (!existingIds.has(kr.id)) {
-            existingIds.add(kr.id);
-            // Phrase matches get a higher base similarity than single-word matches
-            candidates.push({ ...kr, similarity: 0.60 });
-            added++;
-          } else {
-            // If already in candidates, boost its similarity for phrase match
-            const existing = candidates.find(c => c.id === kr.id);
-            if (existing && existing.similarity < 0.60) {
-              existing.similarity = Math.max(existing.similarity, 0.60);
-            }
-          }
-        }
-      }
-    }
-
-    // Hebrew morphology: search shorter prefixes of long words (max 3 terms)
-    const allSearchTerms = new Set<string>();
-    for (const term of originalTerms.slice(0, 3)) {
-      allSearchTerms.add(term);
-      // Add shorter prefixes for Hebrew words (3+ chars prefix)
-      if (term.length >= 5) {
-        const prefix4 = term.slice(0, 4);
-        allSearchTerms.add(prefix4);
-      }
-      if (term.length >= 6) {
-        const prefix5 = term.slice(0, 5);
-        allSearchTerms.add(prefix5);
-      }
-    }
-
-    // Run all ILIKE searches in parallel for performance
-    const originalSearches = [...allSearchTerms].map(term =>
-      supabase
-        .from('document_chunks')
-        .select('id, document_id, entity_type, chunk_index, chunk_text, token_count, metadata, updated_at')
-        .eq('account_id', accountId)
-        .ilike('chunk_text', `%${term}%`)
-        .limit(8)
-    );
-    const originalResults = await Promise.all(originalSearches);
-    for (const { data } of originalResults) {
-      if (!data) continue;
-      for (const kr of data) {
+    if (bm25Results?.length) {
+      for (const kr of bm25Results) {
         if (!existingIds.has(kr.id)) {
           existingIds.add(kr.id);
-          candidates.push({ ...kr, similarity: 0.45 });
+          // BM25 matches get 0.50 base similarity
+          candidates.push({ ...kr, similarity: 0.50 });
           added++;
+        } else {
+          // Boost existing candidates also found by BM25
+          const existing = candidates.find(c => c.id === kr.id);
+          if (existing) {
+            existing.similarity += 0.05;
+          }
         }
       }
     }
 
     if (added > 0) {
       keywordSupplementAdded = true;
-      log.info('Keyword supplement added candidates', { added, keyTerms, originalTerms: originalTerms.slice(0, 5) }, accountId);
+      log.info('BM25 supplement added candidates', { added }, accountId);
     }
     pm?.measure('keywordSupplementMs', 'kw_start');
   }
@@ -554,16 +566,27 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
     });
   }
 
-  // --- Heuristic reranking: boost recency + chunk position + keyword match ---
+  // --- Heuristic reranking: boost recency + chunk position + keyword match + archetype ---
+  // Save raw top similarity BEFORE bonuses — used for skip-rerank decision
+  const rawTopSimilarity = filtered[0]?.similarity || 0;
+  const archetypeConfig = getArchetypeConfig(archetype);
   const now = Date.now();
   const queryLower = query.toLowerCase();
-  // Split query into words (3+ chars) for partial matching
-  const queryWords = queryLower.replace(/[?!.,؟]/g, '').split(/\s+/).filter(w => w.length >= 2);
+  // Split query into content words (3+ chars) for partial matching
+  // Hebrew stop words (יש, לך, את, מה, על, גם, עם, כל, אם, לא) are 2 chars — filter them out
+  const STOP_WORDS = new Set(['יש', 'לך', 'את', 'מה', 'על', 'גם', 'עם', 'כל', 'אם', 'לא', 'של', 'הם', 'זה', 'כי', 'או', 'אל']);
+  const queryWords = queryLower.replace(/[?!.,؟]/g, '').split(/\s+/).filter(w => w.length >= 3 || (w.length === 2 && !STOP_WORDS.has(w)));
   for (const c of filtered) {
     // Recency bonus: content from last 30 days gets +0.05
     const ageMs = now - new Date(c.updated_at).getTime();
+    let recencyBonus = 0;
     if (ageMs < 30 * 24 * 60 * 60 * 1000) {
-      c.similarity += 0.05;
+      recencyBonus = 0.05;
+      // Apply archetype recency multiplier (e.g. media_news = 3x)
+      if (archetypeConfig.recencyMultiplier) {
+        recencyBonus *= archetypeConfig.recencyMultiplier;
+      }
+      c.similarity += recencyBonus;
     }
     // First chunk bonus: chunk_index 0 usually has the most important content
     if (c.chunk_index === 0) {
@@ -583,18 +606,52 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
         c.similarity += 0.08;
       }
     }
+    // Archetype type weight: boost/penalize by entity_type
+    const typeWeight = archetypeConfig.typeWeights[c.entity_type as EntityType] || 0;
+    if (typeWeight !== 0) {
+      c.similarity += typeWeight;
+    }
+    // Topic scoring: penalize chunks from clearly different domains
+    // Only when query has a confident topic
+    if (inferredTopics.length > 0) {
+      const CROSS_DOMAIN: Record<string, Set<string>> = {
+        food: new Set(['beauty', 'fashion', 'tech', 'health']),
+        beauty: new Set(['food', 'tech', 'business', 'home']),
+        fashion: new Set(['food', 'tech', 'business', 'health']),
+        health: new Set(['food', 'fashion', 'home']),
+        tech: new Set(['food', 'beauty', 'fashion', 'home']),
+        home: new Set(['food', 'beauty', 'fashion', 'tech']),
+        coupon: new Set([]), // coupons are cross-cutting, don't penalize
+        business: new Set(['food', 'beauty', 'fashion']),
+      };
+
+      if (c.topic) {
+        const chunkTopic = c.topic.toLowerCase();
+        const isOnTopic = inferredTopics.some(qt => qt === chunkTopic);
+        if (!isOnTopic) {
+          const isCrossDomain = inferredTopics.some(qt =>
+            CROSS_DOMAIN[qt]?.has(chunkTopic)
+          );
+          if (isCrossDomain) {
+            c.similarity -= 0.15;
+          }
+        }
+      }
+    }
   }
+
   // Re-sort after heuristic adjustments
   filtered.sort((a, b) => b.similarity - a.similarity);
 
-  // --- Chunk dedup + diversity (always active) ---
-  // Max 4 chunks per document (raised to allow full recipes/articles), max 8 per entity_type
+  // --- Chunk dedup + diversity (archetype-aware caps) ---
   const perSource = new Map<string, number>();
   const perType = new Map<string, number>();
   filtered = filtered.filter(c => {
     const srcCount = perSource.get(c.document_id) || 0;
     const typeCount = perType.get(c.entity_type) || 0;
-    if (srcCount >= 4 || typeCount >= 8) return false;
+    const docCap = archetypeConfig.docCap;
+    const typeCap = archetypeConfig.typeCaps[c.entity_type as EntityType] ?? 8;
+    if (srcCount >= docCap || typeCount >= typeCap) return false;
     perSource.set(c.document_id, srcCount + 1);
     perType.set(c.entity_type, typeCount + 1);
     return true;
@@ -619,15 +676,14 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
   }));
 
   // Skip LLM rerank when:
-  // - Top similarity > 0.5 AND no keyword supplement was added
-  //   (keyword supplements need reranking since their 0.40 baseline may outrank
-  //    higher-similarity but less-relevant vector results)
-  // - Precision V2 + dominant result (>0.85) AND no keyword supplement
+  // - RAW similarity > 0.65 (before heuristic bonuses) AND no keyword supplement
+  //   Use raw similarity to avoid heuristic bonuses (+0.03 to +0.25) causing
+  //   cross-domain noise to skip reranking
+  // - Precision V2 + dominant result (>0.85 raw) AND no keyword supplement
   let reranked;
-  const topSimilarity = filtered[0]?.similarity || 0;
   const skipRerank = filtered.length > 0 && !keywordSupplementAdded && (
-    topSimilarity > 0.5 ||
-    (process.env.MEMORY_V2_ENABLED === 'true' && topSimilarity > 0.85)
+    rawTopSimilarity > 0.65 ||
+    (process.env.MEMORY_V2_ENABLED === 'true' && rawTopSimilarity > 0.85)
   );
 
   if (skipRerank) {
@@ -642,7 +698,7 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
       }));
     pm?.measure('heuristicRerankMs', 'heuristic_rerank_start');
     log.info('Skipped rerank (confident results)', {
-      topSimilarity,
+      topSimilarity: rawTopSimilarity,
       candidateCount: filtered.length,
     }, accountId);
   } else {
@@ -745,34 +801,6 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
 // ============================================
 // Helpers
 // ============================================
-
-/**
- * Extract key terms that were added by query expansion.
- * Returns the new terms (not in original query) that are meaningful words.
- */
-function extractKeyTerms(originalQuery: string, expandedQuery: string): string[] {
-  // If no expansion happened, skip — avoids treating entire query as a "term"
-  if (expandedQuery === originalQuery) return [];
-
-  const originalWords = new Set(
-    originalQuery.toLowerCase().replace(/[?!.,?؟]/g, '').split(/\s+/).filter(w => w.length > 1)
-  );
-  const expandedTerms = expandedQuery
-    .split(/[,،]+/)  // Split by commas first
-    .map(t => t.trim().replace(/^[(\[{]+|[)\]}.!?:]+$/g, ''))  // Strip surrounding punctuation
-    .filter(t => {
-      if (t.length < 2 || t.length > 40) return false; // Reject too-short or too-long terms
-      if (originalWords.has(t.toLowerCase())) return false;
-      // Filter out noise: terms with parentheses, brackets, or mostly punctuation
-      if (/[()[\]{}]/.test(t)) return false;
-      // Must contain at least 2 actual word characters
-      const wordChars = t.replace(/[^a-zA-Zא-ת\u0600-\u06FF]/g, '');
-      return wordChars.length >= 2;
-    });
-
-  // Return unique terms, max 12
-  return [...new Set(expandedTerms)].slice(0, 12);
-}
 
 function truncate(text: string | null, maxLen: number): string {
   if (!text) return '';

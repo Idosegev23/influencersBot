@@ -59,6 +59,7 @@ export async function enrichAccountChunks(
     skipSyntheticQueries?: boolean;
     skipCleanup?: boolean;
     skipPartnershipEnrich?: boolean;
+    skipTopicClassification?: boolean;
     geminiApiKey?: string;
     openaiApiKey?: string;
   }
@@ -123,6 +124,18 @@ export async function enrichAccountChunks(
     } catch (err: any) {
       result.errors.push(`Partnership enrichment failed: ${err.message}`);
       log.error('Partnership enrichment failed', { error: err.message }, accountId);
+    }
+  }
+
+  // --- Step 5: Topic classification ---
+  if (!options?.skipTopicClassification) {
+    try {
+      const topicsClassified = await classifyChunkTopics(supabase, accountId, options?.dryRun);
+      log.info(`Topic classification: ${topicsClassified} chunks classified`, {}, accountId);
+      result.chunksEnriched += topicsClassified;
+    } catch (err: any) {
+      result.errors.push(`Topic classification failed: ${err.message}`);
+      log.error('Topic classification failed', { error: err.message }, accountId);
     }
   }
 
@@ -192,25 +205,36 @@ async function addHebrewSummaries(
   accountId: string,
   dryRun?: boolean
 ): Promise<number> {
-  // Find chunks that are mostly English and haven't been enriched yet
-  const { data: chunks } = await supabase
-    .from('document_chunks')
-    .select('id, chunk_text, token_count, entity_type, metadata')
-    .eq('account_id', accountId)
-    .gt('token_count', 25) // Only meaningful chunks
-    .limit(500);
+  // Paginate through ALL chunks — no single-query limit
+  let allEnglishChunks: ChunkRow[] = [];
+  const PAGE_SIZE = 1000;
+  let offset = 0;
 
-  if (!chunks || chunks.length === 0) return 0;
+  while (true) {
+    const { data: chunks } = await supabase
+      .from('document_chunks')
+      .select('id, document_id, chunk_text, token_count, entity_type, chunk_index, metadata')
+      .eq('account_id', accountId)
+      .gt('token_count', 25)
+      .order('id')
+      .range(offset, offset + PAGE_SIZE - 1);
 
-  // Filter to English-heavy chunks not yet enriched
-  const englishChunks = chunks.filter(c => {
-    if ((c.metadata as any)?.enriched_he) return false; // Already enriched
-    return isEnglishHeavy(c.chunk_text);
-  });
+    if (!chunks || chunks.length === 0) break;
 
-  if (englishChunks.length === 0) return 0;
+    const english = chunks.filter(c => {
+      if ((c.metadata as any)?.enriched_he) return false;
+      return isEnglishHeavy(c.chunk_text);
+    });
+    allEnglishChunks = allEnglishChunks.concat(english as ChunkRow[]);
 
-  log.info(`Found ${englishChunks.length} English-heavy chunks to translate`, {}, accountId);
+    if (chunks.length < PAGE_SIZE) break;
+    offset += PAGE_SIZE;
+  }
+
+  if (allEnglishChunks.length === 0) return 0;
+
+  log.info(`Found ${allEnglishChunks.length} English-heavy chunks to translate`, {}, accountId);
+  const englishChunks = allEnglishChunks;
 
   // Process in batches of 10 (Gemini rate limits)
   const BATCH = 10;
@@ -281,17 +305,29 @@ async function addSyntheticQueries(
   accountId: string,
   dryRun?: boolean
 ): Promise<number> {
-  // Get chunks without synthetic queries yet
-  const { data: chunks } = await supabase
-    .from('document_chunks')
-    .select('id, document_id, chunk_text, token_count, entity_type, metadata')
-    .eq('account_id', accountId)
-    .gt('token_count', 30) // Only substantial chunks
-    .limit(300);
+  // Paginate through ALL chunks — no single-query limit
+  let unenriched: ChunkRow[] = [];
+  const PAGE_SIZE = 1000;
+  let offset = 0;
 
-  if (!chunks || chunks.length === 0) return 0;
+  while (true) {
+    const { data: chunks } = await supabase
+      .from('document_chunks')
+      .select('id, document_id, chunk_text, token_count, entity_type, chunk_index, metadata')
+      .eq('account_id', accountId)
+      .gt('token_count', 30)
+      .order('id')
+      .range(offset, offset + PAGE_SIZE - 1);
 
-  const unenriched = chunks.filter(c => !(c.metadata as any)?.synthetic_queries);
+    if (!chunks || chunks.length === 0) break;
+
+    const batch = chunks.filter(c => !(c.metadata as any)?.synthetic_queries);
+    unenriched = unenriched.concat(batch as ChunkRow[]);
+
+    if (chunks.length < PAGE_SIZE) break;
+    offset += PAGE_SIZE;
+  }
+
   if (unenriched.length === 0) return 0;
 
   log.info(`Generating synthetic queries for ${unenriched.length} chunks`, {}, accountId);
@@ -439,12 +475,20 @@ async function generateHebrewSummaries(texts: string[]): Promise<(string | null)
   const { GoogleGenAI } = await import('@google/genai');
   const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
-  const prompt = `You are a translation assistant. For each text below, write a concise Hebrew summary (1-2 sentences).
-The summary should capture the KEY TOPIC and MAIN POINT of the text.
-If the text is about a campaign — mention the brand, type of campaign, and what was done.
-If it's about tips/advice — summarize the main tip.
+  const prompt = `You are a Hebrew translation assistant. Your task: summarize each English text below INTO HEBREW (עברית).
 
-Return ONLY a JSON array of strings. One summary per input text. If a text is already in Hebrew, return null for that entry.
+CRITICAL: Every summary MUST be written in Hebrew characters (עברית). Do NOT write summaries in English.
+
+Rules:
+- Write 1-2 sentence summary IN HEBREW for each text
+- Capture the KEY TOPIC and MAIN POINT
+- If about a campaign — mention the brand, type, and what was done (in Hebrew)
+- If about tips/advice — summarize the main tip (in Hebrew)
+- If the text is already in Hebrew — return null for that entry
+
+Return ONLY a JSON array of strings (Hebrew) or nulls. One entry per input text.
+
+Example output: ["סוכנות לידרס יוצרת תוכן משפיע בשילוב אסטרטגיה והבנת שוק", null, "המאמר דן בעליית המשפיענים באינסטגרם"]
 
 Texts:
 ${texts.map((t, i) => `[${i}] ${t.substring(0, 500)}`).join('\n\n')}`;
@@ -481,13 +525,17 @@ async function generateSyntheticQueries(
   const { GoogleGenAI } = await import('@google/genai');
   const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
-  const prompt = `You are a Hebrew Q&A assistant. For each content chunk below, generate 2-3 SHORT questions (in Hebrew) that this chunk can answer.
-Questions should be natural — the kind a user would ask a chatbot about this content.
+  const prompt = `You generate questions that a real fan/follower would ask.
+Based ONLY on the text below, write 2-3 short Hebrew questions per chunk.
+Do NOT invent information not in the text.
+Do NOT add related topics — only what's explicitly mentioned.
 
-Examples:
-- For a campaign chunk: "מה עשיתם עם נספרסו?", "ספרו על קמפיין קפה"
-- For a tip/advice chunk: "איך לגדול באינסטגרם?", "טיפים לתוכן"
-- For a brand chunk: "יש לכם שיתוף פעולה עם X?"
+Rules:
+- If the text is about a recipe for pasta → questions about pasta, NOT about other dishes
+- If the text is about a hair product → questions about that product, NOT about food
+- If the text mentions a specific brand/person → use their actual name
+- Keep questions specific to the actual content
+- Questions must be answerable from the chunk text alone
 
 Return a JSON array of arrays. Each inner array has 2-3 Hebrew questions.
 
@@ -517,6 +565,167 @@ ${chunks.map((c, i) => `[${i}] (${c.entityType}) ${c.text.substring(0, 400)}`).j
 }
 
 // ============================================
+// Step 5: Topic Classification
+// ============================================
+
+/** Valid topics for chunk classification */
+export const VALID_TOPICS = [
+  'food',      // Recipes, cooking, ingredients, kitchen
+  'beauty',    // Hair care, skincare, makeup, cosmetics
+  'fashion',   // Clothing, shoes, accessories, shapewear
+  'home',      // Furniture, mattresses, bedding, home decor
+  'health',    // Dental, fitness, supplements, medical
+  'tech',      // Electronics, gadgets, apps
+  'lifestyle', // General lifestyle, travel, parenting
+  'business',  // B2B services, marketing, agency
+  'coupon',    // Coupon codes, discounts (entity_type based)
+] as const;
+
+export type ChunkTopic = (typeof VALID_TOPICS)[number];
+
+/**
+ * Classify chunks by topic using Gemini Flash.
+ * Only processes chunks that don't have a topic yet.
+ */
+async function classifyChunkTopics(
+  supabase: ReturnType<typeof createClient>,
+  accountId: string,
+  dryRun?: boolean
+): Promise<number> {
+  const BATCH_SIZE = 30; // Gemini can handle larger batches for simple classification
+  let classified = 0;
+  let offset = 0;
+  const PAGE_SIZE = 1000;
+
+  while (true) {
+    const { data: chunks } = await supabase
+      .from('document_chunks')
+      .select('id, chunk_text, entity_type, metadata')
+      .eq('account_id', accountId)
+      .is('topic', null)
+      .order('id')
+      .range(offset, offset + PAGE_SIZE - 1);
+
+    if (!chunks || chunks.length === 0) break;
+    offset += chunks.length;
+
+    // Process in batches
+    for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
+      const batch = chunks.slice(i, i + BATCH_SIZE);
+
+      // Quick classification: coupon/partnership entity types get auto-classified
+      const needsLLM: typeof batch = [];
+      const autoClassified: Array<{ id: string; topic: ChunkTopic }> = [];
+
+      for (const c of batch) {
+        if (c.entity_type === 'coupon') {
+          autoClassified.push({ id: c.id, topic: 'coupon' });
+        } else if (c.entity_type === 'knowledge_base') {
+          autoClassified.push({ id: c.id, topic: 'business' });
+        } else {
+          needsLLM.push(c);
+        }
+      }
+
+      // Save auto-classified
+      if (!dryRun && autoClassified.length > 0) {
+        for (const item of autoClassified) {
+          await supabase
+            .from('document_chunks')
+            .update({ topic: item.topic })
+            .eq('id', item.id);
+        }
+        classified += autoClassified.length;
+      }
+
+      if (needsLLM.length === 0) continue;
+
+      // LLM classification
+      try {
+        const topics = await classifyTopicsWithLLM(needsLLM.map(c => ({
+          text: c.chunk_text,
+          entityType: c.entity_type,
+        })));
+
+        if (!dryRun) {
+          for (let j = 0; j < needsLLM.length; j++) {
+            const topic = topics[j];
+            if (topic && VALID_TOPICS.includes(topic as ChunkTopic)) {
+              await supabase
+                .from('document_chunks')
+                .update({ topic })
+                .eq('id', needsLLM[j].id);
+              classified++;
+            }
+          }
+        } else {
+          classified += topics.filter(t => t && VALID_TOPICS.includes(t as ChunkTopic)).length;
+        }
+      } catch (err: any) {
+        log.warn('Topic classification batch failed', { error: err.message }, accountId);
+      }
+    }
+  }
+
+  return classified;
+}
+
+/**
+ * Classify chunk topics using Gemini Flash.
+ */
+async function classifyTopicsWithLLM(
+  chunks: Array<{ text: string; entityType: string }>
+): Promise<string[]> {
+  const { GoogleGenAI } = await import('@google/genai');
+  const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+
+  const response = await genai.models.generateContent({
+    model: 'gemini-2.0-flash',
+    contents: `Classify each text into exactly ONE topic.
+
+Topics: food, beauty, fashion, home, health, tech, lifestyle, business, coupon
+
+Rules:
+- food: recipes, cooking, ingredients, kitchen tools, restaurants
+- beauty: hair care, skincare, makeup, cosmetics, beauty treatments
+- fashion: clothing, shoes, accessories, shapewear, tights, sunglasses
+- home: furniture, mattresses, bedding, home decor, cleaning
+- health: dental care, toothbrush, fitness, supplements, medical
+- tech: electronics, gadgets, apps, phones
+- lifestyle: general lifestyle, travel, parenting, entertainment, general tips
+- business: B2B services, marketing, agency work, case studies, hiring
+- coupon: discount codes, promotions, sales
+
+IMPORTANT: Classify by the PRIMARY topic of the text, not secondary mentions.
+- A recipe that mentions a kitchen brand → "food" (not "business")
+- A partnership with a hair product → "beauty" (not "business")
+- A coupon for a fashion brand → "coupon"
+- כנאפה/קדאיף recipe → "food" (NOT beauty, even though קדאיף sounds like hair)
+
+Return ONLY a JSON array of topic strings. One per input.
+
+Texts:
+${chunks.map((c, i) => `[${i}] (${c.entityType}) ${c.text.substring(0, 250)}`).join('\n\n')}`,
+    config: {
+      temperature: 0,
+      maxOutputTokens: 500,
+    },
+  });
+
+  const raw = response.text || '';
+  try {
+    const jsonMatch = raw.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+  } catch {
+    log.warn('Failed to parse topic classification response', { raw: raw.substring(0, 200) });
+  }
+
+  return chunks.map(() => 'lifestyle'); // Safe default
+}
+
+// ============================================
 // Helpers
 // ============================================
 
@@ -531,4 +740,4 @@ function isEnglishHeavy(text: string): boolean {
   return asciiLetters / total > 0.6;
 }
 
-export { isEnglishHeavy, cleanupTinyChunks };
+export { isEnglishHeavy, cleanupTinyChunks, classifyChunkTopics, classifyTopicsWithLLM };

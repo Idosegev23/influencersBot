@@ -103,11 +103,20 @@ No explanations, just the array.`,
 
     const content = response.text || '[]';
 
-    // Parse scores - handle various formats
+    // Parse scores - handle various formats including [[7],[9],[9]] and [7,9,9]
     let scores: number[];
     try {
-      const match = content.match(/\[[\s\S]*?\]/);
-      scores = match ? JSON.parse(match[0]) : [];
+      // Match the outermost [...] bracket pair
+      const match = content.match(/\[[\s\S]*\]/);
+      if (match) {
+        const parsed = JSON.parse(match[0]);
+        // Flatten nested arrays: [[7],[9],[9]] → [7,9,9]
+        scores = Array.isArray(parsed)
+          ? parsed.map((v: any) => Array.isArray(v) ? v[0] : v)
+          : [];
+      } else {
+        scores = [];
+      }
     } catch {
       log.warn('Failed to parse rerank scores, using similarity only', { content });
       scores = [];

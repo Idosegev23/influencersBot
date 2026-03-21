@@ -97,6 +97,7 @@ export interface RetrieveInput {
   entityTypes?: EntityType[];
   timeWindow?: { after?: string; before?: string };
   metadataFilter?: Record<string, unknown>;
+  archetype?: string;
 }
 
 export interface RetrievedSource {
