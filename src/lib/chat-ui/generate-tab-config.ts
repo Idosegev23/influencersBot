@@ -9,6 +9,11 @@ import { createClient } from '@/lib/supabase/server';
 interface TabConfig {
   id: string;
   label: string;
+  type: 'chat' | 'discover' | 'content' | 'coupons' | 'support';
+  filters?: {
+    topics?: string[];
+    entityTypes?: string[];
+  };
 }
 
 interface TabGenerationResult {
@@ -129,6 +134,67 @@ function generateGreeting(displayName: string, archetype: string): string {
   }
 }
 
+// ─── Content tab definitions per topic ───
+
+const TOPIC_TAB_LABELS: Record<string, string> = {
+  food: 'מתכונים',
+  beauty: 'טיפוח',
+  fashion: 'לוקים',
+  fitness: 'אימונים',
+  travel: 'יעדים',
+  tech: 'סקירות',
+  lifestyle: 'המלצות',
+  health: 'בריאות',
+  home: 'בית',
+  business: 'עסקים',
+  parenting: 'הורות',
+};
+
+/**
+ * Build content-type tabs based on available RAG topics.
+ * Only adds dedicated content tabs when there are multiple topics with enough data.
+ * For single-topic accounts, the discover tab already covers everything.
+ */
+function buildContentTabs(
+  archetype: string,
+  influencerType: string,
+  ragTopics: string[],
+  entityTypes: string[],
+  discoverLabel: string,
+): TabConfig[] {
+  // Filter out generic/empty topics and coupon (has its own tab)
+  const meaningfulTopics = ragTopics.filter(t => t && t !== 'coupon' && t !== 'other' && t !== 'general');
+
+  // Only add content tabs if there are 2+ distinct topics
+  if (meaningfulTopics.length < 2) return [];
+
+  // For brands: the discover tab already shows "מוצרים", so skip a duplicate products tab.
+  // Instead, add topic-based content tabs if they have diverse topics.
+  if (archetype === 'brand') {
+    // Brands typically don't need extra content tabs — discover covers products
+    return [];
+  }
+
+  // For influencers and others: create a tab per major topic
+  // Skip topics whose label matches the discover tab label (avoid duplicates)
+  // Limit to max 3 content tabs to keep UI clean
+  const topicTabs: TabConfig[] = [];
+  const sortedTopics = meaningfulTopics
+    .filter(t => TOPIC_TAB_LABELS[t] && TOPIC_TAB_LABELS[t] !== discoverLabel)
+    .slice(0, 3);
+
+  for (const topic of sortedTopics) {
+    topicTabs.push({
+      id: `content_${topic}`,
+      label: TOPIC_TAB_LABELS[topic],
+      type: 'content',
+      filters: { topics: [topic] },
+    });
+  }
+
+  return topicTabs;
+}
+
 /**
  * Generate and save tab config for a single account.
  * Reads RAG entity_types + coupons/partnerships to determine which tabs to show.
@@ -174,22 +240,33 @@ export async function generateTabConfig(accountId: string): Promise<TabGeneratio
   const hasCoupons = (couponCount || 0) > 0 || entityTypes.includes('coupon');
   const hasPartnerships = (partnershipCount || 0) > 0;
 
+  // Get distinct topics from RAG chunks
+  const { data: topicData } = await supabase
+    .from('document_chunks')
+    .select('topic')
+    .eq('account_id', accountId);
+  const ragTopics = [...new Set((topicData || []).map((r: { topic: string }) => r.topic).filter(Boolean))];
+
   // Build tabs
-  const tabs: TabConfig[] = [{ id: 'chat', label: 'צ׳אט' }];
+  const tabs: TabConfig[] = [{ id: 'chat', label: 'צ׳אט', type: 'chat' }];
 
   // Discover — always (every account has posts/transcriptions)
   const discoverLabel = resolveLabel(DISCOVER_LABELS, archetype, influencerType);
-  tabs.push({ id: 'discover', label: discoverLabel });
+  tabs.push({ id: 'discover', label: discoverLabel, type: 'discover' });
+
+  // Content tabs — based on RAG topics (only for archetypes with enough content variety)
+  const contentTabDefs = buildContentTabs(archetype, influencerType, ragTopics, entityTypes, discoverLabel);
+  tabs.push(...contentTabDefs);
 
   // Coupons — only if data exists
   if (hasCoupons) {
-    tabs.push({ id: 'coupons', label: COUPONS_LABELS[archetype] || 'קופונים' });
+    tabs.push({ id: 'coupons', label: COUPONS_LABELS[archetype] || 'קופונים', type: 'coupons' });
   }
 
   // Support — only for relevant archetypes + has partnerships
   const supportLabel = SUPPORT_LABELS[archetype];
   if (supportLabel && hasPartnerships) {
-    tabs.push({ id: 'support', label: supportLabel });
+    tabs.push({ id: 'support', label: supportLabel, type: 'support' });
   }
 
   const chatSubtitle = resolveLabel(SUBTITLE_TEMPLATES, archetype, influencerType);

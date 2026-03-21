@@ -62,7 +62,7 @@ export interface Influencer {
   greeting_message?: string | null;
   suggested_questions?: string[];
   // Per-account UI config (generated from RAG data)
-  tabs?: { id: string; label: string }[];
+  tabs?: { id: string; label: string; type?: string; filters?: { topics?: string[]; entityTypes?: string[] } }[];
   chat_subtitle?: string;
   header_label?: string;
   // White label fields

@@ -34,6 +34,7 @@ import { getInfluencerByUsername, getBrandsByInfluencer, getContentByInfluencer,
 import type { DiscoveryCategoryAvailability } from '@/lib/discovery/types';
 
 const DiscoveryTab = dynamic(() => import('@/components/chat/discovery/DiscoveryTab'), { ssr: false });
+const ContentBrowseTab = dynamic(() => import('@/components/chat/ContentBrowseTab'), { ssr: false });
 import { applyTheme, getGoogleFontsUrl } from '@/lib/theme';
 import { getProxiedImageUrl } from '@/lib/image-utils';
 import { BrandCards } from '@/components/chat/BrandCards';
@@ -113,21 +114,26 @@ const typeLabels: Record<InfluencerType, string> = {
 };
 
 // Tab styling per tab id (icon, colors)
-type TabId = 'chat' | 'coupons' | 'support' | 'discover';
+type TabId = string; // Dynamic — tab ids come from account config
 
 const TAB_STYLE: Record<string, { icon: typeof MessageCircle; activeColor: string; activeBg: string }> = {
   chat: { icon: MessageCircle, activeColor: '#6d28d9', activeBg: 'rgba(139, 92, 246, 0.12)' },
   discover: { icon: Compass, activeColor: '#7c3aed', activeBg: 'rgba(168, 85, 247, 0.12)' },
+  content: { icon: Sparkles, activeColor: '#7c3aed', activeBg: 'rgba(168, 85, 247, 0.12)' },
   coupons: { icon: Ticket, activeColor: '#059669', activeBg: 'rgba(16, 185, 129, 0.12)' },
   support: { icon: AlertCircle, activeColor: '#db2777', activeBg: 'rgba(244, 114, 182, 0.12)' },
 };
 
+function getTabStyle(tabId: string) {
+  return TAB_STYLE[tabId] || (tabId.startsWith('content_') ? TAB_STYLE.content : TAB_STYLE.chat);
+}
+
 // Default tabs if config.tabs is not set (fallback)
-const DEFAULT_TABS = [
-  { id: 'chat', label: 'צ׳אט' },
-  { id: 'discover', label: 'גלו' },
-  { id: 'coupons', label: 'קופונים' },
-  { id: 'support', label: 'בעיה בהזמנה' },
+const DEFAULT_TABS: { id: string; label: string; type: string; filters?: { topics?: string[]; entityTypes?: string[] } }[] = [
+  { id: 'chat', label: 'צ׳אט', type: 'chat' },
+  { id: 'discover', label: 'גלו', type: 'discover' },
+  { id: 'coupons', label: 'קופונים', type: 'coupons' },
+  { id: 'support', label: 'בעיה בהזמנה', type: 'support' },
 ];
 
 /**
@@ -872,9 +878,9 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
               {/* Left side: Tab pills */}
               <div className="flex items-center gap-2 flex-shrink-0">
               <div className="flex items-center gap-[5px] rounded-full p-[6px]" style={{ background: 'rgba(255,255,255,0.3)' }}>
-                {(influencer.tabs || DEFAULT_TABS).map((tab: { id: string; label: string }) => {
+                {(influencer.tabs || DEFAULT_TABS).map((tab: { id: string; label: string; type?: string }) => {
                   const isActive = activeTab === tab.id;
-                  const style = TAB_STYLE[tab.id] || TAB_STYLE.chat;
+                  const style = getTabStyle(tab.id);
                   const TabIcon = style.icon;
                   return (
                     <button
@@ -1736,7 +1742,41 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   onCategoryOpened={() => setInitialDiscoverySlug(null)}
                 />
               </motion.div>
-            ) : null}
+            ) : (() => {
+              // Content-type tabs (content_food, content_beauty, etc.)
+              const currentTabConfig = (influencer.tabs || DEFAULT_TABS).find((t: { id: string }) => t.id === activeTab);
+              if (currentTabConfig?.type === 'content' || activeTab.startsWith('content_')) {
+                const filters = (currentTabConfig as { filters?: { topics?: string[]; entityTypes?: string[] } })?.filters;
+                return (
+                  <ContentBrowseTab
+                    key={activeTab}
+                    username={username}
+                    tabLabel={currentTabConfig?.label || 'תוכן'}
+                    topics={filters?.topics}
+                    entityTypes={filters?.entityTypes}
+                    onAskAbout={(question: string) => {
+                      setActiveTab('chat');
+                      maybeShowLeadPopup();
+                      const userMsg = { id: Date.now().toString(), role: 'user' as const, content: question };
+                      setMessages(prev => [...prev, userMsg]);
+                      setIsTyping(true);
+                      const assistantMessageId = (Date.now() + 1).toString();
+                      setStreamingMessageId(assistantMessageId);
+                      setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant' as const, content: '' }]);
+                      setIsTyping(false);
+                      sendStreamMessage({
+                        message: question,
+                        username,
+                        sessionId: sessionId || undefined,
+                        previousResponseId: responseId || undefined,
+                        clientMessageId: assistantMessageId,
+                      });
+                    }}
+                  />
+                );
+              }
+              return null;
+            })()}
           </AnimatePresence>
         </div>
 
@@ -1744,8 +1784,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
         {isMobile && influencer && (
           <div className="mobile-bottom-tabs">
             <div className="mobile-bottom-tabs-inner">
-              {(influencer.tabs || DEFAULT_TABS).map((tab: { id: string; label: string }) => {
-                const style = TAB_STYLE[tab.id] || TAB_STYLE.chat;
+              {(influencer.tabs || DEFAULT_TABS).map((tab: { id: string; label: string; type?: string }) => {
+                const style = getTabStyle(tab.id);
                 const TabIcon = style.icon;
                 return (
                   <button

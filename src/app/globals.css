@@ -2317,7 +2317,8 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 700;
 }
 
-.mobile-tab-btn.active-discover {
+.mobile-tab-btn.active-discover,
+.mobile-tab-btn[class*="active-content_"] {
   background: rgba(168, 85, 247, 0.12);
   color: #7c3aed;
   font-weight: 700;
