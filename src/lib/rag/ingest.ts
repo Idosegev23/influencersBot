@@ -10,6 +10,7 @@
  * - Incremental re-ingestion (upsert by source_id)
  */
 
+import crypto from 'crypto';
 import { createClient } from '@/lib/supabase/server';
 import { chunkText, chunkTextSemantic, normalizeText, estimateTokens } from './chunker';
 import { generateEmbeddings } from './embeddings';
@@ -116,21 +117,58 @@ export async function ingestDocument(input: IngestInput): Promise<IngestResult> 
     throw new Error(`Failed to insert document: ${docError?.message}`);
   }
 
-  // 6. Insert chunks with embeddings
-  const chunkRows = chunks.map((chunk, i) => ({
-    document_id: doc.id,
-    account_id: accountId,
-    entity_type: entityType,
-    chunk_index: chunk.index,
-    chunk_text: chunk.text,
-    embedding: JSON.stringify(embeddings[i]),
-    token_count: chunk.tokenCount,
-    metadata: {
-      ...metadata,
-      startChar: chunk.startChar,
-      endChar: chunk.endChar,
-    },
-  }));
+  // 6. Compute hashes and deduplicate against existing chunks
+  const chunkHashes = chunks.map(c =>
+    crypto.createHash('md5').update(c.text).digest('hex')
+  );
+
+  // Query existing hashes for this account (batch check)
+  const { data: existingHashRows } = await supabase
+    .from('document_chunks')
+    .select('chunk_hash')
+    .eq('account_id', accountId)
+    .in('chunk_hash', chunkHashes);
+
+  const existingHashes = new Set(
+    (existingHashRows || []).map(r => r.chunk_hash)
+  );
+
+  // Build chunk rows, skipping duplicates
+  const chunkRows: Array<Record<string, any>> = [];
+  let skippedDuplicates = 0;
+
+  for (let i = 0; i < chunks.length; i++) {
+    const hash = chunkHashes[i];
+    if (existingHashes.has(hash)) {
+      skippedDuplicates++;
+      continue;
+    }
+    // Mark as seen so we don't insert duplicates within the same document
+    existingHashes.add(hash);
+
+    chunkRows.push({
+      document_id: doc.id,
+      account_id: accountId,
+      entity_type: entityType,
+      chunk_index: chunks[i].index,
+      chunk_text: chunks[i].text,
+      chunk_hash: hash,
+      embedding: JSON.stringify(embeddings[i]),
+      token_count: chunks[i].tokenCount,
+      metadata: {
+        ...metadata,
+        startChar: chunks[i].startChar,
+        endChar: chunks[i].endChar,
+      },
+    });
+  }
+
+  if (skippedDuplicates > 0) {
+    log.info('Dedup: skipped duplicate chunks', {
+      skipped: skippedDuplicates,
+      kept: chunkRows.length,
+    }, accountId);
+  }
 
   // Insert in batches of 50 (Supabase limit)
   const BATCH_SIZE = 50;
@@ -152,14 +190,16 @@ export async function ingestDocument(input: IngestInput): Promise<IngestResult> 
   const durationMs = Date.now() - startMs;
   log.info('Ingestion complete', {
     documentId: doc.id,
-    chunksCreated: chunks.length,
+    chunksCreated: chunkRows.length,
+    skippedDuplicates,
     totalTokens,
     durationMs,
   }, accountId);
 
   return {
     documentId: doc.id,
-    chunksCreated: chunks.length,
+    chunksCreated: chunkRows.length,
+    skippedDuplicates,
     totalTokens,
     durationMs,
   };
