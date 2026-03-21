@@ -4,9 +4,9 @@
  * Used by: scan-account.ts, generate-tab-config script, content-processor
  *
  * Tab structure per archetype:
+ *   influencer:       צ׳אט | גלו | [קופונים] | [בעיה בהזמנה]
  *   brand:            צ׳אט | גלו | מוצרים | [מבצעים] | [שירות לקוחות]
- *   influencer:       צ׳אט | גלו | מתכונים/טיפוח/טיפים | [קופונים] | [בעיה בהזמנה]
- *   media_news:       צ׳אט | גלו | עדכונים | [קופונים]
+ *   media_news:       צ׳אט | גלו | עדכונים אחרונים | [קופונים]
  *   service_provider: צ׳אט | גלו | שירותים
  *   local_business:   צ׳אט | גלו | מוצרים | [הטבות] | [בעיה בהזמנה]
  *   tech_creator:     צ׳אט | גלו | סקירות
@@ -178,11 +178,22 @@ export async function generateTabConfig(accountId: string): Promise<TabGeneratio
   const hasCoupons = (couponCount || 0) > 0 || entityTypes.includes('coupon');
   const hasPartnerships = (partnershipCount || 0) > 0;
 
-  // Build tabs: chat + גלו + [coupons] + [support]
+  // Build tabs: chat + גלו + [type-specific] + [coupons] + [support]
   const tabs: TabConfig[] = [{ id: 'chat', label: 'צ׳אט', type: 'chat' }];
 
   // גלו — always present, universal discover tab
   tabs.push({ id: 'discover', label: 'גלו', type: 'discover' });
+
+  // Type-specific tab (NOT for influencers — they only get גלו)
+  if (archetype === 'brand' || archetype === 'local_business') {
+    tabs.push({ id: 'topics', label: 'מוצרים', type: 'topics' });
+  } else if (archetype === 'media_news') {
+    tabs.push({ id: 'topics', label: 'עדכונים אחרונים', type: 'topics' });
+  } else if (archetype === 'service_provider') {
+    tabs.push({ id: 'topics', label: 'שירותים', type: 'topics' });
+  } else if (archetype === 'tech_creator') {
+    tabs.push({ id: 'topics', label: 'סקירות', type: 'topics' });
+  }
 
   // Coupons — only if data exists
   if (hasCoupons) {
