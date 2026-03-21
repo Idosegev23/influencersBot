@@ -112,62 +112,23 @@ const typeLabels: Record<InfluencerType, string> = {
   other: 'טיפים והמלצות',
 };
 
-// Tab definitions per account type
-type TabId = 'chat' | 'coupons' | 'problem' | 'discover';
+// Tab styling per tab id (icon, colors)
+type TabId = 'chat' | 'coupons' | 'support' | 'discover';
 
-interface TabDef {
-  id: TabId;
-  label: string;
-  icon: typeof MessageCircle;
-  activeColor: string;
-  activeBg: string;
-}
+const TAB_STYLE: Record<string, { icon: typeof MessageCircle; activeColor: string; activeBg: string }> = {
+  chat: { icon: MessageCircle, activeColor: '#6d28d9', activeBg: 'rgba(139, 92, 246, 0.12)' },
+  discover: { icon: Compass, activeColor: '#7c3aed', activeBg: 'rgba(168, 85, 247, 0.12)' },
+  coupons: { icon: Ticket, activeColor: '#059669', activeBg: 'rgba(16, 185, 129, 0.12)' },
+  support: { icon: AlertCircle, activeColor: '#db2777', activeBg: 'rgba(244, 114, 182, 0.12)' },
+};
 
-const TAB_CHAT: TabDef = { id: 'chat', label: 'צ׳אט', icon: MessageCircle, activeColor: '#6d28d9', activeBg: 'rgba(139, 92, 246, 0.12)' };
-const TAB_COUPONS: TabDef = { id: 'coupons', label: 'קופונים', icon: Ticket, activeColor: '#059669', activeBg: 'rgba(16, 185, 129, 0.12)' };
-const TAB_PROBLEM: TabDef = { id: 'problem', label: 'בעיה בהזמנה', icon: AlertCircle, activeColor: '#db2777', activeBg: 'rgba(244, 114, 182, 0.12)' };
-const TAB_DISCOVER: TabDef = { id: 'discover', label: 'גלו', icon: Compass, activeColor: '#7c3aed', activeBg: 'rgba(168, 85, 247, 0.12)' };
-
-function getTabsForAccount(archetype: string | undefined, username: string): TabDef[] {
-  switch (archetype) {
-    case 'brand':
-      return [TAB_CHAT, TAB_COUPONS];
-    case 'service_provider':
-      return [TAB_CHAT];
-    case 'media_news':
-      return [TAB_CHAT];
-    default:
-      // Creators/influencers: all tabs
-      const tabs = [TAB_CHAT, TAB_COUPONS, TAB_PROBLEM];
-      if (username === 'miranbuzaglo') tabs.push(TAB_DISCOVER);
-      return tabs;
-  }
-}
-
-// Subtitle text per account archetype (shown in empty chat state)
-function getSubtitleForAccount(archetype: string | undefined, influencerType: InfluencerType | string | undefined): string {
-  const typeLabel = (typeLabels[(influencerType as InfluencerType) || 'other'] || typeLabels.other).toLowerCase();
-  switch (archetype) {
-    case 'brand':
-      return `אני כאן לעזור עם מוצרים, המלצות וקופונים`;
-    case 'service_provider':
-      return `אני כאן לעזור עם שירותים, פרויקטים ומידע`;
-    case 'media_news':
-      return `אני כאן לעזור עם חדשות, כתבות ומידע`;
-    default:
-      return `אני כאן לעזור עם ${typeLabel}, מותגים וקופונים`;
-  }
-}
-
-// Header subtitle label (under name) — archetype-aware
-function getHeaderLabel(archetype: string | undefined, influencerType: InfluencerType | string | undefined): string {
-  switch (archetype) {
-    case 'brand': return 'מותג';
-    case 'service_provider': return 'נותן שירות';
-    case 'media_news': return 'חדשות ומדיה';
-    default: return typeLabels[(influencerType as InfluencerType) || 'other'] || typeLabels.other;
-  }
-}
+// Default tabs if config.tabs is not set (fallback)
+const DEFAULT_TABS = [
+  { id: 'chat', label: 'צ׳אט' },
+  { id: 'discover', label: 'גלו' },
+  { id: 'coupons', label: 'קופונים' },
+  { id: 'support', label: 'בעיה בהזמנה' },
+];
 
 /**
  * Parse AI-generated suggestions from bot response.
@@ -268,7 +229,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
 
   // Reset problem tab when switching away
   useEffect(() => {
-    if (activeTab !== 'problem') {
+    if (activeTab !== 'support') {
       setProblemStep('brands');
       setProblemBrand(null);
       setProblemForm({ name: '', phone: '', order: '', details: '' });
@@ -876,7 +837,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 </div>
                 <div>
                   <h1 className="font-semibold text-base whitespace-nowrap overflow-hidden text-ellipsis" style={{ color: '#0c1013' }}>{influencer.display_name}</h1>
-                  <p className="text-xs" style={{ color: '#676767' }}>{getHeaderLabel(influencer.archetype, influencer.influencer_type)}</p>
+                  <p className="text-xs" style={{ color: '#676767' }}>{influencer.header_label || typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other}</p>
                 </div>
               </div>
               <div className="flex items-center gap-1">
@@ -904,22 +865,23 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 </div>
                 <div className="min-w-0">
                   <h1 className="font-semibold text-[19px] whitespace-nowrap overflow-hidden text-ellipsis" style={{ color: '#0c1013' }}>{influencer.display_name}</h1>
-                  <p className="text-[13px] whitespace-nowrap" style={{ color: '#676767' }}>{getHeaderLabel(influencer.archetype, influencer.influencer_type)}</p>
+                  <p className="text-[13px] whitespace-nowrap" style={{ color: '#676767' }}>{influencer.header_label || typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other}</p>
                 </div>
               </div>
 
               {/* Left side: Tab pills */}
               <div className="flex items-center gap-2 flex-shrink-0">
               <div className="flex items-center gap-[5px] rounded-full p-[6px]" style={{ background: 'rgba(255,255,255,0.3)' }}>
-                {getTabsForAccount(influencer.archetype, username).map((tab) => {
+                {(influencer.tabs || DEFAULT_TABS).map((tab: { id: string; label: string }) => {
                   const isActive = activeTab === tab.id;
-                  const TabIcon = tab.icon;
+                  const style = TAB_STYLE[tab.id] || TAB_STYLE.chat;
+                  const TabIcon = style.icon;
                   return (
                     <button
                       key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
+                      onClick={() => setActiveTab(tab.id as TabId)}
                       className="flex items-center gap-[6px] px-[11px] py-[6px] rounded-full transition-all"
-                      style={{ color: isActive ? tab.activeColor : '#676767', fontSize: '16px', fontWeight: isActive ? 700 : 400, background: isActive ? tab.activeBg : 'transparent' }}
+                      style={{ color: isActive ? style.activeColor : '#676767', fontSize: '16px', fontWeight: isActive ? 700 : 400, background: isActive ? style.activeBg : 'transparent' }}
                     >
                       <span>{tab.label}</span>
                       <TabIcon className="w-[18px] h-[18px]" />
@@ -980,7 +942,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         className="mb-8 max-w-sm"
                         style={{ color: '#676767', fontSize: '16px' }}
                       >
-                        {getSubtitleForAccount(influencer.archetype, influencer.influencer_type)}
+                        {influencer.chat_subtitle || `אני כאן לעזור עם ${(typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other).toLowerCase()}, מותגים וקופונים`}
                       </motion.p>
 
                       {/* Inline input in empty state (centered, Figma style) */}
@@ -1040,7 +1002,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                       </motion.div>
 
                       {/* Discovery category pills — only for the_dekel */}
-                      {username === 'miranbuzaglo' && discoveryCategories.length > 0 && (
+                      {(influencer.tabs || DEFAULT_TABS).some((t: { id: string }) => t.id === 'discover') && discoveryCategories.length > 0 && (
                         <motion.div
                           initial={{ opacity: 0, y: 8 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -1545,10 +1507,10 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   </div>
                 </div>
               </motion.div>
-            ) : activeTab === 'problem' ? (
-              /* ============ PROBLEM/SUPPORT TAB — WOW GLASSMORPHIC ============ */
+            ) : activeTab === 'support' ? (
+              /* ============ SUPPORT TAB — WOW GLASSMORPHIC ============ */
               <motion.div
-                key="problem"
+                key="support"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -1782,12 +1744,13 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
         {isMobile && influencer && (
           <div className="mobile-bottom-tabs">
             <div className="mobile-bottom-tabs-inner">
-              {getTabsForAccount(influencer.archetype, username).map((tab) => {
-                const TabIcon = tab.icon;
+              {(influencer.tabs || DEFAULT_TABS).map((tab: { id: string; label: string }) => {
+                const style = TAB_STYLE[tab.id] || TAB_STYLE.chat;
+                const TabIcon = style.icon;
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
+                    onClick={() => setActiveTab(tab.id as TabId)}
                     className={`mobile-tab-btn ${activeTab === tab.id ? `active-${tab.id}` : ''}`}
                   >
                     <TabIcon className="w-[18px] h-[18px]" />

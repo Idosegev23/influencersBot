@@ -61,6 +61,10 @@ export interface Influencer {
   // Personalization fields
   greeting_message?: string | null;
   suggested_questions?: string[];
+  // Per-account UI config (generated from RAG data)
+  tabs?: { id: string; label: string }[];
+  chat_subtitle?: string;
+  header_label?: string;
   // White label fields
   hide_branding?: boolean;
   custom_logo_url?: string | null;

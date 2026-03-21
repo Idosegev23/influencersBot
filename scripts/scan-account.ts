@@ -55,6 +55,18 @@ async function main() {
     priority: 'high',
   });
 
+  // Step 4: Generate tab config from RAG data
+  console.log('\n🏷️  Step 4: Generating tab config from RAG data...');
+  try {
+    const { generateTabConfig } = await import('../src/lib/chat-ui/generate-tab-config');
+    const tabResult = await generateTabConfig(accountId);
+    console.log(`   Tabs: ${tabResult.tabs.map((t: { label: string }) => t.label).join(' | ')}`);
+    console.log(`   Subtitle: ${tabResult.chat_subtitle}`);
+    console.log(`   Greeting: ${tabResult.greeting_message}`);
+  } catch (err: any) {
+    console.error(`   ⚠️ Tab config generation failed: ${err.message}`);
+  }
+
   const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
 
   console.log(`\n${'='.repeat(60)}`);

@@ -238,6 +238,9 @@ export async function getInfluencerByUsername(username: string): Promise<Influen
     // Additional config fields
     greeting_message: config.greeting_message,
     suggested_questions: config.suggested_questions,
+    tabs: config.tabs,
+    chat_subtitle: config.chat_subtitle,
+    header_label: config.header_label,
     hide_branding: config.hide_branding,
     custom_logo_url: config.custom_logo_url,
     scrape_settings: config.scrape_settings,

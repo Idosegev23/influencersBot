@@ -2310,7 +2310,8 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 700;
 }
 
-.mobile-tab-btn.active-problem {
+.mobile-tab-btn.active-problem,
+.mobile-tab-btn.active-support {
   background: rgba(244, 114, 182, 0.12);
   color: #db2777;
   font-weight: 700;
