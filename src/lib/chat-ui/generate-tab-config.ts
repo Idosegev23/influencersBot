@@ -178,15 +178,11 @@ export async function generateTabConfig(accountId: string): Promise<TabGeneratio
   const hasCoupons = (couponCount || 0) > 0 || entityTypes.includes('coupon');
   const hasPartnerships = (partnershipCount || 0) > 0;
 
-  // Build tabs: chat + גלו + type-specific + [coupons] + [support]
+  // Build tabs: chat + גלו + [coupons] + [support]
   const tabs: TabConfig[] = [{ id: 'chat', label: 'צ׳אט', type: 'chat' }];
 
   // גלו — always present, universal discover tab
   tabs.push({ id: 'discover', label: 'גלו', type: 'discover' });
-
-  // Type-specific tab — questions/content organized by archetype
-  const topicsLabel = resolveLabel(TOPICS_TAB_LABELS, archetype, influencerType);
-  tabs.push({ id: 'topics', label: topicsLabel, type: 'topics' });
 
   // Coupons — only if data exists
   if (hasCoupons) {
