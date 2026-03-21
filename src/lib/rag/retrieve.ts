@@ -628,12 +628,14 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
       if (c.topic) {
         const chunkTopic = c.topic.toLowerCase();
         const isOnTopic = inferredTopics.some(qt => qt === chunkTopic);
-        if (!isOnTopic) {
+        if (isOnTopic) {
+          c.similarity += 0.05; // Small boost for on-topic chunks
+        } else {
           const isCrossDomain = inferredTopics.some(qt =>
             CROSS_DOMAIN[qt]?.has(chunkTopic)
           );
           if (isCrossDomain) {
-            c.similarity -= 0.15;
+            c.similarity -= 0.25;
           }
         }
       }
@@ -642,6 +644,10 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
 
   // Re-sort after heuristic adjustments
   filtered.sort((a, b) => b.similarity - a.similarity);
+
+  // Drop chunks that fell below minimum threshold after penalties
+  const POST_PENALTY_THRESHOLD = 0.35;
+  filtered = filtered.filter(c => c.similarity >= POST_PENALTY_THRESHOLD);
 
   // --- Chunk dedup + diversity (archetype-aware caps) ---
   const perSource = new Map<string, number>();
