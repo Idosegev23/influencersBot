@@ -433,8 +433,8 @@ export default function ManagePage() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-500">טוען...</p>
+          <div className="w-10 h-10 border-3 border-[#AEB0E8] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-[#bab1a1] font-medium">טוען...</p>
         </div>
       </div>
     );
@@ -443,44 +443,51 @@ export default function ManagePage() {
   if (!isAuthenticated) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md text-center">
-          <div className="text-4xl mb-4">🔒</div>
-          <h1 className="text-xl font-bold mb-2">הלינק לא תקף</h1>
-          <p className="text-gray-500">הלינק פג תוקף או לא חוקי. פנה למנהל המערכת לקבלת לינק חדש.</p>
+        <div className="neon-card max-w-md text-center p-8">
+          <div className="w-16 h-16 rounded-full bg-[#FF76B0]/15 flex items-center justify-center mx-auto mb-4">
+            <span className="material-symbols-outlined text-[#FF76B0]" style={{ fontSize: 32 }}>lock</span>
+          </div>
+          <h1 className="text-xl font-bold text-[#373226] mb-2 font-headline">הלינק לא תקף</h1>
+          <p className="text-[#655e51]">הלינק פג תוקף או לא חוקי. פנה למנהל המערכת לקבלת לינק חדש.</p>
         </div>
       </div>
     );
   }
 
   const tabs = [
-    { id: 'instructions' as const, label: 'הנחיות לבוט', icon: '🤖' },
-    { id: 'faq' as const, label: 'שאלות נפוצות', icon: '❓' },
-    { id: 'pages' as const, label: 'דפים סרוקים', icon: '📄' },
-    { id: 'knowledge' as const, label: 'ידע נוסף', icon: '📚' },
-    { id: 'products' as const, label: 'מוצרים', icon: '🛍️' },
-    { id: 'design' as const, label: 'הגדרות ווידג\'ט', icon: '⚙️' },
+    { id: 'instructions' as const, label: 'הנחיות לבוט', icon: 'smart_toy', color: '#AEB0E8' },
+    { id: 'faq' as const, label: 'שאלות נפוצות', icon: 'help', color: '#69FFC7' },
+    { id: 'pages' as const, label: 'דפים סרוקים', icon: 'article', color: '#7EC8E3' },
+    { id: 'knowledge' as const, label: 'ידע נוסף', icon: 'menu_book', color: '#FFB89A' },
+    { id: 'products' as const, label: 'מוצרים', icon: 'shopping_bag', color: '#FF76B0' },
+    { id: 'design' as const, label: 'הגדרות ווידג\'ט', icon: 'palette', color: '#AEB0E8' },
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <header className="neon-glass-nav sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">{displayName || 'ניהול ווידג\'ט'}</h1>
-            {domain && <p className="text-sm text-gray-500">{domain}</p>}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-[#FFB89A]/20 flex items-center justify-center">
+              <span className="material-symbols-outlined text-[#FFB89A]" style={{ fontSize: 22 }}>settings</span>
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-[#373226] font-headline">{displayName || 'ניהול ווידג\'ט'}</h1>
+              {domain && <p className="text-sm text-[#bab1a1]">{domain}</p>}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {saveMsg && (
-              <span className={`text-sm px-3 py-1 rounded-full ${saveMsg.includes('הצלחה') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+              <span className={`text-sm px-4 py-1.5 rounded-full font-medium ${saveMsg.includes('הצלחה') ? 'bg-[#69FFC7]/20 text-[#2a8a5e]' : 'bg-[#FF76B0]/15 text-[#d4365c]'}`}>
                 {saveMsg}
               </span>
             )}
             <button
               onClick={() => setShowLivePreview(true)}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              className="neon-pill neon-pill-secondary flex items-center gap-1.5 px-5 py-2.5 text-sm font-medium"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>visibility</span>
               צפייה חיה
             </button>
           </div>
@@ -488,20 +495,20 @@ export default function ManagePage() {
       </header>
 
       {/* Tabs */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-white/60 backdrop-blur-sm border-b border-[#e8e0d4]">
         <div className="max-w-5xl mx-auto px-4">
-          <nav className="flex gap-1 overflow-x-auto">
+          <nav className="flex gap-2 overflow-x-auto py-3">
             {tabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium whitespace-nowrap rounded-full transition-all ${
                   activeTab === tab.id
-                    ? 'border-indigo-500 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'bg-[#AEB0E8] text-white shadow-sm'
+                    : 'bg-transparent border border-[#e8e0d4] text-[#655e51] hover:bg-white hover:border-[#AEB0E8]/40'
                 }`}
               >
-                <span className="ml-1.5">{tab.icon}</span>
+                <span className="material-symbols-outlined" style={{ fontSize: 18, color: activeTab === tab.id ? 'white' : tab.color }}>{tab.icon}</span>
                 {tab.label}
               </button>
             ))}
@@ -514,18 +521,18 @@ export default function ManagePage() {
         {/* Tab 1: Instructions */}
         {activeTab === 'instructions' && (
           <div className="space-y-6">
-            <Card title="הנחיות לבוט" description="ספר לבוט איך להתנהג — ההנחיות האלו מתווספות מעל ההנחיות הבסיסיות">
+            <Card icon="smart_toy" iconColor="#AEB0E8" title="הנחיות לבוט" description="ספר לבוט איך להתנהג -- ההנחיות האלו מתווספות מעל ההנחיות הבסיסיות">
               <textarea
                 value={instructions}
                 onChange={e => setInstructions(e.target.value)}
                 placeholder="לדוגמה: תמיד הצע מוצרים ממבצע השבוע. אל תציע מוצרים שאזלו מהמלאי. דבר בצורה חמה ואישית..."
-                className="w-full h-32 p-3 border border-gray-200 rounded-xl text-sm resize-y focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                className="neon-input w-full h-32 !rounded-2xl text-sm resize-y"
                 maxLength={1000}
               />
-              <p className="text-xs text-gray-400 mt-1">{instructions.length}/1000</p>
+              <p className="text-xs text-[#bab1a1] mt-1">{instructions.length}/1000</p>
             </Card>
 
-            <Card title="טון שיחה">
+            <Card icon="record_voice_over" iconColor="#69FFC7" title="טון שיחה">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
                   { value: 'friendly', label: 'ידידותי', desc: 'חם ונגיש' },
@@ -536,20 +543,20 @@ export default function ManagePage() {
                   <button
                     key={opt.value}
                     onClick={() => setTone(opt.value)}
-                    className={`p-3 rounded-xl border-2 text-right transition-all ${
+                    className={`p-3 rounded-2xl border-2 text-right transition-all ${
                       tone === opt.value
-                        ? 'border-indigo-500 bg-indigo-50'
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-[#AEB0E8] bg-[#AEB0E8]/10'
+                        : 'border-[#e8e0d4] hover:border-[#AEB0E8]/40 bg-white'
                     }`}
                   >
-                    <div className="font-medium text-sm">{opt.label}</div>
-                    <div className="text-xs text-gray-500">{opt.desc}</div>
+                    <div className="font-medium text-sm text-[#373226]">{opt.label}</div>
+                    <div className="text-xs text-[#bab1a1]">{opt.desc}</div>
                   </button>
                 ))}
               </div>
             </Card>
 
-            <Card title="נושאים לדגש" description="הבוט יתמקד בנושאים האלו">
+            <Card icon="bookmark" iconColor="#69FFC7" title="נושאים לדגש" description="הבוט יתמקד בנושאים האלו">
               <TagInput
                 tags={focusTopics}
                 onAdd={(tag) => setFocusTopics(prev => [...prev, tag])}
@@ -557,11 +564,11 @@ export default function ManagePage() {
                 value={newFocus}
                 onChange={setNewFocus}
                 placeholder="הוסף נושא..."
-                color="indigo"
+                color="focus"
               />
             </Card>
 
-            <Card title="נושאים חסומים" description="הבוט יסרב לדון בנושאים האלו">
+            <Card icon="block" iconColor="#FF76B0" title="נושאים חסומים" description="הבוט יסרב לדון בנושאים האלו">
               <TagInput
                 tags={bannedTopics}
                 onAdd={(tag) => setBannedTopics(prev => [...prev, tag])}
@@ -569,14 +576,14 @@ export default function ManagePage() {
                 value={newBanned}
                 onChange={setNewBanned}
                 placeholder="הוסף נושא חסום..."
-                color="red"
+                color="banned"
               />
             </Card>
 
             <button
               onClick={savePromptSettings}
               disabled={saving}
-              className="w-full sm:w-auto px-6 py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+              className="neon-pill neon-pill-primary w-full sm:w-auto px-8 py-3 font-medium disabled:opacity-50 transition-all"
             >
               {saving ? 'שומר...' : 'שמור הנחיות'}
             </button>
@@ -586,40 +593,40 @@ export default function ManagePage() {
         {/* Tab 2: FAQ */}
         {activeTab === 'faq' && (
           <div className="space-y-6">
-            <Card title="שאלות נפוצות" description="הבוט יענה על שאלות אלו בעדיפות גבוהה">
+            <Card icon="help" iconColor="#69FFC7" title="שאלות נפוצות" description="הבוט יענה על שאלות אלו בעדיפות גבוהה">
               <div className="space-y-3">
                 {faqItems.map((item, idx) => (
-                  <div key={idx} className="border border-gray-200 rounded-xl p-4 bg-gray-50">
+                  <div key={idx} className="border border-[#e8e0d4] rounded-2xl p-4 bg-[#faf2e9]/50">
                     <div className="flex justify-between items-start mb-2">
-                      <div className="font-medium text-sm text-gray-900">ש: {item.question}</div>
+                      <div className="font-medium text-sm text-[#373226]">ש: {item.question}</div>
                       <button
                         onClick={() => setFaqItems(prev => prev.filter((_, i) => i !== idx))}
-                        className="text-red-400 hover:text-red-600 text-sm mr-2"
+                        className="text-[#FF76B0] hover:text-[#d4365c] text-sm mr-2 font-medium"
                       >
                         מחק
                       </button>
                     </div>
-                    <div className="text-sm text-gray-600">ת: {item.answer}</div>
+                    <div className="text-sm text-[#655e51]">ת: {item.answer}</div>
                   </div>
                 ))}
 
                 {faqItems.length === 0 && (
-                  <p className="text-gray-400 text-sm text-center py-4">אין שאלות נפוצות עדיין</p>
+                  <p className="text-[#bab1a1] text-sm text-center py-4">אין שאלות נפוצות עדיין</p>
                 )}
               </div>
 
-              <div className="mt-4 border-t border-gray-200 pt-4 space-y-3">
+              <div className="mt-4 border-t border-[#e8e0d4] pt-4 space-y-3">
                 <input
                   value={newFaqQ}
                   onChange={e => setNewFaqQ(e.target.value)}
                   placeholder="שאלה..."
-                  className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  className="neon-input w-full"
                 />
                 <textarea
                   value={newFaqA}
                   onChange={e => setNewFaqA(e.target.value)}
                   placeholder="תשובה..."
-                  className="w-full h-20 p-3 border border-gray-200 rounded-xl text-sm resize-y focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  className="neon-input w-full h-20 !rounded-2xl resize-y"
                 />
                 <button
                   onClick={() => {
@@ -630,9 +637,10 @@ export default function ManagePage() {
                     }
                   }}
                   disabled={!newFaqQ.trim() || !newFaqA.trim()}
-                  className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-xl text-sm font-medium hover:bg-indigo-200 disabled:opacity-50 transition-colors"
+                  className="neon-pill neon-pill-outline px-4 py-2 text-sm font-medium disabled:opacity-50 flex items-center gap-1.5"
                 >
-                  + הוסף שאלה
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add</span>
+                  הוסף שאלה
                 </button>
               </div>
             </Card>
@@ -640,7 +648,7 @@ export default function ManagePage() {
             <button
               onClick={savePromptSettings}
               disabled={saving}
-              className="w-full sm:w-auto px-6 py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+              className="neon-pill neon-pill-primary w-full sm:w-auto px-8 py-3 font-medium disabled:opacity-50 transition-all"
             >
               {saving ? 'שומר...' : 'שמור שאלות נפוצות'}
             </button>
@@ -651,78 +659,82 @@ export default function ManagePage() {
         {activeTab === 'pages' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold">דפים סרוקים ({pages.length})</h2>
-              <button onClick={loadPages} className="text-sm text-indigo-600 hover:text-indigo-700">
+              <h2 className="text-lg font-bold text-[#373226] font-headline">דפים סרוקים ({pages.length})</h2>
+              <button onClick={loadPages} className="neon-pill neon-pill-ghost text-sm px-4 py-1.5 flex items-center gap-1">
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>refresh</span>
                 רענן
               </button>
             </div>
 
             {pagesLoading ? (
-              <div className="text-center py-8 text-gray-400">טוען דפים...</div>
+              <div className="text-center py-8 text-[#bab1a1]">טוען דפים...</div>
             ) : pages.length === 0 ? (
-              <div className="text-center py-12 text-gray-400">
-                <div className="text-4xl mb-2">📄</div>
+              <div className="text-center py-12 text-[#bab1a1]">
+                <div className="w-16 h-16 rounded-full bg-[#7EC8E3]/15 flex items-center justify-center mx-auto mb-3">
+                  <span className="material-symbols-outlined text-[#7EC8E3]" style={{ fontSize: 32 }}>article</span>
+                </div>
                 <p>אין דפים סרוקים עדיין</p>
               </div>
             ) : (
               <div className="space-y-3">
                 {pages.map(page => (
-                  <div key={page.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                  <div key={page.id} className="neon-card !p-0 overflow-hidden">
                     <div
-                      className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                      className="p-4 cursor-pointer hover:bg-[#faf2e9]/50 transition-colors"
                       onClick={() => setExpandedPage(expandedPage === page.id ? null : page.id)}
                     >
                       <div className="flex items-center gap-3">
-                        {/* Product thumbnail */}
                         {page.thumbnail ? (
                           <img
                             src={page.thumbnail}
                             alt={page.productName || page.page_title || ''}
-                            className="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-gray-100"
+                            className="w-12 h-12 rounded-xl object-cover flex-shrink-0 border border-[#e8e0d4]"
                             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                           />
                         ) : (
-                          <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 text-lg">
-                            📄
+                          <div className="w-12 h-12 rounded-xl bg-[#7EC8E3]/10 flex items-center justify-center flex-shrink-0">
+                            <span className="material-symbols-outlined text-[#7EC8E3]" style={{ fontSize: 22 }}>article</span>
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm text-gray-900 truncate">
+                          <div className="font-medium text-sm text-[#373226] truncate">
                             {page.productName || page.page_title || 'ללא כותרת'}
                           </div>
-                          <div className="text-xs text-gray-400 truncate mt-0.5">{page.url}</div>
+                          <div className="text-xs text-[#bab1a1] truncate mt-0.5">{page.url}</div>
                         </div>
-                        <div className="flex items-center gap-3 mr-4 text-xs text-gray-400">
+                        <div className="flex items-center gap-3 mr-4 text-xs text-[#bab1a1]">
                           <span>{page.word_count || 0} מילים</span>
                           {page.ragChunks > 0 && (
-                            <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                            <span className="bg-[#69FFC7]/20 text-[#2a8a5e] px-2.5 py-0.5 rounded-full font-medium">
                               {page.ragChunks} chunks
                             </span>
                           )}
-                          <span>{expandedPage === page.id ? '▲' : '▼'}</span>
+                          <span className="material-symbols-outlined text-[#bab1a1]" style={{ fontSize: 18 }}>
+                            {expandedPage === page.id ? 'expand_less' : 'expand_more'}
+                          </span>
                         </div>
                       </div>
                     </div>
 
                     {expandedPage === page.id && (
-                      <div className="border-t border-gray-100 p-4 bg-gray-50">
+                      <div className="border-t border-[#e8e0d4] p-4 bg-[#faf2e9]/30">
                         {editingPage === page.id ? (
                           <div className="space-y-3">
                             <textarea
                               value={editPageContent}
                               onChange={e => setEditPageContent(e.target.value)}
-                              className="w-full h-48 p-3 border border-gray-200 rounded-xl text-sm resize-y font-mono focus:ring-2 focus:ring-indigo-500 outline-none"
+                              className="neon-input w-full h-48 !rounded-2xl text-sm resize-y font-mono"
                             />
                             <div className="flex gap-2">
                               <button
                                 onClick={() => savePageEdit(page.id)}
-                                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"
+                                className="neon-pill neon-pill-primary px-5 py-2 text-sm font-medium"
                               >
                                 שמור
                               </button>
                               <button
                                 onClick={() => { setEditingPage(null); setEditPageContent(''); }}
-                                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300"
+                                className="neon-pill neon-pill-ghost px-5 py-2 text-sm"
                               >
                                 ביטול
                               </button>
@@ -730,23 +742,25 @@ export default function ManagePage() {
                           </div>
                         ) : (
                           <div>
-                            <p className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">
+                            <p className="text-sm text-[#655e51] whitespace-pre-wrap leading-relaxed">
                               {page.page_content || 'אין תוכן'}
                             </p>
                             {page.hasFullContent && (
-                              <p className="text-xs text-gray-400 mt-2">... (התוכן קוצר לתצוגה)</p>
+                              <p className="text-xs text-[#bab1a1] mt-2">... (התוכן קוצר לתצוגה)</p>
                             )}
                             <div className="flex gap-2 mt-4">
                               <button
                                 onClick={() => { setEditingPage(page.id); setEditPageContent(page.page_content); }}
-                                className="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg text-sm hover:bg-indigo-200"
+                                className="neon-pill neon-pill-outline px-4 py-1.5 text-sm flex items-center gap-1"
                               >
+                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
                                 ערוך
                               </button>
                               <button
                                 onClick={() => deletePage(page.id)}
-                                className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-sm hover:bg-red-200"
+                                className="neon-pill neon-pill-danger px-4 py-1.5 text-sm flex items-center gap-1"
                               >
+                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
                                 מחק
                               </button>
                             </div>
@@ -765,35 +779,37 @@ export default function ManagePage() {
         {activeTab === 'knowledge' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold">בסיס ידע ({knowledge.length})</h2>
+              <h2 className="text-lg font-bold text-[#373226] font-headline">בסיס ידע ({knowledge.length})</h2>
               <div className="flex gap-2">
-                <button onClick={loadKnowledge} className="text-sm text-indigo-600 hover:text-indigo-700">
+                <button onClick={loadKnowledge} className="neon-pill neon-pill-ghost text-sm px-4 py-1.5 flex items-center gap-1">
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>refresh</span>
                   רענן
                 </button>
                 <button
                   onClick={() => setShowAddKnowledge(true)}
-                  className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"
+                  className="neon-pill neon-pill-primary text-sm px-4 py-1.5 font-medium flex items-center gap-1"
                 >
-                  + הוסף ידע
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add</span>
+                  הוסף ידע
                 </button>
               </div>
             </div>
 
             {/* Add knowledge form */}
             {showAddKnowledge && (
-              <Card title="הוסף ידע חדש">
+              <Card icon="add_circle" iconColor="#FFB89A" title="הוסף ידע חדש">
                 <div className="space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <input
                       value={newKnowledge.title}
                       onChange={e => setNewKnowledge(prev => ({ ...prev, title: e.target.value }))}
                       placeholder="כותרת"
-                      className="p-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                      className="neon-input"
                     />
                     <select
                       value={newKnowledge.knowledge_type}
                       onChange={e => setNewKnowledge(prev => ({ ...prev, knowledge_type: e.target.value }))}
-                      className="p-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                      className="neon-input bg-white"
                     >
                       <option value="custom">כללי</option>
                       <option value="product">מוצר</option>
@@ -805,25 +821,25 @@ export default function ManagePage() {
                     value={newKnowledge.content}
                     onChange={e => setNewKnowledge(prev => ({ ...prev, content: e.target.value }))}
                     placeholder="תוכן..."
-                    className="w-full h-24 p-3 border border-gray-200 rounded-xl text-sm resize-y focus:ring-2 focus:ring-indigo-500 outline-none"
+                    className="neon-input w-full h-24 !rounded-2xl resize-y"
                   />
                   <input
                     value={newKnowledge.keywords}
                     onChange={e => setNewKnowledge(prev => ({ ...prev, keywords: e.target.value }))}
                     placeholder="מילות מפתח (מופרדות בפסיק)"
-                    className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    className="neon-input w-full"
                   />
                   <div className="flex gap-2">
                     <button
                       onClick={addKnowledge}
                       disabled={!newKnowledge.title || !newKnowledge.content}
-                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+                      className="neon-pill neon-pill-primary px-5 py-2 text-sm font-medium disabled:opacity-50"
                     >
                       הוסף
                     </button>
                     <button
                       onClick={() => setShowAddKnowledge(false)}
-                      className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300"
+                      className="neon-pill neon-pill-ghost px-5 py-2 text-sm"
                     >
                       ביטול
                     </button>
@@ -834,41 +850,43 @@ export default function ManagePage() {
 
             {/* Knowledge list */}
             {knowledgeLoading ? (
-              <div className="text-center py-8 text-gray-400">טוען...</div>
+              <div className="text-center py-8 text-[#bab1a1]">טוען...</div>
             ) : knowledge.length === 0 ? (
-              <div className="text-center py-12 text-gray-400">
-                <div className="text-4xl mb-2">📚</div>
+              <div className="text-center py-12 text-[#bab1a1]">
+                <div className="w-16 h-16 rounded-full bg-[#FFB89A]/15 flex items-center justify-center mx-auto mb-3">
+                  <span className="material-symbols-outlined text-[#FFB89A]" style={{ fontSize: 32 }}>menu_book</span>
+                </div>
                 <p>אין ידע נוסף עדיין</p>
               </div>
             ) : (
               <div className="space-y-2">
                 {knowledge.map(entry => (
-                  <div key={entry.id} className={`bg-white border rounded-xl p-4 ${entry.is_active ? 'border-gray-200' : 'border-gray-100 opacity-60'}`}>
+                  <div key={entry.id} className={`neon-card !p-4 ${!entry.is_active ? 'opacity-60' : ''}`}>
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm text-gray-900">{entry.title}</span>
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-sm text-[#373226]">{entry.title}</span>
+                          <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#faf2e9] text-[#655e51] border border-[#e8e0d4]">
                             {typeLabel(entry.knowledge_type)}
                           </span>
                           {!entry.is_active && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">
+                            <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#FFB89A]/15 text-[#c47a54]">
                               מושבת
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-gray-500 mt-1 truncate">{entry.content}</p>
+                        <p className="text-xs text-[#bab1a1] mt-1 truncate">{entry.content}</p>
                       </div>
                       <div className="flex items-center gap-2 mr-4">
                         <button
                           onClick={() => toggleKnowledge(entry.id, entry.is_active)}
-                          className={`text-xs px-2 py-1 rounded-lg ${entry.is_active ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}
+                          className={`neon-pill text-xs px-3 py-1 ${entry.is_active ? 'neon-pill-outline' : 'neon-pill-primary'}`}
                         >
                           {entry.is_active ? 'השבת' : 'הפעל'}
                         </button>
                         <button
                           onClick={() => deleteKnowledge(entry.id)}
-                          className="text-xs px-2 py-1 rounded-lg bg-red-100 text-red-700 hover:bg-red-200"
+                          className="neon-pill neon-pill-danger text-xs px-3 py-1"
                         >
                           מחק
                         </button>
@@ -885,16 +903,18 @@ export default function ManagePage() {
         {activeTab === 'products' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold">קטלוג מוצרים ({products.length})</h2>
+              <h2 className="text-lg font-bold text-[#373226] font-headline">קטלוג מוצרים ({products.length})</h2>
               <div className="flex gap-2">
-                <button onClick={loadProducts} className="text-sm text-indigo-600 hover:text-indigo-700">
+                <button onClick={loadProducts} className="neon-pill neon-pill-ghost text-sm px-4 py-1.5 flex items-center gap-1">
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>refresh</span>
                   רענן
                 </button>
                 <button
                   onClick={extractProducts}
                   disabled={extracting}
-                  className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+                  className="neon-pill neon-pill-primary text-sm px-4 py-1.5 font-medium disabled:opacity-50 flex items-center gap-1"
                 >
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>auto_awesome</span>
                   {extracting ? 'מחלץ מוצרים...' : 'חלץ מוצרים מהאתר'}
                 </button>
               </div>
@@ -902,21 +922,27 @@ export default function ManagePage() {
 
             {/* Extraction result */}
             {extractResult && (
-              <div className={`p-4 rounded-xl border text-sm ${extractResult.success ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+              <div className={`neon-card !p-4 text-sm ${extractResult.success ? 'border-[#69FFC7] bg-[#69FFC7]/10' : 'border-[#FF76B0] bg-[#FF76B0]/10'}`}>
                 {extractResult.success ? (
                   <div className="space-y-1">
-                    <div className="font-medium">חילוץ הושלם בהצלחה!</div>
-                    <div>מוצרים שחולצו: {extractResult.extraction?.productsExtracted || 0}</div>
-                    <div>סדרות שזוהו: {extractResult.extraction?.seriesDetected || 0}</div>
+                    <div className="font-medium text-[#2a8a5e] flex items-center gap-1.5">
+                      <span className="material-symbols-outlined" style={{ fontSize: 18 }}>check_circle</span>
+                      חילוץ הושלם בהצלחה!
+                    </div>
+                    <div className="text-[#655e51]">מוצרים שחולצו: {extractResult.extraction?.productsExtracted || 0}</div>
+                    <div className="text-[#655e51]">סדרות שזוהו: {extractResult.extraction?.seriesDetected || 0}</div>
                     {extractResult.enrichment && (
                       <>
-                        <div>פרופילים AI: {extractResult.enrichment.productsEnriched}</div>
-                        <div>embeddings: {extractResult.enrichment.embeddingsGenerated}</div>
+                        <div className="text-[#655e51]">פרופילים AI: {extractResult.enrichment.productsEnriched}</div>
+                        <div className="text-[#655e51]">embeddings: {extractResult.enrichment.embeddingsGenerated}</div>
                       </>
                     )}
                   </div>
                 ) : (
-                  <div>{extractResult.error || extractResult.details || 'שגיאה'}</div>
+                  <div className="text-[#d4365c] flex items-center gap-1.5">
+                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>error</span>
+                    {extractResult.error || extractResult.details || 'שגיאה'}
+                  </div>
                 )}
               </div>
             )}
@@ -924,73 +950,78 @@ export default function ManagePage() {
             {/* Extracting indicator */}
             {extracting && (
               <div className="text-center py-8">
-                <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                <p className="text-gray-500 text-sm">מחלץ מוצרים מדפי האתר...</p>
-                <p className="text-gray-400 text-xs mt-1">זה עלול לקחת כמה דקות</p>
+                <div className="w-10 h-10 border-3 border-[#AEB0E8] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                <p className="text-[#655e51] text-sm">מחלץ מוצרים מדפי האתר...</p>
+                <p className="text-[#bab1a1] text-xs mt-1">זה עלול לקחת כמה דקות</p>
               </div>
             )}
 
             {/* Series chips */}
             {productSeries.length > 0 && (
               <div className="flex flex-wrap gap-2">
-                {productSeries.map((s: any) => (
-                  <span key={s.id} className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-medium">
-                    {s.name} ({s.product_count})
-                  </span>
-                ))}
+                {productSeries.map((s: any, idx: number) => {
+                  const pastelColors = ['#AEB0E8', '#69FFC7', '#FF76B0', '#FFB89A', '#7EC8E3'];
+                  const bg = pastelColors[idx % pastelColors.length];
+                  return (
+                    <span key={s.id} className="px-3.5 py-1 rounded-full text-xs font-medium" style={{ backgroundColor: `${bg}20`, color: bg === '#69FFC7' ? '#2a8a5e' : bg === '#FFB89A' ? '#c47a54' : bg }}>
+                      {s.name} ({s.product_count})
+                    </span>
+                  );
+                })}
               </div>
             )}
 
             {/* Products grid */}
             {productsLoading ? (
-              <div className="text-center py-8 text-gray-400">טוען מוצרים...</div>
+              <div className="text-center py-8 text-[#bab1a1]">טוען מוצרים...</div>
             ) : products.length === 0 && !extracting ? (
-              <div className="text-center py-12 text-gray-400">
-                <div className="text-4xl mb-2">🛍️</div>
+              <div className="text-center py-12 text-[#bab1a1]">
+                <div className="w-16 h-16 rounded-full bg-[#FF76B0]/15 flex items-center justify-center mx-auto mb-3">
+                  <span className="material-symbols-outlined text-[#FF76B0]" style={{ fontSize: 32 }}>shopping_bag</span>
+                </div>
                 <p>אין מוצרים עדיין</p>
                 <p className="text-xs mt-1">לחץ &quot;חלץ מוצרים מהאתר&quot; כדי ליצור קטלוג אוטומטי</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {products.map((product: any) => (
-                  <div key={product.id} className={`bg-white border rounded-xl overflow-hidden ${product.is_featured ? 'border-yellow-400 ring-1 ring-yellow-200' : 'border-gray-200'}`}>
+                  <div key={product.id} className={`neon-card !p-0 overflow-hidden ${product.is_featured ? 'ring-2 ring-[#FFB89A]/50 border-[#FFB89A]' : ''}`}>
                     <div className="flex gap-3 p-3">
-                      {/* Product image */}
                       {product.image_url ? (
                         <img
                           src={product.image_url}
                           alt={product.name}
-                          className="w-16 h-16 rounded-lg object-cover flex-shrink-0 border border-gray-100"
+                          className="w-16 h-16 rounded-xl object-cover flex-shrink-0 border border-[#e8e0d4]"
                           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                         />
                       ) : (
-                        <div className="w-16 h-16 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 text-2xl">
-                          🛍️
+                        <div className="w-16 h-16 rounded-xl bg-[#FF76B0]/10 flex items-center justify-center flex-shrink-0">
+                          <span className="material-symbols-outlined text-[#FF76B0]" style={{ fontSize: 28 }}>shopping_bag</span>
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm text-gray-900 truncate">{product.name}</div>
+                        <div className="font-medium text-sm text-[#373226] truncate">{product.name}</div>
                         {product.price && (
                           <div className="text-sm mt-0.5">
                             {product.is_on_sale && product.original_price && (
-                              <span className="text-gray-400 line-through text-xs ml-1">₪{product.original_price}</span>
+                              <span className="text-[#bab1a1] line-through text-xs ml-1">{'\u20AA'}{product.original_price}</span>
                             )}
-                            <span className="font-bold text-indigo-600">₪{product.price}</span>
+                            <span className="font-bold text-[#AEB0E8]">{'\u20AA'}{product.price}</span>
                           </div>
                         )}
                         <div className="flex flex-wrap gap-1 mt-1">
                           {product.category && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#faf2e9] text-[#655e51] border border-[#e8e0d4]">
                               {product.category}
                             </span>
                           )}
                           {product.product_line && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600">
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#AEB0E8]/15 text-[#AEB0E8]">
                               {product.product_line}
                             </span>
                           )}
                           {product.is_featured && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700">
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#FFB89A]/15 text-[#c47a54]">
                               מקודם
                             </span>
                           )}
@@ -998,29 +1029,34 @@ export default function ManagePage() {
                       </div>
                     </div>
                     {/* Actions */}
-                    <div className="flex border-t border-gray-100 divide-x divide-gray-100">
+                    <div className="flex border-t border-[#e8e0d4] divide-x divide-[#e8e0d4]">
                       <button
                         onClick={() => toggleFeatured(product.id, product.is_featured)}
-                        className={`flex-1 py-2 text-xs font-medium transition-colors ${
+                        className={`flex-1 py-2.5 text-xs font-medium transition-colors flex items-center justify-center gap-1 ${
                           product.is_featured
-                            ? 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100'
-                            : 'text-gray-500 hover:bg-gray-50'
+                            ? 'bg-[#FFB89A]/10 text-[#c47a54] hover:bg-[#FFB89A]/20'
+                            : 'text-[#655e51] hover:bg-[#faf2e9]'
                         }`}
                       >
+                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
+                          {product.is_featured ? 'star' : 'star_outline'}
+                        </span>
                         {product.is_featured ? 'הסר קידום' : 'קדם מוצר'}
                       </button>
                       <a
                         href={product.product_url}
                         target="_blank"
                         rel="noopener"
-                        className="flex-1 py-2 text-xs font-medium text-gray-500 hover:bg-gray-50 text-center"
+                        className="flex-1 py-2.5 text-xs font-medium text-[#655e51] hover:bg-[#faf2e9] text-center flex items-center justify-center gap-1"
                       >
+                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>open_in_new</span>
                         צפה באתר
                       </a>
                       <button
                         onClick={() => deleteProduct(product.id)}
-                        className="flex-1 py-2 text-xs font-medium text-red-500 hover:bg-red-50"
+                        className="flex-1 py-2.5 text-xs font-medium text-[#FF76B0] hover:bg-[#FF76B0]/10 flex items-center justify-center gap-1"
                       >
+                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>delete</span>
                         מחק
                       </button>
                     </div>
@@ -1034,16 +1070,16 @@ export default function ManagePage() {
         {/* Tab 6: Design */}
         {activeTab === 'design' && (
           <div className="space-y-6">
-            <Card title="הודעת פתיחה" description="ההודעה שתופיע כשהווידג'ט נפתח">
+            <Card icon="chat_bubble" iconColor="#AEB0E8" title="הודעת פתיחה" description="ההודעה שתופיע כשהווידג'ט נפתח">
               <input
                 value={welcomeMessage}
                 onChange={e => setWelcomeMessage(e.target.value)}
                 placeholder="שלום! איך אפשר לעזור?"
-                className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="neon-input w-full"
               />
             </Card>
 
-            <Card title="מיקום ווידג'ט">
+            <Card icon="dock_to_bottom" iconColor="#FFB89A" title="מיקום ווידג'ט">
               <div className="grid grid-cols-2 gap-3">
                 {[
                   { value: 'bottom-right' as const, label: 'ימין למטה' },
@@ -1052,10 +1088,10 @@ export default function ManagePage() {
                   <button
                     key={opt.value}
                     onClick={() => setWidgetPosition(opt.value)}
-                    className={`p-3 rounded-xl border-2 text-sm font-medium transition-all ${
+                    className={`p-3 rounded-2xl border-2 text-sm font-medium transition-all ${
                       widgetPosition === opt.value
-                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                        : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                        ? 'border-[#AEB0E8] bg-[#AEB0E8]/10 text-[#AEB0E8]'
+                        : 'border-[#e8e0d4] text-[#655e51] hover:border-[#AEB0E8]/40 bg-white'
                     }`}
                   >
                     {opt.label}
@@ -1067,7 +1103,7 @@ export default function ManagePage() {
             <button
               onClick={saveDesignSettings}
               disabled={saving}
-              className="w-full sm:w-auto px-6 py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+              className="neon-pill neon-pill-primary w-full sm:w-auto px-8 py-3 font-medium disabled:opacity-50 transition-all"
             >
               {saving ? 'שומר...' : 'שמור הגדרות'}
             </button>
@@ -1079,7 +1115,7 @@ export default function ManagePage() {
       {showLivePreview && accountId && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center"
-          style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+          style={{ backgroundColor: 'rgba(55,50,38,0.6)', backdropFilter: 'blur(8px)' }}
           onClick={() => setShowLivePreview(false)}
         >
           <div
@@ -1088,8 +1124,8 @@ export default function ManagePage() {
           >
             {/* Top bar */}
             <div className="flex items-center justify-between w-[390px] mb-3 px-1">
-              <span className="text-sm font-medium text-white/80">
-                צפייה חיה — {displayName || 'ווידג׳ט'}
+              <span className="text-sm font-medium text-white/80 font-headline">
+                צפייה חיה -- {displayName || 'ווידג׳ט'}
               </span>
               <div className="flex items-center gap-2">
                 <a
@@ -1104,7 +1140,7 @@ export default function ManagePage() {
                   onClick={() => setShowLivePreview(false)}
                   className="w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 transition-all"
                 >
-                  ✕
+                  <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
                 </button>
               </div>
             </div>
@@ -1112,19 +1148,19 @@ export default function ManagePage() {
             {/* Phone frame */}
             <div
               className="rounded-[40px] overflow-hidden shadow-2xl"
-              style={{ width: 390, height: 760, border: '8px solid #1a1a1a', backgroundColor: '#1a1a1a' }}
+              style={{ width: 390, height: 760, border: '8px solid #373226', backgroundColor: '#373226' }}
             >
               {/* Notch */}
-              <div className="relative flex justify-center" style={{ backgroundColor: '#1a1a1a', height: 30 }}>
-                <div className="absolute top-0 rounded-b-2xl" style={{ width: 120, height: 24, backgroundColor: '#1a1a1a' }} />
+              <div className="relative flex justify-center" style={{ backgroundColor: '#373226', height: 30 }}>
+                <div className="absolute top-0 rounded-b-2xl" style={{ width: 120, height: 24, backgroundColor: '#373226' }} />
               </div>
 
               {/* Iframe */}
               <iframe
                 src={`/widget-preview?accountId=${accountId}&t=${Date.now()}`}
                 className="w-full border-0"
-                style={{ height: 'calc(100% - 30px)', borderRadius: '0 0 32px 32px', backgroundColor: '#f8f9fa' }}
-                title="תצוגה מקדימה — ווידג׳ט"
+                style={{ height: 'calc(100% - 30px)', borderRadius: '0 0 32px 32px', backgroundColor: '#FFF7ED' }}
+                title="תצוגה מקדימה -- ווידג׳ט"
               />
             </div>
 
@@ -1142,16 +1178,32 @@ export default function ManagePage() {
 // Sub-components
 // ============================================
 
-function Card({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+function Card({ icon, iconColor, title, description, children }: { icon?: string; iconColor?: string; title: string; description?: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl p-6">
-      <h3 className="font-bold text-gray-900 mb-1">{title}</h3>
-      {description && <p className="text-sm text-gray-500 mb-4">{description}</p>}
-      {!description && <div className="mb-4" />}
+    <div className="neon-card">
+      <div className="flex items-center gap-3 mb-4">
+        {icon && (
+          <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${iconColor || '#AEB0E8'}20` }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 20, color: iconColor || '#AEB0E8' }}>{icon}</span>
+          </div>
+        )}
+        <div>
+          <h3 className="font-bold text-[#373226]">{title}</h3>
+          {description && <p className="text-sm text-[#655e51]">{description}</p>}
+        </div>
+      </div>
       {children}
     </div>
   );
 }
+
+const PASTEL_TAG_COLORS = [
+  { bg: '#AEB0E8', text: '#6365a0' },
+  { bg: '#69FFC7', text: '#2a8a5e' },
+  { bg: '#FF76B0', text: '#c4366a' },
+  { bg: '#FFB89A', text: '#c47a54' },
+  { bg: '#7EC8E3', text: '#4a8ea3' },
+];
 
 function TagInput({
   tags,
@@ -1168,12 +1220,8 @@ function TagInput({
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
-  color: 'indigo' | 'red';
+  color: 'focus' | 'banned';
 }) {
-  const colorClasses = color === 'indigo'
-    ? 'bg-indigo-100 text-indigo-700'
-    : 'bg-red-100 text-red-700';
-
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && value.trim()) {
       e.preventDefault();
@@ -1185,12 +1233,23 @@ function TagInput({
   return (
     <div>
       <div className="flex flex-wrap gap-2 mb-3">
-        {tags.map((tag, idx) => (
-          <span key={idx} className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm ${colorClasses}`}>
-            {tag}
-            <button onClick={() => onRemove(idx)} className="hover:opacity-70 mr-1">×</button>
-          </span>
-        ))}
+        {tags.map((tag, idx) => {
+          const palette = color === 'banned'
+            ? { bg: '#FF76B0', text: '#c4366a' }
+            : PASTEL_TAG_COLORS[idx % PASTEL_TAG_COLORS.length];
+          return (
+            <span
+              key={idx}
+              className="inline-flex items-center gap-1 px-3.5 py-1 rounded-full text-sm font-medium"
+              style={{ backgroundColor: `${palette.bg}20`, color: palette.text }}
+            >
+              {tag}
+              <button onClick={() => onRemove(idx)} className="hover:opacity-70 mr-1">
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span>
+              </button>
+            </span>
+          );
+        })}
       </div>
       <div className="flex gap-2">
         <input
@@ -1198,7 +1257,7 @@ function TagInput({
           onChange={e => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className="flex-1 p-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+          className="neon-input flex-1"
         />
         <button
           onClick={() => {
@@ -1208,7 +1267,7 @@ function TagInput({
             }
           }}
           disabled={!value.trim()}
-          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm hover:bg-gray-200 disabled:opacity-50"
+          className="neon-pill neon-pill-ghost px-4 py-2 text-sm disabled:opacity-50"
         >
           הוסף
         </button>

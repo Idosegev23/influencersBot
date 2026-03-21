@@ -1342,6 +1342,210 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ============================================
+   Neon Admin Theme — Soft & Dreamy (Warm Cream)
+   ============================================ */
+.neon-admin {
+  background: #FFF7ED;
+  color: #474747;
+  min-height: 100vh;
+  font-family: 'Be Vietnam Pro', system-ui, sans-serif;
+}
+
+.neon-admin .font-headline {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+}
+
+.neon-glass-nav {
+  background: rgba(255, 248, 241, 0.7);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 20px 40px rgba(71, 71, 71, 0.06);
+}
+
+.neon-brand {
+  color: #69FFC7;
+}
+
+.neon-admin .neon-card {
+  background: #ffffff;
+  border-radius: 1.5rem;
+  box-shadow: 0 1px 3px rgba(71, 71, 71, 0.06);
+  border: 1px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.neon-admin .neon-card:hover {
+  box-shadow: 0 8px 32px rgba(105, 255, 199, 0.08), 0 4px 16px rgba(71, 71, 71, 0.06);
+  transform: translateY(-2px);
+}
+
+.neon-admin .neon-stat-card {
+  background: #ffffff;
+  border-radius: 1.5rem;
+  box-shadow: 0 1px 3px rgba(71, 71, 71, 0.06);
+  padding: 1.5rem;
+  border: 1px solid transparent;
+  transition: border-color 0.3s ease;
+}
+
+.neon-admin .neon-stat-card:hover {
+  border-color: rgba(105, 255, 199, 0.2);
+}
+
+.neon-admin .neon-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.5rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.neon-admin .neon-pill-primary {
+  background: #69FFC7;
+  color: #1A1C1E;
+  box-shadow: 0 4px 16px rgba(105, 255, 199, 0.2);
+}
+
+.neon-admin .neon-pill-primary:hover {
+  transform: scale(1.02);
+}
+
+.neon-admin .neon-pill-primary:active {
+  transform: scale(0.98);
+}
+
+.neon-admin .neon-pill-secondary {
+  background: #AEB0E8;
+  color: #1A1C1E;
+  box-shadow: 0 4px 16px rgba(174, 176, 232, 0.2);
+}
+
+.neon-admin .neon-pill-outline {
+  background: transparent;
+  color: #474747;
+  border: 1px solid #bab1a1;
+}
+
+.neon-admin .neon-pill-outline:hover {
+  background: #ffffff;
+  border-color: #AEB0E8;
+  color: #AEB0E8;
+}
+
+.neon-admin .neon-pill-ghost {
+  background: #ffffff;
+  color: #474747;
+  box-shadow: 0 1px 3px rgba(71, 71, 71, 0.06);
+}
+
+.neon-admin .neon-pill-ghost:hover {
+  background: #faf2e9;
+}
+
+.neon-admin .neon-pill-danger {
+  background: rgba(255, 118, 176, 0.1);
+  color: #FF76B0;
+}
+
+.neon-admin .neon-pill-danger:hover {
+  background: rgba(255, 118, 176, 0.2);
+}
+
+.neon-admin .neon-input {
+  width: 100%;
+  background: #faf2e9;
+  border: none;
+  border-radius: 9999px;
+  padding: 1rem 1.5rem;
+  color: #474747;
+  font-size: 0.875rem;
+  transition: all 0.3s ease;
+}
+
+.neon-admin .neon-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(105, 255, 199, 0.4);
+  background: #ffffff;
+}
+
+.neon-admin .neon-input::placeholder {
+  color: #bab1a1;
+}
+
+/* Toggle switch for neon admin */
+.neon-toggle {
+  position: relative;
+  width: 2.75rem;
+  height: 1.5rem;
+  background: #e3d9c8;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.neon-toggle.active {
+  background: #AEB0E8;
+}
+
+.neon-toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 1.25rem;
+  height: 1.25rem;
+  background: #ffffff;
+  border-radius: 9999px;
+  transition: transform 0.3s ease;
+}
+
+.neon-toggle.active::after {
+  transform: translateX(-1.25rem);
+}
+
+/* Status pills */
+.neon-status-connected {
+  background: rgba(105, 255, 199, 0.1);
+  color: #1A1C1E;
+}
+
+.neon-status-disconnected {
+  background: rgba(255, 118, 176, 0.1);
+  color: #FF76B0;
+}
+
+.neon-status-expired {
+  background: rgba(174, 176, 232, 0.15);
+  color: #474747;
+}
+
+/* Neon admin action buttons (round icon) */
+.neon-admin .neon-action-btn {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(174, 176, 232, 0.1);
+  color: #AEB0E8;
+  transition: all 0.3s ease;
+}
+
+.neon-admin .neon-action-btn:hover {
+  background: #AEB0E8;
+  color: #ffffff;
+}
+
+.neon-admin .neon-action-btn:active {
+  transform: scale(0.9);
+}
+
+/* ============================================
    Wizard Steps
    ============================================ */
 .wizard-step {

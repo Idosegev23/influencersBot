@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowRight, Upload, Trash2, Check, X, Image, Search, ExternalLink, Phone, Mail, Save } from 'lucide-react';
 
 interface BrandLogo {
   id: string;
@@ -135,196 +134,216 @@ export default function BrandLogosPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen admin-panel flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#a094e0] border-t-transparent rounded-full animate-spin" />
+      <div className="flex items-center justify-center py-32">
+        <div className="w-8 h-8 border-2 border-[#AEB0E8] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen admin-panel p-6" dir="rtl">
+    <>
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFileChange} />
 
       {/* Toast */}
       {toast && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 pill pill-green px-6 py-3 text-sm font-medium shadow-lg">
+        <div className="fixed bottom-6 left-6 z-50 flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-medium shadow-lg"
+          style={{ background: '#69FFC7', color: '#373226' }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>check_circle</span>
           {toast}
         </div>
       )}
 
-      {/* Header */}
-      <div className="max-w-6xl mx-auto">
-        <Link href="/admin/dashboard" className="inline-flex items-center gap-2 text-sm mb-6 transition-colors" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>
-          <ArrowRight className="w-4 h-4" /> חזרה לדשבורד
-        </Link>
-
+      <div className="max-w-6xl mx-auto" dir="rtl">
+        {/* Header */}
         <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-2xl font-bold" style={{ color: '#ede9f8' }}>ניהול מותגים</h1>
-            <p className="text-sm mt-1" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>
-              {withLogo} עם לוגו · {withoutLogo} ללא לוגו · {brands.length} סה״כ
-            </p>
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: '#FF76B0' }}>
+              <span className="material-symbols-outlined text-white" style={{ fontSize: 24 }}>palette</span>
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold" style={{ color: '#373226' }}>ניהול לוגואים</h1>
+              <p className="text-sm mt-0.5" style={{ color: '#bab1a1' }}>
+                {withLogo} עם לוגו · {withoutLogo} ללא לוגו · {brands.length} סה״כ
+              </p>
+            </div>
           </div>
+          <Link href="/admin/dashboard" className="neon-pill neon-pill-outline flex items-center gap-1.5 text-sm">
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_forward</span>
+            חזרה לדשבורד
+          </Link>
         </div>
 
-        {/* Filters */}
-        <div className="flex gap-3 mb-6">
-          <div className="relative flex-1">
-            <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'rgba(237, 233, 248, 0.25)' }} />
+        {/* Search & Filters */}
+        <div className="flex gap-3 mb-6 flex-wrap">
+          <div className="relative flex-1 min-w-[200px]">
+            <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2" style={{ fontSize: 18, color: '#bab1a1' }}>search</span>
             <input
               type="text"
               placeholder="חיפוש מותג..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="admin-input pr-10"
+              className="neon-input w-full pr-11 shadow-sm"
             />
           </div>
-          <div className="flex rounded-full overflow-hidden" style={{ border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-            {(['all', 'without', 'with'] as const).map(f => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className="px-4 py-2.5 text-xs font-medium transition-all"
-                style={filter === f
-                  ? { background: 'rgba(160, 148, 224, 0.15)', color: '#a094e0' }
-                  : { background: 'rgba(255, 255, 255, 0.02)', color: 'rgba(237, 233, 248, 0.35)' }
-                }
-              >
-                {f === 'all' ? 'הכל' : f === 'with' ? 'עם לוגו' : 'חסר לוגו'}
-              </button>
-            ))}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setFilter('all')}
+              className={`neon-pill ${filter === 'all' ? 'neon-pill-secondary' : 'neon-pill-outline'} text-xs`}
+            >
+              הכל
+            </button>
+            <button
+              onClick={() => setFilter('with')}
+              className={`neon-pill text-xs ${filter === 'with' ? 'neon-pill-primary' : ''}`}
+              style={filter !== 'with' ? { border: '1.5px solid #69FFC7', color: '#655e51', background: 'transparent' } : {}}
+            >
+              עם לוגו
+            </button>
+            <button
+              onClick={() => setFilter('without')}
+              className={`neon-pill text-xs ${filter === 'without' ? 'neon-pill-danger' : ''}`}
+              style={filter !== 'without' ? { border: '1.5px solid #FFB89A', color: '#655e51', background: 'transparent' } : {}}
+            >
+              בלי לוגו
+            </button>
           </div>
         </div>
 
-        {/* Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {/* Brand Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {filtered.map(brand => (
             <div
               key={brand.id}
-              className="admin-card p-4 transition-all"
-              style={!brand.logo_url ? { borderColor: 'rgba(224, 164, 148, 0.15)' } : {}}
+              className="neon-card p-5 transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
+              style={!brand.logo_url ? { border: '2px dashed #AEB0E8' } : {}}
             >
               {/* Logo preview */}
-              <div className="w-full h-24 rounded-xl mb-3 flex items-center justify-center overflow-hidden" style={{ background: 'rgba(255, 255, 255, 0.02)' }}>
+              <div className="w-[120px] h-[120px] rounded-2xl mx-auto mb-4 flex items-center justify-center overflow-hidden"
+                style={{ background: '#FAF8F5' }}
+              >
                 {brand.logo_url ? (
                   <img
                     src={brand.logo_url}
                     alt={brand.display_name}
-                    className="max-h-20 max-w-full object-contain"
+                    className="max-h-[100px] max-w-[100px] object-contain"
                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                   />
                 ) : (
-                  <div className="flex flex-col items-center gap-1" style={{ color: 'rgba(237, 233, 248, 0.15)' }}>
-                    <Image className="w-8 h-8" />
+                  <div className="flex flex-col items-center gap-1" style={{ color: '#bab1a1' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 36 }}>photo_camera</span>
                     <span className="text-[10px]">חסר לוגו</span>
                   </div>
                 )}
               </div>
 
               {/* Name & info */}
-              <h3 className="font-semibold text-sm truncate" style={{ color: '#ede9f8' }}>{brand.display_name}</h3>
-              {brand.category && (
-                <span className="pill pill-neutral text-[10px] mt-1 inline-block">
-                  {brand.category}
-                </span>
-              )}
-              <p className="text-[10px] mt-1" style={{ color: 'rgba(237, 233, 248, 0.25)' }}>
-                {brand.partnerships?.length || 0} משפיענים
-              </p>
+              <div className="text-center mb-3">
+                <h3 className="font-semibold text-sm truncate" style={{ color: '#373226' }}>{brand.display_name}</h3>
+                {brand.category && (
+                  <span className="neon-pill neon-pill-outline text-[10px] mt-1.5 inline-block px-2 py-0.5">
+                    {brand.category}
+                  </span>
+                )}
+                <p className="text-[11px] mt-1.5 flex items-center justify-center gap-1" style={{ color: '#bab1a1' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>handshake</span>
+                  {brand.partnerships?.length || 0} משפיענים
+                </p>
+              </div>
 
               {/* Contact info */}
               {editingBrand === brand.id ? (
                 <div className="mt-3 space-y-2">
                   <div className="relative">
-                    <Phone className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: 'rgba(237, 233, 248, 0.25)' }} />
+                    <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2" style={{ fontSize: 14, color: '#bab1a1' }}>phone</span>
                     <input
                       type="tel"
                       value={editPhone}
                       onChange={e => setEditPhone(e.target.value)}
                       placeholder="972501234567"
-                      className="admin-input pr-8 text-xs py-1.5 !rounded-lg text-left"
+                      className="neon-input w-full pr-8 text-xs py-2 text-left"
                       dir="ltr"
                     />
                   </div>
                   <div className="relative">
-                    <Mail className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: 'rgba(237, 233, 248, 0.25)' }} />
+                    <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2" style={{ fontSize: 14, color: '#bab1a1' }}>mail</span>
                     <input
                       type="email"
                       value={editEmail}
                       onChange={e => setEditEmail(e.target.value)}
                       placeholder="contact@brand.com"
-                      className="admin-input pr-8 text-xs py-1.5 !rounded-lg text-left"
+                      className="neon-input w-full pr-8 text-xs py-2 text-left"
                       dir="ltr"
                     />
                   </div>
-                  <div className="flex gap-1.5">
+                  <div className="flex gap-2">
                     <button
                       onClick={() => handleSaveContact(brand.id)}
                       disabled={saving}
-                      className="btn-teal flex-1 flex items-center justify-center gap-1 py-1.5 text-[11px] font-medium disabled:opacity-50"
+                      className="neon-pill neon-pill-primary flex-1 flex items-center justify-center gap-1 text-[11px] font-medium disabled:opacity-50"
                     >
-                      <Save className="w-3 h-3" />
+                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>save</span>
                       שמור
                     </button>
                     <button
                       onClick={() => setEditingBrand(null)}
-                      className="btn-ghost py-1.5 text-[11px]"
+                      className="neon-pill neon-pill-ghost text-[11px]"
                     >
                       ביטול
                     </button>
                   </div>
                 </div>
               ) : (
-                <div className="mt-2 space-y-1">
+                <div className="mt-2 space-y-1 text-center">
                   {brand.whatsapp_phone && (
-                    <div className="flex items-center gap-1.5 text-[10px]" style={{ color: 'rgba(237, 233, 248, 0.3)' }}>
-                      <Phone className="w-2.5 h-2.5" />
+                    <div className="flex items-center justify-center gap-1.5 text-[11px]" style={{ color: '#655e51' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 13 }}>phone</span>
                       <span dir="ltr">{brand.whatsapp_phone}</span>
                     </div>
                   )}
                   {brand.email && (
-                    <div className="flex items-center gap-1.5 text-[10px]" style={{ color: 'rgba(237, 233, 248, 0.3)' }}>
-                      <Mail className="w-2.5 h-2.5" />
+                    <div className="flex items-center justify-center gap-1.5 text-[11px]" style={{ color: '#655e51' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 13 }}>mail</span>
                       <span>{brand.email}</span>
                     </div>
                   )}
                   {!brand.whatsapp_phone && !brand.email && (
-                    <p className="text-[10px]" style={{ color: 'rgba(224, 164, 148, 0.5)' }}>חסר פרטי קשר</p>
+                    <p className="text-[11px]" style={{ color: '#FF76B0' }}>חסר פרטי קשר</p>
                   )}
                 </div>
               )}
 
               {/* Actions */}
-              <div className="flex gap-2 mt-3">
+              <div className="flex gap-2 mt-4 justify-center">
                 <button
                   onClick={() => triggerUpload(brand.id)}
                   disabled={uploading === brand.id}
-                  className="btn-primary flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium disabled:opacity-50"
+                  className="neon-pill neon-pill-secondary flex items-center gap-1.5 text-xs font-medium disabled:opacity-50"
                 >
                   {uploading === brand.id ? (
                     <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                   ) : (
-                    <Upload className="w-3.5 h-3.5" />
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>swap_horiz</span>
                   )}
                   {brand.logo_url ? 'החלף' : 'העלה'}
                 </button>
                 {editingBrand !== brand.id && (
                   <button
                     onClick={() => startEditing(brand)}
-                    className="px-3 py-2 rounded-full text-xs transition-all"
-                    style={{ background: 'rgba(94, 234, 212, 0.08)', color: '#5eead4', border: '1px solid rgba(94, 234, 212, 0.12)' }}
+                    className="neon-pill text-xs"
+                    style={{ border: '1.5px solid #7DD3FC', color: '#655e51', background: 'transparent' }}
                     title="ערוך פרטי קשר"
                   >
-                    <Mail className="w-3.5 h-3.5" />
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
                   </button>
                 )}
                 {brand.logo_url && (
                   <button
                     onClick={() => handleDelete(brand.id)}
-                    className="px-3 py-2 rounded-full text-xs transition-all"
-                    style={{ background: 'rgba(239, 68, 68, 0.08)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.12)' }}
+                    className="neon-pill text-xs"
+                    style={{ border: '1.5px solid #FF76B0', color: '#FF76B0', background: 'transparent' }}
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
                   </button>
                 )}
               </div>
@@ -333,11 +352,30 @@ export default function BrandLogosPage() {
         </div>
 
         {filtered.length === 0 && (
-          <div className="text-center py-20" style={{ color: 'rgba(237, 233, 248, 0.25)' }}>
+          <div className="text-center py-20" style={{ color: '#bab1a1' }}>
+            <span className="material-symbols-outlined block mx-auto mb-2" style={{ fontSize: 48 }}>search_off</span>
             לא נמצאו מותגים
           </div>
         )}
+
+        {/* Quick Upload Zone */}
+        <div className="mt-10 mb-6">
+          <h2 className="text-lg font-semibold mb-4" style={{ color: '#373226' }}>העלאה מהירה</h2>
+          <div
+            className="rounded-[3rem] flex flex-col items-center justify-center py-16 cursor-pointer transition-all hover:shadow-md"
+            style={{ border: '4px dashed #AEB0E8', background: 'transparent' }}
+            onClick={() => {
+              if (filtered.length > 0) {
+                triggerUpload(filtered[0].id);
+              }
+            }}
+          >
+            <span className="material-symbols-outlined mb-3" style={{ fontSize: 48, color: '#AEB0E8' }}>cloud_upload</span>
+            <p className="text-sm font-medium" style={{ color: '#655e51' }}>גרור לוגו לכאן או לחץ להעלאה</p>
+            <p className="text-xs mt-1" style={{ color: '#bab1a1' }}>PNG, JPG, SVG עד 5MB</p>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

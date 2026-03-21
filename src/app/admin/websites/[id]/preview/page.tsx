@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowRight, ExternalLink, Copy, Check } from 'lucide-react';
 
 interface WidgetConfig {
   theme: { primaryColor: string };
@@ -21,6 +20,8 @@ export default function WebsitePreviewPage() {
   const [websiteUrl, setWebsiteUrl] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [codeCopied, setCodeCopied] = useState(false);
+  const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop');
+  const [infoPanelOpen, setInfoPanelOpen] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -53,8 +54,8 @@ export default function WebsitePreviewPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen admin-panel flex items-center justify-center" dir="rtl">
-        <div className="w-8 h-8 border-2 border-[#a094e0] border-t-transparent rounded-full animate-spin" />
+      <div className="h-screen flex items-center justify-center" dir="rtl">
+        <div className="w-8 h-8 border-2 border-[#AEB0E8] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -64,70 +65,240 @@ export default function WebsitePreviewPage() {
     ? `/api/admin/proxy?url=${encodeURIComponent(websiteUrl)}`
     : '';
 
+  const domain = websiteUrl ? new URL(websiteUrl).hostname : '';
+
   return (
-    <div className="h-screen flex flex-col admin-panel" dir="rtl">
-      {/* Top bar */}
+    <>
+      {/* Top Toolbar */}
       <div
-        className="flex-shrink-0 flex items-center justify-between px-4 py-2 z-20"
-        style={{ background: 'rgba(7, 7, 13, 0.88)', backdropFilter: 'blur(20px) saturate(1.4)', borderBottom: '1px solid rgba(255, 255, 255, 0.06)' }}
+        className="flex-shrink-0 flex items-center justify-between px-5 z-20 bg-white"
+        style={{ height: 60, boxShadow: '0 1px 8px rgba(55,50,38,0.06)', direction: 'rtl' }}
       >
+        {/* Right side (RTL): back + brand info */}
         <div className="flex items-center gap-3">
-          <Link href="/admin/dashboard" className="btn-ghost px-2 py-1">
-            <ArrowRight className="w-5 h-5" />
+          <Link href="/admin/dashboard" className="neon-pill-outline flex items-center gap-1.5 px-4 py-2 text-sm">
+            <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+            חזרה
           </Link>
-          <span className="text-sm truncate max-w-xs" style={{ color: 'rgba(237, 233, 248, 0.5)' }}>
-            תצוגה מקדימה — {config?.brandName || websiteUrl}
+          <span className="font-semibold text-[#373226] text-sm" style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+            {config?.brandName || 'אתר'}
           </span>
+          {domain && (
+            <span className="text-xs text-[#bab1a1] font-mono">{domain}</span>
+          )}
         </div>
+
+        {/* Left side (RTL): actions + device toggle */}
         <div className="flex items-center gap-2">
+          {/* Info panel toggle */}
+          <button
+            onClick={() => setInfoPanelOpen(!infoPanelOpen)}
+            className={`neon-pill-outline flex items-center gap-1.5 px-4 py-2 text-sm ${infoPanelOpen ? '!bg-[#AEB0E8]/15 !border-[#AEB0E8]' : ''}`}
+          >
+            <span className="material-symbols-outlined text-[18px]">info</span>
+            פרטים
+          </button>
+
           <button
             onClick={handleCopyCode}
-            className="btn-ghost flex items-center gap-1.5 px-3 py-1.5 text-sm"
+            className="neon-pill-outline flex items-center gap-1.5 px-4 py-2 text-sm"
           >
-            {codeCopied ? <Check className="w-3.5 h-3.5" style={{ color: '#5eead4' }} /> : <Copy className="w-3.5 h-3.5" />}
-            {codeCopied ? 'הועתק!' : 'העתק קוד'}
+            <span className="material-symbols-outlined text-[18px]">
+              {codeCopied ? 'check' : 'code'}
+            </span>
+            {codeCopied ? 'הועתק!' : 'העתק קוד הטמעה'}
           </button>
+
           {websiteUrl && (
             <a
               href={websiteUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="btn-ghost flex items-center gap-1.5 px-3 py-1.5 text-sm"
+              className="neon-pill-outline flex items-center gap-1.5 px-4 py-2 text-sm"
             >
-              <ExternalLink className="w-3.5 h-3.5" />
-              פתח באתר
+              <span className="material-symbols-outlined text-[18px]">open_in_new</span>
+              פתח אתר
             </a>
           )}
+
+          {/* Device toggle */}
+          <div className="flex items-center gap-1 mr-2">
+            <button
+              onClick={() => setDevice('desktop')}
+              className={`neon-pill-outline flex items-center justify-center w-9 h-9 !px-0 ${device === 'desktop' ? '!bg-[#AEB0E8]/20 !border-[#AEB0E8] !text-[#AEB0E8]' : ''}`}
+            >
+              <span className="material-symbols-outlined text-[20px]">monitor</span>
+            </button>
+            <button
+              onClick={() => setDevice('mobile')}
+              className={`neon-pill-outline flex items-center justify-center w-9 h-9 !px-0 ${device === 'mobile' ? '!bg-[#AEB0E8]/20 !border-[#AEB0E8] !text-[#AEB0E8]' : ''}`}
+            >
+              <span className="material-symbols-outlined text-[20px]">smartphone</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Main preview area — website background + widget on top */}
-      <div className="flex-1 relative overflow-hidden">
-        {/* Website via proxy iframe — always works */}
-        {proxyUrl && (
-          <iframe
-            src={proxyUrl}
-            className="w-full h-full border-0"
-            title="Website Preview"
-            sandbox="allow-same-origin"
-          />
-        )}
+      {/* Main content area */}
+      <div className="flex-1 flex overflow-hidden relative" style={{ height: 'calc(100vh - 60px)' }} dir="rtl">
+        {/* Info Panel (collapsible, slides from right in RTL) */}
+        <div
+          className="flex-shrink-0 bg-white overflow-y-auto transition-all duration-300 ease-in-out"
+          style={{
+            width: infoPanelOpen ? 320 : 0,
+            opacity: infoPanelOpen ? 1 : 0,
+            borderLeft: infoPanelOpen ? '1px solid rgba(55,50,38,0.08)' : 'none',
+          }}
+        >
+          {infoPanelOpen && config && (
+            <div className="p-5 space-y-5" style={{ width: 320 }}>
+              <h3 className="text-base font-semibold text-[#373226]" style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+                פרטי וידג׳ט
+              </h3>
 
-        {/* Widget floating in corner — pinned to bottom-right, flex-col to keep within bounds */}
-        <div className="absolute bottom-0 right-0 z-50 flex flex-col items-end justify-end p-6" style={{ maxHeight: '100%' }}>
-          {config ? (
-            <WidgetPreview accountId={accountId} config={config} />
+              {/* Brand name */}
+              <div>
+                <label className="text-xs text-[#bab1a1] block mb-1">שם המותג</label>
+                <p className="text-sm text-[#373226] font-medium">{config.brandName}</p>
+              </div>
+
+              {/* Domain */}
+              <div>
+                <label className="text-xs text-[#bab1a1] block mb-1">דומיין</label>
+                <p className="text-sm text-[#655e51] font-mono">{domain || '—'}</p>
+              </div>
+
+              {/* Color swatch */}
+              <div>
+                <label className="text-xs text-[#bab1a1] block mb-1">צבע מותג</label>
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-8 h-8 rounded-lg border border-black/5"
+                    style={{ background: config.theme.primaryColor || '#0c1013' }}
+                  />
+                  <span className="text-sm text-[#655e51] font-mono">
+                    {config.theme.primaryColor || '#0c1013'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Welcome message */}
+              <div>
+                <label className="text-xs text-[#bab1a1] block mb-1">הודעת פתיחה</label>
+                <p className="text-sm text-[#655e51] leading-relaxed">{config.welcomeMessage}</p>
+              </div>
+
+              {/* Account ID */}
+              <div>
+                <label className="text-xs text-[#bab1a1] block mb-1">Account ID</label>
+                <p className="text-xs text-[#655e51] font-mono break-all">{accountId}</p>
+              </div>
+
+              {/* Embed code */}
+              <div>
+                <label className="text-xs text-[#bab1a1] block mb-1">קוד הטמעה</label>
+                <pre
+                  className="text-xs p-3 rounded-xl bg-[#FFF7ED] text-[#655e51] overflow-x-auto leading-relaxed"
+                  style={{ direction: 'ltr', fontFamily: 'monospace' }}
+                >
+{`<!-- InfluencerBot Widget -->
+<script
+  src="${typeof window !== 'undefined' ? window.location.origin : ''}/widget.js"
+  data-account-id="${accountId}">
+</script>`}
+                </pre>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Preview Area */}
+        <div className="flex-1 flex items-center justify-center bg-[#FFF7ED]/50 relative overflow-hidden">
+          {proxyUrl ? (
+            device === 'desktop' ? (
+              /* Desktop: centered iframe */
+              <div
+                className="relative bg-white overflow-hidden"
+                style={{
+                  width: '100%',
+                  maxWidth: 1200,
+                  height: '100%',
+                  borderRadius: '1rem',
+                  margin: 16,
+                  boxShadow: '0 4px 32px rgba(55,50,38,0.08)',
+                }}
+              >
+                <iframe
+                  src={proxyUrl}
+                  className="w-full h-full border-0"
+                  title="Website Preview"
+                  sandbox="allow-same-origin"
+                />
+                {/* Widget floating in corner */}
+                <div className="absolute bottom-0 right-0 z-50 flex flex-col items-end justify-end p-6" style={{ maxHeight: '100%' }}>
+                  {config ? (
+                    <WidgetPreview accountId={accountId} config={config} />
+                  ) : (
+                    <div style={{
+                      width: 60, height: 60, borderRadius: '50%', overflow: 'hidden',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.1)', cursor: 'pointer',
+                    }}>
+                      <iframe src="/blob-animation.html" style={{ width: '100%', height: '100%', border: 'none', pointerEvents: 'none' }} title="Bot" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* Mobile: phone frame */
+              <div
+                className="relative bg-white overflow-hidden"
+                style={{
+                  width: 375,
+                  height: 667,
+                  borderRadius: '2rem',
+                  boxShadow: '0 8px 40px rgba(55,50,38,0.12), 0 0 0 1px rgba(55,50,38,0.06)',
+                }}
+              >
+                {/* Phone notch hint */}
+                <div className="absolute top-2 left-1/2 -translate-x-1/2 w-24 h-1.5 rounded-full bg-black/10 z-10" />
+                <iframe
+                  src={proxyUrl}
+                  className="w-full h-full border-0"
+                  title="Website Preview"
+                  sandbox="allow-same-origin"
+                />
+                {/* Widget floating in corner */}
+                <div className="absolute bottom-0 right-0 z-50 flex flex-col items-end justify-end p-4" style={{ maxHeight: '100%' }}>
+                  {config ? (
+                    <WidgetPreview accountId={accountId} config={config} />
+                  ) : (
+                    <div style={{
+                      width: 60, height: 60, borderRadius: '50%', overflow: 'hidden',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.1)', cursor: 'pointer',
+                    }}>
+                      <iframe src="/blob-animation.html" style={{ width: '100%', height: '100%', border: 'none', pointerEvents: 'none' }} title="Bot" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
           ) : (
-            <div style={{
-              width: 60, height: 60, borderRadius: '50%', overflow: 'hidden',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.1)', cursor: 'pointer',
-            }}>
-              <iframe src="/blob-animation.html" style={{ width: '100%', height: '100%', border: 'none', pointerEvents: 'none' }} title="Bot" />
+            /* Error / no URL state */
+            <div className="flex flex-col items-center gap-4 text-center">
+              <span className="material-symbols-outlined text-[#bab1a1]" style={{ fontSize: 64 }}>language</span>
+              <p className="text-[#655e51] text-base">לא ניתן לטעון את האתר</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="neon-pill-outline flex items-center gap-1.5 px-5 py-2.5 text-sm"
+              >
+                <span className="material-symbols-outlined text-[16px]">refresh</span>
+                נסה שוב
+              </button>
             </div>
           )}
         </div>
       </div>
-    </div>
+    </>
   );
 }
 

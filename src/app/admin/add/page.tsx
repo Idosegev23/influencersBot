@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowRight, Instagram, UserPlus, Copy, Link2, CheckCircle, Loader2 } from 'lucide-react';
 
 export default function AddAccountPage() {
   const router = useRouter();
@@ -79,179 +78,150 @@ export default function AddAccountPage() {
 
   if (checkingAuth) {
     return (
-      <div className="min-h-screen admin-panel flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#a094e0] border-t-transparent rounded-full animate-spin" />
+      <div className="flex items-center justify-center py-32">
+        <div className="w-8 h-8 border-2 border-[#AEB0E8] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen admin-panel p-6" dir="rtl">
-      <div className="max-w-lg mx-auto">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-8">
-          <Link
-            href="/admin/influencers"
-            className="w-10 h-10 flex items-center justify-center rounded-full transition-all"
-            style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.06)' }}
-          >
-            <ArrowRight className="w-5 h-5" style={{ color: '#ede9f8' }} />
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold" style={{ color: '#ede9f8' }}>הוספת חשבון</h1>
-            <p className="text-sm" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>צור חשבון חדש וקבל קישור התחברות לאינסטגרם</p>
+    <div className="max-w-lg mx-auto">
+      {!accountId ? (
+        /* ── Step 1: Account Creation Form ── */
+        <div className="neon-card p-10">
+          <div className="flex flex-col items-center text-center mb-8">
+            <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6" style={{ background: 'rgba(105, 255, 199, 0.1)' }}>
+              <span className="material-symbols-outlined text-[48px]" style={{ color: '#69FFC7' }}>person_add</span>
+            </div>
+            <h1 className="text-2xl font-extrabold tracking-tight mb-2" style={{ color: '#373226' }}>הוספת חשבון חדש</h1>
+            <p className="text-sm" style={{ color: '#655e51' }}>הזן את פרטי החשבון החדש כדי להתחיל בניהול</p>
           </div>
-        </div>
 
-        {!accountId ? (
-          /* ── Step 1: Enter username ── */
-          <div className="admin-card p-6">
-            <div className="flex items-center gap-2 mb-6">
-              <UserPlus className="w-5 h-5" style={{ color: '#a094e0' }} />
-              <h2 className="text-lg font-bold" style={{ color: '#ede9f8' }}>פרטי החשבון</h2>
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold mr-2" style={{ color: '#373226' }}>
+                שם משתמש
+              </label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+                placeholder="@username"
+                className="neon-input w-full"
+                style={{ direction: 'ltr' }}
+                autoFocus
+              />
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm mb-2" style={{ color: 'rgba(237, 233, 248, 0.5)' }}>
-                  Instagram Username *
-                </label>
-                <div className="flex items-center gap-2">
-                  <span className="text-lg" style={{ color: 'rgba(237, 233, 248, 0.3)' }}>@</span>
-                  <input
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-                    placeholder="username"
-                    className="admin-input flex-1"
-                    style={{ direction: 'ltr' }}
-                    autoFocus
-                  />
-                </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold mr-2" style={{ color: '#373226' }}>
+                שם תצוגה
+              </label>
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+                placeholder="הזן שם מלא"
+                className="neon-input w-full"
+              />
+            </div>
+
+            {error && (
+              <div className="text-sm p-3 rounded-xl" style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.06)', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
+                {error}
               </div>
+            )}
 
-              <div>
-                <label className="block text-sm mb-2" style={{ color: 'rgba(237, 233, 248, 0.5)' }}>
-                  שם תצוגה (אופציונלי)
-                </label>
-                <input
-                  type="text"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-                  placeholder="מירן בוזגלו"
-                  className="admin-input"
-                />
-              </div>
-
-              {error && (
-                <div className="text-sm p-3 rounded-xl" style={{ color: '#f87171', background: 'rgba(239, 68, 68, 0.06)', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
-                  {error}
-                </div>
-              )}
-
+            <div className="pt-4">
               <button
                 onClick={handleCreate}
                 disabled={isLoading || !username.trim()}
-                className="btn-primary w-full flex items-center justify-center gap-2 py-3 disabled:opacity-50"
+                className="neon-pill neon-pill-primary w-full flex items-center justify-center gap-3 py-4 font-bold text-base disabled:opacity-50"
               >
                 {isLoading ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> יוצר חשבון...</>
+                  <>
+                    <span>יוצר חשבון...</span>
+                    <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  </>
                 ) : (
-                  <><UserPlus className="w-4 h-4" /> צור חשבון</>
+                  <span>צור חשבון</span>
                 )}
               </button>
             </div>
           </div>
-        ) : (
-          /* ── Step 2: Account created — show ID + OAuth link ── */
-          <div className="space-y-4">
-            {/* Success banner */}
-            <div className="admin-card p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'rgba(94, 234, 212, 0.1)' }}>
-                  <CheckCircle className="w-5 h-5" style={{ color: '#5eead4' }} />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold" style={{ color: '#ede9f8' }}>
-                    {existed ? 'חשבון קיים נמצא' : 'חשבון נוצר בהצלחה!'}
-                  </h2>
-                  <p className="text-sm" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>
-                    @{username.trim().replace(/^@/, '')}
-                  </p>
-                </div>
-              </div>
+        </div>
+      ) : (
+        /* ── Step 2: Success — show ID + OAuth link ── */
+        <div className="neon-card p-10" style={{ borderRight: '3px solid #69FFC7' }}>
+          <div className="flex items-center gap-6 mb-8">
+            <div className="w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(105, 255, 199, 0.2)' }}>
+              <span className="material-symbols-outlined text-[32px] font-bold" style={{ color: '#69FFC7', fontVariationSettings: "'FILL' 1" }}>check</span>
+            </div>
+            <div>
+              <h2 className="text-2xl font-extrabold tracking-tight" style={{ color: '#373226' }}>
+                {existed ? 'חשבון קיים נמצא' : 'החשבון נוצר בהצלחה!'}
+              </h2>
+              <p className="font-bold" style={{ color: '#69FFC7' }}>
+                @{username.trim().replace(/^@/, '')}
+              </p>
+            </div>
+          </div>
 
-              {/* Copy Account ID */}
+          <div className="space-y-4 mb-10">
+            {/* Account ID row */}
+            <div className="flex items-center justify-between p-5 rounded-xl" style={{ background: '#faf2e9' }}>
+              <div className="flex flex-col">
+                <span className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: '#817a6c' }}>מזהה חשבון</span>
+                <span className="font-mono font-medium" style={{ color: '#373226' }}>{accountId.slice(0, 12)}...</span>
+              </div>
               <button
                 onClick={() => copyToClipboard(accountId, 'id')}
-                className="w-full flex items-center justify-between gap-2 p-3 rounded-xl text-sm transition-all mb-2"
-                style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.06)' }}
+                className="p-2 rounded-full transition-colors"
+                style={{ background: '#fff', color: copiedId ? '#69FFC7' : '#FF76B0' }}
               >
-                <div className="flex items-center gap-2" style={{ color: '#ede9f8' }}>
-                  <Copy className="w-4 h-4" />
-                  <span>העתק Account ID</span>
-                </div>
-                <span className="text-xs font-mono" style={{ color: copiedId ? '#5eead4' : 'rgba(237, 233, 248, 0.3)' }}>
-                  {copiedId ? 'הועתק!' : accountId.slice(0, 8) + '...'}
-                </span>
+                <span className="material-symbols-outlined text-[20px]">{copiedId ? 'check' : 'content_copy'}</span>
               </button>
             </div>
 
-            {/* Instagram OAuth Link */}
-            <div className="admin-card p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Instagram className="w-5 h-5" style={{ color: '#E1306C' }} />
-                <h2 className="text-lg font-bold" style={{ color: '#ede9f8' }}>קישור התחברות לאינסטגרם</h2>
+            {/* IG Connect link row */}
+            <div className="flex items-center justify-between p-5 rounded-xl" style={{ background: '#faf2e9' }}>
+              <div className="flex flex-col min-w-0">
+                <span className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: '#817a6c' }}>חיבור IG</span>
+                <span className="font-medium truncate" style={{ color: '#373226' }}>{igConnectLink.slice(0, 35)}...</span>
               </div>
-
-              <p className="text-sm mb-4" style={{ color: 'rgba(237, 233, 248, 0.4)' }}>
-                שלח את הקישור הזה למשפיענ/ית — ברגע שיתחברו תראה את הסטטוס בדף החשבון.
-              </p>
-
-              <div className="p-3 rounded-xl mb-3 overflow-x-auto" style={{ background: 'rgba(0, 0, 0, 0.2)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                <code className="text-xs break-all" style={{ color: 'rgba(237, 233, 248, 0.5)', direction: 'ltr', display: 'block' }}>
-                  {igConnectLink}
-                </code>
-              </div>
-
               <button
                 onClick={() => copyToClipboard(igConnectLink, 'link')}
-                className="w-full flex items-center justify-center gap-2 p-3 rounded-xl text-sm font-medium transition-all"
-                style={{ background: 'rgba(225, 48, 108, 0.1)', border: '1px solid rgba(225, 48, 108, 0.25)', color: '#ede9f8' }}
+                className="px-4 py-1.5 rounded-full text-xs font-bold transition-colors flex-shrink-0"
+                style={{ background: copiedLink ? 'rgba(105, 255, 199, 0.2)' : 'rgba(174, 176, 232, 0.2)', color: copiedLink ? '#373226' : '#373226' }}
               >
-                {copiedLink ? (
-                  <><CheckCircle className="w-4 h-4" style={{ color: '#5eead4' }} /> הועתק!</>
-                ) : (
-                  <><Link2 className="w-4 h-4" style={{ color: '#E1306C' }} /> העתק קישור התחברות</>
-                )}
-              </button>
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-3">
-              <Link
-                href={`/admin/influencers/${accountId}`}
-                className="btn-primary flex-1 flex items-center justify-center gap-2 py-3 text-sm"
-              >
-                צפה בחשבון
-              </Link>
-              <button
-                onClick={() => {
-                  setAccountId(null);
-                  setUsername('');
-                  setDisplayName('');
-                  setExisted(false);
-                }}
-                className="btn-ghost flex-1 py-3 text-sm"
-              >
-                הוסף עוד
+                {copiedLink ? 'הועתק!' : 'העתק לינק'}
               </button>
             </div>
           </div>
-        )}
-      </div>
+
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Link
+              href={`/admin/influencers/${accountId}`}
+              className="neon-pill neon-pill-secondary flex-1 py-4 font-bold text-center"
+            >
+              צפה בחשבון
+            </Link>
+            <button
+              onClick={() => {
+                setAccountId(null);
+                setUsername('');
+                setDisplayName('');
+                setExisted(false);
+              }}
+              className="neon-pill neon-pill-outline flex-1 py-4 font-bold text-center"
+            >
+              הוסף חשבון נוסף
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

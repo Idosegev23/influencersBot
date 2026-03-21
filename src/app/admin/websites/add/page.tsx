@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { ArrowRight, Zap, Globe, Check, Loader2, Copy, ExternalLink } from 'lucide-react';
 
 type WizardStep = 'url' | 'scraping' | 'processing' | 'settings' | 'complete';
 
@@ -20,6 +19,14 @@ interface WizardState {
   welcomeMessage: string;
 }
 
+const COLOR_PRESETS = [
+  { name: 'mint', value: '#69FFC7' },
+  { name: 'lavender', value: '#AEB0E8' },
+  { name: 'pink', value: '#FF76B0' },
+  { name: 'gold', value: '#FFD700' },
+  { name: 'lime', value: '#BFFF00' },
+];
+
 export default function AddWebsitePage() {
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -31,7 +38,7 @@ export default function AddWebsitePage() {
     accountId: null,
     error: null,
     isLoading: false,
-    widgetColor: '#6366f1',
+    widgetColor: '#69FFC7',
     welcomeMessage: 'שלום! איך אפשר לעזור?',
   });
 
@@ -163,295 +170,463 @@ export default function AddWebsitePage() {
 
   if (checkingAuth) {
     return (
-      <div className="min-h-screen admin-panel flex items-center justify-center" dir="rtl">
-        <div className="w-8 h-8 border-2 border-[#a094e0] border-t-transparent rounded-full animate-spin" />
+      <div className="flex items-center justify-center py-32" dir="rtl">
+        <div className="w-10 h-10 rounded-full border-3 border-[#AEB0E8] border-t-transparent animate-spin" />
       </div>
     );
   }
 
-  const steps: { key: WizardStep; label: string }[] = [
-    { key: 'url', label: 'כתובת' },
-    { key: 'scraping', label: 'סריקה' },
-    { key: 'settings', label: 'הגדרות' },
-    { key: 'complete', label: 'סיום' },
+  const steps: { key: WizardStep; label: string; icon: string }[] = [
+    { key: 'url', label: 'כתובת', icon: 'language' },
+    { key: 'scraping', label: 'סריקה', icon: 'radar' },
+    { key: 'settings', label: 'הגדרות', icon: 'palette' },
+    { key: 'complete', label: 'סיום', icon: 'celebration' },
   ];
 
   const currentStepIndex = steps.findIndex((s) => s.key === state.step);
 
   return (
-    <div className="min-h-screen admin-panel" dir="rtl">
-      {/* Header */}
-      <header className="relative z-10 sticky top-0 backdrop-blur-xl border-b" style={{ background: 'rgba(7, 7, 13, 0.88)', borderColor: 'rgba(255, 255, 255, 0.06)' }}>
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Link href="/admin/dashboard" className="transition-colors" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>
-                <ArrowRight className="w-5 h-5" />
-              </Link>
-              <div className="flex items-center gap-2">
-                <Globe className="w-5 h-5" style={{ color: '#a094e0' }} />
-                <h1 className="font-semibold" style={{ color: '#ede9f8' }}>הוספת אתר</h1>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+    <>
+      {/* Back button */}
+      <div className="mb-6">
+        <Link
+          href="/admin/dashboard"
+          className="neon-pill neon-pill-outline inline-flex items-center gap-2"
+        >
+          <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+          חזרה
+        </Link>
+      </div>
 
-      <main className="relative z-10 p-6 max-w-2xl mx-auto">
-        {/* Progress Steps */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          {steps.map((s, i) => (
-            <div key={s.key} className="flex items-center gap-2">
-              <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors"
-                style={
-                  i < currentStepIndex
-                    ? { background: 'rgba(94, 234, 212, 0.15)', color: '#5eead4' }
-                    : i === currentStepIndex
-                    ? { background: 'rgba(160, 148, 224, 0.15)', color: '#a094e0' }
-                    : { background: 'rgba(255, 255, 255, 0.04)', color: 'rgba(237, 233, 248, 0.25)' }
-                }
-              >
-                {i < currentStepIndex ? <Check className="w-4 h-4" /> : i + 1}
+      {/* Page title */}
+      <div className="text-center mb-8">
+        <h1 className="text-2xl font-bold text-[#373226] font-headline">הוספת אתר חדש</h1>
+        <p className="text-sm text-[#655e51] mt-1">סרקו, התאימו והטמיעו צ&apos;אטבוט חכם באתר שלכם</p>
+      </div>
+
+      {/* Step indicator */}
+      <div className="flex items-center justify-center gap-0 mb-10">
+        {steps.map((s, i) => {
+          const isDone = i < currentStepIndex;
+          const isCurrent = i === currentStepIndex;
+
+          return (
+            <div key={s.key} className="flex items-center">
+              <div className="flex flex-col items-center">
+                <motion.div
+                  className={`rounded-full flex items-center justify-center transition-all duration-300 ${
+                    isDone
+                      ? 'w-10 h-10 bg-[#69FFC7] text-[#1A1C1E] shadow-[0_4px_16px_rgba(105,255,199,0.3)]'
+                      : isCurrent
+                      ? 'w-12 h-12 bg-[#AEB0E8] text-white ring-4 ring-white shadow-[0_4px_20px_rgba(174,176,232,0.35)] scale-110'
+                      : 'w-10 h-10 bg-transparent border-2 border-[#bab1a1] text-[#bab1a1]'
+                  }`}
+                  animate={isCurrent ? { scale: [1, 1.08, 1] } : {}}
+                  transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
+                >
+                  {isDone ? (
+                    <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>check</span>
+                  ) : (
+                    <span className="material-symbols-outlined text-[20px]">{s.icon}</span>
+                  )}
+                </motion.div>
+                <span className={`text-xs mt-2 font-medium ${
+                  isDone ? 'text-[#69FFC7]' : isCurrent ? 'text-[#AEB0E8] font-bold' : 'text-[#bab1a1]'
+                }`}>
+                  {s.label}
+                </span>
               </div>
-              <span className="text-sm" style={{ color: i === currentStepIndex ? '#ede9f8' : 'rgba(237, 233, 248, 0.25)' }}>
-                {s.label}
-              </span>
               {i < steps.length - 1 && (
-                <div className="w-8 h-0.5" style={{ background: i < currentStepIndex ? 'rgba(94, 234, 212, 0.3)' : 'rgba(255, 255, 255, 0.06)' }} />
+                <div className="mx-3 mt-[-1.25rem]">
+                  <div
+                    className="w-12 h-[3px] rounded-full transition-colors duration-500"
+                    style={{
+                      background: isDone
+                        ? 'linear-gradient(to left, #69FFC7, #AEB0E8)'
+                        : '#e8e0d6',
+                    }}
+                  />
+                </div>
               )}
             </div>
-          ))}
-        </div>
+          );
+        })}
+      </div>
+
+      {/* Content area — max-width centered */}
+      <div className="max-w-xl mx-auto">
 
         {/* Step: URL Input */}
         {state.step === 'url' && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="admin-card p-8">
-            <h2 className="text-xl font-semibold mb-2" style={{ color: '#ede9f8' }}>הזינו את כתובת האתר</h2>
-            <p className="mb-6" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>נסרוק את כל דפי האתר ונאנדקס את התוכן לצ&#39;אטבוט חכם</p>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative">
+            {/* Decorative blur glow */}
+            <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-64 h-32 bg-[#AEB0E8]/15 rounded-full blur-3xl pointer-events-none" />
 
-            <input
-              type="url"
-              placeholder="https://example.com"
-              value={state.url}
-              onChange={(e) => setState((s) => ({ ...s, url: e.target.value, error: null }))}
-              onKeyDown={(e) => e.key === 'Enter' && handleStartScan()}
-              className="admin-input w-full !rounded-xl text-lg mb-4"
-              dir="ltr"
-              autoFocus
-            />
+            <div className="neon-card p-8 relative">
+              {/* Header */}
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 rounded-full bg-[#FF76B0]/10 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[#FF76B0] text-[24px]">brush</span>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-[#373226] font-headline">הזינו את כתובת האתר</h2>
+                  <p className="text-sm text-[#655e51]">נסרוק את כל דפי האתר ונאנדקס את התוכן לצ&apos;אטבוט חכם</p>
+                </div>
+              </div>
 
-            {state.error && (
-              <p className="text-sm mb-4" style={{ color: '#f87171' }}>{state.error}</p>
-            )}
+              <input
+                type="url"
+                placeholder="https://example.com"
+                value={state.url}
+                onChange={(e) => setState((s) => ({ ...s, url: e.target.value, error: null }))}
+                onKeyDown={(e) => e.key === 'Enter' && handleStartScan()}
+                className={`neon-input text-lg mb-4 ${state.error ? '!shadow-[0_0_0_2px_rgba(255,118,176,0.4)] !bg-[#FF76B0]/[0.03]' : ''}`}
+                dir="ltr"
+                autoFocus
+              />
 
-            <button
-              onClick={handleStartScan}
-              disabled={state.isLoading || !state.url.trim()}
-              className="btn-primary w-full flex items-center justify-center gap-2 py-3 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {state.isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Zap className="w-5 h-5" />}
-              {state.isLoading ? 'מתחיל...' : 'התחל סריקה'}
-            </button>
+              {state.error && (
+                <div className="flex items-center gap-2 mb-4 px-1">
+                  <span className="material-symbols-outlined text-[#FF76B0] text-[16px]">error</span>
+                  <p className="text-sm text-[#FF76B0]">{state.error}</p>
+                </div>
+              )}
+
+              <button
+                onClick={handleStartScan}
+                disabled={state.isLoading || !state.url.trim()}
+                className="neon-pill neon-pill-primary w-full justify-center py-3 text-base font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: state.isLoading ? '#69FFC7' : 'linear-gradient(135deg, #69FFC7, #AEB0E8)' }}
+              >
+                {state.isLoading ? (
+                  <span className="material-symbols-outlined text-[20px] animate-spin">progress_activity</span>
+                ) : (
+                  <span className="material-symbols-outlined text-[20px]">bolt</span>
+                )}
+                {state.isLoading ? 'מתחיל...' : 'התחל סריקה'}
+              </button>
+            </div>
           </motion.div>
         )}
 
         {/* Step: Scraping */}
         {state.step === 'scraping' && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="admin-card p-8">
-            <h2 className="text-xl font-semibold mb-2" style={{ color: '#ede9f8' }}>סורקים את האתר...</h2>
-            <p className="mb-6" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>התהליך עשוי לקחת כמה דקות. אל תסגרו את הדף.</p>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative">
+            <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-64 h-32 bg-[#69FFC7]/10 rounded-full blur-3xl pointer-events-none" />
 
-            <div className="space-y-3 mb-6">
-              {deduplicateSteps(jobStatus?.steps || []).map((step: any, i: number) => (
-                <div key={step.step || i} className="flex items-center gap-3">
-                  <div
-                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0"
-                    style={
-                      step.status === 'completed' ? { background: 'rgba(94, 234, 212, 0.15)', color: '#5eead4' } :
-                      step.status === 'running' ? { background: 'rgba(160, 148, 224, 0.15)', color: '#a094e0' } :
-                      step.status === 'failed' ? { background: 'rgba(239, 68, 68, 0.15)', color: '#f87171' } :
-                      { background: 'rgba(255, 255, 255, 0.04)', color: 'rgba(237, 233, 248, 0.25)' }
-                    }
-                  >
-                    {step.status === 'completed' ? <Check className="w-3 h-3" /> :
-                     step.status === 'running' ? <Loader2 className="w-3 h-3 animate-spin" /> : ''}
-                  </div>
-                  <span className="text-sm" style={{
-                    color: step.status === 'running' ? '#ede9f8' : step.status === 'completed' ? '#5eead4' : 'rgba(237, 233, 248, 0.35)'
-                  }}>
-                    {step.message}
-                  </span>
+            <div className="neon-card p-8 relative">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 rounded-full bg-[#AEB0E8]/15 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[#AEB0E8] text-[24px] animate-spin" style={{ animationDuration: '3s' }}>radar</span>
                 </div>
-              ))}
-            </div>
-
-            {/* Progress bar */}
-            <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255, 255, 255, 0.06)' }}>
-              <motion.div
-                className="h-full rounded-full"
-                style={{ background: '#a094e0' }}
-                initial={{ width: '5%' }}
-                animate={{ width: `${getLatestProgress(jobStatus?.steps || [])}%` }}
-                transition={{ duration: 0.5 }}
-              />
-            </div>
-
-            {state.error && (
-              <div className="mt-4 p-3 rounded-xl" style={{ background: 'rgba(239, 68, 68, 0.06)', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
-                <p className="text-sm" style={{ color: '#f87171' }}>{state.error}</p>
-                <button
-                  onClick={() => setState((s) => ({ ...s, step: 'url', error: null, jobId: null }))}
-                  className="mt-2 text-sm" style={{ color: '#a094e0' }}
-                >
-                  נסה שוב
-                </button>
+                <div>
+                  <h2 className="text-xl font-bold text-[#373226] font-headline">סורקים את האתר...</h2>
+                  <p className="text-sm text-[#655e51]">התהליך עשוי לקחת כמה דקות. אל תסגרו את הדף.</p>
+                </div>
               </div>
-            )}
 
-            <button
-              onClick={handleCancelScan}
-              className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2 text-sm rounded-full transition-all"
-              style={{ color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.15)' }}
-            >
-              ביטול סריקה
-            </button>
+              <div className="space-y-3 mb-6">
+                {deduplicateSteps(jobStatus?.steps || []).map((step: any, i: number) => (
+                  <div key={step.step || i} className="flex items-center gap-3">
+                    <div
+                      className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
+                        step.status === 'completed'
+                          ? 'bg-[#69FFC7]/15'
+                          : step.status === 'running'
+                          ? 'bg-[#AEB0E8]/15'
+                          : step.status === 'failed'
+                          ? 'bg-[#FF76B0]/10'
+                          : 'bg-[#faf2e9]'
+                      }`}
+                    >
+                      {step.status === 'completed' ? (
+                        <span className="material-symbols-outlined text-[#69FFC7] text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                      ) : step.status === 'running' ? (
+                        <span className="material-symbols-outlined text-[#AEB0E8] text-[16px] animate-spin">progress_activity</span>
+                      ) : step.status === 'failed' ? (
+                        <span className="material-symbols-outlined text-[#FF76B0] text-[16px]">cancel</span>
+                      ) : (
+                        <span className="material-symbols-outlined text-[#bab1a1] text-[16px]">radio_button_unchecked</span>
+                      )}
+                    </div>
+                    <span className={`text-sm ${
+                      step.status === 'running' ? 'text-[#373226] font-medium' :
+                      step.status === 'completed' ? 'text-[#655e51]' :
+                      step.status === 'failed' ? 'text-[#FF76B0]' :
+                      'text-[#bab1a1]'
+                    }`}>
+                      {step.message}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Progress bar */}
+              <div className="w-full h-2.5 rounded-full overflow-hidden bg-[#faf2e9]">
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{ background: 'linear-gradient(to left, #AEB0E8, #69FFC7)' }}
+                  initial={{ width: '5%' }}
+                  animate={{ width: `${getLatestProgress(jobStatus?.steps || [])}%` }}
+                  transition={{ duration: 0.5 }}
+                />
+              </div>
+
+              {state.error && (
+                <div className="mt-4 p-4 rounded-2xl bg-[#FF76B0]/[0.04] border border-[#FF76B0]/20">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[#FF76B0] text-[18px]">warning</span>
+                    <p className="text-sm text-[#FF76B0]">{state.error}</p>
+                  </div>
+                  <button
+                    onClick={() => setState((s) => ({ ...s, step: 'url', error: null, jobId: null }))}
+                    className="mt-2 text-sm text-[#AEB0E8] font-medium hover:underline"
+                  >
+                    נסה שוב
+                  </button>
+                </div>
+              )}
+
+              <button
+                onClick={handleCancelScan}
+                className="neon-pill neon-pill-danger w-full justify-center mt-5"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+                ביטול סריקה
+              </button>
+            </div>
           </motion.div>
         )}
 
         {/* Step: Settings */}
         {state.step === 'settings' && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="admin-card p-8">
-            <h2 className="text-xl font-semibold mb-2" style={{ color: '#ede9f8' }}>הגדרות ווידג&#39;ט</h2>
-            <p className="mb-6" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>התאימו את הצ&#39;אטבוט לאתר שלכם</p>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative">
+            <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-64 h-32 bg-[#AEB0E8]/10 rounded-full blur-3xl pointer-events-none" />
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm mb-2" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>צבע ראשי</label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="color"
-                    value={state.widgetColor}
-                    onChange={(e) => setState((s) => ({ ...s, widgetColor: e.target.value }))}
-                    className="w-10 h-10 rounded-lg cursor-pointer"
-                    style={{ border: '1px solid rgba(255, 255, 255, 0.06)' }}
-                  />
-                  <input
-                    type="text"
-                    value={state.widgetColor}
-                    onChange={(e) => setState((s) => ({ ...s, widgetColor: e.target.value }))}
-                    className="admin-input flex-1 !rounded-xl"
-                    dir="ltr"
-                  />
+            <div className="neon-card p-8 relative">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 rounded-full bg-[#AEB0E8]/15 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[#AEB0E8] text-[24px]">palette</span>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-[#373226] font-headline">הגדרות ווידג&apos;ט</h2>
+                  <p className="text-sm text-[#655e51]">התאימו את הצ&apos;אטבוט לאתר שלכם</p>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm mb-2" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>הודעת ברכה</label>
-                <input
-                  type="text"
-                  value={state.welcomeMessage}
-                  onChange={(e) => setState((s) => ({ ...s, welcomeMessage: e.target.value }))}
-                  className="admin-input w-full !rounded-xl"
-                />
+              <div className="space-y-6">
+                {/* Color picker */}
+                <div>
+                  <label className="block text-sm font-medium text-[#655e51] mb-3">צבע ראשי</label>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {COLOR_PRESETS.map((c) => (
+                      <button
+                        key={c.value}
+                        onClick={() => setState((s) => ({ ...s, widgetColor: c.value }))}
+                        className={`w-9 h-9 rounded-full transition-all duration-200 ${
+                          state.widgetColor === c.value
+                            ? 'ring-2 ring-offset-2 ring-[#373226] scale-110'
+                            : 'hover:scale-105'
+                        }`}
+                        style={{ background: c.value }}
+                      >
+                        {state.widgetColor === c.value && (
+                          <span className="material-symbols-outlined text-white text-[16px] drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]" style={{ fontVariationSettings: "'FILL' 1" }}>check</span>
+                        )}
+                      </button>
+                    ))}
+                    {/* Custom color picker */}
+                    <div className="relative">
+                      <input
+                        type="color"
+                        value={state.widgetColor}
+                        onChange={(e) => setState((s) => ({ ...s, widgetColor: e.target.value }))}
+                        className="w-9 h-9 rounded-full cursor-pointer border-2 border-dashed border-[#bab1a1] bg-transparent appearance-none"
+                        style={{ WebkitAppearance: 'none' }}
+                        title="בחר צבע מותאם"
+                      />
+                      <span className="material-symbols-outlined text-[#bab1a1] text-[14px] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">add</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Welcome message */}
+                <div>
+                  <label className="block text-sm font-medium text-[#655e51] mb-2">הודעת ברכה</label>
+                  <textarea
+                    value={state.welcomeMessage}
+                    onChange={(e) => setState((s) => ({ ...s, welcomeMessage: e.target.value }))}
+                    className="neon-input !rounded-2xl resize-none"
+                    rows={3}
+                  />
+                </div>
+
+                {/* Phone preview */}
+                <div>
+                  <label className="block text-sm font-medium text-[#655e51] mb-3">תצוגה מקדימה</label>
+                  <div className="flex justify-center">
+                    <div className="relative w-[160px] h-[320px] rounded-[24px] bg-slate-900 p-[6px] shadow-xl">
+                      {/* Phone notch */}
+                      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-16 h-5 bg-slate-900 rounded-b-xl z-10" />
+                      {/* Screen */}
+                      <div className="w-full h-full rounded-[20px] bg-white overflow-hidden flex flex-col">
+                        {/* Header bar */}
+                        <div className="h-10 flex items-center justify-center" style={{ background: state.widgetColor }}>
+                          <span className="text-white text-[10px] font-bold">הצ&apos;אטבוט שלכם</span>
+                        </div>
+                        {/* Chat area */}
+                        <div className="flex-1 p-3 flex flex-col justify-end gap-2">
+                          <div className="self-start max-w-[85%] rounded-xl rounded-br-sm px-3 py-2 text-[8px] text-white leading-tight" style={{ background: state.widgetColor }}>
+                            {state.welcomeMessage}
+                          </div>
+                          <div className="self-end max-w-[75%] rounded-xl rounded-bl-sm px-3 py-2 bg-[#faf2e9] text-[8px] text-[#373226] leading-tight">
+                            היי, יש לי שאלה...
+                          </div>
+                        </div>
+                        {/* Input bar */}
+                        <div className="h-8 border-t border-gray-100 flex items-center px-2 gap-1">
+                          <div className="flex-1 h-5 bg-[#faf2e9] rounded-full" />
+                          <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: state.widgetColor }}>
+                            <span className="material-symbols-outlined text-white text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>send</span>
+                          </div>
+                        </div>
+                      </div>
+                      {/* FAB */}
+                      <div className="absolute -bottom-3 -left-3 w-11 h-11 rounded-full shadow-lg flex items-center justify-center" style={{ background: state.widgetColor }}>
+                        <span className="material-symbols-outlined text-white text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>chat_bubble</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
+
+              {/* Actions */}
+              <button
+                onClick={async () => {
+                  setState((s) => ({ ...s, isLoading: true }));
+                  try {
+                    // Generate management token for client access
+                    const token = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+                      .map(b => b.toString(16).padStart(2, '0')).join('');
+                    setManageToken(token);
+
+                    await fetch(`/api/admin/accounts/${state.accountId}/config`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        widget: {
+                          primaryColor: state.widgetColor,
+                          welcomeMessage: state.welcomeMessage,
+                          position: 'bottom-right',
+                          managementToken: token,
+                        },
+                      }),
+                    });
+                  } catch {
+                    // Continue even if save fails
+                  }
+                  setState((s) => ({ ...s, step: 'complete', isLoading: false }));
+                }}
+                disabled={state.isLoading}
+                className="neon-pill neon-pill-primary w-full justify-center py-3 text-base font-semibold mt-6 disabled:opacity-50"
+                style={{ background: 'linear-gradient(135deg, #69FFC7, #AEB0E8)' }}
+              >
+                {state.isLoading ? (
+                  <span className="material-symbols-outlined text-[20px] animate-spin">progress_activity</span>
+                ) : (
+                  <span className="material-symbols-outlined text-[20px]">check_circle</span>
+                )}
+                {state.isLoading ? 'שומר...' : 'המשך לסיום'}
+              </button>
+
+              <button
+                onClick={() => setState((s) => ({ ...s, step: 'complete', isLoading: false }))}
+                className="w-full text-center text-sm text-[#bab1a1] hover:text-[#655e51] transition-colors mt-3 py-2"
+              >
+                דילוג על שלב זה
+              </button>
             </div>
-
-            <button
-              onClick={async () => {
-                setState((s) => ({ ...s, isLoading: true }));
-                try {
-                  // Generate management token for client access
-                  const token = Array.from(crypto.getRandomValues(new Uint8Array(32)))
-                    .map(b => b.toString(16).padStart(2, '0')).join('');
-                  setManageToken(token);
-
-                  await fetch(`/api/admin/accounts/${state.accountId}/config`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      widget: {
-                        primaryColor: state.widgetColor,
-                        welcomeMessage: state.welcomeMessage,
-                        position: 'bottom-right',
-                        managementToken: token,
-                      },
-                    }),
-                  });
-                } catch {
-                  // Continue even if save fails
-                }
-                setState((s) => ({ ...s, step: 'complete', isLoading: false }));
-              }}
-              disabled={state.isLoading}
-              className="btn-primary w-full mt-6 flex items-center justify-center gap-2 py-3 font-medium disabled:opacity-50"
-            >
-              {state.isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
-              {state.isLoading ? 'שומר...' : 'סיום'}
-            </button>
           </motion.div>
         )}
 
         {/* Step: Complete */}
         {state.step === 'complete' && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-            <div className="admin-card p-8 text-center">
-              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(94, 234, 212, 0.12)', border: '1px solid rgba(94, 234, 212, 0.18)' }}>
-                <Check className="w-8 h-8" style={{ color: '#5eead4' }} />
-              </div>
-              <h2 className="text-xl font-semibold mb-2" style={{ color: '#ede9f8' }}>האתר נסרק בהצלחה!</h2>
-              <p className="mb-6" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>הווידג&#39;ט מוכן להטמעה באתר שלכם</p>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
+            {/* Success card */}
+            <div className="neon-card p-8 text-center relative overflow-hidden">
+              {/* Decorative glow */}
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-24 bg-[#69FFC7]/10 rounded-full blur-3xl pointer-events-none" />
 
-              {/* Scan results */}
-              {jobStatus?.result && (
-                <div className="grid grid-cols-3 gap-4 mb-6">
-                  <div className="rounded-xl p-3" style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                    <p className="text-2xl font-bold" style={{ color: '#ede9f8' }}>{jobStatus.result.pagesScraped || 0}</p>
-                    <p className="text-xs" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>דפים</p>
-                  </div>
-                  <div className="rounded-xl p-3" style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                    <p className="text-2xl font-bold" style={{ color: '#ede9f8' }}>{formatNumber(jobStatus.result.totalWords || 0)}</p>
-                    <p className="text-xs" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>מילים</p>
-                  </div>
-                  <div className="rounded-xl p-3" style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                    <p className="text-2xl font-bold" style={{ color: '#ede9f8' }}>{jobStatus.result.totalImages || 0}</p>
-                    <p className="text-xs" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>תמונות</p>
-                  </div>
+              <div className="relative">
+                <div className="w-16 h-16 rounded-full bg-[#69FFC7]/15 flex items-center justify-center mx-auto mb-4 shadow-[0_4px_20px_rgba(105,255,199,0.2)]">
+                  <span className="material-symbols-outlined text-[#69FFC7] text-[32px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
                 </div>
-              )}
+                <h2 className="text-xl font-bold text-[#373226] font-headline mb-1">האתר נסרק בהצלחה!</h2>
+                <p className="text-sm text-[#655e51] mb-6">הווידג&apos;ט מוכן להטמעה באתר שלכם</p>
+
+                {/* Scan results */}
+                {jobStatus?.result && (
+                  <div className="grid grid-cols-3 gap-3 mb-2">
+                    <div className="rounded-2xl p-4 bg-[#faf2e9]">
+                      <p className="text-2xl font-bold text-[#373226]">{jobStatus.result.pagesScraped || 0}</p>
+                      <p className="text-xs text-[#bab1a1] mt-1">דפים</p>
+                    </div>
+                    <div className="rounded-2xl p-4 bg-[#faf2e9]">
+                      <p className="text-2xl font-bold text-[#373226]">{formatNumber(jobStatus.result.totalWords || 0)}</p>
+                      <p className="text-xs text-[#bab1a1] mt-1">מילים</p>
+                    </div>
+                    <div className="rounded-2xl p-4 bg-[#faf2e9]">
+                      <p className="text-2xl font-bold text-[#373226]">{jobStatus.result.totalImages || 0}</p>
+                      <p className="text-xs text-[#bab1a1] mt-1">תמונות</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Embed Code */}
-            <div className="admin-card p-6">
-              <h3 className="text-lg font-semibold mb-3" style={{ color: '#ede9f8' }}>קוד הטמעה</h3>
-              <p className="text-sm mb-4" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>
+            <div className="neon-card p-6">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="material-symbols-outlined text-[#AEB0E8] text-[22px]">code</span>
+                <h3 className="text-lg font-bold text-[#373226] font-headline">קוד הטמעה</h3>
+              </div>
+              <p className="text-sm text-[#655e51] mb-4">
                 הדביקו את הקוד הזה לפני תגית {'</body>'} בכל דפי האתר שלכם
               </p>
 
-              <div className="rounded-xl p-4 font-mono text-sm mb-4" dir="ltr" style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)', color: '#ede9f8' }}>
+              <div className="rounded-2xl p-4 font-mono text-sm bg-[#faf2e9] text-[#373226] break-all leading-relaxed" dir="ltr">
                 {`<script src="${typeof window !== 'undefined' ? window.location.origin : ''}/widget.js" data-account-id="${state.accountId}"></script>`}
               </div>
 
               <button
                 onClick={handleCopyCode}
-                className="btn-ghost w-full flex items-center justify-center gap-2 py-2.5"
+                className="neon-pill neon-pill-ghost w-full justify-center mt-4"
               >
                 {codeCopied ? (
-                  <><Check className="w-4 h-4" style={{ color: '#5eead4' }} /> הועתק!</>
+                  <>
+                    <span className="material-symbols-outlined text-[#69FFC7] text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>check</span>
+                    הועתק!
+                  </>
                 ) : (
-                  <><Copy className="w-4 h-4" /> העתק קוד</>
+                  <>
+                    <span className="material-symbols-outlined text-[18px]">content_copy</span>
+                    העתק קוד
+                  </>
                 )}
               </button>
             </div>
 
             {/* Management Link */}
             {manageToken && (
-              <div className="admin-card p-6">
-                <h3 className="text-lg font-semibold mb-3" style={{ color: '#ede9f8' }}>לינק ניהול ללקוח</h3>
-                <p className="text-sm mb-4" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>
+              <div className="neon-card p-6">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="material-symbols-outlined text-[#FF76B0] text-[22px]">link</span>
+                  <h3 className="text-lg font-bold text-[#373226] font-headline">לינק ניהול ללקוח</h3>
+                </div>
+                <p className="text-sm text-[#655e51] mb-4">
                   שלחו את הלינק הזה לבעל האתר — הוא יוכל לנהל הנחיות, שאלות נפוצות וידע
                 </p>
-                <div className="rounded-xl p-4 font-mono text-sm mb-4" dir="ltr" style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)', color: '#ede9f8', wordBreak: 'break-all' }}>
+                <div className="rounded-2xl p-4 font-mono text-sm bg-[#faf2e9] text-[#373226] break-all leading-relaxed" dir="ltr">
                   {typeof window !== 'undefined' ? `${window.location.origin}/manage/${manageToken}` : ''}
                 </div>
                 <button
@@ -460,12 +635,18 @@ export default function AddWebsitePage() {
                     setManageLinkCopied(true);
                     setTimeout(() => setManageLinkCopied(false), 2000);
                   }}
-                  className="btn-ghost w-full flex items-center justify-center gap-2 py-2.5"
+                  className="neon-pill neon-pill-ghost w-full justify-center mt-4"
                 >
                   {manageLinkCopied ? (
-                    <><Check className="w-4 h-4" style={{ color: '#5eead4' }} /> הועתק!</>
+                    <>
+                      <span className="material-symbols-outlined text-[#69FFC7] text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>check</span>
+                      הועתק!
+                    </>
                   ) : (
-                    <><Copy className="w-4 h-4" /> העתק לינק ניהול</>
+                    <>
+                      <span className="material-symbols-outlined text-[18px]">content_copy</span>
+                      העתק לינק ניהול
+                    </>
                   )}
                 </button>
               </div>
@@ -475,21 +656,28 @@ export default function AddWebsitePage() {
             <div className="flex gap-3">
               <Link
                 href={`/admin/websites/${state.accountId}/preview`}
-                className="btn-primary flex-1 flex items-center justify-center gap-2 py-3"
+                className="neon-pill neon-pill-primary flex-1 justify-center py-3"
               >
-                <ExternalLink className="w-4 h-4" /> צפה בהדגמה
+                <span className="material-symbols-outlined text-[18px]">open_in_new</span>
+                צפה בהדגמה
               </Link>
               <Link
                 href="/admin/dashboard"
-                className="btn-ghost flex-1 flex items-center justify-center gap-2 py-3"
+                className="neon-pill neon-pill-outline flex-1 justify-center py-3"
               >
                 חזרה לדשבורד
               </Link>
             </div>
+
+            {/* Footer security note */}
+            <div className="flex items-center justify-center gap-2 py-4">
+              <span className="material-symbols-outlined text-[#bab1a1] text-[16px]">shield</span>
+              <p className="text-xs text-[#bab1a1]">כל הנתונים מוצפנים ומאובטחים</p>
+            </div>
           </motion.div>
         )}
-      </main>
-    </div>
+      </div>
+    </>
   );
 }
 

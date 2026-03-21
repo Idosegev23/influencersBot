@@ -2,24 +2,6 @@
 
 import { use, useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import {
-  ArrowRight,
-  MessageCircle,
-  Settings,
-  BarChart3,
-  CheckCircle,
-  AlertCircle,
-  RefreshCw,
-  Eye,
-  FileText,
-  Upload,
-  Trash2,
-  Loader2,
-  Instagram,
-  Copy,
-  Link2,
-  ExternalLink,
-} from 'lucide-react';
 
 interface AdminDocument {
   id: string;
@@ -239,21 +221,34 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
     }
   }
 
+  /* ---------- helper: doc status pill colors ---------- */
+  const statusPillStyle = (status: string) => {
+    if (status === 'completed' || status === 'success')
+      return { backgroundColor: 'rgba(105, 255, 199, 0.2)', color: '#059669' };
+    if (status === 'processing')
+      return { backgroundColor: 'rgba(174, 176, 232, 0.2)', color: '#6366f1' };
+    if (status === 'failed')
+      return { backgroundColor: 'rgba(255, 118, 176, 0.2)', color: '#FF76B0' };
+    return { backgroundColor: 'rgba(186, 177, 161, 0.2)', color: '#655e51' };
+  };
+
+  // --- Loading state ---
   if (loading) {
     return (
-      <div className="min-h-screen admin-panel flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#a094e0] border-t-transparent rounded-full animate-spin" />
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="w-10 h-10 rounded-full border-[3px] border-[#69FFC7] border-t-transparent animate-spin" />
       </div>
     );
   }
 
+  // --- Not found state ---
   if (!influencer) {
     return (
-      <div className="min-h-screen admin-panel flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
-          <AlertCircle className="w-16 h-16 mx-auto mb-4" style={{ color: '#f87171' }} />
-          <div className="text-xl mb-2" style={{ color: '#ede9f8' }}>משפיענית לא נמצאה</div>
-          <Link href="/admin/influencers" className="hover:underline" style={{ color: '#a094e0' }}>
+          <span className="material-symbols-outlined text-6xl mb-4 block" style={{ color: '#FF76B0' }}>error</span>
+          <div className="text-xl mb-2 font-extrabold text-[#474747]">משפיענית לא נמצאה</div>
+          <Link href="/admin/influencers" className="text-[#69FFC7] hover:underline font-medium">
             חזרה לרשימה
           </Link>
         </div>
@@ -262,413 +257,506 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
   }
 
   return (
-    <div className="min-h-screen admin-panel p-6" dir="rtl">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <Link
-            href="/admin/influencers"
-            className="w-10 h-10 flex items-center justify-center rounded-full transition-all"
-            style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.06)' }}
-          >
-            <ArrowRight className="w-5 h-5" style={{ color: '#ede9f8' }} />
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold" style={{ color: '#ede9f8' }}>{influencer.displayName}</h1>
-            <p style={{ color: 'rgba(237, 233, 248, 0.35)' }}>@{influencer.username}</p>
+    <div className="space-y-8">
+      {/* ============ Page Header ============ */}
+      <div className="flex flex-wrap items-center gap-5">
+        {/* Back button */}
+        <Link
+          href="/admin/influencers"
+          className="w-12 h-12 flex items-center justify-center rounded-full border border-[#bab1a1]/30 bg-white hover:shadow-md transition-all"
+        >
+          <span className="material-symbols-outlined text-[20px]" style={{ color: '#474747' }}>arrow_forward</span>
+        </Link>
+
+        {/* Avatar + name */}
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <div className="w-14 h-14 rounded-full border-[3px] border-[#69FFC7] bg-gradient-to-br from-[#69FFC7]/30 to-[#AEB0E8]/30 flex items-center justify-center text-2xl font-black text-[#474747]">
+              {influencer.displayName.charAt(0)}
+            </div>
+            {influencer.persona.hasGemini && (
+              <div className="absolute -bottom-0.5 -left-0.5 w-5 h-5 rounded-full bg-[#69FFC7] flex items-center justify-center shadow-sm">
+                <span className="material-symbols-outlined text-[12px] text-white" style={{ fontVariationSettings: "'FILL' 1" }}>check</span>
+              </div>
+            )}
           </div>
-          <div className="mr-auto flex gap-2">
-            <Link
-              href={`/chat/${influencer.username}`}
-              target="_blank"
-              className="btn-primary flex items-center gap-2 text-sm"
-            >
-              <Eye className="w-4 h-4" />
-              צפייה בצ'אט
-            </Link>
-            <Link
-              href={`/admin/chatbot-persona/${id}`}
-              className="btn-ghost flex items-center gap-2 text-sm"
-            >
-              <Settings className="w-4 h-4" />
-              הגדרות פרסונה
-            </Link>
+          <div>
+            <h1 className="text-2xl font-extrabold text-[#474747]">{influencer.displayName}</h1>
+            <p className="text-[#655e51]">@{influencer.username}</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Content - 2 columns */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Persona Status */}
-            <div className="admin-card p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold" style={{ color: '#ede9f8' }}>סטטוס הפרסונה</h2>
-                <button
-                  onClick={rebuildPersona}
-                  disabled={rebuilding}
-                  className="btn-coral flex items-center gap-2 text-sm disabled:opacity-50"
-                >
-                  <RefreshCw className={`w-4 h-4 ${rebuilding ? 'animate-spin' : ''}`} />
-                  {rebuilding ? 'בונה...' : 'בניה מחדש'}
-                </button>
-              </div>
+        {/* Action pills */}
+        <div className="flex flex-wrap gap-3 mr-auto">
+          <button
+            onClick={rebuildPersona}
+            disabled={rebuilding}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full border border-[#bab1a1]/40 text-sm font-semibold text-[#474747] bg-white hover:border-[#69FFC7] hover:text-[#059669] transition-all disabled:opacity-50"
+          >
+            <span className={`material-symbols-outlined text-[18px] ${rebuilding ? 'animate-spin' : ''}`}>refresh</span>
+            {rebuilding ? 'בונה...' : 'בנה פרסונה מחדש'}
+          </button>
+          <Link
+            href={`/chat/${influencer.username}`}
+            target="_blank"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full border border-[#bab1a1]/40 text-sm font-semibold text-[#474747] bg-white hover:border-[#AEB0E8] hover:text-[#6366f1] transition-all"
+          >
+            <span className="material-symbols-outlined text-[18px]">visibility</span>
+            צפה בצ&apos;אט
+          </Link>
+          <Link
+            href={`/admin/chatbot-persona/${id}`}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold text-white shadow-lg transition-all hover:shadow-xl"
+            style={{ background: 'linear-gradient(135deg, #69FFC7 0%, #AEB0E8 100%)' }}
+          >
+            <span className="material-symbols-outlined text-[18px]">settings</span>
+            עריכת פרסונה
+          </Link>
+        </div>
+      </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl" style={influencer.persona.hasGemini
-                  ? { background: 'rgba(94, 234, 212, 0.06)', border: '1px solid rgba(94, 234, 212, 0.15)' }
-                  : { background: 'rgba(239, 68, 68, 0.06)', border: '1px solid rgba(239, 68, 68, 0.15)' }
-                }>
-                  <div className="flex items-center gap-2 mb-2">
-                    {influencer.persona.hasGemini ? (
-                      <CheckCircle className="w-5 h-5" style={{ color: '#5eead4' }} />
-                    ) : (
-                      <AlertCircle className="w-5 h-5" style={{ color: '#f87171' }} />
-                    )}
-                    <span className="font-medium" style={{ color: '#ede9f8' }}>Gemini Output</span>
-                  </div>
-                  <p className="text-sm" style={{ color: influencer.persona.hasGemini ? '#5eead4' : '#f87171' }}>
-                    {influencer.persona.hasGemini ? 'קיים ✓' : 'חסר - יש לבנות'}
-                  </p>
-                </div>
+      {/* ============ Two-column layout ============ */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-                <div className="p-4 rounded-xl" style={influencer.persona.instagramUsername
-                  ? { background: 'rgba(94, 234, 212, 0.06)', border: '1px solid rgba(94, 234, 212, 0.15)' }
-                  : { background: 'rgba(224, 164, 148, 0.06)', border: '1px solid rgba(224, 164, 148, 0.15)' }
-                }>
-                  <div className="flex items-center gap-2 mb-2">
-                    {influencer.persona.instagramUsername ? (
-                      <CheckCircle className="w-5 h-5" style={{ color: '#5eead4' }} />
-                    ) : (
-                      <AlertCircle className="w-5 h-5" style={{ color: '#e0a494' }} />
-                    )}
-                    <span className="font-medium" style={{ color: '#ede9f8' }}>Instagram Username</span>
-                  </div>
-                  <p className="text-sm" style={{ color: influencer.persona.instagramUsername ? '#5eead4' : '#e0a494' }}>
-                    {influencer.persona.instagramUsername || 'לא מוגדר'}
-                  </p>
-                </div>
+        {/* ---------- Left column (2/3) ---------- */}
+        <div className="lg:col-span-2 space-y-8">
 
-                <div className="p-4 rounded-xl" style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                  <div className="text-sm mb-1" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>מוצרים</div>
-                  <div className="text-2xl font-bold" style={{ color: '#ede9f8' }}>{influencer.persona.productsCount}</div>
-                </div>
-
-                <div className="p-4 rounded-xl" style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                  <div className="text-sm mb-1" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>מותגים</div>
-                  <div className="text-2xl font-bold" style={{ color: '#ede9f8' }}>{influencer.persona.brandsCount}</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Content Stats */}
-            <div className="admin-card p-6">
-              <h2 className="text-xl font-bold mb-4" style={{ color: '#ede9f8' }}>תוכן</h2>
-              <div className="grid grid-cols-3 gap-4">
-                {[
-                  { label: 'פוסטים', value: influencer.stats.posts },
-                  { label: 'תמלולים', value: influencer.stats.transcriptions },
-                  { label: 'אתרים', value: influencer.stats.websites },
-                ].map((stat) => (
-                  <div key={stat.label} className="p-4 rounded-xl" style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                    <div className="text-sm mb-1" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>{stat.label}</div>
-                    <div className="text-2xl font-bold" style={{ color: '#ede9f8' }}>{stat.value}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Commerce */}
-            <div className="admin-card p-6">
-              <h2 className="text-xl font-bold mb-4" style={{ color: '#ede9f8' }}>מסחר</h2>
-              <div className="grid grid-cols-2 gap-4">
-                {[
-                  { label: 'קופונים (DB)', value: influencer.stats.coupons },
-                  { label: 'שיתופי פעולה', value: influencer.stats.partnerships },
-                ].map((stat) => (
-                  <div key={stat.label} className="p-4 rounded-xl" style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                    <div className="text-sm mb-1" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>{stat.label}</div>
-                    <div className="text-2xl font-bold" style={{ color: '#ede9f8' }}>{stat.value}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Documents */}
-            <div className="admin-card p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: '#ede9f8' }}>
-                  <FileText className="w-5 h-5" />
-                  מסמכים ({documents.length})
-                </h2>
-                <div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    accept=".pdf,.docx,.pptx,.doc,.ppt,.xlsx,.xls,.jpg,.jpeg,.png,.webp"
-                    className="hidden"
-                    onChange={handleFileUpload}
-                  />
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                    className="btn-primary flex items-center gap-2 text-sm disabled:opacity-50"
-                  >
-                    {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                    {uploading ? 'מעלה...' : 'העלאת מסמך'}
-                  </button>
-                </div>
-              </div>
-
-              {docsLoading ? (
-                <div className="text-center py-4" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>טוען מסמכים...</div>
-              ) : documents.length === 0 ? (
-                <div className="text-center py-8">
-                  <FileText className="w-12 h-12 mx-auto mb-2" style={{ color: 'rgba(237, 233, 248, 0.15)' }} />
-                  <p style={{ color: 'rgba(237, 233, 248, 0.3)' }}>אין מסמכים עדיין</p>
-                  <p className="text-sm mt-1" style={{ color: 'rgba(237, 233, 248, 0.2)' }}>העלה PDF, מצגות, או מסמכים שייכנסו למאגר הידע של הבוט</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {documents.map((doc) => (
-                    <div key={doc.id} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                      <FileText className="w-5 h-5 flex-shrink-0" style={{ color: 'rgba(237, 233, 248, 0.3)' }} />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm truncate" style={{ color: '#ede9f8' }}>{doc.filename}</div>
-                        <div className="flex items-center gap-2 text-xs mt-0.5" style={{ color: 'rgba(237, 233, 248, 0.3)' }}>
-                          <span>{doc.document_type}</span>
-                          <span>·</span>
-                          <span>{(doc.file_size / 1024).toFixed(0)} KB</span>
-                          <span>·</span>
-                          <span style={{
-                            color: doc.parsing_status === 'completed' ? '#5eead4' :
-                            doc.parsing_status === 'failed' ? '#f87171' :
-                            doc.parsing_status === 'processing' ? '#e0a494' :
-                            'rgba(237, 233, 248, 0.3)'
-                          }}>
-                            {doc.parsing_status === 'completed' ? 'נותח' :
-                             doc.parsing_status === 'failed' ? 'נכשל' :
-                             doc.parsing_status === 'processing' ? 'מנתח...' :
-                             'ממתין'}
-                          </span>
-                          {doc.parsing_confidence != null && doc.parsing_confidence > 0 && (
-                            <>
-                              <span>·</span>
-                              <span>{(doc.parsing_confidence * 100).toFixed(0)}%</span>
-                            </>
-                          )}
-                          {doc.ai_model_used && (
-                            <>
-                              <span>·</span>
-                              <span>{doc.ai_model_used}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => deleteDocument(doc.id)}
-                        className="p-1.5 transition-colors rounded-full"
-                        style={{ color: 'rgba(237, 233, 248, 0.25)' }}
-                        title="מחק"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
+          {/* A. Profile Card */}
+          <div className="bg-white rounded-2xl p-8 shadow-sm">
+            {/* Category + plan badges */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: 'rgba(174, 176, 232, 0.2)', color: '#6366f1' }}>
+                {influencer.type}
+              </span>
+              <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: 'rgba(105, 255, 199, 0.2)', color: '#059669' }}>
+                {influencer.status}
+              </span>
+              {influencer.persona.hasGemini && (
+                <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: 'rgba(105, 255, 199, 0.2)', color: '#059669' }}>
+                  Gemini Ready
+                </span>
               )}
+              {!influencer.persona.hasGemini && (
+                <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: 'rgba(255, 118, 176, 0.2)', color: '#FF76B0' }}>
+                  חסר Gemini
+                </span>
+              )}
+            </div>
+
+            {/* Bio / persona name */}
+            {influencer.persona.name && influencer.persona.name !== 'N/A' && (
+              <p className="text-[#655e51] mb-6 leading-relaxed">{influencer.persona.name}</p>
+            )}
+
+            {/* Stats grid 2x3 */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {[
+                { label: 'פוסטים', value: influencer.stats.posts, icon: 'article' },
+                { label: 'תמלולים', value: influencer.stats.transcriptions, icon: 'subtitles' },
+                { label: 'קופונים', value: influencer.stats.coupons, icon: 'confirmation_number' },
+                { label: 'שיתופי פעולה', value: influencer.stats.partnerships, icon: 'handshake' },
+                { label: 'מסמכים', value: documents.length, icon: 'description' },
+                { label: 'אתרים', value: influencer.stats.websites, icon: 'language' },
+              ].map((stat) => (
+                <div key={stat.label} className="bg-[#faf2e9] p-4 rounded-2xl text-center">
+                  <div className="text-2xl font-black" style={{ color: '#69FFC7' }}>{stat.value}</div>
+                  <div className="text-xs uppercase tracking-wider text-[#655e51] mt-1 font-medium">{stat.label}</div>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Sidebar - 1 column */}
-          <div className="space-y-6">
-            {/* Chat Config */}
-            <div className="admin-card p-6">
-              <h2 className="text-lg font-bold mb-4" style={{ color: '#ede9f8' }}>הגדרות צ'אט</h2>
+          {/* B. Persona Section */}
+          <div className="bg-white rounded-2xl p-8 shadow-sm">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(105, 255, 199, 0.15)' }}>
+                <span className="material-symbols-outlined text-[20px]" style={{ color: '#69FFC7' }}>psychology</span>
+              </div>
+              <h2 className="text-lg font-extrabold text-[#474747]">הגדרות פרסונה (AI)</h2>
+            </div>
 
-              <div className="mb-4">
-                <div className="text-sm mb-2" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>הודעת פתיחה</div>
-                <div className="text-sm rounded-xl p-3" style={{ color: '#ede9f8', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-bold text-[#655e51] block mb-1.5">טון</label>
+                <div className="bg-[#faf2e9] rounded-xl p-3 text-sm text-[#474747]">
+                  {influencer.persona.tone || 'לא מוגדר'}
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-bold text-[#655e51] block mb-1.5">מוצרים</label>
+                <div className="bg-[#faf2e9] rounded-xl p-3 text-sm text-[#474747]">
+                  {influencer.persona.productsCount} מוצרים, {influencer.persona.brandsCount} מותגים
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-bold text-[#655e51] block mb-1.5">קופונים ב-Gemini</label>
+                <div className="bg-[#faf2e9] rounded-xl p-3 text-sm text-[#474747]">
+                  {influencer.persona.couponsInGemini}
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-bold text-[#655e51] block mb-1.5">הודעת פתיחה</label>
+                <div className="bg-[#faf2e9] rounded-xl p-3 text-sm text-[#474747] line-clamp-2">
                   {influencer.chatConfig.greeting || 'לא מוגדרת'}
                 </div>
               </div>
+            </div>
 
-              <div className="mb-4">
-                <div className="text-sm mb-2" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>שאלות מוכנות</div>
+            {/* Suggested questions */}
+            {influencer.chatConfig.questions.length > 0 && (
+              <div className="mt-4">
+                <label className="text-sm font-bold text-[#655e51] block mb-1.5">שאלות מוכנות</label>
                 <div className="space-y-2">
                   {influencer.chatConfig.questions.map((q, i) => (
-                    <div key={i} className="text-sm rounded-xl p-2" style={{ color: '#ede9f8', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                    <div key={i} className="bg-[#faf2e9] rounded-xl p-3 text-sm text-[#474747]">
                       {i + 1}. {q}
                     </div>
                   ))}
                 </div>
               </div>
+            )}
+          </div>
 
-              <div>
-                <div className="text-sm mb-2" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>ערכת צבעים</div>
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <div className="text-xs mb-1" style={{ color: 'rgba(237, 233, 248, 0.25)' }}>ראשי</div>
-                    <div
-                      className="h-10 rounded-xl"
-                      style={{ backgroundColor: influencer.chatConfig.theme.primary }}
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-xs mb-1" style={{ color: 'rgba(237, 233, 248, 0.25)' }}>רקע</div>
-                    <div
-                      className="h-10 rounded-xl"
-                      style={{ backgroundColor: influencer.chatConfig.theme.background, border: '1px solid rgba(255, 255, 255, 0.06)' }}
-                    />
-                  </div>
+          {/* C. Documents Section */}
+          <div className="bg-white rounded-2xl p-8 shadow-sm">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(174, 176, 232, 0.15)' }}>
+                  <span className="material-symbols-outlined text-[20px]" style={{ color: '#AEB0E8' }}>description</span>
                 </div>
+                <h2 className="text-lg font-extrabold text-[#474747]">מסמכים ({documents.length})</h2>
               </div>
             </div>
 
-            {/* Instagram Connection */}
-            <div className="admin-card p-6">
-              <h2 className="text-lg font-bold mb-4 flex items-center gap-2" style={{ color: '#ede9f8' }}>
-                <Instagram className="w-5 h-5" style={{ color: '#E1306C' }} />
-                חיבור אינסטגרם
-              </h2>
+            {/* Upload zone */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept=".pdf,.docx,.pptx,.doc,.ppt,.xlsx,.xls,.jpg,.jpeg,.png,.webp"
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="w-full mb-6 border-2 border-dashed rounded-2xl p-6 flex flex-col items-center gap-2 transition-colors disabled:opacity-50 cursor-pointer"
+              style={{
+                borderColor: 'rgba(105, 255, 199, 0.2)',
+                backgroundColor: 'rgba(105, 255, 199, 0.05)',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = '#69FFC7'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(105, 255, 199, 0.2)'; }}
+            >
+              <span className={`material-symbols-outlined text-[32px] ${uploading ? 'animate-spin' : ''}`} style={{ color: '#69FFC7' }}>
+                {uploading ? 'progress_activity' : 'cloud_upload'}
+              </span>
+              <span className="text-sm font-medium text-[#655e51]">
+                {uploading ? 'מעלה...' : 'לחץ להעלאת מסמכים (PDF, מצגות, תמונות)'}
+              </span>
+            </button>
 
-              {/* Connection Status */}
-              <div className="p-3 rounded-xl mb-4" style={igConnection?.is_active
-                ? { background: 'rgba(94, 234, 212, 0.06)', border: '1px solid rgba(94, 234, 212, 0.15)' }
-                : { background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }
-              }>
-                <div className="flex items-center gap-2">
-                  {igConnection?.is_active ? (
-                    <>
-                      <CheckCircle className="w-4 h-4" style={{ color: '#5eead4' }} />
-                      <span className="text-sm font-medium" style={{ color: '#5eead4' }}>
-                        מחובר — @{igConnection.ig_username}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <AlertCircle className="w-4 h-4" style={{ color: 'rgba(237, 233, 248, 0.35)' }} />
-                      <span className="text-sm" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>
-                        לא מחובר
-                      </span>
-                    </>
-                  )}
-                </div>
-                {igConnection?.connected_at && (
-                  <div className="text-xs mt-1 mr-6" style={{ color: 'rgba(237, 233, 248, 0.25)' }}>
-                    חובר ב-{new Date(igConnection.connected_at).toLocaleDateString('he-IL')}
-                  </div>
-                )}
+            {/* Document list */}
+            {docsLoading ? (
+              <div className="text-center py-4 text-[#bab1a1]">טוען מסמכים...</div>
+            ) : documents.length === 0 ? (
+              <div className="text-center py-6 text-[#bab1a1]">
+                <span className="material-symbols-outlined text-[40px] mb-2 block opacity-30">description</span>
+                <p>אין מסמכים עדיין</p>
               </div>
-
-              {/* DM Bot Toggle */}
-              {igConnection?.is_active && (
-                <div
-                  className="p-3 rounded-xl mb-4 flex items-center justify-between"
-                  style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.06)' }}
-                >
-                  <div>
-                    <div className="text-sm font-medium" style={{ color: '#ede9f8' }}>בוט DM</div>
-                    <div className="text-xs mt-0.5" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>
-                      תשובות אוטומטיות בהודעות ישירות
+            ) : (
+              <div className="space-y-2">
+                {documents.map((doc) => {
+                  const pill = statusPillStyle(doc.parsing_status);
+                  return (
+                    <div key={doc.id} className="bg-[#faf2e9] rounded-xl p-4 flex items-center gap-3">
+                      <span className="material-symbols-outlined text-[20px] flex-shrink-0" style={{ color: '#bab1a1' }}>description</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-[#474747] truncate">{doc.filename}</div>
+                        <div className="flex items-center gap-2 text-xs mt-1 text-[#bab1a1]">
+                          <span>{(doc.file_size / 1024).toFixed(0)} KB</span>
+                          <span>&middot;</span>
+                          <span>{new Date(doc.uploaded_at).toLocaleDateString('he-IL')}</span>
+                          {doc.parsing_confidence != null && doc.parsing_confidence > 0 && (
+                            <>
+                              <span>&middot;</span>
+                              <span>{(doc.parsing_confidence * 100).toFixed(0)}%</span>
+                            </>
+                          )}
+                          {doc.ai_model_used && (
+                            <>
+                              <span>&middot;</span>
+                              <span>{doc.ai_model_used}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <span
+                        className="px-2.5 py-1 rounded-full text-xs font-bold flex-shrink-0"
+                        style={pill}
+                      >
+                        {doc.parsing_status === 'completed' ? 'נותח' :
+                         doc.parsing_status === 'failed' ? 'נכשל' :
+                         doc.parsing_status === 'processing' ? 'מנתח...' :
+                         'ממתין'}
+                      </span>
+                      <button
+                        onClick={() => deleteDocument(doc.id)}
+                        className="p-2 rounded-full transition-colors"
+                        style={{ color: '#bab1a1' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#FF76B0'; (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255,118,176,0.1)'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#bab1a1'; (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'; }}
+                        title="מחק"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">delete</span>
+                      </button>
                     </div>
-                  </div>
-                  <button
-                    onClick={toggleDmBot}
-                    disabled={dmToggling}
-                    className="relative w-12 h-6 rounded-full transition-colors duration-200"
-                    style={{
-                      backgroundColor: dmBotEnabled ? '#5eead4' : 'rgba(255, 255, 255, 0.1)',
-                    }}
-                  >
-                    <span
-                      className="absolute top-0.5 w-5 h-5 rounded-full transition-transform duration-200"
-                      style={{
-                        backgroundColor: dmBotEnabled ? '#0f172a' : 'rgba(237, 233, 248, 0.5)',
-                        transform: dmBotEnabled ? 'translateX(26px)' : 'translateX(2px)',
-                      }}
-                    />
-                  </button>
-                </div>
-              )}
-
-              {/* Copy Account ID */}
-              <div className="space-y-2">
-                <button
-                  onClick={() => copyToClipboard(id, 'id')}
-                  className="w-full flex items-center justify-between gap-2 p-3 rounded-xl text-sm transition-all"
-                  style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.06)' }}
-                >
-                  <div className="flex items-center gap-2" style={{ color: '#ede9f8' }}>
-                    <Copy className="w-4 h-4" />
-                    <span>העתק Account ID</span>
-                  </div>
-                  <span className="text-xs font-mono" style={{ color: copiedId ? '#5eead4' : 'rgba(237, 233, 248, 0.3)' }}>
-                    {copiedId ? 'הועתק!' : id.slice(0, 8) + '...'}
-                  </span>
-                </button>
-
-                {/* Copy OAuth Link */}
-                <button
-                  onClick={() => copyToClipboard(igConnectLink, 'link')}
-                  className="w-full flex items-center justify-between gap-2 p-3 rounded-xl text-sm transition-all"
-                  style={{ background: 'rgba(225, 48, 108, 0.06)', border: '1px solid rgba(225, 48, 108, 0.15)' }}
-                >
-                  <div className="flex items-center gap-2" style={{ color: '#ede9f8' }}>
-                    <Link2 className="w-4 h-4" style={{ color: '#E1306C' }} />
-                    <span>העתק קישור התחברות</span>
-                  </div>
-                  <span className="text-xs" style={{ color: copiedLink ? '#5eead4' : 'rgba(237, 233, 248, 0.3)' }}>
-                    {copiedLink ? 'הועתק!' : ''}
-                  </span>
-                </button>
+                  );
+                })}
               </div>
+            )}
+          </div>
+        </div>
+
+        {/* ---------- Right column (1/3) ---------- */}
+        <div className="space-y-8">
+
+          {/* D. IG Connection Card */}
+          <div className="bg-white rounded-2xl p-6 shadow-sm" style={{ borderRight: '6px solid #69FFC7' }}>
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center"
+                style={{ background: 'linear-gradient(135deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)' }}
+              >
+                <span className="material-symbols-outlined text-[20px] text-white">photo_camera</span>
+              </div>
+              <div>
+                <h3 className="font-bold text-[#474747]">חיבור אינסטגרם</h3>
+                <p className="text-xs text-[#655e51]">
+                  {igConnection?.is_active
+                    ? `מחובר — @${igConnection.ig_username}`
+                    : 'לא מחובר'}
+                </p>
+              </div>
+              {igConnection?.is_active && (
+                <span className="material-symbols-outlined text-[20px] mr-auto" style={{ color: '#69FFC7', fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+              )}
             </div>
 
-            {/* Quick Actions */}
-            <div className="admin-card p-6">
-              <h2 className="text-lg font-bold mb-4" style={{ color: '#ede9f8' }}>פעולות</h2>
-              <div className="space-y-2">
+            {igConnection?.connected_at && (
+              <p className="text-xs text-[#bab1a1] mb-4">
+                חובר ב-{new Date(igConnection.connected_at).toLocaleDateString('he-IL')}
+              </p>
+            )}
+
+            {/* DM Bot toggle */}
+            {igConnection?.is_active && (
+              <div className="bg-[#faf2e9] rounded-2xl p-4 flex items-center justify-between mb-4">
+                <div>
+                  <div className="text-sm font-bold text-[#474747]">בוט DM</div>
+                  <div className="text-xs text-[#655e51] mt-0.5">תשובות אוטומטיות</div>
+                </div>
                 <button
-                  onClick={async () => {
-                    try {
-                      const res = await fetch('/api/admin/websites', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ accountId: id }),
-                      });
-                      const data = await res.json();
-                      if (data.token) {
-                        window.open(`/manage/${data.token}`, '_blank');
-                      } else {
-                        alert('שגיאה ביצירת קישור ניהול');
-                      }
-                    } catch {
-                      alert('שגיאה ביצירת קישור ניהול');
-                    }
+                  onClick={toggleDmBot}
+                  disabled={dmToggling}
+                  className="relative w-12 h-6 rounded-full transition-colors duration-200"
+                  style={{
+                    backgroundColor: dmBotEnabled ? '#69FFC7' : '#bab1a1',
                   }}
-                  className="btn-primary block w-full text-center text-sm py-2.5"
                 >
-                  דף ניהול
+                  <span
+                    className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200"
+                    style={{
+                      transform: dmBotEnabled ? 'translateX(26px)' : 'translateX(2px)',
+                    }}
+                  />
                 </button>
-                <button
-                  onClick={async () => {
-                    if (!confirm('להתחיל תמלול מלא? זה עלול לקחת כמה דקות.')) return;
-                    try {
-                      await fetch(`/api/process/start?accountId=${id}`, { method: 'POST' });
-                      alert('תמלול מלא הותחל');
-                    } catch {
-                      alert('שגיאה בהפעלת תמלול');
-                    }
-                  }}
-                  className="btn-coral block w-full text-center text-sm py-2.5"
-                >
-                  תמלול מלא
-                </button>
+              </div>
+            )}
+
+            {/* Copy buttons */}
+            <div className="space-y-2">
+              <button
+                onClick={() => copyToClipboard(id, 'id')}
+                className="w-full flex items-center justify-between gap-2 p-3 rounded-xl text-sm bg-[#faf2e9] hover:bg-[#f5ece0] transition-colors"
+              >
+                <div className="flex items-center gap-2 text-[#474747]">
+                  <span className="material-symbols-outlined text-[18px]">content_copy</span>
+                  <span>העתק Account ID</span>
+                </div>
+                <span className="text-xs font-mono" style={{ color: copiedId ? '#69FFC7' : '#bab1a1' }}>
+                  {copiedId ? 'הועתק!' : id.slice(0, 8) + '...'}
+                </span>
+              </button>
+
+              <button
+                onClick={() => copyToClipboard(igConnectLink, 'link')}
+                className="w-full flex items-center justify-between gap-2 p-3 rounded-xl text-sm transition-colors"
+                style={{ backgroundColor: 'rgba(255, 118, 176, 0.05)' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255, 118, 176, 0.1)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255, 118, 176, 0.05)'; }}
+              >
+                <div className="flex items-center gap-2 text-[#474747]">
+                  <span className="material-symbols-outlined text-[18px]" style={{ color: '#FF76B0' }}>link</span>
+                  <span>העתק קישור התחברות</span>
+                </div>
+                <span className="text-xs" style={{ color: copiedLink ? '#69FFC7' : '#bab1a1' }}>
+                  {copiedLink ? 'הועתק!' : ''}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* E. AI Insight Card */}
+          <div className="rounded-2xl p-6" style={{ backgroundColor: 'rgba(105, 255, 199, 0.05)' }}>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="material-symbols-outlined text-[18px]" style={{ color: '#FF76B0' }}>auto_awesome</span>
+              <h3 className="text-sm font-bold" style={{ color: '#FF76B0' }}>AI Insight</h3>
+            </div>
+            <p className="text-sm text-[#655e51] leading-relaxed mb-3">
+              {influencer.persona.hasGemini
+                ? `הפרסונה מוכנה עם ${influencer.persona.productsCount} מוצרים ו-${influencer.persona.brandsCount} מותגים.`
+                : 'הפרסונה טרם נבנתה. לחץ על "בנה פרסונה מחדש" כדי להתחיל.'}
+            </p>
+            <Link
+              href={`/admin/chatbot-persona/${id}`}
+              className="text-sm font-semibold inline-flex items-center gap-1 transition-colors"
+              style={{ color: '#69FFC7' }}
+            >
+              עריכת פרסונה
+              <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+            </Link>
+          </div>
+
+          {/* F. Integrations Card */}
+          <div className="bg-white rounded-2xl p-6 shadow-sm">
+            <h3 className="font-bold text-[#474747] mb-4">אינטגרציות</h3>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[20px]" style={{ color: '#bab1a1' }}>photo_camera</span>
+                <span className="text-sm text-[#474747] flex-1">Instagram</span>
+                <span className="text-xs font-medium" style={{ color: igConnection?.is_active ? '#059669' : '#bab1a1' }}>
+                  {igConnection?.is_active ? 'מחובר' : 'לא מחובר'}
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[20px]" style={{ color: '#bab1a1' }}>psychology</span>
+                <span className="text-sm text-[#474747] flex-1">Gemini Output</span>
+                <span className="text-xs font-medium" style={{ color: influencer.persona.hasGemini ? '#059669' : '#FF76B0' }}>
+                  {influencer.persona.hasGemini ? 'קיים' : 'חסר'}
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[20px]" style={{ color: '#bab1a1' }}>language</span>
+                <span className="text-sm text-[#474747] flex-1">אתרים</span>
+                <span className="text-xs font-medium text-[#655e51]">{influencer.stats.websites}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Color theme preview */}
+          <div className="bg-white rounded-2xl p-6 shadow-sm">
+            <h3 className="font-bold text-[#474747] mb-4">ערכת צבעים</h3>
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <div className="text-xs text-[#655e51] mb-1">ראשי</div>
+                <div className="h-10 rounded-xl shadow-inner" style={{ backgroundColor: influencer.chatConfig.theme.primary }} />
+              </div>
+              <div className="flex-1">
+                <div className="text-xs text-[#655e51] mb-1">רקע</div>
+                <div className="h-10 rounded-xl shadow-inner" style={{ backgroundColor: influencer.chatConfig.theme.background, border: '1px solid rgba(186, 177, 161, 0.2)' }} />
               </div>
             </div>
           </div>
         </div>
+      </div>
+
+      {/* ============ Actions Footer ============ */}
+      <div className="rounded-3xl p-6 flex flex-wrap items-center gap-3" style={{ backgroundColor: 'rgba(250, 242, 233, 0.5)', border: '1px solid rgba(255, 255, 255, 0.4)' }}>
+        <button
+          onClick={async () => {
+            try {
+              const res = await fetch('/api/admin/websites', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ accountId: id }),
+              });
+              const data = await res.json();
+              if (data.token) {
+                window.open(`/manage/${data.token}`, '_blank');
+              } else {
+                alert('שגיאה ביצירת קישור ניהול');
+              }
+            } catch {
+              alert('שגיאה ביצירת קישור ניהול');
+            }
+          }}
+          className="px-5 py-2.5 rounded-full text-sm font-semibold text-[#474747] bg-white shadow-sm transition-all"
+          style={{ border: '1px solid rgba(186, 177, 161, 0.2)' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#69FFC7'; (e.currentTarget as HTMLElement).style.borderColor = '#69FFC7'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#474747'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(186, 177, 161, 0.2)'; }}
+        >
+          דף ניהול
+        </button>
+        <button
+          onClick={async () => {
+            if (!confirm('להתחיל סריקה מלאה? זה עלול לקחת כמה דקות.')) return;
+            try {
+              await fetch(`/api/process/start?accountId=${id}`, { method: 'POST' });
+              alert('סריקה מלאה הותחלה');
+            } catch {
+              alert('שגיאה בהפעלת סריקה');
+            }
+          }}
+          className="px-5 py-2.5 rounded-full text-sm font-semibold text-[#474747] bg-white shadow-sm transition-all"
+          style={{ border: '1px solid rgba(186, 177, 161, 0.2)' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#69FFC7'; (e.currentTarget as HTMLElement).style.borderColor = '#69FFC7'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#474747'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(186, 177, 161, 0.2)'; }}
+        >
+          סריקה מלאה
+        </button>
+        <button
+          onClick={async () => {
+            if (!confirm('להריץ Re-embed RAG?')) return;
+            try {
+              await fetch('/api/admin/rag-rebuild', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ accountId: id }),
+              });
+              alert('Re-embed RAG הותחל');
+            } catch {
+              alert('שגיאה בהפעלת Re-embed');
+            }
+          }}
+          className="px-5 py-2.5 rounded-full text-sm font-semibold text-[#474747] bg-white shadow-sm transition-all"
+          style={{ border: '1px solid rgba(186, 177, 161, 0.2)' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#69FFC7'; (e.currentTarget as HTMLElement).style.borderColor = '#69FFC7'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#474747'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(186, 177, 161, 0.2)'; }}
+        >
+          Re-embed RAG
+        </button>
+        <div className="flex-1" />
+        <button
+          onClick={async () => {
+            if (!confirm('האם אתה בטוח שברצונך למחוק חשבון זה? פעולה זו אינה הפיכה!')) return;
+            try {
+              const res = await fetch(`/api/admin/influencers/${id}`, { method: 'DELETE' });
+              if (res.ok) {
+                window.location.href = '/admin/influencers';
+              } else {
+                alert('שגיאה במחיקה');
+              }
+            } catch {
+              alert('שגיאה במחיקה');
+            }
+          }}
+          className="px-5 py-2.5 rounded-full text-sm font-semibold transition-all"
+          style={{ color: '#FF76B0', backgroundColor: 'rgba(255, 118, 176, 0.1)', border: '1px solid rgba(255, 118, 176, 0.2)' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255, 118, 176, 0.2)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255, 118, 176, 0.1)'; }}
+        >
+          מחק חשבון
+        </button>
       </div>
     </div>
   );

@@ -2,25 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  ArrowRight,
-  Plus,
-  Trash2,
-  Check,
-  Send,
-  Copy,
-  MessageCircle,
-  X,
-  Instagram,
-  Globe,
-  Monitor,
-  FileText,
-  Video,
-  Youtube,
-  Facebook,
-} from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -63,23 +45,23 @@ interface TaskRecord {
   completed_at: string | null;
 }
 
-// ─── Badge colors (glassmorphic pastel) ───
+// ─── Badge colors (neon pastel pills) ───
 const BC: Record<string, string> = {
-  data: 'pill pill-blue',
-  admin: 'pill pill-red',
-  content: 'pill pill-teal',
-  scan: 'pill pill-green',
-  local: 'pill pill-green',
-  ai: 'pill pill-purple',
-  persona: 'pill pill-pink',
-  policy: 'pill pill-red',
-  ux: 'pill pill-pink',
-  design: 'pill pill-purple',
-  test: 'pill pill-amber',
-  deploy: 'pill pill-coral',
-  social: 'pill pill-blue',
-  brands: 'pill pill-amber',
-  graphic: 'pill pill-coral',
+  data: 'bg-[#B0E0FF]/20 text-[#3b82c8]',
+  admin: 'bg-[#FF76B0]/15 text-[#d64580]',
+  content: 'bg-[#69FFC7]/15 text-[#2d8a62]',
+  scan: 'bg-[#69FFC7]/20 text-[#2d8a62]',
+  local: 'bg-[#69FFC7]/20 text-[#2d8a62]',
+  ai: 'bg-[#AEB0E8]/20 text-[#6b6db0]',
+  persona: 'bg-[#FF76B0]/15 text-[#d64580]',
+  policy: 'bg-[#FF76B0]/20 text-[#d64580]',
+  ux: 'bg-[#FFD9B0]/30 text-[#b07830]',
+  design: 'bg-[#AEB0E8]/20 text-[#6b6db0]',
+  test: 'bg-[#FFD9B0]/30 text-[#b07830]',
+  deploy: 'bg-[#FF76B0]/15 text-[#d64580]',
+  social: 'bg-[#B0E0FF]/20 text-[#3b82c8]',
+  brands: 'bg-[#FFD9B0]/30 text-[#b07830]',
+  graphic: 'bg-[#AEB0E8]/15 text-[#6b6db0]',
 };
 
 interface TaskTemplate {
@@ -378,15 +360,25 @@ function formatHebDate(date: Date) {
 
 const DEFAULT_ASSETS: DigitalAssets = { instagram: false, website: false, tiktok: false, youtube: false, facebook: false, documents: false };
 
-// ─── Asset display config ───
-const ASSET_OPTIONS: { key: keyof DigitalAssets; label: string; icon: typeof Instagram; desc: string }[] = [
-  { key: 'instagram', label: 'Instagram', icon: Instagram, desc: 'חשבון אינסטגרם' },
-  { key: 'website', label: 'אתר', icon: Globe, desc: 'אתר אינטרנט' },
-  { key: 'tiktok', label: 'TikTok', icon: Video, desc: 'חשבון טיקטוק' },
-  { key: 'youtube', label: 'YouTube', icon: Youtube, desc: 'ערוץ יוטיוב' },
-  { key: 'facebook', label: 'Facebook', icon: Facebook, desc: 'עמוד פייסבוק' },
-  { key: 'documents', label: 'מסמכים', icon: FileText, desc: 'PDF, קטלוג, FAQ' },
+// ─── Asset display config (icon = Material Symbols name) ───
+const ASSET_OPTIONS: { key: keyof DigitalAssets; label: string; icon: string; desc: string }[] = [
+  { key: 'instagram', label: 'Instagram', icon: 'photo_camera', desc: 'חשבון אינסטגרם' },
+  { key: 'website', label: 'אתר', icon: 'language', desc: 'אתר אינטרנט' },
+  { key: 'tiktok', label: 'TikTok', icon: 'movie', desc: 'חשבון טיקטוק' },
+  { key: 'youtube', label: 'YouTube', icon: 'play_circle', desc: 'ערוץ יוטיוב' },
+  { key: 'facebook', label: 'Facebook', icon: 'group', desc: 'עמוד פייסבוק' },
+  { key: 'documents', label: 'מסמכים', icon: 'description', desc: 'PDF, קטלוג, FAQ' },
 ];
+
+// ─── Section icons ───
+const SECTION_ICONS: Record<string, { icon: string; color: string; bg: string }> = {
+  A: { icon: 'inventory_2', color: '#3b82c8', bg: 'rgba(176, 224, 255, 0.25)' },
+  B: { icon: 'radar', color: '#2d8a62', bg: 'rgba(105, 255, 199, 0.15)' },
+  C: { icon: 'smart_toy', color: '#6b6db0', bg: 'rgba(174, 176, 232, 0.2)' },
+  D: { icon: 'widgets', color: '#d64580', bg: 'rgba(255, 118, 176, 0.15)' },
+  E: { icon: 'bug_report', color: '#b07830', bg: 'rgba(255, 217, 176, 0.3)' },
+  F: { icon: 'verified', color: '#69FFC7', bg: 'rgba(105, 255, 199, 0.15)' },
+};
 
 // ═══════════════════════════════════════════════
 // Main Component
@@ -655,246 +647,351 @@ export default function OnboardingChecklistPage() {
   function sendWhatsApp() { window.open(`https://wa.me/?text=${encodeURIComponent(buildSummary())}`, '_blank'); }
   function copyText() { navigator.clipboard.writeText(buildSummary()).then(() => showToast('הועתק!')); }
 
+  // ─── Loading state ───
   if (loading) {
     return (
-      <div className="min-h-screen admin-panel flex items-center justify-center" dir="rtl">
-        <div className="w-8 h-8 border-2 border-[#a094e0] border-t-transparent rounded-full animate-spin" />
+      <div className="flex items-center justify-center py-32">
+        <div className="w-8 h-8 border-2 border-[#AEB0E8] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen admin-panel" dir="rtl">
-      {/* Header */}
-      <header className="relative z-10 sticky top-0 backdrop-blur-xl border-b" style={{ background: 'rgba(7, 7, 13, 0.88)', borderColor: 'rgba(255, 255, 255, 0.06)' }}>
-        <div className="px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="font-semibold text-lg" style={{ color: '#ede9f8' }}>צ&apos;קליסט אונבורדינג</h1>
+    <>
+      {/* ─── Page Header ─── */}
+      <div className="flex items-start justify-between mb-8">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(174, 176, 232, 0.15)' }}>
+            <span className="material-symbols-outlined text-[28px]" style={{ color: '#AEB0E8' }}>checklist</span>
+          </div>
+          <div>
+            <h1 className="text-2xl font-extrabold tracking-tight font-headline" style={{ color: '#373226' }}>
+              אונבורדינג לקוחות
+            </h1>
+            <p className="text-sm mt-0.5" style={{ color: '#655e51' }}>
+              מעקב קליטת לקוחות למערכת
+              {currentRecord && (
+                <span className="mr-2" style={{ color: '#bab1a1' }}>
+                  {assetTags(currentRecord.digital_assets || DEFAULT_ASSETS)}
+                  {currentRecord.wants_widget ? ' + Widget' : ''}
+                </span>
+              )}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={openWizard}
+            className="neon-pill neon-pill-primary flex items-center gap-2 px-5 py-2.5 text-sm font-bold"
+          >
+            <span className="material-symbols-outlined text-[18px]">add</span>
+            צ&apos;קליסט חדש
+          </button>
+        </div>
+      </div>
+
+      {/* ─── Stats Bento Grid ─── */}
+      <div className="grid grid-cols-12 gap-4 mb-8">
+        {/* Main stat card */}
+        <div className="col-span-8 neon-card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-[20px]" style={{ color: '#655e51' }}>analytics</span>
+              <span className="text-sm font-semibold" style={{ color: '#373226' }}>התקדמות</span>
+            </div>
             {currentRecord && (
-              <span className="text-xs font-medium" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>
-                {assetTags(currentRecord.digital_assets || DEFAULT_ASSETS)}
-                {currentRecord.wants_widget ? ' + Widget' : ''}
+              <span
+                className="text-xs font-bold px-3 py-1 rounded-full"
+                style={currentRecord.status === 'completed'
+                  ? { background: 'rgba(105, 255, 199, 0.15)', color: '#2d8a62' }
+                  : { background: 'rgba(174, 176, 232, 0.15)', color: '#6b6db0' }
+                }
+              >
+                {currentRecord.status === 'completed' ? 'הושלם' : 'בתהליך'}
               </span>
             )}
           </div>
-          <Link href="/admin/dashboard" className="btn-ghost text-sm flex items-center gap-2">
-            <ArrowRight className="w-4 h-4" /> חזרה לדאשבורד
-          </Link>
-        </div>
-      </header>
-
-      <main className="relative z-10 p-6 max-w-3xl mx-auto">
-        {/* Selector */}
-        <div className="flex items-center gap-3 mb-6 flex-wrap">
-          <select
-            value={currentId || ''}
-            onChange={(e) => { if (e.target.value) loadChecklist(e.target.value); else { setCurrentId(null); setCurrentRecord(null); setTasks([]); } }}
-            className="flex-1 min-w-[200px] admin-input !rounded-xl"
-          >
-            <option value="">בחר צ&apos;קליסט...</option>
-            {checklists.map(c => {
-              const date = new Date(c.created_at).toLocaleDateString('he-IL');
-              const at = c.digital_assets ? assetTags(c.digital_assets) : '';
-              return (
-                <option key={c.id} value={c.id}>
-                  {c.brand_name || 'ללא שם'} — {at}{c.wants_widget ? ' +W' : ''} ({date}) {c.status === 'completed' ? '[V]' : ''}
-                </option>
-              );
-            })}
-          </select>
-          <button onClick={openWizard} className="btn-primary flex items-center gap-2 px-4 py-2.5 text-sm font-medium">
-            <Plus className="w-4 h-4" /> חדש
-          </button>
-          {currentId && (
-            <button
-              onClick={deleteChecklist}
-              className="px-3 py-2.5 rounded-full text-xs transition-all"
-              style={{ background: 'rgba(239, 68, 68, 0.08)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.12)' }}
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+          {currentId ? (
+            <>
+              <div className="flex items-end gap-3 mb-3">
+                <span className="text-4xl font-extrabold font-headline" style={{ color: '#373226' }}>{progressPct}%</span>
+                <span className="text-sm mb-1.5" style={{ color: '#bab1a1' }}>{completedCount} / {totalCount} משימות</span>
+              </div>
+              <div className="w-full h-3 rounded-full overflow-hidden" style={{ background: '#faf2e9' }}>
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{ background: 'linear-gradient(90deg, #69FFC7, #AEB0E8)' }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progressPct}%` }}
+                  transition={{ duration: 0.5 }}
+                />
+              </div>
+            </>
+          ) : (
+            <p className="text-sm" style={{ color: '#bab1a1' }}>בחר צ&apos;קליסט להצגת התקדמות</p>
           )}
         </div>
 
-        {/* ═══ Content ═══ */}
-        {currentId && currentRecord && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-            {/* Info */}
-            <div className="admin-card p-5 mb-6" style={{ borderColor: 'rgba(160, 148, 224, 0.15)' }}>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-medium mb-1 block" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>שם הלקוח</label>
-                  <input
-                    type="text"
-                    value={brandName}
-                    onChange={(e) => { setBrandName(e.target.value); saveBrandInfo(e.target.value, brandDomain, notes); }}
-                    placeholder="שם הלקוח"
-                    className="admin-input w-full !rounded-xl text-lg font-semibold"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium mb-1 block" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>Handle / דומיין</label>
-                  <input
-                    type="text"
-                    value={brandDomain}
-                    onChange={(e) => { setBrandDomain(e.target.value); saveBrandInfo(brandName, e.target.value, notes); }}
-                    placeholder="@handle או domain.com"
-                    dir="ltr"
-                    className="admin-input w-full !rounded-xl"
-                  />
-                </div>
+        {/* Accent card */}
+        <div className="col-span-4 neon-card p-6 flex flex-col justify-between" style={{ background: 'rgba(174, 176, 232, 0.08)' }}>
+          <span className="material-symbols-outlined text-[24px] mb-3" style={{ color: '#AEB0E8' }}>folder_open</span>
+          <div>
+            <span className="text-3xl font-extrabold font-headline" style={{ color: '#373226' }}>{checklists.length}</span>
+            <p className="text-xs mt-1" style={{ color: '#655e51' }}>סה״כ צ&apos;קליסטים</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ─── Checklist Selector ─── */}
+      <div className="flex items-center gap-3 mb-6 flex-wrap">
+        <select
+          value={currentId || ''}
+          onChange={(e) => { if (e.target.value) loadChecklist(e.target.value); else { setCurrentId(null); setCurrentRecord(null); setTasks([]); } }}
+          className="neon-input flex-1 min-w-[200px]"
+        >
+          <option value="">בחר צ&apos;קליסט...</option>
+          {checklists.map(c => {
+            const date = new Date(c.created_at).toLocaleDateString('he-IL');
+            const at = c.digital_assets ? assetTags(c.digital_assets) : '';
+            return (
+              <option key={c.id} value={c.id}>
+                {c.brand_name || 'ללא שם'} — {at}{c.wants_widget ? ' +W' : ''} ({date}) {c.status === 'completed' ? '[V]' : ''}
+              </option>
+            );
+          })}
+        </select>
+        {currentId && (
+          <button
+            onClick={deleteChecklist}
+            className="neon-pill neon-pill-danger flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium"
+          >
+            <span className="material-symbols-outlined text-[16px]">delete</span>
+            מחק
+          </button>
+        )}
+      </div>
+
+      {/* ═══ Content ═══ */}
+      {currentId && currentRecord && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          {/* Brand Info Card */}
+          <div className="neon-card p-6 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div>
+                <label className="block text-xs font-semibold mb-1.5 mr-1" style={{ color: '#655e51' }}>שם הלקוח</label>
+                <input
+                  type="text"
+                  value={brandName}
+                  onChange={(e) => { setBrandName(e.target.value); saveBrandInfo(e.target.value, brandDomain, notes); }}
+                  placeholder="שם הלקוח"
+                  className="neon-input w-full text-lg font-semibold"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1.5 mr-1" style={{ color: '#655e51' }}>Handle / דומיין</label>
+                <input
+                  type="text"
+                  value={brandDomain}
+                  onChange={(e) => { setBrandDomain(e.target.value); saveBrandInfo(brandName, e.target.value, notes); }}
+                  placeholder="@handle או domain.com"
+                  dir="ltr"
+                  className="neon-input w-full"
+                />
               </div>
             </div>
+          </div>
 
-            {/* Progress */}
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>{completedCount} / {totalCount}</span>
-              <span className="text-sm font-medium" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>{progressPct}%</span>
-            </div>
-            <div className="w-full h-2 rounded-full mb-8 overflow-hidden" style={{ background: 'rgba(255, 255, 255, 0.06)' }}>
-              <motion.div className="h-full rounded-full" style={{ background: '#a094e0' }} initial={{ width: 0 }} animate={{ width: `${progressPct}%` }} transition={{ duration: 0.4 }} />
-            </div>
+          {/* Sections (Accordion) */}
+          <div className="neon-card p-6 mb-6">
+            <div className="space-y-4">
+              {sections.map(sec => {
+                const secDone = sec.tasks.filter(t => t.completed).length;
+                const secTotal = sec.tasks.length;
+                const secPct = secTotal > 0 ? Math.round((secDone / secTotal) * 100) : 0;
+                const secStyle = SECTION_ICONS[sec.key] || { icon: 'task_alt', color: '#655e51', bg: 'rgba(186, 177, 161, 0.15)' };
 
-            {/* Sections */}
-            {sections.map(sec => (
-              <div key={sec.key} className="mb-6">
-                <div className="flex items-center gap-3 mb-3">
-                  <span
-                    className="w-7 h-7 rounded-lg text-xs font-bold flex items-center justify-center"
-                    style={{ background: 'rgba(160, 148, 224, 0.12)', color: '#a094e0' }}
-                  >
-                    {sec.key}
-                  </span>
-                  <span className="text-sm font-semibold" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>{sec.title}</span>
-                  <div className="flex-1 h-px" style={{ background: 'rgba(255, 255, 255, 0.04)' }} />
-                </div>
-                <div className="space-y-2">
-                  {sec.tasks.map(task => {
-                    const badges = task.badges || [];
-                    return (
+                return (
+                  <details key={sec.key} className="group" open>
+                    <summary className="flex items-center gap-3 cursor-pointer select-none list-none py-3 px-2 rounded-xl hover:bg-[#faf2e9]/60 transition-colors">
                       <div
-                        key={task.task_number}
-                        onClick={() => handleTaskClick(task.task_number)}
-                        className={`admin-card p-4 cursor-pointer transition-all ${task.completed ? 'opacity-50' : ''}`}
-                        style={{ borderRadius: '16px' }}
+                        className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: secStyle.bg }}
                       >
-                        <div className="flex items-start gap-3">
-                          <span className="text-xs font-bold mt-1 min-w-[20px] text-center" style={{ color: 'rgba(237, 233, 248, 0.2)' }}>{task.task_number}</span>
+                        <span className="material-symbols-outlined text-[20px]" style={{ color: secStyle.color }}>{secStyle.icon}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold" style={{ color: '#373226' }}>{sec.key}. {sec.title}</span>
+                          <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: '#faf2e9', color: '#655e51' }}>
+                            {secDone}/{secTotal}
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 rounded-full mt-1.5 overflow-hidden" style={{ background: '#faf2e9' }}>
                           <div
-                            className="w-5 h-5 mt-0.5 rounded flex-shrink-0 border-2 flex items-center justify-center transition-all"
-                            style={task.completed
-                              ? { background: '#a094e0', borderColor: '#a094e0' }
-                              : { borderColor: 'rgba(255, 255, 255, 0.12)' }
-                            }
-                          >
-                            {task.completed && <Check className="w-3 h-3 text-white" />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className={`text-sm font-semibold ${task.completed ? 'line-through' : ''}`} style={{ color: task.completed ? 'rgba(237, 233, 248, 0.3)' : '#ede9f8' }}>{task.task_title}</div>
-                            {badges.length > 0 && (
-                              <div className="flex gap-1.5 mt-1 flex-wrap">
-                                {badges.map((b, i) => (
-                                  <span key={i} className={`text-[10px] font-semibold ${BC[b.color] || 'pill pill-neutral'}`}>{b.label}</span>
-                                ))}
-                              </div>
-                            )}
-                            {task.note && <p className="text-[11px] mt-1" style={{ color: 'rgba(237, 233, 248, 0.25)' }}>{task.note}</p>}
-                            {task.completed && task.completed_by && (
-                              <p className="text-[11px] font-medium mt-1.5" style={{ color: '#a094e0' }}>
-                                {task.completed_by}{task.completed_at && ` — ${formatHebDate(new Date(task.completed_at))}`}
-                              </p>
-                            )}
-                          </div>
+                            className="h-full rounded-full transition-all duration-300"
+                            style={{
+                              width: `${secPct}%`,
+                              background: secPct === 100 ? '#69FFC7' : `linear-gradient(90deg, ${secStyle.color}88, ${secStyle.color})`,
+                            }}
+                          />
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+                      <span className="material-symbols-outlined text-[20px] transition-transform group-open:rotate-180" style={{ color: '#bab1a1' }}>
+                        expand_more
+                      </span>
+                    </summary>
 
-            {/* Notes */}
-            <div className="admin-card p-5 mt-8">
-              <h3 className="text-sm font-semibold mb-3" style={{ color: '#ede9f8' }}>הערות</h3>
-              <textarea
-                value={notes}
-                onChange={(e) => { setNotes(e.target.value); saveBrandInfo(brandName, brandDomain, e.target.value); }}
-                placeholder="הערות, בעיות, דברים לזכור..."
-                className="w-full min-h-[80px] px-4 py-3 rounded-xl text-sm resize-y"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.03)',
-                  border: '1px solid rgba(255, 255, 255, 0.06)',
-                  color: '#ede9f8',
-                }}
-              />
-            </div>
+                    <div className="mt-2 mr-12 space-y-1.5">
+                      {sec.tasks.map(task => {
+                        const badges = task.badges || [];
+                        return (
+                          <div
+                            key={task.task_number}
+                            onClick={() => handleTaskClick(task.task_number)}
+                            className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all hover:bg-[#faf2e9]/80 ${task.completed ? 'opacity-60' : ''}`}
+                          >
+                            {/* Checkbox */}
+                            <div
+                              className="w-5 h-5 mt-0.5 rounded-md flex-shrink-0 border-2 flex items-center justify-center transition-all"
+                              style={task.completed
+                                ? { background: '#AEB0E8', borderColor: '#AEB0E8' }
+                                : { borderColor: '#ddd5c8' }
+                              }
+                            >
+                              {task.completed && (
+                                <span className="material-symbols-outlined text-[14px] text-white" style={{ fontVariationSettings: "'FILL' 1" }}>check</span>
+                              )}
+                            </div>
 
-            {/* Send */}
-            <div className="admin-card p-5 mt-4">
-              <h3 className="text-sm font-semibold mb-3" style={{ color: '#ede9f8' }}>שליחת סטטוס</h3>
-              <div className="flex gap-3 flex-wrap">
-                <button onClick={sendEmail} className="btn-primary flex-1 min-w-[100px] flex items-center justify-center gap-2 py-2.5 text-sm font-medium">
-                  <Send className="w-4 h-4" /> מייל
-                </button>
-                <button onClick={sendWhatsApp} className="btn-teal flex-1 min-w-[100px] flex items-center justify-center gap-2 py-2.5 text-sm font-medium">
-                  <MessageCircle className="w-4 h-4" /> וואטסאפ
-                </button>
-                <button onClick={copyText} className="btn-ghost flex-1 min-w-[100px] flex items-center justify-center gap-2 py-2.5 text-sm font-medium">
-                  <Copy className="w-4 h-4" /> העתק
-                </button>
-              </div>
+                            <div className="flex-1 min-w-0">
+                              <div className={`text-sm font-semibold ${task.completed ? 'line-through' : ''}`} style={{ color: task.completed ? '#bab1a1' : '#373226' }}>
+                                {task.task_title}
+                              </div>
+                              {badges.length > 0 && (
+                                <div className="flex gap-1.5 mt-1 flex-wrap">
+                                  {badges.map((b, i) => (
+                                    <span key={i} className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${BC[b.color] || 'bg-[#faf2e9] text-[#655e51]'}`}>
+                                      {b.label}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              {task.note && (
+                                <p className="text-[11px] mt-1" style={{ color: '#bab1a1' }}>{task.note}</p>
+                              )}
+                              {task.completed && task.completed_by && (
+                                <p className="text-[11px] font-medium mt-1.5" style={{ color: '#AEB0E8' }}>
+                                  {task.completed_by}{task.completed_at && ` — ${formatHebDate(new Date(task.completed_at))}`}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </details>
+                );
+              })}
             </div>
-          </motion.div>
-        )}
-
-        {/* Empty state */}
-        {!currentId && (
-          <div className="text-center py-20">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(160, 148, 224, 0.12)', border: '1px solid rgba(160, 148, 224, 0.18)' }}>
-              <Check className="w-8 h-8" style={{ color: '#a094e0' }} />
-            </div>
-            <h2 className="text-lg font-semibold mb-2" style={{ color: '#ede9f8' }}>צ&apos;קליסט אונבורדינג</h2>
-            <p className="text-sm mb-6" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>מעקב קליטת לקוחות למערכת</p>
-            <button onClick={openWizard} className="btn-primary inline-flex items-center gap-2 px-6 py-3 font-medium">
-              <Plus className="w-5 h-5" /> צור צ&apos;קליסט חדש
-            </button>
           </div>
-        )}
-      </main>
 
-      {/* ═══ Create Wizard ═══ */}
+          {/* Notes */}
+          <div className="neon-card p-6 mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="material-symbols-outlined text-[18px]" style={{ color: '#655e51' }}>notes</span>
+              <h3 className="text-sm font-bold" style={{ color: '#373226' }}>הערות</h3>
+            </div>
+            <textarea
+              value={notes}
+              onChange={(e) => { setNotes(e.target.value); saveBrandInfo(brandName, brandDomain, e.target.value); }}
+              placeholder="הערות, בעיות, דברים לזכור..."
+              className="neon-input w-full min-h-[80px] resize-y"
+              style={{ borderRadius: '1rem' }}
+            />
+          </div>
+
+          {/* Send Footer */}
+          <div className="neon-card p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="material-symbols-outlined text-[18px]" style={{ color: '#655e51' }}>send</span>
+              <h3 className="text-sm font-bold" style={{ color: '#373226' }}>שליחת סטטוס</h3>
+            </div>
+            <div className="flex gap-3 flex-wrap">
+              <button onClick={sendEmail} className="neon-pill neon-pill-outline flex-1 min-w-[100px] flex items-center justify-center gap-2 py-2.5 text-sm font-semibold">
+                <span className="material-symbols-outlined text-[18px]">mail</span>
+                מייל
+              </button>
+              <button onClick={sendWhatsApp} className="neon-pill neon-pill-outline flex-1 min-w-[100px] flex items-center justify-center gap-2 py-2.5 text-sm font-semibold">
+                <span className="material-symbols-outlined text-[18px]">phone_android</span>
+                וואטסאפ
+              </button>
+              <button onClick={copyText} className="neon-pill neon-pill-outline flex-1 min-w-[100px] flex items-center justify-center gap-2 py-2.5 text-sm font-semibold">
+                <span className="material-symbols-outlined text-[18px]">content_copy</span>
+                העתק
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* ─── Empty state ─── */}
+      {!currentId && (
+        <div className="text-center py-20">
+          <div className="w-20 h-20 mx-auto mb-5 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(174, 176, 232, 0.12)' }}>
+            <span className="material-symbols-outlined text-[40px]" style={{ color: '#AEB0E8' }}>checklist</span>
+          </div>
+          <h2 className="text-xl font-extrabold mb-2 font-headline" style={{ color: '#373226' }}>צ&apos;קליסט אונבורדינג</h2>
+          <p className="text-sm mb-6" style={{ color: '#655e51' }}>בחר צ&apos;קליסט קיים או צור חדש להתחיל מעקב</p>
+          <button onClick={openWizard} className="neon-pill neon-pill-primary inline-flex items-center gap-2 px-7 py-3 font-bold text-base">
+            <span className="material-symbols-outlined text-[20px]">add</span>
+            צור צ&apos;קליסט חדש
+          </button>
+        </div>
+      )}
+
+      {/* ═══ Create Wizard Modal ═══ */}
       <AnimatePresence>
         {showWizard && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowWizard(false)}>
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+            onClick={() => setShowWizard(false)}
+          >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
               onClick={e => e.stopPropagation()}
-              className="admin-card p-6 w-[90%] max-w-[480px] shadow-2xl"
+              className="neon-card p-8 w-[90%] max-w-[480px] shadow-2xl"
             >
               {/* Step 1: Pick digital assets */}
               {wizStep === 1 && (
                 <>
-                  <h3 className="text-lg font-bold mb-1" style={{ color: '#ede9f8' }}>צ&apos;קליסט חדש</h3>
-                  <p className="text-sm mb-5" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>מה הנכסים הדיגיטליים של הלקוח?</p>
-                  <div className="grid grid-cols-2 gap-2.5 mb-5">
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(174, 176, 232, 0.15)' }}>
+                      <span className="material-symbols-outlined text-[22px]" style={{ color: '#AEB0E8' }}>inventory_2</span>
+                    </div>
+                    <h3 className="text-lg font-extrabold font-headline" style={{ color: '#373226' }}>צ&apos;קליסט חדש</h3>
+                  </div>
+                  <p className="text-sm mb-5 mr-[52px]" style={{ color: '#655e51' }}>מה הנכסים הדיגיטליים של הלקוח?</p>
+                  <div className="grid grid-cols-2 gap-2.5 mb-6">
                     {ASSET_OPTIONS.map(opt => {
                       const active = wizAssets[opt.key];
-                      const Icon = opt.icon;
                       return (
                         <button
                           key={opt.key}
                           onClick={() => toggleAsset(opt.key)}
                           className="p-3.5 rounded-xl transition-all text-right"
                           style={active
-                            ? { border: '2px solid rgba(160, 148, 224, 0.4)', background: 'rgba(160, 148, 224, 0.08)' }
-                            : { border: '2px solid rgba(255, 255, 255, 0.06)', background: 'rgba(255, 255, 255, 0.02)' }
+                            ? { border: '2px solid rgba(174, 176, 232, 0.5)', background: 'rgba(174, 176, 232, 0.08)' }
+                            : { border: '2px solid #ede8df', background: '#faf2e9' }
                           }
                         >
                           <div className="flex items-center gap-2.5">
-                            <Icon className="w-5 h-5 flex-shrink-0" style={{ color: active ? '#a094e0' : 'rgba(237, 233, 248, 0.25)' }} />
+                            <span className="material-symbols-outlined text-[22px] flex-shrink-0" style={{ color: active ? '#AEB0E8' : '#bab1a1' }}>
+                              {opt.icon}
+                            </span>
                             <div>
-                              <div className="text-sm font-semibold" style={{ color: active ? '#ede9f8' : 'rgba(237, 233, 248, 0.35)' }}>{opt.label}</div>
-                              <div className="text-[11px]" style={{ color: 'rgba(237, 233, 248, 0.25)' }}>{opt.desc}</div>
+                              <div className="text-sm font-semibold" style={{ color: active ? '#373226' : '#655e51' }}>{opt.label}</div>
+                              <div className="text-[11px]" style={{ color: '#bab1a1' }}>{opt.desc}</div>
                             </div>
                           </div>
                         </button>
@@ -904,11 +1001,13 @@ export default function OnboardingChecklistPage() {
                   <div className="flex gap-3">
                     <button
                       onClick={() => { if (anyAsset) setWizStep(2); else showToast('בחר לפחות נכס אחד'); }}
-                      className={anyAsset ? 'btn-primary flex-1 py-2.5 font-semibold' : 'btn-ghost flex-1 py-2.5 font-semibold opacity-50 cursor-not-allowed'}
+                      className={`neon-pill flex-1 py-2.5 font-bold ${anyAsset ? 'neon-pill-primary' : 'neon-pill-ghost opacity-50 cursor-not-allowed'}`}
                     >
                       המשך
                     </button>
-                    <button onClick={() => setShowWizard(false)} className="btn-ghost flex-1 py-2.5 font-semibold">ביטול</button>
+                    <button onClick={() => setShowWizard(false)} className="neon-pill neon-pill-ghost flex-1 py-2.5 font-bold">
+                      ביטול
+                    </button>
                   </div>
                 </>
               )}
@@ -916,37 +1015,46 @@ export default function OnboardingChecklistPage() {
               {/* Step 2: Widget? */}
               {wizStep === 2 && (
                 <>
-                  <h3 className="text-lg font-bold mb-1" style={{ color: '#ede9f8' }}>וידג&apos;ט באתר?</h3>
-                  <p className="text-sm mb-5" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>האם הלקוח צריך צ&apos;אט מוטמע באתר שלו?</p>
-                  <div className="grid grid-cols-2 gap-3 mb-5">
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(105, 255, 199, 0.12)' }}>
+                      <span className="material-symbols-outlined text-[22px]" style={{ color: '#69FFC7' }}>widgets</span>
+                    </div>
+                    <h3 className="text-lg font-extrabold font-headline" style={{ color: '#373226' }}>וידג&apos;ט באתר?</h3>
+                  </div>
+                  <p className="text-sm mb-5 mr-[52px]" style={{ color: '#655e51' }}>האם הלקוח צריך צ&apos;אט מוטמע באתר שלו?</p>
+                  <div className="grid grid-cols-2 gap-3 mb-6">
                     <button
                       onClick={() => setWizWidget(true)}
-                      className="p-4 rounded-xl transition-all text-center"
+                      className="p-5 rounded-xl transition-all text-center"
                       style={wizWidget
-                        ? { border: '2px solid rgba(94, 234, 212, 0.4)', background: 'rgba(94, 234, 212, 0.08)' }
-                        : { border: '2px solid rgba(255, 255, 255, 0.06)', background: 'rgba(255, 255, 255, 0.02)' }
+                        ? { border: '2px solid rgba(105, 255, 199, 0.5)', background: 'rgba(105, 255, 199, 0.08)' }
+                        : { border: '2px solid #ede8df', background: '#faf2e9' }
                       }
                     >
-                      <Monitor className="w-8 h-8 mx-auto mb-2" style={{ color: wizWidget ? '#5eead4' : 'rgba(237, 233, 248, 0.25)' }} />
-                      <div className="text-sm font-semibold" style={{ color: wizWidget ? '#ede9f8' : 'rgba(237, 233, 248, 0.35)' }}>כן, עם וידג&apos;ט</div>
-                      <div className="text-[11px] mt-1" style={{ color: 'rgba(237, 233, 248, 0.25)' }}>צ&apos;אט מוטמע באתר</div>
+                      <span className="material-symbols-outlined text-[32px] mx-auto mb-2 block" style={{ color: wizWidget ? '#69FFC7' : '#bab1a1' }}>desktop_windows</span>
+                      <div className="text-sm font-bold" style={{ color: wizWidget ? '#373226' : '#655e51' }}>כן, עם וידג&apos;ט</div>
+                      <div className="text-[11px] mt-1" style={{ color: '#bab1a1' }}>צ&apos;אט מוטמע באתר</div>
                     </button>
                     <button
                       onClick={() => setWizWidget(false)}
-                      className="p-4 rounded-xl transition-all text-center"
+                      className="p-5 rounded-xl transition-all text-center"
                       style={!wizWidget
-                        ? { border: '2px solid rgba(160, 148, 224, 0.4)', background: 'rgba(160, 148, 224, 0.08)' }
-                        : { border: '2px solid rgba(255, 255, 255, 0.06)', background: 'rgba(255, 255, 255, 0.02)' }
+                        ? { border: '2px solid rgba(174, 176, 232, 0.5)', background: 'rgba(174, 176, 232, 0.08)' }
+                        : { border: '2px solid #ede8df', background: '#faf2e9' }
                       }
                     >
-                      <MessageCircle className="w-8 h-8 mx-auto mb-2" style={{ color: !wizWidget ? '#a094e0' : 'rgba(237, 233, 248, 0.25)' }} />
-                      <div className="text-sm font-semibold" style={{ color: !wizWidget ? '#ede9f8' : 'rgba(237, 233, 248, 0.35)' }}>לא</div>
-                      <div className="text-[11px] mt-1" style={{ color: 'rgba(237, 233, 248, 0.25)' }}>ללא וידג&apos;ט</div>
+                      <span className="material-symbols-outlined text-[32px] mx-auto mb-2 block" style={{ color: !wizWidget ? '#AEB0E8' : '#bab1a1' }}>chat_bubble_outline</span>
+                      <div className="text-sm font-bold" style={{ color: !wizWidget ? '#373226' : '#655e51' }}>לא</div>
+                      <div className="text-[11px] mt-1" style={{ color: '#bab1a1' }}>ללא וידג&apos;ט</div>
                     </button>
                   </div>
                   <div className="flex gap-3">
-                    <button onClick={finishCreate} className="btn-primary flex-1 py-2.5 font-semibold">צור צ&apos;קליסט</button>
-                    <button onClick={() => setWizStep(1)} className="btn-ghost flex-1 py-2.5 font-semibold">חזרה</button>
+                    <button onClick={finishCreate} className="neon-pill neon-pill-primary flex-1 py-2.5 font-bold">
+                      צור צ&apos;קליסט
+                    </button>
+                    <button onClick={() => setWizStep(1)} className="neon-pill neon-pill-ghost flex-1 py-2.5 font-bold">
+                      חזרה
+                    </button>
                   </div>
                 </>
               )}
@@ -958,19 +1066,32 @@ export default function OnboardingChecklistPage() {
       {/* ═══ Task Confirm Modal ═══ */}
       <AnimatePresence>
         {modalOpen && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => { setModalOpen(false); setPendingTaskNum(null); }}>
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+            onClick={() => { setModalOpen(false); setPendingTaskNum(null); }}
+          >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
               onClick={e => e.stopPropagation()}
-              className="admin-card p-6 w-[90%] max-w-[400px] shadow-2xl"
+              className="neon-card p-8 w-[90%] max-w-[400px] shadow-2xl"
             >
               <div className="flex items-center justify-between mb-1">
-                <h3 className="text-lg font-bold" style={{ color: '#ede9f8' }}>סימון משימה #{pendingTaskNum}</h3>
-                <button onClick={() => { setModalOpen(false); setPendingTaskNum(null); }} style={{ color: 'rgba(237, 233, 248, 0.35)' }}><X className="w-5 h-5" /></button>
+                <h3 className="text-lg font-extrabold font-headline" style={{ color: '#373226' }}>
+                  סימון משימה #{pendingTaskNum}
+                </h3>
+                <button
+                  onClick={() => { setModalOpen(false); setPendingTaskNum(null); }}
+                  className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-[#faf2e9] transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[20px]" style={{ color: '#bab1a1' }}>close</span>
+                </button>
               </div>
-              <p className="text-sm font-medium mb-5" style={{ color: '#a094e0' }}>{tasks.find(t => t.task_number === pendingTaskNum)?.task_title}</p>
+              <p className="text-sm font-semibold mb-5" style={{ color: '#AEB0E8' }}>
+                {tasks.find(t => t.task_number === pendingTaskNum)?.task_title}
+              </p>
 
-              <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>מי ביצע?</label>
+              <label className="block text-xs font-bold mb-1.5 mr-1" style={{ color: '#655e51' }}>מי ביצע?</label>
               <input
                 ref={nameInputRef}
                 type="text"
@@ -978,30 +1099,40 @@ export default function OnboardingChecklistPage() {
                 onChange={e => setPersonName(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') confirmTask(); }}
                 placeholder="הקלד את שמך..."
-                className="admin-input w-full !rounded-xl text-base font-medium mb-3"
+                className="neon-input w-full text-base font-medium mb-3"
               />
 
-              <div className="px-4 py-3 rounded-xl text-sm mb-5" style={{ background: 'rgba(255, 255, 255, 0.03)', color: 'rgba(237, 233, 248, 0.35)' }}>
-                <span className="font-semibold" style={{ color: '#ede9f8' }}>תאריך ושעה: </span>{formatHebDate(modalNow)}
+              <div className="px-4 py-3 rounded-xl text-sm mb-5" style={{ background: '#faf2e9', color: '#655e51' }}>
+                <span className="font-bold" style={{ color: '#373226' }}>תאריך ושעה: </span>{formatHebDate(modalNow)}
               </div>
 
               <div className="flex gap-3">
-                <button onClick={confirmTask} className="btn-primary flex-1 py-2.5 font-semibold">אישור</button>
-                <button onClick={() => { setModalOpen(false); setPendingTaskNum(null); }} className="btn-ghost flex-1 py-2.5 font-semibold">ביטול</button>
+                <button onClick={confirmTask} className="neon-pill neon-pill-primary flex-1 py-2.5 font-bold">
+                  אישור
+                </button>
+                <button onClick={() => { setModalOpen(false); setPendingTaskNum(null); }} className="neon-pill neon-pill-ghost flex-1 py-2.5 font-bold">
+                  ביטול
+                </button>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Toast */}
+      {/* ─── Toast ─── */}
       <AnimatePresence>
         {toast && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pill pill-green px-6 py-3 text-sm font-medium shadow-xl">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-full text-sm font-bold shadow-xl"
+            style={{ background: '#69FFC7', color: '#1a3a2a' }}
+          >
             {toast}
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </>
   );
 }
