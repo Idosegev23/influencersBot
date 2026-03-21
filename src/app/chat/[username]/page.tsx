@@ -112,6 +112,51 @@ const typeLabels: Record<InfluencerType, string> = {
   other: 'טיפים והמלצות',
 };
 
+// Tab definitions per account type
+type TabId = 'chat' | 'coupons' | 'problem' | 'discover';
+
+interface TabDef {
+  id: TabId;
+  label: string;
+  icon: typeof MessageCircle;
+  activeColor: string;
+  activeBg: string;
+}
+
+const TAB_CHAT: TabDef = { id: 'chat', label: 'צ׳אט', icon: MessageCircle, activeColor: '#6d28d9', activeBg: 'rgba(139, 92, 246, 0.12)' };
+const TAB_COUPONS: TabDef = { id: 'coupons', label: 'קופונים', icon: Ticket, activeColor: '#059669', activeBg: 'rgba(16, 185, 129, 0.12)' };
+const TAB_PROBLEM: TabDef = { id: 'problem', label: 'בעיה בהזמנה', icon: AlertCircle, activeColor: '#db2777', activeBg: 'rgba(244, 114, 182, 0.12)' };
+const TAB_DISCOVER: TabDef = { id: 'discover', label: 'גלו', icon: Compass, activeColor: '#7c3aed', activeBg: 'rgba(168, 85, 247, 0.12)' };
+
+function getTabsForAccount(accountType: string | undefined, username: string): TabDef[] {
+  switch (accountType) {
+    case 'brand':
+      // Brands: chat + coupons (no "problem with order" — they handle that themselves)
+      return [TAB_CHAT, TAB_COUPONS];
+    case 'service_provider':
+      // Service providers: chat only (no coupons, no order problems)
+      return [TAB_CHAT];
+    default:
+      // Creators/influencers: all tabs
+      const tabs = [TAB_CHAT, TAB_COUPONS, TAB_PROBLEM];
+      if (username === 'miranbuzaglo') tabs.push(TAB_DISCOVER);
+      return tabs;
+  }
+}
+
+// Subtitle text per account type (shown in empty chat state)
+function getSubtitleForAccount(accountType: string | undefined, influencerType: InfluencerType | string | undefined): string {
+  const typeLabel = (typeLabels[(influencerType as InfluencerType) || 'other'] || typeLabels.other).toLowerCase();
+  switch (accountType) {
+    case 'brand':
+      return `אני כאן לעזור עם מוצרים, המלצות וקופונים`;
+    case 'service_provider':
+      return `אני כאן לעזור עם שירותים, פרויקטים ומידע`;
+    default:
+      return `אני כאן לעזור עם ${typeLabel}, מותגים וקופונים`;
+  }
+}
+
 /**
  * Parse AI-generated suggestions from bot response.
  * Format: <<SUGGESTIONS>>suggestion1|suggestion2|suggestion3<</SUGGESTIONS>>
@@ -144,7 +189,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   
-  const [activeTab, setActiveTab] = useState<'chat' | 'coupons' | 'problem' | 'discover'>('chat');
+  const [activeTab, setActiveTab] = useState<TabId>('chat');
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -250,6 +295,10 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     onCards: (cards) => {
       streamCardsRef.current = cards;
     },
+    onDelta: () => {
+      // First token arrived — hide typing dots, streaming text takes over
+      setIsTyping(false);
+    },
     onDone: (done) => {
       if (done.responseId) setResponseId(done.responseId);
       const msgId = streamingMessageIdRef.current;
@@ -287,6 +336,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       setStreamingMessageId(null);
     },
     onError: (error) => {
+      setIsTyping(false);
       const msgId = streamingMessageIdRef.current;
       if (msgId) {
         setMessages(prev => prev.map(m =>
@@ -604,7 +654,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
           content: '',
         };
         setMessages((prev) => [...prev, streamingMessage]);
-        setIsTyping(false); // Let streaming indicator take over
+        // Keep isTyping=true — the dots stay visible until first stream token arrives
 
         // Start streaming
         await sendStreamMessage({
@@ -849,41 +899,21 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
               {/* Left side: Tab pills */}
               <div className="flex items-center gap-2 flex-shrink-0">
               <div className="flex items-center gap-[5px] rounded-full p-[6px]" style={{ background: 'rgba(255,255,255,0.3)' }}>
-                {/* Tabs in RTL order: צ'אט first (rightmost), then קופונים, then בעיה בהזמנה (leftmost) */}
-                <button
-                  onClick={() => setActiveTab('chat')}
-                  className={`flex items-center gap-[6px] px-[11px] py-[6px] rounded-full transition-all`}
-                  style={{ color: activeTab === 'chat' ? '#6d28d9' : '#676767', fontSize: '16px', fontWeight: activeTab === 'chat' ? 700 : 400, background: activeTab === 'chat' ? 'rgba(139, 92, 246, 0.12)' : 'transparent' }}
-                >
-                  <span>צ׳אט</span>
-                  <MessageCircle className="w-[18px] h-[18px]" />
-                </button>
-                <button
-                  onClick={() => setActiveTab('coupons')}
-                  className={`flex items-center gap-[6px] px-[13px] py-[6px] rounded-full transition-all`}
-                  style={{ color: activeTab === 'coupons' ? '#059669' : '#676767', fontSize: '16px', fontWeight: activeTab === 'coupons' ? 700 : 400, background: activeTab === 'coupons' ? 'rgba(16, 185, 129, 0.12)' : 'transparent' }}
-                >
-                  <span>קופונים</span>
-                  <Ticket className="w-[18px] h-[18px]" />
-                </button>
-                <button
-                  onClick={() => setActiveTab('problem')}
-                  className={`flex items-center gap-[6px] px-[13px] py-[6px] rounded-full transition-all`}
-                  style={{ color: activeTab === 'problem' ? '#db2777' : '#676767', fontSize: '16px', fontWeight: activeTab === 'problem' ? 700 : 400, background: activeTab === 'problem' ? 'rgba(244, 114, 182, 0.12)' : 'transparent' }}
-                >
-                  <span>בעיה בהזמנה</span>
-                  <AlertCircle className="w-[18px] h-[18px]" />
-                </button>
-                {username === 'miranbuzaglo' && (
-                <button
-                  onClick={() => setActiveTab('discover')}
-                  className={`flex items-center gap-[6px] px-[11px] py-[6px] rounded-full transition-all`}
-                  style={{ color: activeTab === 'discover' ? '#7c3aed' : '#676767', fontSize: '16px', fontWeight: activeTab === 'discover' ? 700 : 400, background: activeTab === 'discover' ? 'rgba(168, 85, 247, 0.12)' : 'transparent' }}
-                >
-                  <span>גלו</span>
-                  <Compass className="w-[18px] h-[18px]" />
-                </button>
-                )}
+                {getTabsForAccount(influencer.type, username).map((tab) => {
+                  const isActive = activeTab === tab.id;
+                  const TabIcon = tab.icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className="flex items-center gap-[6px] px-[11px] py-[6px] rounded-full transition-all"
+                      style={{ color: isActive ? tab.activeColor : '#676767', fontSize: '16px', fontWeight: isActive ? 700 : 400, background: isActive ? tab.activeBg : 'transparent' }}
+                    >
+                      <span>{tab.label}</span>
+                      <TabIcon className="w-[18px] h-[18px]" />
+                    </button>
+                  );
+                })}
               </div>
               </div>
             </div>
@@ -929,7 +959,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         className="font-semibold mb-2 max-w-[426px]"
                         style={{ color: '#0c1013', fontSize: '33px', lineHeight: '33px' }}
                       >
-                        {`היי אני העוזר האישי של ${influencer.display_name.split(' ')[0]}`}
+                        {influencer.greeting_message || `היי אני העוזר האישי של ${influencer.display_name.split(' ')[0]}`}
                       </motion.h2>
                       <motion.p
                         initial={{ opacity: 0, y: 8 }}
@@ -938,7 +968,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         className="mb-8 max-w-sm"
                         style={{ color: '#676767', fontSize: '16px' }}
                       >
-                        אני כאן לעזור עם {(typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other).toLowerCase()}, מותגים וקופונים
+                        {getSubtitleForAccount(influencer.type, influencer.influencer_type)}
                       </motion.p>
 
                       {/* Inline input in empty state (centered, Figma style) */}
@@ -1737,39 +1767,22 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
         </div>
 
         {/* Mobile Bottom Tab Bar */}
-        {isMobile && (
+        {isMobile && influencer && (
           <div className="mobile-bottom-tabs">
             <div className="mobile-bottom-tabs-inner">
-              <button
-                onClick={() => setActiveTab('chat')}
-                className={`mobile-tab-btn ${activeTab === 'chat' ? 'active-chat' : ''}`}
-              >
-                <MessageCircle className="w-[18px] h-[18px]" />
-                <span>צ'אט</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('coupons')}
-                className={`mobile-tab-btn ${activeTab === 'coupons' ? 'active-coupons' : ''}`}
-              >
-                <Ticket className="w-[18px] h-[18px]" />
-                <span>קופונים</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('problem')}
-                className={`mobile-tab-btn ${activeTab === 'problem' ? 'active-problem' : ''}`}
-              >
-                <AlertCircle className="w-[18px] h-[18px]" />
-                <span>בעיה בהזמנה</span>
-              </button>
-              {username === 'miranbuzaglo' && (
-              <button
-                onClick={() => setActiveTab('discover')}
-                className={`mobile-tab-btn ${activeTab === 'discover' ? 'active-discover' : ''}`}
-              >
-                <Compass className="w-[18px] h-[18px]" />
-                <span>גלו</span>
-              </button>
-              )}
+              {getTabsForAccount(influencer.type, username).map((tab) => {
+                const TabIcon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`mobile-tab-btn ${activeTab === tab.id ? `active-${tab.id}` : ''}`}
+                  >
+                    <TabIcon className="w-[18px] h-[18px]" />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
