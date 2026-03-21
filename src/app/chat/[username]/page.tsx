@@ -128,13 +128,13 @@ const TAB_COUPONS: TabDef = { id: 'coupons', label: 'קופונים', icon: Tick
 const TAB_PROBLEM: TabDef = { id: 'problem', label: 'בעיה בהזמנה', icon: AlertCircle, activeColor: '#db2777', activeBg: 'rgba(244, 114, 182, 0.12)' };
 const TAB_DISCOVER: TabDef = { id: 'discover', label: 'גלו', icon: Compass, activeColor: '#7c3aed', activeBg: 'rgba(168, 85, 247, 0.12)' };
 
-function getTabsForAccount(accountType: string | undefined, username: string): TabDef[] {
-  switch (accountType) {
+function getTabsForAccount(archetype: string | undefined, username: string): TabDef[] {
+  switch (archetype) {
     case 'brand':
-      // Brands: chat + coupons (no "problem with order" — they handle that themselves)
       return [TAB_CHAT, TAB_COUPONS];
     case 'service_provider':
-      // Service providers: chat only (no coupons, no order problems)
+      return [TAB_CHAT];
+    case 'media_news':
       return [TAB_CHAT];
     default:
       // Creators/influencers: all tabs
@@ -144,16 +144,28 @@ function getTabsForAccount(accountType: string | undefined, username: string): T
   }
 }
 
-// Subtitle text per account type (shown in empty chat state)
-function getSubtitleForAccount(accountType: string | undefined, influencerType: InfluencerType | string | undefined): string {
+// Subtitle text per account archetype (shown in empty chat state)
+function getSubtitleForAccount(archetype: string | undefined, influencerType: InfluencerType | string | undefined): string {
   const typeLabel = (typeLabels[(influencerType as InfluencerType) || 'other'] || typeLabels.other).toLowerCase();
-  switch (accountType) {
+  switch (archetype) {
     case 'brand':
       return `אני כאן לעזור עם מוצרים, המלצות וקופונים`;
     case 'service_provider':
       return `אני כאן לעזור עם שירותים, פרויקטים ומידע`;
+    case 'media_news':
+      return `אני כאן לעזור עם חדשות, כתבות ומידע`;
     default:
       return `אני כאן לעזור עם ${typeLabel}, מותגים וקופונים`;
+  }
+}
+
+// Header subtitle label (under name) — archetype-aware
+function getHeaderLabel(archetype: string | undefined, influencerType: InfluencerType | string | undefined): string {
+  switch (archetype) {
+    case 'brand': return 'מותג';
+    case 'service_provider': return 'נותן שירות';
+    case 'media_news': return 'חדשות ומדיה';
+    default: return typeLabels[(influencerType as InfluencerType) || 'other'] || typeLabels.other;
   }
 }
 
@@ -864,7 +876,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 </div>
                 <div>
                   <h1 className="font-semibold text-base whitespace-nowrap overflow-hidden text-ellipsis" style={{ color: '#0c1013' }}>{influencer.display_name}</h1>
-                  <p className="text-xs" style={{ color: '#676767' }}>{typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other}</p>
+                  <p className="text-xs" style={{ color: '#676767' }}>{getHeaderLabel(influencer.archetype, influencer.influencer_type)}</p>
                 </div>
               </div>
               <div className="flex items-center gap-1">
@@ -892,14 +904,14 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 </div>
                 <div className="min-w-0">
                   <h1 className="font-semibold text-[19px] whitespace-nowrap overflow-hidden text-ellipsis" style={{ color: '#0c1013' }}>{influencer.display_name}</h1>
-                  <p className="text-[13px] whitespace-nowrap" style={{ color: '#676767' }}>{typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other}</p>
+                  <p className="text-[13px] whitespace-nowrap" style={{ color: '#676767' }}>{getHeaderLabel(influencer.archetype, influencer.influencer_type)}</p>
                 </div>
               </div>
 
               {/* Left side: Tab pills */}
               <div className="flex items-center gap-2 flex-shrink-0">
               <div className="flex items-center gap-[5px] rounded-full p-[6px]" style={{ background: 'rgba(255,255,255,0.3)' }}>
-                {getTabsForAccount(influencer.type, username).map((tab) => {
+                {getTabsForAccount(influencer.archetype, username).map((tab) => {
                   const isActive = activeTab === tab.id;
                   const TabIcon = tab.icon;
                   return (
@@ -968,7 +980,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         className="mb-8 max-w-sm"
                         style={{ color: '#676767', fontSize: '16px' }}
                       >
-                        {getSubtitleForAccount(influencer.type, influencer.influencer_type)}
+                        {getSubtitleForAccount(influencer.archetype, influencer.influencer_type)}
                       </motion.p>
 
                       {/* Inline input in empty state (centered, Figma style) */}
@@ -1770,7 +1782,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
         {isMobile && influencer && (
           <div className="mobile-bottom-tabs">
             <div className="mobile-bottom-tabs-inner">
-              {getTabsForAccount(influencer.type, username).map((tab) => {
+              {getTabsForAccount(influencer.archetype, username).map((tab) => {
                 const TabIcon = tab.icon;
                 return (
                   <button

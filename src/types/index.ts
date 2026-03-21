@@ -73,6 +73,7 @@ export interface Influencer {
   // Account info
   plan?: string;
   type?: string;
+  archetype?: string;
   mode?: string;
   persona_name?: string;
   has_persona?: boolean;
