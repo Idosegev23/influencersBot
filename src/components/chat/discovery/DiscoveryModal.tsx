@@ -44,9 +44,22 @@ export function DiscoveryModal({
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
+      setIsVideoPlaying(false);
     }
     return () => { document.body.style.overflow = ''; };
   }, [isOpen]);
+
+  // Autoplay video when modal opens with a reel
+  useEffect(() => {
+    if (isOpen && isReel && videoRef.current) {
+      const timer = setTimeout(() => {
+        videoRef.current?.play().then(() => {
+          setIsVideoPlaying(true);
+        }).catch(() => { /* autoplay blocked */ });
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, isReel]);
 
   const handleAskInChat = useCallback(() => {
     if (!item) return;
