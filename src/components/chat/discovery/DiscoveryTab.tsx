@@ -20,8 +20,11 @@ interface DiscoveryTabProps {
   onCategoryOpened?: () => void;
 }
 
-/** Alternate layouts so each section looks different */
-const LAYOUT_CYCLE: Array<'scroll' | 'hero' | 'grid'> = ['scroll', 'hero', 'scroll', 'grid', 'scroll', 'hero'];
+/** Max sections to show initially */
+const INITIAL_VISIBLE = 5;
+
+/** Layout cycle: hero first, then scroll/grid alternating */
+const LAYOUT_CYCLE: Array<'scroll' | 'grid'> = ['scroll', 'grid', 'scroll', 'grid', 'scroll', 'grid'];
 
 export default function DiscoveryTab({ username, influencerName, sessionId, initialCategory, onAskInChat, onCategoryOpened }: DiscoveryTabProps) {
   const { rows, loading, error } = useDiscoveryAll({ username });
@@ -35,6 +38,7 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
 
   const [showQuestions, setShowQuestions] = useState(false);
   const questionsLoadedRef = useRef(false);
+  const [showAll, setShowAll] = useState(false);
 
   // Modal state
   const [selectedItem, setSelectedItem] = useState<DiscoveryItem | null>(null);
@@ -139,142 +143,145 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
     } catch { /* sessionStorage not available */ }
   }, [username, sessionId]);
 
+  // Determine visible rows
+  const visibleRows = showAll ? rows : rows.slice(0, INITIAL_VISIBLE);
+  const hasMore = rows.length > INITIAL_VISIBLE && !showAll;
+
   return (
     <div ref={scrollContainerRef} className="h-full overflow-y-auto" style={{ backgroundColor: '#f8f9fb' }}>
-      {/* Header */}
-      <div className="px-4 pt-5 pb-4" dir="rtl">
-        <div className="flex items-center gap-2 mb-1">
-          <span
-            className="material-symbols-outlined text-2xl"
-            style={{ color: '#6d28d9', fontVariationSettings: "'FILL' 1" }}
-          >
-            auto_awesome
-          </span>
-          <h1 className="text-[22px] font-bold tracking-tight" style={{ color: '#6d28d9' }}>
-            גלה תוכן
-          </h1>
+      <div className="max-w-[700px] mx-auto">
+        {/* Header */}
+        <div className="px-5 pt-5 pb-3 flex items-center justify-between" dir="rtl">
+          <div>
+            <h1 className="font-bold text-[20px] tracking-tight" style={{ color: '#191c1e' }}>
+              גלו
+            </h1>
+            <p className="text-[13px] font-medium" style={{ color: '#444749' }}>
+              הבחירות של {influencerName}
+            </p>
+          </div>
         </div>
-        <p className="text-[13px] font-medium" style={{ color: '#4a4455' }}>
-          הבחירות של {influencerName}
-        </p>
-      </div>
 
-      {/* Loading */}
-      {loading && (
-        <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <Loader2 className="w-7 h-7 animate-spin" style={{ color: '#bbb' }} />
-          <p className="text-[14px]" style={{ color: '#999' }}>טוען תוכן...</p>
-        </div>
-      )}
+        {/* Loading */}
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-20 gap-3">
+            <Loader2 className="w-6 h-6 animate-spin" style={{ color: '#c4b5fd' }} />
+            <p className="text-[13px]" style={{ color: '#9ca3af' }}>טוען תוכן...</p>
+          </div>
+        )}
 
-      {/* Error */}
-      {error && !loading && (
-        <div className="px-4 py-16 text-center">
-          <p className="text-[14px]" style={{ color: '#999' }}>{error}</p>
-        </div>
-      )}
+        {/* Error */}
+        {error && !loading && (
+          <div className="px-5 py-16 text-center">
+            <p className="text-[13px]" style={{ color: '#9ca3af' }}>{error}</p>
+          </div>
+        )}
 
-      {/* Content rows — alternating layouts */}
-      {!loading && rows.length > 0 && (
-        <div className="mt-2">
-          {rows.map((row, idx) => {
-            // Pick layout: hero for first row with enough items, then cycle
-            let layout: 'scroll' | 'hero' | 'grid';
-            if (idx === 0 && row.items.length >= 3) {
-              layout = 'hero';
-            } else {
-              layout = LAYOUT_CYCLE[(idx - 1 + LAYOUT_CYCLE.length) % LAYOUT_CYCLE.length] || 'scroll';
-              // Grid needs at least 3 items
-              if (layout === 'grid' && row.items.length < 3) layout = 'scroll';
-              // Hero needs at least 3 items
-              if (layout === 'hero' && row.items.length < 3) layout = 'scroll';
-            }
+        {/* Content rows */}
+        {!loading && rows.length > 0 && (
+          <div className="px-5 pb-4 space-y-[28px]">
+            {visibleRows.map((row, idx) => {
+              let layout: 'scroll' | 'hero' | 'grid';
+              if (idx === 0 && row.items.length >= 3) {
+                layout = 'hero';
+              } else {
+                const cycleIdx = idx === 0 ? 0 : idx - 1;
+                layout = LAYOUT_CYCLE[cycleIdx % LAYOUT_CYCLE.length] || 'scroll';
+                if (layout === 'grid' && row.items.length < 2) layout = 'scroll';
+              }
 
-            return (
-              <DiscoveryRow
-                key={row.category.slug}
-                slug={row.category.slug}
-                title={row.category.title}
-                subtitle={row.category.subtitle}
-                color={row.category.color}
-                items={row.items}
-                onItemClick={handleItemClick}
-                layout={layout}
-              />
-            );
-          })}
-        </div>
-      )}
+              return (
+                <DiscoveryRow
+                  key={row.category.slug}
+                  slug={row.category.slug}
+                  title={row.category.title}
+                  subtitle={row.category.subtitle}
+                  color={row.category.color}
+                  items={row.items}
+                  onItemClick={handleItemClick}
+                  layout={layout}
+                />
+              );
+            })}
 
-      {/* Empty */}
-      {!loading && rows.length === 0 && !error && (
-        <div className="px-4 py-16 text-center">
-          <p className="text-[28px] mb-2 opacity-30">🔍</p>
-          <p className="text-[14px]" style={{ color: '#999' }}>אין רשימות זמינות כרגע</p>
-        </div>
-      )}
-
-      {/* Questions */}
-      <div className="mt-2 mx-4 mb-32">
-        <button
-          onClick={() => setShowQuestions(!showQuestions)}
-          className="w-full flex items-center justify-between rounded-2xl p-5 transition-colors hover:bg-white"
-          style={{ backgroundColor: '#ffffff', boxShadow: '0 2px 8px rgba(12, 16, 19, 0.04)', border: '1px solid rgba(204, 195, 216, 0.15)' }}
-          dir="rtl"
-        >
-          <div className="flex items-center gap-4">
-            <div
-              className="w-12 h-12 rounded-full flex items-center justify-center shrink-0"
-              style={{ backgroundColor: 'rgba(99, 14, 212, 0.05)' }}
-            >
-              <span
-                className="material-symbols-outlined text-2xl"
-                style={{ color: '#7c3aed', fontVariationSettings: "'FILL' 1" }}
+            {/* Show more button */}
+            {hasMore && (
+              <button
+                onClick={() => setShowAll(true)}
+                className="w-full py-3 rounded-2xl text-[13px] font-bold transition-colors active:scale-[0.98]"
+                style={{ backgroundColor: '#f3f0ff', color: '#7c3aed' }}
+                dir="rtl"
               >
-                help
-              </span>
-            </div>
-            <div className="flex flex-col items-start">
-              <span className="text-[14px] font-semibold" style={{ color: '#191c1e' }}>
+                הצג עוד {rows.length - INITIAL_VISIBLE} קטגוריות
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Empty */}
+        {!loading && rows.length === 0 && !error && (
+          <div className="px-5 py-16 text-center">
+            <p className="text-[13px]" style={{ color: '#9ca3af' }}>אין רשימות זמינות כרגע</p>
+          </div>
+        )}
+
+        {/* Questions */}
+        <div className="px-5 pt-4 mb-32">
+          <button
+            onClick={() => setShowQuestions(!showQuestions)}
+            className="w-full flex items-center justify-between p-4 bg-white rounded-2xl active:scale-[0.98] transition-all"
+            style={{ border: '1px solid #f0f0f0', boxShadow: '0 4px 16px rgba(0,0,0,0.04)' }}
+            dir="rtl"
+          >
+            <div className="flex items-center gap-4">
+              <div
+                className="w-10 h-10 rounded-full flex items-center justify-center"
+                style={{ backgroundColor: '#f3f0ff' }}
+              >
+                <span
+                  className="material-symbols-outlined"
+                  style={{ color: '#7c3aed', fontVariationSettings: "'FILL' 1" }}
+                >
+                  help
+                </span>
+              </div>
+              <span className="font-bold text-[14px]" style={{ color: '#191c1e' }}>
                 שאלות שתמיד רציתם לשאול
               </span>
-              <span className="text-[11px]" style={{ color: '#4a4455' }}>
-                כל מה שחדש בעולם התוכן והדיגיטל
-              </span>
             </div>
-          </div>
-          <span
-            className="material-symbols-outlined text-xl transition-transform"
-            style={{
-              color: '#4a4455',
-              transform: showQuestions ? 'rotate(180deg)' : 'rotate(0deg)',
-            }}
-          >
-            expand_more
-          </span>
-        </button>
-
-        <AnimatePresence>
-          {showQuestions && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.25 }}
-              className="overflow-hidden"
+            <span
+              className="material-symbols-outlined transition-transform"
+              style={{
+                color: '#75777a',
+                transform: showQuestions ? 'rotate(90deg)' : 'rotate(0deg)',
+              }}
             >
-              <div className="pt-2">
-                <QuestionsView
-                  data={questionsData}
-                  loading={questionsLoading}
-                  onBack={() => setShowQuestions(false)}
-                  onSubmit={submitNewQuestion}
-                  onVote={vote}
-                />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              chevron_left
+            </span>
+          </button>
+
+          <AnimatePresence>
+            {showQuestions && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.25 }}
+                className="overflow-hidden"
+              >
+                <div className="pt-2">
+                  <QuestionsView
+                    data={questionsData}
+                    loading={questionsLoading}
+                    onBack={() => setShowQuestions(false)}
+                    onSubmit={submitNewQuestion}
+                    onVote={vote}
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
 
       {/* Discovery Modal */}
