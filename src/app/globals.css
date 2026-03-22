@@ -246,21 +246,51 @@ h1, h2, h3, h4, h5, h6 {
   position: relative;
 }
 
-/* Desktop gradient background (Figma: blue/purple vertical stripes) */
+/* Desktop gradient background (Figma: cyan→purple vertical stripes with blur) */
 @media (min-width: 768px) {
   .chat-page::before {
     content: '';
     position: absolute;
     inset: 0;
     z-index: 0;
+    /* Base gradient: cyan (left) → blue (center) → purple (right) */
     background:
-      linear-gradient(90deg,
-        rgba(180, 220, 255, 0.15) 0%,
-        rgba(180, 220, 255, 0.12) 20%,
-        rgba(190, 200, 255, 0.10) 40%,
-        rgba(200, 190, 255, 0.10) 60%,
-        rgba(210, 185, 255, 0.08) 80%,
-        rgba(220, 200, 255, 0.05) 100%
+      /* Vertical stripes overlay */
+      repeating-linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.35) 0px,
+        rgba(255, 255, 255, 0.35) 2px,
+        transparent 2px,
+        transparent 52px
+      ),
+      /* Main color gradient */
+      linear-gradient(
+        90deg,
+        rgba(180, 230, 255, 0.30) 0%,
+        rgba(170, 220, 255, 0.35) 15%,
+        rgba(165, 210, 255, 0.30) 30%,
+        rgba(175, 200, 255, 0.25) 45%,
+        rgba(190, 190, 255, 0.22) 55%,
+        rgba(200, 185, 255, 0.20) 65%,
+        rgba(210, 185, 250, 0.18) 75%,
+        rgba(215, 185, 245, 0.15) 85%,
+        rgba(220, 190, 240, 0.10) 100%
+      );
+    pointer-events: none;
+    filter: blur(8px);
+  }
+  /* Fade out edges with radial overlay */
+  .chat-page::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background:
+      radial-gradient(
+        ellipse 80% 70% at 50% 45%,
+        transparent 30%,
+        rgba(255, 255, 255, 0.6) 70%,
+        white 100%
       );
     pointer-events: none;
   }
