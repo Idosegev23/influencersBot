@@ -55,8 +55,8 @@ function getGemini(): GoogleGenAI {
 // ============================================
 
 const ENTITY_KEYWORDS: Record<EntityType, string[]> = {
-  post: ['post', 'caption', 'photo', 'picture', 'image', 'reel', 'carousel', 'פוסט', 'תמונה', 'רילס'],
-  transcription: ['video', 'said', 'spoke', 'talk', 'transcription', 'audio', 'סרטון', 'דיבר', 'אמר', 'תמלול'],
+  post: ['post', 'caption', 'photo', 'picture', 'image', 'reel', 'carousel', 'פוסט', 'תמונה', 'רילס', 'סרטון', 'וידאו'],
+  transcription: ['video', 'said', 'spoke', 'talk', 'transcription', 'audio', 'סרטון', 'דיבר', 'אמר', 'תמלול', 'רילס', 'רילז', 'הסבירה', 'סיפרה', 'דיברה'],
   highlight: ['highlight', 'story', 'stories', 'הילייט', 'סטורי'],
   partnership: ['partnership', 'brand', 'collab', 'sponsor', 'deal', 'contract', 'שיתוף', 'מותג', 'חוזה', 'ספונסר'],
   coupon: ['coupon', 'discount', 'code', 'promo', 'sale', 'קופון', 'הנחה', 'קוד', 'מבצע'],
@@ -84,6 +84,13 @@ const TOPIC_KEYWORDS: Record<string, string[]> = {
     'Sonicare', 'Philips'],
   tech: ['טלפון', 'מחשב', 'אפליקציה', 'גאדג\'ט', 'מסך',
     'phone', 'computer', 'app', 'gadget', 'screen', 'tech'],
+  parenting: ['ילד', 'ילדים', 'תינוק', 'תינוקת', 'אמא', 'אבא', 'הורות', 'הורים',
+    'משחק', 'משחקים', 'גן', 'פעוט', 'חינוך', 'גידול', 'שינה', 'לידה', 'הריון',
+    'אתגר', 'אתגרים', 'פעילות', 'ילדה', 'בן', 'בת', 'משפחה', 'בית ספר',
+    'kids', 'children', 'baby', 'parenting', 'mom', 'dad', 'games', 'challenge',
+    'family', 'toddler', 'school'],
+  lifestyle: ['יום יום', 'שגרה', 'בוקר', 'ערב', 'בית', 'חיים', 'טיפ', 'טיפים',
+    'routine', 'daily', 'lifestyle', 'morning', 'tips', 'life', 'hack'],
 };
 
 const STRUCTURED_INDICATORS = [
@@ -164,11 +171,15 @@ async function classifyQuery(query: string): Promise<{
     }
   }
 
-  // Expand related entity types — coupon ↔ partnership, brand → partnership
+  // Expand related entity types — coupon ↔ partnership, post ↔ transcription
   // Coupon/discount content is often stored as partnership (with coupon codes)
+  // Post and transcription are tightly coupled — transcriptions come from video posts,
+  // so searching for "פוסט" should also find transcription content and vice versa
   const RELATED_TYPES: Partial<Record<EntityType, EntityType[]>> = {
     coupon: ['partnership'],
     partnership: ['coupon'],
+    post: ['transcription', 'highlight'],
+    transcription: ['post'],
   };
   const expanded = new Set(inferredTypes);
   for (const t of inferredTypes) {
@@ -486,10 +497,11 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
 
   // --- Step 3e: BM25 keyword supplement (replaces old ILIKE queries) ---
   // Uses tsvector GIN index for fast full-text search with Hebrew prefix stripping
-  // Only when vector search isn't confident enough
+  // Only skip when vector search is VERY confident (0.78+)
+  // Lower thresholds (0.65) caused brand name queries like "Layoga" to miss exact matches
   let keywordSupplementAdded = false;
   const topSimilarityFinal = candidates[0]?.similarity || 0;
-  if (topSimilarityFinal >= 0.65 && candidates.length >= 3) {
+  if (topSimilarityFinal >= 0.78 && candidates.length >= 3) {
     pm?.inc('keywordSupplementSkipped');
     log.info('Skipped keyword supplement (confident vector results)', {
       topSimilarity: topSimilarityFinal,
@@ -529,14 +541,15 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
       for (const kr of bm25Results) {
         if (!existingIds.has(kr.id)) {
           existingIds.add(kr.id);
-          // BM25 matches get 0.50 base similarity
-          candidates.push({ ...kr, similarity: 0.50 });
+          // BM25 matches get 0.55 base similarity — exact keyword matches
+          // are strong signals, especially for brand names
+          candidates.push({ ...kr, similarity: 0.55 });
           added++;
         } else {
-          // Boost existing candidates also found by BM25
+          // Boost existing candidates also found by BM25 — dual match is strong
           const existing = candidates.find(c => c.id === kr.id);
           if (existing) {
-            existing.similarity += 0.05;
+            existing.similarity += 0.10;
           }
         }
       }
@@ -623,6 +636,8 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
         home: new Set(['food', 'beauty', 'fashion', 'tech']),
         coupon: new Set([]), // coupons are cross-cutting, don't penalize
         business: new Set(['food', 'beauty', 'fashion']),
+        parenting: new Set(['tech', 'business']), // parenting is compatible with food, beauty, home, health, lifestyle
+        lifestyle: new Set(['tech', 'business']), // lifestyle is broadly compatible
       };
 
       if (c.topic) {

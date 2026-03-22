@@ -1,0 +1,1127 @@
+{
+  "summary": {
+    "timestamp": "2026-03-21T16:39:03.514Z",
+    "total_queries": 48,
+    "passed": 36,
+    "failed": 9,
+    "pass_rate": 80,
+    "avg_top_similarity": 0.833,
+    "avg_duration_ms": 4029,
+    "by_account": {
+      "danielamit": {
+        "total": 35,
+        "passed": 25,
+        "rate": 71
+      },
+      "ldrs_group": {
+        "total": 9,
+        "passed": 8,
+        "rate": 89
+      },
+      "the_dekel": {
+        "total": 4,
+        "passed": 4,
+        "rate": 100
+      }
+    },
+    "by_domain": {
+      "food": {
+        "total": 7,
+        "passed": 3,
+        "rate": 43
+      },
+      "cross-domain": {
+        "total": 3,
+        "passed": 2,
+        "rate": 67
+      },
+      "fashion": {
+        "total": 4,
+        "passed": 1,
+        "rate": 25
+      },
+      "coupon": {
+        "total": 7,
+        "passed": 6,
+        "rate": 86
+      },
+      "brand": {
+        "total": 3,
+        "passed": 3,
+        "rate": 100
+      },
+      "general": {
+        "total": 7,
+        "passed": 6,
+        "rate": 86
+      },
+      "edge": {
+        "total": 9,
+        "passed": 9,
+        "rate": 100
+      },
+      "product": {
+        "total": 3,
+        "passed": 2,
+        "rate": 67
+      },
+      "services": {
+        "total": 3,
+        "passed": 3,
+        "rate": 100
+      },
+      "casestudy": {
+        "total": 2,
+        "passed": 2,
+        "rate": 100
+      }
+    },
+    "failed_queries": [
+      {
+        "id": "da-food-pasta-1",
+        "query": "יש לך מתכון לפסטה?",
+        "reason": "missing: בשר"
+      },
+      {
+        "id": "da-food-pasta-specific",
+        "query": "מה המתכון של הפסטה עם בשר טחון?",
+        "reason": "missing: בקר טחון, יין אדום, עגבניות מרוסקות"
+      },
+      {
+        "id": "da-food-sandwich-1",
+        "query": "יש לך מתכון לסנדוויץ'?",
+        "reason": "missing: אבוקדו"
+      },
+      {
+        "id": "da-food-dorot-brand",
+        "query": "מה דעתך על דורות?",
+        "reason": "noise: מחטב"
+      },
+      {
+        "id": "da-cross-hair-2",
+        "query": "מה את ממליצה לשיער יבש?",
+        "reason": "noise: פסטה, מתכון"
+      },
+      {
+        "id": "da-fashion-zohara-1",
+        "query": "יש לך המלצה למחטב?",
+        "reason": "noise: מתכון"
+      },
+      {
+        "id": "da-fashion-zohara-tights",
+        "query": "את מכירה גרביונים טובים?",
+        "reason": "noise: בשר"
+      },
+      {
+        "id": "da-fashion-story-1",
+        "query": "יש לך המלצה לקפוצ'ון?",
+        "reason": "noise: מתכון"
+      },
+      {
+        "id": "da-coupon-panda",
+        "query": "יש קופון לפנדה?",
+        "reason": "missing: 15%"
+      },
+      {
+        "id": "da-product-addict",
+        "query": "איפה אפשר לקנות בגדים?",
+        "reason": "noise: מתכון"
+      },
+      {
+        "id": "ldrs-hiring",
+        "query": "אתם מגייסים עובדים?",
+        "reason": "missing: Account Manager"
+      }
+    ]
+  },
+  "results": [
+    {
+      "id": "da-food-pasta-1",
+      "account_name": "danielamit",
+      "domain": "food",
+      "query": "יש לך מתכון לפסטה?",
+      "passed": false,
+      "positive_hits": [
+        "פסטה",
+        "עגבניות"
+      ],
+      "positive_misses": [
+        "בשר"
+      ],
+      "negative_violations": [],
+      "top_similarity": 0.896,
+      "avg_similarity": 0.826,
+      "chunk_count": 4,
+      "entity_types": [
+        "transcription",
+        "website"
+      ],
+      "duration_ms": 1524
+    },
+    {
+      "id": "da-food-pasta-specific",
+      "account_name": "danielamit",
+      "domain": "food",
+      "query": "מה המתכון של הפסטה עם בשר טחון?",
+      "passed": false,
+      "positive_hits": [],
+      "positive_misses": [
+        "בקר טחון",
+        "יין אדום",
+        "עגבניות מרוסקות"
+      ],
+      "negative_violations": [],
+      "top_similarity": 0.822,
+      "avg_similarity": 0.753,
+      "chunk_count": 3,
+      "entity_types": [
+        "website"
+      ],
+      "duration_ms": 2591
+    },
+    {
+      "id": "da-food-chicken-1",
+      "account_name": "danielamit",
+      "domain": "food",
+      "query": "איך מכינים פילה עוף רך?",
+      "passed": true,
+      "positive_hits": [
+        "עוף",
+        "קונקפלור",
+        "סויה"
+      ],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.83,
+      "avg_similarity": 0.743,
+      "chunk_count": 4,
+      "entity_types": [
+        "partnership",
+        "website"
+      ],
+      "duration_ms": 2542
+    },
+    {
+      "id": "da-food-sandwich-1",
+      "account_name": "danielamit",
+      "domain": "food",
+      "query": "יש לך מתכון לסנדוויץ'?",
+      "passed": false,
+      "positive_hits": [
+        "חלה",
+        "עוף"
+      ],
+      "positive_misses": [
+        "אבוקדו"
+      ],
+      "negative_violations": [],
+      "top_similarity": 0.74,
+      "avg_similarity": 0.688,
+      "chunk_count": 6,
+      "entity_types": [
+        "transcription",
+        "website"
+      ],
+      "duration_ms": 2070
+    },
+    {
+      "id": "da-food-knafeh-1",
+      "account_name": "danielamit",
+      "domain": "food",
+      "query": "איך מכינים כנאפה?",
+      "passed": true,
+      "positive_hits": [
+        "קדאיף",
+        "חמאה",
+        "מסקרפונה"
+      ],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.782,
+      "avg_similarity": 0.593,
+      "chunk_count": 5,
+      "entity_types": [
+        "website",
+        "transcription"
+      ],
+      "duration_ms": 875
+    },
+    {
+      "id": "da-food-dorot-1",
+      "account_name": "danielamit",
+      "domain": "food",
+      "query": "יש לך מתכון אסיאתי?",
+      "passed": true,
+      "positive_hits": [
+        "מוקפץ",
+        "אסי"
+      ],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.841,
+      "avg_similarity": 0.801,
+      "chunk_count": 3,
+      "entity_types": [
+        "website"
+      ],
+      "duration_ms": 3723
+    },
+    {
+      "id": "da-food-dorot-brand",
+      "account_name": "danielamit",
+      "domain": "food",
+      "query": "מה דעתך על דורות?",
+      "passed": false,
+      "positive_hits": [
+        "דורות",
+        "תיבול"
+      ],
+      "positive_misses": [],
+      "negative_violations": [
+        "מחטב"
+      ],
+      "top_similarity": 0.925,
+      "avg_similarity": 0.481,
+      "chunk_count": 8,
+      "entity_types": [
+        "partnership",
+        "transcription",
+        "website"
+      ],
+      "duration_ms": 3957
+    },
+    {
+      "id": "da-cross-hair-1",
+      "account_name": "danielamit",
+      "domain": "cross-domain",
+      "query": "יש לך משהו לשיער?",
+      "passed": true,
+      "positive_hits": [],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.935,
+      "avg_similarity": 0.636,
+      "chunk_count": 8,
+      "entity_types": [
+        "partnership",
+        "transcription",
+        "website"
+      ],
+      "duration_ms": 5527
+    },
+    {
+      "id": "da-cross-hair-2",
+      "account_name": "danielamit",
+      "domain": "cross-domain",
+      "query": "מה את ממליצה לשיער יבש?",
+      "passed": false,
+      "positive_hits": [],
+      "positive_misses": [],
+      "negative_violations": [
+        "פסטה",
+        "מתכון"
+      ],
+      "top_similarity": 0.901,
+      "avg_similarity": 0.547,
+      "chunk_count": 8,
+      "entity_types": [
+        "transcription",
+        "partnership",
+        "website"
+      ],
+      "duration_ms": 5719
+    },
+    {
+      "id": "da-cross-kitchen-vs-fashion",
+      "account_name": "danielamit",
+      "domain": "cross-domain",
+      "query": "מה את ממליצה לקנות?",
+      "passed": true,
+      "positive_hits": [],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.76,
+      "avg_similarity": 0.649,
+      "chunk_count": 7,
+      "entity_types": [
+        "transcription",
+        "website"
+      ],
+      "duration_ms": 4867
+    },
+    {
+      "id": "da-fashion-zohara-1",
+      "account_name": "danielamit",
+      "domain": "fashion",
+      "query": "יש לך המלצה למחטב?",
+      "passed": false,
+      "positive_hits": [
+        "זוהרה",
+        "מחטב"
+      ],
+      "positive_misses": [],
+      "negative_violations": [
+        "מתכון"
+      ],
+      "top_similarity": 0.932,
+      "avg_similarity": 0.629,
+      "chunk_count": 8,
+      "entity_types": [
+        "transcription",
+        "partnership",
+        "website"
+      ],
+      "duration_ms": 6324
+    },
+    {
+      "id": "da-fashion-zohara-tights",
+      "account_name": "danielamit",
+      "domain": "fashion",
+      "query": "את מכירה גרביונים טובים?",
+      "passed": false,
+      "positive_hits": [
+        "זוהרה",
+        "גרביונים"
+      ],
+      "positive_misses": [],
+      "negative_violations": [
+        "בשר"
+      ],
+      "top_similarity": 0.822,
+      "avg_similarity": 0.544,
+      "chunk_count": 8,
+      "entity_types": [
+        "transcription",
+        "partnership",
+        "website"
+      ],
+      "duration_ms": 1852
+    },
+    {
+      "id": "da-fashion-story-1",
+      "account_name": "danielamit",
+      "domain": "fashion",
+      "query": "יש לך המלצה לקפוצ'ון?",
+      "passed": false,
+      "positive_hits": [
+        "קפוצ'ון",
+        "סטורי"
+      ],
+      "positive_misses": [],
+      "negative_violations": [
+        "מתכון"
+      ],
+      "top_similarity": 0.657,
+      "avg_similarity": 0.551,
+      "chunk_count": 8,
+      "entity_types": [
+        "partnership",
+        "transcription",
+        "website"
+      ],
+      "duration_ms": 5464
+    },
+    {
+      "id": "da-fashion-sunglasses",
+      "account_name": "danielamit",
+      "domain": "fashion",
+      "query": "מה את ממליצה למשקפי שמש?",
+      "passed": true,
+      "positive_hits": [
+        "רייבאן"
+      ],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.909,
+      "avg_similarity": 0.887,
+      "chunk_count": 8,
+      "entity_types": [
+        "coupon",
+        "partnership",
+        "transcription"
+      ],
+      "duration_ms": 2414
+    },
+    {
+      "id": "da-coupon-zohara",
+      "account_name": "danielamit",
+      "domain": "coupon",
+      "query": "יש קוד הנחה לזוהרה?",
+      "passed": true,
+      "positive_hits": [
+        "Danielamit",
+        "זוהרה"
+      ],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.997,
+      "avg_similarity": 0.627,
+      "chunk_count": 8,
+      "entity_types": [
+        "coupon",
+        "partnership"
+      ],
+      "duration_ms": 2204
+    },
+    {
+      "id": "da-coupon-magnus",
+      "account_name": "danielamit",
+      "domain": "coupon",
+      "query": "יש קופון למגנוס?",
+      "passed": true,
+      "positive_hits": [
+        "Danielamit",
+        "מגנוס",
+        "18%"
+      ],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.985,
+      "avg_similarity": 0.562,
+      "chunk_count": 8,
+      "entity_types": [
+        "coupon",
+        "partnership"
+      ],
+      "duration_ms": 4290
+    },
+    {
+      "id": "da-coupon-sonicare",
+      "account_name": "danielamit",
+      "domain": "coupon",
+      "query": "יש הנחה על מברשת שיניים?",
+      "passed": true,
+      "positive_hits": [
+        "Daniel30",
+        "סוניקייר"
+      ],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.972,
+      "avg_similarity": 0.794,
+      "chunk_count": 8,
+      "entity_types": [
+        "coupon",
+        "partnership"
+      ],
+      "duration_ms": 5509
+    },
+    {
+      "id": "da-coupon-generic",
+      "account_name": "danielamit",
+      "domain": "coupon",
+      "query": "יש לך קוד הנחה?",
+      "passed": true,
+      "positive_hits": [
+        "Danielamit"
+      ],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 1.048,
+      "avg_similarity": 0.998,
+      "chunk_count": 8,
+      "entity_types": [
+        "coupon"
+      ],
+      "duration_ms": 1307
+    },
+    {
+      "id": "da-coupon-opticana",
+      "account_name": "danielamit",
+      "domain": "coupon",
+      "query": "יש הנחה באופטיקנה?",
+      "passed": true,
+      "positive_hits": [
+        "Danielamit",
+        "אופטיקנה",
+        "10%"
+      ],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.946,
+      "avg_similarity": 0.58,
+      "chunk_count": 8,
+      "entity_types": [
+        "partnership",
+        "coupon"
+      ],
+      "duration_ms": 4493
+    },
+    {
+      "id": "da-coupon-panda",
+      "account_name": "danielamit",
+      "domain": "coupon",
+      "query": "יש קופון לפנדה?",
+      "passed": false,
+      "positive_hits": [
+        "Danielamit",
+        "פנדה"
+      ],
+      "positive_misses": [
+        "15%"
+      ],
+      "negative_violations": [],
+      "top_similarity": 1.002,
+      "avg_similarity": 0.971,
+      "chunk_count": 8,
+      "entity_types": [
+        "coupon",
+        "partnership"
+      ],
+      "duration_ms": 2142
+    },
+    {
+      "id": "da-brand-magnus-products",
+      "account_name": "danielamit",
+      "domain": "brand",
+      "query": "מה יש במגנוס?",
+      "passed": true,
+      "positive_hits": [
+        "מגנוס",
+        "כלי"
+      ],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.836,
+      "avg_similarity": 0.761,
+      "chunk_count": 8,
+      "entity_types": [
+        "partnership",
+        "transcription",
+        "coupon"
+      ],
+      "duration_ms": 4228
+    },
+    {
+      "id": "da-brand-papajohns",
+      "account_name": "danielamit",
+      "domain": "brand",
+      "query": "יש לך שיתוף פעולה עם פיצה?",
+      "passed": true,
+      "positive_hits": [
+        "פאפא ג'ונס"
+      ],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 1.009,
+      "avg_similarity": 0.83,
+      "chunk_count": 6,
+      "entity_types": [
+        "partnership"
+      ],
+      "duration_ms": 3448
+    },
+    {
+      "id": "da-brand-panda-products",
+      "account_name": "danielamit",
+      "domain": "brand",
+      "query": "מה את יודעת על פנדה מזרנים?",
+      "passed": true,
+      "positive_hits": [
+        "פנדה",
+        "מזרן"
+      ],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.989,
+      "avg_similarity": 0.882,
+      "chunk_count": 8,
+      "entity_types": [
+        "partnership",
+        "transcription",
+        "coupon"
+      ],
+      "duration_ms": 2416
+    },
+    {
+      "id": "da-general-partnerships",
+      "account_name": "danielamit",
+      "domain": "general",
+      "query": "עם מי יש לך שיתופי פעולה?",
+      "passed": true,
+      "positive_hits": [],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.903,
+      "avg_similarity": 0.869,
+      "chunk_count": 8,
+      "entity_types": [
+        "partnership",
+        "transcription"
+      ],
+      "duration_ms": 5377
+    },
+    {
+      "id": "da-general-who",
+      "account_name": "danielamit",
+      "domain": "general",
+      "query": "מי את?",
+      "passed": true,
+      "positive_hits": [
+        "דניאל"
+      ],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.76,
+      "avg_similarity": 0.711,
+      "chunk_count": 7,
+      "entity_types": [
+        "transcription",
+        "website"
+      ],
+      "duration_ms": 4107
+    },
+    {
+      "id": "da-general-recommend",
+      "account_name": "danielamit",
+      "domain": "general",
+      "query": "על מה את ממליצה?",
+      "passed": true,
+      "positive_hits": [],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.716,
+      "avg_similarity": 0.634,
+      "chunk_count": 8,
+      "entity_types": [
+        "transcription",
+        "partnership",
+        "website"
+      ],
+      "duration_ms": 5335
+    },
+    {
+      "id": "da-edge-greeting",
+      "account_name": "danielamit",
+      "domain": "edge",
+      "query": "היי",
+      "passed": true,
+      "positive_hits": [],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.894,
+      "avg_similarity": 0.839,
+      "chunk_count": 5,
+      "entity_types": [
+        "transcription",
+        "website"
+      ],
+      "duration_ms": 4197
+    },
+    {
+      "id": "da-edge-outofscope",
+      "account_name": "danielamit",
+      "domain": "edge",
+      "query": "מה דעתך על המצב הפוליטי?",
+      "passed": true,
+      "positive_hits": [],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.61,
+      "avg_similarity": 0.545,
+      "chunk_count": 7,
+      "entity_types": [
+        "transcription",
+        "website"
+      ],
+      "duration_ms": 3981
+    },
+    {
+      "id": "da-edge-english",
+      "account_name": "danielamit",
+      "domain": "edge",
+      "query": "Do you have a pasta recipe?",
+      "passed": true,
+      "positive_hits": [
+        "פסטה"
+      ],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.782,
+      "avg_similarity": 0.504,
+      "chunk_count": 8,
+      "entity_types": [
+        "website",
+        "transcription",
+        "partnership"
+      ],
+      "duration_ms": 4789
+    },
+    {
+      "id": "da-edge-typo",
+      "account_name": "danielamit",
+      "domain": "edge",
+      "query": "יש קופן לזוהארה?",
+      "passed": true,
+      "positive_hits": [
+        "זוהרה"
+      ],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.839,
+      "avg_similarity": 0.442,
+      "chunk_count": 8,
+      "entity_types": [
+        "partnership",
+        "coupon"
+      ],
+      "duration_ms": 4878
+    },
+    {
+      "id": "da-edge-emoji-only",
+      "account_name": "danielamit",
+      "domain": "edge",
+      "query": "🍝",
+      "passed": true,
+      "positive_hits": [],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.809,
+      "avg_similarity": 0.545,
+      "chunk_count": 8,
+      "entity_types": [
+        "partnership",
+        "website",
+        "transcription"
+      ],
+      "duration_ms": 4007
+    },
+    {
+      "id": "da-edge-followup-context",
+      "account_name": "danielamit",
+      "domain": "edge",
+      "query": "ואיזה תבלינים את שמה?",
+      "passed": true,
+      "positive_hits": [],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.622,
+      "avg_similarity": 0.59,
+      "chunk_count": 7,
+      "entity_types": [
+        "transcription",
+        "website"
+      ],
+      "duration_ms": 4886
+    },
+    {
+      "id": "da-product-philips",
+      "account_name": "danielamit",
+      "domain": "product",
+      "query": "מה את חושבת על מברשת שיניים חשמלית?",
+      "passed": true,
+      "positive_hits": [
+        "סוניקייר",
+        "מברשת שיניים"
+      ],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.974,
+      "avg_similarity": 0.855,
+      "chunk_count": 8,
+      "entity_types": [
+        "transcription",
+        "coupon",
+        "partnership"
+      ],
+      "duration_ms": 4969
+    },
+    {
+      "id": "da-product-magnus-kitchen",
+      "account_name": "danielamit",
+      "domain": "product",
+      "query": "איזה סירים את ממליצה?",
+      "passed": true,
+      "positive_hits": [
+        "מגנוס"
+      ],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.928,
+      "avg_similarity": 0.601,
+      "chunk_count": 8,
+      "entity_types": [
+        "transcription",
+        "partnership",
+        "website"
+      ],
+      "duration_ms": 3339
+    },
+    {
+      "id": "da-product-addict",
+      "account_name": "danielamit",
+      "domain": "product",
+      "query": "איפה אפשר לקנות בגדים?",
+      "passed": false,
+      "positive_hits": [],
+      "positive_misses": [],
+      "negative_violations": [
+        "מתכון"
+      ],
+      "top_similarity": 0.69,
+      "avg_similarity": 0.584,
+      "chunk_count": 8,
+      "entity_types": [
+        "transcription",
+        "website",
+        "partnership"
+      ],
+      "duration_ms": 3856
+    },
+    {
+      "id": "ldrs-services-1",
+      "account_name": "ldrs_group",
+      "domain": "services",
+      "query": "מה אתם מציעים?",
+      "passed": true,
+      "positive_hits": [
+        "influencer",
+        "marketing"
+      ],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.727,
+      "avg_similarity": 0.66,
+      "chunk_count": 8,
+      "entity_types": [
+        "website",
+        "transcription",
+        "post"
+      ],
+      "duration_ms": 5798
+    },
+    {
+      "id": "ldrs-services-whitelisting",
+      "account_name": "ldrs_group",
+      "domain": "services",
+      "query": "מה זה whitelisting?",
+      "passed": true,
+      "positive_hits": [
+        "whitelisting",
+        "influencer"
+      ],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.957,
+      "avg_similarity": 0.306,
+      "chunk_count": 8,
+      "entity_types": [
+        "website"
+      ],
+      "duration_ms": 4752
+    },
+    {
+      "id": "ldrs-services-performance",
+      "account_name": "ldrs_group",
+      "domain": "services",
+      "query": "אתם עושים שיווק ביצועים?",
+      "passed": true,
+      "positive_hits": [
+        "performance"
+      ],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.958,
+      "avg_similarity": 0.898,
+      "chunk_count": 8,
+      "entity_types": [
+        "website"
+      ],
+      "duration_ms": 5835
+    },
+    {
+      "id": "ldrs-casestudy-1",
+      "account_name": "ldrs_group",
+      "domain": "casestudy",
+      "query": "יש לכם דוגמאות לקמפיינים?",
+      "passed": true,
+      "positive_hits": [
+        "LEADERS"
+      ],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.963,
+      "avg_similarity": 0.771,
+      "chunk_count": 8,
+      "entity_types": [
+        "website",
+        "transcription",
+        "post"
+      ],
+      "duration_ms": 5621
+    },
+    {
+      "id": "ldrs-casestudy-tamar",
+      "account_name": "ldrs_group",
+      "domain": "casestudy",
+      "query": "מה עשיתם עם תמר מג'הול?",
+      "passed": true,
+      "positive_hits": [
+        "TAMAR MAJHUL"
+      ],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.904,
+      "avg_similarity": 0.791,
+      "chunk_count": 8,
+      "entity_types": [
+        "website",
+        "transcription"
+      ],
+      "duration_ms": 4714
+    },
+    {
+      "id": "ldrs-hiring",
+      "account_name": "ldrs_group",
+      "domain": "general",
+      "query": "אתם מגייסים עובדים?",
+      "passed": false,
+      "positive_hits": [],
+      "positive_misses": [
+        "Account Manager"
+      ],
+      "negative_violations": [],
+      "top_similarity": 0.856,
+      "avg_similarity": 0.401,
+      "chunk_count": 8,
+      "entity_types": [
+        "website",
+        "transcription",
+        "post"
+      ],
+      "duration_ms": 5303
+    },
+    {
+      "id": "ldrs-top10",
+      "account_name": "ldrs_group",
+      "domain": "general",
+      "query": "מי המשפיענים המובילים שלכם?",
+      "passed": true,
+      "positive_hits": [
+        "TOP 10"
+      ],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.895,
+      "avg_similarity": 0.777,
+      "chunk_count": 8,
+      "entity_types": [
+        "transcription",
+        "website",
+        "post"
+      ],
+      "duration_ms": 5825
+    },
+    {
+      "id": "ldrs-edge-coupon",
+      "account_name": "ldrs_group",
+      "domain": "edge",
+      "query": "יש לכם קוד הנחה?",
+      "passed": true,
+      "positive_hits": [],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.53,
+      "avg_similarity": 0.53,
+      "chunk_count": 3,
+      "entity_types": [
+        "partnership"
+      ],
+      "duration_ms": 3047
+    },
+    {
+      "id": "ldrs-edge-recipe",
+      "account_name": "ldrs_group",
+      "domain": "edge",
+      "query": "יש לכם מתכון לפסטה?",
+      "passed": true,
+      "positive_hits": [],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.66,
+      "avg_similarity": 0.537,
+      "chunk_count": 4,
+      "entity_types": [
+        "transcription",
+        "partnership"
+      ],
+      "duration_ms": 3529
+    },
+    {
+      "id": "dekel-coupon-1",
+      "account_name": "the_dekel",
+      "domain": "coupon",
+      "query": "יש לך קוד הנחה?",
+      "passed": true,
+      "positive_hits": [],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 1.075,
+      "avg_similarity": 1.046,
+      "chunk_count": 8,
+      "entity_types": [
+        "coupon"
+      ],
+      "duration_ms": 1101
+    },
+    {
+      "id": "dekel-general-who",
+      "account_name": "the_dekel",
+      "domain": "general",
+      "query": "מי אתה?",
+      "passed": true,
+      "positive_hits": [
+        "דקל"
+      ],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.364,
+      "avg_similarity": 0.286,
+      "chunk_count": 8,
+      "entity_types": [
+        "transcription",
+        "website",
+        "post"
+      ],
+      "duration_ms": 4297
+    },
+    {
+      "id": "dekel-content-1",
+      "account_name": "the_dekel",
+      "domain": "general",
+      "query": "על מה אתה מדבר בסרטונים?",
+      "passed": true,
+      "positive_hits": [],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.766,
+      "avg_similarity": 0.631,
+      "chunk_count": 8,
+      "entity_types": [
+        "post",
+        "transcription",
+        "website"
+      ],
+      "duration_ms": 5105
+    },
+    {
+      "id": "dekel-edge-danielamit-leak",
+      "account_name": "the_dekel",
+      "domain": "edge",
+      "query": "יש לך מתכון של דניאל עמית?",
+      "passed": true,
+      "positive_hits": [],
+      "positive_misses": [],
+      "negative_violations": [],
+      "top_similarity": 0.264,
+      "avg_similarity": 0.227,
+      "chunk_count": 8,
+      "entity_types": [
+        "transcription",
+        "post",
+        "website"
+      ],
+      "duration_ms": 5240
+    }
+  ]
+}

@@ -35,6 +35,7 @@ import type { DiscoveryCategoryAvailability } from '@/lib/discovery/types';
 
 const DiscoveryTab = dynamic(() => import('@/components/chat/discovery/DiscoveryTab'), { ssr: false });
 const TopicQuestionsTab = dynamic(() => import('@/components/chat/TopicQuestionsTab'), { ssr: false });
+const ContentFeedTab = dynamic(() => import('@/components/chat/content-feed/ContentFeedTab'), { ssr: false });
 import { applyTheme, getGoogleFontsUrl } from '@/lib/theme';
 import { getProxiedImageUrl } from '@/lib/image-utils';
 import { BrandCards } from '@/components/chat/BrandCards';
@@ -120,6 +121,7 @@ const TAB_STYLE: Record<string, { icon: typeof MessageCircle; activeColor: strin
   chat: { icon: MessageCircle, activeColor: '#f1e9fd', activeBg: '#883fe2' },
   discover: { icon: Compass, activeColor: '#f1e9fd', activeBg: '#883fe2' },
   topics: { icon: Sparkles, activeColor: '#f1e9fd', activeBg: '#883fe2' },
+  content_feed: { icon: Sparkles, activeColor: '#f1e9fd', activeBg: '#883fe2' },
   coupons: { icon: Ticket, activeColor: '#f1e9fd', activeBg: '#883fe2' },
   support: { icon: AlertCircle, activeColor: '#f1e9fd', activeBg: '#883fe2' },
 };
@@ -1784,6 +1786,31 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 key="topics"
                 username={username}
                 tabLabel={(influencer.tabs || DEFAULT_TABS).find((t: { id: string }) => t.id === 'topics')?.label || 'תוכן'}
+                onAskAbout={(question: string) => {
+                  setActiveTab('chat');
+                  maybeShowLeadPopup();
+                  const userMsg = { id: Date.now().toString(), role: 'user' as const, content: question };
+                  setMessages(prev => [...prev, userMsg]);
+                  setIsTyping(true);
+                  const assistantMessageId = (Date.now() + 1).toString();
+                  setStreamingMessageId(assistantMessageId);
+                  setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant' as const, content: '' }]);
+                  setIsTyping(false);
+                  sendStreamMessage({
+                    message: question,
+                    username,
+                    sessionId: sessionId || undefined,
+                    previousResponseId: responseId || undefined,
+                    clientMessageId: assistantMessageId,
+                  });
+                }}
+              />
+            ) : activeTab === 'content_feed' ? (
+              <ContentFeedTab
+                key="content_feed"
+                username={username}
+                influencerType={(influencer.influencer_type as InfluencerType) || 'other'}
+                tabLabel={(influencer.tabs || DEFAULT_TABS).find((t: { id: string }) => t.id === 'content_feed')?.label || 'תוכן'}
                 onAskAbout={(question: string) => {
                   setActiveTab('chat');
                   maybeShowLeadPopup();

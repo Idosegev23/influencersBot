@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 
 // ============================================
 // Types
@@ -53,7 +53,9 @@ interface ScrapedPage {
 
 export default function ManagePage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const token = params.token as string;
+  const tabParam = searchParams.get('tab') as 'instructions' | 'faq' | 'pages' | 'knowledge' | 'products' | 'design' | null;
 
   // Auth state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -63,7 +65,7 @@ export default function ManagePage() {
   const [domain, setDomain] = useState('');
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'instructions' | 'faq' | 'pages' | 'knowledge' | 'products' | 'design'>('instructions');
+  const [activeTab, setActiveTab] = useState<'instructions' | 'faq' | 'pages' | 'knowledge' | 'products' | 'design'>(tabParam || 'instructions');
 
   // Settings state
   const [settings, setSettings] = useState<WidgetSettings>({});

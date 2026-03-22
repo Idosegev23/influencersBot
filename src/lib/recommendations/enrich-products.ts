@@ -238,6 +238,7 @@ export async function enrichAllProducts(accountId: string): Promise<EnrichmentRe
       if (!embText || embText.length < 10) continue;
 
       const embedding = await generateEmbedding(embText);
+      if (!embedding) continue; // timeout — skip this product
       const { error: embErr } = await supabase
         .from('widget_products')
         .update({ embedding: JSON.stringify(embedding) })

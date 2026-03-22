@@ -210,6 +210,14 @@ export async function retrieveKnowledge(
   const ragAvailable = await isRAGAvailable(supabase, accountId);
   const normalizedQuery = normalizeHebrewQuery(userMessage);
 
+  // Load account archetype for RAG content-type weighting
+  const { data: acctRow } = await supabase
+    .from('accounts')
+    .select('config')
+    .eq('id', accountId)
+    .single();
+  const accountArchetype = (acctRow?.config as any)?.archetype as string | undefined;
+
   console.log(`[Knowledge Retrieval] Mode: ${ragAvailable ? 'RAG + Direct DB' : 'FTS + Direct DB'}`);
   getMetrics()?.set('retrievalPath', ragAvailable ? 'rag+direct' : 'fts');
 
@@ -231,6 +239,7 @@ export async function retrieveKnowledge(
       query: userMessage,
       topK: 12,
       conversationSummary: rollingSummary,
+      archetype: accountArchetype,
     });
   } else {
     contentPromises.posts = fetchRelevantPostsIndexed(supabase, accountId, normalizedQuery, 5);

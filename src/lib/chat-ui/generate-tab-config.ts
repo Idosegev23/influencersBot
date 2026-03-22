@@ -17,7 +17,7 @@ import { createClient } from '@/lib/supabase/server';
 interface TabConfig {
   id: string;
   label: string;
-  type: 'chat' | 'discover' | 'topics' | 'coupons' | 'support';
+  type: 'chat' | 'discover' | 'topics' | 'coupons' | 'support' | 'content_feed';
   topic?: string; // RAG topic filter for topics-type tabs
 }
 
@@ -184,7 +184,13 @@ export async function generateTabConfig(accountId: string): Promise<TabGeneratio
   // גלו — always present, universal discover tab
   tabs.push({ id: 'discover', label: 'גלו', type: 'discover' });
 
-  // Type-specific tab (NOT for influencers — they only get גלו)
+  // Content feed tab for influencers — per influencer_type
+  if (archetype === 'influencer') {
+    const contentFeedLabel = TOPICS_TAB_LABELS.influencer[influencerType] || TOPICS_TAB_LABELS.influencer['other'] || 'תוכן';
+    tabs.push({ id: 'content_feed', label: contentFeedLabel, type: 'content_feed' });
+  }
+
+  // Type-specific tab (for non-influencer archetypes)
   if (archetype === 'brand' || archetype === 'local_business') {
     tabs.push({ id: 'topics', label: 'מוצרים', type: 'topics' });
   } else if (archetype === 'media_news') {

@@ -25,7 +25,10 @@
       "mcp__plugin_figma_figma__get_metadata",
       "mcp__plugin_figma_figma__get_design_context",
       "mcp__plugin_figma_figma__get_screenshot",
-      "Bash(git diff:*)"
+      "Bash(git diff:*)",
+      "Bash(find /Users/idosegev/Downloads/TriRoars/Leaders/influencerbot/public -type f \\\\\\( -name \"*.css\" -o -name \"*.scss\" \\\\\\) 2>/dev/null | head -20)",
+      "Bash(identify /Users/idosegev/Downloads/TriRoars/Leaders/influencerbot/public/vidNB.gif 2>/dev/null | head -5 || sips -g all /Users/idosegev/Downloads/TriRoars/Leaders/influencerbot/public/vidNB.gif 2>/dev/null | head -20)",
+      "Bash(which gifsicle:*)"
     ]
   }
 }

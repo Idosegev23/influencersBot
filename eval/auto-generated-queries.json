@@ -1,0 +1,2896 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "description": "Auto-generated RAG evaluation queries from synthetic_queries in document_chunks",
+    "created": "2026-03-21",
+    "total_queries": 167
+  },
+  "queries": [
+    {
+      "id": "auto-linatechflat-1",
+      "account_id": "bcde047e-4cce-406b-aafd-31888a96317e",
+      "account_name": "lina.tech.flat",
+      "domain": "business",
+      "query": "מה המטרה של תוכנית ה-Accelerator של Meta?",
+      "expected_contains": [
+        "אפים",
+        "Meta",
+        "סטארט"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "53a9218a-a797-4aef-9c57-8de7d428001e",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-linatechflat-2",
+      "account_id": "bcde047e-4cce-406b-aafd-31888a96317e",
+      "account_name": "lina.tech.flat",
+      "domain": "business",
+      "query": "מי משקיעות אחת בשנייה?",
+      "expected_contains": [
+        "שבבים",
+        "אנבידיה",
+        "בשנייה"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "77a83cef-d098-4298-9fa8-cfc6ad6fffe4",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-linatechflat-3",
+      "account_id": "bcde047e-4cce-406b-aafd-31888a96317e",
+      "account_name": "lina.tech.flat",
+      "domain": "fashion",
+      "query": "מה לינה מבקשת לעשות בתגובה?",
+      "expected_contains": [
+        "לינה",
+        "בתגובה",
+        "הסוודר"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "בישול"
+      ],
+      "ground_truth_chunk_id": "70cfb291-9047-4939-bffe-dae4c22a59c2",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-linatechflat-4",
+      "account_id": "bcde047e-4cce-406b-aafd-31888a96317e",
+      "account_name": "lina.tech.flat",
+      "domain": "lifestyle",
+      "query": "מי נמצא בפיקוד דרום?",
+      "expected_contains": [
+        "דרום",
+        "המשימה",
+        "תרגיל"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "ef1ad2ba-1062-426a-9384-83945c22ce0b",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-linatechflat-5",
+      "account_id": "bcde047e-4cce-406b-aafd-31888a96317e",
+      "account_name": "lina.tech.flat",
+      "domain": "fashion",
+      "query": "איזה סוודר מוציאה מיקרוסופט כל שנה?",
+      "expected_contains": [
+        "הסוודר",
+        "בתגובות",
+        "לקבל"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "בישול"
+      ],
+      "ground_truth_chunk_id": "29e65b8d-0b7b-48db-9d08-d36bb4cee1a2",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-linatechflat-6",
+      "account_id": "bcde047e-4cce-406b-aafd-31888a96317e",
+      "account_name": "lina.tech.flat",
+      "domain": "lifestyle",
+      "query": "מה היו מערכות ממוחשבות מבוססות בעבר?",
+      "expected_contains": [
+        "מערכות",
+        "בעבר",
+        "ממוחשבות"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "e0b9c373-ea22-47ee-aaeb-50d450e3bacd",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-linatechflat-7",
+      "account_id": "bcde047e-4cce-406b-aafd-31888a96317e",
+      "account_name": "lina.tech.flat",
+      "domain": "business",
+      "query": "מה האתר צריך לעשות כדי להציג תמונה?",
+      "expected_contains": [
+        "REST",
+        "gallery",
+        "pictures"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "69272b14-05ec-43a7-a185-27aa6135634a",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-linatechflat-8",
+      "account_id": "bcde047e-4cce-406b-aafd-31888a96317e",
+      "account_name": "lina.tech.flat",
+      "domain": "business",
+      "query": "על איזה פרויקט הכריז דונלד טראמפ?",
+      "expected_contains": [
+        "טראמפ",
+        "CNBC",
+        "built"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "7801895f-6e42-49d9-855e-748fd464fabd",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-israel_bidur-1",
+      "account_id": "7c773762-908c-4e94-9097-943748b369bd",
+      "account_name": "israel_bidur",
+      "domain": "beauty",
+      "query": "מה מאיה ורטהיימר חגגה?",
+      "expected_contains": [
+        "BUYME",
+        "להפתיע",
+        "הפתעה"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "e1b0576b-4580-4708-bd97-0baedd87890d",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-israel_bidur-2",
+      "account_id": "7c773762-908c-4e94-9097-943748b369bd",
+      "account_name": "israel_bidur",
+      "domain": "beauty",
+      "query": "מה הם צריכים לנחש?",
+      "expected_contains": [
+        "סבון",
+        "ניקוי",
+        "לנחש"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "0c21f503-be37-40d0-84ef-bac1cb43288e",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-israel_bidur-3",
+      "account_id": "7c773762-908c-4e94-9097-943748b369bd",
+      "account_name": "israel_bidur",
+      "domain": "beauty",
+      "query": "מי כתב את השיר שייצג אותנו באירוויזיון 2026?",
+      "expected_contains": [
+        "השיר",
+        "Michelle",
+        "ישראל"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "b520428f-8b79-403c-aef9-327af3f78a0e",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-israel_bidur-4",
+      "account_id": "7c773762-908c-4e94-9097-943748b369bd",
+      "account_name": "israel_bidur",
+      "domain": "health",
+      "query": "מה שמה של נערת הבריסטה?",
+      "expected_contains": [
+        "הבריסטה",
+        "נערת",
+        "רוני"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "59362e9d-437b-4a36-953e-b635eb1f9011",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-israel_bidur-5",
+      "account_id": "7c773762-908c-4e94-9097-943748b369bd",
+      "account_name": "israel_bidur",
+      "domain": "beauty",
+      "query": "מה נטע אלחמיסטר השיקה?",
+      "expected_contains": [
+        "אלחמיסטר",
+        "בקייס",
+        "הרוכשות"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "d8dad50f-cc38-42ab-9dfd-f9163f133dfa",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-israel_bidur-6",
+      "account_id": "7c773762-908c-4e94-9097-943748b369bd",
+      "account_name": "israel_bidur",
+      "domain": "beauty",
+      "query": "מה הפירוש של סו-בון קרים?",
+      "expected_contains": [
+        "ניקוי",
+        "קייר",
+        "הפירוש"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "adf787d6-cba2-41a2-aa28-a844f15e6cfc",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-israel_bidur-7",
+      "account_id": "7c773762-908c-4e94-9097-943748b369bd",
+      "account_name": "israel_bidur",
+      "domain": "business",
+      "query": "מי זאת יובל בוצ'ן?",
+      "expected_contains": [
+        "לראשונה",
+        "חושף",
+        "החברה"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "80720ac6-1db4-40ab-aa3b-b74460e5daf4",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-israel_bidur-8",
+      "account_id": "7c773762-908c-4e94-9097-943748b369bd",
+      "account_name": "israel_bidur",
+      "domain": "coupon",
+      "query": "מי הקראש של גייז?",
+      "expected_contains": [
+        "תומר",
+        "יותר",
+        "יודע"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "a76b61cc-6a61-4b6e-a1b8-3aed4504ae75",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-danazarmon-1",
+      "account_id": "bf5e7e73-be86-4158-bc43-ccf8b147c911",
+      "account_name": "danazarmon",
+      "domain": "fashion",
+      "query": "מה קרה לשרוך של המגף?",
+      "expected_contains": [
+        "הלוק",
+        "המכנסיים",
+        "הנעליים"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "בישול"
+      ],
+      "ground_truth_chunk_id": "5fd31035-8c68-4ad7-92d2-11cc98026b1c",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-danazarmon-2",
+      "account_id": "bf5e7e73-be86-4158-bc43-ccf8b147c911",
+      "account_name": "danazarmon",
+      "domain": "fashion",
+      "query": "לאיזה יום יש קריצה בלוק?",
+      "expected_contains": [
+        "קריצה",
+        "מאיזה",
+        "הלוק"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "בישול"
+      ],
+      "ground_truth_chunk_id": "dbc822d8-55db-4925-897f-7839498f8763",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-danazarmon-3",
+      "account_id": "bf5e7e73-be86-4158-bc43-ccf8b147c911",
+      "account_name": "danazarmon",
+      "domain": "fashion",
+      "query": "מה נגמר לשבוע אחד?",
+      "expected_contains": [
+        "אפשר",
+        "לשבוע",
+        "מאוד"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "בישול"
+      ],
+      "ground_truth_chunk_id": "b4098648-a231-489f-ba05-0ba4c38e5c67",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-danazarmon-4",
+      "account_id": "bf5e7e73-be86-4158-bc43-ccf8b147c911",
+      "account_name": "danazarmon",
+      "domain": "fashion",
+      "query": "מה היא לובשת בסרטון?",
+      "expected_contains": [
+        "איזה",
+        "התיק",
+        "NORI"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "בישול"
+      ],
+      "ground_truth_chunk_id": "02bdb643-ec18-45a9-b3a1-bd13cab74a88",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-danazarmon-5",
+      "account_id": "bf5e7e73-be86-4158-bc43-ccf8b147c911",
+      "account_name": "danazarmon",
+      "domain": "beauty",
+      "query": "מי זו איה גסמן?",
+      "expected_contains": [
+        "נשים",
+        "אישה",
+        "המידות"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "c73dca0c-98e4-416b-bb45-c382786b81ff",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-danazarmon-6",
+      "account_id": "bf5e7e73-be86-4158-bc43-ccf8b147c911",
+      "account_name": "danazarmon",
+      "domain": "fashion",
+      "query": "מה הדוגמנית אמרה על הארון שלה?",
+      "expected_contains": [
+        "בואו",
+        "נראה",
+        "הדוגמנית"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "בישול"
+      ],
+      "ground_truth_chunk_id": "8ce9c583-d27c-4482-96cc-99ab3474485f",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-danazarmon-7",
+      "account_id": "bf5e7e73-be86-4158-bc43-ccf8b147c911",
+      "account_name": "danazarmon",
+      "domain": "fashion",
+      "query": "איך היא קוראת ללוק הבא?",
+      "expected_contains": [
+        "ללוק",
+        "קוראת",
+        "שאריות"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "בישול"
+      ],
+      "ground_truth_chunk_id": "a2d94fd7-7a7f-4c02-9e25-2e6003c63790",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-danazarmon-8",
+      "account_id": "bf5e7e73-be86-4158-bc43-ccf8b147c911",
+      "account_name": "danazarmon",
+      "domain": "fashion",
+      "query": "אילו מותגים מוזכרים בלוק 66/365?",
+      "expected_contains": [
+        "בלוק",
+        "לבוש",
+        "מותגים"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "בישול"
+      ],
+      "ground_truth_chunk_id": "fa98cf31-fbc7-4e77-a16f-df5e3a28d209",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-einavbooblil_ben-1",
+      "account_id": "e18b4860-a281-4c8b-bde0-2e15360cb16f",
+      "account_name": "einavbooblil_benisti",
+      "domain": "beauty",
+      "query": "מה הקוד שלה?",
+      "expected_contains": [
+        "כאילו",
+        "האפליקציה",
+        "מחיר"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "e3b220d0-9bda-41e3-9eb9-4d4d9aff5f67",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-einavbooblil_ben-2",
+      "account_id": "e18b4860-a281-4c8b-bde0-2e15360cb16f",
+      "account_name": "einavbooblil_benisti",
+      "domain": "beauty",
+      "query": "מה ההבדל בין ה-IPL 5 ל-IPL 7?",
+      "expected_contains": [
+        "לעשות",
+        "ראשים",
+        "בראון"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "d31c7c69-1245-40a5-831e-79cc23e20038",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-einavbooblil_ben-3",
+      "account_id": "e18b4860-a281-4c8b-bde0-2e15360cb16f",
+      "account_name": "einavbooblil_benisti",
+      "domain": "beauty",
+      "query": "למה עינב יושבת לעשות צמות?",
+      "expected_contains": [
+        "צמות",
+        "לעשות",
+        "ארוך"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "0931ce1c-eba6-4b92-ae38-557d4348db0f",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-einavbooblil_ben-4",
+      "account_id": "e18b4860-a281-4c8b-bde0-2e15360cb16f",
+      "account_name": "einavbooblil_benisti",
+      "domain": "beauty",
+      "query": "מה צריך לעשות כדי לקבל את המייקאפ של אסתי לאודר?",
+      "expected_contains": [
+        "המייקאפ",
+        "אסתי",
+        "יקבלו"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "015b02c2-5c53-4e16-97f1-7883442e2ae4",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-einavbooblil_ben-5",
+      "account_id": "e18b4860-a281-4c8b-bde0-2e15360cb16f",
+      "account_name": "einavbooblil_benisti",
+      "domain": "beauty",
+      "query": "מה הקוד הנחה ל-IPL 7?",
+      "expected_contains": [
+        "לעשות",
+        "הקוד",
+        "בשיתוף"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "3cc4c78d-f80b-4dd0-948b-ed667a1292a9",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-einavbooblil_ben-6",
+      "account_id": "e18b4860-a281-4c8b-bde0-2e15360cb16f",
+      "account_name": "einavbooblil_benisti",
+      "domain": "beauty",
+      "query": "איזה מכשיר להסרת שיער הוא הכי טוב?",
+      "expected_contains": [
+        "המכשיר",
+        "בראון",
+        "שיער"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "0fc9cb94-205e-4cf0-8aeb-7df4cff4b4e6",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-einavbooblil_ben-7",
+      "account_id": "e18b4860-a281-4c8b-bde0-2e15360cb16f",
+      "account_name": "einavbooblil_benisti",
+      "domain": "beauty",
+      "query": "של איזו חברה המוצר?",
+      "expected_contains": [
+        "עיניים",
+        "קישור",
+        "המוצר"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "17efd10b-9426-4e18-9cd9-425e20a086d6",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-einavbooblil_ben-8",
+      "account_id": "e18b4860-a281-4c8b-bde0-2e15360cb16f",
+      "account_name": "einavbooblil_benisti",
+      "domain": "beauty",
+      "query": "מהו קוד הקופון?",
+      "expected_contains": [
+        "העור",
+        "מראה",
+        "כאילו"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "0ed68dfe-1814-4b95-99fe-6fe11ce392bb",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-maayanadam-1",
+      "account_id": "a135b1ff-5cff-42d2-9158-a80676a091dc",
+      "account_name": "maayanadam",
+      "domain": "beauty",
+      "query": "מהו השם המלא של הסרום?",
+      "expected_contains": [
+        "מאוד",
+        "רטינול",
+        "הזדקנות"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "6f3ae8d7-12f1-43a8-9283-e681738eb1e3",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-maayanadam-2",
+      "account_id": "a135b1ff-5cff-42d2-9158-a80676a091dc",
+      "account_name": "maayanadam",
+      "domain": "beauty",
+      "query": "מה פירוש הסימן X?",
+      "expected_contains": [
+        "בהיר",
+        "פירושו",
+        "רלוונטי"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "f5102e85-f041-468a-884a-a6e970bbbe08",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-maayanadam-3",
+      "account_id": "a135b1ff-5cff-42d2-9158-a80676a091dc",
+      "account_name": "maayanadam",
+      "domain": "beauty",
+      "query": "בת כמה היא הייתה כשצמחו לה שערות בפס של הטבור?",
+      "expected_contains": [
+        "מזדהה",
+        "מאוד",
+        "הטבור"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "784fa117-5382-436b-a529-3c62f58c86f8",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-maayanadam-4",
+      "account_id": "a135b1ff-5cff-42d2-9158-a80676a091dc",
+      "account_name": "maayanadam",
+      "domain": "beauty",
+      "query": "מהו המותג של סכיני הגילוח?",
+      "expected_contains": [
+        "תקנון",
+        "הגילוח",
+        "פעילות"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "6ffe2c5c-af99-455a-9faf-b467e6655f02",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-maayanadam-5",
+      "account_id": "a135b1ff-5cff-42d2-9158-a80676a091dc",
+      "account_name": "maayanadam",
+      "domain": "beauty",
+      "query": "מהו המוצר הכי נמכר של דרמלוג'יקה?",
+      "expected_contains": [
+        "פילינג",
+        "דרמלוג",
+        "המוצר"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "005712f6-0838-4eef-b220-9b546233ac4f",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-maayanadam-6",
+      "account_id": "a135b1ff-5cff-42d2-9158-a80676a091dc",
+      "account_name": "maayanadam",
+      "domain": "beauty",
+      "query": "אילו מוצרים כלולים במארז הדגל של Dermalogica?",
+      "expected_contains": [
+        "מארז",
+        "הדגל",
+        "הנחה"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "49d76e6f-14e9-435d-abd9-b20f1b61a729",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-maayanadam-7",
+      "account_id": "a135b1ff-5cff-42d2-9158-a80676a091dc",
+      "account_name": "maayanadam",
+      "domain": "beauty",
+      "query": "באיזה חבילות מגיעים המארזים?",
+      "expected_contains": [
+        "צנצנות",
+        "שלושה",
+        "חודשים"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "2f555e9a-585d-4118-946a-9fe591d87cee",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-maayanadam-8",
+      "account_id": "a135b1ff-5cff-42d2-9158-a80676a091dc",
+      "account_name": "maayanadam",
+      "domain": "beauty",
+      "query": "האם המוצר מאושר על ידי משרד הבריאות הישראלי?",
+      "expected_contains": [
+        "מותר",
+        "האזורים",
+        "מתאים"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "b83cf57f-81c2-48b0-a2b7-499186d8fb0c",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-eranswis-1",
+      "account_id": "72c0d040-7f32-4af7-9d62-93fa74739a06",
+      "account_name": "eranswis",
+      "domain": "beauty",
+      "query": "באיזו פרשה עוסק הטקסט?",
+      "expected_contains": [
+        "הארץ",
+        "המרגלים",
+        "מרגלים"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "0ef47caf-93a7-442c-a072-ca929bbc5421",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-eranswis-2",
+      "account_id": "72c0d040-7f32-4af7-9d62-93fa74739a06",
+      "account_name": "eranswis",
+      "domain": "beauty",
+      "query": "מה יקרה אם שי תלד היום?",
+      "expected_contains": [
+        "באותו",
+        "היום",
+        "באמת"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "407b980f-2620-4275-a0f6-83a2692dd0e4",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-eranswis-3",
+      "account_id": "72c0d040-7f32-4af7-9d62-93fa74739a06",
+      "account_name": "eranswis",
+      "domain": "business",
+      "query": "באיזו פרשה נמשיך בנאום הפרידה של משה רבנו?",
+      "expected_contains": [
+        "נמשיך",
+        "בנאום",
+        "הפרידה"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "b01c64dc-bc64-4234-ba24-a5095177449b",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-eranswis-4",
+      "account_id": "72c0d040-7f32-4af7-9d62-93fa74739a06",
+      "account_name": "eranswis",
+      "domain": "business",
+      "query": "למי שייך הקטע המלא?",
+      "expected_contains": [
+        "המלא",
+        "לקטע",
+        "המשקיעים"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "d1495eea-d9c5-4352-8949-8177ca844fa2",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-eranswis-5",
+      "account_id": "72c0d040-7f32-4af7-9d62-93fa74739a06",
+      "account_name": "eranswis",
+      "domain": "beauty",
+      "query": "מה המעצבות מציעות במתנה?",
+      "expected_contains": [
+        "נשמח",
+        "המעצבות",
+        "אנחנו"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "c6f2c116-7a35-4f88-ab62-2aaa24ab50c2",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-eranswis-6",
+      "account_id": "72c0d040-7f32-4af7-9d62-93fa74739a06",
+      "account_name": "eranswis",
+      "domain": "business",
+      "query": "מתי נשלחו ההודעות?",
+      "expected_contains": [
+        "מצפה",
+        "לפחות",
+        "הבאתי"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "35ca2e91-93e6-4e62-9fb7-93141664d718",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-eranswis-7",
+      "account_id": "72c0d040-7f32-4af7-9d62-93fa74739a06",
+      "account_name": "eranswis",
+      "domain": "business",
+      "query": "כמה חליפות קיבלה?",
+      "expected_contains": [
+        "החליפות",
+        "עדיין",
+        "מחכה"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "a7bea740-a496-4f3c-80a2-beebd66f18f7",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-eranswis-8",
+      "account_id": "72c0d040-7f32-4af7-9d62-93fa74739a06",
+      "account_name": "eranswis",
+      "domain": "business",
+      "query": "מה נתנה הכותבת בחינם?",
+      "expected_contains": [
+        "בחינם",
+        "נתתי",
+        "שירות"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "a6f12eec-9427-4495-8303-0de082492de0",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-jewishdelitlv-1",
+      "account_id": "cbbadf57-d857-4b22-87db-42f952afcb67",
+      "account_name": "jewish.deli.tlv",
+      "domain": "food",
+      "query": "מה אפשר לראות בסטורי הבאים?",
+      "expected_contains": [
+        "הבאים",
+        "להזמין",
+        "המוצרים"
+      ],
+      "should_not_contain": [
+        "שמפו",
+        "מחטב"
+      ],
+      "ground_truth_chunk_id": "dcd62af7-3fa8-4c05-a7bd-c161aba687f3",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-jewishdelitlv-2",
+      "account_id": "cbbadf57-d857-4b22-87db-42f952afcb67",
+      "account_name": "jewish.deli.tlv",
+      "domain": "food",
+      "query": "איזה סוג קובה הוזכר?",
+      "expected_contains": [
+        "איזה",
+        "קובה",
+        "טעים"
+      ],
+      "should_not_contain": [
+        "שמפו",
+        "מחטב"
+      ],
+      "ground_truth_chunk_id": "f6615e39-c159-407d-9bec-113e714639d1",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-jewishdelitlv-3",
+      "account_id": "cbbadf57-d857-4b22-87db-42f952afcb67",
+      "account_name": "jewish.deli.tlv",
+      "domain": "food",
+      "query": "מה המחיר של ימונענע סחוט?",
+      "expected_contains": [
+        "סחוט",
+        "ימונענע",
+        "פריגת"
+      ],
+      "should_not_contain": [
+        "שמפו",
+        "מחטב"
+      ],
+      "ground_truth_chunk_id": "b4975fb2-0745-4e59-8e8c-f82a258102d3",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-jewishdelitlv-4",
+      "account_id": "cbbadf57-d857-4b22-87db-42f952afcb67",
+      "account_name": "jewish.deli.tlv",
+      "domain": "food",
+      "query": "מה שם הממרח שמופיע בתמונה?",
+      "expected_contains": [
+        "בזיליקום",
+        "המוצר",
+        "חמאת"
+      ],
+      "should_not_contain": [
+        "שמפו",
+        "מחטב"
+      ],
+      "ground_truth_chunk_id": "5a60dbb9-b11a-4592-aac7-825f0cde5f1d",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-jewishdelitlv-5",
+      "account_id": "cbbadf57-d857-4b22-87db-42f952afcb67",
+      "account_name": "jewish.deli.tlv",
+      "domain": "business",
+      "query": "למי סורוצקין מציעה פתרונות מותאמים?",
+      "expected_contains": [
+        "סורוצקין",
+        "מרחוק",
+        "מציעה"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "30741df6-2cb3-4a67-a2cd-b4ecf5542e67",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-jewishdelitlv-6",
+      "account_id": "cbbadf57-d857-4b22-87db-42f952afcb67",
+      "account_name": "jewish.deli.tlv",
+      "domain": "food",
+      "query": "מה צריך לעשות כדי להזמין קציצות כרישה?",
+      "expected_contains": [
+        "קציצות",
+        "כרישה",
+        "איזה"
+      ],
+      "should_not_contain": [
+        "שמפו",
+        "מחטב"
+      ],
+      "ground_truth_chunk_id": "a5e3af81-25bb-432b-bf82-a582d86bfbed",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-jewishdelitlv-7",
+      "account_id": "cbbadf57-d857-4b22-87db-42f952afcb67",
+      "account_name": "jewish.deli.tlv",
+      "domain": "food",
+      "query": "מאיפה מגיעים הפירות?",
+      "expected_contains": [
+        "פירות",
+        "טריים",
+        "שמגיעים"
+      ],
+      "should_not_contain": [
+        "שמפו",
+        "מחטב"
+      ],
+      "ground_truth_chunk_id": "b32036d4-4343-4885-82d1-27c5051503a1",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-jewishdelitlv-8",
+      "account_id": "cbbadf57-d857-4b22-87db-42f952afcb67",
+      "account_name": "jewish.deli.tlv",
+      "domain": "food",
+      "query": "מה טל שמש סול קיבלה?",
+      "expected_contains": [
+        "כאילו",
+        "מגיע",
+        "שישי"
+      ],
+      "should_not_contain": [
+        "שמפו",
+        "מחטב"
+      ],
+      "ground_truth_chunk_id": "cf6598cb-7804-46d7-a0a7-e74d479ce742",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-erevtov-1",
+      "account_id": "b502750e-8fc5-484d-b2af-b9e70b76a9ea",
+      "account_name": "erevtov",
+      "domain": "business",
+      "query": "מי התחתנו?",
+      "expected_contains": [
+        "עקבים",
+        "נועה",
+        "קירל"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "320a4f50-2410-4674-8bc4-25eefe1cd8c2",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-erevtov-2",
+      "account_id": "b502750e-8fc5-484d-b2af-b9e70b76a9ea",
+      "account_name": "erevtov",
+      "domain": "beauty",
+      "query": "מי נפגשה עם אנג'ל ואורטל מאקים תל אביב?",
+      "expected_contains": [
+        "מאוד",
+        "אקים",
+        "לפגוש"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "6c3df7cc-c72a-458c-a3e4-33495d22a4e2",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-erevtov-3",
+      "account_id": "b502750e-8fc5-484d-b2af-b9e70b76a9ea",
+      "account_name": "erevtov",
+      "domain": "food",
+      "query": "מה המקצוע החדש של מאיה קיי?",
+      "expected_contains": [
+        "מאיה",
+        "חלבון",
+        "תחשפי"
+      ],
+      "should_not_contain": [
+        "שמפו",
+        "מחטב"
+      ],
+      "ground_truth_chunk_id": "10717363-a862-45ce-8cf2-28167dc53aec",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-erevtov-4",
+      "account_id": "b502750e-8fc5-484d-b2af-b9e70b76a9ea",
+      "account_name": "erevtov",
+      "domain": "business",
+      "query": "מי הם עינב בובליל ואוהד הנווד?",
+      "expected_contains": [
+        "עינב",
+        "בובליל",
+        "אוהד"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "5339c04b-a63e-4380-ad7f-eaf59bcf8a9c",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-erevtov-5",
+      "account_id": "b502750e-8fc5-484d-b2af-b9e70b76a9ea",
+      "account_name": "erevtov",
+      "domain": "fashion",
+      "query": "מי הם נועה קירל ודניאל פרץ?",
+      "expected_contains": [
+        "מיליון",
+        "דולר",
+        "נועה"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "בישול"
+      ],
+      "ground_truth_chunk_id": "f13f3c73-3c28-4b55-abc8-4582518db678",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-erevtov-6",
+      "account_id": "b502750e-8fc5-484d-b2af-b9e70b76a9ea",
+      "account_name": "erevtov",
+      "domain": "fashion",
+      "query": "מה גיא פינס ביקש מהכוכבים?",
+      "expected_contains": [
+        "פינס",
+        "מהממ",
+        "מהכוכבים"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "בישול"
+      ],
+      "ground_truth_chunk_id": "050cafe1-cedc-428e-b3bf-676d32d33c08",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-erevtov-7",
+      "account_id": "b502750e-8fc5-484d-b2af-b9e70b76a9ea",
+      "account_name": "erevtov",
+      "domain": "fashion",
+      "query": "מה תמיד היה בבית?",
+      "expected_contains": [
+        "היום",
+        "בבית",
+        "הייתה"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "בישול"
+      ],
+      "ground_truth_chunk_id": "9beb8592-ae9a-439b-b6af-24ae24c73606",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-erevtov-8",
+      "account_id": "b502750e-8fc5-484d-b2af-b9e70b76a9ea",
+      "account_name": "erevtov",
+      "domain": "food",
+      "query": "מה מקבלים בהזמנת סוויטבוקס דרך WOLT?",
+      "expected_contains": [
+        "פינס",
+        "סוויטבוקס",
+        "שלנו"
+      ],
+      "should_not_contain": [
+        "שמפו",
+        "מחטב"
+      ],
+      "ground_truth_chunk_id": "dbfd5261-fcc3-48da-a369-c8ac7b02f422",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-miranbuzaglo-1",
+      "account_id": "4e2a0ce8-8753-4876-973c-00c9e1426e51",
+      "account_name": "miranbuzaglo",
+      "domain": "beauty",
+      "query": "מהו שם המותג המוזכר?",
+      "expected_contains": [
+        "מהיר",
+        "הצבע",
+        "העיפרון"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "aecc94c2-9ee1-42b2-9df0-701a98367655",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-miranbuzaglo-2",
+      "account_id": "4e2a0ce8-8753-4876-973c-00c9e1426e51",
+      "account_name": "miranbuzaglo",
+      "domain": "beauty",
+      "query": "למי ניתנה המתנה?",
+      "expected_contains": [
+        "MIRAN",
+        "הבושם",
+        "בעולם"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "54ed4e8f-9450-41e0-a204-c173a4dc9f23",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-miranbuzaglo-3",
+      "account_id": "4e2a0ce8-8753-4876-973c-00c9e1426e51",
+      "account_name": "miranbuzaglo",
+      "domain": "beauty",
+      "query": "מי עיצב את התחפושות?",
+      "expected_contains": [
+        "carousel",
+        "שצריך",
+        "אומץ"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "3e760783-bb2f-4efb-8525-f27ef3851a54",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-miranbuzaglo-4",
+      "account_id": "4e2a0ce8-8753-4876-973c-00c9e1426e51",
+      "account_name": "miranbuzaglo",
+      "domain": "beauty",
+      "query": "מה זה @k_care_organics?",
+      "expected_contains": [
+        "לחות",
+        "care",
+        "organics"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "ef8aa5e3-cacb-4dc4-b05c-51fbe56b99ba",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-miranbuzaglo-5",
+      "account_id": "4e2a0ce8-8753-4876-973c-00c9e1426e51",
+      "account_name": "miranbuzaglo",
+      "domain": "beauty",
+      "query": "איזה מוצר של סקארה היא חייבת להראות?",
+      "expected_contains": [
+        "סקארה",
+        "sacara",
+        "המוצרים"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "78084316-8ef7-4bb1-8ff0-094be6608084",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-miranbuzaglo-6",
+      "account_id": "4e2a0ce8-8753-4876-973c-00c9e1426e51",
+      "account_name": "miranbuzaglo",
+      "domain": "beauty",
+      "query": "מה שם הבושם בשיתוף ספרינג?",
+      "expected_contains": [
+        "בושם",
+        "תינוק",
+        "לבושם"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "4e09a987-7217-47cf-b70c-481ca70c3091",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-miranbuzaglo-7",
+      "account_id": "4e2a0ce8-8753-4876-973c-00c9e1426e51",
+      "account_name": "miranbuzaglo",
+      "domain": "beauty",
+      "query": "איזה קרם פנים הדוברת מערבבת עם הסאן קיס של סקארה?",
+      "expected_contains": [
+        "פנים",
+        "הסאן",
+        "מברשת"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "d5da9398-6c49-47d2-af11-2fb1a9de7e2b",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-miranbuzaglo-8",
+      "account_id": "4e2a0ce8-8753-4876-973c-00c9e1426e51",
+      "account_name": "miranbuzaglo",
+      "domain": "beauty",
+      "query": "לאיזה חג מתייחס הפוסט?",
+      "expected_contains": [
+        "הלוק",
+        "reel",
+        "PURIM"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "9067d983-0499-41df-8875-cfd7a9f424af",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-tambour_il-1",
+      "account_id": "218c0d6a-f76b-4418-a5ab-4f42c2917e07",
+      "account_name": "tambour_il",
+      "domain": "business",
+      "query": "מי זאת יודפת קירמאיר?",
+      "expected_contains": [
+        "יודפת",
+        "קירמאיר",
+        "כניסה"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "13d40594-4711-4ce5-9574-a2078912ede2",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-tambour_il-2",
+      "account_id": "218c0d6a-f76b-4418-a5ab-4f42c2917e07",
+      "account_name": "tambour_il",
+      "domain": "business",
+      "query": "מהו לוח גבס ורוד מעכב בערה 4 פאזות של טמבור?",
+      "expected_contains": [
+        "ורוד",
+        "מעכב",
+        "בערה"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "419440b9-855e-43e2-bc2b-dcdd58494b65",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-tambour_il-3",
+      "account_id": "218c0d6a-f76b-4418-a5ab-4f42c2917e07",
+      "account_name": "tambour_il",
+      "domain": "business",
+      "query": "מהו 'אפוקסי עשיר אבץ SSPC' של טמבור?",
+      "expected_contains": [
+        "עשיר",
+        "אפוקסי",
+        "SSPC"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "1f1885a7-e643-4b4b-b114-c88bc06a1992",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-tambour_il-4",
+      "account_id": "218c0d6a-f76b-4418-a5ab-4f42c2917e07",
+      "account_name": "tambour_il",
+      "domain": "business",
+      "query": "מהו שם המוצר?",
+      "expected_contains": [
+        "פוליאסטר",
+        "אבקת",
+        "אפקט"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "5579892e-7bea-4b01-8c56-d83eb182d9b1",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-tambour_il-5",
+      "account_id": "218c0d6a-f76b-4418-a5ab-4f42c2917e07",
+      "account_name": "tambour_il",
+      "domain": "business",
+      "query": "מה שם המוצר?",
+      "expected_contains": [
+        "אריזה",
+        "שקוף",
+        "טמבור"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "23ca3306-e12a-409b-baf2-425c33311c0b",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-tambour_il-6",
+      "account_id": "218c0d6a-f76b-4418-a5ab-4f42c2917e07",
+      "account_name": "tambour_il",
+      "domain": "business",
+      "query": "מהו שם המוצר 'יד ראשונה'?",
+      "expected_contains": [
+        "ראשונה",
+        "המוצר",
+        "חומרי"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "79b73a93-a286-41fe-8908-c53fc97da750",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-tambour_il-7",
+      "account_id": "218c0d6a-f76b-4418-a5ab-4f42c2917e07",
+      "account_name": "tambour_il",
+      "domain": "business",
+      "query": "מה שם המוצר?",
+      "expected_contains": [
+        "אריזה",
+        "המוצר",
+        "טמבור"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "2b8accb8-1ec1-49a1-8053-46604b011ea1",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-tambour_il-8",
+      "account_id": "218c0d6a-f76b-4418-a5ab-4f42c2917e07",
+      "account_name": "tambour_il",
+      "domain": "business",
+      "query": "מה שם המוצר?",
+      "expected_contains": [
+        "סטיילינג",
+        "להום",
+        "מושלם"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "4df7efdf-07a6-40c8-ac20-6e5c936c6c76",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-danielamit-1",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "business",
+      "query": "איזה מותג פעיל בשיתוף פעולה באינסטגרם?",
+      "expected_contains": [
+        "זיתא",
+        "זיתים",
+        "פעיל"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "153fffe6-9b0c-44ad-95d1-c7cd02b2fc28",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-danielamit-2",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "coupon",
+      "query": "מה הפתרון של פנדה?",
+      "expected_contains": [
+        "פנדה",
+        "הפתרון",
+        "הטופר"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "55ba86e8-ca50-4bae-a62e-6b383920f6f1",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-danielamit-3",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "coupon",
+      "query": "מה שם מרכך הכביסה?",
+      "expected_contains": [
+        "לנור",
+        "בקבוקים",
+        "אוקיינוס"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "58f7bbec-d361-43b3-8eda-1f047dfc94c6",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-danielamit-4",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "beauty",
+      "query": "למה היא לא עובדת בלי כפפות?",
+      "expected_contains": [
+        "הבשר",
+        "חלבי",
+        "מרדכי"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "09547b52-f0fc-4129-bdcb-9ec8cd0b26cf",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-danielamit-5",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "beauty",
+      "query": "מה דנה בן זאב אמרה על הקפסולות?",
+      "expected_contains": [
+        "דניאל",
+        "עמית",
+        "צפיות"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "0230627d-e364-4ee4-906b-a6195ee906d5",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-danielamit-6",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "coupon",
+      "query": "מהו קוד הקופון של דניאל עמית?",
+      "expected_contains": [
+        "דניאל",
+        "עמית",
+        "Beaute"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "ff9e33da-3d44-4434-8176-824b8991b068",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-danielamit-7",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "business",
+      "query": "באיזה חום אופים את בצק הפילו?",
+      "expected_contains": [
+        "דניאל",
+        "עמית",
+        "הפילו"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "685ed793-5436-4937-86ab-b03554b9b58b",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-danielamit-8",
+      "account_id": "038fd490-906d-431f-b428-ff9203ce4968",
+      "account_name": "danielamit",
+      "domain": "business",
+      "query": "מהו המותג המוזכר?",
+      "expected_contains": [
+        "הלמנס",
+        "Hellmann",
+        "מזון"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "13ef5fac-c01f-498c-9628-46ca5c4544f9",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-the_dekel-1",
+      "account_id": "e5a5076a-faaf-4e67-8bdd-61c15153fb20",
+      "account_name": "the_dekel",
+      "domain": "beauty",
+      "query": "מה דקל חושבת על רשימת הרכיבים?",
+      "expected_contains": [
+        "הרכיבים",
+        "השמן",
+        "האתרי"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "b6935c1a-aa6d-4dd2-a70d-8fed0027836d",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-the_dekel-2",
+      "account_id": "e5a5076a-faaf-4e67-8bdd-61c15153fb20",
+      "account_name": "the_dekel",
+      "domain": "beauty",
+      "query": "לאילו סוגי עור אייקוניקס מתאימים?",
+      "expected_contains": [
+        "העור",
+        "סוגי",
+        "שלכן"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "128ed2b8-4434-4f6d-b7a9-903a92a8e38b",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-the_dekel-3",
+      "account_id": "e5a5076a-faaf-4e67-8bdd-61c15153fb20",
+      "account_name": "the_dekel",
+      "domain": "beauty",
+      "query": "לגבי מה דקל אומרת שכדאי להיות ביקורתיים?",
+      "expected_contains": [
+        "לגבי",
+        "reel",
+        "עוקבת"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "b1e0ac92-eb3c-4b30-93f0-4481ac8d36e2",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-the_dekel-4",
+      "account_id": "e5a5076a-faaf-4e67-8bdd-61c15153fb20",
+      "account_name": "the_dekel",
+      "domain": "beauty",
+      "query": "איזה מכשיר להסרת שיער ביתי מוזכר?",
+      "expected_contains": [
+        "בשביל",
+        "תעשו",
+        "מכשיר"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "96f874d1-a599-441b-97e2-b80b80f4037a",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-the_dekel-5",
+      "account_id": "e5a5076a-faaf-4e67-8bdd-61c15153fb20",
+      "account_name": "the_dekel",
+      "domain": "beauty",
+      "query": "למה משמש איפור לפני ניקוי כפול?",
+      "expected_contains": [
+        "איפור",
+        "לפני",
+        "ניקוי"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "815f4f37-0234-40a9-9c9c-eb7386bb859b",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-the_dekel-6",
+      "account_id": "e5a5076a-faaf-4e67-8bdd-61c15153fb20",
+      "account_name": "the_dekel",
+      "domain": "beauty",
+      "query": "מה זה טאצ'אפ?",
+      "expected_contains": [
+        "לטיפול",
+        "ביתי",
+        "צריכה"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "60333c86-8e40-4606-81cf-f6d1268cb549",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-the_dekel-7",
+      "account_id": "e5a5076a-faaf-4e67-8bdd-61c15153fb20",
+      "account_name": "the_dekel",
+      "domain": "beauty",
+      "query": "מה מציין צבע המכסה החדש?",
+      "expected_contains": [
+        "מכיל",
+        "העור",
+        "סבון"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "3eb22f97-6d19-44b1-a98a-46cf517f39e8",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-the_dekel-8",
+      "account_id": "e5a5076a-faaf-4e67-8bdd-61c15153fb20",
+      "account_name": "the_dekel",
+      "domain": "beauty",
+      "query": "כמה מחקרים קליניים נעשו על המכשיר?",
+      "expected_contains": [
+        "המכשיר",
+        "מבטיח",
+        "שיער"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "49776d8d-ed60-4b0c-98bc-f007b247ecd4",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-sapir_avisror-1",
+      "account_id": "e57a2e7c-1f88-4ff4-9d6f-8577bc796818",
+      "account_name": "sapir_avisror",
+      "domain": "beauty",
+      "query": "מהו המוצר הנוסף המוזכר?",
+      "expected_contains": [
+        "ניקוי",
+        "מנוי",
+        "בתיק"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "2f52873a-1c5a-4eda-b419-ce2fb2521ef5",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-sapir_avisror-2",
+      "account_id": "e57a2e7c-1f88-4ff4-9d6f-8577bc796818",
+      "account_name": "sapir_avisror",
+      "domain": "beauty",
+      "query": "מה ספיר לובשת בתמונות?",
+      "expected_contains": [
+        "ספיר",
+        "sapir",
+        "avisror"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "6decc125-ff8f-4096-b666-7c61aca53d50",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-sapir_avisror-3",
+      "account_id": "e57a2e7c-1f88-4ff4-9d6f-8577bc796818",
+      "account_name": "sapir_avisror",
+      "domain": "beauty",
+      "query": "באיזה גוון עיפרון השפתיים?",
+      "expected_contains": [
+        "עיפרון",
+        "גוון",
+        "עליו"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "2a523749-8dd7-42bd-8e77-7fb4249de4b1",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-sapir_avisror-4",
+      "account_id": "e57a2e7c-1f88-4ff4-9d6f-8577bc796818",
+      "account_name": "sapir_avisror",
+      "domain": "beauty",
+      "query": "מה שם הליפגלוס של SACARA?",
+      "expected_contains": [
+        "SACARA",
+        "עיפרון",
+        "בתיק"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "5597269f-df79-4775-ae6f-b67179d247b0",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-sapir_avisror-5",
+      "account_id": "e57a2e7c-1f88-4ff4-9d6f-8577bc796818",
+      "account_name": "sapir_avisror",
+      "domain": "beauty",
+      "query": "איזה מוצר של איב רושה מוזכר?",
+      "expected_contains": [
+        "אותו",
+        "הדאודורנט",
+        "בבית"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "e090614d-b217-478b-bcc9-e9bf041d7253",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-sapir_avisror-6",
+      "account_id": "e57a2e7c-1f88-4ff4-9d6f-8577bc796818",
+      "account_name": "sapir_avisror",
+      "domain": "beauty",
+      "query": "על מה השאלה שנשאלת כל הזמן?",
+      "expected_contains": [
+        "כאילו",
+        "ומותק",
+        "השאלה"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "77595e67-c1c4-4b31-882f-11b9f9ea94d2",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-sapir_avisror-7",
+      "account_id": "e57a2e7c-1f88-4ff4-9d6f-8577bc796818",
+      "account_name": "sapir_avisror",
+      "domain": "beauty",
+      "query": "איזה מוצר של איב רושה ספיר משתמשת בו?",
+      "expected_contains": [
+        "ספיר",
+        "אעשה",
+        "רושה"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "9d44a04b-c583-440a-bae9-15a548220a3a",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-sapir_avisror-8",
+      "account_id": "e57a2e7c-1f88-4ff4-9d6f-8577bc796818",
+      "account_name": "sapir_avisror",
+      "domain": "beauty",
+      "query": "מה ספיר אומרת שמתחיל לעבוד?",
+      "expected_contains": [
+        "מתחיל",
+        "רואות",
+        "ספיר"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "9d7fb958-30a7-4fd5-bdc4-93c14d6e29e7",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-cliniqueisrael-1",
+      "account_id": "86fc5238-1d5a-4803-b43a-d99bd63d5fa4",
+      "account_name": "cliniqueisrael",
+      "domain": "beauty",
+      "query": "מה הסרום עיניים עוצמתי מכיל?",
+      "expected_contains": [
+        "עיניים",
+        "בטעינה",
+        "טיפולי"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "5cf620ba-8e4d-4097-8d17-f961a458fb66",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-cliniqueisrael-2",
+      "account_id": "86fc5238-1d5a-4803-b43a-d99bd63d5fa4",
+      "account_name": "cliniqueisrael",
+      "domain": "beauty",
+      "query": "מה מסכת הלחות ללילה עושה?",
+      "expected_contains": [
+        "לחות",
+        "בטעינה",
+        "הלחות"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "5cc9f0b1-11c2-4b14-a271-809a07c8ec6a",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-cliniqueisrael-3",
+      "account_id": "86fc5238-1d5a-4803-b43a-d99bd63d5fa4",
+      "account_name": "cliniqueisrael",
+      "domain": "beauty",
+      "query": "מהו היתרון של סרום Anti Blemish + Line Correcting Serum?",
+      "expected_contains": [
+        "סרום",
+        "העור",
+        "ביותר"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "2869c880-98c3-45ff-83c8-5d6567e05f7e",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-cliniqueisrael-4",
+      "account_id": "86fc5238-1d5a-4803-b43a-d99bd63d5fa4",
+      "account_name": "cliniqueisrael",
+      "domain": "beauty",
+      "query": "אילו גוונים של מוצרי שפתיים מוצגים בקולאז'?",
+      "expected_contains": [
+        "honey",
+        "מוצרי",
+        "שפתיים"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "5c689101-8717-4c80-a7b1-7c4730a4c276",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-cliniqueisrael-5",
+      "account_id": "86fc5238-1d5a-4803-b43a-d99bd63d5fa4",
+      "account_name": "cliniqueisrael",
+      "domain": "beauty",
+      "query": "מה ירין חסון משתמשת?",
+      "expected_contains": [
+        "משתמשת",
+        "בבלאק",
+        "האני"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "627ec9fb-7e05-4143-b0a3-3e560b5b2c00",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-cliniqueisrael-6",
+      "account_id": "86fc5238-1d5a-4803-b43a-d99bd63d5fa4",
+      "account_name": "cliniqueisrael",
+      "domain": "beauty",
+      "query": "אילו מוצרים של CLINIQUE מוזכרים?",
+      "expected_contains": [
+        "בטעינה",
+        "product",
+        "short"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "8d6138aa-c32b-465e-871c-f17948632a9e",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-cliniqueisrael-7",
+      "account_id": "86fc5238-1d5a-4803-b43a-d99bd63d5fa4",
+      "account_name": "cliniqueisrael",
+      "domain": "beauty",
+      "query": "איפה ממוקם הפופ אפ של קליניק?",
+      "expected_contains": [
+        "יהיה",
+        "הפופ",
+        "קליניק"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "1a0fdf18-c54c-4e62-828c-e9185f5d4253",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-cliniqueisrael-8",
+      "account_id": "86fc5238-1d5a-4803-b43a-d99bd63d5fa4",
+      "account_name": "cliniqueisrael",
+      "domain": "beauty",
+      "query": "מה השלב השלישי בשגרת הטיפוח?",
+      "expected_contains": [
+        "המסייעת",
+        "העור",
+        "חומצה"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "5bdec20c-5f79-4078-bfe4-f0b57268f935",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-corringideon-1",
+      "account_id": "1a9fe42f-98e1-470c-9dee-d549342b34a1",
+      "account_name": "corringideon",
+      "domain": "beauty",
+      "query": "בשיתוף עם איזו חברה נעשה הסרטון?",
+      "expected_contains": [
+        "עושה",
+        "בשיתוף",
+        "החדש"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "8932f852-d22a-4dd0-9dc5-beb00c7b173d",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-corringideon-2",
+      "account_id": "1a9fe42f-98e1-470c-9dee-d549342b34a1",
+      "account_name": "corringideon",
+      "domain": "beauty",
+      "query": "בשיתוף עם מי הפוסט הזה?",
+      "expected_contains": [
+        "משאיר",
+        "כתמים",
+        "טבעי"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "56975e7a-d2fa-4fdd-b95e-5ba14bb12181",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-corringideon-3",
+      "account_id": "1a9fe42f-98e1-470c-9dee-d549342b34a1",
+      "account_name": "corringideon",
+      "domain": "beauty",
+      "query": "בשיתוף עם איזו חברה הסרטון?",
+      "expected_contains": [
+        "העור",
+        "בשיתוף",
+        "פעמיים"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "9d890c51-c1ce-4869-ac28-bcb187531e2a",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-corringideon-4",
+      "account_id": "1a9fe42f-98e1-470c-9dee-d549342b34a1",
+      "account_name": "corringideon",
+      "domain": "beauty",
+      "query": "האם המוצרים של קליניק נבדקו לאלרגיות?",
+      "expected_contains": [
+        "פיגמנטציה",
+        "יודעת",
+        "לפני"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "434af082-902c-49f7-9558-fd0d319ce3fc",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-corringideon-5",
+      "account_id": "1a9fe42f-98e1-470c-9dee-d549342b34a1",
+      "account_name": "corringideon",
+      "domain": "beauty",
+      "query": "עם איזו ערכה היא צובעת את השיער?",
+      "expected_contains": [
+        "הערכות",
+        "וולה",
+        "מהבית"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "32215df5-23f1-4fa5-86b5-8af9ee33636a",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-corringideon-6",
+      "account_id": "1a9fe42f-98e1-470c-9dee-d549342b34a1",
+      "account_name": "corringideon",
+      "domain": "beauty",
+      "query": "מה קורה כשלוחצים על כפתור הטורבו?",
+      "expected_contains": [
+        "כפתור",
+        "טורבו",
+        "אחוז"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "5f171c1d-93b1-4797-87ea-66ffa2c41740",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-corringideon-7",
+      "account_id": "1a9fe42f-98e1-470c-9dee-d549342b34a1",
+      "account_name": "corringideon",
+      "domain": "beauty",
+      "query": "מה שם המסכה שהוזכרה?",
+      "expected_contains": [
+        "לחות",
+        "אחרי",
+        "דברים"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "aa7268d4-3c33-40c0-a8c4-5990eae004b2",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-corringideon-8",
+      "account_id": "1a9fe42f-98e1-470c-9dee-d549342b34a1",
+      "account_name": "corringideon",
+      "domain": "beauty",
+      "query": "מה מורחים על המסגרת כדי למנוע כתמים?",
+      "expected_contains": [
+        "המסגרת",
+        "כתמים",
+        "שיער"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "9c5c4a66-99b4-4ded-95c5-be26824830f4",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-mayawertheimer-1",
+      "account_id": "5bae19d4-16a2-4139-ab53-c91588f4ca2e",
+      "account_name": "mayawertheimer",
+      "domain": "beauty",
+      "query": "מה קרה ללנח?",
+      "expected_contains": [
+        "שיער",
+        "בפועל",
+        "בהתקף"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "0f2502b9-e93d-4429-a7bd-86e3823d3e4f",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-mayawertheimer-2",
+      "account_id": "5bae19d4-16a2-4139-ab53-c91588f4ca2e",
+      "account_name": "mayawertheimer",
+      "domain": "beauty",
+      "query": "מה היא צרחה עליהם לא לעשות?",
+      "expected_contains": [
+        "עליהם",
+        "שלום",
+        "עושה"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "12dee3c7-68d4-4f42-882c-42146ee4e032",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-mayawertheimer-3",
+      "account_id": "5bae19d4-16a2-4139-ab53-c91588f4ca2e",
+      "account_name": "mayawertheimer",
+      "domain": "beauty",
+      "query": "מה שלי עשתה?",
+      "expected_contains": [
+        "בובי",
+        "עושה",
+        "פוגעני"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "64fe79b8-ebf5-4750-bbc6-22cda790ebc4",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-mayawertheimer-4",
+      "account_id": "5bae19d4-16a2-4139-ab53-c91588f4ca2e",
+      "account_name": "mayawertheimer",
+      "domain": "beauty",
+      "query": "מאיפה האוברול של הילד?",
+      "expected_contains": [
+        "הילד",
+        "האוברול",
+        "הבגדים"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "1e0a82c9-162d-4fd5-bbc4-31357edb3556",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-mayawertheimer-5",
+      "account_id": "5bae19d4-16a2-4139-ab53-c91588f4ca2e",
+      "account_name": "mayawertheimer",
+      "domain": "beauty",
+      "query": "למה חשוב שיהיו גם סרומים וגם קרם לחות?",
+      "expected_contains": [
+        "לחות",
+        "סרומים",
+        "תחשבו"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "202570db-067b-41e1-8855-494cea77ebd9",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-mayawertheimer-6",
+      "account_id": "5bae19d4-16a2-4139-ab53-c91588f4ca2e",
+      "account_name": "mayawertheimer",
+      "domain": "beauty",
+      "query": "מה חשוב לשים גם בחורף?",
+      "expected_contains": [
+        "הגנה",
+        "לשים",
+        "כאילו"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "ef8e5691-f150-4d23-9671-1ac0bc69316f",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-mayawertheimer-7",
+      "account_id": "5bae19d4-16a2-4139-ab53-c91588f4ca2e",
+      "account_name": "mayawertheimer",
+      "domain": "business",
+      "query": "איזו חברת תעופה מוזכרת?",
+      "expected_contains": [
+        "אישור",
+        "אסיוש",
+        "גמורה"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "b2fe471d-9a07-4de7-9ec4-829618409e98",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-mayawertheimer-8",
+      "account_id": "5bae19d4-16a2-4139-ab53-c91588f4ca2e",
+      "account_name": "mayawertheimer",
+      "domain": "beauty",
+      "query": "איזה קרם מולטי פפטידים מומלץ לשים מעל הכל?",
+      "expected_contains": [
+        "מולטי",
+        "פפטידים",
+        "הקרם"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "38444eb9-f2c2-4bda-89f8-411e49ca9420",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-aline_cohenn-1",
+      "account_id": "3ad7f9c2-10f2-4a8e-8133-ac5c0d6234f7",
+      "account_name": "aline_cohenn",
+      "domain": "beauty",
+      "query": "מה שם סדרת השיער המוזכרת?",
+      "expected_contains": [
+        "רוצה",
+        "סדרת",
+        "הבונד"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "c85c1350-aa41-43e5-99f6-dac61e0c5135",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-aline_cohenn-2",
+      "account_id": "3ad7f9c2-10f2-4a8e-8133-ac5c0d6234f7",
+      "account_name": "aline_cohenn",
+      "domain": "beauty",
+      "query": "לאיזה מוצרי Pantene מתייחסת הדוברת?",
+      "expected_contains": [
+        "והוא",
+        "מושלם",
+        "ברמות"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "0658f1ae-14f1-42b3-bf58-d39b1552ad53",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-aline_cohenn-3",
+      "account_id": "3ad7f9c2-10f2-4a8e-8133-ac5c0d6234f7",
+      "account_name": "aline_cohenn",
+      "domain": "beauty",
+      "query": "מה קורה עם ולדה?",
+      "expected_contains": [
+        "תודה",
+        "איזה",
+        "יואו"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "eac27a7f-350c-4c91-bff5-0e17dcbb50c6",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-aline_cohenn-4",
+      "account_id": "3ad7f9c2-10f2-4a8e-8133-ac5c0d6234f7",
+      "account_name": "aline_cohenn",
+      "domain": "beauty",
+      "query": "מה מחיר מגן החום של פנטן?",
+      "expected_contains": [
+        "באמת",
+        "מראה",
+        "נותן"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "c88a06e4-c6f7-44bb-80d4-11c268abdbf2",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-aline_cohenn-5",
+      "account_id": "3ad7f9c2-10f2-4a8e-8133-ac5c0d6234f7",
+      "account_name": "aline_cohenn",
+      "domain": "beauty",
+      "query": "למי היא אסירת תודה?",
+      "expected_contains": [
+        "תודה",
+        "אסירת",
+        "התמיכה"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "262d0c8f-bfd4-45d5-a9a8-48614fbf778c",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-aline_cohenn-6",
+      "account_id": "3ad7f9c2-10f2-4a8e-8133-ac5c0d6234f7",
+      "account_name": "aline_cohenn",
+      "domain": "beauty",
+      "query": "בשיתוף איזה חשבון נעשה הפרסום?",
+      "expected_contains": [
+        "הנחה",
+        "בשיתוף",
+        "נקבוביות"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "ee7fbf54-2f74-4ba7-ba0a-17d0563faf96",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-aline_cohenn-7",
+      "account_id": "3ad7f9c2-10f2-4a8e-8133-ac5c0d6234f7",
+      "account_name": "aline_cohenn",
+      "domain": "beauty",
+      "query": "איזה מותג בושם מוצג בתמונה?",
+      "expected_contains": [
+        "kilianparis",
+        "Kilian",
+        "Good"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "cb40dfaa-b7f4-4ea5-bbb8-04d92051b621",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-aline_cohenn-8",
+      "account_id": "3ad7f9c2-10f2-4a8e-8133-ac5c0d6234f7",
+      "account_name": "aline_cohenn",
+      "domain": "beauty",
+      "query": "איפה היא התארגנה?",
+      "expected_contains": [
+        "מושלמת",
+        "הטבה",
+        "קיליאן"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "f50673bf-20a1-4e87-b9bd-9894b0fc637a",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-maimonspices-1",
+      "account_id": "bc26f0ae-adde-494c-9586-e6ca33d04ac9",
+      "account_name": "maimonspices",
+      "domain": "business",
+      "query": "איזה טעם יש למרק?",
+      "expected_contains": [
+        "איזה",
+        "למרק",
+        "הפעם"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "acd9227c-d841-474c-b612-a7540c416ec0",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-maimonspices-2",
+      "account_id": "bc26f0ae-adde-494c-9586-e6ca33d04ac9",
+      "account_name": "maimonspices",
+      "domain": "business",
+      "query": "מה אופירה אסייג אמרה?",
+      "expected_contains": [
+        "ורוד",
+        "ofiraaasayag",
+        "translation"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "5a9ad877-e881-45fa-97cf-22673053cf53",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-maimonspices-3",
+      "account_id": "bc26f0ae-adde-494c-9586-e6ca33d04ac9",
+      "account_name": "maimonspices",
+      "domain": "business",
+      "query": "איזה סוג דבש מומלץ להשתמש?",
+      "expected_contains": [
+        "בדבש",
+        "יותר",
+        "הדבש"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "d13d648a-5a58-432c-9e81-457ac8566467",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-maimonspices-4",
+      "account_id": "bc26f0ae-adde-494c-9586-e6ca33d04ac9",
+      "account_name": "maimonspices",
+      "domain": "business",
+      "query": "אילו חומרים צריך למתכון?",
+      "expected_contains": [
+        "כפית",
+        "שטוחה",
+        "צריך"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "48b9453f-7059-44ba-b6b6-2b101f9a05f5",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-maimonspices-5",
+      "account_id": "bc26f0ae-adde-494c-9586-e6ca33d04ac9",
+      "account_name": "maimonspices",
+      "domain": "business",
+      "query": "איזה מתכון מוזכר?",
+      "expected_contains": [
+        "תבליני",
+        "מימון",
+        "אורז"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "104c5b25-4daa-4995-932c-a262a4cfc93c",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-maimonspices-6",
+      "account_id": "bc26f0ae-adde-494c-9586-e6ca33d04ac9",
+      "account_name": "maimonspices",
+      "domain": "business",
+      "query": "מה השלב הבא אחרי שהמרק רותח?",
+      "expected_contains": [
+        "מוכן",
+        "בסוף",
+        "המרק"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "26f29d56-72af-4988-a3c3-2a53a1c90185",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-maimonspices-7",
+      "account_id": "bc26f0ae-adde-494c-9586-e6ca33d04ac9",
+      "account_name": "maimonspices",
+      "domain": "coupon",
+      "query": "מה משקל האריזה של פלפל שחור טחון?",
+      "expected_contains": [
+        "פפריקה",
+        "מימים",
+        "תבלין"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "ac53fb38-f897-41af-8eec-2fae5b14d32f",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-maimonspices-8",
+      "account_id": "bc26f0ae-adde-494c-9586-e6ca33d04ac9",
+      "account_name": "maimonspices",
+      "domain": "business",
+      "query": "מה הכיתוב על מהדורת התבלינים המורחבת?",
+      "expected_contains": [
+        "התבלינים",
+        "במהדורה",
+        "פפריקה"
+      ],
+      "should_not_contain": [],
+      "ground_truth_chunk_id": "60a2c68e-c080-4a00-bd95-2901a58067f3",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-ldrs_group-1",
+      "account_id": "de38eac6-d2fb-46a7-ac09-5ec860147ca0",
+      "account_name": "ldrs_group",
+      "domain": "beauty",
+      "query": "מי היא דניאלה שרוויט?",
+      "expected_contains": [
+        "דניאלה",
+        "שרוויט",
+        "REELS"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "247f8ede-27dc-4e90-8947-3cdcf19cd6d1",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-ldrs_group-2",
+      "account_id": "de38eac6-d2fb-46a7-ac09-5ec860147ca0",
+      "account_name": "ldrs_group",
+      "domain": "beauty",
+      "query": "מה הסטטוס של השותפות עם קליניק?",
+      "expected_contains": [
+        "קליניק",
+        "Clinique",
+        "השותפות"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "9d008811-3f14-42cb-b472-5bdf47d3c678",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-ldrs_group-3",
+      "account_id": "de38eac6-d2fb-46a7-ac09-5ec860147ca0",
+      "account_name": "ldrs_group",
+      "domain": "beauty",
+      "query": "לאיזו מטרה משמש שיווק באמצעות משפיענים?",
+      "expected_contains": [
+        "פלמוליב",
+        "האירוע",
+        "LEADERS"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "3e83fada-a24f-4573-8d79-9a02ecc53dd7",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-ldrs_group-4",
+      "account_id": "de38eac6-d2fb-46a7-ac09-5ec860147ca0",
+      "account_name": "ldrs_group",
+      "domain": "beauty",
+      "query": "עבור איזה מותג יין מוצג Case Study?",
+      "expected_contains": [
+        "Argania",
+        "תמונה",
+        "CASE"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "2157c1fb-2a6a-44a3-a8be-feb2111b9030",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-ldrs_group-5",
+      "account_id": "de38eac6-d2fb-46a7-ac09-5ec860147ca0",
+      "account_name": "ldrs_group",
+      "domain": "beauty",
+      "query": "איזה מותג מופיע בתמונה?",
+      "expected_contains": [
+        "סופר",
+        "פארם",
+        "בתמונה"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "810d6325-8593-4818-be5d-c81e380da84f",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-ldrs_group-6",
+      "account_id": "de38eac6-d2fb-46a7-ac09-5ec860147ca0",
+      "account_name": "ldrs_group",
+      "domain": "beauty",
+      "query": "עבור איזה מותג הפיקה קבוצת LDRS תוכן?",
+      "expected_contains": [
+        "LDRS",
+        "קבוצת",
+        "הפיקה"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "038ffd77-2998-4cfa-bf35-bae94fc5cbdc",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-ldrs_group-7",
+      "account_id": "de38eac6-d2fb-46a7-ac09-5ec860147ca0",
+      "account_name": "ldrs_group",
+      "domain": "beauty",
+      "query": "מה יעשה הדובר כשהתקופה המבלבלת הזו תיגמר?",
+      "expected_contains": [
+        "תהנו",
+        "יודעת",
+        "תקופה"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "0ebc1a62-2bbc-4452-bc8c-9c3d08b9141c",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-ldrs_group-8",
+      "account_id": "de38eac6-d2fb-46a7-ac09-5ec860147ca0",
+      "account_name": "ldrs_group",
+      "domain": "beauty",
+      "query": "אילו מוצרים של PALMOLIVE מוזכרים?",
+      "expected_contains": [
+        "PALMOLIVE",
+        "MILK",
+        "good"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "87757e33-de56-4418-bcf0-0fffdec8721a",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-moroccanoil_il-1",
+      "account_id": "6facd754-2aed-410f-8b74-49ecc9304558",
+      "account_name": "moroccanoil_il",
+      "domain": "beauty",
+      "query": "לפי @AMITABRAHAMHAIR, האם המוצרים של MOROCCANOIL גורמים לקרקפת להתייבש?",
+      "expected_contains": [
+        "לקרקפת",
+        "להתייבש",
+        "AMITABRAHAMHAIR"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "0685aa0d-6db5-4ae8-8cd5-a189432d3860",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-moroccanoil_il-2",
+      "account_id": "6facd754-2aed-410f-8b74-49ecc9304558",
+      "account_name": "moroccanoil_il",
+      "domain": "beauty",
+      "query": "מה הפורמולה של ג'ל רחצה Soleil de Tanger מכילה?",
+      "expected_contains": [
+        "price",
+        "Regular",
+        "הביקורות"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "d5bda23b-8e1f-43fc-9790-9e01a248c98b",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-moroccanoil_il-3",
+      "account_id": "6facd754-2aed-410f-8b74-49ecc9304558",
+      "account_name": "moroccanoil_il",
+      "domain": "beauty",
+      "query": "אילו תוכנות אופיס נדרשות לתפקיד?",
+      "expected_contains": [
+        "שליטה",
+        "לתפקיד",
+        "אופיס"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "0805f2ea-284a-4f6c-9bcc-6cd3254b660a",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-moroccanoil_il-4",
+      "account_id": "6facd754-2aed-410f-8b74-49ecc9304558",
+      "account_name": "moroccanoil_il",
+      "domain": "beauty",
+      "query": "מה הפילינג עושה?",
+      "expected_contains": [
+        "ידיים",
+        "Maroc",
+        "עשיר"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "e4095fa7-b7bb-4c18-990c-48db09b4ee9f",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-moroccanoil_il-5",
+      "account_id": "6facd754-2aed-410f-8b74-49ecc9304558",
+      "account_name": "moroccanoil_il",
+      "domain": "beauty",
+      "query": "אילו מוצרים של Moroccanoil קיימים לשיער מתולתל?",
+      "expected_contains": [
+        "moroccanoil",
+        "אובססיה",
+        "MOROCCANOIL"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "27de9e34-f555-4c4c-a382-bed043715e66",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-moroccanoil_il-7",
+      "account_id": "6facd754-2aed-410f-8b74-49ecc9304558",
+      "account_name": "moroccanoil_il",
+      "domain": "beauty",
+      "query": "מה מכילה הפורמולה של הסרום לריכוך אינטנסיבי של Moroccanoil?",
+      "expected_contains": [
+        "לריכוך",
+        "אינטנסיבי",
+        "אותו"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "deb6ab1b-83b2-40e2-9ec3-fb4efa6d09ea",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-moroccanoil_il-8",
+      "account_id": "6facd754-2aed-410f-8b74-49ecc9304558",
+      "account_name": "moroccanoil_il",
+      "domain": "beauty",
+      "query": "מה הנפח של ג'ל הרחצה Bergamote Fraiche?",
+      "expected_contains": [
+        "הרחצה",
+        "רחצה",
+        "Bergamote"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "1323fb65-7372-4c00-8911-b70acd4e80c2",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-argania_group-1",
+      "account_id": "c68ef2bd-f294-4c8c-83dc-abd5f9cbf6d1",
+      "account_name": "argania_group",
+      "domain": "beauty",
+      "query": "מה הנפח של שמן הקיק הטהור?",
+      "expected_contains": [
+        "קוקוס",
+        "וחומצות",
+        "אומגה"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "8945d70e-c99a-40f4-a08f-aaf3c10660b2",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-argania_group-2",
+      "account_id": "c68ef2bd-f294-4c8c-83dc-abd5f9cbf6d1",
+      "account_name": "argania_group",
+      "domain": "beauty",
+      "query": "מהם הרכיבים העיקריים במסכת קיק זעפרן של Argania Pro?",
+      "expected_contains": [
+        "זעפרן",
+        "שיער",
+        "מסכה"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "6274deca-aae1-464d-8ab7-63fad90f5ea8",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-argania_group-3",
+      "account_id": "c68ef2bd-f294-4c8c-83dc-abd5f9cbf6d1",
+      "account_name": "argania_group",
+      "domain": "beauty",
+      "query": "מה ארונובנה מדגימה בסרטון?",
+      "expected_contains": [
+        "היום",
+        "ארונובנה",
+        "הקוקו"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "a9cb9c83-eea6-4a01-b726-c47a297e55e9",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-argania_group-4",
+      "account_id": "c68ef2bd-f294-4c8c-83dc-abd5f9cbf6d1",
+      "account_name": "argania_group",
+      "domain": "beauty",
+      "query": "איזה מוצר של ארגניה השתמשו בו הפעם?",
+      "expected_contains": [
+        "שטיפה",
+        "הפעם",
+        "אחרי"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "5de736e6-79ff-41e8-ab03-443b6156c554",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-argania_group-5",
+      "account_id": "c68ef2bd-f294-4c8c-83dc-abd5f9cbf6d1",
+      "account_name": "argania_group",
+      "domain": "beauty",
+      "query": "מהו שם המוצר?",
+      "expected_contains": [
+        "זעפרן",
+        "שמפו",
+        "השיער"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "ae8f23e0-4849-4d70-a277-2ee7051d5699",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-argania_group-6",
+      "account_id": "c68ef2bd-f294-4c8c-83dc-abd5f9cbf6d1",
+      "account_name": "argania_group",
+      "domain": "beauty",
+      "query": "מה מכילה ערכת Argania Men Hyaluronic Acid?",
+      "expected_contains": [
+        "Argania",
+        "Hyaluronic",
+        "Acid"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "a0faba19-7c12-43ca-ba16-3e0ef8514498",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-argania_group-7",
+      "account_id": "c68ef2bd-f294-4c8c-83dc-abd5f9cbf6d1",
+      "account_name": "argania_group",
+      "domain": "beauty",
+      "query": "איזו סדרה עינב בובליל בניסטי ממליצה?",
+      "expected_contains": [
+        "היאלרונית",
+        "בסדרה",
+        "האלרונית"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "a40d582a-3446-41f5-a8f3-ee0f15ddcc12",
+      "notes": "Auto-generated from synthetic query"
+    },
+    {
+      "id": "auto-argania_group-8",
+      "account_id": "c68ef2bd-f294-4c8c-83dc-abd5f9cbf6d1",
+      "account_name": "argania_group",
+      "domain": "beauty",
+      "query": "למה חשוב להשתמש במסכה מסדרת קיק של ARGANIA?",
+      "expected_contains": [
+        "חשוב",
+        "במסכה",
+        "ARGANIA"
+      ],
+      "should_not_contain": [
+        "מתכון",
+        "פסטה"
+      ],
+      "ground_truth_chunk_id": "6ea37ab9-679a-458f-83a5-578fde0e3207",
+      "notes": "Auto-generated from synthetic query"
+    }
+  ]
+}

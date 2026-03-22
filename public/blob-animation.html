@@ -4,163 +4,163 @@
 <meta charset="UTF-8">
 <style>
   * { margin: 0; padding: 0; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #F8F7F3; }
   canvas { display: block; }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 <script>
-
 const canvas = document.getElementById('c');
 const ctx    = canvas.getContext('2d');
+let W, H;
 
-let W, H, CX, CY;
 function resize() {
   W = canvas.width  = window.innerWidth;
   H = canvas.height = window.innerHeight;
-  CX = W / 2; CY = H / 2;
 }
 resize();
 window.addEventListener('resize', resize);
 
-// ─── COLOR ────────────────────────────────────────────────────────────────────
-function dotColor(nx, ny, nz, depth) {
-  const coolWarm = nx * 0.55 + nz * 0.3 + 0.5;
-  const cool = { r: 140, g: 148, b: 225 };
-  const warm = { r: 238, g: 165, b: 155 };
-  const mid  = { r: 192, g: 182, b: 222 };
+const PAL = [
+  [219,234,254], [208,250,254], [243,232,255], [253,231,244],
+  [242,233,189], [220,252,232], [255,238,213], [255,226,227],
+];
 
-  let t = Math.max(0, Math.min(1, coolWarm));
-  let r, g, b;
-  if (t < 0.5) {
-    const s = t * 2;
-    r = cool.r + (mid.r - cool.r) * s;
-    g = cool.g + (mid.g - cool.g) * s;
-    b = cool.b + (mid.b - cool.b) * s;
-  } else {
-    const s = (t - 0.5) * 2;
-    r = mid.r + (warm.r - mid.r) * s;
-    g = mid.g + (warm.g - mid.g) * s;
-    b = mid.b + (warm.b - mid.b) * s;
+const NUCLEI = [
+  { r: 0.310, or: 0.000, os: 0.000, ph: 0.00, oe: 1.0 },
+  { r: 0.255, or: 0.072, os: 0.182, ph: 0.00, oe: 0.75 },
+  { r: 0.235, or: 0.088, os: 0.140, ph: 2.09, oe: 0.60 },
+  { r: 0.245, or: 0.065, os: 0.218, ph: 4.19, oe: 0.85 },
+  { r: 0.220, or: 0.054, os: 0.165, ph: 1.05, oe: 0.70 },
+];
+
+const LIGHTS = PAL.map((col, i) => ({
+  col,
+  or:  0.07 + (i % 4) * 0.035,
+  os:  0.072 + i * 0.011,
+  ph:  (i / 8) * Math.PI * 2,
+  oe:  0.5 + (i % 3) * 0.22,
+  sy:  0.068 + i * 0.009,
+  sph: i * 0.77,
+}));
+
+const off  = document.createElement('canvas');
+const octx = off.getContext('2d');
+let imgData = null, prevRW = 0, prevRH = 0;
+
+let t = 0;
+
+function frame() {
+  requestAnimationFrame(frame);
+  t += 0.0025;
+
+  const SCL = 4;
+  const RW  = Math.ceil(W / SCL);
+  const RH  = Math.ceil(H / SCL);
+
+  if (RW !== prevRW || RH !== prevRH) {
+    off.width  = RW;
+    off.height = RH;
+    imgData    = octx.createImageData(RW, RH);
+    prevRW = RW; prevRH = RH;
   }
 
-  const fade = 0.15 + depth * 0.85;
-  return { r: r|0, g: g|0, b: b|0, a: fade };
-}
+  const CX   = RW / 2;
+  const CY   = RH / 2;
+  const BASE = Math.min(RW, RH);
 
-// ─── FIBONACCI SPHERE ─────────────────────────────────────────────────────────
-function fibSphere(n) {
-  const pts = [], gr = (1 + Math.sqrt(5)) / 2;
-  for (let i = 0; i < n; i++) {
-    const phi   = Math.acos(1 - 2*(i+0.5)/n);
-    const theta = 2 * Math.PI * i / gr;
-    pts.push({
-      bx: Math.sin(phi)*Math.cos(theta),
-      by: Math.cos(phi),
-      bz: Math.sin(phi)*Math.sin(theta),
-    });
+  const NP = NUCLEI.map(n => ({
+    x:  Math.cos(t * n.os + n.ph) * n.or * n.oe,
+    y:  Math.sin(t * n.os * 1.29 + n.ph) * n.or,
+    r2: n.r * n.r,
+  }));
+
+  const LP = LIGHTS.map(l => ({
+    col: l.col,
+    x:   Math.cos(t * l.os + l.ph) * l.or * l.oe,
+    y:   Math.sin(t * l.sy * 1.41 + l.sph) * l.or,
+  }));
+
+  const data       = imgData.data;
+  const THRESH     = 1.0;
+  const A_START    = 0.65;
+
+  for (let py = 0; py < RH; py++) {
+    for (let px = 0; px < RW; px++) {
+      const nx = (px - CX) / BASE;
+      const ny = (py - CY) / BASE;
+
+      let sum = 0;
+      for (let i = 0; i < NP.length; i++) {
+        const n  = NP[i];
+        const dx = nx - n.x;
+        const dy = ny - n.y;
+        sum += n.r2 / (dx*dx + dy*dy + 8e-5);
+      }
+
+      const idx = (py * RW + px) << 2;
+
+      if (sum < A_START) {
+        data[idx + 3] = 0;
+        continue;
+      }
+
+      const rawA  = (sum - A_START) / (THRESH - A_START);
+      const clamp = Math.min(1.0, rawA);
+      const alpha = clamp * clamp * (3 - 2 * clamp);
+
+      const depth = Math.min(1.0, Math.max(0, (sum - THRESH) / (THRESH * 1.8)));
+
+      let tr=0, tg=0, tb=0, tw=0;
+      for (let i = 0; i < LP.length; i++) {
+        const l  = LP[i];
+        const dx = nx - l.x;
+        const dy = ny - l.y;
+        const w  = 1.0 / (dx*dx + dy*dy + 0.0025);
+        tr += l.col[0] * w;
+        tg += l.col[1] * w;
+        tb += l.col[2] * w;
+        tw += w;
+      }
+      tr /= tw; tg /= tw; tb /= tw;
+
+      const cs = depth * 0.82;
+      let r = 255 + (tr - 255) * cs;
+      let g = 255 + (tg - 255) * cs;
+      let b = 255 + (tb - 255) * cs;
+
+      const hx  = -0.17, hy = -0.22;
+      const hd2 = (nx - hx) * (nx - hx) + (ny - hy) * (ny - hy);
+      const spec = Math.exp(-hd2 * 22) * 0.72;
+      r = r + (255 - r) * spec;
+      g = g + (255 - g) * spec;
+      b = b + (255 - b) * spec;
+
+      const rx  = 0.22, ry = 0.28;
+      const rd2 = (nx - rx) * (nx - rx) + (ny - ry) * (ny - ry);
+      const shd = Math.exp(-rd2 * 5.5) * 0.09;
+      r *= (1 - shd);
+      g *= (1 - shd);
+      b *= (1 - shd);
+
+      data[idx]     = r | 0;
+      data[idx + 1] = g | 0;
+      data[idx + 2] = b | 0;
+      data[idx + 3] = (alpha * 255) | 0;
+    }
   }
-  return pts;
+
+  octx.putImageData(imgData, 0, 0);
+
+  ctx.fillStyle = '#F8F7F3';
+  ctx.fillRect(0, 0, W, H);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(off, 0, 0, W, H);
 }
 
-const DOTS = fibSphere(800);
-
-// ─── TURBULENT NOISE — chaotic, layered, fast ────────────────────────────────
-function turbulence(nx, ny, nz, t) {
-  // Layer 1 — large slow undulation
-  const L1 =
-    Math.sin(nx * 1.9 + t * 0.85) * Math.cos(ny * 1.7 + t * 0.68) * 0.38 +
-    Math.sin(ny * 1.7 + t * 0.75) * Math.cos(nz * 2.0 + t * 0.62) * 0.32 +
-    Math.sin(nz * 2.1 + t * 0.70) * Math.cos(nx * 1.8 + t * 0.78) * 0.28;
-
-  // Layer 2 — medium ripples
-  const L2 =
-    Math.sin(nx * 3.8 + t * 1.45 + ny * 2.1) * 0.16 +
-    Math.sin(ny * 4.1 + t * 1.30 + nz * 1.9) * 0.14 +
-    Math.sin(nz * 3.6 + t * 1.55 + nx * 2.2) * 0.12;
-
-  // Layer 3 — fast tiny turbulence (the "noise" / roughness)
-  const L3 =
-    Math.sin(nx * 6.5 + t * 2.20 + ny * 3.0) * 0.08 +
-    Math.sin(ny * 7.0 + t * 2.40 + nz * 2.8) * 0.07 +
-    Math.sin(nz * 6.2 + t * 2.10 + nx * 3.1) * 0.06;
-
-  // Layer 4 — diagonal traveling waves
-  const L4 =
-    Math.sin((nx + ny) * 2.8 + t * 1.65) * 0.09 +
-    Math.sin((ny - nz) * 3.1 + t * 1.80) * 0.08 +
-    Math.sin((nx + nz) * 2.5 + t * 1.50) * 0.07 +
-    Math.sin((nx - ny + nz) * 3.8 + t * 2.00) * 0.05;
-
-  return L1 + L2 + L3 + L4;
-}
-
-// ─── ROTATION ────────────────────────────────────────────────────────────────
-function rotY(x, z, a) {
-  const c = Math.cos(a), s = Math.sin(a);
-  return [x*c + z*s, -x*s + z*c];
-}
-function rotX(y, z, a) {
-  const c = Math.cos(a), s = Math.sin(a);
-  return [y*c - z*s, y*s + z*c];
-}
-
-let time = 0;
-
-function render() {
-  requestAnimationFrame(render);
-  time += 0.007; // faster tick
-
-  const R   = Math.min(W, H) * 0.28;
-  const fov = R * 2.85;
-
-  const tiltY = time * 0.32 + Math.sin(time * 0.15) * 0.22;
-  const tiltX = Math.sin(time * 0.21) * 0.35 + Math.cos(time * 0.11) * 0.15;
-
-  ctx.clearRect(0, 0, W, H);
-
-  const projected = DOTS.map(({ bx, by, bz }) => {
-    const d = turbulence(bx, by, bz, time);
-
-    // Heavy surface warp — normals shift a lot
-    const warp = 0.10;
-    const wnx  = bx + Math.sin(bz * 3.2 + time * 0.9) * warp;
-    const wny  = by + Math.sin(bx * 3.5 + time * 0.8) * warp;
-    const wnz  = bz + Math.sin(by * 3.0 + time * 1.0) * warp;
-
-    const r = R * (1 + d * 0.52); // deep deformation
-
-    let x = r*bx, y = r*by, z = r*bz;
-    let [rx,  rz1] = rotY(x, z,   tiltY);
-    let [ry,  rz2] = rotX(y, rz1, tiltX);
-
-    const scale = fov / (fov + rz2);
-    const sx    = CX + rx * scale;
-    const sy    = CY + ry * scale;
-    const depth = Math.max(0, Math.min(1, (scale - 0.4) / 1.25));
-
-    let [cnx, cnz1] = rotY(wnx, wnz,  tiltY);
-    let [cny, cnz2] = rotX(wny, cnz1, tiltX);
-
-    const col  = dotColor(cnx, cny, cnz2, depth);
-    const size = Math.max(0.3, scale * 0.75);
-
-    return { sx, sy, z: rz2, size, col };
-  });
-
-  projected.sort((a, b) => a.z - b.z);
-
-  for (const { sx, sy, size, col } of projected) {
-    ctx.beginPath();
-    ctx.arc(sx, sy, size, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(${col.r},${col.g},${col.b},${col.a.toFixed(3)})`;
-    ctx.fill();
-  }
-}
-
-render();
-
+frame();
 </script>
 </body>
 </html>
