@@ -248,49 +248,49 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Desktop gradient background (Figma: cyan→purple vertical stripes with blur) */
 @media (min-width: 768px) {
+  /* Layer 1: Blurred color gradient */
   .chat-page::before {
     content: '';
     position: absolute;
-    inset: 0;
+    inset: -20px;
     z-index: 0;
-    /* Base gradient: cyan (left) → blue (center) → purple (right) */
     background:
-      /* Vertical stripes overlay */
-      repeating-linear-gradient(
-        90deg,
-        rgba(255, 255, 255, 0.35) 0px,
-        rgba(255, 255, 255, 0.35) 2px,
-        transparent 2px,
-        transparent 52px
-      ),
-      /* Main color gradient */
       linear-gradient(
         90deg,
-        rgba(180, 230, 255, 0.30) 0%,
-        rgba(170, 220, 255, 0.35) 15%,
-        rgba(165, 210, 255, 0.30) 30%,
-        rgba(175, 200, 255, 0.25) 45%,
-        rgba(190, 190, 255, 0.22) 55%,
-        rgba(200, 185, 255, 0.20) 65%,
-        rgba(210, 185, 250, 0.18) 75%,
+        rgba(180, 230, 255, 0.35) 0%,
+        rgba(170, 220, 255, 0.40) 15%,
+        rgba(165, 210, 255, 0.35) 30%,
+        rgba(175, 200, 255, 0.28) 45%,
+        rgba(190, 190, 255, 0.25) 55%,
+        rgba(200, 185, 255, 0.22) 65%,
+        rgba(210, 185, 250, 0.20) 75%,
         rgba(215, 185, 245, 0.15) 85%,
         rgba(220, 190, 240, 0.10) 100%
       );
+    filter: blur(12px);
     pointer-events: none;
-    filter: blur(8px);
   }
-  /* Fade out edges with radial overlay */
+  /* Layer 2: Vertical stripes + edge fade (crisp, not blurred) */
   .chat-page::after {
     content: '';
     position: absolute;
     inset: 0;
     z-index: 0;
     background:
+      /* Radial fade at edges */
       radial-gradient(
-        ellipse 80% 70% at 50% 45%,
-        transparent 30%,
-        rgba(255, 255, 255, 0.6) 70%,
+        ellipse 85% 75% at 50% 45%,
+        transparent 25%,
+        rgba(255, 255, 255, 0.5) 65%,
         white 100%
+      ),
+      /* Visible vertical stripes */
+      repeating-linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.5) 0px,
+        rgba(255, 255, 255, 0.5) 1.5px,
+        transparent 1.5px,
+        transparent 50px
       );
     pointer-events: none;
   }
