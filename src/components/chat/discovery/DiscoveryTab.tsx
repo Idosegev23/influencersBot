@@ -218,20 +218,30 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
       <div className="mt-2 mx-4 mb-32">
         <button
           onClick={() => setShowQuestions(!showQuestions)}
-          className="w-full flex items-center justify-between rounded-2xl p-4 transition-colors hover:bg-white"
-          style={{ backgroundColor: '#ffffff', boxShadow: '0 2px 8px rgba(12, 16, 19, 0.04)', border: '1px solid rgba(204, 195, 216, 0.2)' }}
+          className="w-full flex items-center justify-between rounded-2xl p-5 transition-colors hover:bg-white"
+          style={{ backgroundColor: '#ffffff', boxShadow: '0 2px 8px rgba(12, 16, 19, 0.04)', border: '1px solid rgba(204, 195, 216, 0.15)' }}
           dir="rtl"
         >
-          <div className="flex items-center gap-2.5">
-            <span
-              className="material-symbols-outlined text-xl"
-              style={{ color: '#7c3aed', fontVariationSettings: "'FILL' 1" }}
+          <div className="flex items-center gap-4">
+            <div
+              className="w-12 h-12 rounded-full flex items-center justify-center shrink-0"
+              style={{ backgroundColor: 'rgba(99, 14, 212, 0.05)' }}
             >
-              help
-            </span>
-            <span className="text-[14px] font-semibold" style={{ color: '#191c1e' }}>
-              שאלות שתמיד רציתם לשאול
-            </span>
+              <span
+                className="material-symbols-outlined text-2xl"
+                style={{ color: '#7c3aed', fontVariationSettings: "'FILL' 1" }}
+              >
+                help
+              </span>
+            </div>
+            <div className="flex flex-col items-start">
+              <span className="text-[14px] font-semibold" style={{ color: '#191c1e' }}>
+                שאלות שתמיד רציתם לשאול
+              </span>
+              <span className="text-[11px]" style={{ color: '#4a4455' }}>
+                כל מה שחדש בעולם התוכן והדיגיטל
+              </span>
+            </div>
           </div>
           <span
             className="material-symbols-outlined text-xl transition-transform"

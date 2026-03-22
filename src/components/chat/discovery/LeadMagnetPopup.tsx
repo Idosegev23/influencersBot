@@ -117,7 +117,7 @@ export function LeadMagnetPopup({ isOpen, onClose, onSubmit, influencerName }: L
                 />
                 <input
                   type="email"
-                  placeholder="אימייל"
+                  placeholder="כתובת אימייל"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full border-none rounded-lg px-4 py-3 text-right outline-none transition-all focus:ring-2 focus:ring-purple-500/20"
@@ -150,8 +150,8 @@ export function LeadMagnetPopup({ isOpen, onClose, onSubmit, influencerName }: L
 
             {/* Subtle decorative gradient bar at bottom per Stitch */}
             <div
-              className="h-1.5 opacity-30"
-              style={{ background: 'linear-gradient(135deg, #630ed4 0%, #7c3aed 100%)' }}
+              className="h-1.5"
+              style={{ background: 'linear-gradient(to left, #f97316, #ec4899, #7c3aed, #630ed4)' }}
             />
           </motion.div>
         </motion.div>

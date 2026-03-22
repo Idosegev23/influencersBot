@@ -95,6 +95,7 @@ export function DiscoveryModal({
       : null;
 
   const displayTitle = item.aiTitle || item.captionExcerpt;
+  const postedAtLabel = formatPostedAt((item as any).postedAt);
 
   return (
     <AnimatePresence>
@@ -106,7 +107,7 @@ export function DiscoveryModal({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
         >
-          {/* Backdrop — matches Stitch: bg-on-surface/40 backdrop-blur-md */}
+          {/* Backdrop */}
           <motion.div
             className="absolute inset-0 backdrop-blur-md"
             style={{ backgroundColor: 'rgba(25, 28, 30, 0.4)' }}
@@ -125,7 +126,7 @@ export function DiscoveryModal({
             transition={{ type: 'spring', damping: 28, stiffness: 340 }}
             dir="rtl"
           >
-            {/* Close button — top right for RTL */}
+            {/* Close button */}
             <button
               onClick={onClose}
               className="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white active:scale-90 transition-transform"
@@ -133,7 +134,7 @@ export function DiscoveryModal({
               <span className="material-symbols-outlined">close</span>
             </button>
 
-            {/* Media area — 4:5 aspect per Stitch */}
+            {/* Media area */}
             <div className="relative w-full overflow-hidden" style={{ aspectRatio: '4/5', maxHeight: '55vh' }}>
               {isReel && item.postUrl ? (
                 <>
@@ -159,7 +160,7 @@ export function DiscoveryModal({
                     playsInline
                     onPlay={() => setIsVideoPlaying(true)}
                   />
-                  {/* Mute/Unmute — bottom left per Stitch */}
+                  {/* Mute/Unmute */}
                   <div className="absolute bottom-4 left-4 flex gap-2 z-20">
                     <button
                       onClick={toggleMute}
@@ -182,7 +183,7 @@ export function DiscoveryModal({
                 </div>
               )}
 
-              {/* AI Badge overlay — top left per Stitch */}
+              {/* AI Badge overlay */}
               <div
                 className="absolute top-4 left-4 z-10 text-[11px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1 shadow-lg text-white"
                 style={{ backgroundColor: 'rgba(124, 58, 237, 0.9)' }}
@@ -192,47 +193,87 @@ export function DiscoveryModal({
               </div>
             </div>
 
-            {/* Content Details — p-6 pb-10 space-y-6 per Stitch */}
+            {/* Content Details */}
             <div className="p-6 pb-10 flex flex-col gap-6 overflow-y-auto flex-1">
-              {/* Title & Summary */}
+              {/* Title & Published time & Summary */}
               <div className="flex flex-col gap-3">
-                <h2 className="text-[20px] font-extrabold leading-tight tracking-tight" style={{ color: '#191c1e' }}>
+                <h2 className="text-[20px] font-black font-headline leading-tight tracking-tight" style={{ color: '#191c1e' }}>
                   {displayTitle}
                 </h2>
+
+                {/* Published time indicator */}
+                {postedAtLabel && (
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#7c3aed' }} />
+                    <span className="text-[12px] font-medium" style={{ color: '#4a4455' }}>
+                      {postedAtLabel}
+                    </span>
+                  </div>
+                )}
+
+                {/* AI Summary card */}
                 {item.aiSummary && (
-                  <p className="text-[14px] leading-relaxed" style={{ color: '#4a4455' }}>
-                    {item.aiSummary}
-                  </p>
+                  <div
+                    className="bg-[#edeef0] rounded-2xl p-4 border-r-4"
+                    style={{ borderColor: 'rgba(99, 14, 212, 0.4)' }}
+                  >
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <span
+                        className="material-symbols-outlined text-[16px]"
+                        style={{ color: '#630ed4', fontVariationSettings: "'FILL' 1" }}
+                      >
+                        summarize
+                      </span>
+                      <span className="text-[12px] font-bold" style={{ color: '#630ed4' }}>
+                        תקציר חכם
+                      </span>
+                    </div>
+                    <p className="text-[14px] leading-relaxed" style={{ color: '#4a4455' }}>
+                      {item.aiSummary}
+                    </p>
+                  </div>
                 )}
               </div>
 
-              {/* Bento-style Insights — 2-col grid per Stitch */}
+              {/* Bento-style Insights */}
               {(item.metricValue != null || categoryTitle) && (
                 <div className="grid grid-cols-2 gap-3">
                   {item.metricValue != null && item.metricLabel && (
-                    <div className="p-4 rounded-xl flex flex-col gap-1" style={{ backgroundColor: '#f3f4f6' }}>
+                    <div className="p-4 rounded-xl flex flex-col items-center gap-1.5" style={{ backgroundColor: '#f3f4f6' }}>
+                      <span
+                        className="material-symbols-outlined text-[22px]"
+                        style={{ color: '#630ed4', fontVariationSettings: "'FILL' 1" }}
+                      >
+                        trending_up
+                      </span>
                       <span className="text-[11px] font-medium" style={{ color: '#4a4455' }}>{item.metricLabel}</span>
-                      <span className="text-[16px] font-bold" style={{ color: '#630ed4' }}>
+                      <span className="text-[18px] font-black" style={{ color: '#630ed4' }}>
                         {formatMetric(item.metricValue)}
                       </span>
                     </div>
                   )}
                   {categoryTitle && (
-                    <div className="p-4 rounded-xl flex flex-col gap-1" style={{ backgroundColor: '#f3f4f6' }}>
+                    <div className="p-4 rounded-xl flex flex-col items-center gap-1.5" style={{ backgroundColor: '#f3f4f6' }}>
+                      <span
+                        className="material-symbols-outlined text-[22px]"
+                        style={{ color: '#630ed4', fontVariationSettings: "'FILL' 1" }}
+                      >
+                        category
+                      </span>
                       <span className="text-[11px] font-medium" style={{ color: '#4a4455' }}>קטגוריה</span>
-                      <span className="text-[16px] font-bold" style={{ color: '#191c1e' }}>{categoryTitle}</span>
+                      <span className="text-[18px] font-black" style={{ color: '#191c1e' }}>{categoryTitle}</span>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Action Buttons — per Stitch design */}
+              {/* Action Buttons */}
               <div className="flex flex-col gap-3 pt-2">
                 <button
                   onClick={handleAskInChat}
-                  className="w-full font-bold py-4 rounded-xl flex items-center justify-center gap-2 text-white active:scale-[0.98] transition-all hover:brightness-110"
+                  className="w-full font-bold h-14 rounded-xl flex items-center justify-center gap-2 text-white active:scale-[0.98] transition-all hover:brightness-110"
                   style={{
-                    backgroundColor: '#7c3aed',
+                    background: 'linear-gradient(to left, #630ed4, #7c3aed)',
                     boxShadow: '0 10px 30px -10px rgba(124, 58, 237, 0.4)',
                   }}
                 >
@@ -242,10 +283,10 @@ export function DiscoveryModal({
 
                 <button
                   onClick={handleOpenPost}
-                  className="w-full font-bold py-4 rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+                  className="w-full font-bold h-14 rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
                   style={{
-                    color: '#191c1e',
-                    border: '2px solid rgba(204, 195, 216, 0.3)',
+                    color: '#630ed4',
+                    border: '1px solid #ccc3d8',
                     backgroundColor: 'transparent',
                   }}
                 >
@@ -265,4 +306,24 @@ function formatMetric(value: number): string {
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
   if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
   return value.toLocaleString('he-IL');
+}
+
+function formatPostedAt(postedAt: string | undefined | null): string | null {
+  if (!postedAt) return null;
+  try {
+    const posted = new Date(postedAt);
+    const now = new Date();
+    const diffMs = now.getTime() - posted.getTime();
+    const diffMins = Math.floor(diffMs / 60_000);
+    if (diffMins < 60) return `פורסם לפני ${diffMins} דקות`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `פורסם לפני ${diffHours === 1 ? 'שעה' : diffHours === 2 ? 'שעתיים' : `${diffHours} שעות`}`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays === 1) return 'פורסם אתמול';
+    if (diffDays < 7) return `פורסם לפני ${diffDays} ימים`;
+    if (diffDays < 30) return `פורסם לפני ${Math.floor(diffDays / 7)} שבועות`;
+    return `פורסם לפני ${Math.floor(diffDays / 30)} חודשים`;
+  } catch {
+    return null;
+  }
 }
