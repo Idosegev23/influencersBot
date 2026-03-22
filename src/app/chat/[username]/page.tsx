@@ -915,23 +915,6 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 <div className={`flex-1 overflow-y-auto px-4 chat-bg chat-messages-scroll ${messages.length === 0 ? (isMobile ? 'pb-[80px]' : 'pb-8') : (isMobile ? 'pb-2 pt-3' : 'py-6 pb-8')} space-y-4`}>
                   {messages.length === 0 ? (
                     <div className={`flex flex-col items-center text-center px-4 ${isMobile ? 'pt-[32px]' : 'justify-center min-h-full'}`}>
-                      {/* Bot illustration (same on mobile + desktop per Figma) */}
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.4 }}
-                        className="mb-6"
-                      >
-                        <div className="relative w-[143px] h-[147px] mx-auto">
-                          <iframe
-                            src="/blob-animation.html"
-                            className="w-full h-full border-0"
-                            style={{ background: 'transparent', pointerEvents: 'none' }}
-                            title="Bot animation"
-                          />
-                        </div>
-                      </motion.div>
-
                       <motion.h2
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -1016,76 +999,85 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         )}
                       </motion.div>
 
-                      {/* Discovery category pills — only for the_dekel */}
+                      {/* Discovery category pills — horizontal scroll with arrow */}
                       {(influencer.tabs || DEFAULT_TABS).some((t: { id: string }) => t.id === 'discover') && discoveryCategories.length > 0 && (
                         <motion.div
                           initial={{ opacity: 0, y: 8 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.4, delay: 0.4 }}
-                          className={`flex flex-wrap gap-2 justify-center ${isMobile ? 'max-w-md' : 'max-w-[600px]'}`}
+                          className="discovery-pills-row"
                         >
-                          {discoveryCategories.slice(0, 6).map((cat, i) => (
+                          <button
+                            className="discovery-pills-arrow"
+                            onClick={() => {
+                              const el = document.querySelector('.discovery-pills-scroll');
+                              if (el) el.scrollBy({ left: -200, behavior: 'smooth' });
+                            }}
+                            aria-label="גלול שמאלה"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </button>
+                          <div className="discovery-pills-scroll">
+                            {discoveryCategories.slice(0, 6).map((cat, i) => (
+                              <motion.button
+                                key={cat.slug}
+                                initial={{ opacity: 0, y: 6 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.45 + i * 0.05, duration: 0.3 }}
+                                whileTap={{ scale: 0.96 }}
+                                onClick={async () => {
+                                  if (isTyping || isStreamActive) return;
+                                  maybeShowLeadPopup();
+                                  const visibleMsg = `ספרי לי על ${cat.title}`;
+                                  const userMsg: Message = { id: Date.now().toString(), role: 'user', content: visibleMsg };
+                                  setMessages(prev => [...prev, userMsg]);
+                                  setIsTyping(true);
+
+                                  let enrichedMsg = visibleMsg;
+                                  try {
+                                    const res = await fetch(`/api/discovery/list?username=${encodeURIComponent(username)}&slug=${encodeURIComponent(cat.slug)}`);
+                                    if (res.ok) {
+                                      const listData = await res.json();
+                                      const items = (listData.items || []).slice(0, 10);
+                                      const contextLines = items.map((item: any, idx: number) => {
+                                        const title = item.aiTitle || item.captionExcerpt || '';
+                                        const summary = item.aiSummary || '';
+                                        const metric = item.metricValue && item.metricLabel ? ` (${item.metricLabel}: ${item.metricValue.toLocaleString()})` : '';
+                                        return `${idx + 1}. ${title}${metric}${summary ? ' — ' + summary : ''}`;
+                                      }).join('\n');
+                                      enrichedMsg = `[הנתונים מתוך הרשימה "${cat.title}":\n${contextLines}]\n\n${visibleMsg}`;
+                                    }
+                                  } catch { /* fallback to plain message */ }
+
+                                  const assistantMessageId = (Date.now() + 1).toString();
+                                  setStreamingMessageId(assistantMessageId);
+                                  setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant', content: '' }]);
+                                  setIsTyping(false);
+                                  await sendStreamMessage({
+                                    message: enrichedMsg,
+                                    username,
+                                    sessionId: sessionId || undefined,
+                                    previousResponseId: responseId || undefined,
+                                    clientMessageId: assistantMessageId,
+                                  });
+                                }}
+                                className="suggestion-pill whitespace-nowrap flex-shrink-0"
+                              >
+                                {cat.title}
+                              </motion.button>
+                            ))}
                             <motion.button
-                              key={cat.slug}
                               initial={{ opacity: 0, y: 6 }}
                               animate={{ opacity: 1, y: 0 }}
-                              transition={{ delay: 0.45 + i * 0.05, duration: 0.3 }}
+                              transition={{ delay: 0.75, duration: 0.3 }}
                               whileTap={{ scale: 0.96 }}
-                              onClick={async () => {
-                                if (isTyping || isStreamActive) return;
-                                maybeShowLeadPopup();
-                                const visibleMsg = `ספרי לי על ${cat.title}`;
-                                // Show clean message in UI
-                                const userMsg: Message = { id: Date.now().toString(), role: 'user', content: visibleMsg };
-                                setMessages(prev => [...prev, userMsg]);
-                                setIsTyping(true);
-
-                                // Fetch discovery list data to enrich the message for the LLM
-                                let enrichedMsg = visibleMsg;
-                                try {
-                                  const res = await fetch(`/api/discovery/list?username=${encodeURIComponent(username)}&slug=${encodeURIComponent(cat.slug)}`);
-                                  if (res.ok) {
-                                    const listData = await res.json();
-                                    const items = (listData.items || []).slice(0, 10);
-                                    const contextLines = items.map((item: any, idx: number) => {
-                                      const title = item.aiTitle || item.captionExcerpt || '';
-                                      const summary = item.aiSummary || '';
-                                      const metric = item.metricValue && item.metricLabel ? ` (${item.metricLabel}: ${item.metricValue.toLocaleString()})` : '';
-                                      return `${idx + 1}. ${title}${metric}${summary ? ' — ' + summary : ''}`;
-                                    }).join('\n');
-                                    enrichedMsg = `[הנתונים מתוך הרשימה "${cat.title}":\n${contextLines}]\n\n${visibleMsg}`;
-                                  }
-                                } catch { /* fallback to plain message */ }
-
-                                // Send via streaming
-                                const assistantMessageId = (Date.now() + 1).toString();
-                                setStreamingMessageId(assistantMessageId);
-                                setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant', content: '' }]);
-                                setIsTyping(false);
-                                await sendStreamMessage({
-                                  message: enrichedMsg,
-                                  username,
-                                  sessionId: sessionId || undefined,
-                                  previousResponseId: responseId || undefined,
-                                  clientMessageId: assistantMessageId,
-                                });
-                              }}
-                              className="suggestion-pill"
+                              onClick={() => setActiveTab('discover')}
+                              className="suggestion-pill flex items-center gap-1 whitespace-nowrap flex-shrink-0"
                             >
-                              {cat.title}
+                              <Compass className="w-3.5 h-3.5" />
+                              <span>גלו עוד</span>
                             </motion.button>
-                          ))}
-                          <motion.button
-                            initial={{ opacity: 0, y: 6 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.75, duration: 0.3 }}
-                            whileTap={{ scale: 0.96 }}
-                            onClick={() => setActiveTab('discover')}
-                            className="suggestion-pill flex items-center gap-1"
-                          >
-                            <Compass className="w-3.5 h-3.5" />
-                            <span>גלו עוד</span>
-                          </motion.button>
+                          </div>
                         </motion.div>
                       )}
                     </div>

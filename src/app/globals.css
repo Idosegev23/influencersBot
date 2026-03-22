@@ -2147,6 +2147,56 @@ h1, h2, h3, h4, h5, h6 {
   transform: translateY(-1px);
 }
 
+/* ── Discovery pills horizontal scroll row (Figma) ── */
+.discovery-pills-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 670px;
+  position: relative;
+}
+
+.discovery-pills-scroll {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  mask-image: linear-gradient(to left, transparent 0px, black 40px, black calc(100% - 40px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to left, transparent 0px, black 40px, black calc(100% - 40px), transparent 100%);
+  padding: 4px 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.discovery-pills-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.discovery-pills-arrow {
+  flex-shrink: 0;
+  width: 31px;
+  height: 31px;
+  border-radius: 23px;
+  background: white;
+  border: 1px solid #f9e8f3;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #676767;
+  transition: all 0.2s ease;
+}
+
+.discovery-pills-arrow:hover {
+  background: #faf7f9;
+  transform: scale(1.05);
+}
+
 .pb-safe {
   padding-bottom: max(16px, env(safe-area-inset-bottom));
 }
@@ -2197,28 +2247,28 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .mobile-tab-btn.active-chat {
-  background: #dbe4f5;
-  color: #0c1013;
+  background: #883fe2;
+  color: #f1e9fd;
   font-weight: 700;
 }
 
 .mobile-tab-btn.active-coupons {
-  background: #dbe4f5;
-  color: #0c1013;
+  background: #883fe2;
+  color: #f1e9fd;
   font-weight: 700;
 }
 
 .mobile-tab-btn.active-problem,
 .mobile-tab-btn.active-support {
-  background: #dbe4f5;
-  color: #0c1013;
+  background: #883fe2;
+  color: #f1e9fd;
   font-weight: 700;
 }
 
 .mobile-tab-btn.active-discover,
 .mobile-tab-btn.active-topics {
-  background: #dbe4f5;
-  color: #0c1013;
+  background: #883fe2;
+  color: #f1e9fd;
   font-weight: 700;
 }
 
