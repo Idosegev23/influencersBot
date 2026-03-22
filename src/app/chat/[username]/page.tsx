@@ -117,11 +117,11 @@ const typeLabels: Record<InfluencerType, string> = {
 type TabId = string; // Dynamic — tab ids come from account config
 
 const TAB_STYLE: Record<string, { icon: typeof MessageCircle; activeColor: string; activeBg: string }> = {
-  chat: { icon: MessageCircle, activeColor: '#6d28d9', activeBg: 'rgba(139, 92, 246, 0.12)' },
-  discover: { icon: Compass, activeColor: '#7c3aed', activeBg: 'rgba(168, 85, 247, 0.12)' },
-  topics: { icon: Sparkles, activeColor: '#7c3aed', activeBg: 'rgba(168, 85, 247, 0.12)' },
-  coupons: { icon: Ticket, activeColor: '#059669', activeBg: 'rgba(16, 185, 129, 0.12)' },
-  support: { icon: AlertCircle, activeColor: '#db2777', activeBg: 'rgba(244, 114, 182, 0.12)' },
+  chat: { icon: MessageCircle, activeColor: '#f1e9fd', activeBg: '#883fe2' },
+  discover: { icon: Compass, activeColor: '#f1e9fd', activeBg: '#883fe2' },
+  topics: { icon: Sparkles, activeColor: '#f1e9fd', activeBg: '#883fe2' },
+  coupons: { icon: Ticket, activeColor: '#f1e9fd', activeBg: '#883fe2' },
+  support: { icon: AlertCircle, activeColor: '#f1e9fd', activeBg: '#883fe2' },
 };
 
 function getTabStyle(tabId: string) {
@@ -824,7 +824,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       
       <main className="chat-page flex flex-col overflow-hidden" style={{ position: 'relative' }}>
         {/* Header */}
-        <header className={`sticky top-0 z-50 ${isMobile ? 'glass header-border px-4 h-[68px] flex items-center' : 'px-4 py-[10px]'}`} style={{ position: 'sticky', zIndex: 50, isolation: 'isolate' }}>
+        <header className={`sticky top-0 z-50 ${isMobile ? 'glass px-4 h-[76px] flex items-center' : 'px-4 py-[10px]'}`} style={{ position: 'sticky', zIndex: 50, isolation: 'isolate' }}>
           {isMobile ? (
             /* ---- Mobile Header ---- */
             <div className="w-full flex items-center justify-between">
@@ -854,7 +854,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
             </div>
           ) : (
             /* ---- Desktop Header (Figma pill) ---- */
-            <div className="max-w-[700px] mx-auto rounded-full h-[69px] flex items-center justify-between px-3 flex-nowrap overflow-hidden chat-header-glow" style={{ background: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(24px) saturate(1.6)', WebkitBackdropFilter: 'blur(24px) saturate(1.6)', border: '1px solid rgba(255,255,255,0.7)', boxShadow: '0 4px 30px rgba(0,0,0,0.06)' }}>
+            <div className="max-w-[700px] mx-auto rounded-full h-[69px] flex items-center justify-between px-3 flex-nowrap overflow-hidden chat-header-glow" style={{ background: 'white', border: '1px solid #f9e8f3', boxShadow: '-30px 4px 60px 0 rgba(201,60,118,0.1), 30px 4px 60px 0 rgba(56,100,227,0.1)' }}>
               {/* Right side: Avatar + Name */}
               <div className="flex items-center gap-2.5 min-w-0 flex-shrink">
                 <div onClick={handleAvatarTap} className="cursor-pointer select-none relative">
@@ -877,7 +877,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
 
               {/* Left side: Tab pills */}
               <div className="flex items-center gap-2 flex-shrink-0">
-              <div className="flex items-center gap-[5px] rounded-full p-[6px]" style={{ background: 'rgba(255,255,255,0.3)' }}>
+              <div className="flex items-center gap-[5px] rounded-full p-[6px]" style={{ background: 'white' }}>
                 {(influencer.tabs || DEFAULT_TABS).map((tab: { id: string; label: string; type?: string }) => {
                   const isActive = activeTab === tab.id;
                   const style = getTabStyle(tab.id);
@@ -937,10 +937,19 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4, delay: 0.1 }}
                         className="font-semibold mb-2 max-w-[426px]"
-                        style={{ color: '#0c1013', fontSize: '33px', lineHeight: '33px' }}
+                        style={{ color: '#0c1013', fontSize: '33px', lineHeight: '38px' }}
                       >
                         {influencer.greeting_message || `היי אני העוזר האישי של ${influencer.display_name.split(' ')[0]}`}
                       </motion.h2>
+                      {!isMobile && (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ duration: 0.4, delay: 0.15 }}
+                          className="w-[296px] h-px mb-3"
+                          style={{ background: 'linear-gradient(90deg, transparent, #d9d9d9, transparent)' }}
+                        />
+                      )}
                       <motion.p
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -956,7 +965,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4, delay: 0.3 }}
-                        className={`${isMobile ? 'w-[363px]' : 'w-[700px]'} max-w-full mb-6`}
+                        className={`${isMobile ? 'w-[363px]' : 'w-[670px]'} max-w-full mb-6`}
                       >
                         {media.previewUrl && (
                           <MediaPreview
@@ -1001,7 +1010,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           </button>
                         </div>
                         {hasCommercialContent && (
-                          <p dir="rtl" style={{ color: '#9ca3af', fontSize: '11px', textAlign: 'center', marginTop: '6px', lineHeight: '16px' }}>
+                          <p dir="rtl" style={{ color: '#676767', fontSize: isMobile ? '11px' : '10px', textAlign: 'center', marginTop: '6px', lineHeight: '16px' }}>
                             העמוד עשוי לכלול תוכן שיווקי ושיתופי פעולה מסחריים
                           </p>
                         )}
@@ -1819,8 +1828,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                     onClick={() => setActiveTab(tab.id as TabId)}
                     className={`mobile-tab-btn ${activeTab === tab.id ? `active-${tab.id}` : ''}`}
                   >
-                    <TabIcon className="w-[18px] h-[18px]" />
                     <span>{tab.label}</span>
+                    <TabIcon className="w-[18px] h-[18px]" />
                   </button>
                 );
               })}

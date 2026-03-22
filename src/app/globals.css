@@ -227,6 +227,29 @@ h1, h2, h3, h4, h5, h6 {
   position: relative;
 }
 
+/* Desktop gradient background (Figma: blue/purple vertical stripes) */
+@media (min-width: 768px) {
+  .chat-page::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background:
+      linear-gradient(90deg,
+        rgba(180, 220, 255, 0.15) 0%,
+        rgba(180, 220, 255, 0.12) 20%,
+        rgba(190, 200, 255, 0.10) 40%,
+        rgba(200, 190, 255, 0.10) 60%,
+        rgba(210, 185, 255, 0.08) 80%,
+        rgba(220, 200, 255, 0.05) 100%
+      );
+    pointer-events: none;
+  }
+  .chat-page {
+    background: white;
+  }
+}
+
 /* ============================================
    GLASSMORPHIC FOUNDATION
    ============================================ */
@@ -641,11 +664,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .chat-page .glass {
-  background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(24px) saturate(1.6);
-  -webkit-backdrop-filter: blur(24px) saturate(1.6);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.04);
+  background: transparent;
   position: relative;
 }
 
@@ -659,24 +678,19 @@ h1, h2, h3, h4, h5, h6 {
    Chat Bubbles
    ============================================ */
 .chat-bubble-user {
-  background: linear-gradient(135deg, #2d2b3d 0%, #1a1a2e 100%);
-  border-radius: 22px 22px 4px 22px;
+  background: #0c1013;
+  border-radius: 30px 30px 4px 30px;
   color: white;
   font-size: 16px;
   padding: 12px 18px;
-  box-shadow: 0 2px 12px rgba(30, 20, 60, 0.15);
 }
 
 .chat-bubble-assistant {
-  background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(16px) saturate(1.4);
-  -webkit-backdrop-filter: blur(16px) saturate(1.4);
-  border-radius: 22px 22px 22px 4px;
-  color: #1a1a2e;
-  border: 1px solid rgba(255, 255, 255, 0.65);
-  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.04);
+  background: transparent;
+  border-radius: 30px 30px 30px 4px;
+  color: #0c1013;
   font-size: 16px;
-  padding: 12px 18px;
+  padding: 3px;
 }
 
 /* ============================================
@@ -2026,15 +2040,9 @@ h1, h2, h3, h4, h5, h6 {
 .status-dot {
   width: 10px;
   height: 10px;
-  background: linear-gradient(135deg, #8b5cf6, #d946ef);
+  background: #22c55e;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.8);
-  animation: statusPulse 2s infinite;
-}
-
-@keyframes statusPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4); }
-  50% { box-shadow: 0 0 0 4px rgba(139, 92, 246, 0); }
+  border: 2px solid white;
 }
 
 .chat-input-pill {
@@ -2042,14 +2050,14 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   align-items: center;
   min-height: 60px;
-  background: rgba(255, 255, 255, 0.65);
-  backdrop-filter: blur(24px) saturate(1.5);
-  -webkit-backdrop-filter: blur(24px) saturate(1.5);
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: white;
+  border: 1px solid #f9e8f3;
   border-radius: 60px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(255, 255, 255, 0.3) inset;
+  box-shadow:
+    -30px 4px 60px 0 rgba(201, 60, 118, 0.1),
+     30px 4px 60px 0 rgba(56, 100, 227, 0.1);
   transition: box-shadow 0.3s ease, border-color 0.3s ease;
-  padding: 8px 10px 8px 8px;
+  padding: 8px 16px 8px 10px;
 }
 
 /* No visual change on focus — same look always */
@@ -2074,29 +2082,27 @@ h1, h2, h3, h4, h5, h6 {
 
 .chat-input-pill .send-btn {
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #8b5cf6 0%, #d946ef 50%, #f472b6 100%);
+  background: #883fe2;
   color: white;
   border: none;
   cursor: pointer;
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
-  box-shadow: 0 2px 10px rgba(139, 92, 246, 0.3);
+  transition: transform 0.25s ease, opacity 0.25s ease;
 }
 
 .chat-input-pill .send-btn:hover:not(:disabled) {
-  transform: scale(1.1);
-  box-shadow: 0 4px 18px rgba(139, 92, 246, 0.4);
+  transform: scale(1.08);
+  opacity: 0.9;
 }
 
 .chat-input-pill .send-btn:disabled {
   opacity: 0.25;
   cursor: not-allowed;
-  box-shadow: none;
 }
 
 /* ── Media Attach Button ── */
@@ -2110,13 +2116,13 @@ h1, h2, h3, h4, h5, h6 {
   justify-content: center;
   background: transparent;
   border: none;
-  color: #8b5cf6;
+  color: #883fe2;
   cursor: pointer;
   transition: all 0.2s;
   margin-right: 4px;
 }
 .media-attach-btn:hover:not(:disabled) {
-  background: rgba(139, 92, 246, 0.1);
+  background: rgba(136, 63, 226, 0.1);
   transform: scale(1.1);
 }
 .media-attach-btn:disabled {
@@ -2228,25 +2234,22 @@ h1, h2, h3, h4, h5, h6 {
 .suggestion-pill {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 10px 18px;
+  padding: 6px 15px;
   font-size: 13px;
-  background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.65);
-  border-radius: 9999px;
-  color: #3a3550;
+  background: white;
+  border: 1px solid #f9e8f3;
+  border-radius: 23px;
+  color: #676767;
   transition: all 0.25s ease;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .suggestion-pill:hover {
-  border-color: rgba(200, 170, 255, 0.5);
-  background: rgba(255, 255, 255, 0.75);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.1);
+  border-color: #e8d0e0;
+  background: #faf7f9;
+  transform: translateY(-1px);
 }
 
 .pb-safe {
@@ -2274,12 +2277,8 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   gap: 5px;
   padding: 6px;
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(24px) saturate(1.5);
-  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  background: white;
   border-radius: 60px;
-  border: 1px solid rgba(255, 255, 255, 0.65);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.08);
   pointer-events: auto;
   position: relative;
 }
@@ -2303,28 +2302,28 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .mobile-tab-btn.active-chat {
-  background: rgba(139, 92, 246, 0.12);
-  color: #6d28d9;
+  background: #dbe4f5;
+  color: #0c1013;
   font-weight: 700;
 }
 
 .mobile-tab-btn.active-coupons {
-  background: rgba(16, 185, 129, 0.12);
-  color: #059669;
+  background: #dbe4f5;
+  color: #0c1013;
   font-weight: 700;
 }
 
 .mobile-tab-btn.active-problem,
 .mobile-tab-btn.active-support {
-  background: rgba(244, 114, 182, 0.12);
-  color: #db2777;
+  background: #dbe4f5;
+  color: #0c1013;
   font-weight: 700;
 }
 
 .mobile-tab-btn.active-discover,
 .mobile-tab-btn.active-topics {
-  background: rgba(168, 85, 247, 0.12);
-  color: #7c3aed;
+  background: #dbe4f5;
+  color: #0c1013;
   font-weight: 700;
 }
 
@@ -2337,47 +2336,40 @@ h1, h2, h3, h4, h5, h6 {
     background: transparent !important;
   }
   .chat-page .glass {
-    background: rgba(255, 255, 255, 0.45) !important;
-    backdrop-filter: blur(20px) saturate(1.5) !important;
-    -webkit-backdrop-filter: blur(20px) saturate(1.5) !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.5) !important;
+    background: white !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border-bottom: 1px solid #d9d9d9 !important;
   }
   .chat-bg {
     background: transparent !important;
   }
 
   .mobile-chat .chat-input-pill {
-    border: 1px solid rgba(255, 255, 255, 0.6) !important;
+    border: none !important;
     border-radius: 60px !important;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06) !important;
-    background: rgba(255, 255, 255, 0.6) !important;
-    backdrop-filter: blur(20px) !important;
-    -webkit-backdrop-filter: blur(20px) !important;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1) !important;
+    background: white !important;
   }
 
   .mobile-chat .chat-input-pill .send-btn {
-    background: linear-gradient(135deg, #8b5cf6 0%, #d946ef 50%, #f472b6 100%) !important;
-    width: 40px !important;
-    height: 40px !important;
-    box-shadow: 0 2px 10px rgba(139, 92, 246, 0.3) !important;
+    background: #0c1013 !important;
+    width: 38px !important;
+    height: 38px !important;
   }
 
   .mobile-chat .suggestion-pill {
-    background: rgba(255, 255, 255, 0.5) !important;
-    backdrop-filter: blur(10px) !important;
-    -webkit-backdrop-filter: blur(10px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.6) !important;
+    background: white !important;
+    border: none !important;
     border-radius: 23px !important;
-    padding: 8px 15px !important;
+    padding: 6px 15px !important;
     font-size: 13px !important;
-    color: #3a3550 !important;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+    color: #676767 !important;
   }
 
   .mobile-chat .suggestion-pill:hover {
-    background: rgba(255, 255, 255, 0.7) !important;
+    background: #f8f8f8 !important;
     transform: none !important;
-    box-shadow: 0 2px 12px rgba(139, 92, 246, 0.08) !important;
   }
 
   .mobile-chat .bot-avatar-inline {
@@ -2385,10 +2377,8 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .mobile-chat .typing-indicator {
-    background: rgba(255, 255, 255, 0.45) !important;
-    backdrop-filter: blur(12px) !important;
-    -webkit-backdrop-filter: blur(12px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.5) !important;
+    background: white !important;
+    border: none !important;
     box-shadow: none !important;
   }
 
@@ -2397,7 +2387,7 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .mobile-chat .chat-input-gradient {
-    background: linear-gradient(to top, rgba(244, 245, 247, 0.9) 40%, transparent 100%) !important;
+    background: transparent !important;
   }
 }
 
