@@ -1641,6 +1641,10 @@ h1, h2, h3, h4, h5, h6 {
   50% { transform: translateY(-4px); }
 }
 
+/* Hide scrollbar utility */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
 /* Marquee scroll animation */
 @keyframes marquee {
   from { transform: translateX(0); }

@@ -7,6 +7,7 @@ interface DiscoveryCardProps {
   item: DiscoveryItem;
   color: string;
   onClick: (item: DiscoveryItem) => void;
+  variant?: 'default' | 'hero' | 'wide';
 }
 
 function formatMetric(value: number | undefined, label: string | undefined): string {
@@ -17,7 +18,6 @@ function formatMetric(value: number | undefined, label: string | undefined): str
   return value.toLocaleString('he-IL');
 }
 
-/** Pick a Material Symbols icon based on the metric label */
 function metricIcon(label: string | undefined): string {
   if (!label) return 'trending_up';
   if (label.includes('צפיות')) return 'visibility';
@@ -28,7 +28,13 @@ function metricIcon(label: string | undefined): string {
   return 'trending_up';
 }
 
-export function DiscoveryCard({ item, color, onClick }: DiscoveryCardProps) {
+const sizeMap = {
+  default: { width: 140, height: 200 },
+  hero: { width: 200, height: 280 },
+  wide: { width: 220, height: 160 },
+};
+
+export function DiscoveryCard({ item, color, onClick, variant = 'default' }: DiscoveryCardProps) {
   const displayTitle = item.aiTitle || item.captionExcerpt;
   const thumbnailSrc = item.thumbnailUrl
     ? getProxiedImageUrl(item.thumbnailUrl, item.shortcode)
@@ -38,21 +44,20 @@ export function DiscoveryCard({ item, color, onClick }: DiscoveryCardProps) {
 
   const isReel = item.mediaType === 'reel' || item.mediaType === 'video';
   const metricText = formatMetric(item.metricValue, item.metricLabel);
-
-  // Rank #1 gets primary purple bg, others get white/90
   const isFirst = item.rank === 1;
+  const size = sizeMap[variant];
 
   return (
     <button
       onClick={() => onClick(item)}
-      className="relative flex-shrink-0 cursor-pointer overflow-hidden rounded-[20px] border border-black/[.04] hover:scale-[1.03] active:scale-[0.95] transition-all duration-200 group"
+      className="relative flex-shrink-0 cursor-pointer overflow-hidden rounded-2xl hover:scale-[1.03] active:scale-[0.95] transition-all duration-200 group"
       style={{
-        width: 140,
-        height: 240,
-        boxShadow: '0px 20px 40px rgba(12, 16, 19, 0.06)',
+        width: size.width,
+        height: size.height,
+        boxShadow: '0 8px 24px rgba(12, 16, 19, 0.08)',
       }}
     >
-      {/* Full-bleed image — 9:16 portrait ratio */}
+      {/* Thumbnail image */}
       {thumbnailSrc ? (
         <img
           src={thumbnailSrc}
@@ -69,27 +74,22 @@ export function DiscoveryCard({ item, color, onClick }: DiscoveryCardProps) {
         </div>
       )}
 
-      {/* Dark gradient from bottom */}
+      {/* Dark gradient */}
       <div
         className="absolute inset-0"
-        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.80) 0%, transparent 60%)' }}
+        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.15) 50%, transparent 70%)' }}
       />
 
-      {/* Play icon for reels — backdrop-blur pill per Stitch */}
+      {/* Play icon for reels */}
       {isReel && (
-        <div className="absolute top-2 left-2 w-7 h-7 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center">
-          <span
-            className="material-symbols-outlined text-white text-base"
-            style={{ fontVariationSettings: "'FILL' 1" }}
-          >
-            play_arrow
-          </span>
+        <div className="absolute top-2.5 left-2.5 w-6 h-6 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center">
+          <span className="material-symbols-outlined text-white text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
         </div>
       )}
 
-      {/* Rank badge — #1 gets primary color, rest get white/90 */}
+      {/* Rank badge */}
       <div
-        className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shadow-md"
+        className="absolute top-2.5 right-2.5 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shadow-md"
         style={{
           backgroundColor: isFirst ? '#7c3aed' : 'rgba(255,255,255,0.9)',
           color: isFirst ? '#ffffff' : '#191c1e',
@@ -98,20 +98,15 @@ export function DiscoveryCard({ item, color, onClick }: DiscoveryCardProps) {
         {item.rank}
       </div>
 
-      {/* Bottom content — metric pill + title */}
-      <div className="absolute bottom-3 right-3 left-3 flex flex-col gap-1.5" dir="rtl">
+      {/* Bottom content */}
+      <div className="absolute bottom-2.5 right-2.5 left-2.5 flex flex-col gap-1" dir="rtl">
         {metricText && (
-          <span className="bg-white/10 backdrop-blur-md text-white text-[10px] px-2 py-0.5 rounded-full self-start flex items-center gap-1">
-            <span
-              className="material-symbols-outlined text-[10px]"
-              style={{ fontVariationSettings: "'FILL' 1" }}
-            >
-              {metricIcon(item.metricLabel)}
-            </span>
+          <span className="bg-white/15 backdrop-blur-md text-white text-[9px] px-1.5 py-0.5 rounded-full self-start flex items-center gap-0.5">
+            <span className="material-symbols-outlined text-[9px]" style={{ fontVariationSettings: "'FILL' 1" }}>{metricIcon(item.metricLabel)}</span>
             {metricText}
           </span>
         )}
-        <h3 className="text-white text-[13px] font-bold leading-tight line-clamp-2">
+        <h3 className="text-white text-[12px] font-bold leading-tight line-clamp-2 drop-shadow-sm">
           {displayTitle}
         </h3>
       </div>

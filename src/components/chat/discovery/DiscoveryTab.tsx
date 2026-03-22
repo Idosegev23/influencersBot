@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useDiscoveryAll } from '@/hooks/useDiscoveryAll';
 import { useDiscovery } from '@/hooks/useDiscovery';
 import { DiscoveryRow } from './DiscoveryRow';
@@ -19,6 +19,9 @@ interface DiscoveryTabProps {
   onAskInChat: (message: string, enrichedData?: string) => void;
   onCategoryOpened?: () => void;
 }
+
+/** Alternate layouts so each section looks different */
+const LAYOUT_CYCLE: Array<'scroll' | 'hero' | 'grid'> = ['scroll', 'hero', 'scroll', 'grid', 'scroll', 'hero'];
 
 export default function DiscoveryTab({ username, influencerName, sessionId, initialCategory, onAskInChat, onCategoryOpened }: DiscoveryTabProps) {
   const { rows, loading, error } = useDiscoveryAll({ username });
@@ -44,7 +47,6 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
   const viewCountRef = useRef(0);
   const leadMagnetShownRef = useRef(false);
 
-  // Check if lead magnet was already dismissed this session
   useEffect(() => {
     try {
       const dismissed = sessionStorage.getItem(`discovery_lead_magnet_${username}`);
@@ -52,7 +54,6 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
     } catch { /* sessionStorage not available */ }
   }, [username]);
 
-  // Preserve scroll position
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef(0);
 
@@ -73,12 +74,10 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
   }, [initialCategory, onCategoryOpened]);
 
   const handleItemClick = useCallback((item: DiscoveryItem, categoryTitle: string, categorySlug: string) => {
-    // Save scroll position
     if (scrollContainerRef.current) {
       scrollPositionRef.current = scrollContainerRef.current.scrollTop;
     }
 
-    // Find category color
     const row = rows.find(r => r.category.slug === categorySlug);
     const color = row?.category.color || '#7c3aed';
 
@@ -87,18 +86,15 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
     setModalCategoryColor(color);
     setIsModalOpen(true);
 
-    // Track views for lead magnet
     viewCountRef.current += 1;
     if (viewCountRef.current >= 3 && !leadMagnetShownRef.current) {
       leadMagnetShownRef.current = true;
-      // Show lead magnet after a brief delay so modal opens first
       setTimeout(() => setShowLeadMagnet(true), 600);
     }
   }, [rows]);
 
   const handleModalClose = useCallback(() => {
     setIsModalOpen(false);
-    // Restore scroll position
     requestAnimationFrame(() => {
       if (scrollContainerRef.current) {
         scrollContainerRef.current.scrollTop = scrollPositionRef.current;
@@ -107,7 +103,6 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
   }, []);
 
   const handleModalAskInChat = useCallback((message: string, enrichedData?: string) => {
-    // Build richer enriched data with category context
     const row = rows.find(r => r.category.title === modalCategoryTitle);
     if (row && selectedItem) {
       const contextLines = row.items.map((it, idx) => {
@@ -131,16 +126,13 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
   }, [username]);
 
   const handleLeadMagnetSubmit = useCallback(async (name: string, email: string) => {
-    // Save lead to Supabase via API
     try {
       await fetch('/api/discovery/lead', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, name, email, sessionId }),
       });
-    } catch {
-      // Non-blocking — don't fail the UX
-    }
+    } catch { /* Non-blocking */ }
     setShowLeadMagnet(false);
     try {
       sessionStorage.setItem(`discovery_lead_magnet_${username}`, '1');
@@ -149,8 +141,8 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
 
   return (
     <div ref={scrollContainerRef} className="h-full overflow-y-auto" style={{ backgroundColor: '#f8f9fb' }}>
-      {/* Header — per Stitch: sticky top bar style */}
-      <div className="px-6 pt-5 pb-3" dir="rtl">
+      {/* Header */}
+      <div className="px-4 pt-5 pb-4" dir="rtl">
         <div className="flex items-center gap-2 mb-1">
           <span
             className="material-symbols-outlined text-2xl"
@@ -158,7 +150,7 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
           >
             auto_awesome
           </span>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: '#6d28d9' }}>
+          <h1 className="text-[22px] font-bold tracking-tight" style={{ color: '#6d28d9' }}>
             גלה תוכן
           </h1>
         </div>
@@ -182,12 +174,22 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
         </div>
       )}
 
-      {/* Marquee rows */}
+      {/* Content rows — alternating layouts */}
       {!loading && rows.length > 0 && (
-        <div className="pt-1 pb-4">
+        <div className="mt-2">
           {rows.map((row, idx) => {
-            const speeds = [28, 38, 22, 34, 26, 42, 30, 36];
-            const duration = speeds[idx % speeds.length];
+            // Pick layout: hero for first row with enough items, then cycle
+            let layout: 'scroll' | 'hero' | 'grid';
+            if (idx === 0 && row.items.length >= 3) {
+              layout = 'hero';
+            } else {
+              layout = LAYOUT_CYCLE[(idx - 1 + LAYOUT_CYCLE.length) % LAYOUT_CYCLE.length] || 'scroll';
+              // Grid needs at least 3 items
+              if (layout === 'grid' && row.items.length < 3) layout = 'scroll';
+              // Hero needs at least 3 items
+              if (layout === 'hero' && row.items.length < 3) layout = 'scroll';
+            }
+
             return (
               <DiscoveryRow
                 key={row.category.slug}
@@ -197,8 +199,7 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
                 color={row.category.color}
                 items={row.items}
                 onItemClick={handleItemClick}
-                reverse={idx % 2 === 1}
-                duration={duration}
+                layout={layout}
               />
             );
           })}
@@ -217,20 +218,30 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
       <div className="mt-2 mx-4 mb-32">
         <button
           onClick={() => setShowQuestions(!showQuestions)}
-          className="w-full flex items-center justify-between rounded-[20px] p-4 transition-colors"
-          style={{ backgroundColor: '#ffffff', border: '1px solid #e5e5ea' }}
+          className="w-full flex items-center justify-between rounded-2xl p-4 transition-colors hover:bg-white"
+          style={{ backgroundColor: '#ffffff', boxShadow: '0 2px 8px rgba(12, 16, 19, 0.04)', border: '1px solid rgba(204, 195, 216, 0.2)' }}
           dir="rtl"
         >
-          <div className="flex items-center gap-2">
-            <span className="text-[16px]">❓</span>
-            <span className="text-[15px] font-semibold" style={{ color: '#0c1013' }}>
+          <div className="flex items-center gap-2.5">
+            <span
+              className="material-symbols-outlined text-xl"
+              style={{ color: '#7c3aed', fontVariationSettings: "'FILL' 1" }}
+            >
+              help
+            </span>
+            <span className="text-[14px] font-semibold" style={{ color: '#191c1e' }}>
               שאלות שתמיד רציתם לשאול
             </span>
           </div>
-          {showQuestions
-            ? <ChevronUp className="w-5 h-5" style={{ color: '#676767' }} />
-            : <ChevronDown className="w-5 h-5" style={{ color: '#676767' }} />
-          }
+          <span
+            className="material-symbols-outlined text-xl transition-transform"
+            style={{
+              color: '#4a4455',
+              transform: showQuestions ? 'rotate(180deg)' : 'rotate(0deg)',
+            }}
+          >
+            expand_more
+          </span>
         </button>
 
         <AnimatePresence>
