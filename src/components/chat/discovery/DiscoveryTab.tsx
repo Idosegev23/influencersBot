@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, ChevronUp, Loader2, Sparkles } from 'lucide-react';
 import { useDiscoveryAll } from '@/hooks/useDiscoveryAll';
 import { useDiscovery } from '@/hooks/useDiscovery';
 import { DiscoveryRow } from './DiscoveryRow';
+import { DiscoveryModal } from './DiscoveryModal';
+import { LeadMagnetPopup } from './LeadMagnetPopup';
 import { QuestionsView } from './QuestionsView';
 import type { DiscoveryItem } from '@/lib/discovery/types';
 
@@ -31,6 +33,29 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
   const [showQuestions, setShowQuestions] = useState(false);
   const questionsLoadedRef = useRef(false);
 
+  // Modal state
+  const [selectedItem, setSelectedItem] = useState<DiscoveryItem | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalCategoryTitle, setModalCategoryTitle] = useState('');
+  const [modalCategoryColor, setModalCategoryColor] = useState('#7c3aed');
+
+  // Lead magnet state
+  const [showLeadMagnet, setShowLeadMagnet] = useState(false);
+  const viewCountRef = useRef(0);
+  const leadMagnetShownRef = useRef(false);
+
+  // Check if lead magnet was already dismissed this session
+  useEffect(() => {
+    try {
+      const dismissed = sessionStorage.getItem(`discovery_lead_magnet_${username}`);
+      if (dismissed) leadMagnetShownRef.current = true;
+    } catch { /* sessionStorage not available */ }
+  }, [username]);
+
+  // Preserve scroll position
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollPositionRef = useRef(0);
+
   useEffect(() => {
     if (showQuestions && !questionsLoadedRef.current) {
       questionsLoadedRef.current = true;
@@ -47,14 +72,44 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
     }
   }, [initialCategory, onCategoryOpened]);
 
-  const handleItemClick = (item: DiscoveryItem, categoryTitle: string, categorySlug: string) => {
-    const title = item.aiTitle || item.captionExcerpt;
-    const truncated = title.length > 80 ? title.slice(0, 80) + '...' : title;
-    const visibleMsg = `ספרי לי עוד על: ${truncated}`;
+  const handleItemClick = useCallback((item: DiscoveryItem, categoryTitle: string, categorySlug: string) => {
+    // Save scroll position
+    if (scrollContainerRef.current) {
+      scrollPositionRef.current = scrollContainerRef.current.scrollTop;
+    }
 
+    // Find category color
     const row = rows.find(r => r.category.slug === categorySlug);
-    let enrichedData: string | undefined;
-    if (row) {
+    const color = row?.category.color || '#7c3aed';
+
+    setSelectedItem(item);
+    setModalCategoryTitle(categoryTitle);
+    setModalCategoryColor(color);
+    setIsModalOpen(true);
+
+    // Track views for lead magnet
+    viewCountRef.current += 1;
+    if (viewCountRef.current >= 3 && !leadMagnetShownRef.current) {
+      leadMagnetShownRef.current = true;
+      // Show lead magnet after a brief delay so modal opens first
+      setTimeout(() => setShowLeadMagnet(true), 600);
+    }
+  }, [rows]);
+
+  const handleModalClose = useCallback(() => {
+    setIsModalOpen(false);
+    // Restore scroll position
+    requestAnimationFrame(() => {
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = scrollPositionRef.current;
+      }
+    });
+  }, []);
+
+  const handleModalAskInChat = useCallback((message: string, enrichedData?: string) => {
+    // Build richer enriched data with category context
+    const row = rows.find(r => r.category.title === modalCategoryTitle);
+    if (row && selectedItem) {
       const contextLines = row.items.map((it, idx) => {
         const t = it.aiTitle || it.captionExcerpt || '';
         const summary = it.aiSummary || '';
@@ -63,14 +118,37 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
           : '';
         return `${idx + 1}. ${t}${metric}${summary ? ' — ' + summary : ''}`;
       }).join('\n');
-      enrichedData = `[הנתונים מתוך הרשימה "${categoryTitle}":\n${contextLines}]\n\nספרי לי עוד על: ${truncated}`;
+      enrichedData = `[הנתונים מתוך הרשימה "${modalCategoryTitle}":\n${contextLines}]\n\n${message}`;
     }
+    onAskInChat(message, enrichedData);
+  }, [rows, modalCategoryTitle, selectedItem, onAskInChat]);
 
-    onAskInChat(visibleMsg, enrichedData);
-  };
+  const handleLeadMagnetClose = useCallback(() => {
+    setShowLeadMagnet(false);
+    try {
+      sessionStorage.setItem(`discovery_lead_magnet_${username}`, '1');
+    } catch { /* sessionStorage not available */ }
+  }, [username]);
+
+  const handleLeadMagnetSubmit = useCallback(async (name: string, email: string) => {
+    // Save lead to Supabase via API
+    try {
+      await fetch('/api/discovery/lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, name, email, sessionId }),
+      });
+    } catch {
+      // Non-blocking — don't fail the UX
+    }
+    setShowLeadMagnet(false);
+    try {
+      sessionStorage.setItem(`discovery_lead_magnet_${username}`, '1');
+    } catch { /* sessionStorage not available */ }
+  }, [username, sessionId]);
 
   return (
-    <div className="h-full overflow-y-auto" style={{ backgroundColor: '#f4f5f7' }}>
+    <div ref={scrollContainerRef} className="h-full overflow-y-auto" style={{ backgroundColor: '#f4f5f7' }}>
       {/* Header */}
       <div className="px-4 pt-5 pb-3" dir="rtl">
         <div className="flex items-center gap-2 mb-0.5">
@@ -99,11 +177,10 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
         </div>
       )}
 
-      {/* Marquee rows — each row has its own fade edges */}
+      {/* Marquee rows */}
       {!loading && rows.length > 0 && (
         <div className="pt-1 pb-4">
           {rows.map((row, idx) => {
-            // Different speed per row so they don't move in sync
             const speeds = [28, 38, 22, 34, 26, 42, 30, 36];
             const duration = speeds[idx % speeds.length];
             return (
@@ -173,6 +250,24 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
           )}
         </AnimatePresence>
       </div>
+
+      {/* Discovery Modal */}
+      <DiscoveryModal
+        item={selectedItem}
+        isOpen={isModalOpen}
+        onClose={handleModalClose}
+        onAskInChat={handleModalAskInChat}
+        categoryTitle={modalCategoryTitle}
+        categoryColor={modalCategoryColor}
+      />
+
+      {/* Lead Magnet Popup */}
+      <LeadMagnetPopup
+        isOpen={showLeadMagnet}
+        onClose={handleLeadMagnetClose}
+        onSubmit={handleLeadMagnetSubmit}
+        influencerName={influencerName}
+      />
     </div>
   );
 }
