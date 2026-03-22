@@ -1471,45 +1471,81 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   <div className={`mx-auto ${isMobile ? 'max-w-2xl' : 'max-w-[700px]'}`}>
                     <h2 className="coupons-header-title mb-1 text-center">קופונים</h2>
                     <p className="mb-6 text-center" style={{ fontSize: '15px', color: '#888' }}>הנחות בלעדיות בשבילכם</p>
-                    <div className={`${isMobile ? 'flex flex-col gap-3' : 'grid grid-cols-2 gap-4'}`}>
-                      {brands.map((brand) => (
-                        <button
-                          key={brand.id}
-                          onClick={() => brand.coupon_code && handleCopyCode(brand.coupon_code, brand.id)}
-                          className="coupon-card"
-                        >
-                          {/* Brand logo */}
-                          <div className="brand-logo">
-                            {brand.image_url ? (
-                              <img src={getProxiedImageUrl(brand.image_url)} alt={brand.brand_name} />
-                            ) : (
-                              <span className="brand-logo-letter">{brand.brand_name.charAt(0).toUpperCase()}</span>
-                            )}
-                          </div>
-                          {/* Brand name + coupon description */}
-                          <div className="flex-1 min-w-0 text-right">
-                            <p className="font-semibold truncate" style={{ fontSize: '16px', color: '#1a1a2e' }}>
-                              {brand.brand_name}
-                            </p>
-                            {brand.description && (
-                              <p className="truncate" style={{ fontSize: '13px', color: '#888', marginTop: '2px' }}>
-                                {brand.description}
+
+                    {/* Active coupons */}
+                    {brands.filter(b => b.coupon_code).length > 0 && (
+                      <div className={`${isMobile ? 'flex flex-col gap-3' : 'grid grid-cols-2 gap-4'}`}>
+                        {brands.filter(b => b.coupon_code).map((brand) => (
+                          <button
+                            key={brand.id}
+                            onClick={() => handleCopyCode(brand.coupon_code!, brand.id)}
+                            className="coupon-card"
+                          >
+                            {/* Brand logo */}
+                            <div className="brand-logo">
+                              {brand.image_url ? (
+                                <img src={getProxiedImageUrl(brand.image_url)} alt={brand.brand_name} />
+                              ) : (
+                                <span className="brand-logo-letter">{brand.brand_name.charAt(0).toUpperCase()}</span>
+                              )}
+                            </div>
+                            {/* Brand name + what the coupon gives */}
+                            <div className="flex-1 min-w-0 text-right">
+                              <p className="font-semibold truncate" style={{ fontSize: '16px', color: '#1a1a2e' }}>
+                                {brand.brand_name}
                               </p>
-                            )}
-                          </div>
-                          {/* Coupon badge or "no coupon" */}
-                          {brand.coupon_code ? (
-                            <div className="flex items-center gap-2">
+                              {brand.description && (
+                                <p style={{ fontSize: '13px', color: '#888', marginTop: '2px', lineHeight: 1.4 }} className="line-clamp-2">
+                                  {brand.description}
+                                </p>
+                              )}
+                            </div>
+                            {/* Coupon code pill */}
+                            <div className="flex items-center gap-2 flex-shrink-0">
                               <span className={`coupon-code-pill ${copiedCode === brand.id ? 'copied' : ''}`}>
                                 {copiedCode === brand.id ? '✓ הועתק!' : brand.coupon_code}
                               </span>
                             </div>
-                          ) : (
-                            <span style={{ fontSize: '12px', color: '#bbb' }}>ללא קוד</span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Partnerships without coupons */}
+                    {brands.filter(b => !b.coupon_code).length > 0 && (
+                      <>
+                        <h3 className="text-[15px] font-semibold mt-8 mb-3 text-right" style={{ color: '#555' }}>
+                          שיתופי פעולה
+                        </h3>
+                        <div className={`${isMobile ? 'flex flex-col gap-2' : 'grid grid-cols-2 gap-3'}`}>
+                          {brands.filter(b => !b.coupon_code).map((brand) => (
+                            <div
+                              key={brand.id}
+                              className="coupon-card"
+                              style={{ opacity: 0.75 }}
+                            >
+                              <div className="brand-logo">
+                                {brand.image_url ? (
+                                  <img src={getProxiedImageUrl(brand.image_url)} alt={brand.brand_name} />
+                                ) : (
+                                  <span className="brand-logo-letter">{brand.brand_name.charAt(0).toUpperCase()}</span>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0 text-right">
+                                <p className="font-semibold truncate" style={{ fontSize: '15px', color: '#1a1a2e' }}>
+                                  {brand.brand_name}
+                                </p>
+                                {brand.category && (
+                                  <p className="truncate" style={{ fontSize: '12px', color: '#aaa', marginTop: '2px' }}>
+                                    {brand.category}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </motion.div>
