@@ -293,8 +293,8 @@ export default function AnalyticsPage({
                 <AreaChart data={chartData}>
                   <defs>
                     <linearGradient id="colorSessions" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#9334EB" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#9334EB" stopOpacity={0} />
                     </linearGradient>
                     <linearGradient id="colorMessages" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
@@ -319,7 +319,7 @@ export default function AnalyticsPage({
                     type="monotone"
                     dataKey="sessions"
                     name="שיחות"
-                    stroke="#6366f1"
+                    stroke="#9334EB"
                     fillOpacity={1}
                     fill="url(#colorSessions)"
                   />

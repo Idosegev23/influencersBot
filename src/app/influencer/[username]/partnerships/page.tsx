@@ -41,9 +41,9 @@ interface Partnership {
 }
 
 const STATUS_OPTIONS = [
-  { value: 'active', label: 'פעיל', color: '#34d399' },
-  { value: 'in_progress', label: 'בביצוע', color: '#60a5fa' },
-  { value: 'proposal', label: 'הצעה', color: '#fbbf24' },
+  { value: 'active', label: 'פעיל', color: '#17A34A' },
+  { value: 'in_progress', label: 'בביצוע', color: '#2663EB' },
+  { value: 'proposal', label: 'הצעה', color: '#CB8A04' },
   { value: 'negotiation', label: 'משא ומתן', color: '#f97316' },
   { value: 'completed', label: 'הושלם', color: '#a78bfa' },
   { value: 'cancelled', label: 'בוטל', color: '#ef4444' },

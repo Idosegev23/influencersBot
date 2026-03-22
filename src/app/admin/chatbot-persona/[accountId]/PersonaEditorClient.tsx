@@ -37,9 +37,9 @@ const EMOJI_OPTIONS: { value: Persona['emoji_usage']; label: string }[] = [
 ];
 
 const TAG_COLORS = [
-  'bg-[#69FFC7]/15 text-[#2d8a5e] border-[#69FFC7]/30',
-  'bg-[#AEB0E8]/15 text-[#575a8c] border-[#AEB0E8]/30',
-  'bg-[#FF76B0]/15 text-[#a14470] border-[#FF76B0]/30',
+  'bg-[#9334EB]/15 text-[#2d8a5e] border-[#9334EB]/30',
+  'bg-[#2663EB]/15 text-[#575a8c] border-[#2663EB]/30',
+  'bg-[#DC2627]/15 text-[#a14470] border-[#DC2627]/30',
   'bg-[#FFD166]/15 text-[#8a7030] border-[#FFD166]/30',
   'bg-[#73C7FF]/15 text-[#3a6a8c] border-[#73C7FF]/30',
 ];
@@ -98,12 +98,12 @@ function TagInput({
             }
           }}
           placeholder={placeholder}
-          className="flex-1 px-4 py-2.5 bg-[#fff8f1] border-none rounded-xl text-sm focus:ring-2 focus:ring-[#AEB0E8]/50 focus:outline-none transition-shadow"
+          className="flex-1 px-4 py-2.5 bg-[#f8f9fc] border-none rounded-xl text-sm focus:ring-2 focus:ring-[#2663EB]/50 focus:outline-none transition-shadow"
         />
         <button
           type="button"
           onClick={addTag}
-          className="px-4 py-2.5 rounded-xl bg-[#69FFC7]/10 text-[#2d8a5e] hover:bg-[#69FFC7]/20 transition-colors flex items-center gap-1"
+          className="px-4 py-2.5 rounded-xl bg-[#9334EB]/10 text-[#2d8a5e] hover:bg-[#9334EB]/20 transition-colors flex items-center gap-1"
         >
           <span className="material-symbols-outlined text-[18px]">add</span>
           <span className="text-sm font-medium">הוסף</span>
@@ -173,16 +173,16 @@ export default function PersonaEditorClient({
       <div className="max-w-[800px] mx-auto px-6 mt-12">
         <div className="animate-pulse space-y-6">
           <div className="flex items-center gap-4">
-            <div className="h-10 w-10 rounded-full bg-[#AEB0E8]/20" />
-            <div className="h-7 bg-[#AEB0E8]/10 rounded-xl w-1/3" />
+            <div className="h-10 w-10 rounded-full bg-[#2663EB]/20" />
+            <div className="h-7 bg-[#2663EB]/10 rounded-xl w-1/3" />
           </div>
           <div className="neon-card p-8 space-y-6">
-            <div className="h-5 bg-[#AEB0E8]/10 rounded-xl w-1/4" />
-            <div className="h-12 bg-[#fff8f1] rounded-xl" />
-            <div className="h-5 bg-[#AEB0E8]/10 rounded-xl w-1/4" />
-            <div className="h-12 bg-[#fff8f1] rounded-xl" />
-            <div className="h-5 bg-[#AEB0E8]/10 rounded-xl w-1/4" />
-            <div className="h-24 bg-[#fff8f1] rounded-xl" />
+            <div className="h-5 bg-[#2663EB]/10 rounded-xl w-1/4" />
+            <div className="h-12 bg-[#f8f9fc] rounded-xl" />
+            <div className="h-5 bg-[#2663EB]/10 rounded-xl w-1/4" />
+            <div className="h-12 bg-[#f8f9fc] rounded-xl" />
+            <div className="h-5 bg-[#2663EB]/10 rounded-xl w-1/4" />
+            <div className="h-24 bg-[#f8f9fc] rounded-xl" />
           </div>
         </div>
       </div>
@@ -228,7 +228,7 @@ export default function PersonaEditorClient({
               <p className="text-sm text-[#474747]/60 mt-0.5">
                 {persona.name}
                 {persona.instagram_username && (
-                  <span className="mr-2 text-[#AEB0E8]">@{persona.instagram_username}</span>
+                  <span className="mr-2 text-[#2663EB]">@{persona.instagram_username}</span>
                 )}
               </p>
             )}
@@ -259,9 +259,9 @@ export default function PersonaEditorClient({
       <div className="space-y-6">
         {/* Section 1: Basic Details */}
         <div className="neon-card overflow-hidden">
-          <div className="flex items-center gap-3 px-6 py-4 border-b border-[#faf2e9]">
-            <div className="w-9 h-9 rounded-full bg-[#AEB0E8]/15 flex items-center justify-center">
-              <span className="material-symbols-outlined text-[#AEB0E8] text-[20px]">person</span>
+          <div className="flex items-center gap-3 px-6 py-4 border-b border-[#f3f4f6]">
+            <div className="w-9 h-9 rounded-full bg-[#2663EB]/15 flex items-center justify-center">
+              <span className="material-symbols-outlined text-[#2663EB] text-[20px]">person</span>
             </div>
             <h2 className="text-lg font-bold text-[#474747] font-headline">פרטים בסיסיים</h2>
           </div>
@@ -274,7 +274,7 @@ export default function PersonaEditorClient({
                 value={persona.name}
                 onChange={(e) => setPersona({ ...persona, name: e.target.value })}
                 placeholder="לדוגמה: ליאור המסייעת"
-                className="w-full px-4 py-2.5 bg-[#fff8f1] border-none rounded-xl text-sm focus:ring-2 focus:ring-[#AEB0E8]/50 focus:outline-none transition-shadow"
+                className="w-full px-4 py-2.5 bg-[#f8f9fc] border-none rounded-xl text-sm focus:ring-2 focus:ring-[#2663EB]/50 focus:outline-none transition-shadow"
               />
             </div>
 
@@ -288,7 +288,7 @@ export default function PersonaEditorClient({
                   value={persona.instagram_username || ''}
                   onChange={(e) => setPersona({ ...persona, instagram_username: e.target.value || null })}
                   placeholder="username"
-                  className="w-full pr-8 pl-4 py-2.5 bg-[#fff8f1] border-none rounded-xl text-sm focus:ring-2 focus:ring-[#AEB0E8]/50 focus:outline-none transition-shadow"
+                  className="w-full pr-8 pl-4 py-2.5 bg-[#f8f9fc] border-none rounded-xl text-sm focus:ring-2 focus:ring-[#2663EB]/50 focus:outline-none transition-shadow"
                 />
               </div>
             </div>
@@ -301,7 +301,7 @@ export default function PersonaEditorClient({
                 onChange={(e) => setPersona({ ...persona, bio: e.target.value })}
                 placeholder="ביוגרפיה מאינסטגרם..."
                 rows={3}
-                className="w-full px-4 py-2.5 bg-[#fff8f1] border-none rounded-xl text-sm focus:ring-2 focus:ring-[#AEB0E8]/50 focus:outline-none transition-shadow resize-none"
+                className="w-full px-4 py-2.5 bg-[#f8f9fc] border-none rounded-xl text-sm focus:ring-2 focus:ring-[#2663EB]/50 focus:outline-none transition-shadow resize-none"
               />
             </div>
 
@@ -329,7 +329,7 @@ export default function PersonaEditorClient({
 
         {/* Section 2: Voice & Style */}
         <div className="neon-card overflow-hidden">
-          <div className="flex items-center gap-3 px-6 py-4 border-b border-[#faf2e9]">
+          <div className="flex items-center gap-3 px-6 py-4 border-b border-[#f3f4f6]">
             <div className="w-9 h-9 rounded-full bg-[#FFD166]/15 flex items-center justify-center">
               <span className="material-symbols-outlined text-[#FFD166] text-[20px]">mic</span>
             </div>
@@ -348,7 +348,7 @@ export default function PersonaEditorClient({
                     className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
                       persona.tone === opt.value
                         ? 'bg-[#575a8c] text-white shadow-md shadow-[#575a8c]/25'
-                        : 'bg-[#fff8f1] text-[#474747] hover:bg-[#AEB0E8]/10'
+                        : 'bg-[#f8f9fc] text-[#474747] hover:bg-[#2663EB]/10'
                     }`}
                   >
                     {opt.label}
@@ -363,7 +363,7 @@ export default function PersonaEditorClient({
               <select
                 value={persona.language}
                 onChange={(e) => setPersona({ ...persona, language: e.target.value as Persona['language'] })}
-                className="w-full px-4 py-2.5 bg-[#fff8f1] border-none rounded-xl text-sm focus:ring-2 focus:ring-[#AEB0E8]/50 focus:outline-none transition-shadow appearance-none cursor-pointer"
+                className="w-full px-4 py-2.5 bg-[#f8f9fc] border-none rounded-xl text-sm focus:ring-2 focus:ring-[#2663EB]/50 focus:outline-none transition-shadow appearance-none cursor-pointer"
               >
                 <option value="he">עברית</option>
                 <option value="en">English</option>
@@ -384,7 +384,7 @@ export default function PersonaEditorClient({
                     className={`py-2.5 rounded-full text-sm font-medium transition-all duration-200 ${
                       persona.emoji_usage === opt.value
                         ? 'bg-[#575a8c] text-white shadow-md shadow-[#575a8c]/25'
-                        : 'bg-[#fff8f1] text-[#474747] hover:bg-[#AEB0E8]/10'
+                        : 'bg-[#f8f9fc] text-[#474747] hover:bg-[#2663EB]/10'
                     }`}
                   >
                     {opt.label}
@@ -401,7 +401,7 @@ export default function PersonaEditorClient({
                 onChange={(e) => setPersona({ ...persona, response_style: e.target.value })}
                 placeholder="תאר את סגנון התגובה הרצוי, לדוגמה: helpful, funny, serious"
                 rows={3}
-                className="w-full px-4 py-2.5 bg-[#fff8f1] border-none rounded-xl text-sm focus:ring-2 focus:ring-[#AEB0E8]/50 focus:outline-none transition-shadow resize-none"
+                className="w-full px-4 py-2.5 bg-[#f8f9fc] border-none rounded-xl text-sm focus:ring-2 focus:ring-[#2663EB]/50 focus:outline-none transition-shadow resize-none"
               />
             </div>
           </div>
@@ -409,9 +409,9 @@ export default function PersonaEditorClient({
 
         {/* Section 3: Greeting & Directives */}
         <div className="neon-card overflow-hidden">
-          <div className="flex items-center gap-3 px-6 py-4 border-b border-[#faf2e9]">
-            <div className="w-9 h-9 rounded-full bg-[#69FFC7]/15 flex items-center justify-center">
-              <span className="material-symbols-outlined text-[#69FFC7] text-[20px]">forum</span>
+          <div className="flex items-center gap-3 px-6 py-4 border-b border-[#f3f4f6]">
+            <div className="w-9 h-9 rounded-full bg-[#9334EB]/15 flex items-center justify-center">
+              <span className="material-symbols-outlined text-[#9334EB] text-[20px]">forum</span>
             </div>
             <h2 className="text-lg font-bold text-[#474747] font-headline">ברכה והנחיות</h2>
           </div>
@@ -424,7 +424,7 @@ export default function PersonaEditorClient({
                 onChange={(e) => setPersona({ ...persona, greeting_message: e.target.value })}
                 placeholder="שלום! איך אפשר לעזור?"
                 rows={3}
-                className="w-full px-4 py-2.5 bg-[#fff8f1] border-none rounded-xl text-sm focus:ring-2 focus:ring-[#AEB0E8]/50 focus:outline-none transition-shadow resize-none"
+                className="w-full px-4 py-2.5 bg-[#f8f9fc] border-none rounded-xl text-sm focus:ring-2 focus:ring-[#2663EB]/50 focus:outline-none transition-shadow resize-none"
               />
             </div>
 
@@ -439,10 +439,10 @@ export default function PersonaEditorClient({
                 })}
                 placeholder={"תמיד תציע קופון\nאל תדבר על מחירים\nתהיה חיובי ומעודד"}
                 rows={5}
-                className="w-full px-4 py-2.5 bg-[#fff8f1] border-none rounded-xl text-sm font-mono focus:ring-2 focus:ring-[#AEB0E8]/50 focus:outline-none transition-shadow resize-none"
+                className="w-full px-4 py-2.5 bg-[#f8f9fc] border-none rounded-xl text-sm font-mono focus:ring-2 focus:ring-[#2663EB]/50 focus:outline-none transition-shadow resize-none"
               />
-              <div className="mt-3 flex items-start gap-2 bg-[#AEB0E8]/8 rounded-xl p-3">
-                <span className="material-symbols-outlined text-[#AEB0E8] text-[18px] mt-0.5">info</span>
+              <div className="mt-3 flex items-start gap-2 bg-[#2663EB]/8 rounded-xl p-3">
+                <span className="material-symbols-outlined text-[#2663EB] text-[18px] mt-0.5">info</span>
                 <p className="text-xs text-[#474747]/70 leading-relaxed">
                   שורה אחת לכל הנחיה. ההנחיות מגדירות את ההתנהגות של הצ׳אטבוט בשיחות עם עוקבים.
                   <span className="block mt-1 font-medium text-[#575a8c]">{persona.directives.length} הנחיות</span>
@@ -454,10 +454,10 @@ export default function PersonaEditorClient({
 
         {/* Instagram Info Card */}
         {persona.instagram_username && (
-          <div className="rounded-2xl bg-[#69FFC7]/8 border border-[#69FFC7]/20 p-5">
+          <div className="rounded-2xl bg-[#9334EB]/8 border border-[#9334EB]/20 p-5">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 rounded-full bg-[#69FFC7]/15 flex items-center justify-center">
-                <span className="material-symbols-outlined text-[#69FFC7] text-[18px]">photo_camera</span>
+              <div className="w-8 h-8 rounded-full bg-[#9334EB]/15 flex items-center justify-center">
+                <span className="material-symbols-outlined text-[#9334EB] text-[18px]">photo_camera</span>
               </div>
               <h3 className="font-bold text-[#2d8a5e] text-sm">מידע מאינסטגרם</h3>
             </div>
@@ -475,7 +475,7 @@ export default function PersonaEditorClient({
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="flex-1 py-3 rounded-full bg-[#AEB0E8] text-white font-semibold text-sm hover:bg-[#9b9ddb] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md shadow-[#AEB0E8]/20 flex items-center justify-center gap-2"
+            className="flex-1 py-3 rounded-full bg-[#2663EB] text-white font-semibold text-sm hover:bg-[#9b9ddb] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md shadow-[#2663EB]/20 flex items-center justify-center gap-2"
           >
             {isSaving ? (
               <>
@@ -494,7 +494,7 @@ export default function PersonaEditorClient({
           </button>
           <button
             onClick={() => router.back()}
-            className="px-8 py-3 rounded-full border-2 border-[#e0ddd8] text-[#474747] font-semibold text-sm hover:bg-[#fff8f1] transition-colors"
+            className="px-8 py-3 rounded-full border-2 border-[#e0ddd8] text-[#474747] font-semibold text-sm hover:bg-[#f8f9fc] transition-colors"
           >
             ביטול
           </button>

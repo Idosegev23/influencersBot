@@ -33,28 +33,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="flex items-center gap-6">
           <span className="text-xl font-black tracking-tight neon-brand font-headline">InfluencerBot</span>
           <div className="hidden md:flex gap-6 items-center">
-            <Link href="/admin/dashboard" className="text-[#474747] font-medium hover:text-[#69FFC7] transition-colors text-sm">דשבורד</Link>
-            <Link href="/admin/influencers" className="text-[#474747] font-medium hover:text-[#69FFC7] transition-colors text-sm">משפיענים</Link>
+            <Link href="/admin/dashboard" className="text-[#474747] font-medium hover:text-[#9334EB] transition-colors text-sm">דשבורד</Link>
+            <Link href="/admin/influencers" className="text-[#474747] font-medium hover:text-[#9334EB] transition-colors text-sm">משפיענים</Link>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[#69FFC7]/5 transition-colors">
-            <span className="material-symbols-outlined text-[#655e51]">notifications</span>
+          <button className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[#9334EB]/5 transition-colors">
+            <span className="material-symbols-outlined text-[#4b5563]">notifications</span>
           </button>
-          <button className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[#69FFC7]/5 transition-colors">
-            <span className="material-symbols-outlined text-[#655e51]">account_circle</span>
+          <button className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[#9334EB]/5 transition-colors">
+            <span className="material-symbols-outlined text-[#4b5563]">account_circle</span>
           </button>
         </div>
       </nav>
 
       {/* Side Navigation */}
-      <aside className="fixed right-0 top-0 h-full w-64 flex flex-col p-4 z-40 bg-[#faf2e9] mt-16">
+      <aside className="fixed right-0 top-0 h-full w-64 flex flex-col p-4 z-40 bg-[#f3f4f6] mt-16">
         <div className="mb-6 px-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-[#69FFC7]/10 border-2 border-[#69FFC7]/20 flex items-center justify-center">
-            <span className="material-symbols-outlined text-[#69FFC7]">shield</span>
+          <div className="w-10 h-10 rounded-full bg-[#9334EB]/10 border-2 border-[#9334EB]/20 flex items-center justify-center">
+            <span className="material-symbols-outlined text-[#9334EB]">shield</span>
           </div>
           <div>
-            <p className="text-sm font-bold text-[#AEB0E8]">ניהול מערכת</p>
+            <p className="text-sm font-bold text-[#2663EB]">ניהול מערכת</p>
             <p className="text-[10px] opacity-70">ממשק מנהל</p>
           </div>
         </div>
@@ -68,7 +68,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 href={item.href}
                 className={`flex items-center gap-3 px-4 py-3 rounded-full transition-all duration-300 ${
                   isActive
-                    ? 'text-[#69FFC7] font-bold bg-white shadow-sm'
+                    ? 'text-[#9334EB] font-bold bg-white shadow-sm'
                     : 'text-[#474747] opacity-70 hover:opacity-100 hover:bg-white/50 hover:translate-x-[-4px]'
                 }`}
               >
@@ -86,7 +86,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         <Link
           href="/admin"
-          className="flex items-center gap-3 px-4 py-3 text-[#474747] opacity-70 hover:opacity-100 hover:text-[#FF76B0] rounded-full transition-all duration-300"
+          className="flex items-center gap-3 px-4 py-3 text-[#474747] opacity-70 hover:opacity-100 hover:text-[#DC2627] rounded-full transition-all duration-300"
         >
           <span className="material-symbols-outlined">logout</span>
           <span className="font-medium text-sm">יציאה</span>
@@ -99,14 +99,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </main>
 
       {/* Footer */}
-      <footer className="mr-64 flex flex-row-reverse justify-between items-center px-8 py-8 border-t border-[#faf2e9] bg-[#fff8f1] text-xs">
+      <footer className="mr-64 flex flex-row-reverse justify-between items-center px-8 py-8 border-t border-[#f3f4f6] bg-[#f8f9fc] text-xs">
         <div className="flex items-center gap-6">
-          <a className="text-[#474747] opacity-80 hover:text-[#FF76B0] transition-colors" href="#">תנאי שימוש</a>
-          <a className="text-[#474747] opacity-80 hover:text-[#FF76B0] transition-colors" href="#">פרטיות</a>
-          <a className="text-[#474747] opacity-80 hover:text-[#FF76B0] transition-colors" href="#">תמיכה</a>
+          <a className="text-[#474747] opacity-80 hover:text-[#DC2627] transition-colors" href="#">תנאי שימוש</a>
+          <a className="text-[#474747] opacity-80 hover:text-[#DC2627] transition-colors" href="#">פרטיות</a>
+          <a className="text-[#474747] opacity-80 hover:text-[#DC2627] transition-colors" href="#">תמיכה</a>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-[#69FFC7]">InfluencerBot</span>
+          <span className="text-sm font-semibold text-[#9334EB]">InfluencerBot</span>
           <span className="text-[#474747] opacity-60">© 2024 כל הזכויות שמורות</span>
         </div>
       </footer>

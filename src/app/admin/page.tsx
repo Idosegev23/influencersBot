@@ -55,7 +55,7 @@ export default function AdminLogin() {
   if (checking) {
     return (
       <div className="min-h-screen admin-panel flex items-center justify-center" dir="rtl">
-        <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#a094e0' }} />
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#9334EB' }} />
       </div>
     );
   }
@@ -77,8 +77,8 @@ export default function AdminLogin() {
       >
         {/* Logo */}
         <div className="flex justify-center mb-8">
-          <div className="w-20 h-20 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(160, 148, 224, 0.12)', border: '1px solid rgba(160, 148, 224, 0.18)', boxShadow: '0 0 40px rgba(160, 148, 224, 0.1)' }}>
-            <Zap className="w-10 h-10" style={{ color: '#a094e0' }} />
+          <div className="w-20 h-20 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(147, 52, 235, 0.12)', border: '1px solid rgba(147, 52, 235, 0.18)', boxShadow: '0 0 40px rgba(147, 52, 235, 0.1)' }}>
+            <Zap className="w-10 h-10" style={{ color: '#9334EB' }} />
           </div>
         </div>
 

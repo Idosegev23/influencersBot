@@ -20,9 +20,9 @@ interface WizardState {
 }
 
 const COLOR_PRESETS = [
-  { name: 'mint', value: '#69FFC7' },
-  { name: 'lavender', value: '#AEB0E8' },
-  { name: 'pink', value: '#FF76B0' },
+  { name: 'mint', value: '#9334EB' },
+  { name: 'lavender', value: '#2663EB' },
+  { name: 'pink', value: '#DC2627' },
   { name: 'gold', value: '#FFD700' },
   { name: 'lime', value: '#BFFF00' },
 ];
@@ -38,7 +38,7 @@ export default function AddWebsitePage() {
     accountId: null,
     error: null,
     isLoading: false,
-    widgetColor: '#69FFC7',
+    widgetColor: '#9334EB',
     welcomeMessage: 'שלום! איך אפשר לעזור?',
   });
 
@@ -171,7 +171,7 @@ export default function AddWebsitePage() {
   if (checkingAuth) {
     return (
       <div className="flex items-center justify-center py-32" dir="rtl">
-        <div className="w-10 h-10 rounded-full border-3 border-[#AEB0E8] border-t-transparent animate-spin" />
+        <div className="w-10 h-10 rounded-full border-3 border-[#2663EB] border-t-transparent animate-spin" />
       </div>
     );
   }
@@ -200,8 +200,8 @@ export default function AddWebsitePage() {
 
       {/* Page title */}
       <div className="text-center mb-8">
-        <h1 className="text-2xl font-bold text-[#373226] font-headline">הוספת אתר חדש</h1>
-        <p className="text-sm text-[#655e51] mt-1">סרקו, התאימו והטמיעו צ&apos;אטבוט חכם באתר שלכם</p>
+        <h1 className="text-2xl font-bold text-[#1f2937] font-headline">הוספת אתר חדש</h1>
+        <p className="text-sm text-[#4b5563] mt-1">סרקו, התאימו והטמיעו צ&apos;אטבוט חכם באתר שלכם</p>
       </div>
 
       {/* Step indicator */}
@@ -216,10 +216,10 @@ export default function AddWebsitePage() {
                 <motion.div
                   className={`rounded-full flex items-center justify-center transition-all duration-300 ${
                     isDone
-                      ? 'w-10 h-10 bg-[#69FFC7] text-[#1A1C1E] shadow-[0_4px_16px_rgba(105,255,199,0.3)]'
+                      ? 'w-10 h-10 bg-[#9334EB] text-[#1A1C1E] shadow-[0_4px_16px_rgba(23,163,74,0.2)]'
                       : isCurrent
-                      ? 'w-12 h-12 bg-[#AEB0E8] text-white ring-4 ring-white shadow-[0_4px_20px_rgba(174,176,232,0.35)] scale-110'
-                      : 'w-10 h-10 bg-transparent border-2 border-[#bab1a1] text-[#bab1a1]'
+                      ? 'w-12 h-12 bg-[#2663EB] text-white ring-4 ring-white shadow-[0_4px_20px_rgba(147,52,235,0.35)] scale-110'
+                      : 'w-10 h-10 bg-transparent border-2 border-[#d1d5db] text-[#d1d5db]'
                   }`}
                   animate={isCurrent ? { scale: [1, 1.08, 1] } : {}}
                   transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
@@ -231,7 +231,7 @@ export default function AddWebsitePage() {
                   )}
                 </motion.div>
                 <span className={`text-xs mt-2 font-medium ${
-                  isDone ? 'text-[#69FFC7]' : isCurrent ? 'text-[#AEB0E8] font-bold' : 'text-[#bab1a1]'
+                  isDone ? 'text-[#9334EB]' : isCurrent ? 'text-[#2663EB] font-bold' : 'text-[#d1d5db]'
                 }`}>
                   {s.label}
                 </span>
@@ -242,7 +242,7 @@ export default function AddWebsitePage() {
                     className="w-12 h-[3px] rounded-full transition-colors duration-500"
                     style={{
                       background: isDone
-                        ? 'linear-gradient(to left, #69FFC7, #AEB0E8)'
+                        ? 'linear-gradient(to left, #9334EB, #2663EB)'
                         : '#e8e0d6',
                     }}
                   />
@@ -260,17 +260,17 @@ export default function AddWebsitePage() {
         {state.step === 'url' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative">
             {/* Decorative blur glow */}
-            <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-64 h-32 bg-[#AEB0E8]/15 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-64 h-32 bg-[#2663EB]/15 rounded-full blur-3xl pointer-events-none" />
 
             <div className="neon-card p-8 relative">
               {/* Header */}
               <div className="flex items-center gap-4 mb-6">
-                <div className="w-12 h-12 rounded-full bg-[#FF76B0]/10 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-[#FF76B0] text-[24px]">brush</span>
+                <div className="w-12 h-12 rounded-full bg-[#DC2627]/10 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[#DC2627] text-[24px]">brush</span>
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-[#373226] font-headline">הזינו את כתובת האתר</h2>
-                  <p className="text-sm text-[#655e51]">נסרוק את כל דפי האתר ונאנדקס את התוכן לצ&apos;אטבוט חכם</p>
+                  <h2 className="text-xl font-bold text-[#1f2937] font-headline">הזינו את כתובת האתר</h2>
+                  <p className="text-sm text-[#4b5563]">נסרוק את כל דפי האתר ונאנדקס את התוכן לצ&apos;אטבוט חכם</p>
                 </div>
               </div>
 
@@ -280,15 +280,15 @@ export default function AddWebsitePage() {
                 value={state.url}
                 onChange={(e) => setState((s) => ({ ...s, url: e.target.value, error: null }))}
                 onKeyDown={(e) => e.key === 'Enter' && handleStartScan()}
-                className={`neon-input text-lg mb-4 ${state.error ? '!shadow-[0_0_0_2px_rgba(255,118,176,0.4)] !bg-[#FF76B0]/[0.03]' : ''}`}
+                className={`neon-input text-lg mb-4 ${state.error ? '!shadow-[0_0_0_2px_rgba(220,38,39,0.3)] !bg-[#DC2627]/[0.03]' : ''}`}
                 dir="ltr"
                 autoFocus
               />
 
               {state.error && (
                 <div className="flex items-center gap-2 mb-4 px-1">
-                  <span className="material-symbols-outlined text-[#FF76B0] text-[16px]">error</span>
-                  <p className="text-sm text-[#FF76B0]">{state.error}</p>
+                  <span className="material-symbols-outlined text-[#DC2627] text-[16px]">error</span>
+                  <p className="text-sm text-[#DC2627]">{state.error}</p>
                 </div>
               )}
 
@@ -296,7 +296,7 @@ export default function AddWebsitePage() {
                 onClick={handleStartScan}
                 disabled={state.isLoading || !state.url.trim()}
                 className="neon-pill neon-pill-primary w-full justify-center py-3 text-base font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ background: state.isLoading ? '#69FFC7' : 'linear-gradient(135deg, #69FFC7, #AEB0E8)' }}
+                style={{ background: state.isLoading ? '#9334EB' : 'linear-gradient(135deg, #9334EB, #2663EB)' }}
               >
                 {state.isLoading ? (
                   <span className="material-symbols-outlined text-[20px] animate-spin">progress_activity</span>
@@ -312,16 +312,16 @@ export default function AddWebsitePage() {
         {/* Step: Scraping */}
         {state.step === 'scraping' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative">
-            <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-64 h-32 bg-[#69FFC7]/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-64 h-32 bg-[#9334EB]/10 rounded-full blur-3xl pointer-events-none" />
 
             <div className="neon-card p-8 relative">
               <div className="flex items-center gap-4 mb-6">
-                <div className="w-12 h-12 rounded-full bg-[#AEB0E8]/15 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-[#AEB0E8] text-[24px] animate-spin" style={{ animationDuration: '3s' }}>radar</span>
+                <div className="w-12 h-12 rounded-full bg-[#2663EB]/15 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[#2663EB] text-[24px] animate-spin" style={{ animationDuration: '3s' }}>radar</span>
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-[#373226] font-headline">סורקים את האתר...</h2>
-                  <p className="text-sm text-[#655e51]">התהליך עשוי לקחת כמה דקות. אל תסגרו את הדף.</p>
+                  <h2 className="text-xl font-bold text-[#1f2937] font-headline">סורקים את האתר...</h2>
+                  <p className="text-sm text-[#4b5563]">התהליך עשוי לקחת כמה דקות. אל תסגרו את הדף.</p>
                 </div>
               </div>
 
@@ -331,29 +331,29 @@ export default function AddWebsitePage() {
                     <div
                       className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
                         step.status === 'completed'
-                          ? 'bg-[#69FFC7]/15'
+                          ? 'bg-[#9334EB]/15'
                           : step.status === 'running'
-                          ? 'bg-[#AEB0E8]/15'
+                          ? 'bg-[#2663EB]/15'
                           : step.status === 'failed'
-                          ? 'bg-[#FF76B0]/10'
-                          : 'bg-[#faf2e9]'
+                          ? 'bg-[#DC2627]/10'
+                          : 'bg-[#f3f4f6]'
                       }`}
                     >
                       {step.status === 'completed' ? (
-                        <span className="material-symbols-outlined text-[#69FFC7] text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                        <span className="material-symbols-outlined text-[#9334EB] text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
                       ) : step.status === 'running' ? (
-                        <span className="material-symbols-outlined text-[#AEB0E8] text-[16px] animate-spin">progress_activity</span>
+                        <span className="material-symbols-outlined text-[#2663EB] text-[16px] animate-spin">progress_activity</span>
                       ) : step.status === 'failed' ? (
-                        <span className="material-symbols-outlined text-[#FF76B0] text-[16px]">cancel</span>
+                        <span className="material-symbols-outlined text-[#DC2627] text-[16px]">cancel</span>
                       ) : (
-                        <span className="material-symbols-outlined text-[#bab1a1] text-[16px]">radio_button_unchecked</span>
+                        <span className="material-symbols-outlined text-[#d1d5db] text-[16px]">radio_button_unchecked</span>
                       )}
                     </div>
                     <span className={`text-sm ${
-                      step.status === 'running' ? 'text-[#373226] font-medium' :
-                      step.status === 'completed' ? 'text-[#655e51]' :
-                      step.status === 'failed' ? 'text-[#FF76B0]' :
-                      'text-[#bab1a1]'
+                      step.status === 'running' ? 'text-[#1f2937] font-medium' :
+                      step.status === 'completed' ? 'text-[#4b5563]' :
+                      step.status === 'failed' ? 'text-[#DC2627]' :
+                      'text-[#d1d5db]'
                     }`}>
                       {step.message}
                     </span>
@@ -362,10 +362,10 @@ export default function AddWebsitePage() {
               </div>
 
               {/* Progress bar */}
-              <div className="w-full h-2.5 rounded-full overflow-hidden bg-[#faf2e9]">
+              <div className="w-full h-2.5 rounded-full overflow-hidden bg-[#f3f4f6]">
                 <motion.div
                   className="h-full rounded-full"
-                  style={{ background: 'linear-gradient(to left, #AEB0E8, #69FFC7)' }}
+                  style={{ background: 'linear-gradient(to left, #2663EB, #9334EB)' }}
                   initial={{ width: '5%' }}
                   animate={{ width: `${getLatestProgress(jobStatus?.steps || [])}%` }}
                   transition={{ duration: 0.5 }}
@@ -373,14 +373,14 @@ export default function AddWebsitePage() {
               </div>
 
               {state.error && (
-                <div className="mt-4 p-4 rounded-2xl bg-[#FF76B0]/[0.04] border border-[#FF76B0]/20">
+                <div className="mt-4 p-4 rounded-2xl bg-[#DC2627]/[0.04] border border-[#DC2627]/20">
                   <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[#FF76B0] text-[18px]">warning</span>
-                    <p className="text-sm text-[#FF76B0]">{state.error}</p>
+                    <span className="material-symbols-outlined text-[#DC2627] text-[18px]">warning</span>
+                    <p className="text-sm text-[#DC2627]">{state.error}</p>
                   </div>
                   <button
                     onClick={() => setState((s) => ({ ...s, step: 'url', error: null, jobId: null }))}
-                    className="mt-2 text-sm text-[#AEB0E8] font-medium hover:underline"
+                    className="mt-2 text-sm text-[#2663EB] font-medium hover:underline"
                   >
                     נסה שוב
                   </button>
@@ -401,23 +401,23 @@ export default function AddWebsitePage() {
         {/* Step: Settings */}
         {state.step === 'settings' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative">
-            <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-64 h-32 bg-[#AEB0E8]/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-64 h-32 bg-[#2663EB]/10 rounded-full blur-3xl pointer-events-none" />
 
             <div className="neon-card p-8 relative">
               <div className="flex items-center gap-4 mb-6">
-                <div className="w-12 h-12 rounded-full bg-[#AEB0E8]/15 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-[#AEB0E8] text-[24px]">palette</span>
+                <div className="w-12 h-12 rounded-full bg-[#2663EB]/15 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[#2663EB] text-[24px]">palette</span>
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-[#373226] font-headline">הגדרות ווידג&apos;ט</h2>
-                  <p className="text-sm text-[#655e51]">התאימו את הצ&apos;אטבוט לאתר שלכם</p>
+                  <h2 className="text-xl font-bold text-[#1f2937] font-headline">הגדרות ווידג&apos;ט</h2>
+                  <p className="text-sm text-[#4b5563]">התאימו את הצ&apos;אטבוט לאתר שלכם</p>
                 </div>
               </div>
 
               <div className="space-y-6">
                 {/* Color picker */}
                 <div>
-                  <label className="block text-sm font-medium text-[#655e51] mb-3">צבע ראשי</label>
+                  <label className="block text-sm font-medium text-[#4b5563] mb-3">צבע ראשי</label>
                   <div className="flex items-center gap-3 flex-wrap">
                     {COLOR_PRESETS.map((c) => (
                       <button
@@ -425,7 +425,7 @@ export default function AddWebsitePage() {
                         onClick={() => setState((s) => ({ ...s, widgetColor: c.value }))}
                         className={`w-9 h-9 rounded-full transition-all duration-200 ${
                           state.widgetColor === c.value
-                            ? 'ring-2 ring-offset-2 ring-[#373226] scale-110'
+                            ? 'ring-2 ring-offset-2 ring-[#1f2937] scale-110'
                             : 'hover:scale-105'
                         }`}
                         style={{ background: c.value }}
@@ -441,18 +441,18 @@ export default function AddWebsitePage() {
                         type="color"
                         value={state.widgetColor}
                         onChange={(e) => setState((s) => ({ ...s, widgetColor: e.target.value }))}
-                        className="w-9 h-9 rounded-full cursor-pointer border-2 border-dashed border-[#bab1a1] bg-transparent appearance-none"
+                        className="w-9 h-9 rounded-full cursor-pointer border-2 border-dashed border-[#d1d5db] bg-transparent appearance-none"
                         style={{ WebkitAppearance: 'none' }}
                         title="בחר צבע מותאם"
                       />
-                      <span className="material-symbols-outlined text-[#bab1a1] text-[14px] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">add</span>
+                      <span className="material-symbols-outlined text-[#d1d5db] text-[14px] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">add</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Welcome message */}
                 <div>
-                  <label className="block text-sm font-medium text-[#655e51] mb-2">הודעת ברכה</label>
+                  <label className="block text-sm font-medium text-[#4b5563] mb-2">הודעת ברכה</label>
                   <textarea
                     value={state.welcomeMessage}
                     onChange={(e) => setState((s) => ({ ...s, welcomeMessage: e.target.value }))}
@@ -463,7 +463,7 @@ export default function AddWebsitePage() {
 
                 {/* Phone preview */}
                 <div>
-                  <label className="block text-sm font-medium text-[#655e51] mb-3">תצוגה מקדימה</label>
+                  <label className="block text-sm font-medium text-[#4b5563] mb-3">תצוגה מקדימה</label>
                   <div className="flex justify-center">
                     <div className="relative w-[160px] h-[320px] rounded-[24px] bg-slate-900 p-[6px] shadow-xl">
                       {/* Phone notch */}
@@ -479,13 +479,13 @@ export default function AddWebsitePage() {
                           <div className="self-start max-w-[85%] rounded-xl rounded-br-sm px-3 py-2 text-[8px] text-white leading-tight" style={{ background: state.widgetColor }}>
                             {state.welcomeMessage}
                           </div>
-                          <div className="self-end max-w-[75%] rounded-xl rounded-bl-sm px-3 py-2 bg-[#faf2e9] text-[8px] text-[#373226] leading-tight">
+                          <div className="self-end max-w-[75%] rounded-xl rounded-bl-sm px-3 py-2 bg-[#f3f4f6] text-[8px] text-[#1f2937] leading-tight">
                             היי, יש לי שאלה...
                           </div>
                         </div>
                         {/* Input bar */}
                         <div className="h-8 border-t border-gray-100 flex items-center px-2 gap-1">
-                          <div className="flex-1 h-5 bg-[#faf2e9] rounded-full" />
+                          <div className="flex-1 h-5 bg-[#f3f4f6] rounded-full" />
                           <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: state.widgetColor }}>
                             <span className="material-symbols-outlined text-white text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>send</span>
                           </div>
@@ -529,7 +529,7 @@ export default function AddWebsitePage() {
                 }}
                 disabled={state.isLoading}
                 className="neon-pill neon-pill-primary w-full justify-center py-3 text-base font-semibold mt-6 disabled:opacity-50"
-                style={{ background: 'linear-gradient(135deg, #69FFC7, #AEB0E8)' }}
+                style={{ background: 'linear-gradient(135deg, #9334EB, #2663EB)' }}
               >
                 {state.isLoading ? (
                   <span className="material-symbols-outlined text-[20px] animate-spin">progress_activity</span>
@@ -541,7 +541,7 @@ export default function AddWebsitePage() {
 
               <button
                 onClick={() => setState((s) => ({ ...s, step: 'complete', isLoading: false }))}
-                className="w-full text-center text-sm text-[#bab1a1] hover:text-[#655e51] transition-colors mt-3 py-2"
+                className="w-full text-center text-sm text-[#d1d5db] hover:text-[#4b5563] transition-colors mt-3 py-2"
               >
                 דילוג על שלב זה
               </button>
@@ -555,29 +555,29 @@ export default function AddWebsitePage() {
             {/* Success card */}
             <div className="neon-card p-8 text-center relative overflow-hidden">
               {/* Decorative glow */}
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-24 bg-[#69FFC7]/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-24 bg-[#9334EB]/10 rounded-full blur-3xl pointer-events-none" />
 
               <div className="relative">
-                <div className="w-16 h-16 rounded-full bg-[#69FFC7]/15 flex items-center justify-center mx-auto mb-4 shadow-[0_4px_20px_rgba(105,255,199,0.2)]">
-                  <span className="material-symbols-outlined text-[#69FFC7] text-[32px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                <div className="w-16 h-16 rounded-full bg-[#9334EB]/15 flex items-center justify-center mx-auto mb-4 shadow-[0_4px_20px_rgba(23,163,74,0.15)]">
+                  <span className="material-symbols-outlined text-[#9334EB] text-[32px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
                 </div>
-                <h2 className="text-xl font-bold text-[#373226] font-headline mb-1">האתר נסרק בהצלחה!</h2>
-                <p className="text-sm text-[#655e51] mb-6">הווידג&apos;ט מוכן להטמעה באתר שלכם</p>
+                <h2 className="text-xl font-bold text-[#1f2937] font-headline mb-1">האתר נסרק בהצלחה!</h2>
+                <p className="text-sm text-[#4b5563] mb-6">הווידג&apos;ט מוכן להטמעה באתר שלכם</p>
 
                 {/* Scan results */}
                 {jobStatus?.result && (
                   <div className="grid grid-cols-3 gap-3 mb-2">
-                    <div className="rounded-2xl p-4 bg-[#faf2e9]">
-                      <p className="text-2xl font-bold text-[#373226]">{jobStatus.result.pagesScraped || 0}</p>
-                      <p className="text-xs text-[#bab1a1] mt-1">דפים</p>
+                    <div className="rounded-2xl p-4 bg-[#f3f4f6]">
+                      <p className="text-2xl font-bold text-[#1f2937]">{jobStatus.result.pagesScraped || 0}</p>
+                      <p className="text-xs text-[#d1d5db] mt-1">דפים</p>
                     </div>
-                    <div className="rounded-2xl p-4 bg-[#faf2e9]">
-                      <p className="text-2xl font-bold text-[#373226]">{formatNumber(jobStatus.result.totalWords || 0)}</p>
-                      <p className="text-xs text-[#bab1a1] mt-1">מילים</p>
+                    <div className="rounded-2xl p-4 bg-[#f3f4f6]">
+                      <p className="text-2xl font-bold text-[#1f2937]">{formatNumber(jobStatus.result.totalWords || 0)}</p>
+                      <p className="text-xs text-[#d1d5db] mt-1">מילים</p>
                     </div>
-                    <div className="rounded-2xl p-4 bg-[#faf2e9]">
-                      <p className="text-2xl font-bold text-[#373226]">{jobStatus.result.totalImages || 0}</p>
-                      <p className="text-xs text-[#bab1a1] mt-1">תמונות</p>
+                    <div className="rounded-2xl p-4 bg-[#f3f4f6]">
+                      <p className="text-2xl font-bold text-[#1f2937]">{jobStatus.result.totalImages || 0}</p>
+                      <p className="text-xs text-[#d1d5db] mt-1">תמונות</p>
                     </div>
                   </div>
                 )}
@@ -587,14 +587,14 @@ export default function AddWebsitePage() {
             {/* Embed Code */}
             <div className="neon-card p-6">
               <div className="flex items-center gap-3 mb-3">
-                <span className="material-symbols-outlined text-[#AEB0E8] text-[22px]">code</span>
-                <h3 className="text-lg font-bold text-[#373226] font-headline">קוד הטמעה</h3>
+                <span className="material-symbols-outlined text-[#2663EB] text-[22px]">code</span>
+                <h3 className="text-lg font-bold text-[#1f2937] font-headline">קוד הטמעה</h3>
               </div>
-              <p className="text-sm text-[#655e51] mb-4">
+              <p className="text-sm text-[#4b5563] mb-4">
                 הדביקו את הקוד הזה לפני תגית {'</body>'} בכל דפי האתר שלכם
               </p>
 
-              <div className="rounded-2xl p-4 font-mono text-sm bg-[#faf2e9] text-[#373226] break-all leading-relaxed" dir="ltr">
+              <div className="rounded-2xl p-4 font-mono text-sm bg-[#f3f4f6] text-[#1f2937] break-all leading-relaxed" dir="ltr">
                 {`<script src="${typeof window !== 'undefined' ? window.location.origin : ''}/widget.js" data-account-id="${state.accountId}"></script>`}
               </div>
 
@@ -604,7 +604,7 @@ export default function AddWebsitePage() {
               >
                 {codeCopied ? (
                   <>
-                    <span className="material-symbols-outlined text-[#69FFC7] text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>check</span>
+                    <span className="material-symbols-outlined text-[#9334EB] text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>check</span>
                     הועתק!
                   </>
                 ) : (
@@ -620,13 +620,13 @@ export default function AddWebsitePage() {
             {manageToken && (
               <div className="neon-card p-6">
                 <div className="flex items-center gap-3 mb-3">
-                  <span className="material-symbols-outlined text-[#FF76B0] text-[22px]">link</span>
-                  <h3 className="text-lg font-bold text-[#373226] font-headline">לינק ניהול ללקוח</h3>
+                  <span className="material-symbols-outlined text-[#DC2627] text-[22px]">link</span>
+                  <h3 className="text-lg font-bold text-[#1f2937] font-headline">לינק ניהול ללקוח</h3>
                 </div>
-                <p className="text-sm text-[#655e51] mb-4">
+                <p className="text-sm text-[#4b5563] mb-4">
                   שלחו את הלינק הזה לבעל האתר — הוא יוכל לנהל הנחיות, שאלות נפוצות וידע
                 </p>
-                <div className="rounded-2xl p-4 font-mono text-sm bg-[#faf2e9] text-[#373226] break-all leading-relaxed" dir="ltr">
+                <div className="rounded-2xl p-4 font-mono text-sm bg-[#f3f4f6] text-[#1f2937] break-all leading-relaxed" dir="ltr">
                   {typeof window !== 'undefined' ? `${window.location.origin}/manage/${manageToken}` : ''}
                 </div>
                 <button
@@ -639,7 +639,7 @@ export default function AddWebsitePage() {
                 >
                   {manageLinkCopied ? (
                     <>
-                      <span className="material-symbols-outlined text-[#69FFC7] text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>check</span>
+                      <span className="material-symbols-outlined text-[#9334EB] text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>check</span>
                       הועתק!
                     </>
                   ) : (
@@ -671,8 +671,8 @@ export default function AddWebsitePage() {
 
             {/* Footer security note */}
             <div className="flex items-center justify-center gap-2 py-4">
-              <span className="material-symbols-outlined text-[#bab1a1] text-[16px]">shield</span>
-              <p className="text-xs text-[#bab1a1]">כל הנתונים מוצפנים ומאובטחים</p>
+              <span className="material-symbols-outlined text-[#d1d5db] text-[16px]">shield</span>
+              <p className="text-xs text-[#d1d5db]">כל הנתונים מוצפנים ומאובטחים</p>
             </div>
           </motion.div>
         )}

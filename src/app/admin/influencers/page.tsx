@@ -74,7 +74,7 @@ export default function InfluencersListPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-32">
-        <div className="w-8 h-8 border-2 border-[#AEB0E8] border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-[#2663EB] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -84,12 +84,12 @@ export default function InfluencersListPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-[#69FFC7]/10 border border-[#69FFC7]/20 flex items-center justify-center">
-            <span className="material-symbols-outlined text-[#69FFC7]">group</span>
+          <div className="w-12 h-12 rounded-2xl bg-[#9334EB]/10 border border-[#9334EB]/20 flex items-center justify-center">
+            <span className="material-symbols-outlined text-[#9334EB]">group</span>
           </div>
           <div>
-            <h1 className="text-2xl font-bold font-headline text-[#373226]">משפיעניות</h1>
-            <p className="text-sm text-[#bab1a1]">{influencers.length} משפיעניות במערכת</p>
+            <h1 className="text-2xl font-bold font-headline text-[#1f2937]">משפיעניות</h1>
+            <p className="text-sm text-[#d1d5db]">{influencers.length} משפיעניות במערכת</p>
           </div>
         </div>
 
@@ -106,7 +106,7 @@ export default function InfluencersListPage() {
 
       {/* Search */}
       <div className="relative mb-6">
-        <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-[#bab1a1] text-[20px]">search</span>
+        <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-[#d1d5db] text-[20px]">search</span>
         <input
           type="text"
           placeholder="חיפוש לפי שם או username..."
@@ -119,18 +119,18 @@ export default function InfluencersListPage() {
       {/* Stat summary */}
       <div className="grid grid-cols-3 gap-4 mb-8">
         <div className="neon-stat-card">
-          <div className="text-xs text-[#655e51] mb-1">סה״כ משפיענים</div>
-          <div className="text-2xl font-bold text-[#373226]">{influencers.length}</div>
+          <div className="text-xs text-[#4b5563] mb-1">סה״כ משפיענים</div>
+          <div className="text-2xl font-bold text-[#1f2937]">{influencers.length}</div>
         </div>
         <div className="neon-stat-card">
-          <div className="text-xs text-[#655e51] mb-1">IG מחוברים</div>
-          <div className="text-2xl font-bold text-[#373226]">
+          <div className="text-xs text-[#4b5563] mb-1">IG מחוברים</div>
+          <div className="text-2xl font-bold text-[#1f2937]">
             {influencers.filter(i => i.igConnection && !i.igConnection.tokenExpired).length}
           </div>
         </div>
         <div className="neon-stat-card">
-          <div className="text-xs text-[#655e51] mb-1">פרסונה פעילה</div>
-          <div className="text-2xl font-bold text-[#373226]">
+          <div className="text-xs text-[#4b5563] mb-1">פרסונה פעילה</div>
+          <div className="text-2xl font-bold text-[#1f2937]">
             {influencers.filter(i => i.stats.hasGemini).length}
           </div>
         </div>
@@ -145,14 +145,14 @@ export default function InfluencersListPage() {
             onClick={() => router.push(`/admin/influencers/${inf.id}`)}
           >
             {/* Avatar placeholder */}
-            <div className="w-12 h-12 rounded-full bg-[#AEB0E8]/15 border border-[#AEB0E8]/25 flex items-center justify-center flex-shrink-0">
-              <span className="material-symbols-outlined text-[#AEB0E8] text-[24px]">person</span>
+            <div className="w-12 h-12 rounded-full bg-[#2663EB]/15 border border-[#2663EB]/25 flex items-center justify-center flex-shrink-0">
+              <span className="material-symbols-outlined text-[#2663EB] text-[24px]">person</span>
             </div>
 
             {/* Name + username */}
             <div className="flex flex-col min-w-[160px]">
-              <span className="text-sm font-bold text-[#373226]">{inf.displayName}</span>
-              <span className="text-xs text-[#bab1a1]">@{inf.username}</span>
+              <span className="text-sm font-bold text-[#1f2937]">{inf.displayName}</span>
+              <span className="text-xs text-[#d1d5db]">@{inf.username}</span>
             </div>
 
             {/* IG connection status badge */}
@@ -185,12 +185,12 @@ export default function InfluencersListPage() {
             {/* Persona status */}
             <div className="flex-shrink-0">
               {inf.stats.hasGemini ? (
-                <span className="text-[#69FFC7] flex items-center gap-1 text-xs">
+                <span className="text-[#9334EB] flex items-center gap-1 text-xs">
                   <span className="material-symbols-outlined text-[16px]">check_circle</span>
                   פרסונה
                 </span>
               ) : (
-                <span className="text-[#bab1a1] flex items-center gap-1 text-xs">
+                <span className="text-[#d1d5db] flex items-center gap-1 text-xs">
                   <span className="material-symbols-outlined text-[16px]">pending</span>
                   חסר
                 </span>
@@ -198,7 +198,7 @@ export default function InfluencersListPage() {
             </div>
 
             {/* Stats */}
-            <div className="flex items-center gap-4 text-xs text-[#655e51] mr-auto">
+            <div className="flex items-center gap-4 text-xs text-[#4b5563] mr-auto">
               <span className="flex items-center gap-1">
                 <span className="material-symbols-outlined text-[16px]">article</span>
                 {inf.stats.posts}
@@ -245,8 +245,8 @@ export default function InfluencersListPage() {
 
       {filteredInfluencers.length === 0 && (
         <div className="text-center py-16">
-          <span className="material-symbols-outlined text-[64px] text-[#bab1a1]/40 mb-4 block">group_off</span>
-          <p className="text-[#655e51]">לא נמצאו משפיעניות</p>
+          <span className="material-symbols-outlined text-[64px] text-[#d1d5db]/40 mb-4 block">group_off</span>
+          <p className="text-[#4b5563]">לא נמצאו משפיעניות</p>
         </div>
       )}
     </>

@@ -79,7 +79,7 @@ export default function AddAccountPage() {
   if (checkingAuth) {
     return (
       <div className="flex items-center justify-center py-32">
-        <div className="w-8 h-8 border-2 border-[#AEB0E8] border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-[#2663EB] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -90,16 +90,16 @@ export default function AddAccountPage() {
         /* ── Step 1: Account Creation Form ── */
         <div className="neon-card p-10">
           <div className="flex flex-col items-center text-center mb-8">
-            <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6" style={{ background: 'rgba(105, 255, 199, 0.1)' }}>
-              <span className="material-symbols-outlined text-[48px]" style={{ color: '#69FFC7' }}>person_add</span>
+            <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6" style={{ background: '#DCFCE8' }}>
+              <span className="material-symbols-outlined text-[48px]" style={{ color: '#9334EB' }}>person_add</span>
             </div>
-            <h1 className="text-2xl font-extrabold tracking-tight mb-2" style={{ color: '#373226' }}>הוספת חשבון חדש</h1>
-            <p className="text-sm" style={{ color: '#655e51' }}>הזן את פרטי החשבון החדש כדי להתחיל בניהול</p>
+            <h1 className="text-2xl font-extrabold tracking-tight mb-2" style={{ color: '#1f2937' }}>הוספת חשבון חדש</h1>
+            <p className="text-sm" style={{ color: '#4b5563' }}>הזן את פרטי החשבון החדש כדי להתחיל בניהול</p>
           </div>
 
           <div className="space-y-6">
             <div className="space-y-2">
-              <label className="block text-sm font-semibold mr-2" style={{ color: '#373226' }}>
+              <label className="block text-sm font-semibold mr-2" style={{ color: '#1f2937' }}>
                 שם משתמש
               </label>
               <input
@@ -115,7 +115,7 @@ export default function AddAccountPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="block text-sm font-semibold mr-2" style={{ color: '#373226' }}>
+              <label className="block text-sm font-semibold mr-2" style={{ color: '#1f2937' }}>
                 שם תצוגה
               </label>
               <input
@@ -154,16 +154,16 @@ export default function AddAccountPage() {
         </div>
       ) : (
         /* ── Step 2: Success — show ID + OAuth link ── */
-        <div className="neon-card p-10" style={{ borderRight: '3px solid #69FFC7' }}>
+        <div className="neon-card p-10" style={{ borderRight: '3px solid #9334EB' }}>
           <div className="flex items-center gap-6 mb-8">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(105, 255, 199, 0.2)' }}>
-              <span className="material-symbols-outlined text-[32px] font-bold" style={{ color: '#69FFC7', fontVariationSettings: "'FILL' 1" }}>check</span>
+            <div className="w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(23, 163, 74, 0.15)' }}>
+              <span className="material-symbols-outlined text-[32px] font-bold" style={{ color: '#9334EB', fontVariationSettings: "'FILL' 1" }}>check</span>
             </div>
             <div>
-              <h2 className="text-2xl font-extrabold tracking-tight" style={{ color: '#373226' }}>
+              <h2 className="text-2xl font-extrabold tracking-tight" style={{ color: '#1f2937' }}>
                 {existed ? 'חשבון קיים נמצא' : 'החשבון נוצר בהצלחה!'}
               </h2>
-              <p className="font-bold" style={{ color: '#69FFC7' }}>
+              <p className="font-bold" style={{ color: '#9334EB' }}>
                 @{username.trim().replace(/^@/, '')}
               </p>
             </div>
@@ -171,30 +171,30 @@ export default function AddAccountPage() {
 
           <div className="space-y-4 mb-10">
             {/* Account ID row */}
-            <div className="flex items-center justify-between p-5 rounded-xl" style={{ background: '#faf2e9' }}>
+            <div className="flex items-center justify-between p-5 rounded-xl" style={{ background: '#f3f4f6' }}>
               <div className="flex flex-col">
                 <span className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: '#817a6c' }}>מזהה חשבון</span>
-                <span className="font-mono font-medium" style={{ color: '#373226' }}>{accountId.slice(0, 12)}...</span>
+                <span className="font-mono font-medium" style={{ color: '#1f2937' }}>{accountId.slice(0, 12)}...</span>
               </div>
               <button
                 onClick={() => copyToClipboard(accountId, 'id')}
                 className="p-2 rounded-full transition-colors"
-                style={{ background: '#fff', color: copiedId ? '#69FFC7' : '#FF76B0' }}
+                style={{ background: '#fff', color: copiedId ? '#9334EB' : '#DC2627' }}
               >
                 <span className="material-symbols-outlined text-[20px]">{copiedId ? 'check' : 'content_copy'}</span>
               </button>
             </div>
 
             {/* IG Connect link row */}
-            <div className="flex items-center justify-between p-5 rounded-xl" style={{ background: '#faf2e9' }}>
+            <div className="flex items-center justify-between p-5 rounded-xl" style={{ background: '#f3f4f6' }}>
               <div className="flex flex-col min-w-0">
                 <span className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: '#817a6c' }}>חיבור IG</span>
-                <span className="font-medium truncate" style={{ color: '#373226' }}>{igConnectLink.slice(0, 35)}...</span>
+                <span className="font-medium truncate" style={{ color: '#1f2937' }}>{igConnectLink.slice(0, 35)}...</span>
               </div>
               <button
                 onClick={() => copyToClipboard(igConnectLink, 'link')}
                 className="px-4 py-1.5 rounded-full text-xs font-bold transition-colors flex-shrink-0"
-                style={{ background: copiedLink ? 'rgba(105, 255, 199, 0.2)' : 'rgba(174, 176, 232, 0.2)', color: copiedLink ? '#373226' : '#373226' }}
+                style={{ background: copiedLink ? 'rgba(23, 163, 74, 0.15)' : 'rgba(147, 52, 235, 0.2)', color: copiedLink ? '#1f2937' : '#1f2937' }}
               >
                 {copiedLink ? 'הועתק!' : 'העתק לינק'}
               </button>

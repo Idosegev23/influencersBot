@@ -135,7 +135,7 @@ export default function BrandLogosPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-32">
-        <div className="w-8 h-8 border-2 border-[#AEB0E8] border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-[#2663EB] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -147,7 +147,7 @@ export default function BrandLogosPage() {
       {/* Toast */}
       {toast && (
         <div className="fixed bottom-6 left-6 z-50 flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-medium shadow-lg"
-          style={{ background: '#69FFC7', color: '#373226' }}
+          style={{ background: '#9334EB', color: '#1f2937' }}
         >
           <span className="material-symbols-outlined" style={{ fontSize: 18 }}>check_circle</span>
           {toast}
@@ -158,12 +158,12 @@ export default function BrandLogosPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: '#FF76B0' }}>
+            <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: '#DC2627' }}>
               <span className="material-symbols-outlined text-white" style={{ fontSize: 24 }}>palette</span>
             </div>
             <div>
-              <h1 className="text-2xl font-bold" style={{ color: '#373226' }}>ניהול לוגואים</h1>
-              <p className="text-sm mt-0.5" style={{ color: '#bab1a1' }}>
+              <h1 className="text-2xl font-bold" style={{ color: '#1f2937' }}>ניהול לוגואים</h1>
+              <p className="text-sm mt-0.5" style={{ color: '#d1d5db' }}>
                 {withLogo} עם לוגו · {withoutLogo} ללא לוגו · {brands.length} סה״כ
               </p>
             </div>
@@ -177,7 +177,7 @@ export default function BrandLogosPage() {
         {/* Search & Filters */}
         <div className="flex gap-3 mb-6 flex-wrap">
           <div className="relative flex-1 min-w-[200px]">
-            <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2" style={{ fontSize: 18, color: '#bab1a1' }}>search</span>
+            <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2" style={{ fontSize: 18, color: '#d1d5db' }}>search</span>
             <input
               type="text"
               placeholder="חיפוש מותג..."
@@ -196,14 +196,14 @@ export default function BrandLogosPage() {
             <button
               onClick={() => setFilter('with')}
               className={`neon-pill text-xs ${filter === 'with' ? 'neon-pill-primary' : ''}`}
-              style={filter !== 'with' ? { border: '1.5px solid #69FFC7', color: '#655e51', background: 'transparent' } : {}}
+              style={filter !== 'with' ? { border: '1.5px solid #9334EB', color: '#4b5563', background: 'transparent' } : {}}
             >
               עם לוגו
             </button>
             <button
               onClick={() => setFilter('without')}
               className={`neon-pill text-xs ${filter === 'without' ? 'neon-pill-danger' : ''}`}
-              style={filter !== 'without' ? { border: '1.5px solid #FFB89A', color: '#655e51', background: 'transparent' } : {}}
+              style={filter !== 'without' ? { border: '1.5px solid #FFB89A', color: '#4b5563', background: 'transparent' } : {}}
             >
               בלי לוגו
             </button>
@@ -216,7 +216,7 @@ export default function BrandLogosPage() {
             <div
               key={brand.id}
               className="neon-card p-5 transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
-              style={!brand.logo_url ? { border: '2px dashed #AEB0E8' } : {}}
+              style={!brand.logo_url ? { border: '2px dashed #2663EB' } : {}}
             >
               {/* Logo preview */}
               <div className="w-[120px] h-[120px] rounded-2xl mx-auto mb-4 flex items-center justify-center overflow-hidden"
@@ -230,7 +230,7 @@ export default function BrandLogosPage() {
                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                   />
                 ) : (
-                  <div className="flex flex-col items-center gap-1" style={{ color: '#bab1a1' }}>
+                  <div className="flex flex-col items-center gap-1" style={{ color: '#d1d5db' }}>
                     <span className="material-symbols-outlined" style={{ fontSize: 36 }}>photo_camera</span>
                     <span className="text-[10px]">חסר לוגו</span>
                   </div>
@@ -239,13 +239,13 @@ export default function BrandLogosPage() {
 
               {/* Name & info */}
               <div className="text-center mb-3">
-                <h3 className="font-semibold text-sm truncate" style={{ color: '#373226' }}>{brand.display_name}</h3>
+                <h3 className="font-semibold text-sm truncate" style={{ color: '#1f2937' }}>{brand.display_name}</h3>
                 {brand.category && (
                   <span className="neon-pill neon-pill-outline text-[10px] mt-1.5 inline-block px-2 py-0.5">
                     {brand.category}
                   </span>
                 )}
-                <p className="text-[11px] mt-1.5 flex items-center justify-center gap-1" style={{ color: '#bab1a1' }}>
+                <p className="text-[11px] mt-1.5 flex items-center justify-center gap-1" style={{ color: '#d1d5db' }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 14 }}>handshake</span>
                   {brand.partnerships?.length || 0} משפיענים
                 </p>
@@ -255,7 +255,7 @@ export default function BrandLogosPage() {
               {editingBrand === brand.id ? (
                 <div className="mt-3 space-y-2">
                   <div className="relative">
-                    <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2" style={{ fontSize: 14, color: '#bab1a1' }}>phone</span>
+                    <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2" style={{ fontSize: 14, color: '#d1d5db' }}>phone</span>
                     <input
                       type="tel"
                       value={editPhone}
@@ -266,7 +266,7 @@ export default function BrandLogosPage() {
                     />
                   </div>
                   <div className="relative">
-                    <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2" style={{ fontSize: 14, color: '#bab1a1' }}>mail</span>
+                    <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2" style={{ fontSize: 14, color: '#d1d5db' }}>mail</span>
                     <input
                       type="email"
                       value={editEmail}
@@ -296,19 +296,19 @@ export default function BrandLogosPage() {
               ) : (
                 <div className="mt-2 space-y-1 text-center">
                   {brand.whatsapp_phone && (
-                    <div className="flex items-center justify-center gap-1.5 text-[11px]" style={{ color: '#655e51' }}>
+                    <div className="flex items-center justify-center gap-1.5 text-[11px]" style={{ color: '#4b5563' }}>
                       <span className="material-symbols-outlined" style={{ fontSize: 13 }}>phone</span>
                       <span dir="ltr">{brand.whatsapp_phone}</span>
                     </div>
                   )}
                   {brand.email && (
-                    <div className="flex items-center justify-center gap-1.5 text-[11px]" style={{ color: '#655e51' }}>
+                    <div className="flex items-center justify-center gap-1.5 text-[11px]" style={{ color: '#4b5563' }}>
                       <span className="material-symbols-outlined" style={{ fontSize: 13 }}>mail</span>
                       <span>{brand.email}</span>
                     </div>
                   )}
                   {!brand.whatsapp_phone && !brand.email && (
-                    <p className="text-[11px]" style={{ color: '#FF76B0' }}>חסר פרטי קשר</p>
+                    <p className="text-[11px]" style={{ color: '#DC2627' }}>חסר פרטי קשר</p>
                   )}
                 </div>
               )}
@@ -331,7 +331,7 @@ export default function BrandLogosPage() {
                   <button
                     onClick={() => startEditing(brand)}
                     className="neon-pill text-xs"
-                    style={{ border: '1.5px solid #7DD3FC', color: '#655e51', background: 'transparent' }}
+                    style={{ border: '1.5px solid #7DD3FC', color: '#4b5563', background: 'transparent' }}
                     title="ערוך פרטי קשר"
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
@@ -341,7 +341,7 @@ export default function BrandLogosPage() {
                   <button
                     onClick={() => handleDelete(brand.id)}
                     className="neon-pill text-xs"
-                    style={{ border: '1.5px solid #FF76B0', color: '#FF76B0', background: 'transparent' }}
+                    style={{ border: '1.5px solid #DC2627', color: '#DC2627', background: 'transparent' }}
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
                   </button>
@@ -352,7 +352,7 @@ export default function BrandLogosPage() {
         </div>
 
         {filtered.length === 0 && (
-          <div className="text-center py-20" style={{ color: '#bab1a1' }}>
+          <div className="text-center py-20" style={{ color: '#d1d5db' }}>
             <span className="material-symbols-outlined block mx-auto mb-2" style={{ fontSize: 48 }}>search_off</span>
             לא נמצאו מותגים
           </div>
@@ -360,19 +360,19 @@ export default function BrandLogosPage() {
 
         {/* Quick Upload Zone */}
         <div className="mt-10 mb-6">
-          <h2 className="text-lg font-semibold mb-4" style={{ color: '#373226' }}>העלאה מהירה</h2>
+          <h2 className="text-lg font-semibold mb-4" style={{ color: '#1f2937' }}>העלאה מהירה</h2>
           <div
             className="rounded-[3rem] flex flex-col items-center justify-center py-16 cursor-pointer transition-all hover:shadow-md"
-            style={{ border: '4px dashed #AEB0E8', background: 'transparent' }}
+            style={{ border: '4px dashed #2663EB', background: 'transparent' }}
             onClick={() => {
               if (filtered.length > 0) {
                 triggerUpload(filtered[0].id);
               }
             }}
           >
-            <span className="material-symbols-outlined mb-3" style={{ fontSize: 48, color: '#AEB0E8' }}>cloud_upload</span>
-            <p className="text-sm font-medium" style={{ color: '#655e51' }}>גרור לוגו לכאן או לחץ להעלאה</p>
-            <p className="text-xs mt-1" style={{ color: '#bab1a1' }}>PNG, JPG, SVG עד 5MB</p>
+            <span className="material-symbols-outlined mb-3" style={{ fontSize: 48, color: '#2663EB' }}>cloud_upload</span>
+            <p className="text-sm font-medium" style={{ color: '#4b5563' }}>גרור לוגו לכאן או לחץ להעלאה</p>
+            <p className="text-xs mt-1" style={{ color: '#d1d5db' }}>PNG, JPG, SVG עד 5MB</p>
           </div>
         </div>
       </div>

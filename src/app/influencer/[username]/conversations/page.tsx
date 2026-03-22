@@ -43,7 +43,7 @@ function detectChannel(threadId: string | null): 'chat' | 'dm' | 'widget' {
 const CHANNEL_CONFIG: Record<'chat' | 'dm' | 'widget', { label: string; icon: typeof MessageCircle; color: string; bg: string }> = {
   chat: { label: 'צ׳אט', icon: MessageSquare, color: '#818cf8', bg: 'rgba(129,140,248,0.15)' },
   dm: { label: 'DM', icon: Instagram, color: '#e879a8', bg: 'rgba(232,121,168,0.15)' },
-  widget: { label: 'וידג׳ט', icon: Globe, color: '#34d399', bg: 'rgba(52,211,153,0.15)' },
+  widget: { label: 'וידג׳ט', icon: Globe, color: '#17A34A', bg: 'rgba(23,163,74,0.15)' },
 };
 
 export default function ConversationsPage({

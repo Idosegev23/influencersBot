@@ -118,7 +118,7 @@ export default function RulesAdminPage() {
   if (loading) {
     return (
       <div className="min-h-screen admin-panel flex items-center justify-center" dir="rtl">
-        <div className="w-8 h-8 border-2 border-[#a094e0] border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-[#9334EB] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -166,7 +166,7 @@ export default function RulesAdminPage() {
                   onClick={() => setSelectedRule(rule)}
                   className="p-4 rounded-xl cursor-pointer transition-all"
                   style={selectedRule?.id === rule.id
-                    ? { background: 'rgba(160, 148, 224, 0.08)', border: '1px solid rgba(160, 148, 224, 0.25)' }
+                    ? { background: 'rgba(147, 52, 235, 0.08)', border: '1px solid rgba(147, 52, 235, 0.25)' }
                     : { background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }
                   }
                 >
@@ -178,7 +178,7 @@ export default function RulesAdminPage() {
                         </span>
                         <span className="text-xs" style={{ color: 'rgba(237, 233, 248, 0.25)' }}>P{rule.priority}</span>
                         {rule.source === 'db' && (
-                          <span className="text-xs" style={{ color: '#a094e0' }}>DB</span>
+                          <span className="text-xs" style={{ color: '#9334EB' }}>DB</span>
                         )}
                       </div>
                       <h3 className="font-medium mt-1" style={{ color: '#ede9f8' }}>{rule.name}</h3>
@@ -196,7 +196,7 @@ export default function RulesAdminPage() {
                       />
                       <div
                         className="w-11 h-6 rounded-full peer after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"
-                        style={{ background: rule.enabled ? '#5eead4' : 'rgba(255, 255, 255, 0.1)' }}
+                        style={{ background: rule.enabled ? '#0891B3' : 'rgba(255, 255, 255, 0.1)' }}
                       />
                     </label>
                   </div>
@@ -236,7 +236,7 @@ export default function RulesAdminPage() {
                       <button
                         onClick={() => deleteRule(selectedRule.id)}
                         className="px-3 py-1.5 rounded-full text-sm flex items-center gap-1.5 transition-all"
-                        style={{ background: 'rgba(239, 68, 68, 0.08)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.12)' }}
+                        style={{ background: 'rgba(239, 68, 68, 0.08)', color: '#DC2627', border: '1px solid rgba(239, 68, 68, 0.12)' }}
                       >
                         <Trash2 className="w-3.5 h-3.5" /> מחק
                       </button>
@@ -248,8 +248,8 @@ export default function RulesAdminPage() {
                       <h3 className="text-sm font-medium mb-2" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>Conditions</h3>
                       <div className="rounded-xl p-3 text-sm font-mono overflow-x-auto" style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
                         {selectedRule.conditions.map((c, i) => (
-                          <div key={i} style={{ color: '#5eead4' }}>
-                            {c.field} <span style={{ color: '#e0a494' }}>{c.operator}</span> {JSON.stringify(c.value)}
+                          <div key={i} style={{ color: '#0891B3' }}>
+                            {c.field} <span style={{ color: '#EA580B' }}>{c.operator}</span> {JSON.stringify(c.value)}
                           </div>
                         ))}
                       </div>
@@ -259,7 +259,7 @@ export default function RulesAdminPage() {
                       <h3 className="text-sm font-medium mb-2" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>Actions</h3>
                       <div className="rounded-xl p-3 text-sm font-mono overflow-x-auto" style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
                         {selectedRule.actions.map((a, i) => (
-                          <div key={i} style={{ color: '#a094e0' }}>
+                          <div key={i} style={{ color: '#9334EB' }}>
                             {a.type}: {a.target} = {JSON.stringify(a.value)}
                           </div>
                         ))}
@@ -315,16 +315,16 @@ export default function RulesAdminPage() {
                     <div
                       className="mt-4 p-4 rounded-xl"
                       style={testResult.matched
-                        ? { background: 'rgba(94, 234, 212, 0.06)', border: '1px solid rgba(94, 234, 212, 0.2)' }
+                        ? { background: 'rgba(8, 145, 179, 0.06)', border: '1px solid rgba(8, 145, 179, 0.2)' }
                         : { background: 'rgba(239, 68, 68, 0.06)', border: '1px solid rgba(239, 68, 68, 0.2)' }
                       }
                     >
-                      <div className="font-medium mb-2" style={{ color: testResult.matched ? '#5eead4' : '#f87171' }}>
+                      <div className="font-medium mb-2" style={{ color: testResult.matched ? '#0891B3' : '#DC2627' }}>
                         {testResult.matched ? 'החוק התאים!' : 'החוק לא התאים'}
                       </div>
                       <div className="text-sm space-y-1">
                         {testResult.matchedConditions.map((c, i) => (
-                          <div key={i} style={{ color: c.result ? '#5eead4' : '#f87171' }}>
+                          <div key={i} style={{ color: c.result ? '#0891B3' : '#DC2627' }}>
                             {c.result ? '✓' : '✗'} {c.field}: {JSON.stringify(c.actual)} {c.result ? '=' : '≠'} {JSON.stringify(c.expected)}
                           </div>
                         ))}
@@ -333,7 +333,7 @@ export default function RulesAdminPage() {
                         <div className="mt-3 pt-3" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
                           <div className="text-sm mb-1" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>פעולות שיופעלו:</div>
                           {testResult.wouldApply.map((a, i) => (
-                            <div key={i} className="text-sm" style={{ color: '#a094e0' }}>
+                            <div key={i} className="text-sm" style={{ color: '#9334EB' }}>
                               {a.type}: {a.target}
                             </div>
                           ))}

@@ -457,7 +457,7 @@ export default function CouponsPage({
                           {/* Discount */}
                           <span
                             className="text-xs px-2 py-0.5 rounded-full"
-                            style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399' }}
+                            style={{ background: 'rgba(23,163,74,0.15)', color: '#17A34A' }}
                           >
                             {formatDiscount(coupon.discount_type, coupon.discount_value)}
                           </span>

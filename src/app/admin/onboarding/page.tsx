@@ -48,20 +48,20 @@ interface TaskRecord {
 // ─── Badge colors (neon pastel pills) ───
 const BC: Record<string, string> = {
   data: 'bg-[#B0E0FF]/20 text-[#3b82c8]',
-  admin: 'bg-[#FF76B0]/15 text-[#d64580]',
-  content: 'bg-[#69FFC7]/15 text-[#2d8a62]',
-  scan: 'bg-[#69FFC7]/20 text-[#2d8a62]',
-  local: 'bg-[#69FFC7]/20 text-[#2d8a62]',
-  ai: 'bg-[#AEB0E8]/20 text-[#6b6db0]',
-  persona: 'bg-[#FF76B0]/15 text-[#d64580]',
-  policy: 'bg-[#FF76B0]/20 text-[#d64580]',
+  admin: 'bg-[#DC2627]/15 text-[#d64580]',
+  content: 'bg-[#9334EB]/15 text-[#2d8a62]',
+  scan: 'bg-[#9334EB]/20 text-[#2d8a62]',
+  local: 'bg-[#9334EB]/20 text-[#2d8a62]',
+  ai: 'bg-[#2663EB]/20 text-[#6b6db0]',
+  persona: 'bg-[#DC2627]/15 text-[#d64580]',
+  policy: 'bg-[#DC2627]/20 text-[#d64580]',
   ux: 'bg-[#FFD9B0]/30 text-[#b07830]',
-  design: 'bg-[#AEB0E8]/20 text-[#6b6db0]',
+  design: 'bg-[#2663EB]/20 text-[#6b6db0]',
   test: 'bg-[#FFD9B0]/30 text-[#b07830]',
-  deploy: 'bg-[#FF76B0]/15 text-[#d64580]',
+  deploy: 'bg-[#DC2627]/15 text-[#d64580]',
   social: 'bg-[#B0E0FF]/20 text-[#3b82c8]',
   brands: 'bg-[#FFD9B0]/30 text-[#b07830]',
-  graphic: 'bg-[#AEB0E8]/15 text-[#6b6db0]',
+  graphic: 'bg-[#2663EB]/15 text-[#6b6db0]',
 };
 
 interface TaskTemplate {
@@ -373,11 +373,11 @@ const ASSET_OPTIONS: { key: keyof DigitalAssets; label: string; icon: string; de
 // ─── Section icons ───
 const SECTION_ICONS: Record<string, { icon: string; color: string; bg: string }> = {
   A: { icon: 'inventory_2', color: '#3b82c8', bg: 'rgba(176, 224, 255, 0.25)' },
-  B: { icon: 'radar', color: '#2d8a62', bg: 'rgba(105, 255, 199, 0.15)' },
-  C: { icon: 'smart_toy', color: '#6b6db0', bg: 'rgba(174, 176, 232, 0.2)' },
-  D: { icon: 'widgets', color: '#d64580', bg: 'rgba(255, 118, 176, 0.15)' },
+  B: { icon: 'radar', color: '#2d8a62', bg: 'rgba(23, 163, 74, 0.12)' },
+  C: { icon: 'smart_toy', color: '#6b6db0', bg: 'rgba(147, 52, 235, 0.2)' },
+  D: { icon: 'widgets', color: '#d64580', bg: 'rgba(220, 38, 39, 0.12)' },
   E: { icon: 'bug_report', color: '#b07830', bg: 'rgba(255, 217, 176, 0.3)' },
-  F: { icon: 'verified', color: '#69FFC7', bg: 'rgba(105, 255, 199, 0.15)' },
+  F: { icon: 'verified', color: '#9334EB', bg: 'rgba(23, 163, 74, 0.12)' },
 };
 
 // ═══════════════════════════════════════════════
@@ -651,7 +651,7 @@ export default function OnboardingChecklistPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-32">
-        <div className="w-8 h-8 border-2 border-[#AEB0E8] border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-[#2663EB] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -661,17 +661,17 @@ export default function OnboardingChecklistPage() {
       {/* ─── Page Header ─── */}
       <div className="flex items-start justify-between mb-8">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(174, 176, 232, 0.15)' }}>
-            <span className="material-symbols-outlined text-[28px]" style={{ color: '#AEB0E8' }}>checklist</span>
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(147, 52, 235, 0.15)' }}>
+            <span className="material-symbols-outlined text-[28px]" style={{ color: '#2663EB' }}>checklist</span>
           </div>
           <div>
-            <h1 className="text-2xl font-extrabold tracking-tight font-headline" style={{ color: '#373226' }}>
+            <h1 className="text-2xl font-extrabold tracking-tight font-headline" style={{ color: '#1f2937' }}>
               אונבורדינג לקוחות
             </h1>
-            <p className="text-sm mt-0.5" style={{ color: '#655e51' }}>
+            <p className="text-sm mt-0.5" style={{ color: '#4b5563' }}>
               מעקב קליטת לקוחות למערכת
               {currentRecord && (
-                <span className="mr-2" style={{ color: '#bab1a1' }}>
+                <span className="mr-2" style={{ color: '#d1d5db' }}>
                   {assetTags(currentRecord.digital_assets || DEFAULT_ASSETS)}
                   {currentRecord.wants_widget ? ' + Widget' : ''}
                 </span>
@@ -696,15 +696,15 @@ export default function OnboardingChecklistPage() {
         <div className="col-span-8 neon-card p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-[20px]" style={{ color: '#655e51' }}>analytics</span>
-              <span className="text-sm font-semibold" style={{ color: '#373226' }}>התקדמות</span>
+              <span className="material-symbols-outlined text-[20px]" style={{ color: '#4b5563' }}>analytics</span>
+              <span className="text-sm font-semibold" style={{ color: '#1f2937' }}>התקדמות</span>
             </div>
             {currentRecord && (
               <span
                 className="text-xs font-bold px-3 py-1 rounded-full"
                 style={currentRecord.status === 'completed'
-                  ? { background: 'rgba(105, 255, 199, 0.15)', color: '#2d8a62' }
-                  : { background: 'rgba(174, 176, 232, 0.15)', color: '#6b6db0' }
+                  ? { background: 'rgba(23, 163, 74, 0.12)', color: '#2d8a62' }
+                  : { background: 'rgba(147, 52, 235, 0.15)', color: '#6b6db0' }
                 }
               >
                 {currentRecord.status === 'completed' ? 'הושלם' : 'בתהליך'}
@@ -714,13 +714,13 @@ export default function OnboardingChecklistPage() {
           {currentId ? (
             <>
               <div className="flex items-end gap-3 mb-3">
-                <span className="text-4xl font-extrabold font-headline" style={{ color: '#373226' }}>{progressPct}%</span>
-                <span className="text-sm mb-1.5" style={{ color: '#bab1a1' }}>{completedCount} / {totalCount} משימות</span>
+                <span className="text-4xl font-extrabold font-headline" style={{ color: '#1f2937' }}>{progressPct}%</span>
+                <span className="text-sm mb-1.5" style={{ color: '#d1d5db' }}>{completedCount} / {totalCount} משימות</span>
               </div>
-              <div className="w-full h-3 rounded-full overflow-hidden" style={{ background: '#faf2e9' }}>
+              <div className="w-full h-3 rounded-full overflow-hidden" style={{ background: '#f3f4f6' }}>
                 <motion.div
                   className="h-full rounded-full"
-                  style={{ background: 'linear-gradient(90deg, #69FFC7, #AEB0E8)' }}
+                  style={{ background: 'linear-gradient(90deg, #9334EB, #2663EB)' }}
                   initial={{ width: 0 }}
                   animate={{ width: `${progressPct}%` }}
                   transition={{ duration: 0.5 }}
@@ -728,16 +728,16 @@ export default function OnboardingChecklistPage() {
               </div>
             </>
           ) : (
-            <p className="text-sm" style={{ color: '#bab1a1' }}>בחר צ&apos;קליסט להצגת התקדמות</p>
+            <p className="text-sm" style={{ color: '#d1d5db' }}>בחר צ&apos;קליסט להצגת התקדמות</p>
           )}
         </div>
 
         {/* Accent card */}
-        <div className="col-span-4 neon-card p-6 flex flex-col justify-between" style={{ background: 'rgba(174, 176, 232, 0.08)' }}>
-          <span className="material-symbols-outlined text-[24px] mb-3" style={{ color: '#AEB0E8' }}>folder_open</span>
+        <div className="col-span-4 neon-card p-6 flex flex-col justify-between" style={{ background: 'rgba(147, 52, 235, 0.08)' }}>
+          <span className="material-symbols-outlined text-[24px] mb-3" style={{ color: '#2663EB' }}>folder_open</span>
           <div>
-            <span className="text-3xl font-extrabold font-headline" style={{ color: '#373226' }}>{checklists.length}</span>
-            <p className="text-xs mt-1" style={{ color: '#655e51' }}>סה״כ צ&apos;קליסטים</p>
+            <span className="text-3xl font-extrabold font-headline" style={{ color: '#1f2937' }}>{checklists.length}</span>
+            <p className="text-xs mt-1" style={{ color: '#4b5563' }}>סה״כ צ&apos;קליסטים</p>
           </div>
         </div>
       </div>
@@ -778,7 +778,7 @@ export default function OnboardingChecklistPage() {
           <div className="neon-card p-6 mb-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
-                <label className="block text-xs font-semibold mb-1.5 mr-1" style={{ color: '#655e51' }}>שם הלקוח</label>
+                <label className="block text-xs font-semibold mb-1.5 mr-1" style={{ color: '#4b5563' }}>שם הלקוח</label>
                 <input
                   type="text"
                   value={brandName}
@@ -788,7 +788,7 @@ export default function OnboardingChecklistPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold mb-1.5 mr-1" style={{ color: '#655e51' }}>Handle / דומיין</label>
+                <label className="block text-xs font-semibold mb-1.5 mr-1" style={{ color: '#4b5563' }}>Handle / דומיין</label>
                 <input
                   type="text"
                   value={brandDomain}
@@ -808,11 +808,11 @@ export default function OnboardingChecklistPage() {
                 const secDone = sec.tasks.filter(t => t.completed).length;
                 const secTotal = sec.tasks.length;
                 const secPct = secTotal > 0 ? Math.round((secDone / secTotal) * 100) : 0;
-                const secStyle = SECTION_ICONS[sec.key] || { icon: 'task_alt', color: '#655e51', bg: 'rgba(186, 177, 161, 0.15)' };
+                const secStyle = SECTION_ICONS[sec.key] || { icon: 'task_alt', color: '#4b5563', bg: 'rgba(186, 177, 161, 0.15)' };
 
                 return (
                   <details key={sec.key} className="group" open>
-                    <summary className="flex items-center gap-3 cursor-pointer select-none list-none py-3 px-2 rounded-xl hover:bg-[#faf2e9]/60 transition-colors">
+                    <summary className="flex items-center gap-3 cursor-pointer select-none list-none py-3 px-2 rounded-xl hover:bg-[#f3f4f6]/60 transition-colors">
                       <div
                         className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                         style={{ background: secStyle.bg }}
@@ -821,22 +821,22 @@ export default function OnboardingChecklistPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold" style={{ color: '#373226' }}>{sec.key}. {sec.title}</span>
-                          <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: '#faf2e9', color: '#655e51' }}>
+                          <span className="text-sm font-bold" style={{ color: '#1f2937' }}>{sec.key}. {sec.title}</span>
+                          <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: '#f3f4f6', color: '#4b5563' }}>
                             {secDone}/{secTotal}
                           </span>
                         </div>
-                        <div className="w-full h-1.5 rounded-full mt-1.5 overflow-hidden" style={{ background: '#faf2e9' }}>
+                        <div className="w-full h-1.5 rounded-full mt-1.5 overflow-hidden" style={{ background: '#f3f4f6' }}>
                           <div
                             className="h-full rounded-full transition-all duration-300"
                             style={{
                               width: `${secPct}%`,
-                              background: secPct === 100 ? '#69FFC7' : `linear-gradient(90deg, ${secStyle.color}88, ${secStyle.color})`,
+                              background: secPct === 100 ? '#9334EB' : `linear-gradient(90deg, ${secStyle.color}88, ${secStyle.color})`,
                             }}
                           />
                         </div>
                       </div>
-                      <span className="material-symbols-outlined text-[20px] transition-transform group-open:rotate-180" style={{ color: '#bab1a1' }}>
+                      <span className="material-symbols-outlined text-[20px] transition-transform group-open:rotate-180" style={{ color: '#d1d5db' }}>
                         expand_more
                       </span>
                     </summary>
@@ -848,13 +848,13 @@ export default function OnboardingChecklistPage() {
                           <div
                             key={task.task_number}
                             onClick={() => handleTaskClick(task.task_number)}
-                            className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all hover:bg-[#faf2e9]/80 ${task.completed ? 'opacity-60' : ''}`}
+                            className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all hover:bg-[#f3f4f6]/80 ${task.completed ? 'opacity-60' : ''}`}
                           >
                             {/* Checkbox */}
                             <div
                               className="w-5 h-5 mt-0.5 rounded-md flex-shrink-0 border-2 flex items-center justify-center transition-all"
                               style={task.completed
-                                ? { background: '#AEB0E8', borderColor: '#AEB0E8' }
+                                ? { background: '#2663EB', borderColor: '#2663EB' }
                                 : { borderColor: '#ddd5c8' }
                               }
                             >
@@ -864,23 +864,23 @@ export default function OnboardingChecklistPage() {
                             </div>
 
                             <div className="flex-1 min-w-0">
-                              <div className={`text-sm font-semibold ${task.completed ? 'line-through' : ''}`} style={{ color: task.completed ? '#bab1a1' : '#373226' }}>
+                              <div className={`text-sm font-semibold ${task.completed ? 'line-through' : ''}`} style={{ color: task.completed ? '#d1d5db' : '#1f2937' }}>
                                 {task.task_title}
                               </div>
                               {badges.length > 0 && (
                                 <div className="flex gap-1.5 mt-1 flex-wrap">
                                   {badges.map((b, i) => (
-                                    <span key={i} className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${BC[b.color] || 'bg-[#faf2e9] text-[#655e51]'}`}>
+                                    <span key={i} className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${BC[b.color] || 'bg-[#f3f4f6] text-[#4b5563]'}`}>
                                       {b.label}
                                     </span>
                                   ))}
                                 </div>
                               )}
                               {task.note && (
-                                <p className="text-[11px] mt-1" style={{ color: '#bab1a1' }}>{task.note}</p>
+                                <p className="text-[11px] mt-1" style={{ color: '#d1d5db' }}>{task.note}</p>
                               )}
                               {task.completed && task.completed_by && (
-                                <p className="text-[11px] font-medium mt-1.5" style={{ color: '#AEB0E8' }}>
+                                <p className="text-[11px] font-medium mt-1.5" style={{ color: '#2663EB' }}>
                                   {task.completed_by}{task.completed_at && ` — ${formatHebDate(new Date(task.completed_at))}`}
                                 </p>
                               )}
@@ -898,8 +898,8 @@ export default function OnboardingChecklistPage() {
           {/* Notes */}
           <div className="neon-card p-6 mb-4">
             <div className="flex items-center gap-2 mb-3">
-              <span className="material-symbols-outlined text-[18px]" style={{ color: '#655e51' }}>notes</span>
-              <h3 className="text-sm font-bold" style={{ color: '#373226' }}>הערות</h3>
+              <span className="material-symbols-outlined text-[18px]" style={{ color: '#4b5563' }}>notes</span>
+              <h3 className="text-sm font-bold" style={{ color: '#1f2937' }}>הערות</h3>
             </div>
             <textarea
               value={notes}
@@ -913,8 +913,8 @@ export default function OnboardingChecklistPage() {
           {/* Send Footer */}
           <div className="neon-card p-6">
             <div className="flex items-center gap-2 mb-4">
-              <span className="material-symbols-outlined text-[18px]" style={{ color: '#655e51' }}>send</span>
-              <h3 className="text-sm font-bold" style={{ color: '#373226' }}>שליחת סטטוס</h3>
+              <span className="material-symbols-outlined text-[18px]" style={{ color: '#4b5563' }}>send</span>
+              <h3 className="text-sm font-bold" style={{ color: '#1f2937' }}>שליחת סטטוס</h3>
             </div>
             <div className="flex gap-3 flex-wrap">
               <button onClick={sendEmail} className="neon-pill neon-pill-outline flex-1 min-w-[100px] flex items-center justify-center gap-2 py-2.5 text-sm font-semibold">
@@ -937,11 +937,11 @@ export default function OnboardingChecklistPage() {
       {/* ─── Empty state ─── */}
       {!currentId && (
         <div className="text-center py-20">
-          <div className="w-20 h-20 mx-auto mb-5 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(174, 176, 232, 0.12)' }}>
-            <span className="material-symbols-outlined text-[40px]" style={{ color: '#AEB0E8' }}>checklist</span>
+          <div className="w-20 h-20 mx-auto mb-5 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(147, 52, 235, 0.12)' }}>
+            <span className="material-symbols-outlined text-[40px]" style={{ color: '#2663EB' }}>checklist</span>
           </div>
-          <h2 className="text-xl font-extrabold mb-2 font-headline" style={{ color: '#373226' }}>צ&apos;קליסט אונבורדינג</h2>
-          <p className="text-sm mb-6" style={{ color: '#655e51' }}>בחר צ&apos;קליסט קיים או צור חדש להתחיל מעקב</p>
+          <h2 className="text-xl font-extrabold mb-2 font-headline" style={{ color: '#1f2937' }}>צ&apos;קליסט אונבורדינג</h2>
+          <p className="text-sm mb-6" style={{ color: '#4b5563' }}>בחר צ&apos;קליסט קיים או צור חדש להתחיל מעקב</p>
           <button onClick={openWizard} className="neon-pill neon-pill-primary inline-flex items-center gap-2 px-7 py-3 font-bold text-base">
             <span className="material-symbols-outlined text-[20px]">add</span>
             צור צ&apos;קליסט חדש
@@ -966,12 +966,12 @@ export default function OnboardingChecklistPage() {
               {wizStep === 1 && (
                 <>
                   <div className="flex items-center gap-3 mb-1">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(174, 176, 232, 0.15)' }}>
-                      <span className="material-symbols-outlined text-[22px]" style={{ color: '#AEB0E8' }}>inventory_2</span>
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(147, 52, 235, 0.15)' }}>
+                      <span className="material-symbols-outlined text-[22px]" style={{ color: '#2663EB' }}>inventory_2</span>
                     </div>
-                    <h3 className="text-lg font-extrabold font-headline" style={{ color: '#373226' }}>צ&apos;קליסט חדש</h3>
+                    <h3 className="text-lg font-extrabold font-headline" style={{ color: '#1f2937' }}>צ&apos;קליסט חדש</h3>
                   </div>
-                  <p className="text-sm mb-5 mr-[52px]" style={{ color: '#655e51' }}>מה הנכסים הדיגיטליים של הלקוח?</p>
+                  <p className="text-sm mb-5 mr-[52px]" style={{ color: '#4b5563' }}>מה הנכסים הדיגיטליים של הלקוח?</p>
                   <div className="grid grid-cols-2 gap-2.5 mb-6">
                     {ASSET_OPTIONS.map(opt => {
                       const active = wizAssets[opt.key];
@@ -981,17 +981,17 @@ export default function OnboardingChecklistPage() {
                           onClick={() => toggleAsset(opt.key)}
                           className="p-3.5 rounded-xl transition-all text-right"
                           style={active
-                            ? { border: '2px solid rgba(174, 176, 232, 0.5)', background: 'rgba(174, 176, 232, 0.08)' }
-                            : { border: '2px solid #ede8df', background: '#faf2e9' }
+                            ? { border: '2px solid rgba(147, 52, 235, 0.5)', background: 'rgba(147, 52, 235, 0.08)' }
+                            : { border: '2px solid #ede8df', background: '#f3f4f6' }
                           }
                         >
                           <div className="flex items-center gap-2.5">
-                            <span className="material-symbols-outlined text-[22px] flex-shrink-0" style={{ color: active ? '#AEB0E8' : '#bab1a1' }}>
+                            <span className="material-symbols-outlined text-[22px] flex-shrink-0" style={{ color: active ? '#2663EB' : '#d1d5db' }}>
                               {opt.icon}
                             </span>
                             <div>
-                              <div className="text-sm font-semibold" style={{ color: active ? '#373226' : '#655e51' }}>{opt.label}</div>
-                              <div className="text-[11px]" style={{ color: '#bab1a1' }}>{opt.desc}</div>
+                              <div className="text-sm font-semibold" style={{ color: active ? '#1f2937' : '#4b5563' }}>{opt.label}</div>
+                              <div className="text-[11px]" style={{ color: '#d1d5db' }}>{opt.desc}</div>
                             </div>
                           </div>
                         </button>
@@ -1016,36 +1016,36 @@ export default function OnboardingChecklistPage() {
               {wizStep === 2 && (
                 <>
                   <div className="flex items-center gap-3 mb-1">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(105, 255, 199, 0.12)' }}>
-                      <span className="material-symbols-outlined text-[22px]" style={{ color: '#69FFC7' }}>widgets</span>
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(23, 163, 74, 0.1)' }}>
+                      <span className="material-symbols-outlined text-[22px]" style={{ color: '#9334EB' }}>widgets</span>
                     </div>
-                    <h3 className="text-lg font-extrabold font-headline" style={{ color: '#373226' }}>וידג&apos;ט באתר?</h3>
+                    <h3 className="text-lg font-extrabold font-headline" style={{ color: '#1f2937' }}>וידג&apos;ט באתר?</h3>
                   </div>
-                  <p className="text-sm mb-5 mr-[52px]" style={{ color: '#655e51' }}>האם הלקוח צריך צ&apos;אט מוטמע באתר שלו?</p>
+                  <p className="text-sm mb-5 mr-[52px]" style={{ color: '#4b5563' }}>האם הלקוח צריך צ&apos;אט מוטמע באתר שלו?</p>
                   <div className="grid grid-cols-2 gap-3 mb-6">
                     <button
                       onClick={() => setWizWidget(true)}
                       className="p-5 rounded-xl transition-all text-center"
                       style={wizWidget
-                        ? { border: '2px solid rgba(105, 255, 199, 0.5)', background: 'rgba(105, 255, 199, 0.08)' }
-                        : { border: '2px solid #ede8df', background: '#faf2e9' }
+                        ? { border: '2px solid rgba(23, 163, 74, 0.35)', background: 'rgba(23, 163, 74, 0.06)' }
+                        : { border: '2px solid #ede8df', background: '#f3f4f6' }
                       }
                     >
-                      <span className="material-symbols-outlined text-[32px] mx-auto mb-2 block" style={{ color: wizWidget ? '#69FFC7' : '#bab1a1' }}>desktop_windows</span>
-                      <div className="text-sm font-bold" style={{ color: wizWidget ? '#373226' : '#655e51' }}>כן, עם וידג&apos;ט</div>
-                      <div className="text-[11px] mt-1" style={{ color: '#bab1a1' }}>צ&apos;אט מוטמע באתר</div>
+                      <span className="material-symbols-outlined text-[32px] mx-auto mb-2 block" style={{ color: wizWidget ? '#9334EB' : '#d1d5db' }}>desktop_windows</span>
+                      <div className="text-sm font-bold" style={{ color: wizWidget ? '#1f2937' : '#4b5563' }}>כן, עם וידג&apos;ט</div>
+                      <div className="text-[11px] mt-1" style={{ color: '#d1d5db' }}>צ&apos;אט מוטמע באתר</div>
                     </button>
                     <button
                       onClick={() => setWizWidget(false)}
                       className="p-5 rounded-xl transition-all text-center"
                       style={!wizWidget
-                        ? { border: '2px solid rgba(174, 176, 232, 0.5)', background: 'rgba(174, 176, 232, 0.08)' }
-                        : { border: '2px solid #ede8df', background: '#faf2e9' }
+                        ? { border: '2px solid rgba(147, 52, 235, 0.5)', background: 'rgba(147, 52, 235, 0.08)' }
+                        : { border: '2px solid #ede8df', background: '#f3f4f6' }
                       }
                     >
-                      <span className="material-symbols-outlined text-[32px] mx-auto mb-2 block" style={{ color: !wizWidget ? '#AEB0E8' : '#bab1a1' }}>chat_bubble_outline</span>
-                      <div className="text-sm font-bold" style={{ color: !wizWidget ? '#373226' : '#655e51' }}>לא</div>
-                      <div className="text-[11px] mt-1" style={{ color: '#bab1a1' }}>ללא וידג&apos;ט</div>
+                      <span className="material-symbols-outlined text-[32px] mx-auto mb-2 block" style={{ color: !wizWidget ? '#2663EB' : '#d1d5db' }}>chat_bubble_outline</span>
+                      <div className="text-sm font-bold" style={{ color: !wizWidget ? '#1f2937' : '#4b5563' }}>לא</div>
+                      <div className="text-[11px] mt-1" style={{ color: '#d1d5db' }}>ללא וידג&apos;ט</div>
                     </button>
                   </div>
                   <div className="flex gap-3">
@@ -1077,21 +1077,21 @@ export default function OnboardingChecklistPage() {
               className="neon-card p-8 w-[90%] max-w-[400px] shadow-2xl"
             >
               <div className="flex items-center justify-between mb-1">
-                <h3 className="text-lg font-extrabold font-headline" style={{ color: '#373226' }}>
+                <h3 className="text-lg font-extrabold font-headline" style={{ color: '#1f2937' }}>
                   סימון משימה #{pendingTaskNum}
                 </h3>
                 <button
                   onClick={() => { setModalOpen(false); setPendingTaskNum(null); }}
-                  className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-[#faf2e9] transition-colors"
+                  className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-[#f3f4f6] transition-colors"
                 >
-                  <span className="material-symbols-outlined text-[20px]" style={{ color: '#bab1a1' }}>close</span>
+                  <span className="material-symbols-outlined text-[20px]" style={{ color: '#d1d5db' }}>close</span>
                 </button>
               </div>
-              <p className="text-sm font-semibold mb-5" style={{ color: '#AEB0E8' }}>
+              <p className="text-sm font-semibold mb-5" style={{ color: '#2663EB' }}>
                 {tasks.find(t => t.task_number === pendingTaskNum)?.task_title}
               </p>
 
-              <label className="block text-xs font-bold mb-1.5 mr-1" style={{ color: '#655e51' }}>מי ביצע?</label>
+              <label className="block text-xs font-bold mb-1.5 mr-1" style={{ color: '#4b5563' }}>מי ביצע?</label>
               <input
                 ref={nameInputRef}
                 type="text"
@@ -1102,8 +1102,8 @@ export default function OnboardingChecklistPage() {
                 className="neon-input w-full text-base font-medium mb-3"
               />
 
-              <div className="px-4 py-3 rounded-xl text-sm mb-5" style={{ background: '#faf2e9', color: '#655e51' }}>
-                <span className="font-bold" style={{ color: '#373226' }}>תאריך ושעה: </span>{formatHebDate(modalNow)}
+              <div className="px-4 py-3 rounded-xl text-sm mb-5" style={{ background: '#f3f4f6', color: '#4b5563' }}>
+                <span className="font-bold" style={{ color: '#1f2937' }}>תאריך ושעה: </span>{formatHebDate(modalNow)}
               </div>
 
               <div className="flex gap-3">
@@ -1127,7 +1127,7 @@ export default function OnboardingChecklistPage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
             className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-full text-sm font-bold shadow-xl"
-            style={{ background: '#69FFC7', color: '#1a3a2a' }}
+            style={{ background: '#9334EB', color: '#1a3a2a' }}
           >
             {toast}
           </motion.div>

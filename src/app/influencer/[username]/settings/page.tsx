@@ -185,7 +185,7 @@ export default function SettingsPage({
               onClick={handleSave}
               disabled={saving}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 disabled:opacity-50"
-              style={{ background: saved ? '#34d399' : 'var(--color-primary)', color: '#fff' }}
+              style={{ background: saved ? '#17A34A' : 'var(--color-primary)', color: '#fff' }}
             >
               {saving ? (
                 <Loader2 className="w-4 h-4 animate-spin" />

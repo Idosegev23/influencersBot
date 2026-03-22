@@ -55,7 +55,7 @@ export default function WebsitePreviewPage() {
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center" dir="rtl">
-        <div className="w-8 h-8 border-2 border-[#AEB0E8] border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-[#2663EB] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -80,11 +80,11 @@ export default function WebsitePreviewPage() {
             <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
             חזרה
           </Link>
-          <span className="font-semibold text-[#373226] text-sm" style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+          <span className="font-semibold text-[#1f2937] text-sm" style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
             {config?.brandName || 'אתר'}
           </span>
           {domain && (
-            <span className="text-xs text-[#bab1a1] font-mono">{domain}</span>
+            <span className="text-xs text-[#d1d5db] font-mono">{domain}</span>
           )}
         </div>
 
@@ -93,7 +93,7 @@ export default function WebsitePreviewPage() {
           {/* Info panel toggle */}
           <button
             onClick={() => setInfoPanelOpen(!infoPanelOpen)}
-            className={`neon-pill-outline flex items-center gap-1.5 px-4 py-2 text-sm ${infoPanelOpen ? '!bg-[#AEB0E8]/15 !border-[#AEB0E8]' : ''}`}
+            className={`neon-pill-outline flex items-center gap-1.5 px-4 py-2 text-sm ${infoPanelOpen ? '!bg-[#2663EB]/15 !border-[#2663EB]' : ''}`}
           >
             <span className="material-symbols-outlined text-[18px]">info</span>
             פרטים
@@ -125,13 +125,13 @@ export default function WebsitePreviewPage() {
           <div className="flex items-center gap-1 mr-2">
             <button
               onClick={() => setDevice('desktop')}
-              className={`neon-pill-outline flex items-center justify-center w-9 h-9 !px-0 ${device === 'desktop' ? '!bg-[#AEB0E8]/20 !border-[#AEB0E8] !text-[#AEB0E8]' : ''}`}
+              className={`neon-pill-outline flex items-center justify-center w-9 h-9 !px-0 ${device === 'desktop' ? '!bg-[#2663EB]/20 !border-[#2663EB] !text-[#2663EB]' : ''}`}
             >
               <span className="material-symbols-outlined text-[20px]">monitor</span>
             </button>
             <button
               onClick={() => setDevice('mobile')}
-              className={`neon-pill-outline flex items-center justify-center w-9 h-9 !px-0 ${device === 'mobile' ? '!bg-[#AEB0E8]/20 !border-[#AEB0E8] !text-[#AEB0E8]' : ''}`}
+              className={`neon-pill-outline flex items-center justify-center w-9 h-9 !px-0 ${device === 'mobile' ? '!bg-[#2663EB]/20 !border-[#2663EB] !text-[#2663EB]' : ''}`}
             >
               <span className="material-symbols-outlined text-[20px]">smartphone</span>
             </button>
@@ -152,31 +152,31 @@ export default function WebsitePreviewPage() {
         >
           {infoPanelOpen && config && (
             <div className="p-5 space-y-5" style={{ width: 320 }}>
-              <h3 className="text-base font-semibold text-[#373226]" style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+              <h3 className="text-base font-semibold text-[#1f2937]" style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
                 פרטי וידג׳ט
               </h3>
 
               {/* Brand name */}
               <div>
-                <label className="text-xs text-[#bab1a1] block mb-1">שם המותג</label>
-                <p className="text-sm text-[#373226] font-medium">{config.brandName}</p>
+                <label className="text-xs text-[#d1d5db] block mb-1">שם המותג</label>
+                <p className="text-sm text-[#1f2937] font-medium">{config.brandName}</p>
               </div>
 
               {/* Domain */}
               <div>
-                <label className="text-xs text-[#bab1a1] block mb-1">דומיין</label>
-                <p className="text-sm text-[#655e51] font-mono">{domain || '—'}</p>
+                <label className="text-xs text-[#d1d5db] block mb-1">דומיין</label>
+                <p className="text-sm text-[#4b5563] font-mono">{domain || '—'}</p>
               </div>
 
               {/* Color swatch */}
               <div>
-                <label className="text-xs text-[#bab1a1] block mb-1">צבע מותג</label>
+                <label className="text-xs text-[#d1d5db] block mb-1">צבע מותג</label>
                 <div className="flex items-center gap-2">
                   <div
                     className="w-8 h-8 rounded-lg border border-black/5"
                     style={{ background: config.theme.primaryColor || '#0c1013' }}
                   />
-                  <span className="text-sm text-[#655e51] font-mono">
+                  <span className="text-sm text-[#4b5563] font-mono">
                     {config.theme.primaryColor || '#0c1013'}
                   </span>
                 </div>
@@ -184,21 +184,21 @@ export default function WebsitePreviewPage() {
 
               {/* Welcome message */}
               <div>
-                <label className="text-xs text-[#bab1a1] block mb-1">הודעת פתיחה</label>
-                <p className="text-sm text-[#655e51] leading-relaxed">{config.welcomeMessage}</p>
+                <label className="text-xs text-[#d1d5db] block mb-1">הודעת פתיחה</label>
+                <p className="text-sm text-[#4b5563] leading-relaxed">{config.welcomeMessage}</p>
               </div>
 
               {/* Account ID */}
               <div>
-                <label className="text-xs text-[#bab1a1] block mb-1">Account ID</label>
-                <p className="text-xs text-[#655e51] font-mono break-all">{accountId}</p>
+                <label className="text-xs text-[#d1d5db] block mb-1">Account ID</label>
+                <p className="text-xs text-[#4b5563] font-mono break-all">{accountId}</p>
               </div>
 
               {/* Embed code */}
               <div>
-                <label className="text-xs text-[#bab1a1] block mb-1">קוד הטמעה</label>
+                <label className="text-xs text-[#d1d5db] block mb-1">קוד הטמעה</label>
                 <pre
-                  className="text-xs p-3 rounded-xl bg-[#FFF7ED] text-[#655e51] overflow-x-auto leading-relaxed"
+                  className="text-xs p-3 rounded-xl bg-[#f8f9fc] text-[#4b5563] overflow-x-auto leading-relaxed"
                   style={{ direction: 'ltr', fontFamily: 'monospace' }}
                 >
 {`<!-- InfluencerBot Widget -->
@@ -213,7 +213,7 @@ export default function WebsitePreviewPage() {
         </div>
 
         {/* Preview Area */}
-        <div className="flex-1 flex items-center justify-center bg-[#FFF7ED]/50 relative overflow-hidden">
+        <div className="flex-1 flex items-center justify-center bg-[#f8f9fc]/50 relative overflow-hidden">
           {proxyUrl ? (
             device === 'desktop' ? (
               /* Desktop: centered iframe */
@@ -285,8 +285,8 @@ export default function WebsitePreviewPage() {
           ) : (
             /* Error / no URL state */
             <div className="flex flex-col items-center gap-4 text-center">
-              <span className="material-symbols-outlined text-[#bab1a1]" style={{ fontSize: 64 }}>language</span>
-              <p className="text-[#655e51] text-base">לא ניתן לטעון את האתר</p>
+              <span className="material-symbols-outlined text-[#d1d5db]" style={{ fontSize: 64 }}>language</span>
+              <p className="text-[#4b5563] text-base">לא ניתן לטעון את האתר</p>
               <button
                 onClick={() => window.location.reload()}
                 className="neon-pill-outline flex items-center gap-1.5 px-5 py-2.5 text-sm"

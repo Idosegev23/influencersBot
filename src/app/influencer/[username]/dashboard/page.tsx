@@ -373,13 +373,13 @@ export default function InfluencerDashboardPage({
               delta: instagram.followersGrowth !== 0 ? instagram.followersGrowth : null,
               fill: 'fill-purple',
               icon: Users,
-              iconColor: '#a094e0',
+              iconColor: '#9334EB',
             },
-            { label: 'שיחות', value: formatNumber(chat.totalSessions), sub: `${formatNumber(chat.totalMessages)} הודעות`, fill: 'fill-blue', icon: MessageSquare, iconColor: '#60a5fa' },
-            { label: 'שת״פים', value: partnerships.active, sub: partnerships.total > partnerships.active ? `מתוך ${partnerships.total}` : undefined, fill: 'fill-coral', icon: Heart, iconColor: '#e0a494' },
-            { label: 'קופונים', value: coupons.active, sub: coupons.totalCopies > 0 ? `${formatNumber(coupons.totalCopies)} העתקות` : undefined, fill: 'fill-green', icon: Copy, iconColor: '#34d399' },
-            { label: 'אנגייג׳מנט', value: `${instagram.avgEngagement}%`, sub: instagram.totalLikes > 0 ? `${formatNumber(instagram.totalLikes)} לייקים` : undefined, fill: 'fill-pink', icon: Eye, iconColor: '#f472b6' },
-            { label: 'צפיות', value: formatNumber(instagram.totalViews), sub: instagram.scrapedPosts > 0 ? `${instagram.scrapedPosts} פוסטים` : undefined, fill: 'fill-amber', icon: Play, iconColor: '#fbbf24' },
+            { label: 'שיחות', value: formatNumber(chat.totalSessions), sub: `${formatNumber(chat.totalMessages)} הודעות`, fill: 'fill-blue', icon: MessageSquare, iconColor: '#2663EB' },
+            { label: 'שת״פים', value: partnerships.active, sub: partnerships.total > partnerships.active ? `מתוך ${partnerships.total}` : undefined, fill: 'fill-coral', icon: Heart, iconColor: '#EA580B' },
+            { label: 'קופונים', value: coupons.active, sub: coupons.totalCopies > 0 ? `${formatNumber(coupons.totalCopies)} העתקות` : undefined, fill: 'fill-green', icon: Copy, iconColor: '#17A34A' },
+            { label: 'אנגייג׳מנט', value: `${instagram.avgEngagement}%`, sub: instagram.totalLikes > 0 ? `${formatNumber(instagram.totalLikes)} לייקים` : undefined, fill: 'fill-pink', icon: Eye, iconColor: '#DB2877' },
+            { label: 'צפיות', value: formatNumber(instagram.totalViews), sub: instagram.scrapedPosts > 0 ? `${instagram.scrapedPosts} פוסטים` : undefined, fill: 'fill-amber', icon: Play, iconColor: '#CB8A04' },
           ].map((m, i) => (
             <div key={i} className="metric-card text-center animate-slide-up" style={{ animationDelay: `${i * 0.05}s`, animationFillMode: 'both' }}>
               <div className={`w-8 h-8 rounded-xl mx-auto mb-2 flex items-center justify-center relative z-10 ${m.fill}`}>

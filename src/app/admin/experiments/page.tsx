@@ -160,7 +160,7 @@ export default function ExperimentsAdminPage() {
   if (loading) {
     return (
       <div className="min-h-screen admin-panel flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#a094e0] border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-[#9334EB] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -242,7 +242,7 @@ export default function ExperimentsAdminPage() {
                     max="100"
                     value={newExperiment.allocation}
                     onChange={e => setNewExperiment({...newExperiment, allocation: parseInt(e.target.value)})}
-                    className="w-full accent-[#a094e0]"
+                    className="w-full accent-[#9334EB]"
                   />
                 </div>
 
@@ -292,7 +292,7 @@ export default function ExperimentsAdminPage() {
                       ...newExperiment,
                       variants: [...newExperiment.variants, { name: `Variant ${String.fromCharCode(65 + newExperiment.variants.length - 1)}`, weight: 50, uiOverrides: {} }],
                     })}
-                    className="text-sm transition-colors" style={{ color: '#a094e0' }}
+                    className="text-sm transition-colors" style={{ color: '#9334EB' }}
                   >
                     + הוסף וריאנט
                   </button>
@@ -329,7 +329,7 @@ export default function ExperimentsAdminPage() {
                   onClick={() => setSelectedExperiment(exp)}
                   className="p-4 rounded-xl cursor-pointer transition-all"
                   style={selectedExperiment?.id === exp.id
-                    ? { background: 'rgba(160, 148, 224, 0.08)', border: '1px solid rgba(160, 148, 224, 0.2)' }
+                    ? { background: 'rgba(147, 52, 235, 0.08)', border: '1px solid rgba(147, 52, 235, 0.2)' }
                     : { background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)' }
                   }
                 >
@@ -356,13 +356,13 @@ export default function ExperimentsAdminPage() {
                       />
                       <div className="w-11 h-6 rounded-full peer after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:rounded-full after:h-5 after:w-5 after:transition-all"
                         style={{
-                          background: exp.enabled ? 'rgba(94, 234, 212, 0.3)' : 'rgba(255, 255, 255, 0.06)',
+                          background: exp.enabled ? 'rgba(8, 145, 179, 0.3)' : 'rgba(255, 255, 255, 0.06)',
                         }}
                       >
                         <div className="absolute top-[2px] rounded-full h-5 w-5 transition-all"
                           style={{
                             left: exp.enabled ? '22px' : '2px',
-                            background: exp.enabled ? '#5eead4' : 'rgba(237, 233, 248, 0.3)',
+                            background: exp.enabled ? '#0891B3' : 'rgba(237, 233, 248, 0.3)',
                           }}
                         />
                       </div>
@@ -434,19 +434,19 @@ export default function ExperimentsAdminPage() {
                           <div className="grid grid-cols-2 gap-2 text-sm">
                             <div className="flex justify-between">
                               <span style={{ color: 'rgba(237, 233, 248, 0.35)' }}>Coupon copied:</span>
-                              <span style={{ color: '#5eead4' }}>{(v.conversionRates.coupon_copied * 100).toFixed(1)}%</span>
+                              <span style={{ color: '#0891B3' }}>{(v.conversionRates.coupon_copied * 100).toFixed(1)}%</span>
                             </div>
                             <div className="flex justify-between">
                               <span style={{ color: 'rgba(237, 233, 248, 0.35)' }}>Link clicked:</span>
-                              <span style={{ color: '#a094e0' }}>{(v.conversionRates.link_clicked * 100).toFixed(1)}%</span>
+                              <span style={{ color: '#9334EB' }}>{(v.conversionRates.link_clicked * 100).toFixed(1)}%</span>
                             </div>
                             <div className="flex justify-between">
                               <span style={{ color: 'rgba(237, 233, 248, 0.35)' }}>Support created:</span>
-                              <span style={{ color: '#e0a494' }}>{(v.conversionRates.support_created * 100).toFixed(1)}%</span>
+                              <span style={{ color: '#EA580B' }}>{(v.conversionRates.support_created * 100).toFixed(1)}%</span>
                             </div>
                             <div className="flex justify-between">
                               <span style={{ color: 'rgba(237, 233, 248, 0.35)' }}>Satisfied:</span>
-                              <span style={{ color: '#f472b6' }}>{(v.conversionRates.satisfied * 100).toFixed(1)}%</span>
+                              <span style={{ color: '#DB2877' }}>{(v.conversionRates.satisfied * 100).toFixed(1)}%</span>
                             </div>
                           </div>
                         </div>

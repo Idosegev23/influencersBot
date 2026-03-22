@@ -224,19 +224,19 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
   /* ---------- helper: doc status pill colors ---------- */
   const statusPillStyle = (status: string) => {
     if (status === 'completed' || status === 'success')
-      return { backgroundColor: 'rgba(105, 255, 199, 0.2)', color: '#059669' };
+      return { backgroundColor: 'rgba(23, 163, 74, 0.15)', color: '#059669' };
     if (status === 'processing')
-      return { backgroundColor: 'rgba(174, 176, 232, 0.2)', color: '#6366f1' };
+      return { backgroundColor: 'rgba(147, 52, 235, 0.2)', color: '#9334EB' };
     if (status === 'failed')
-      return { backgroundColor: 'rgba(255, 118, 176, 0.2)', color: '#FF76B0' };
-    return { backgroundColor: 'rgba(186, 177, 161, 0.2)', color: '#655e51' };
+      return { backgroundColor: 'rgba(220, 38, 39, 0.15)', color: '#DC2627' };
+    return { backgroundColor: 'rgba(186, 177, 161, 0.2)', color: '#4b5563' };
   };
 
   // --- Loading state ---
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-10 h-10 rounded-full border-[3px] border-[#69FFC7] border-t-transparent animate-spin" />
+        <div className="w-10 h-10 rounded-full border-[3px] border-[#9334EB] border-t-transparent animate-spin" />
       </div>
     );
   }
@@ -246,9 +246,9 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
-          <span className="material-symbols-outlined text-6xl mb-4 block" style={{ color: '#FF76B0' }}>error</span>
+          <span className="material-symbols-outlined text-6xl mb-4 block" style={{ color: '#DC2627' }}>error</span>
           <div className="text-xl mb-2 font-extrabold text-[#474747]">משפיענית לא נמצאה</div>
-          <Link href="/admin/influencers" className="text-[#69FFC7] hover:underline font-medium">
+          <Link href="/admin/influencers" className="text-[#9334EB] hover:underline font-medium">
             חזרה לרשימה
           </Link>
         </div>
@@ -263,7 +263,7 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
         {/* Back button */}
         <Link
           href="/admin/influencers"
-          className="w-12 h-12 flex items-center justify-center rounded-full border border-[#bab1a1]/30 bg-white hover:shadow-md transition-all"
+          className="w-12 h-12 flex items-center justify-center rounded-full border border-[#d1d5db]/30 bg-white hover:shadow-md transition-all"
         >
           <span className="material-symbols-outlined text-[20px]" style={{ color: '#474747' }}>arrow_forward</span>
         </Link>
@@ -271,18 +271,18 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
         {/* Avatar + name */}
         <div className="flex items-center gap-4">
           <div className="relative">
-            <div className="w-14 h-14 rounded-full border-[3px] border-[#69FFC7] bg-gradient-to-br from-[#69FFC7]/30 to-[#AEB0E8]/30 flex items-center justify-center text-2xl font-black text-[#474747]">
+            <div className="w-14 h-14 rounded-full border-[3px] border-[#9334EB] bg-gradient-to-br from-[#9334EB]/30 to-[#2663EB]/30 flex items-center justify-center text-2xl font-black text-[#474747]">
               {influencer.displayName.charAt(0)}
             </div>
             {influencer.persona.hasGemini && (
-              <div className="absolute -bottom-0.5 -left-0.5 w-5 h-5 rounded-full bg-[#69FFC7] flex items-center justify-center shadow-sm">
+              <div className="absolute -bottom-0.5 -left-0.5 w-5 h-5 rounded-full bg-[#9334EB] flex items-center justify-center shadow-sm">
                 <span className="material-symbols-outlined text-[12px] text-white" style={{ fontVariationSettings: "'FILL' 1" }}>check</span>
               </div>
             )}
           </div>
           <div>
             <h1 className="text-2xl font-extrabold text-[#474747]">{influencer.displayName}</h1>
-            <p className="text-[#655e51]">@{influencer.username}</p>
+            <p className="text-[#4b5563]">@{influencer.username}</p>
           </div>
         </div>
 
@@ -291,7 +291,7 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
           <button
             onClick={rebuildPersona}
             disabled={rebuilding}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-full border border-[#bab1a1]/40 text-sm font-semibold text-[#474747] bg-white hover:border-[#69FFC7] hover:text-[#059669] transition-all disabled:opacity-50"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full border border-[#d1d5db]/40 text-sm font-semibold text-[#474747] bg-white hover:border-[#9334EB] hover:text-[#059669] transition-all disabled:opacity-50"
           >
             <span className={`material-symbols-outlined text-[18px] ${rebuilding ? 'animate-spin' : ''}`}>refresh</span>
             {rebuilding ? 'בונה...' : 'בנה פרסונה מחדש'}
@@ -299,7 +299,7 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
           <Link
             href={`/chat/${influencer.username}`}
             target="_blank"
-            className="flex items-center gap-2 px-5 py-2.5 rounded-full border border-[#bab1a1]/40 text-sm font-semibold text-[#474747] bg-white hover:border-[#AEB0E8] hover:text-[#6366f1] transition-all"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full border border-[#d1d5db]/40 text-sm font-semibold text-[#474747] bg-white hover:border-[#2663EB] hover:text-[#9334EB] transition-all"
           >
             <span className="material-symbols-outlined text-[18px]">visibility</span>
             צפה בצ&apos;אט
@@ -307,7 +307,7 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
           <Link
             href={`/admin/chatbot-persona/${id}`}
             className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold text-white shadow-lg transition-all hover:shadow-xl"
-            style={{ background: 'linear-gradient(135deg, #69FFC7 0%, #AEB0E8 100%)' }}
+            style={{ background: 'linear-gradient(135deg, #9334EB 0%, #2663EB 100%)' }}
           >
             <span className="material-symbols-outlined text-[18px]">settings</span>
             עריכת פרסונה
@@ -325,19 +325,19 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
           <div className="bg-white rounded-2xl p-8 shadow-sm">
             {/* Category + plan badges */}
             <div className="flex flex-wrap gap-2 mb-4">
-              <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: 'rgba(174, 176, 232, 0.2)', color: '#6366f1' }}>
+              <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: 'rgba(147, 52, 235, 0.2)', color: '#9334EB' }}>
                 {influencer.type}
               </span>
-              <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: 'rgba(105, 255, 199, 0.2)', color: '#059669' }}>
+              <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: 'rgba(23, 163, 74, 0.15)', color: '#059669' }}>
                 {influencer.status}
               </span>
               {influencer.persona.hasGemini && (
-                <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: 'rgba(105, 255, 199, 0.2)', color: '#059669' }}>
+                <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: 'rgba(23, 163, 74, 0.15)', color: '#059669' }}>
                   Gemini Ready
                 </span>
               )}
               {!influencer.persona.hasGemini && (
-                <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: 'rgba(255, 118, 176, 0.2)', color: '#FF76B0' }}>
+                <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: 'rgba(220, 38, 39, 0.15)', color: '#DC2627' }}>
                   חסר Gemini
                 </span>
               )}
@@ -345,7 +345,7 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
 
             {/* Bio / persona name */}
             {influencer.persona.name && influencer.persona.name !== 'N/A' && (
-              <p className="text-[#655e51] mb-6 leading-relaxed">{influencer.persona.name}</p>
+              <p className="text-[#4b5563] mb-6 leading-relaxed">{influencer.persona.name}</p>
             )}
 
             {/* Stats grid 2x3 */}
@@ -358,9 +358,9 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
                 { label: 'מסמכים', value: documents.length, icon: 'description' },
                 { label: 'אתרים', value: influencer.stats.websites, icon: 'language' },
               ].map((stat) => (
-                <div key={stat.label} className="bg-[#faf2e9] p-4 rounded-2xl text-center">
-                  <div className="text-2xl font-black" style={{ color: '#69FFC7' }}>{stat.value}</div>
-                  <div className="text-xs uppercase tracking-wider text-[#655e51] mt-1 font-medium">{stat.label}</div>
+                <div key={stat.label} className="bg-[#f3f4f6] p-4 rounded-2xl text-center">
+                  <div className="text-2xl font-black" style={{ color: '#9334EB' }}>{stat.value}</div>
+                  <div className="text-xs uppercase tracking-wider text-[#4b5563] mt-1 font-medium">{stat.label}</div>
                 </div>
               ))}
             </div>
@@ -369,34 +369,34 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
           {/* B. Persona Section */}
           <div className="bg-white rounded-2xl p-8 shadow-sm">
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(105, 255, 199, 0.15)' }}>
-                <span className="material-symbols-outlined text-[20px]" style={{ color: '#69FFC7' }}>psychology</span>
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(23, 163, 74, 0.12)' }}>
+                <span className="material-symbols-outlined text-[20px]" style={{ color: '#9334EB' }}>psychology</span>
               </div>
               <h2 className="text-lg font-extrabold text-[#474747]">הגדרות פרסונה (AI)</h2>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-bold text-[#655e51] block mb-1.5">טון</label>
-                <div className="bg-[#faf2e9] rounded-xl p-3 text-sm text-[#474747]">
+                <label className="text-sm font-bold text-[#4b5563] block mb-1.5">טון</label>
+                <div className="bg-[#f3f4f6] rounded-xl p-3 text-sm text-[#474747]">
                   {influencer.persona.tone || 'לא מוגדר'}
                 </div>
               </div>
               <div>
-                <label className="text-sm font-bold text-[#655e51] block mb-1.5">מוצרים</label>
-                <div className="bg-[#faf2e9] rounded-xl p-3 text-sm text-[#474747]">
+                <label className="text-sm font-bold text-[#4b5563] block mb-1.5">מוצרים</label>
+                <div className="bg-[#f3f4f6] rounded-xl p-3 text-sm text-[#474747]">
                   {influencer.persona.productsCount} מוצרים, {influencer.persona.brandsCount} מותגים
                 </div>
               </div>
               <div>
-                <label className="text-sm font-bold text-[#655e51] block mb-1.5">קופונים ב-Gemini</label>
-                <div className="bg-[#faf2e9] rounded-xl p-3 text-sm text-[#474747]">
+                <label className="text-sm font-bold text-[#4b5563] block mb-1.5">קופונים ב-Gemini</label>
+                <div className="bg-[#f3f4f6] rounded-xl p-3 text-sm text-[#474747]">
                   {influencer.persona.couponsInGemini}
                 </div>
               </div>
               <div>
-                <label className="text-sm font-bold text-[#655e51] block mb-1.5">הודעת פתיחה</label>
-                <div className="bg-[#faf2e9] rounded-xl p-3 text-sm text-[#474747] line-clamp-2">
+                <label className="text-sm font-bold text-[#4b5563] block mb-1.5">הודעת פתיחה</label>
+                <div className="bg-[#f3f4f6] rounded-xl p-3 text-sm text-[#474747] line-clamp-2">
                   {influencer.chatConfig.greeting || 'לא מוגדרת'}
                 </div>
               </div>
@@ -405,10 +405,10 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
             {/* Suggested questions */}
             {influencer.chatConfig.questions.length > 0 && (
               <div className="mt-4">
-                <label className="text-sm font-bold text-[#655e51] block mb-1.5">שאלות מוכנות</label>
+                <label className="text-sm font-bold text-[#4b5563] block mb-1.5">שאלות מוכנות</label>
                 <div className="space-y-2">
                   {influencer.chatConfig.questions.map((q, i) => (
-                    <div key={i} className="bg-[#faf2e9] rounded-xl p-3 text-sm text-[#474747]">
+                    <div key={i} className="bg-[#f3f4f6] rounded-xl p-3 text-sm text-[#474747]">
                       {i + 1}. {q}
                     </div>
                   ))}
@@ -421,8 +421,8 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
           <div className="bg-white rounded-2xl p-8 shadow-sm">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(174, 176, 232, 0.15)' }}>
-                  <span className="material-symbols-outlined text-[20px]" style={{ color: '#AEB0E8' }}>description</span>
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(147, 52, 235, 0.15)' }}>
+                  <span className="material-symbols-outlined text-[20px]" style={{ color: '#2663EB' }}>description</span>
                 </div>
                 <h2 className="text-lg font-extrabold text-[#474747]">מסמכים ({documents.length})</h2>
               </div>
@@ -442,25 +442,25 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
               disabled={uploading}
               className="w-full mb-6 border-2 border-dashed rounded-2xl p-6 flex flex-col items-center gap-2 transition-colors disabled:opacity-50 cursor-pointer"
               style={{
-                borderColor: 'rgba(105, 255, 199, 0.2)',
-                backgroundColor: 'rgba(105, 255, 199, 0.05)',
+                borderColor: 'rgba(23, 163, 74, 0.15)',
+                backgroundColor: 'rgba(23, 163, 74, 0.04)',
               }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = '#69FFC7'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(105, 255, 199, 0.2)'; }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = '#9334EB'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(23, 163, 74, 0.15)'; }}
             >
-              <span className={`material-symbols-outlined text-[32px] ${uploading ? 'animate-spin' : ''}`} style={{ color: '#69FFC7' }}>
+              <span className={`material-symbols-outlined text-[32px] ${uploading ? 'animate-spin' : ''}`} style={{ color: '#9334EB' }}>
                 {uploading ? 'progress_activity' : 'cloud_upload'}
               </span>
-              <span className="text-sm font-medium text-[#655e51]">
+              <span className="text-sm font-medium text-[#4b5563]">
                 {uploading ? 'מעלה...' : 'לחץ להעלאת מסמכים (PDF, מצגות, תמונות)'}
               </span>
             </button>
 
             {/* Document list */}
             {docsLoading ? (
-              <div className="text-center py-4 text-[#bab1a1]">טוען מסמכים...</div>
+              <div className="text-center py-4 text-[#d1d5db]">טוען מסמכים...</div>
             ) : documents.length === 0 ? (
-              <div className="text-center py-6 text-[#bab1a1]">
+              <div className="text-center py-6 text-[#d1d5db]">
                 <span className="material-symbols-outlined text-[40px] mb-2 block opacity-30">description</span>
                 <p>אין מסמכים עדיין</p>
               </div>
@@ -469,11 +469,11 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
                 {documents.map((doc) => {
                   const pill = statusPillStyle(doc.parsing_status);
                   return (
-                    <div key={doc.id} className="bg-[#faf2e9] rounded-xl p-4 flex items-center gap-3">
-                      <span className="material-symbols-outlined text-[20px] flex-shrink-0" style={{ color: '#bab1a1' }}>description</span>
+                    <div key={doc.id} className="bg-[#f3f4f6] rounded-xl p-4 flex items-center gap-3">
+                      <span className="material-symbols-outlined text-[20px] flex-shrink-0" style={{ color: '#d1d5db' }}>description</span>
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-[#474747] truncate">{doc.filename}</div>
-                        <div className="flex items-center gap-2 text-xs mt-1 text-[#bab1a1]">
+                        <div className="flex items-center gap-2 text-xs mt-1 text-[#d1d5db]">
                           <span>{(doc.file_size / 1024).toFixed(0)} KB</span>
                           <span>&middot;</span>
                           <span>{new Date(doc.uploaded_at).toLocaleDateString('he-IL')}</span>
@@ -503,9 +503,9 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
                       <button
                         onClick={() => deleteDocument(doc.id)}
                         className="p-2 rounded-full transition-colors"
-                        style={{ color: '#bab1a1' }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#FF76B0'; (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255,118,176,0.1)'; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#bab1a1'; (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'; }}
+                        style={{ color: '#d1d5db' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#DC2627'; (e.currentTarget as HTMLElement).style.backgroundColor = '#FFE2E3'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#d1d5db'; (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'; }}
                         title="מחק"
                       >
                         <span className="material-symbols-outlined text-[16px]">delete</span>
@@ -522,7 +522,7 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
         <div className="space-y-8">
 
           {/* D. IG Connection Card */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm" style={{ borderRight: '6px solid #69FFC7' }}>
+          <div className="bg-white rounded-2xl p-6 shadow-sm" style={{ borderRight: '6px solid #9334EB' }}>
             <div className="flex items-center gap-3 mb-5">
               <div className="w-10 h-10 rounded-full flex items-center justify-center"
                 style={{ background: 'linear-gradient(135deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)' }}
@@ -531,36 +531,36 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
               </div>
               <div>
                 <h3 className="font-bold text-[#474747]">חיבור אינסטגרם</h3>
-                <p className="text-xs text-[#655e51]">
+                <p className="text-xs text-[#4b5563]">
                   {igConnection?.is_active
                     ? `מחובר — @${igConnection.ig_username}`
                     : 'לא מחובר'}
                 </p>
               </div>
               {igConnection?.is_active && (
-                <span className="material-symbols-outlined text-[20px] mr-auto" style={{ color: '#69FFC7', fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                <span className="material-symbols-outlined text-[20px] mr-auto" style={{ color: '#9334EB', fontVariationSettings: "'FILL' 1" }}>check_circle</span>
               )}
             </div>
 
             {igConnection?.connected_at && (
-              <p className="text-xs text-[#bab1a1] mb-4">
+              <p className="text-xs text-[#d1d5db] mb-4">
                 חובר ב-{new Date(igConnection.connected_at).toLocaleDateString('he-IL')}
               </p>
             )}
 
             {/* DM Bot toggle */}
             {igConnection?.is_active && (
-              <div className="bg-[#faf2e9] rounded-2xl p-4 flex items-center justify-between mb-4">
+              <div className="bg-[#f3f4f6] rounded-2xl p-4 flex items-center justify-between mb-4">
                 <div>
                   <div className="text-sm font-bold text-[#474747]">בוט DM</div>
-                  <div className="text-xs text-[#655e51] mt-0.5">תשובות אוטומטיות</div>
+                  <div className="text-xs text-[#4b5563] mt-0.5">תשובות אוטומטיות</div>
                 </div>
                 <button
                   onClick={toggleDmBot}
                   disabled={dmToggling}
                   className="relative w-12 h-6 rounded-full transition-colors duration-200"
                   style={{
-                    backgroundColor: dmBotEnabled ? '#69FFC7' : '#bab1a1',
+                    backgroundColor: dmBotEnabled ? '#9334EB' : '#d1d5db',
                   }}
                 >
                   <span
@@ -577,13 +577,13 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
             <div className="space-y-2">
               <button
                 onClick={() => copyToClipboard(id, 'id')}
-                className="w-full flex items-center justify-between gap-2 p-3 rounded-xl text-sm bg-[#faf2e9] hover:bg-[#f5ece0] transition-colors"
+                className="w-full flex items-center justify-between gap-2 p-3 rounded-xl text-sm bg-[#f3f4f6] hover:bg-[#f5ece0] transition-colors"
               >
                 <div className="flex items-center gap-2 text-[#474747]">
                   <span className="material-symbols-outlined text-[18px]">content_copy</span>
                   <span>העתק Account ID</span>
                 </div>
-                <span className="text-xs font-mono" style={{ color: copiedId ? '#69FFC7' : '#bab1a1' }}>
+                <span className="text-xs font-mono" style={{ color: copiedId ? '#9334EB' : '#d1d5db' }}>
                   {copiedId ? 'הועתק!' : id.slice(0, 8) + '...'}
                 </span>
               </button>
@@ -591,15 +591,15 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
               <button
                 onClick={() => copyToClipboard(igConnectLink, 'link')}
                 className="w-full flex items-center justify-between gap-2 p-3 rounded-xl text-sm transition-colors"
-                style={{ backgroundColor: 'rgba(255, 118, 176, 0.05)' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255, 118, 176, 0.1)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255, 118, 176, 0.05)'; }}
+                style={{ backgroundColor: 'rgba(220, 38, 39, 0.04)' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.backgroundColor = '#FFE2E3'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(220, 38, 39, 0.04)'; }}
               >
                 <div className="flex items-center gap-2 text-[#474747]">
-                  <span className="material-symbols-outlined text-[18px]" style={{ color: '#FF76B0' }}>link</span>
+                  <span className="material-symbols-outlined text-[18px]" style={{ color: '#DC2627' }}>link</span>
                   <span>העתק קישור התחברות</span>
                 </div>
-                <span className="text-xs" style={{ color: copiedLink ? '#69FFC7' : '#bab1a1' }}>
+                <span className="text-xs" style={{ color: copiedLink ? '#9334EB' : '#d1d5db' }}>
                   {copiedLink ? 'הועתק!' : ''}
                 </span>
               </button>
@@ -607,12 +607,12 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
           </div>
 
           {/* E. AI Insight Card */}
-          <div className="rounded-2xl p-6" style={{ backgroundColor: 'rgba(105, 255, 199, 0.05)' }}>
+          <div className="rounded-2xl p-6" style={{ backgroundColor: 'rgba(23, 163, 74, 0.04)' }}>
             <div className="flex items-center gap-2 mb-3">
-              <span className="material-symbols-outlined text-[18px]" style={{ color: '#FF76B0' }}>auto_awesome</span>
-              <h3 className="text-sm font-bold" style={{ color: '#FF76B0' }}>AI Insight</h3>
+              <span className="material-symbols-outlined text-[18px]" style={{ color: '#DC2627' }}>auto_awesome</span>
+              <h3 className="text-sm font-bold" style={{ color: '#DC2627' }}>AI Insight</h3>
             </div>
-            <p className="text-sm text-[#655e51] leading-relaxed mb-3">
+            <p className="text-sm text-[#4b5563] leading-relaxed mb-3">
               {influencer.persona.hasGemini
                 ? `הפרסונה מוכנה עם ${influencer.persona.productsCount} מוצרים ו-${influencer.persona.brandsCount} מותגים.`
                 : 'הפרסונה טרם נבנתה. לחץ על "בנה פרסונה מחדש" כדי להתחיל.'}
@@ -620,7 +620,7 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
             <Link
               href={`/admin/chatbot-persona/${id}`}
               className="text-sm font-semibold inline-flex items-center gap-1 transition-colors"
-              style={{ color: '#69FFC7' }}
+              style={{ color: '#9334EB' }}
             >
               עריכת פרסונה
               <span className="material-symbols-outlined text-[14px]">open_in_new</span>
@@ -632,23 +632,23 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
             <h3 className="font-bold text-[#474747] mb-4">אינטגרציות</h3>
             <div className="space-y-3">
               <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-[20px]" style={{ color: '#bab1a1' }}>photo_camera</span>
+                <span className="material-symbols-outlined text-[20px]" style={{ color: '#d1d5db' }}>photo_camera</span>
                 <span className="text-sm text-[#474747] flex-1">Instagram</span>
-                <span className="text-xs font-medium" style={{ color: igConnection?.is_active ? '#059669' : '#bab1a1' }}>
+                <span className="text-xs font-medium" style={{ color: igConnection?.is_active ? '#059669' : '#d1d5db' }}>
                   {igConnection?.is_active ? 'מחובר' : 'לא מחובר'}
                 </span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-[20px]" style={{ color: '#bab1a1' }}>psychology</span>
+                <span className="material-symbols-outlined text-[20px]" style={{ color: '#d1d5db' }}>psychology</span>
                 <span className="text-sm text-[#474747] flex-1">Gemini Output</span>
-                <span className="text-xs font-medium" style={{ color: influencer.persona.hasGemini ? '#059669' : '#FF76B0' }}>
+                <span className="text-xs font-medium" style={{ color: influencer.persona.hasGemini ? '#059669' : '#DC2627' }}>
                   {influencer.persona.hasGemini ? 'קיים' : 'חסר'}
                 </span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-[20px]" style={{ color: '#bab1a1' }}>language</span>
+                <span className="material-symbols-outlined text-[20px]" style={{ color: '#d1d5db' }}>language</span>
                 <span className="text-sm text-[#474747] flex-1">אתרים</span>
-                <span className="text-xs font-medium text-[#655e51]">{influencer.stats.websites}</span>
+                <span className="text-xs font-medium text-[#4b5563]">{influencer.stats.websites}</span>
               </div>
             </div>
           </div>
@@ -658,11 +658,11 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
             <h3 className="font-bold text-[#474747] mb-4">ערכת צבעים</h3>
             <div className="flex gap-3">
               <div className="flex-1">
-                <div className="text-xs text-[#655e51] mb-1">ראשי</div>
+                <div className="text-xs text-[#4b5563] mb-1">ראשי</div>
                 <div className="h-10 rounded-xl shadow-inner" style={{ backgroundColor: influencer.chatConfig.theme.primary }} />
               </div>
               <div className="flex-1">
-                <div className="text-xs text-[#655e51] mb-1">רקע</div>
+                <div className="text-xs text-[#4b5563] mb-1">רקע</div>
                 <div className="h-10 rounded-xl shadow-inner" style={{ backgroundColor: influencer.chatConfig.theme.background, border: '1px solid rgba(186, 177, 161, 0.2)' }} />
               </div>
             </div>
@@ -671,7 +671,7 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
       </div>
 
       {/* ============ Actions Footer ============ */}
-      <div className="rounded-3xl p-6 flex flex-wrap items-center gap-3" style={{ backgroundColor: 'rgba(250, 242, 233, 0.5)', border: '1px solid rgba(255, 255, 255, 0.4)' }}>
+      <div className="rounded-3xl p-6 flex flex-wrap items-center gap-3" style={{ backgroundColor: 'rgba(243, 244, 246, 0.5)', border: '1px solid rgba(255, 255, 255, 0.4)' }}>
         <button
           onClick={async () => {
             try {
@@ -692,7 +692,7 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
           }}
           className="px-5 py-2.5 rounded-full text-sm font-semibold text-[#474747] bg-white shadow-sm transition-all"
           style={{ border: '1px solid rgba(186, 177, 161, 0.2)' }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#69FFC7'; (e.currentTarget as HTMLElement).style.borderColor = '#69FFC7'; }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#9334EB'; (e.currentTarget as HTMLElement).style.borderColor = '#9334EB'; }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#474747'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(186, 177, 161, 0.2)'; }}
         >
           דף ניהול
@@ -709,7 +709,7 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
           }}
           className="px-5 py-2.5 rounded-full text-sm font-semibold text-[#474747] bg-white shadow-sm transition-all"
           style={{ border: '1px solid rgba(186, 177, 161, 0.2)' }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#69FFC7'; (e.currentTarget as HTMLElement).style.borderColor = '#69FFC7'; }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#9334EB'; (e.currentTarget as HTMLElement).style.borderColor = '#9334EB'; }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#474747'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(186, 177, 161, 0.2)'; }}
         >
           סריקה מלאה
@@ -730,7 +730,7 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
           }}
           className="px-5 py-2.5 rounded-full text-sm font-semibold text-[#474747] bg-white shadow-sm transition-all"
           style={{ border: '1px solid rgba(186, 177, 161, 0.2)' }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#69FFC7'; (e.currentTarget as HTMLElement).style.borderColor = '#69FFC7'; }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#9334EB'; (e.currentTarget as HTMLElement).style.borderColor = '#9334EB'; }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#474747'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(186, 177, 161, 0.2)'; }}
         >
           Re-embed RAG
@@ -751,9 +751,9 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
             }
           }}
           className="px-5 py-2.5 rounded-full text-sm font-semibold transition-all"
-          style={{ color: '#FF76B0', backgroundColor: 'rgba(255, 118, 176, 0.1)', border: '1px solid rgba(255, 118, 176, 0.2)' }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255, 118, 176, 0.2)'; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255, 118, 176, 0.1)'; }}
+          style={{ color: '#DC2627', backgroundColor: '#FFE2E3', border: '1px solid rgba(220, 38, 39, 0.15)' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(220, 38, 39, 0.15)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.backgroundColor = '#FFE2E3'; }}
         >
           מחק חשבון
         </button>

@@ -157,7 +157,7 @@ function DashboardContent() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-32">
-        <div className="w-8 h-8 border-2 border-[#69FFC7] border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-[#9334EB] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -198,7 +198,7 @@ function DashboardContent() {
           אתרים
         </button>
 
-        <div className="w-px h-6 mx-1 bg-[#bab1a1]/20" />
+        <div className="w-px h-6 mx-1 bg-[#d1d5db]/20" />
 
         <Link
           href="/admin/onboarding"
@@ -228,12 +228,12 @@ function DashboardContent() {
               className="neon-stat-card p-6"
             >
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[#69FFC7]/10">
-                  <span className="material-symbols-outlined text-[24px] text-[#69FFC7]">group</span>
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[#9334EB]/10">
+                  <span className="material-symbols-outlined text-[24px] text-[#9334EB]">group</span>
                 </div>
                 <div>
-                  <p className="text-3xl font-bold font-headline text-[#373226]">{filteredInfluencers.length}</p>
-                  <p className="text-sm text-[#655e51]">חשבונות</p>
+                  <p className="text-3xl font-bold font-headline text-[#1f2937]">{filteredInfluencers.length}</p>
+                  <p className="text-sm text-[#4b5563]">חשבונות</p>
                 </div>
               </div>
             </motion.div>
@@ -245,14 +245,14 @@ function DashboardContent() {
               className="neon-stat-card p-6"
             >
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[#AEB0E8]/10">
-                  <span className="material-symbols-outlined text-[24px] text-[#AEB0E8]">chat_bubble</span>
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[#2663EB]/10">
+                  <span className="material-symbols-outlined text-[24px] text-[#2663EB]">chat_bubble</span>
                 </div>
                 <div>
-                  <p className="text-3xl font-bold font-headline text-[#373226]">
+                  <p className="text-3xl font-bold font-headline text-[#1f2937]">
                     {filteredInfluencers.filter((i) => i.is_active).length}
                   </p>
-                  <p className="text-sm text-[#655e51]">פעילים</p>
+                  <p className="text-sm text-[#4b5563]">פעילים</p>
                 </div>
               </div>
             </motion.div>
@@ -264,14 +264,14 @@ function DashboardContent() {
               className="neon-stat-card p-6"
             >
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[#FF76B0]/10">
-                  <span className="material-symbols-outlined text-[24px] text-[#FF76B0]">bar_chart</span>
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[#DC2627]/10">
+                  <span className="material-symbols-outlined text-[24px] text-[#DC2627]">bar_chart</span>
                 </div>
                 <div>
-                  <p className="text-3xl font-bold font-headline text-[#373226]">
+                  <p className="text-3xl font-bold font-headline text-[#1f2937]">
                     {formatNumber(filteredInfluencers.reduce((sum, i) => sum + (i.followers_count || 0), 0))}
                   </p>
-                  <p className="text-sm text-[#655e51]">עוקבים כולל</p>
+                  <p className="text-sm text-[#4b5563]">עוקבים כולל</p>
                 </div>
               </div>
             </motion.div>
@@ -280,9 +280,9 @@ function DashboardContent() {
           {/* Action bar with sub-filter */}
           <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
             <div className="flex items-center gap-3">
-              <h2 className="text-xl font-semibold font-headline text-[#373226]">חשבונות</h2>
+              <h2 className="text-xl font-semibold font-headline text-[#1f2937]">חשבונות</h2>
               {/* Sub-filter pills */}
-              <div className="flex items-center gap-1 rounded-full p-1 bg-[#bab1a1]/10 border border-[#bab1a1]/15">
+              <div className="flex items-center gap-1 rounded-full p-1 bg-[#d1d5db]/10 border border-[#d1d5db]/15">
                 {([
                   { key: 'all' as AccountFilter, label: 'הכל' },
                   { key: 'creator' as AccountFilter, label: 'משפיענים' },
@@ -293,8 +293,8 @@ function DashboardContent() {
                     onClick={() => setAccountFilter(key)}
                     className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all ${
                       accountFilter === key
-                        ? 'bg-[#69FFC7]/15 text-[#373226] border border-[#69FFC7]/30'
-                        : 'text-[#655e51] border border-transparent hover:text-[#474747]'
+                        ? 'bg-[#9334EB]/15 text-[#1f2937] border border-[#9334EB]/30'
+                        : 'text-[#4b5563] border border-transparent hover:text-[#474747]'
                     }`}
                   >
                     {label}
@@ -333,7 +333,7 @@ function DashboardContent() {
                 >
                   <div className="flex items-start gap-3">
                     {influencer.profile_pic_url ? (
-                      <div className="relative w-14 h-14 rounded-2xl overflow-hidden flex-shrink-0 border-2 border-[#69FFC7]/20">
+                      <div className="relative w-14 h-14 rounded-2xl overflow-hidden flex-shrink-0 border-2 border-[#9334EB]/20">
                         <Image
                           src={getProxiedImageUrl(influencer.profile_pic_url || '')}
                           alt={influencer.display_name}
@@ -344,28 +344,28 @@ function DashboardContent() {
                         />
                       </div>
                     ) : (
-                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-bold flex-shrink-0 bg-[#bab1a1]/10 border-2 border-[#bab1a1]/15 text-[#bab1a1]">
+                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-bold flex-shrink-0 bg-[#d1d5db]/10 border-2 border-[#d1d5db]/15 text-[#d1d5db]">
                         ?
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold truncate text-[#373226]">
+                      <h3 className="font-semibold truncate text-[#1f2937]">
                         {influencer.display_name}
                       </h3>
-                      <p className="text-sm text-[#655e51]">@{influencer.username}</p>
+                      <p className="text-sm text-[#4b5563]">@{influencer.username}</p>
                       <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                        <span className="text-xs text-[#bab1a1]">{formatNumber(influencer.followers_count)} עוקבים</span>
+                        <span className="text-xs text-[#d1d5db]">{formatNumber(influencer.followers_count)} עוקבים</span>
                         <span
                           className={`inline-flex items-center text-[11px] py-0.5 px-2 rounded-full font-medium ${
                             influencer.is_active
-                              ? 'bg-[#69FFC7]/15 text-[#373226] border border-[#69FFC7]/30'
-                              : 'bg-[#bab1a1]/10 text-[#655e51] border border-[#bab1a1]/20'
+                              ? 'bg-[#9334EB]/15 text-[#1f2937] border border-[#9334EB]/30'
+                              : 'bg-[#d1d5db]/10 text-[#4b5563] border border-[#d1d5db]/20'
                           }`}
                         >
                           {influencer.is_active ? 'פעיל' : 'לא פעיל'}
                         </span>
                         {influencer.type === 'brand' && (
-                          <span className="inline-flex items-center text-[11px] py-0.5 px-2 rounded-full font-medium bg-[#AEB0E8]/15 text-[#AEB0E8] border border-[#AEB0E8]/30">
+                          <span className="inline-flex items-center text-[11px] py-0.5 px-2 rounded-full font-medium bg-[#2663EB]/15 text-[#2663EB] border border-[#2663EB]/30">
                             מותג
                           </span>
                         )}
@@ -373,7 +373,7 @@ function DashboardContent() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 mt-4 pt-4 border-t border-[#bab1a1]/10">
+                  <div className="flex items-center gap-2 mt-4 pt-4 border-t border-[#d1d5db]/10">
                     <a
                       href={`/chat/${influencer.username}`}
                       target="_blank"
@@ -407,13 +407,13 @@ function DashboardContent() {
               animate={{ opacity: 1 }}
               className="neon-card p-12 text-center"
             >
-              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 bg-[#bab1a1]/10 border border-[#bab1a1]/15">
-                <span className="material-symbols-outlined text-[32px] text-[#bab1a1]">group</span>
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 bg-[#d1d5db]/10 border border-[#d1d5db]/15">
+                <span className="material-symbols-outlined text-[32px] text-[#d1d5db]">group</span>
               </div>
-              <h3 className="text-lg font-medium font-headline mb-2 text-[#373226]">
+              <h3 className="text-lg font-medium font-headline mb-2 text-[#1f2937]">
                 {accountFilter === 'all' ? 'אין עדיין חשבונות' : accountFilter === 'creator' ? 'אין משפיענים' : 'אין מותגים'}
               </h3>
-              <p className="mb-6 text-[#655e51]">
+              <p className="mb-6 text-[#4b5563]">
                 {accountFilter === 'all' ? 'התחילו על ידי הוספת חשבון ראשון' : 'לא נמצאו חשבונות מסוג זה'}
               </p>
               <Link
@@ -433,7 +433,7 @@ function DashboardContent() {
         <>
           {websitesLoading ? (
             <div className="flex items-center justify-center py-20">
-              <div className="w-8 h-8 border-2 border-[#AEB0E8] border-t-transparent rounded-full animate-spin" />
+              <div className="w-8 h-8 border-2 border-[#2663EB] border-t-transparent rounded-full animate-spin" />
             </div>
           ) : (
             <>
@@ -445,12 +445,12 @@ function DashboardContent() {
                   className="neon-stat-card p-6"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[#AEB0E8]/10">
-                      <span className="material-symbols-outlined text-[24px] text-[#AEB0E8]">language</span>
+                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[#2663EB]/10">
+                      <span className="material-symbols-outlined text-[24px] text-[#2663EB]">language</span>
                     </div>
                     <div>
-                      <p className="text-3xl font-bold font-headline text-[#373226]">{websites.length}</p>
-                      <p className="text-sm text-[#655e51]">אתרים</p>
+                      <p className="text-3xl font-bold font-headline text-[#1f2937]">{websites.length}</p>
+                      <p className="text-sm text-[#4b5563]">אתרים</p>
                     </div>
                   </div>
                 </motion.div>
@@ -462,14 +462,14 @@ function DashboardContent() {
                   className="neon-stat-card p-6"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[#69FFC7]/10">
-                      <span className="material-symbols-outlined text-[24px] text-[#69FFC7]">description</span>
+                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[#9334EB]/10">
+                      <span className="material-symbols-outlined text-[24px] text-[#9334EB]">description</span>
                     </div>
                     <div>
-                      <p className="text-3xl font-bold font-headline text-[#373226]">
+                      <p className="text-3xl font-bold font-headline text-[#1f2937]">
                         {websites.reduce((sum, w) => sum + w.pagesCount, 0)}
                       </p>
-                      <p className="text-sm text-[#655e51]">מסמכים</p>
+                      <p className="text-sm text-[#4b5563]">מסמכים</p>
                     </div>
                   </div>
                 </motion.div>
@@ -477,7 +477,7 @@ function DashboardContent() {
 
               {/* Action bar */}
               <div className="mb-6">
-                <h2 className="text-xl font-semibold font-headline text-[#373226]">אתרים</h2>
+                <h2 className="text-xl font-semibold font-headline text-[#1f2937]">אתרים</h2>
               </div>
 
               {/* Websites Grid */}
@@ -493,7 +493,7 @@ function DashboardContent() {
                     >
                       <div className="flex items-start gap-3">
                         {website.profilePic ? (
-                          <div className="relative w-14 h-14 rounded-2xl overflow-hidden flex-shrink-0 border-2 border-[#bab1a1]/15">
+                          <div className="relative w-14 h-14 rounded-2xl overflow-hidden flex-shrink-0 border-2 border-[#d1d5db]/15">
                             <Image
                               src={website.profilePic}
                               alt={website.displayName}
@@ -512,18 +512,18 @@ function DashboardContent() {
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold truncate text-[#373226]">
+                          <h3 className="font-semibold truncate text-[#1f2937]">
                             {website.displayName}
                           </h3>
                           <a
                             href={website.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-sm truncate block transition-colors text-[#AEB0E8] hover:text-[#69FFC7]"
+                            className="text-sm truncate block transition-colors text-[#2663EB] hover:text-[#9334EB]"
                           >
                             {website.domain}
                           </a>
-                          <div className="flex items-center gap-2 mt-1.5 text-xs text-[#bab1a1]">
+                          <div className="flex items-center gap-2 mt-1.5 text-xs text-[#d1d5db]">
                             <span>{website.pagesCount} מסמכים</span>
                             <span>{website.chunksCount} chunks</span>
                           </div>
@@ -531,7 +531,7 @@ function DashboardContent() {
                       </div>
 
                       {/* Action buttons row */}
-                      <div className="flex items-center gap-2 mt-4 pt-4 border-t border-[#bab1a1]/10">
+                      <div className="flex items-center gap-2 mt-4 pt-4 border-t border-[#d1d5db]/10">
                         <Link
                           href={`/admin/websites/${website.id}/preview`}
                           className="neon-pill neon-pill-ghost flex-1 flex items-center justify-center gap-1 py-2 text-sm"
@@ -591,8 +591,8 @@ function DashboardContent() {
                         disabled={generatingTokenId === website.id}
                         className={`w-full flex items-center justify-center gap-2 mt-2 py-2.5 text-sm font-medium rounded-full transition-all cursor-pointer ${
                           website.managementToken
-                            ? 'bg-[#69FFC7]/10 text-[#373226] border border-[#69FFC7]/25 hover:bg-[#69FFC7]/20'
-                            : 'bg-[#FF76B0]/10 text-[#FF76B0] border border-[#FF76B0]/25 hover:bg-[#FF76B0]/20'
+                            ? 'bg-[#9334EB]/10 text-[#1f2937] border border-[#9334EB]/25 hover:bg-[#9334EB]/20'
+                            : 'bg-[#DC2627]/10 text-[#DC2627] border border-[#DC2627]/25 hover:bg-[#DC2627]/20'
                         }`}
                       >
                         {generatingTokenId === website.id ? (
@@ -623,11 +623,11 @@ function DashboardContent() {
                   animate={{ opacity: 1 }}
                   className="neon-card p-12 text-center"
                 >
-                  <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 bg-[#bab1a1]/10 border border-[#bab1a1]/15">
-                    <span className="material-symbols-outlined text-[32px] text-[#bab1a1]">language</span>
+                  <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 bg-[#d1d5db]/10 border border-[#d1d5db]/15">
+                    <span className="material-symbols-outlined text-[32px] text-[#d1d5db]">language</span>
                   </div>
-                  <h3 className="text-lg font-medium font-headline mb-2 text-[#373226]">אין עדיין אתרים</h3>
-                  <p className="text-[#655e51]">אתרים מתווספים דרך הקוד</p>
+                  <h3 className="text-lg font-medium font-headline mb-2 text-[#1f2937]">אין עדיין אתרים</h3>
+                  <p className="text-[#4b5563]">אתרים מתווספים דרך הקוד</p>
                 </motion.div>
               )}
             </>
@@ -642,7 +642,7 @@ export default function AdminDashboard() {
   return (
     <Suspense fallback={
       <div className="flex items-center justify-center py-32">
-        <div className="w-8 h-8 border-2 border-[#69FFC7] border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-[#9334EB] border-t-transparent rounded-full animate-spin" />
       </div>
     }>
       <DashboardContent />
