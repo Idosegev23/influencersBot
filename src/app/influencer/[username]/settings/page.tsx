@@ -1,64 +1,17 @@
 'use client';
 
-import { useState, useEffect, use, useCallback } from 'react';
+import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import {
   Settings,
-  ArrowLeft,
-  Palette,
-  MessageCircle,
   Save,
-  Eye,
-  RefreshCw,
   Loader2,
   Check,
-  Sparkles,
-  Type,
-  Sun,
-  Moon,
-  Database,
-  Image,
-  Video,
-  Film,
-  Layers,
-  Hash,
+  RefreshCw,
   MessageSquare,
-  Phone,
-  Bell,
-  User,
-  Smile,
-  Heart,
-  Zap,
-  Coffee,
-  Star,
-  Globe,
 } from 'lucide-react';
-import {
-  getInfluencerByUsername,
-  getProductsByInfluencer,
-  getContentByInfluencer,
-} from '@/lib/supabase';
-import type { Influencer, InfluencerTheme, Product, ContentItem, ScrapeSettings, PostType } from '@/types';
-import { DEFAULT_SCRAPE_SETTINGS } from '@/types';
-
-const fontOptions = [
-  { value: 'Assistant', label: 'Assistant' },
-  { value: 'Heebo', label: 'Heebo' },
-  { value: 'Rubik', label: 'Rubik' },
-  { value: 'Open Sans Hebrew', label: 'Open Sans Hebrew' },
-  { value: 'Alef', label: 'Alef' },
-  { value: 'Secular One', label: 'Secular One' },
-];
-
-const colorPresets = [
-  { name: 'סגול', primary: '#7c3aed', accent: '#a855f7', background: '#0f0a1a', text: '#ffffff' },
-  { name: 'כחול', primary: '#3b82f6', accent: '#60a5fa', background: '#0a1628', text: '#ffffff' },
-  { name: 'ירוק', primary: '#10b981', accent: '#34d399', background: '#0a1a14', text: '#ffffff' },
-  { name: 'ורוד', primary: '#ec4899', accent: '#f472b6', background: '#1a0a14', text: '#ffffff' },
-  { name: 'כתום', primary: '#f97316', accent: '#fb923c', background: '#1a120a', text: '#ffffff' },
-  { name: 'בהיר', primary: '#6366f1', accent: '#818cf8', background: '#f8fafc', text: '#1e293b' },
-];
+import { getInfluencerByUsername } from '@/lib/supabase';
+import type { Influencer } from '@/types';
 
 export default function SettingsPage({
   params,
@@ -74,67 +27,18 @@ export default function SettingsPage({
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
-  const [rescanning, setRescanning] = useState(false);
-  const [rescanResult, setRescanResult] = useState<{ products: number; content: number } | null>(null);
-
-  // Form state
-  const [theme, setTheme] = useState<InfluencerTheme>({
-    colors: {
-      primary: '#7c3aed',
-      accent: '#a855f7',
-      background: '#0f0a1a',
-      text: '#ffffff',
-      surface: '#1a1a2e',
-      border: '#2a2a4a',
-    },
-    fonts: {
-      heading: 'Assistant',
-      body: 'Assistant',
-    },
-    style: 'minimal',
-    darkMode: true,
-  });
   const [greetingMessage, setGreetingMessage] = useState('');
-  const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
-  const [hideBranding, setHideBranding] = useState(false);
-  const [customLogoUrl, setCustomLogoUrl] = useState('');
-
-  // Widget-specific state (what widget.js actually reads)
-  const [widgetPosition, setWidgetPosition] = useState<'bottom-right' | 'bottom-left'>('bottom-right');
-  const [widgetPlaceholder, setWidgetPlaceholder] = useState('שאלו משהו...');
-
-  // Phone & WhatsApp state
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [whatsappEnabled, setWhatsappEnabled] = useState(false);
-
-  // Scrape settings state
-  const [scrapeSettings, setScrapeSettings] = useState<ScrapeSettings>(DEFAULT_SCRAPE_SETTINGS);
-
-  // Persona settings state
-  const [personaTone, setPersonaTone] = useState('');
-  const [personaStyle, setPersonaStyle] = useState('');
-  const [personaInterests, setPersonaInterests] = useState<string[]>([]);
-  const [personaPhrases, setPersonaPhrases] = useState<string[]>([]);
-  const [personaEmojiStyle, setPersonaEmojiStyle] = useState<'none' | 'minimal' | 'frequent'>('minimal');
-  const [personaLanguage, setPersonaLanguage] = useState<'he' | 'en' | 'mixed'>('he');
-
-  // Preview state
-  const [showPreview, setShowPreview] = useState(false);
-  const [showLivePreview, setShowLivePreview] = useState(false);
 
   useEffect(() => {
     async function loadData() {
       try {
-        // Check authentication
         const authRes = await fetch(`/api/influencer/auth?username=${username}`);
         const authData = await authRes.json();
-
         if (!authData.authenticated) {
           router.push(`/influencer/${username}`);
           return;
         }
 
-        // Load influencer data
         const inf = await getInfluencerByUsername(username);
         if (!inf) {
           router.push(`/influencer/${username}`);
@@ -142,35 +46,15 @@ export default function SettingsPage({
         }
 
         setInfluencer(inf);
-        if (inf.theme) setTheme(inf.theme);
-        if (inf.greeting_message) setGreetingMessage(inf.greeting_message);
-        if (inf.suggested_questions) setSuggestedQuestions(inf.suggested_questions);
-        if (inf.hide_branding) setHideBranding(inf.hide_branding);
-        if (inf.custom_logo_url) setCustomLogoUrl(inf.custom_logo_url);
-        if (inf.scrape_settings) setScrapeSettings(inf.scrape_settings);
-        if (inf.phone_number) setPhoneNumber(inf.phone_number);
-        if (inf.whatsapp_enabled) setWhatsappEnabled(inf.whatsapp_enabled);
 
-        // Load widget-specific settings from raw account config
-        const rawConfig = (inf as any)._rawConfig || {};
-        const w = rawConfig.widget || {};
-        if (w.position) setWidgetPosition(w.position);
-        if (w.placeholder) setWidgetPlaceholder(w.placeholder);
-        // If widget has its own welcomeMessage and greeting is empty, use it
-        if (!inf.greeting_message && w.welcomeMessage) setGreetingMessage(w.welcomeMessage);
-
-        // Load persona settings
-        if (inf.persona) {
-          setPersonaTone(inf.persona.tone || '');
-          setPersonaStyle(inf.persona.style || '');
-          setPersonaInterests(inf.persona.interests || []);
-          setPersonaPhrases(inf.persona.signature_phrases || []);
-          setPersonaLanguage(inf.persona.language || 'he');
+        // Load greeting from config or chatbot_persona
+        if (inf.greeting_message) {
+          setGreetingMessage(inf.greeting_message);
+        } else if ((inf as any).config?.widget?.welcomeMessage) {
+          setGreetingMessage((inf as any).config.widget.welcomeMessage);
         }
-        // emoji_style stored in config (no DB column)
-        if (rawConfig.persona_emoji_style) setPersonaEmojiStyle(rawConfig.persona_emoji_style);
-      } catch (error) {
-        console.error('Error loading data:', error);
+      } catch (err) {
+        console.error('Error loading settings:', err);
       } finally {
         setLoading(false);
       }
@@ -179,141 +63,56 @@ export default function SettingsPage({
     loadData();
   }, [username, router]);
 
-  const handleSave = async () => {
-    if (!influencer) return;
-
+  async function handleSave() {
     setSaving(true);
+    setSaved(false);
     try {
       const res = await fetch('/api/influencer/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           username,
-          theme,
           greeting_message: greetingMessage,
-          suggested_questions: suggestedQuestions,
-          hide_branding: hideBranding,
-          custom_logo_url: customLogoUrl || null,
-          scrape_settings: scrapeSettings,
-          phone_number: phoneNumber || null,
-          whatsapp_enabled: whatsappEnabled,
-          persona: {
-            tone: personaTone,
-            style: personaStyle,
-            interests: personaInterests,
-            signature_phrases: personaPhrases,
-            emoji_style: personaEmojiStyle,
-            language: personaLanguage,
-          },
-          // Widget-specific config (read by widget.js via /api/widget/config)
-          widget: {
-            primaryColor: theme.colors.primary,
-            welcomeMessage: greetingMessage,
-            placeholder: widgetPlaceholder,
-            position: widgetPosition,
-          },
         }),
       });
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed to save');
+      if (res.ok) {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
       }
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    } catch (error) {
-      console.error('Error saving:', error);
+    } catch (err) {
+      console.error('Error saving settings:', err);
     } finally {
       setSaving(false);
     }
-  };
+  }
 
-  const handleRegenerateAI = async () => {
-    if (!influencer) return;
-
+  async function handleRegenerate() {
     setRegenerating(true);
     try {
-      const response = await fetch('/api/influencer/regenerate-greeting', {
+      const res = await fetch('/api/influencer/regenerate-greeting', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username }),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setGreetingMessage(data.greeting);
-        setSuggestedQuestions(data.questions);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.greeting) {
+          setGreetingMessage(data.greeting);
+        }
       }
-    } catch (error) {
-      console.error('Error regenerating:', error);
+    } catch (err) {
+      console.error('Error regenerating greeting:', err);
     } finally {
       setRegenerating(false);
     }
-  };
-
-  const handleRescan = async () => {
-    if (!influencer) return;
-
-    setRescanning(true);
-    setRescanResult(null);
-    try {
-      const response = await fetch('/api/influencer/rescan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setRescanResult({
-          products: data.stats.products,
-          content: data.stats.content,
-        });
-        // Reload influencer data
-        const inf = await getInfluencerByUsername(username);
-        if (inf) setInfluencer(inf);
-      }
-    } catch (error) {
-      console.error('Error rescanning:', error);
-    } finally {
-      setRescanning(false);
-    }
-  };
-
-  const applyPreset = (preset: typeof colorPresets[0]) => {
-    setTheme({
-      ...theme,
-      colors: {
-        ...theme.colors,
-        primary: preset.primary,
-        accent: preset.accent,
-        background: preset.background,
-        text: preset.text,
-      },
-      darkMode: preset.background.startsWith('#0') || preset.background.startsWith('#1'),
-    });
-  };
-
-  const addQuestion = () => {
-    if (suggestedQuestions.length < 6) {
-      setSuggestedQuestions([...suggestedQuestions, '']);
-    }
-  };
-
-  const removeQuestion = (index: number) => {
-    setSuggestedQuestions(suggestedQuestions.filter((_, i) => i !== index));
-  };
-
-  const updateQuestion = (index: number, value: string) => {
-    const updated = [...suggestedQuestions];
-    updated[index] = value;
-    setSuggestedQuestions(updated);
-  };
+  }
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" dir="rtl" style={{ background: 'transparent' }}>
-        <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--color-primary)' }} />
+      <div className="min-h-screen flex items-center justify-center" dir="rtl">
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--dash-text-3)' }} />
       </div>
     );
   }
@@ -322,961 +121,84 @@ export default function SettingsPage({
 
   return (
     <div className="min-h-screen" dir="rtl" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-        {/* Top Actions */}
-        <div className="flex items-center justify-end gap-2 mb-8 animate-slide-up">
-          <button
-            onClick={() => setShowLivePreview(true)}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium transition-all btn-ghost"
-            style={{ border: '1px solid var(--color-primary)', color: 'var(--color-primary)' }}
-          >
-            <Globe className="w-4 h-4" />
-            צפייה חיה
-          </button>
-          <button
-            onClick={() => setShowPreview(!showPreview)}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-all ${
-              showPreview ? 'btn-primary' : 'btn-ghost'
-            }`}
-          >
-            <Eye className="w-4 h-4" />
-            תצוגה מקדימה
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-all ${
-              saved ? 'btn-teal' : 'btn-solid'
-            }`}
-          >
-            {saving ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : saved ? (
-              <Check className="w-4 h-4" />
-            ) : (
-              <Save className="w-4 h-4" />
-            )}
-            {saved ? 'נשמר!' : 'שמור'}
-          </button>
+      <main className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 py-8">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-xl font-bold flex items-center gap-2">
+            <Settings className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
+            הגדרות
+          </h1>
         </div>
 
-        <div className={`grid ${showPreview ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'} gap-8`}>
-          {/* Settings Panel */}
-          <div className="space-y-8">
-            {/* Theme Settings */}
-            <div
-              className="glass-card rounded-2xl p-6 animate-slide-up"
-              style={{ borderColor: 'var(--dash-glass-border)' }}
+        {/* Greeting Message */}
+        <div className="glass-card rounded-2xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold flex items-center gap-2">
+              <MessageSquare className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
+              הודעת פתיחה
+            </h2>
+            <button
+              onClick={handleRegenerate}
+              disabled={regenerating}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all duration-200 hover:bg-[var(--dash-surface-hover)]"
+              style={{ color: 'var(--dash-text-2)' }}
             >
-              <h2 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
-                <Palette className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
-                עיצוב וצבעים
-              </h2>
-
-              {/* Color Presets */}
-              <div className="mb-6 relative z-10">
-                <label className="block text-sm font-medium mb-3" style={{ color: 'var(--dash-text-2)' }}>ערכות צבעים מוכנות</label>
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-                  {colorPresets.map((preset) => (
-                    <button
-                      key={preset.name}
-                      onClick={() => applyPreset(preset)}
-                      className="group flex flex-col items-center gap-2 p-3 rounded-xl border transition-all glass-subtle"
-                      style={{ borderColor: 'var(--dash-glass-border)' }}
-                    >
-                      <div
-                        className="w-8 h-8 rounded-full"
-                        style={{
-                          background: `linear-gradient(135deg, ${preset.primary}, ${preset.accent})`,
-                        }}
-                      />
-                      <span className="text-xs transition-colors" style={{ color: 'var(--dash-text-2)' }}>
-                        {preset.name}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Custom Colors */}
-              <div className="grid grid-cols-2 gap-4 mb-6 relative z-10">
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>צבע ראשי</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={theme.colors.primary}
-                      onChange={(e) => setTheme({ ...theme, colors: { ...theme.colors, primary: e.target.value } })}
-                      className="w-12 h-10 rounded cursor-pointer border-0"
-                    />
-                    <input
-                      type="text"
-                      value={theme.colors.primary}
-                      onChange={(e) => setTheme({ ...theme, colors: { ...theme.colors, primary: e.target.value } })}
-                      className="flex-1 rounded-xl px-3 py-2 text-sm"
-                      style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>צבע משני</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={theme.colors.accent}
-                      onChange={(e) => setTheme({ ...theme, colors: { ...theme.colors, accent: e.target.value } })}
-                      className="w-12 h-10 rounded cursor-pointer border-0"
-                    />
-                    <input
-                      type="text"
-                      value={theme.colors.accent}
-                      onChange={(e) => setTheme({ ...theme, colors: { ...theme.colors, accent: e.target.value } })}
-                      className="flex-1 rounded-xl px-3 py-2 text-sm"
-                      style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>צבע רקע</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={theme.colors.background}
-                      onChange={(e) => setTheme({ ...theme, colors: { ...theme.colors, background: e.target.value } })}
-                      className="w-12 h-10 rounded cursor-pointer border-0"
-                    />
-                    <input
-                      type="text"
-                      value={theme.colors.background}
-                      onChange={(e) => setTheme({ ...theme, colors: { ...theme.colors, background: e.target.value } })}
-                      className="flex-1 rounded-xl px-3 py-2 text-sm"
-                      style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>צבע טקסט</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={theme.colors.text}
-                      onChange={(e) => setTheme({ ...theme, colors: { ...theme.colors, text: e.target.value } })}
-                      className="w-12 h-10 rounded cursor-pointer border-0"
-                    />
-                    <input
-                      type="text"
-                      value={theme.colors.text}
-                      onChange={(e) => setTheme({ ...theme, colors: { ...theme.colors, text: e.target.value } })}
-                      className="flex-1 rounded-xl px-3 py-2 text-sm"
-                      style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Font */}
-              <div className="relative z-10">
-                <label className="block text-sm font-medium mb-2 flex items-center gap-2" style={{ color: 'var(--dash-text-2)' }}>
-                  <Type className="w-4 h-4" />
-                  גופן
-                </label>
-                <select
-                  value={theme.fonts.heading}
-                  onChange={(e) => setTheme({ ...theme, fonts: { heading: e.target.value, body: e.target.value } })}
-                  className="w-full rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
-                >
-                  {fontOptions.map((font) => (
-                    <option key={font.value} value={font.value}>{font.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Greeting & Questions */}
-            <div
-              className="glass-card rounded-2xl p-6 animate-slide-up"
-              style={{ borderColor: 'var(--dash-glass-border)' }}
-            >
-              <div className="flex items-center justify-between mb-6 relative z-10">
-                <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
-                  <MessageCircle className="w-5 h-5" style={{ color: 'var(--color-info)' }} />
-                  הודעת פתיחה ושאלות מוצעות
-                </h2>
-                <button
-                  onClick={handleRegenerateAI}
-                  disabled={regenerating}
-                  className="flex items-center gap-2 px-3 py-2 text-sm btn-primary transition-all"
-                >
-                  {regenerating ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Sparkles className="w-4 h-4" />
-                  )}
-                  יצירה מחדש ב-AI
-                </button>
-              </div>
-
-              {/* Greeting Message */}
-              <div className="mb-6 relative z-10">
-                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>הודעת פתיחה</label>
-                <textarea
-                  value={greetingMessage}
-                  onChange={(e) => setGreetingMessage(e.target.value)}
-                  rows={3}
-                  className="w-full rounded-xl px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-                  style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
-                  placeholder="היי! אני העוזר שלך..."
-                />
-              </div>
-
-              {/* Suggested Questions */}
-              <div className="relative z-10">
-                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>שאלות מוצעות</label>
-                <div className="space-y-2">
-                  {suggestedQuestions.map((question, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={question}
-                        onChange={(e) => updateQuestion(index, e.target.value)}
-                        className="flex-1 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
-                        placeholder={`שאלה ${index + 1}`}
-                      />
-                      <button
-                        onClick={() => removeQuestion(index)}
-                        className="p-2 text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-lg transition-colors"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                {suggestedQuestions.length < 6 && (
-                  <button
-                    onClick={addQuestion}
-                    className="mt-3 text-sm transition-colors text-purple-400 hover:text-purple-300"
-                  >
-                    + הוסף שאלה
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Widget Settings */}
-            <div
-              className="glass-card rounded-2xl p-6 animate-slide-up"
-              style={{ borderColor: 'var(--dash-glass-border)' }}
-            >
-              <h2 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
-                <Globe className="w-5 h-5" style={{ color: 'var(--color-info)' }} />
-                הגדרות ווידג&apos;ט
-              </h2>
-              <p className="text-sm mb-6" style={{ color: 'var(--dash-text-3)' }}>
-                הגדרות אלה משפיעות על הווידג&apos;ט שמוטמע באתר שלכם בלבד (לא על דף הצ&apos;אט)
-              </p>
-
-              <div className="space-y-6 relative z-10">
-                {/* Widget Position */}
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>מיקום הווידג&apos;ט</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { value: 'bottom-right' as const, label: 'ימין למטה', icon: '↘' },
-                      { value: 'bottom-left' as const, label: 'שמאל למטה', icon: '↙' },
-                    ].map((pos) => (
-                      <button
-                        key={pos.value}
-                        type="button"
-                        onClick={() => setWidgetPosition(pos.value)}
-                        className={`flex items-center justify-center gap-2 p-3 rounded-full border transition-all ${
-                          widgetPosition === pos.value ? 'pill pill-purple' : 'pill pill-neutral'
-                        }`}
-                      >
-                        <span className="text-lg">{pos.icon}</span>
-                        <span className="text-sm">{pos.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Widget Placeholder */}
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>טקסט Placeholder בשדה הקלט</label>
-                  <input
-                    type="text"
-                    value={widgetPlaceholder}
-                    onChange={(e) => setWidgetPlaceholder(e.target.value)}
-                    className="w-full rounded-xl px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
-                    placeholder="שאלו משהו..."
-                  />
-                </div>
-
-                <div className="p-4 rounded-xl glass-subtle" style={{ background: 'color-mix(in srgb, var(--color-info) 10%, transparent)', border: '1px solid var(--dash-glass-border)' }}>
-                  <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>
-                    <strong>💡</strong> הצבע הראשי, הודעת הפתיחה והשאלות המוצעות נלקחים מההגדרות למעלה ומשפיעים גם על הווידג&apos;ט.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Persona Settings */}
-            <div
-              className="glass-card rounded-2xl p-6 animate-slide-up"
-              style={{ borderColor: 'var(--dash-glass-border)' }}
-            >
-              <h2 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
-                <User className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
-                פרסונה וטון הצ&apos;אטבוט
-              </h2>
-
-              <div className="space-y-6 relative z-10">
-                {/* Tone */}
-                <div>
-                  <label className="block text-sm font-medium mb-2 flex items-center gap-2" style={{ color: 'var(--dash-text-2)' }}>
-                    <Heart className="w-4 h-4 text-pink-400" />
-                    טון השיחה
-                  </label>
-                  <input
-                    type="text"
-                    value={personaTone}
-                    onChange={(e) => setPersonaTone(e.target.value)}
-                    className="w-full rounded-xl px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
-                    placeholder="לדוגמה: חם, ידידותי ומעודד"
-                  />
-                  <p className="mt-1 text-xs" style={{ color: 'var(--dash-text-3)' }}>תאר איך הצ&apos;אטבוט צריך לדבר - האם הוא רשמי, חברותי, הומוריסטי?</p>
-                </div>
-
-                {/* Style */}
-                <div>
-                  <label className="block text-sm font-medium mb-2 flex items-center gap-2" style={{ color: 'var(--dash-text-2)' }}>
-                    <Zap className="w-4 h-4 text-yellow-400" />
-                    סגנון תוכן
-                  </label>
-                  <textarea
-                    value={personaStyle}
-                    onChange={(e) => setPersonaStyle(e.target.value)}
-                    rows={2}
-                    className="w-full rounded-xl px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
-                    style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
-                    placeholder="לדוגמה: שיחתי, קליל, עם הרבה הדגשות ודוגמאות"
-                  />
-                </div>
-
-                {/* Language */}
-                <div>
-                  <label className="block text-sm font-medium mb-2 flex items-center gap-2" style={{ color: 'var(--dash-text-2)' }}>
-                    <Globe className="w-4 h-4" style={{ color: 'var(--color-info)' }} />
-                    שפה
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { value: 'he', label: 'עברית', icon: '🇮🇱' },
-                      { value: 'en', label: 'אנגלית', icon: '🇺🇸' },
-                      { value: 'mixed', label: 'מעורב', icon: '🌐' },
-                    ].map((lang) => (
-                      <button
-                        key={lang.value}
-                        type="button"
-                        onClick={() => setPersonaLanguage(lang.value as 'he' | 'en' | 'mixed')}
-                        className={`flex items-center justify-center gap-2 p-3 rounded-full border transition-all ${
-                          personaLanguage === lang.value ? 'pill pill-purple' : 'pill pill-neutral'
-                        }`}
-                      >
-                        <span>{lang.icon}</span>
-                        <span className="text-sm">{lang.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Emoji Style */}
-                <div>
-                  <label className="block text-sm font-medium mb-2 flex items-center gap-2" style={{ color: 'var(--dash-text-2)' }}>
-                    <Smile className="w-4 h-4 text-yellow-400" />
-                    שימוש באימוג&apos;ים
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { value: 'none', label: 'ללא', example: 'ללא אימוג\'ים' },
-                      { value: 'minimal', label: 'מינימלי', example: 'מעט 👍' },
-                      { value: 'frequent', label: 'הרבה', example: 'הרבה!! 🎉✨💕' },
-                    ].map((style) => (
-                      <button
-                        key={style.value}
-                        type="button"
-                        onClick={() => setPersonaEmojiStyle(style.value as 'none' | 'minimal' | 'frequent')}
-                        className={`flex flex-col items-center gap-1 p-3 rounded-full border transition-all ${
-                          personaEmojiStyle === style.value ? 'pill pill-amber' : 'pill pill-neutral'
-                        }`}
-                      >
-                        <span className="text-sm font-medium">{style.label}</span>
-                        <span className="text-xs opacity-60">{style.example}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Interests */}
-                <div>
-                  <label className="block text-sm font-medium mb-2 flex items-center gap-2" style={{ color: 'var(--dash-text-2)' }}>
-                    <Star className="w-4 h-4 text-amber-400" />
-                    תחומי עניין (נושאים שהצ&apos;אטבוט יודע עליהם)
-                  </label>
-                  <div className="space-y-2">
-                    {personaInterests.map((interest, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={interest}
-                          onChange={(e) => {
-                            const updated = [...personaInterests];
-                            updated[index] = e.target.value;
-                            setPersonaInterests(updated);
-                          }}
-                          className="flex-1 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
-                          placeholder={`תחום עניין ${index + 1}`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setPersonaInterests(personaInterests.filter((_, i) => i !== index))}
-                          className="p-2 text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-lg transition-colors"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  {personaInterests.length < 10 && (
-                    <button
-                      type="button"
-                      onClick={() => setPersonaInterests([...personaInterests, ''])}
-                      className="mt-3 text-sm transition-colors text-purple-400 hover:text-purple-300"
-                    >
-                      + הוסף תחום עניין
-                    </button>
-                  )}
-                </div>
-
-                {/* Signature Phrases */}
-                <div>
-                  <label className="block text-sm font-medium mb-2 flex items-center gap-2" style={{ color: 'var(--dash-text-2)' }}>
-                    <Coffee className="w-4 h-4 text-orange-400" />
-                    ביטויים ייחודיים (משפטי חתימה)
-                  </label>
-                  <div className="space-y-2">
-                    {personaPhrases.map((phrase, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={phrase}
-                          onChange={(e) => {
-                            const updated = [...personaPhrases];
-                            updated[index] = e.target.value;
-                            setPersonaPhrases(updated);
-                          }}
-                          className="flex-1 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
-                          placeholder={`ביטוי ${index + 1}`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setPersonaPhrases(personaPhrases.filter((_, i) => i !== index))}
-                          className="p-2 text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-lg transition-colors"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  {personaPhrases.length < 10 && (
-                    <button
-                      type="button"
-                      onClick={() => setPersonaPhrases([...personaPhrases, ''])}
-                      className="mt-3 text-sm transition-colors text-purple-400 hover:text-purple-300"
-                    >
-                      + הוסף ביטוי
-                    </button>
-                  )}
-                </div>
-
-                {/* Info box */}
-                <div className="p-4 rounded-xl glass-subtle" style={{ background: 'color-mix(in srgb, var(--color-primary) 10%, transparent)', border: '1px solid var(--dash-glass-border)' }}>
-                  <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>
-                    <strong>💡 טיפ:</strong> הגדרות אלה משפיעות על איך הצ&apos;אטבוט מדבר עם המבקרים.
-                    ככל שתתאימו יותר לסגנון האישי שלכם, ככה התגובות יהיו אותנטיות יותר.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Scrape Settings */}
-            <div
-              className="glass-card rounded-2xl p-6 animate-slide-up"
-              style={{ borderColor: 'var(--dash-glass-border)' }}
-            >
-              <h2 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
-                <Database className="w-5 h-5" style={{ color: 'var(--dash-positive)' }} />
-                הגדרות סריקת אינסטגרם
-              </h2>
-
-              <div className="space-y-6 relative z-10">
-                {/* Posts Limit Slider */}
-                <div>
-                  <label className="block text-sm font-medium mb-3" style={{ color: 'var(--dash-text-2)' }}>
-                    כמות פוסטים לסריקה: <span className="font-bold" style={{ color: 'var(--dash-text)' }}>{scrapeSettings.posts_limit}</span>
-                  </label>
-                  <input
-                    type="range"
-                    min="10"
-                    max="100"
-                    step="10"
-                    value={scrapeSettings.posts_limit}
-                    onChange={(e) => setScrapeSettings({ ...scrapeSettings, posts_limit: parseInt(e.target.value) })}
-                    className="w-full h-2 rounded-lg appearance-none cursor-pointer"
-                    style={{ background: 'rgba(255,255,255,0.1)', accentColor: 'var(--color-primary)' }}
-                  />
-                  <div className="flex justify-between text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>
-                    <span>10</span>
-                    <span>50</span>
-                    <span>100</span>
-                  </div>
-                </div>
-
-                {/* Content Types */}
-                <div>
-                  <label className="block text-sm font-medium mb-3" style={{ color: 'var(--dash-text-2)' }}>סוגי תוכן לסריקה</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { type: 'image' as PostType, label: 'תמונות', icon: Image },
-                      { type: 'video' as PostType, label: 'סרטונים', icon: Video },
-                      { type: 'reel' as PostType, label: 'Reels', icon: Film },
-                      { type: 'carousel' as PostType, label: 'קרוסלות', icon: Layers },
-                    ].map(({ type, label, icon: Icon }) => {
-                      const isSelected = scrapeSettings.content_types.includes(type);
-                      return (
-                        <button
-                          key={type}
-                          onClick={() => {
-                            if (isSelected) {
-                              if (scrapeSettings.content_types.length > 1) {
-                                setScrapeSettings({
-                                  ...scrapeSettings,
-                                  content_types: scrapeSettings.content_types.filter(t => t !== type),
-                                });
-                              }
-                            } else {
-                              setScrapeSettings({
-                                ...scrapeSettings,
-                                content_types: [...scrapeSettings.content_types, type],
-                              });
-                            }
-                          }}
-                          className={`flex items-center gap-3 p-3 rounded-full border transition-all ${
-                            isSelected ? 'pill pill-teal' : 'pill pill-neutral'
-                          }`}
-                        >
-                          <Icon className="w-5 h-5" />
-                          <span className="text-sm font-medium">{label}</span>
-                          {isSelected && <Check className="w-4 h-4 mr-auto" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Additional Options */}
-                <div className="space-y-3">
-                  {/* Include Hashtags */}
-                  <div className="flex items-center justify-between p-4 rounded-xl glass-subtle" style={{ borderColor: 'var(--dash-glass-border)', border: '1px solid' }}>
-                    <div className="flex items-center gap-3">
-                      <Hash className="w-5 h-5" style={{ color: 'var(--color-info)' }} />
-                      <div>
-                        <h4 className="font-medium" style={{ color: 'var(--dash-text)' }}>חילוץ האשטגים</h4>
-                        <p className="text-xs" style={{ color: 'var(--dash-text-2)' }}>שמירת האשטגים מהפוסטים</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setScrapeSettings({ ...scrapeSettings, include_hashtags: !scrapeSettings.include_hashtags })}
-                      className={`w-12 h-7 rounded-full relative transition-colors`}
-                      style={{
-                        background: scrapeSettings.include_hashtags ? 'var(--color-primary)' : 'rgba(255,255,255,0.1)',
-                      }}
-                    >
-                      <div
-                        className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all ${
-                          scrapeSettings.include_hashtags ? 'left-1' : 'right-1'
-                        }`}
-                      />
-                    </button>
-                  </div>
-
-                  {/* Include Comments */}
-                  <div className="flex items-center justify-between p-4 rounded-xl glass-subtle" style={{ borderColor: 'var(--dash-glass-border)', border: '1px solid' }}>
-                    <div className="flex items-center gap-3">
-                      <MessageSquare className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
-                      <div>
-                        <h4 className="font-medium" style={{ color: 'var(--dash-text)' }}>שליפת תגובות</h4>
-                        <p className="text-xs" style={{ color: 'var(--dash-text-2)' }}>יאט את הסריקה אך יספק יותר מידע</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setScrapeSettings({ ...scrapeSettings, include_comments: !scrapeSettings.include_comments })}
-                      className={`w-12 h-7 rounded-full relative transition-colors`}
-                      style={{
-                        background: scrapeSettings.include_comments ? 'var(--color-primary)' : 'rgba(255,255,255,0.1)',
-                      }}
-                    >
-                      <div
-                        className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all ${
-                          scrapeSettings.include_comments ? 'left-1' : 'right-1'
-                        }`}
-                      />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-xl glass-subtle" style={{ background: 'color-mix(in srgb, var(--color-info) 10%, transparent)', border: '1px solid var(--dash-glass-border)' }}>
-                  <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>
-                    <strong>שימו לב:</strong> Highlights ו-Stories לא נתמכים על ידי הסריקה (דורשים התחברות לאינסטגרם).
-                  </p>
-                </div>
-
-                {/* Rescan Button */}
-                <div className="pt-4" style={{ borderTop: '1px solid var(--dash-glass-border)' }}>
-                  <button
-                    onClick={handleRescan}
-                    disabled={rescanning}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 disabled:opacity-50 font-medium btn-teal transition-all"
-                  >
-                    {rescanning ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        סורק מחדש...
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="w-5 h-5" />
-                        סרוק מחדש מאינסטגרם
-                      </>
-                    )}
-                  </button>
-                  {rescanResult && (
-                    <div className="mt-3 p-3 rounded-xl glass-subtle" style={{ background: 'color-mix(in srgb, var(--dash-positive) 20%, transparent)', border: '1px solid var(--dash-glass-border)' }}>
-                      <p className="text-sm text-center" style={{ color: 'var(--dash-positive)' }}>
-                        נמצאו {rescanResult.products} מוצרים ו-{rescanResult.content} פריטי תוכן
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* WhatsApp & Phone Settings */}
-            <div
-              className="glass-card rounded-2xl p-6 animate-slide-up"
-              style={{ borderColor: 'var(--dash-glass-border)' }}
-            >
-              <h2 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
-                <Phone className="w-5 h-5" style={{ color: 'var(--dash-positive)' }} />
-                טלפון והתראות WhatsApp
-              </h2>
-
-              <div className="space-y-6 relative z-10">
-                {/* Phone Number */}
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>מספר טלפון</label>
-                  <div className="relative">
-                    <input
-                      type="tel"
-                      value={phoneNumber}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, '');
-                        setPhoneNumber(value);
-                      }}
-                      placeholder="0541234567"
-                      dir="ltr"
-                      className="w-full rounded-xl px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 text-left"
-                      style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
-                    />
-                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" style={{ color: 'var(--dash-text-3)' }} />
-                  </div>
-                  <p className="mt-2 text-xs" style={{ color: 'var(--dash-text-3)' }}>
-                    מספר לקבלת התראות על פניות תמיכה ושאלות מלקוחות
-                  </p>
-                </div>
-
-                {/* WhatsApp Notifications Toggle */}
-                <div className="flex items-center justify-between p-4 rounded-xl glass-subtle" style={{ borderColor: 'var(--dash-glass-border)', border: '1px solid' }}>
-                  <div className="flex items-center gap-3">
-                    <Bell className="w-5 h-5" style={{ color: 'var(--dash-positive)' }} />
-                    <div>
-                      <h4 className="font-medium" style={{ color: 'var(--dash-text)' }}>התראות WhatsApp</h4>
-                      <p className="text-xs" style={{ color: 'var(--dash-text-2)' }}>קבלת התראות בזמן אמת על פניות חדשות</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setWhatsappEnabled(!whatsappEnabled)}
-                    disabled={!phoneNumber}
-                    className={`w-12 h-7 rounded-full relative transition-colors ${!phoneNumber ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    style={{
-                      background: whatsappEnabled && phoneNumber ? 'var(--color-primary)' : 'rgba(255,255,255,0.1)',
-                    }}
-                  >
-                    <div
-                      className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all ${
-                        whatsappEnabled && phoneNumber ? 'left-1' : 'right-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                {!phoneNumber && whatsappEnabled && (
-                  <div className="p-4 rounded-xl glass-subtle" style={{ background: 'color-mix(in srgb, var(--color-warning) 10%, transparent)', border: '1px solid var(--dash-glass-border)' }}>
-                    <p className="text-sm" style={{ color: 'var(--color-warning)' }}>
-                      יש להזין מספר טלפון כדי להפעיל התראות WhatsApp
-                    </p>
-                  </div>
-                )}
-
-                {phoneNumber && whatsappEnabled && (
-                  <div className="p-4 rounded-xl glass-subtle" style={{ background: 'color-mix(in srgb, var(--dash-positive) 10%, transparent)', border: '1px solid var(--dash-glass-border)' }}>
-                    <p className="text-sm" style={{ color: 'var(--dash-positive)' }}>
-                      התראות WhatsApp פעילות - תקבלו הודעה בכל פנייה חדשה
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* White Label Settings */}
-            <div
-              className="glass-card rounded-2xl p-6 animate-slide-up"
-              style={{ borderColor: 'var(--dash-glass-border)' }}
-            >
-              <h2 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
-                <svg className="w-5 h-5" style={{ color: 'var(--color-primary)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-                </svg>
-                White Label (מיתוג עצמי)
-              </h2>
-
-              <div className="space-y-4 relative z-10">
-                {/* Hide Branding Toggle */}
-                <div className="flex items-center justify-between p-4 rounded-xl glass-subtle" style={{ borderColor: 'var(--dash-glass-border)', border: '1px solid' }}>
-                  <div>
-                    <h4 className="font-medium" style={{ color: 'var(--dash-text)' }}>הסתר מיתוג המערכת</h4>
-                    <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>הסתר את הלוגו והקרדיט של InfluencerBot</p>
-                  </div>
-                  <button
-                    onClick={() => setHideBranding(!hideBranding)}
-                    className={`w-12 h-7 rounded-full relative transition-colors`}
-                    style={{
-                      background: hideBranding ? 'var(--color-primary)' : 'rgba(255,255,255,0.1)',
-                    }}
-                  >
-                    <div
-                      className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all ${
-                        hideBranding ? 'left-1' : 'right-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                {/* Custom Logo URL */}
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>לוגו מותאם (URL)</label>
-                  <input
-                    type="url"
-                    value={customLogoUrl}
-                    onChange={(e) => setCustomLogoUrl(e.target.value)}
-                    placeholder="https://example.com/logo.png"
-                    className="w-full rounded-xl px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
-                  />
-                  <p className="mt-2 text-xs" style={{ color: 'var(--dash-text-3)' }}>
-                    השאירו ריק להצגת תמונת הפרופיל שלכם
-                  </p>
-                </div>
-
-                {hideBranding && (
-                  <div className="p-4 rounded-xl glass-subtle" style={{ background: 'color-mix(in srgb, var(--color-warning) 10%, transparent)', border: '1px solid var(--dash-glass-border)' }}>
-                    <p className="text-sm" style={{ color: 'var(--color-warning)' }}>
-                      💡 אפשרות זו זמינה בחבילות Premium. צרו קשר לשדרוג.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
+              <RefreshCw className={`w-3.5 h-3.5 ${regenerating ? 'animate-spin' : ''}`} />
+              ייצור אוטומטי
+            </button>
           </div>
 
-          {/* Preview Panel */}
-          {showPreview && (
-            <div className="lg:sticky lg:top-24 h-fit animate-fade-in">
-              <div className="glass-card rounded-2xl overflow-hidden" style={{ borderColor: 'var(--dash-glass-border)' }}>
-                <div className="p-4 flex items-center justify-between relative z-10" style={{ borderBottom: '1px solid var(--dash-glass-border)' }}>
-                  <span className="text-sm font-medium" style={{ color: 'var(--dash-text-2)' }}>תצוגה מקדימה</span>
-                  <div className="flex gap-1.5">
-                    <div className="w-3 h-3 rounded-full bg-red-500" />
-                    <div className="w-3 h-3 rounded-full bg-yellow-500" />
-                    <div className="w-3 h-3 rounded-full bg-green-500" />
-                  </div>
-                </div>
+          <p className="text-sm mb-3" style={{ color: 'var(--dash-text-3)' }}>
+            ההודעה שתופיע למבקרים כשהם פותחים את הצ׳אט
+          </p>
 
-                {/* Chat Preview */}
-                <div
-                  className="p-6 min-h-[400px]"
-                  style={{
-                    backgroundColor: theme.colors.background,
-                    fontFamily: theme.fonts.heading,
-                  }}
-                >
-                  {/* Avatar */}
-                  <div className="flex flex-col items-center mb-6">
-                    <div
-                      className="w-16 h-16 rounded-full mb-3 flex items-center justify-center text-2xl font-bold"
-                      style={{
-                        background: `linear-gradient(135deg, ${theme.colors.primary}, ${theme.colors.accent})`,
-                        color: theme.colors.text,
-                      }}
-                    >
-                      {influencer.display_name.charAt(0)}
-                    </div>
-                    <h3 className="font-semibold" style={{ color: theme.colors.text }}>
-                      {influencer.display_name}
-                    </h3>
-                  </div>
+          <textarea
+            className="input w-full py-3 px-4 text-sm"
+            rows={4}
+            value={greetingMessage}
+            onChange={(e) => setGreetingMessage(e.target.value)}
+            placeholder="היי! איך אוכל לעזור?"
+          />
 
-                  {/* Greeting */}
-                  <div
-                    className="rounded-2xl rounded-tr-sm p-4 mb-4 max-w-[85%] mr-auto"
-                    style={{
-                      backgroundColor: `${theme.colors.primary}20`,
-                      borderColor: `${theme.colors.primary}50`,
-                      borderWidth: '1px',
-                    }}
-                  >
-                    <p className="text-sm" style={{ color: theme.colors.text }}>
-                      {greetingMessage || 'היי! איך אוכל לעזור?'}
-                    </p>
-                  </div>
-
-                  {/* Suggested Questions */}
-                  <div className="flex flex-wrap gap-2">
-                    {suggestedQuestions.slice(0, 4).map((q, i) => (
-                      <button
-                        key={i}
-                        className="px-3 py-2 text-xs rounded-full border pill pill-purple"
-                      >
-                        {q || `שאלה ${i + 1}`}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Input */}
-                  <div
-                    className="mt-6 rounded-full px-4 py-3 flex items-center"
-                    style={{
-                      backgroundColor: `${theme.colors.text}10`,
-                      borderColor: `${theme.colors.primary}30`,
-                      borderWidth: '1px',
-                    }}
-                  >
-                    <span className="text-sm opacity-50" style={{ color: theme.colors.text }}>
-                      הקלד הודעה...
-                    </span>
-                    <div
-                      className="mr-auto w-8 h-8 rounded-full flex items-center justify-center"
-                      style={{ backgroundColor: theme.colors.primary }}
-                    >
-                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke={theme.colors.text}>
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
+          {/* Preview */}
+          {greetingMessage && (
+            <div className="mt-4 p-4 rounded-xl" style={{ background: 'var(--dash-muted)', border: '1px solid var(--dash-glass-border)' }}>
+              <div className="text-xs mb-2" style={{ color: 'var(--dash-text-3)' }}>תצוגה מקדימה:</div>
+              <div
+                className="p-3 rounded-2xl text-sm"
+                style={{
+                  background: 'rgba(160,148,224,0.1)',
+                  border: '1px solid rgba(160,148,224,0.2)',
+                  color: 'var(--dash-text)',
+                  borderBottomLeftRadius: '4px',
+                  maxWidth: '80%',
+                }}
+              >
+                {greetingMessage}
               </div>
             </div>
           )}
-        </div>
-      </main>
 
-      {/* Live Preview Modal */}
-      {showLivePreview && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center"
-          style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
-          onClick={() => setShowLivePreview(false)}
-        >
-          <div
-            className="relative flex flex-col items-center"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Phone frame header */}
-            <div className="flex items-center justify-between w-[390px] mb-3 px-1">
-              <span className="text-sm font-medium text-white/80">
-                צפייה חיה — {influencer.display_name}
-              </span>
-              <div className="flex items-center gap-2">
-                <a
-                  href={`/chat/${username}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-white/60 hover:text-white transition-colors underline"
-                >
-                  פתח בטאב חדש
-                </a>
-                <button
-                  onClick={() => setShowLivePreview(false)}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 transition-all"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            {/* Phone frame */}
-            <div
-              className="rounded-[40px] overflow-hidden shadow-2xl"
-              style={{
-                width: 390,
-                height: 760,
-                border: '8px solid #1a1a1a',
-                backgroundColor: '#1a1a1a',
-              }}
+          {/* Save button */}
+          <div className="mt-6 flex justify-end">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 disabled:opacity-50"
+              style={{ background: saved ? '#34d399' : 'var(--color-primary)', color: '#fff' }}
             >
-              {/* Notch */}
-              <div className="relative flex justify-center" style={{ backgroundColor: '#1a1a1a', height: 30 }}>
-                <div
-                  className="absolute top-0 rounded-b-2xl"
-                  style={{ width: 120, height: 24, backgroundColor: '#1a1a1a' }}
-                />
-              </div>
-
-              {/* Iframe */}
-              <iframe
-                src={`/chat/${username}?preview=1&t=${Date.now()}`}
-                className="w-full border-0"
-                style={{
-                  height: 'calc(100% - 30px)',
-                  borderRadius: '0 0 32px 32px',
-                  backgroundColor: '#f4f5f7',
-                }}
-                title="תצוגה מקדימה חיה"
-              />
-            </div>
-
-            {/* Hint */}
-            <p className="text-xs text-white/50 mt-3">
-              זה הצ׳אט כמו שהעוקבים שלך רואים אותו — נסו לשלוח הודעה
-            </p>
+              {saving ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : saved ? (
+                <Check className="w-4 h-4" />
+              ) : (
+                <Save className="w-4 h-4" />
+              )}
+              {saved ? 'נשמר!' : 'שמירה'}
+            </button>
           </div>
         </div>
-      )}
+      </main>
     </div>
   );
 }

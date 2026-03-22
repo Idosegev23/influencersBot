@@ -1,138 +1,86 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  ArrowRight,
-  Save,
-  Sparkles,
+  Bot,
   Instagram,
   MessageSquare,
   Brain,
-  Settings,
-  Quote,
-  Ban,
   Map,
-  Layers,
   ChevronDown,
   ChevronUp,
-  X,
-  Plus,
-  RotateCcw,
-  AlertTriangle,
-  Sliders,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  ToggleLeft,
+  ToggleRight,
+  RefreshCw,
+  ExternalLink,
+  Zap,
+  Hash,
+  Calendar,
+  FileText,
+  Sparkles,
 } from 'lucide-react';
-import ScrapeProgressModal from '@/components/ScrapeProgressModal';
 
-/* ------------------------------------------------------------------ */
-/*  Types                                                              */
-/* ------------------------------------------------------------------ */
+/* ─── Types ─── */
 
 interface VoiceRules {
-  tone?: string | { primary?: string[]; evidence?: unknown[] };
+  tone?: string | { primary?: string[] };
   avgLength?: string;
-  firstPerson?: boolean;
-  avoidedWords?: string[];
-  recurringPhrases?: string[];
-  responseStructure?: string;
   language?: string;
+  recurringPhrases?: string[];
+  avoidedWords?: string[];
+  responseStructure?: string;
   styleMarkers?: {
     humorAndSlang?: string[];
     formatPreferences?: string[];
-    commonPhrasingPatterns?: string[];
-  };
-  stanceSignals?: {
-    evidenceFirst?: boolean;
-    consumerAdvocacy?: boolean;
-    ingredientLiteracy?: boolean;
-    antiCelebrityHypeBias?: string;
   };
 }
 
 interface CoreTopic {
   name: string;
-  examples?: string[];
   keyPoints?: string[];
-  subtopics?: string[];
+  examples?: string[];
 }
 
 interface KnowledgeDomain {
   domain: string;
   whatSheCovers?: string[];
   brandsAndLinesExplicitlyCovered?: string[];
-  notableIngredientsMentioned?: string[];
-  examples?: Array<{ topic?: string; whatIncluded?: string }>;
-  format?: string;
   [key: string]: unknown;
 }
 
-interface KnowledgeMap {
-  coreTopics?: CoreTopic[];
-  domains?: KnowledgeDomain[];
-}
-
-interface PersonaFull {
-  /* AI-generated read-only fields */
+interface PersonaData {
   name: string;
   tone: string;
   voice_rules: VoiceRules | null;
-  knowledge_map: KnowledgeMap | null;
+  knowledge_map: { coreTopics?: CoreTopic[]; domains?: KnowledgeDomain[] } | null;
   common_phrases: string[] | null;
   narrative_perspective: string | null;
   sass_level: number | null;
-  slang_map: Record<string, string> | null;
   storytelling_mode: string | null;
   message_structure: string | null;
   emoji_usage: string | null;
-
-  /* Editable fields */
   greeting_message: string;
-  directives: string[];
   bio: string;
   interests: string[];
-
-  /* Snapshot tracking */
-  ai_snapshot: Record<string, unknown> | null;
+  directives: string[];
 }
 
-const EMPTY_PERSONA: PersonaFull = {
-  name: '',
-  tone: '',
-  voice_rules: null,
-  knowledge_map: null,
-  common_phrases: null,
-  narrative_perspective: null,
-  sass_level: null,
-  slang_map: null,
-  storytelling_mode: null,
-  message_structure: null,
-  emoji_usage: null,
-  greeting_message: '',
-  directives: [],
-  bio: '',
-  interests: [],
-  ai_snapshot: null,
-};
-
-const EMOJI_LABELS: Record<string, string> = {
-  none: 'ללא',
-  minimal: 'מעט',
-  moderate: 'מתון',
-  heavy: 'הרבה',
-};
-
-/* ------------------------------------------------------------------ */
-/*  Small reusable components                                          */
-/* ------------------------------------------------------------------ */
+interface IGConnection {
+  ig_username?: string;
+  connected: boolean;
+}
 
 function Badge({ children, color = 'var(--color-primary)' }: { children: React.ReactNode; color?: string }) {
   return (
     <span
-      className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium relative z-10"
+      className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium"
       style={{
         background: `color-mix(in srgb, ${color} 15%, transparent)`,
         color,
-        border: `1px solid var(--dash-glass-border)`,
       }}
     >
       {children}
@@ -140,1176 +88,457 @@ function Badge({ children, color = 'var(--color-primary)' }: { children: React.R
   );
 }
 
-function Chip({ children, onRemove }: { children: React.ReactNode; onRemove?: () => void }) {
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm relative z-10 pill pill-purple"
-    >
-      {children}
-      {onRemove && (
-        <button onClick={onRemove} className="hover:opacity-70 transition-opacity">
-          <X className="w-3.5 h-3.5" />
-        </button>
-      )}
-    </span>
-  );
-}
-
-function SectionCard({
-  icon: Icon,
+function Section({
   title,
+  icon: Icon,
   children,
-  collapsible = false,
-  defaultOpen = true,
+  defaultOpen = false,
 }: {
-  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
   title: string;
+  icon: any;
   children: React.ReactNode;
-  collapsible?: boolean;
   defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
-
   return (
-    <div className="glass-card rounded-2xl overflow-hidden">
+    <div className="rounded-xl border overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}>
       <button
-        type="button"
-        onClick={() => collapsible && setOpen(!open)}
-        className={`w-full flex items-center gap-3 p-5 text-right relative z-10 ${
-          collapsible ? 'cursor-pointer' : 'cursor-default'
-        }`}
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-5 py-4 transition-colors"
         style={{ color: 'var(--dash-text)' }}
       >
-        <Icon className="w-5 h-5 shrink-0" style={{ color: 'var(--color-primary)' }} />
-        <h2 className="text-lg font-bold flex-1 text-right">{title}</h2>
-        {collapsible && (
-          open ? <ChevronUp className="w-4 h-4" style={{ color: 'var(--dash-text-3)' }} /> : <ChevronDown className="w-4 h-4" style={{ color: 'var(--dash-text-3)' }} />
-        )}
-      </button>
-      {open && (
-        <div className="px-5 pb-5 space-y-4 relative z-10">
-          {children}
+        <div className="flex items-center gap-2.5">
+          <Icon className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
+          <span className="font-semibold">{title}</span>
         </div>
-      )}
+        {open ? <ChevronUp className="w-4 h-4" style={{ color: 'var(--dash-text-3)' }} /> : <ChevronDown className="w-4 h-4" style={{ color: 'var(--dash-text-3)' }} />}
+      </button>
+      {open && <div className="px-5 pb-5 border-t" style={{ borderColor: 'var(--dash-glass-border)' }}>{children}</div>}
     </div>
   );
 }
 
-function EmptyLabel({ text = 'לא הוגדר' }: { text?: string }) {
-  return (
-    <span className="text-sm italic" style={{ color: 'var(--dash-text-3)' }}>
-      {text}
-    </span>
-  );
-}
+/* ─── Page ─── */
 
-function SassIndicator({ level }: { level: number }) {
-  return (
-    <div className="inline-flex items-center gap-1.5">
-      <span className="text-xs font-medium" style={{ color: 'var(--dash-text-2)' }}>סאס:</span>
-      <div className="flex gap-0.5">
-        {Array.from({ length: 10 }).map((_, i) => (
-          <div
-            key={i}
-            className="w-2 h-2 rounded-full"
-            style={{
-              background: i < level
-                ? `color-mix(in srgb, var(--color-primary) ${50 + i * 5}%, var(--dash-negative))`
-                : 'var(--dash-muted)',
-            }}
-          />
-        ))}
-      </div>
-      <span className="text-xs font-bold" style={{ color: 'var(--color-primary)' }}>{level}/10</span>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Label mapping helpers                                              */
-/* ------------------------------------------------------------------ */
-
-const NARRATIVE_LABELS: Record<string, string> = {
-  'sidekick-professional': 'עוזר מקצועי',
-  'first-person': 'גוף ראשון',
-  'third-person': 'גוף שלישי',
-  'friendly-assistant': 'עוזר ידידותי',
-};
-
-const STORYTELLING_LABELS: Record<string, string> = {
-  balanced: 'מאוזן',
-  narrative: 'סיפורי',
-  factual: 'עובדתי',
-  emotional: 'רגשי',
-};
-
-const MESSAGE_STRUCTURE_LABELS: Record<string, string> = {
-  whatsapp: 'וואטסאפ',
-  formal: 'פורמלי',
-  email: 'אימייל',
-  chat: "צ'אט",
-};
-
-function humanize(value: string | null | undefined, map: Record<string, string>): string | null {
-  if (!value) return null;
-  return map[value] || value;
-}
-
-/** Safely convert any value to a renderable string */
-function safeString(value: unknown): string | null {
-  if (value === null || value === undefined) return null;
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  if (Array.isArray(value)) return value.filter(v => typeof v === 'string').join(', ');
-  return null;
-}
-
-/** Extract tone text from voice_rules.tone which can be a string or {primary, evidence} object */
-function extractToneText(tone: VoiceRules['tone']): string[] {
-  if (!tone) return [];
-  if (typeof tone === 'string') return [tone];
-  if (typeof tone === 'object' && 'primary' in tone && Array.isArray(tone.primary)) {
-    return tone.primary.filter((t): t is string => typeof t === 'string');
-  }
-  return [];
-}
-
-/* ------------------------------------------------------------------ */
-/*  Main page                                                          */
-/* ------------------------------------------------------------------ */
-
-export default function ChatbotPersonaPage({
-  params,
-}: {
-  params: Promise<{ username: string }>;
-}) {
-  const resolvedParams = use(params);
-  const username = resolvedParams.username;
+export default function MyBotPage({ params }: { params: Promise<{ username: string }> }) {
+  const { username } = use(params);
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [persona, setPersona] = useState<PersonaData | null>(null);
+  const [igConnection, setIgConnection] = useState<IGConnection>({ connected: false });
+  const [dmBotEnabled, setDmBotEnabled] = useState(false);
+  const [dmLoading, setDmLoading] = useState(false);
+  const [accountId, setAccountId] = useState<string>('');
+  const [stats, setStats] = useState<{ totalPosts: number; topicsCount: number; lastScrape: string | null }>({
+    totalPosts: 0, topicsCount: 0, lastScrape: null,
+  });
   const [syncing, setSyncing] = useState(false);
-  const [showProgressModal, setShowProgressModal] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
-  const [persona, setPersona] = useState<PersonaFull>(EMPTY_PERSONA);
-
-  const [restoring, setRestoring] = useState(false);
-
-  const [newDirective, setNewDirective] = useState('');
-  const [newInterest, setNewInterest] = useState('');
-  const [newPhrase, setNewPhrase] = useState('');
-
-  /* ---- data loading ---- */
-
-  useEffect(() => {
-    loadPersona();
-  }, [username]);
-
-  const loadPersona = async () => {
+  const loadData = useCallback(async () => {
     try {
-      const response = await fetch(`/api/influencer/chatbot/persona?username=${username}`);
-      if (!response.ok) throw new Error('Failed to load persona');
+      const authRes = await fetch(`/api/influencer/auth?username=${username}`);
+      const authData = await authRes.json();
+      if (!authData.authenticated) {
+        router.push(`/influencer/${username}/login`);
+        return;
+      }
 
-      const data = await response.json();
-      if (data.persona) {
-        setPersona({
-          name: data.persona.name || '',
-          tone: data.persona.tone || '',
-          voice_rules: data.persona.voice_rules || null,
-          knowledge_map: data.persona.knowledge_map || null,
-          common_phrases: data.persona.common_phrases || null,
-          narrative_perspective: data.persona.narrative_perspective || null,
-          sass_level: data.persona.sass_level ?? null,
-          slang_map: data.persona.slang_map || null,
-          storytelling_mode: data.persona.storytelling_mode || null,
-          message_structure: data.persona.message_structure || null,
-          emoji_usage: data.persona.emoji_usage || null,
-          greeting_message: data.persona.greeting_message || '',
-          directives: data.persona.directives || [],
-          bio: data.persona.bio || '',
-          interests: data.persona.interests || [],
-          ai_snapshot: data.persona.ai_snapshot || null,
+      // Load persona
+      const personaRes = await fetch(`/api/influencer/chatbot/persona?username=${username}`);
+      if (personaRes.ok) {
+        const personaData = await personaRes.json();
+        setPersona(personaData.persona || null);
+        setAccountId(personaData.accountId || '');
+      }
+
+      // Load stats
+      const statsRes = await fetch(`/api/influencer/chatbot/stats?username=${username}`);
+      if (statsRes.ok) {
+        const statsData = await statsRes.json();
+        setStats({
+          totalPosts: statsData.totalPosts || 0,
+          topicsCount: statsData.topicsCount || 0,
+          lastScrape: statsData.lastScrape || null,
         });
       }
-    } catch (err) {
-      console.error('Error loading persona:', err);
-      setError('שגיאה בטעינת הפרסונה');
+
+      // Load DM settings
+      if (authData.accountId || accountId) {
+        const aid = authData.accountId || accountId;
+        setAccountId(aid);
+        const dmRes = await fetch(`/api/influencer/dm-settings?accountId=${aid}`);
+        if (dmRes.ok) {
+          const dmData = await dmRes.json();
+          setIgConnection(dmData.ig_connection || { connected: false });
+          setDmBotEnabled(dmData.dm_bot_enabled || false);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading bot data:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [username, router, accountId]);
 
-  /* ---- save ALL editable fields ---- */
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
-  const handleSave = async () => {
-    setSaving(true);
-    setError(null);
-    setSuccess(false);
-
+  const handleToggleDM = async () => {
+    if (!accountId) return;
+    setDmLoading(true);
     try {
-      const response = await fetch(`/api/influencer/chatbot/persona?username=${username}`, {
+      const res = await fetch('/api/influencer/dm-settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          directives: persona.directives,
-          tone: persona.tone,
-          emoji_usage: persona.emoji_usage,
-          greeting_message: persona.greeting_message,
-          bio: persona.bio,
-          interests: persona.interests,
-          narrative_perspective: persona.narrative_perspective,
-          sass_level: persona.sass_level,
-          storytelling_mode: persona.storytelling_mode,
-          message_structure: persona.message_structure,
-          common_phrases: persona.common_phrases,
-        }),
+        body: JSON.stringify({ accountId, dm_bot_enabled: !dmBotEnabled }),
       });
-
-      if (!response.ok) throw new Error('Failed to save persona');
-
-      const data = await response.json();
-      if (data.persona) {
-        setPersona(prev => ({ ...prev, ai_snapshot: data.persona.ai_snapshot || prev.ai_snapshot }));
+      if (res.ok) {
+        setDmBotEnabled(!dmBotEnabled);
       }
-
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-    } catch (err) {
-      console.error('Error saving persona:', err);
-      setError('שגיאה בשמירת הפרסונה');
-    } finally {
-      setSaving(false);
+    } catch {} finally {
+      setDmLoading(false);
     }
   };
 
-  /* ---- restore from AI snapshot ---- */
-
-  const handleRestore = async () => {
-    if (!confirm('לשחזר את כל ההגדרות לערכים המקוריים שה-AI יצר? שינויים ידניים יימחקו.')) return;
-
-    setRestoring(true);
-    setError(null);
-
+  const handleSync = async () => {
+    if (!accountId) return;
+    setSyncing(true);
     try {
-      const response = await fetch(`/api/influencer/chatbot/persona?username=${username}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ restore: true }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to restore');
-      }
-
-      await loadPersona();
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-    } catch (err) {
-      console.error('Error restoring persona:', err);
-      setError(err instanceof Error ? err.message : 'שגיאה בשחזור הפרסונה');
-    } finally {
-      setRestoring(false);
-    }
-  };
-
-  /* ---- directives helpers ---- */
-
-  const addDirective = () => {
-    if (newDirective.trim()) {
-      setPersona({ ...persona, directives: [...persona.directives, newDirective.trim()] });
-      setNewDirective('');
-    }
-  };
-
-  const removeDirective = (index: number) => {
-    setPersona({ ...persona, directives: persona.directives.filter((_, i) => i !== index) });
-  };
-
-  /* ---- interests helpers ---- */
-
-  const addInterest = () => {
-    if (newInterest.trim()) {
-      setPersona({ ...persona, interests: [...persona.interests, newInterest.trim()] });
-      setNewInterest('');
-    }
-  };
-
-  const removeInterest = (index: number) => {
-    setPersona({ ...persona, interests: persona.interests.filter((_, i) => i !== index) });
-  };
-
-  /* ---- common phrases helpers ---- */
-
-  const addPhrase = () => {
-    if (newPhrase.trim()) {
-      setPersona({
-        ...persona,
-        common_phrases: [...(persona.common_phrases || []), newPhrase.trim()],
-      });
-      setNewPhrase('');
-    }
-  };
-
-  const removePhrase = (index: number) => {
-    setPersona({
-      ...persona,
-      common_phrases: (persona.common_phrases || []).filter((_, i) => i !== index),
-    });
-  };
-
-  /* ---- sync from Instagram ---- */
-
-  const syncFromInstagram = async () => {
-    try {
-      setSyncing(true);
-      setError(null);
-      setSuccess(false);
-      setShowProgressModal(true);
-
-      const response = await fetch(`/api/influencer/chatbot/persona?username=${username}`, {
+      await fetch('/api/influencer/rescan', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId }),
       });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to sync from Instagram');
-      }
-    } catch (err) {
-      console.error('Error syncing from Instagram:', err);
-      setError(err instanceof Error ? err.message : 'שגיאה בסנכרון מאינסטגרם');
-      setShowProgressModal(false);
+    } catch {} finally {
       setSyncing(false);
     }
   };
 
-  const handleSyncComplete = async (ok: boolean) => {
-    setShowProgressModal(false);
-    setSyncing(false);
-
-    if (ok) {
-      await loadPersona();
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 5000);
-    } else {
-      setError('הסריקה נכשלה. נסה שוב.');
-    }
+  const handleConnectIG = () => {
+    if (!accountId) return;
+    window.location.href = `/api/auth/instagram/connect?accountId=${accountId}`;
   };
-
-  /* ---- derived data ---- */
-
-  const voiceRules = persona.voice_rules;
-  const knowledgeMap = persona.knowledge_map;
-  const hasRichData =
-    !!voiceRules || !!knowledgeMap?.coreTopics?.length || !!knowledgeMap?.domains?.length ||
-    !!persona.common_phrases?.length || persona.sass_level !== null;
-
-  // Merge recurring phrases + common_phrases + commonPhrasingPatterns into one list, deduplicated
-  const allPhrases = Array.from(
-    new Set([
-      ...(voiceRules?.recurringPhrases || []),
-      ...(voiceRules?.styleMarkers?.commonPhrasingPatterns || []),
-      ...(persona.common_phrases || []),
-    ]),
-  );
-
-  const slangEntries = persona.slang_map ? Object.entries(persona.slang_map) : [];
-
-  /* ---- loading state ---- */
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'transparent' }}>
-        <div
-          className="animate-spin rounded-full h-12 w-12 border-b-2"
-          style={{ borderColor: 'var(--color-primary)' }}
-        />
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--color-primary)' }} />
       </div>
     );
   }
 
-  /* ================================================================ */
-  /*  RENDER                                                           */
-  /* ================================================================ */
+  const voiceRules = persona?.voice_rules;
+  const knowledgeMap = persona?.knowledge_map;
+  const toneStr = typeof voiceRules?.tone === 'string'
+    ? voiceRules.tone
+    : (voiceRules?.tone as any)?.primary?.join(', ') || persona?.tone || '';
 
   return (
-    <div
-      dir="rtl"
-      className="min-h-screen py-8 px-4"
-      style={{ background: 'transparent', color: 'var(--dash-text)' }}
-    >
-      <div className="max-w-6xl mx-auto space-y-6">
-        {/* ---- Header ---- */}
-        <div className="mb-2 animate-slide-up">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-2 mb-4 transition-colors"
-            style={{ color: 'var(--dash-text-2)' }}
-          >
-            <ArrowRight className="w-5 h-5" />
-            חזרה
-          </button>
-          <div className="flex items-center gap-3 mb-2">
-            <Sparkles className="w-10 h-10" style={{ color: 'var(--color-primary)' }} />
-            <h1 className="text-3xl font-bold">הפרסונה של הצ'אטבוט</h1>
+    <div className="min-h-screen" dir="rtl" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-5">
+
+        {/* ═══ HEADER ═══ */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <Bot className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
+              הבוט שלי
+            </h1>
+            {persona?.name && (
+              <p className="text-sm mt-1" style={{ color: 'var(--dash-text-2)' }}>
+                {persona.name}
+              </p>
+            )}
           </div>
-          <p style={{ color: 'var(--dash-text-2)' }}>כל מה שה-AI יודע על הסגנון שלך</p>
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm btn-primary disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+            סנכרון מאינסטגרם
+          </button>
         </div>
 
-        {/* ---- Notifications ---- */}
-        {error && (
-          <div
-            className="p-4 rounded-lg text-sm relative z-10"
-            style={{
-              background: 'color-mix(in srgb, var(--dash-negative) 12%, transparent)',
-              border: '1px solid var(--dash-glass-border)',
-              color: 'var(--dash-negative)',
-            }}
-          >
-            {error}
-          </div>
-        )}
-        {success && (
-          <div
-            className="p-4 rounded-lg text-sm relative z-10"
-            style={{
-              background: 'color-mix(in srgb, var(--dash-positive) 12%, transparent)',
-              border: '1px solid var(--dash-glass-border)',
-              color: 'var(--dash-positive)',
-            }}
-          >
-            הפרסונה נשמרה בהצלחה!
-          </div>
-        )}
-
-        {/* ============================================================ */}
-        {/*  1. PERSONA IDENTITY + PERSONALITY CONTROLS                    */}
-        {/* ============================================================ */}
-
-        <SectionCard icon={Sliders} title="בקרת אישיות הבוט">
-          {/* Warning banner */}
-          <div
-            className="rounded-lg p-3 flex items-start gap-2 relative z-10"
-            style={{
-              background: 'color-mix(in srgb, var(--dash-warning, #f59e0b) 10%, transparent)',
-              border: '1px solid var(--dash-glass-border)',
-            }}
-          >
-            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: 'var(--dash-warning, #f59e0b)' }} />
-            <p className="text-xs leading-relaxed" style={{ color: 'var(--dash-warning, #f59e0b)' }}>
-              <strong>שים לב:</strong> שדות אלו נוצרו אוטומטית ע&quot;י AI מניתוח הפוסטים שלך. שינויים ידניים ישפיעו על אופי התשובות של הבוט.
-              {persona.ai_snapshot && ' ניתן לשחזר למקור בכל עת.'}
-            </p>
-          </div>
-
-          {/* Identity header */}
-          <div className="flex items-center gap-3 pb-2 relative z-10">
-            <div
-              className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-              style={{ background: 'color-mix(in srgb, var(--color-primary) 15%, transparent)' }}
-            >
-              <Sparkles className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
-            </div>
-            <div>
-              <h3 className="font-bold" style={{ color: 'var(--dash-text)' }}>
-                {persona.name || username}
-              </h3>
-              {persona.tone && (
-                <p className="text-xs leading-relaxed" style={{ color: 'var(--dash-text-2)' }}>
-                  {persona.tone}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Personality dropdowns grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Narrative Perspective */}
-            <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--dash-text-2)' }}>
-                סגנון דיבור
-              </label>
-              <select
-                value={persona.narrative_perspective || 'sidekick-professional'}
-                onChange={(e) => setPersona({ ...persona, narrative_perspective: e.target.value })}
-                className="w-full px-3 py-2 rounded-xl text-sm focus:outline-none"
-                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }}
-              >
-                {Object.entries(NARRATIVE_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Storytelling Mode */}
-            <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--dash-text-2)' }}>
-                סגנון סיפור
-              </label>
-              <select
-                value={persona.storytelling_mode || 'balanced'}
-                onChange={(e) => setPersona({ ...persona, storytelling_mode: e.target.value })}
-                className="w-full px-3 py-2 rounded-xl text-sm focus:outline-none"
-                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }}
-              >
-                {Object.entries(STORYTELLING_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Message Structure */}
-            <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--dash-text-2)' }}>
-                מבנה הודעות
-              </label>
-              <select
-                value={persona.message_structure || 'whatsapp'}
-                onChange={(e) => setPersona({ ...persona, message_structure: e.target.value })}
-                className="w-full px-3 py-2 rounded-xl text-sm focus:outline-none"
-                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }}
-              >
-                {Object.entries(MESSAGE_STRUCTURE_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Emoji Usage */}
-            <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--dash-text-2)' }}>
-                שימוש באימוג&apos;י
-              </label>
-              <select
-                value={persona.emoji_usage || 'moderate'}
-                onChange={(e) => setPersona({ ...persona, emoji_usage: e.target.value })}
-                className="w-full px-3 py-2 rounded-xl text-sm focus:outline-none"
-                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }}
-              >
-                {Object.entries(EMOJI_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Sass Level Slider */}
-          <div className="relative z-10">
-            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--dash-text-2)' }}>
-              רמת סאס (חוצפה/שנינות)
-            </label>
-            <div className="flex items-center gap-3">
-              <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>0</span>
-              <input
-                type="range"
-                min={0}
-                max={10}
-                step={1}
-                value={persona.sass_level ?? 5}
-                onChange={(e) => setPersona({ ...persona, sass_level: parseInt(e.target.value) })}
-                className="flex-1 accent-[var(--color-primary)]"
-              />
-              <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>10</span>
-              <span className="text-sm font-bold min-w-[2.5rem] text-center" style={{ color: 'var(--color-primary)' }}>
-                {persona.sass_level ?? 5}/10
-              </span>
-            </div>
-          </div>
-
-          {/* Common Phrases (editable chips) */}
-          <div className="relative z-10">
-            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--dash-text-2)' }}>
-              ביטויים חוזרים (הבוט ישתמש בהם בתגובות)
-            </label>
-            <div className="flex gap-2 mb-3">
-              <input
-                type="text"
-                value={newPhrase}
-                onChange={(e) => setNewPhrase(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && addPhrase()}
-                placeholder={'למשל: "בדיוק כמו שאני תמיד אומרת"'}
-                className="flex-1 px-3 py-2 rounded-xl text-sm focus:outline-none"
-                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }}
-              />
-              <button
-                onClick={addPhrase}
-                className="px-3 py-2 rounded-xl transition-colors flex items-center gap-1 text-sm btn-primary"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-            </div>
-            {(persona.common_phrases || []).length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {(persona.common_phrases || []).map((phrase, index) => (
-                  <Chip key={index} onRemove={() => removePhrase(index)}>
-                    &ldquo;{phrase}&rdquo;
-                  </Chip>
-                ))}
+        {/* ═══ STATS STRIP ═══ */}
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { label: 'פוסטים בבסיס', value: stats.totalPosts, icon: FileText },
+            { label: 'נושאים', value: stats.topicsCount, icon: Hash },
+            { label: 'סריקה אחרונה', value: stats.lastScrape ? new Date(stats.lastScrape).toLocaleDateString('he-IL') : 'טרם נסרק', icon: Calendar },
+          ].map((s, i) => (
+            <div key={i} className="metric-card">
+              <div className="flex items-center gap-1.5 mb-1">
+                <s.icon className="w-3.5 h-3.5" style={{ color: 'var(--dash-text-3)' }} />
+                <span className="text-xs" style={{ color: 'var(--dash-text-2)' }}>{s.label}</span>
               </div>
-            ) : (
-              <EmptyLabel text="אין ביטויים חוזרים" />
-            )}
-          </div>
-        </SectionCard>
+              <span className="text-lg font-bold">{s.value}</span>
+            </div>
+          ))}
+        </div>
 
-        {/* ============================================================ */}
-        {/*  2. VOICE & STYLE (read-only)                                 */}
-        {/* ============================================================ */}
-
-        {hasRichData && (
-          <SectionCard icon={MessageSquare} title="קול וסגנון" collapsible defaultOpen>
-            {/* Voice Rules Tone */}
-            {voiceRules?.tone && extractToneText(voiceRules.tone).length > 0 && (
+        {/* ═══ INSTAGRAM CONNECTION ═══ */}
+        <div className="rounded-xl border p-5" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ background: igConnection.connected ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)' }}>
+                <Instagram className="w-5 h-5" style={{ color: igConnection.connected ? '#22c55e' : '#ef4444' }} />
+              </div>
               <div>
-                <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--dash-text-2)' }}>
-                  טון מפורט
-                </h3>
-                {extractToneText(voiceRules.tone).length === 1 ? (
-                  <p className="text-sm leading-relaxed" style={{ color: 'var(--dash-text)' }}>
-                    {extractToneText(voiceRules.tone)[0]}
-                  </p>
+                <h3 className="font-semibold text-sm">חיבור אינסטגרם</h3>
+                {igConnection.connected ? (
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                    <span className="text-xs text-green-500">מחובר — @{igConnection.ig_username}</span>
+                  </div>
                 ) : (
-                  <ul className="list-disc pr-5 space-y-1">
-                    {extractToneText(voiceRules.tone).map((t, i) => (
-                      <li key={i} className="text-sm leading-relaxed" style={{ color: 'var(--dash-text)' }}>
-                        {t}
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <XCircle className="w-3.5 h-3.5 text-red-400" />
+                    <span className="text-xs text-red-400">לא מחובר</span>
+                  </div>
                 )}
               </div>
-            )}
-
-            {/* Language */}
-            {voiceRules?.language && (
-              <div>
-                <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--dash-text-2)' }}>
-                  שפה
-                </h3>
-                <p className="text-sm" style={{ color: 'var(--dash-text)' }}>
-                  {voiceRules.language}
-                </p>
-              </div>
-            )}
-
-            {/* Average Length */}
-            {voiceRules?.avgLength && (
-              <div>
-                <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--dash-text-2)' }}>
-                  אורך תגובה ממוצע
-                </h3>
-                <p className="text-sm" style={{ color: 'var(--dash-text)' }}>
-                  {voiceRules.avgLength}
-                </p>
-              </div>
-            )}
-
-            {/* Response Structure */}
-            {voiceRules?.responseStructure && (
-              <div>
-                <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--dash-text-2)' }}>
-                  מבנה תגובה
-                </h3>
-                <p className="text-sm leading-relaxed" style={{ color: 'var(--dash-text)' }}>
-                  {safeString(voiceRules.responseStructure)}
-                </p>
-              </div>
-            )}
-
-            {/* Format Preferences */}
-            {voiceRules?.styleMarkers?.formatPreferences && voiceRules.styleMarkers.formatPreferences.length > 0 && (
-              <div>
-                <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--dash-text-2)' }}>
-                  העדפות פורמט
-                </h3>
-                <ul className="list-disc pr-5 space-y-1">
-                  {voiceRules.styleMarkers.formatPreferences.map((pref, i) => (
-                    <li key={i} className="text-sm" style={{ color: 'var(--dash-text)' }}>
-                      {pref}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Humor & Slang */}
-            {voiceRules?.styleMarkers?.humorAndSlang && voiceRules.styleMarkers.humorAndSlang.length > 0 && (
-              <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-2">
-                  <Layers className="w-4 h-4" style={{ color: 'var(--color-info)' }} />
-                  <h3 className="text-sm font-semibold" style={{ color: 'var(--dash-text-2)' }}>
-                    הומור וסלנג
-                  </h3>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {voiceRules.styleMarkers.humorAndSlang.map((item, i) => (
-                    <span
-                      key={i}
-                      className="pill pill-blue"
-                    >
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Recurring Phrases */}
-            {allPhrases.length > 0 && (
-              <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-2">
-                  <Quote className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
-                  <h3 className="text-sm font-semibold" style={{ color: 'var(--dash-text-2)' }}>
-                    ביטויים חוזרים
-                  </h3>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {allPhrases.map((phrase, i) => (
-                    <span
-                      key={i}
-                      className="pill pill-purple"
-                    >
-                      &ldquo;{phrase}&rdquo;
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Avoided Words */}
-            {voiceRules?.avoidedWords && voiceRules.avoidedWords.length > 0 && (
-              <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-2">
-                  <Ban className="w-4 h-4" style={{ color: 'var(--dash-negative)' }} />
-                  <h3 className="text-sm font-semibold" style={{ color: 'var(--dash-text-2)' }}>
-                    מילים שנמנעים מהן
-                  </h3>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {voiceRules.avoidedWords.map((word, i) => (
-                    <span
-                      key={i}
-                      className="pill pill-coral"
-                    >
-                      {word}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Slang Map */}
-            {slangEntries.length > 0 && (
-              <div className="glass-subtle rounded-xl p-3 relative z-10">
-                <div className="flex items-center gap-2 mb-2">
-                  <Layers className="w-4 h-4" style={{ color: 'var(--color-info)' }} />
-                  <h3 className="text-sm font-semibold" style={{ color: 'var(--dash-text-2)' }}>
-                    סלנג ומילים מיוחדות
-                  </h3>
-                </div>
-                <div className="space-y-1">
-                  {slangEntries.map(([key, value], i) => (
-                    <div key={i} className="flex items-center gap-2 text-sm">
-                      <span className="font-medium" style={{ color: 'var(--color-primary)' }}>
-                        {key}
-                      </span>
-                      <span style={{ color: 'var(--dash-text-3)' }}>&larr;</span>
-                      <span style={{ color: 'var(--dash-text)' }}>{value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* If no voice data at all */}
-            {!voiceRules && allPhrases.length === 0 && slangEntries.length === 0 && (
-              <EmptyLabel text="אין נתוני קול וסגנון. סנכרן מאינסטגרם כדי ליצור פרסונה מפורטת." />
-            )}
-          </SectionCard>
-        )}
-
-        {/* ============================================================ */}
-        {/*  3. KNOWLEDGE MAP (read-only)                                 */}
-        {/* ============================================================ */}
-
-        {/* Knowledge Map — supports both coreTopics and domains formats */}
-        {(knowledgeMap?.coreTopics?.length || knowledgeMap?.domains?.length) ? (
-          <SectionCard icon={Brain} title="מפת ידע" collapsible defaultOpen>
-            <div className="space-y-5">
-              {/* Format A: coreTopics (simple) */}
-              {knowledgeMap.coreTopics?.map((topic, ti) => (
-                <div key={`ct-${ti}`} className="glass-subtle rounded-xl p-3 relative z-10">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Map className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
-                    <h3 className="font-bold text-sm" style={{ color: 'var(--dash-text)' }}>
-                      {topic.name}
-                    </h3>
-                  </div>
-                  {topic.keyPoints && topic.keyPoints.length > 0 && (
-                    <ul className="list-disc pr-5 space-y-1 mb-2">
-                      {topic.keyPoints.map((point, pi) => (
-                        <li key={pi} className="text-sm" style={{ color: 'var(--dash-text-2)' }}>
-                          {point}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {topic.subtopics && topic.subtopics.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {topic.subtopics.map((sub, si) => (
-                        <span key={si} className="pill pill-blue">
-                          {sub}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {topic.examples && topic.examples.length > 0 && (
-                    <div className="space-y-1 mr-3">
-                      {topic.examples.map((ex, ei) => (
-                        <p key={ei} className="text-xs pr-3 leading-relaxed" style={{ color: 'var(--dash-text-3)', borderRight: '2px solid var(--dash-glass-border)' }}>
-                          {ex}
-                        </p>
-                      ))}
-                    </div>
-                  )}
-                  {ti < (knowledgeMap.coreTopics?.length ?? 0) - 1 && (
-                    <hr className="mt-4" style={{ borderColor: 'var(--dash-glass-border)' }} />
-                  )}
-                </div>
-              ))}
-
-              {/* Format B: domains (rich AI-generated) */}
-              {knowledgeMap.domains?.map((domain, di) => (
-                <div key={`dm-${di}`} className="glass-subtle rounded-xl p-3 relative z-10">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Map className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
-                    <h3 className="font-bold text-sm" style={{ color: 'var(--dash-text)' }}>
-                      {domain.domain}
-                    </h3>
-                  </div>
-
-                  {/* What she covers */}
-                  {domain.whatSheCovers && domain.whatSheCovers.length > 0 && (
-                    <ul className="list-disc pr-5 space-y-1 mb-2">
-                      {domain.whatSheCovers.map((item, wi) => (
-                        <li key={wi} className="text-sm" style={{ color: 'var(--dash-text-2)' }}>
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-
-                  {/* Brands covered */}
-                  {domain.brandsAndLinesExplicitlyCovered && domain.brandsAndLinesExplicitlyCovered.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {domain.brandsAndLinesExplicitlyCovered.map((brand, bi) => (
-                        <span key={bi} className="pill pill-purple">
-                          {brand}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Notable ingredients */}
-                  {domain.notableIngredientsMentioned && domain.notableIngredientsMentioned.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {domain.notableIngredientsMentioned.map((ing, ii) => (
-                        <span key={ii} className="pill pill-blue">
-                          {ing}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Practical examples */}
-                  {domain.examples && domain.examples.length > 0 && (
-                    <div className="space-y-1 mr-3">
-                      {domain.examples.map((ex, ei) => (
-                        <p key={ei} className="text-xs pr-3 leading-relaxed" style={{ color: 'var(--dash-text-3)', borderRight: '2px solid var(--dash-glass-border)' }}>
-                          {typeof ex === 'string' ? ex : ex.topic || ''}
-                          {typeof ex === 'object' && ex.whatIncluded ? ` — ${ex.whatIncluded}` : ''}
-                        </p>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Format note */}
-                  {domain.format && (
-                    <p className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>
-                      {domain.format}
-                    </p>
-                  )}
-
-                  {di < (knowledgeMap.domains?.length ?? 0) - 1 && (
-                    <hr className="mt-4" style={{ borderColor: 'var(--dash-glass-border)' }} />
-                  )}
-                </div>
-              ))}
-            </div>
-          </SectionCard>
-        ) : null}
-
-        {/* ============================================================ */}
-        {/*  4. EDITABLE SETTINGS                                         */}
-        {/* ============================================================ */}
-
-        <SectionCard icon={Settings} title="הגדרות ניתנות לעריכה">
-          {/* Legal notice (compact) */}
-          <div
-            className="rounded-lg p-4 relative z-10"
-            style={{
-              background: 'color-mix(in srgb, var(--color-info) 8%, transparent)',
-              border: '1px solid var(--dash-glass-border)',
-            }}
-          >
-            <p className="text-xs leading-relaxed" style={{ color: 'var(--color-info)' }}>
-              <strong>דרישה חוקית:</strong> על פי החוק הבוט חייב לגלות שהוא בוט בהתחלת השיחה, אבל אפשר לעשות את זה בצורה חמה ונעימה.
-            </p>
-          </div>
-
-          {/* Greeting message */}
-          <div className="relative z-10">
-            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text-2)' }}>
-              הודעת ברוכים הבאים
-            </label>
-            <textarea
-              value={persona.greeting_message}
-              onChange={(e) => setPersona({ ...persona, greeting_message: e.target.value })}
-              rows={3}
-              placeholder='היי! אני הבוט של ירדן, פה לעזור לך עם כל שאלה...'
-              className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none resize-none"
-              style={{
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid var(--dash-glass-border)',
-                color: 'var(--dash-text)',
-              }}
-            />
-          </div>
-
-          {/* Bio */}
-          <div className="relative z-10">
-            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text-2)' }}>
-              קצת על עצמי - הבוט ישתמש בזה
-            </label>
-            <textarea
-              value={persona.bio}
-              onChange={(e) => setPersona({ ...persona, bio: e.target.value })}
-              rows={3}
-              placeholder="אני ירדן, בלוגרית אופנה וטיולים. גרה בתל אביב, אוהבת קפה..."
-              className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none resize-none"
-              style={{
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid var(--dash-glass-border)',
-                color: 'var(--dash-text)',
-              }}
-            />
-          </div>
-
-          {/* Interests */}
-          <div className="relative z-10">
-            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text-2)' }}>
-              תחומי עניין
-            </label>
-            <div className="flex gap-2 mb-3">
-              <input
-                type="text"
-                value={newInterest}
-                onChange={(e) => setNewInterest(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && addInterest()}
-                placeholder="לדוגמה: ברצלונה, קפה, צילום"
-                className="flex-1 px-4 py-2 rounded-xl text-sm focus:outline-none"
-                style={{
-                  background: 'rgba(255,255,255,0.03)',
-                  border: '1px solid var(--dash-glass-border)',
-                  color: 'var(--dash-text)',
-                }}
-              />
-              <button
-                onClick={addInterest}
-                className="px-3 py-2 rounded-xl transition-colors flex items-center gap-1 text-sm btn-primary"
-              >
-                <Plus className="w-4 h-4" />
-                הוסף
-              </button>
-            </div>
-            {persona.interests.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {persona.interests.map((interest, index) => (
-                  <Chip key={index} onRemove={() => removeInterest(index)}>
-                    {interest}
-                  </Chip>
-                ))}
-              </div>
-            ) : (
-              <EmptyLabel text="לא הוגדרו תחומי עניין" />
-            )}
-          </div>
-
-          {/* Directives */}
-          <div className="relative z-10">
-            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text-2)' }}>
-              הנחיות התנהגות לבוט
-            </label>
-
-            {/* Tip box */}
-            <div
-              className="rounded-lg p-3 mb-3"
-              style={{
-                background: 'color-mix(in srgb, var(--dash-positive) 8%, transparent)',
-                border: '1px solid var(--dash-glass-border)',
-              }}
-            >
-              <p className="text-xs" style={{ color: 'var(--dash-positive)' }}>
-                <strong>טיפ:</strong> כתוב כללים כלליים, לא סקריפטים מוכנים. לדוגמה: &quot;כששואלים על דברים אישיים - תענה בעדינות שזה פרטי&quot;
-              </p>
             </div>
 
-            <div className="flex gap-2 mb-3">
-              <input
-                type="text"
-                value={newDirective}
-                onChange={(e) => setNewDirective(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && addDirective()}
-                placeholder="הוסף הנחיה חדשה..."
-                className="flex-1 px-4 py-2 rounded-xl text-sm focus:outline-none"
-                style={{
-                  background: 'rgba(255,255,255,0.03)',
-                  border: '1px solid var(--dash-glass-border)',
-                  color: 'var(--dash-text)',
-                }}
-              />
-              <button
-                onClick={addDirective}
-                className="px-3 py-2 rounded-xl transition-colors flex items-center gap-1 text-sm btn-primary"
-              >
-                <Plus className="w-4 h-4" />
-                הוסף
-              </button>
-            </div>
-
-            {persona.directives.length > 0 ? (
-              <div className="space-y-2">
-                {persona.directives.map((directive, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-3 rounded-xl text-sm"
-                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--dash-glass-border)' }}
-                  >
-                    <span className="flex-1" style={{ color: 'var(--dash-text)' }}>
-                      {directive}
-                    </span>
-                    <button
-                      onClick={() => removeDirective(index)}
-                      className="pr-2 transition-colors"
-                      style={{ color: 'var(--dash-negative)' }}
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <EmptyLabel text="לא הוגדרו הנחיות" />
-            )}
-          </div>
-
-          {/* Save button */}
-          <div className="pt-2 relative z-10">
-            <button
-              onClick={handleSave}
-              disabled={saving || syncing}
-              className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-2xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm btn-solid"
-            >
-              {saving ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                  שומר...
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4" />
-                  שמור שינויים
-                </>
-              )}
-            </button>
-          </div>
-        </SectionCard>
-
-        {/* ============================================================ */}
-        {/*  5. SYNC FROM INSTAGRAM                                       */}
-        {/* ============================================================ */}
-
-        <div className="glass-card rounded-2xl p-5 space-y-4 relative z-10">
-          {/* Sync from Instagram */}
-          <div className="flex flex-col sm:flex-row items-center gap-4">
-            <div className="flex-1 text-center sm:text-right">
-              <h3 className="font-bold text-sm mb-1" style={{ color: 'var(--dash-text)' }}>
-                סנכרון מאינסטגרם
-              </h3>
-              <p className="text-xs leading-relaxed" style={{ color: 'var(--dash-text-3)' }}>
-                סורק את הפוסטים שלך ובונה פרסונה מפורטת עם Gemini Pro. כולל טון, ביטויים, נושאים ועוד.
-              </p>
-            </div>
-            <button
-              onClick={syncFromInstagram}
-              disabled={syncing || saving || restoring}
-              className="shrink-0 flex items-center gap-2 px-5 py-3 rounded-2xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm btn-primary"
-            >
-              {syncing ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                  סורק...
-                </>
-              ) : (
-                <>
-                  <Instagram className="w-4 h-4" />
-                  סנכרן מאינסטגרם
-                </>
-              )}
-            </button>
-          </div>
-
-          {/* Restore from AI snapshot */}
-          {persona.ai_snapshot && (
-            <>
-              <hr style={{ borderColor: 'var(--dash-glass-border)' }} />
-              <div className="flex flex-col sm:flex-row items-center gap-4">
-                <div className="flex-1 text-center sm:text-right">
-                  <h3 className="font-bold text-sm mb-1" style={{ color: 'var(--dash-text)' }}>
-                    שחזור למקור
-                  </h3>
-                  <p className="text-xs leading-relaxed" style={{ color: 'var(--dash-text-3)' }}>
-                    מחזיר את כל ההגדרות לערכים המקוריים שה-AI יצר לפני שביצעת שינויים ידניים.
-                  </p>
-                </div>
-                <button
-                  onClick={handleRestore}
-                  disabled={restoring || syncing || saving}
-                  className="shrink-0 flex items-center gap-2 px-5 py-3 rounded-2xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm btn-coral"
-                >
-                  {restoring ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2" style={{ borderColor: 'var(--dash-negative)' }} />
-                      משחזר...
-                    </>
+            {igConnection.connected ? (
+              <div className="flex items-center gap-3">
+                <span className="text-xs" style={{ color: 'var(--dash-text-2)' }}>
+                  בוט DM
+                </span>
+                <button onClick={handleToggleDM} disabled={dmLoading} className="transition-colors">
+                  {dmLoading ? (
+                    <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--dash-text-3)' }} />
+                  ) : dmBotEnabled ? (
+                    <ToggleRight className="w-8 h-8 text-green-500" />
                   ) : (
-                    <>
-                      <RotateCcw className="w-4 h-4" />
-                      שחזר למקור AI
-                    </>
+                    <ToggleLeft className="w-8 h-8" style={{ color: 'var(--dash-text-3)' }} />
                   )}
                 </button>
               </div>
-            </>
-          )}
+            ) : (
+              <button onClick={handleConnectIG} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm btn-primary">
+                <ExternalLink className="w-4 h-4" />
+                חבר אינסטגרם
+              </button>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Progress Modal */}
-      <ScrapeProgressModal username={username} isOpen={showProgressModal} onComplete={handleSyncComplete} />
+        {/* ═══ PERSONA — read-only from DB ═══ */}
+        {!persona ? (
+          <div className="text-center py-16 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
+            <Bot className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--dash-text-3)' }} />
+            <h3 className="text-xl font-semibold mb-2">אין פרסונה עדיין</h3>
+            <p className="mb-4" style={{ color: 'var(--dash-text-2)' }}>סנכרנו מאינסטגרם כדי לבנות את הפרסונה</p>
+          </div>
+        ) : (
+          <>
+            {/* Voice & Style */}
+            <Section title="קול וסגנון" icon={MessageSquare} defaultOpen>
+              <div className="space-y-4 pt-4">
+                {toneStr && (
+                  <div>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>טון</label>
+                    <p className="text-sm">{toneStr}</p>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  {persona.narrative_perspective && (
+                    <div>
+                      <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>פרספקטיבה</label>
+                      <Badge>{persona.narrative_perspective}</Badge>
+                    </div>
+                  )}
+                  {persona.emoji_usage && (
+                    <div>
+                      <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>אימוג׳ים</label>
+                      <Badge>{persona.emoji_usage}</Badge>
+                    </div>
+                  )}
+                  {persona.storytelling_mode && (
+                    <div>
+                      <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>סיפור</label>
+                      <Badge>{persona.storytelling_mode}</Badge>
+                    </div>
+                  )}
+                  {persona.message_structure && (
+                    <div>
+                      <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>מבנה</label>
+                      <Badge>{persona.message_structure}</Badge>
+                    </div>
+                  )}
+                </div>
+
+                {persona.sass_level !== null && persona.sass_level !== undefined && (
+                  <div>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>רמת חוצפה</label>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--dash-glass-border)' }}>
+                        <div className="h-full rounded-full" style={{ width: `${(persona.sass_level / 10) * 100}%`, background: 'var(--color-primary)' }} />
+                      </div>
+                      <span className="text-xs font-mono" style={{ color: 'var(--dash-text-2)' }}>{persona.sass_level}/10</span>
+                    </div>
+                  </div>
+                )}
+
+                {voiceRules?.language && (
+                  <div>
+                    <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>שפה</label>
+                    <p className="text-sm">{voiceRules.language}</p>
+                  </div>
+                )}
+
+                {persona.common_phrases && persona.common_phrases.length > 0 && (
+                  <div>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>ביטויים אופייניים</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {persona.common_phrases.map((phrase, i) => (
+                        <Badge key={i} color="var(--color-warning)">{phrase}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {voiceRules?.recurringPhrases && voiceRules.recurringPhrases.length > 0 && (
+                  <div>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>ביטויים חוזרים</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {voiceRules.recurringPhrases.map((phrase, i) => (
+                        <Badge key={i} color="var(--color-info)">{phrase}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {voiceRules?.avoidedWords && voiceRules.avoidedWords.length > 0 && (
+                  <div>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>מילים שנמנע מהן</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {voiceRules.avoidedWords.map((w, i) => (
+                        <Badge key={i} color="var(--dash-negative)">{w}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Section>
+
+            {/* Knowledge Map */}
+            <Section title="מפת ידע" icon={Map}>
+              <div className="space-y-4 pt-4">
+                {knowledgeMap?.coreTopics && knowledgeMap.coreTopics.length > 0 && (
+                  <div>
+                    <label className="text-xs font-medium block mb-2" style={{ color: 'var(--dash-text-2)' }}>נושאי ליבה</label>
+                    <div className="space-y-2">
+                      {knowledgeMap.coreTopics.map((topic, i) => (
+                        <div key={i} className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--dash-glass-border)' }}>
+                          <h4 className="text-sm font-semibold mb-1">{topic.name}</h4>
+                          {topic.keyPoints && topic.keyPoints.length > 0 && (
+                            <ul className="text-xs space-y-0.5" style={{ color: 'var(--dash-text-2)' }}>
+                              {topic.keyPoints.slice(0, 4).map((kp, j) => (
+                                <li key={j}>• {kp}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {knowledgeMap?.domains && knowledgeMap.domains.length > 0 && (
+                  <div>
+                    <label className="text-xs font-medium block mb-2" style={{ color: 'var(--dash-text-2)' }}>תחומי מומחיות</label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {knowledgeMap.domains.map((d, i) => (
+                        <div key={i} className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--dash-glass-border)' }}>
+                          <h4 className="text-sm font-semibold mb-1">{d.domain}</h4>
+                          {d.whatSheCovers && d.whatSheCovers.length > 0 && (
+                            <p className="text-xs" style={{ color: 'var(--dash-text-2)' }}>
+                              {d.whatSheCovers.slice(0, 3).join(' · ')}
+                            </p>
+                          )}
+                          {d.brandsAndLinesExplicitlyCovered && d.brandsAndLinesExplicitlyCovered.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {d.brandsAndLinesExplicitlyCovered.slice(0, 5).map((b, j) => (
+                                <Badge key={j} color="var(--color-info)">{b}</Badge>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Section>
+
+            {/* Bio & Interests */}
+            <Section title="אודות" icon={Brain}>
+              <div className="space-y-4 pt-4">
+                {persona.bio && (
+                  <div>
+                    <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>ביו</label>
+                    <p className="text-sm">{persona.bio}</p>
+                  </div>
+                )}
+                {persona.interests && persona.interests.length > 0 && (
+                  <div>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>תחומי עניין</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {persona.interests.map((interest, i) => (
+                        <Badge key={i}>{interest}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {persona.directives && persona.directives.length > 0 && (
+                  <div>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>הנחיות</label>
+                    <ul className="space-y-1 text-sm" style={{ color: 'var(--dash-text-2)' }}>
+                      {persona.directives.map((d, i) => (
+                        <li key={i}>• {d}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </Section>
+
+            {/* Greeting */}
+            {persona.greeting_message && (
+              <Section title="הודעת פתיחה" icon={Sparkles}>
+                <div className="pt-4">
+                  <div className="rounded-lg p-4" style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid var(--dash-glass-border)' }}>
+                    <p className="text-sm leading-relaxed">{persona.greeting_message}</p>
+                  </div>
+                </div>
+              </Section>
+            )}
+          </>
+        )}
+
+        {/* ═══ CHAT LINK ═══ */}
+        <div className="rounded-xl border p-4 flex items-center justify-between" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}>
+          <div className="flex items-center gap-2">
+            <Zap className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
+            <span className="text-sm font-medium">קישור לצ׳אט</span>
+          </div>
+          <a
+            href={`/chat/${username}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs btn-primary"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            פתח צ׳אט
+          </a>
+        </div>
+      </main>
     </div>
   );
 }

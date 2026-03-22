@@ -600,7 +600,7 @@ export default function InfluencerDashboardPage({
 
             {/* Bot status */}
             <Section>
-              <SectionHeader title="סטטוס הבוט" href={`/influencer/${username}/manage`} linkText="ניהול" />
+              <SectionHeader title="סטטוס הבוט" href={`/influencer/${username}/chatbot-persona`} linkText="הבוט שלי" />
               <div className="px-5 pb-5 space-y-3 relative z-10">
                 {[
                   { label: 'מסמכים', value: formatNumber(botKnowledge.totalDocuments) },
@@ -632,12 +632,12 @@ export default function InfluencerDashboardPage({
               </div>
               <div className="px-5 pb-5 grid grid-cols-2 gap-2 relative z-10">
                 {[
-                  { href: 'manage', label: 'ניהול תוכן', pill: 'pill-purple' },
-                  { href: 'chatbot-persona', label: 'פרסונת הבוט', pill: 'pill-coral' },
-                  { href: 'documents', label: 'מסמכים', pill: 'pill-blue' },
-                  { href: 'share', label: 'QR + שיתוף', pill: 'pill-teal' },
-                  { href: 'support', label: 'תמיכה', pill: 'pill-pink' },
+                  { href: 'partnerships', label: 'שת״פים', pill: 'pill-purple' },
+                  { href: 'coupons', label: 'קופונים', pill: 'pill-coral' },
+                  { href: 'conversations', label: 'שיחות', pill: 'pill-blue' },
+                  { href: 'chatbot-persona', label: 'הבוט שלי', pill: 'pill-teal' },
                   { href: 'settings', label: 'הגדרות', pill: 'pill-neutral' },
+                  { href: 'share', label: 'QR + שיתוף', pill: 'pill-pink' },
                 ].map((item) => (
                   <Link
                     key={item.href}

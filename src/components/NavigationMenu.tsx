@@ -8,8 +8,8 @@ import {
   Briefcase,
   Tag,
   MessageCircle,
-  FileText,
-  Sparkles,
+  Bot,
+  Settings,
   Sun,
   Moon,
 } from 'lucide-react';
@@ -19,8 +19,8 @@ const NAV_ITEMS = [
   { key: 'partnerships', label: 'שת״פים', icon: Briefcase },
   { key: 'coupons', label: 'קופונים', icon: Tag },
   { key: 'conversations', label: 'שיחות', icon: MessageCircle },
-  { key: 'documents', label: 'מסמכים', icon: FileText },
-  { key: 'chatbot-persona', label: 'הבוט שלי', icon: Sparkles },
+  { key: 'chatbot-persona', label: 'הבוט שלי', icon: Bot },
+  { key: 'settings', label: 'הגדרות', icon: Settings },
 ];
 
 export function NavigationMenu() {
