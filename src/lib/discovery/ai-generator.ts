@@ -123,12 +123,15 @@ async function enrichWithPostData(accountId: string, items: any[]): Promise<Disc
 
   return items.map((item, i) => {
     const post = postMap.get(item.shortcode);
+    const isVideo = post?.type === 'reel' || post?.type === 'video';
+    const videoUrl = isVideo && post?.media_urls?.length ? post.media_urls[0] : undefined;
     return {
       rank: item.rank || i + 1,
       postId: post?.id,
       shortcode: item.shortcode,
       postUrl: post?.post_url,
-      thumbnailUrl: post?.thumbnail_url || post?.media_urls?.[0],
+      videoUrl,
+      thumbnailUrl: post?.thumbnail_url || (!isVideo && post?.media_urls?.[0]),
       captionExcerpt: item.aiSummary || '',
       mediaType: post?.type,
       postedAt: post?.posted_at,

@@ -25,8 +25,10 @@ export function DiscoveryModal({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isMuted, setIsMuted] = useState(true);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [videoError, setVideoError] = useState(false);
 
   const isReel = item?.mediaType === 'reel' || item?.mediaType === 'video';
+  const hasPlayableVideo = isReel && !!item?.videoUrl && !videoError;
 
   // Close on Escape
   useEffect(() => {
@@ -45,21 +47,22 @@ export function DiscoveryModal({
     } else {
       document.body.style.overflow = '';
       setIsVideoPlaying(false);
+      setVideoError(false);
     }
     return () => { document.body.style.overflow = ''; };
   }, [isOpen]);
 
   // Autoplay video when modal opens with a reel
   useEffect(() => {
-    if (isOpen && isReel && videoRef.current) {
+    if (isOpen && hasPlayableVideo && videoRef.current) {
       const timer = setTimeout(() => {
         videoRef.current?.play().then(() => {
           setIsVideoPlaying(true);
-        }).catch(() => { /* autoplay blocked */ });
+        }).catch(() => { /* autoplay blocked by browser */ });
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [isOpen, isReel]);
+  }, [isOpen, hasPlayableVideo]);
 
   const handleAskInChat = useCallback(() => {
     if (!item) return;
@@ -149,7 +152,7 @@ export function DiscoveryModal({
 
             {/* Media area */}
             <div className="relative w-full overflow-hidden" style={{ aspectRatio: '4/5', maxHeight: '55vh' }}>
-              {isReel && item.postUrl ? (
+              {hasPlayableVideo ? (
                 <>
                   {!isVideoPlaying && thumbnailSrc && (
                     <div className="absolute inset-0 z-10">
@@ -166,27 +169,42 @@ export function DiscoveryModal({
                   )}
                   <video
                     ref={videoRef}
-                    src={item.postUrl}
+                    src={item.videoUrl}
                     className="w-full h-full object-cover"
                     muted={isMuted}
                     loop
                     playsInline
                     onPlay={() => setIsVideoPlaying(true)}
+                    onError={() => setVideoError(true)}
                   />
                   {/* Mute/Unmute */}
-                  <div className="absolute bottom-4 left-4 flex gap-2 z-20">
-                    <button
-                      onClick={toggleMute}
-                      className="bg-black/30 backdrop-blur-md p-2 rounded-full text-white cursor-pointer hover:bg-black/50 transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-[20px]">
-                        {isMuted ? 'volume_off' : 'volume_up'}
-                      </span>
-                    </button>
-                  </div>
+                  {isVideoPlaying && (
+                    <div className="absolute bottom-4 left-4 flex gap-2 z-20">
+                      <button
+                        onClick={toggleMute}
+                        className="bg-black/30 backdrop-blur-md p-2 rounded-full text-white cursor-pointer hover:bg-black/50 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">
+                          {isMuted ? 'volume_off' : 'volume_up'}
+                        </span>
+                      </button>
+                    </div>
+                  )}
                 </>
               ) : thumbnailSrc ? (
-                <img src={thumbnailSrc} alt="" className="w-full h-full object-cover" />
+                <div className="relative w-full h-full">
+                  <img src={thumbnailSrc} alt="" className="w-full h-full object-cover" />
+                  {isReel && (
+                    <button
+                      onClick={handleOpenPost}
+                      className="absolute inset-0 flex items-center justify-center"
+                    >
+                      <div className="w-16 h-16 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center">
+                        <span className="material-symbols-outlined text-white text-4xl" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
+                      </div>
+                    </button>
+                  )}
+                </div>
               ) : (
                 <div
                   className="w-full h-full flex items-center justify-center"

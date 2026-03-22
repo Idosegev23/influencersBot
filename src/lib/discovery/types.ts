@@ -19,6 +19,7 @@ export interface DiscoveryItem {
   postId?: string;
   shortcode?: string;
   postUrl?: string;
+  videoUrl?: string;
   thumbnailUrl?: string;
   captionExcerpt: string;
   mediaType?: 'post' | 'reel' | 'carousel' | 'video';

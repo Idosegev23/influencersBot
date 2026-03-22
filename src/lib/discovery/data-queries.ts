@@ -8,12 +8,16 @@ import type { DiscoveryItem } from './types';
 const DEFAULT_LIMIT = 5;
 
 function mapPostToItem(post: any, rank: number, metricLabel: string, metricField: string): DiscoveryItem {
+  const isVideo = post.type === 'reel' || post.type === 'video';
+  // For reels/videos, media_urls[0] is the actual video CDN URL
+  const videoUrl = isVideo && post.media_urls?.length ? post.media_urls[0] : undefined;
   return {
     rank,
     postId: post.id,
     shortcode: post.shortcode,
     postUrl: post.post_url,
-    thumbnailUrl: post.thumbnail_url || (post.media_urls?.[0]) || null,
+    videoUrl,
+    thumbnailUrl: post.thumbnail_url || (!isVideo && post.media_urls?.[0]) || null,
     captionExcerpt: post.caption ? post.caption.slice(0, 120) : '',
     mediaType: post.type,
     postedAt: post.posted_at,
