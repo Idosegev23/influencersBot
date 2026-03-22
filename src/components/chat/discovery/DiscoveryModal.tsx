@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getProxiedImageUrl, getProxiedImageByShortcode } from '@/lib/image-utils';
 import type { DiscoveryItem } from '@/lib/discovery/types';
@@ -26,9 +27,15 @@ export function DiscoveryModal({
   const [isMuted, setIsMuted] = useState(true);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [videoError, setVideoError] = useState(false);
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
 
   const isReel = item?.mediaType === 'reel' || item?.mediaType === 'video';
   const hasPlayableVideo = isReel && !!item?.videoUrl && !videoError;
+
+  // Set portal target on mount
+  useEffect(() => {
+    setPortalTarget(document.body);
+  }, []);
 
   // Close on Escape
   useEffect(() => {
@@ -102,7 +109,7 @@ export function DiscoveryModal({
     }
   }, []);
 
-  if (!item) return null;
+  if (!item || !portalTarget) return null;
 
   const thumbnailSrc = item.thumbnailUrl
     ? getProxiedImageUrl(item.thumbnailUrl, item.shortcode)
@@ -111,9 +118,11 @@ export function DiscoveryModal({
       : null;
 
   const displayTitle = item.aiTitle || item.captionExcerpt;
-  const postedAtLabel = formatPostedAt((item as any).postedAt);
+  const metricText = item.metricValue != null && item.metricLabel
+    ? formatMetricLabel(item.metricValue, item.metricLabel)
+    : null;
 
-  return (
+  const modalContent = (
     <AnimatePresence>
       {isOpen && (
         <motion.div
@@ -133,9 +142,9 @@ export function DiscoveryModal({
             exit={{ opacity: 0 }}
           />
 
-          {/* Modal */}
+          {/* Modal — compact, no scroll */}
           <motion.div
-            className="relative w-full max-w-[420px] max-h-[92vh] bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl flex flex-col"
+            className="relative w-full max-w-[400px] bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl"
             initial={{ scale: 0.92, y: 40, opacity: 0 }}
             animate={{ scale: 1, y: 0, opacity: 1 }}
             exit={{ scale: 0.92, y: 40, opacity: 0 }}
@@ -145,13 +154,13 @@ export function DiscoveryModal({
             {/* Close button */}
             <button
               onClick={onClose}
-              className="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white active:scale-90 transition-transform"
+              className="absolute top-3 right-3 z-20 w-9 h-9 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white active:scale-90 transition-transform"
             >
-              <span className="material-symbols-outlined">close</span>
+              <span className="material-symbols-outlined text-[20px]">close</span>
             </button>
 
-            {/* Media area */}
-            <div className="relative w-full overflow-hidden" style={{ aspectRatio: '4/5', maxHeight: '55vh' }}>
+            {/* Media area — compact */}
+            <div className="relative w-full" style={{ aspectRatio: '16/9' }}>
               {hasPlayableVideo ? (
                 <>
                   {!isVideoPlaying && thumbnailSrc && (
@@ -161,8 +170,8 @@ export function DiscoveryModal({
                         onClick={handlePlayVideo}
                         className="absolute inset-0 flex items-center justify-center"
                       >
-                        <div className="w-16 h-16 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center">
-                          <span className="material-symbols-outlined text-white text-4xl" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
+                        <div className="w-14 h-14 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center">
+                          <span className="material-symbols-outlined text-white text-3xl" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
                         </div>
                       </button>
                     </div>
@@ -177,14 +186,13 @@ export function DiscoveryModal({
                     onPlay={() => setIsVideoPlaying(true)}
                     onError={() => setVideoError(true)}
                   />
-                  {/* Mute/Unmute */}
                   {isVideoPlaying && (
-                    <div className="absolute bottom-4 left-4 flex gap-2 z-20">
+                    <div className="absolute bottom-3 left-3 z-20">
                       <button
                         onClick={toggleMute}
-                        className="bg-black/30 backdrop-blur-md p-2 rounded-full text-white cursor-pointer hover:bg-black/50 transition-colors"
+                        className="bg-black/30 backdrop-blur-md p-1.5 rounded-full text-white"
                       >
-                        <span className="material-symbols-outlined text-[20px]">
+                        <span className="material-symbols-outlined text-[18px]">
                           {isMuted ? 'volume_off' : 'volume_up'}
                         </span>
                       </button>
@@ -199,130 +207,73 @@ export function DiscoveryModal({
                       onClick={handleOpenPost}
                       className="absolute inset-0 flex items-center justify-center"
                     >
-                      <div className="w-16 h-16 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center">
-                        <span className="material-symbols-outlined text-white text-4xl" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
+                      <div className="w-14 h-14 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center">
+                        <span className="material-symbols-outlined text-white text-3xl" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
                       </div>
                     </button>
                   )}
                 </div>
               ) : (
-                <div
-                  className="w-full h-full flex items-center justify-center"
-                  style={{ backgroundColor: '#e7e8ea' }}
-                >
-                  <span className="text-5xl opacity-25">📷</span>
+                <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: '#e7e8ea' }}>
+                  <span className="text-4xl opacity-25">📷</span>
                 </div>
               )}
 
-              {/* AI Badge overlay */}
-              <div
-                className="absolute top-4 left-4 z-10 text-[11px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1 shadow-lg text-white"
-                style={{ backgroundColor: 'rgba(124, 58, 237, 0.9)' }}
-              >
-                <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
-                <span>ניתוח AI</span>
+              {/* Overlay: metric badge + category */}
+              <div className="absolute bottom-0 inset-x-0 card-gradient pt-12 pb-3 px-4">
+                <div className="flex items-center gap-2">
+                  {metricText && (
+                    <span className="bg-white/20 backdrop-blur-md text-white text-[10px] font-bold px-2.5 py-1 rounded-full">
+                      {metricText}
+                    </span>
+                  )}
+                  {categoryTitle && (
+                    <span className="bg-white/20 backdrop-blur-md text-white text-[10px] font-bold px-2.5 py-1 rounded-full">
+                      {categoryTitle}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Content Details */}
-            <div className="p-6 pb-10 flex flex-col gap-6 overflow-y-auto flex-1">
-              {/* Title & Published time & Summary */}
-              <div className="flex flex-col gap-3">
-                <h2 className="text-[20px] font-black font-headline leading-tight tracking-tight" style={{ color: '#191c1e' }}>
-                  {displayTitle}
-                </h2>
+            {/* Content — compact, no scroll */}
+            <div className="p-5">
+              {/* Title */}
+              <h2 className="text-[17px] font-black leading-tight mb-2" style={{ color: '#191c1e' }}>
+                {displayTitle}
+              </h2>
 
-                {/* Published time indicator */}
-                {postedAtLabel && (
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#7c3aed' }} />
-                    <span className="text-[12px] font-medium" style={{ color: '#4a4455' }}>
-                      {postedAtLabel}
-                    </span>
-                  </div>
-                )}
-
-                {/* AI Summary card */}
-                {item.aiSummary && (
-                  <div
-                    className="bg-[#edeef0] rounded-2xl p-4 border-r-4"
-                    style={{ borderColor: 'rgba(99, 14, 212, 0.4)' }}
-                  >
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <span
-                        className="material-symbols-outlined text-[16px]"
-                        style={{ color: '#630ed4', fontVariationSettings: "'FILL' 1" }}
-                      >
-                        summarize
-                      </span>
-                      <span className="text-[12px] font-bold" style={{ color: '#630ed4' }}>
-                        תקציר חכם
-                      </span>
-                    </div>
-                    <p className="text-[14px] leading-relaxed" style={{ color: '#4a4455' }}>
-                      {item.aiSummary}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Bento-style Insights */}
-              {(item.metricValue != null || categoryTitle) && (
-                <div className="grid grid-cols-2 gap-3">
-                  {item.metricValue != null && item.metricLabel && (
-                    <div className="p-4 rounded-xl flex flex-col items-center gap-1.5" style={{ backgroundColor: '#f3f4f6' }}>
-                      <span
-                        className="material-symbols-outlined text-[22px]"
-                        style={{ color: '#630ed4', fontVariationSettings: "'FILL' 1" }}
-                      >
-                        trending_up
-                      </span>
-                      <span className="text-[11px] font-medium" style={{ color: '#4a4455' }}>{item.metricLabel}</span>
-                      <span className="text-[18px] font-black" style={{ color: '#630ed4' }}>
-                        {formatMetric(item.metricValue)}
-                      </span>
-                    </div>
-                  )}
-                  {categoryTitle && (
-                    <div className="p-4 rounded-xl flex flex-col items-center gap-1.5" style={{ backgroundColor: '#f3f4f6' }}>
-                      <span
-                        className="material-symbols-outlined text-[22px]"
-                        style={{ color: '#630ed4', fontVariationSettings: "'FILL' 1" }}
-                      >
-                        category
-                      </span>
-                      <span className="text-[11px] font-medium" style={{ color: '#4a4455' }}>קטגוריה</span>
-                      <span className="text-[18px] font-black" style={{ color: '#191c1e' }}>{categoryTitle}</span>
-                    </div>
-                  )}
-                </div>
+              {/* AI Summary — 2 lines max */}
+              {item.aiSummary && (
+                <p className="text-[13px] leading-relaxed line-clamp-3 mb-4" style={{ color: '#4a4455' }}>
+                  {item.aiSummary}
+                </p>
               )}
 
-              {/* Action Buttons */}
-              <div className="flex flex-col gap-3 pt-2">
+              {/* Action Buttons — side by side */}
+              <div className="flex gap-2.5">
                 <button
                   onClick={handleAskInChat}
-                  className="w-full font-bold h-14 rounded-xl flex items-center justify-center gap-2 text-white active:scale-[0.98] transition-all hover:brightness-110"
+                  className="flex-1 font-bold h-11 rounded-xl flex items-center justify-center gap-1.5 text-white text-[13px] active:scale-[0.98] transition-all"
                   style={{
                     background: 'linear-gradient(to left, #630ed4, #7c3aed)',
-                    boxShadow: '0 10px 30px -10px rgba(124, 58, 237, 0.4)',
+                    boxShadow: '0 6px 20px -6px rgba(124, 58, 237, 0.4)',
                   }}
                 >
-                  <span className="material-symbols-outlined text-[20px]">forum</span>
-                  <span>שוחח על זה עם ה-AI</span>
+                  <span className="material-symbols-outlined text-[18px]">forum</span>
+                  <span>שאל את ה-AI</span>
                 </button>
 
                 <button
                   onClick={handleOpenPost}
-                  className="w-full font-bold h-14 rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+                  className="flex-1 font-bold h-11 rounded-xl flex items-center justify-center gap-1.5 text-[13px] active:scale-[0.98] transition-all"
                   style={{
                     color: '#630ed4',
                     border: '1px solid #ccc3d8',
-                    backgroundColor: 'transparent',
                   }}
                 >
-                  <span className="material-symbols-outlined text-[20px]">open_in_new</span>
-                  <span>לפוסט באינסטגרם</span>
+                  <span className="material-symbols-outlined text-[18px]">open_in_new</span>
+                  <span>באינסטגרם</span>
                 </button>
               </div>
             </div>
@@ -331,30 +282,15 @@ export function DiscoveryModal({
       )}
     </AnimatePresence>
   );
+
+  return createPortal(modalContent, portalTarget);
 }
 
-function formatMetric(value: number): string {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
-  return value.toLocaleString('he-IL');
-}
-
-function formatPostedAt(postedAt: string | undefined | null): string | null {
-  if (!postedAt) return null;
-  try {
-    const posted = new Date(postedAt);
-    const now = new Date();
-    const diffMs = now.getTime() - posted.getTime();
-    const diffMins = Math.floor(diffMs / 60_000);
-    if (diffMins < 60) return `פורסם לפני ${diffMins} דקות`;
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `פורסם לפני ${diffHours === 1 ? 'שעה' : diffHours === 2 ? 'שעתיים' : `${diffHours} שעות`}`;
-    const diffDays = Math.floor(diffHours / 24);
-    if (diffDays === 1) return 'פורסם אתמול';
-    if (diffDays < 7) return `פורסם לפני ${diffDays} ימים`;
-    if (diffDays < 30) return `פורסם לפני ${Math.floor(diffDays / 7)} שבועות`;
-    return `פורסם לפני ${Math.floor(diffDays / 30)} חודשים`;
-  } catch {
-    return null;
-  }
+function formatMetricLabel(value: number, label: string): string {
+  const formatted = value >= 1_000_000
+    ? `${(value / 1_000_000).toFixed(1)}M`
+    : value >= 1_000
+      ? `${(value / 1_000).toFixed(1)}K`
+      : value.toLocaleString('he-IL');
+  return `${formatted} ${label}`;
 }
