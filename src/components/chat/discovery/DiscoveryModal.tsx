@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Play, Volume2, VolumeX, ExternalLink, MessageCircle } from 'lucide-react';
 import { getProxiedImageUrl, getProxiedImageByShortcode } from '@/lib/image-utils';
 import type { DiscoveryItem } from '@/lib/discovery/types';
 
@@ -107,9 +106,10 @@ export function DiscoveryModal({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
         >
-          {/* Backdrop */}
+          {/* Backdrop — matches Stitch: bg-on-surface/40 backdrop-blur-md */}
           <motion.div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 backdrop-blur-md"
+            style={{ backgroundColor: 'rgba(25, 28, 30, 0.4)' }}
             onClick={onClose}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -118,38 +118,34 @@ export function DiscoveryModal({
 
           {/* Modal */}
           <motion.div
-            className="relative w-full sm:max-w-[420px] max-h-[92vh] bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl flex flex-col"
+            className="relative w-full max-w-[420px] max-h-[92vh] bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl flex flex-col"
             initial={{ scale: 0.92, y: 40, opacity: 0 }}
             animate={{ scale: 1, y: 0, opacity: 1 }}
             exit={{ scale: 0.92, y: 40, opacity: 0 }}
             transition={{ type: 'spring', damping: 28, stiffness: 340 }}
             dir="rtl"
           >
-            {/* Close button */}
+            {/* Close button — top right for RTL */}
             <button
               onClick={onClose}
-              className="absolute top-3 left-3 z-20 w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center hover:bg-black/60 transition-colors"
+              className="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white active:scale-90 transition-transform"
             >
-              <X className="w-5 h-5 text-white" />
+              <span className="material-symbols-outlined">close</span>
             </button>
 
-            {/* Media area */}
-            <div className="relative w-full" style={{ aspectRatio: isReel ? '9/16' : '1/1', maxHeight: '55vh' }}>
+            {/* Media area — 4:5 aspect per Stitch */}
+            <div className="relative w-full overflow-hidden" style={{ aspectRatio: '4/5', maxHeight: '55vh' }}>
               {isReel && item.postUrl ? (
                 <>
                   {!isVideoPlaying && thumbnailSrc && (
                     <div className="absolute inset-0 z-10">
-                      <img
-                        src={thumbnailSrc}
-                        alt=""
-                        className="w-full h-full object-cover"
-                      />
+                      <img src={thumbnailSrc} alt="" className="w-full h-full object-cover" />
                       <button
                         onClick={handlePlayVideo}
                         className="absolute inset-0 flex items-center justify-center"
                       >
                         <div className="w-16 h-16 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center">
-                          <Play className="w-8 h-8 text-white fill-white ml-1" />
+                          <span className="material-symbols-outlined text-white text-4xl" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
                         </div>
                       </button>
                     </div>
@@ -163,97 +159,98 @@ export function DiscoveryModal({
                     playsInline
                     onPlay={() => setIsVideoPlaying(true)}
                   />
-                  {isVideoPlaying && (
+                  {/* Mute/Unmute — bottom left per Stitch */}
+                  <div className="absolute bottom-4 left-4 flex gap-2 z-20">
                     <button
                       onClick={toggleMute}
-                      className="absolute bottom-3 left-3 z-20 w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center hover:bg-black/60 transition-colors"
+                      className="bg-black/30 backdrop-blur-md p-2 rounded-full text-white cursor-pointer hover:bg-black/50 transition-colors"
                     >
-                      {isMuted
-                        ? <VolumeX className="w-4 h-4 text-white" />
-                        : <Volume2 className="w-4 h-4 text-white" />
-                      }
+                      <span className="material-symbols-outlined text-[20px]">
+                        {isMuted ? 'volume_off' : 'volume_up'}
+                      </span>
                     </button>
-                  )}
+                  </div>
                 </>
               ) : thumbnailSrc ? (
-                <img
-                  src={thumbnailSrc}
-                  alt=""
-                  className="w-full h-full object-cover"
-                />
+                <img src={thumbnailSrc} alt="" className="w-full h-full object-cover" />
               ) : (
                 <div
                   className="w-full h-full flex items-center justify-center"
-                  style={{ background: `linear-gradient(135deg, ${categoryColor}30, ${categoryColor}10)` }}
+                  style={{ backgroundColor: '#e7e8ea' }}
                 >
                   <span className="text-5xl opacity-25">📷</span>
                 </div>
               )}
 
-              {/* Gradient overlay at bottom of media */}
+              {/* AI Badge overlay — top left per Stitch */}
               <div
-                className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none"
-                style={{ background: 'linear-gradient(to top, white, transparent)' }}
-              />
-
-              {/* Rank badge */}
-              <div
-                className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full flex items-center justify-center text-[14px] font-bold text-white shadow-lg"
-                style={{ backgroundColor: categoryColor }}
+                className="absolute top-4 left-4 z-10 text-[11px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1 shadow-lg text-white"
+                style={{ backgroundColor: 'rgba(124, 58, 237, 0.9)' }}
               >
-                {item.rank}
+                <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
+                <span>ניתוח AI</span>
               </div>
             </div>
 
-            {/* Content area */}
-            <div className="px-5 pb-5 pt-1 flex flex-col gap-3 overflow-y-auto flex-1">
-              {/* Title */}
-              <h3 className="text-[18px] font-bold leading-snug" style={{ color: '#0c1013' }}>
-                {displayTitle}
-              </h3>
+            {/* Content Details — p-6 pb-10 space-y-6 per Stitch */}
+            <div className="p-6 pb-10 flex flex-col gap-6 overflow-y-auto flex-1">
+              {/* Title & Summary */}
+              <div className="flex flex-col gap-3">
+                <h2 className="text-[20px] font-extrabold leading-tight tracking-tight" style={{ color: '#191c1e' }}>
+                  {displayTitle}
+                </h2>
+                {item.aiSummary && (
+                  <p className="text-[14px] leading-relaxed" style={{ color: '#4a4455' }}>
+                    {item.aiSummary}
+                  </p>
+                )}
+              </div>
 
-              {/* Metric pill */}
-              {item.metricValue != null && item.metricLabel && (
-                <div className="flex items-center gap-2">
-                  <span
-                    className="inline-flex items-center px-3 py-1 rounded-full text-[12px] font-bold text-white"
-                    style={{ backgroundColor: categoryColor }}
-                  >
-                    {formatMetric(item.metricValue)} {item.metricLabel}
-                  </span>
+              {/* Bento-style Insights — 2-col grid per Stitch */}
+              {(item.metricValue != null || categoryTitle) && (
+                <div className="grid grid-cols-2 gap-3">
+                  {item.metricValue != null && item.metricLabel && (
+                    <div className="p-4 rounded-xl flex flex-col gap-1" style={{ backgroundColor: '#f3f4f6' }}>
+                      <span className="text-[11px] font-medium" style={{ color: '#4a4455' }}>{item.metricLabel}</span>
+                      <span className="text-[16px] font-bold" style={{ color: '#630ed4' }}>
+                        {formatMetric(item.metricValue)}
+                      </span>
+                    </div>
+                  )}
                   {categoryTitle && (
-                    <span className="text-[12px]" style={{ color: '#999' }}>
-                      {categoryTitle}
-                    </span>
+                    <div className="p-4 rounded-xl flex flex-col gap-1" style={{ backgroundColor: '#f3f4f6' }}>
+                      <span className="text-[11px] font-medium" style={{ color: '#4a4455' }}>קטגוריה</span>
+                      <span className="text-[16px] font-bold" style={{ color: '#191c1e' }}>{categoryTitle}</span>
+                    </div>
                   )}
                 </div>
               )}
 
-              {/* AI Summary */}
-              {item.aiSummary && (
-                <p className="text-[14px] leading-relaxed" style={{ color: '#4a4a4a' }}>
-                  {item.aiSummary}
-                </p>
-              )}
-
-              {/* Action buttons */}
-              <div className="flex flex-col gap-2.5 mt-2">
+              {/* Action Buttons — per Stitch design */}
+              <div className="flex flex-col gap-3 pt-2">
                 <button
                   onClick={handleAskInChat}
-                  className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-[15px] font-bold text-white transition-all hover:opacity-90 active:scale-[0.98]"
-                  style={{ backgroundColor: '#7c3aed' }}
+                  className="w-full font-bold py-4 rounded-xl flex items-center justify-center gap-2 text-white active:scale-[0.98] transition-all hover:brightness-110"
+                  style={{
+                    backgroundColor: '#7c3aed',
+                    boxShadow: '0 10px 30px -10px rgba(124, 58, 237, 0.4)',
+                  }}
                 >
-                  <MessageCircle className="w-5 h-5" />
-                  שוחח על זה עם ה-AI
+                  <span className="material-symbols-outlined text-[20px]">forum</span>
+                  <span>שוחח על זה עם ה-AI</span>
                 </button>
 
                 <button
                   onClick={handleOpenPost}
-                  className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-[14px] font-semibold transition-all hover:bg-gray-100 active:scale-[0.98]"
-                  style={{ color: '#676767', border: '1px solid #e5e5ea' }}
+                  className="w-full font-bold py-4 rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+                  style={{
+                    color: '#191c1e',
+                    border: '2px solid rgba(204, 195, 216, 0.3)',
+                    backgroundColor: 'transparent',
+                  }}
                 >
-                  <ExternalLink className="w-4 h-4" />
-                  לפוסט באינסטגרם
+                  <span className="material-symbols-outlined text-[20px]">open_in_new</span>
+                  <span>לפוסט באינסטגרם</span>
                 </button>
               </div>
             </div>

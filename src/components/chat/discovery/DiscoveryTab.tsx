@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, Loader2, Sparkles } from 'lucide-react';
+import { ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { useDiscoveryAll } from '@/hooks/useDiscoveryAll';
 import { useDiscovery } from '@/hooks/useDiscovery';
 import { DiscoveryRow } from './DiscoveryRow';
@@ -148,17 +148,22 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
   }, [username, sessionId]);
 
   return (
-    <div ref={scrollContainerRef} className="h-full overflow-y-auto" style={{ backgroundColor: '#f4f5f7' }}>
-      {/* Header */}
-      <div className="px-4 pt-5 pb-3" dir="rtl">
-        <div className="flex items-center gap-2 mb-0.5">
-          <Sparkles className="w-5 h-5" style={{ color: '#e5a00d' }} />
-          <h2 className="text-[22px] font-bold" style={{ color: '#0c1013' }}>
-            גלו תוכן
-          </h2>
+    <div ref={scrollContainerRef} className="h-full overflow-y-auto" style={{ backgroundColor: '#f8f9fb' }}>
+      {/* Header — per Stitch: sticky top bar style */}
+      <div className="px-6 pt-5 pb-3" dir="rtl">
+        <div className="flex items-center gap-2 mb-1">
+          <span
+            className="material-symbols-outlined text-2xl"
+            style={{ color: '#6d28d9', fontVariationSettings: "'FILL' 1" }}
+          >
+            auto_awesome
+          </span>
+          <h1 className="text-2xl font-bold tracking-tight" style={{ color: '#6d28d9' }}>
+            גלה תוכן
+          </h1>
         </div>
-        <p className="text-[13px]" style={{ color: '#676767' }}>
-          הרשימות הכי מעניינות של {influencerName}
+        <p className="text-[13px] font-medium" style={{ color: '#4a4455' }}>
+          הבחירות של {influencerName}
         </p>
       </div>
 

@@ -2,7 +2,6 @@
 
 import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Sparkles } from 'lucide-react';
 
 interface LeadMagnetPopupProps {
   isOpen: boolean;
@@ -28,61 +27,91 @@ export function LeadMagnetPopup({ isOpen, onClose, onSubmit, influencerName }: L
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 z-[10000] flex items-center justify-center px-4"
+          className="fixed inset-0 z-[10000] flex items-center justify-center px-6"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
         >
-          {/* Backdrop */}
+          {/* Glass overlay backdrop — per Stitch */}
           <motion.div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            className="absolute inset-0 backdrop-blur-[12px]"
+            style={{ backgroundColor: 'rgba(248, 249, 251, 0.7)' }}
             onClick={onClose}
           />
 
-          {/* Popup */}
+          {/* Popup Card — max-w-[340px], rounded-xl per Stitch */}
           <motion.div
-            className="relative w-full max-w-[360px] bg-white rounded-3xl overflow-hidden shadow-2xl"
+            className="relative w-full max-w-[340px] bg-white rounded-xl overflow-hidden"
+            style={{
+              boxShadow: '0 20px 40px rgba(12, 16, 19, 0.06)',
+              outline: '1px solid rgba(204, 195, 216, 0.15)',
+            }}
             initial={{ scale: 0.9, y: 30, opacity: 0 }}
             animate={{ scale: 1, y: 0, opacity: 1 }}
             exit={{ scale: 0.9, y: 30, opacity: 0 }}
             transition={{ type: 'spring', damping: 28, stiffness: 340 }}
             dir="rtl"
           >
-            {/* Close button */}
+            {/* Close button — top right per Stitch RTL */}
             <button
               onClick={onClose}
-              className="absolute top-3 left-3 z-10 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+              className="absolute top-4 right-4 z-10 p-1 transition-colors"
+              style={{ color: '#4a4455' }}
             >
-              <X className="w-4 h-4 text-gray-500" />
+              <span className="material-symbols-outlined text-[20px]">close</span>
             </button>
 
-            {/* Header area */}
-            <div className="px-6 pt-8 pb-4 text-center">
-              <div className="w-14 h-14 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ backgroundColor: '#7c3aed15' }}>
-                <Sparkles className="w-7 h-7" style={{ color: '#7c3aed' }} />
+            {/* Card Content */}
+            <div className="p-8 pt-12 flex flex-col items-center text-center">
+              {/* Visual Anchor — 80px circle with star sub-badge per Stitch */}
+              <div className="mb-6 relative">
+                <div
+                  className="w-20 h-20 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: '#eaddff' }}
+                >
+                  <span
+                    className="material-symbols-outlined text-4xl"
+                    style={{ color: '#630ed4', fontVariationSettings: "'FILL' 1" }}
+                  >
+                    auto_awesome
+                  </span>
+                </div>
+                <div className="absolute -bottom-1 -left-1 w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm">
+                  <span
+                    className="material-symbols-outlined text-xl"
+                    style={{ color: '#ffba3e', fontVariationSettings: "'FILL' 1" }}
+                  >
+                    star
+                  </span>
+                </div>
               </div>
-              <h3 className="text-[20px] font-bold mb-1.5" style={{ color: '#0c1013' }}>
-                נהנים מהתוכן? 🔥
-              </h3>
-              <p className="text-[14px] leading-relaxed" style={{ color: '#676767' }}>
-                השאירו פרטים וקבלו גישה לתוכן בלעדי של {influencerName}
-              </p>
-            </div>
 
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="px-6 pb-6">
-              <div className="flex flex-col gap-3 mb-4">
+              {/* Text Content */}
+              <h1
+                className="text-2xl font-extrabold leading-tight tracking-tight mb-3"
+                style={{ color: '#191c1e' }}
+              >
+                רוצה גישה לקולקשיין הפרטי?
+              </h1>
+              <p
+                className="text-base font-light leading-relaxed mb-8 px-2"
+                style={{ color: '#4a4455' }}
+              >
+                תוכן בלעדי שלא תמצאו באינסטגרם
+              </p>
+
+              {/* Form */}
+              <form onSubmit={handleSubmit} className="w-full space-y-4">
                 <input
                   type="text"
-                  placeholder="שם"
+                  placeholder="השם שלך"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl text-[14px] outline-none transition-all focus:ring-2 focus:ring-purple-500/25"
+                  className="w-full border-none rounded-lg px-4 py-3 text-right outline-none transition-all focus:ring-2 focus:ring-purple-500/20"
                   style={{
-                    backgroundColor: '#f4f5f7',
-                    border: '1px solid #e5e5ea',
-                    color: '#0c1013',
+                    backgroundColor: '#f3f4f6',
+                    color: '#191c1e',
                   }}
                   required
                 />
@@ -91,35 +120,39 @@ export function LeadMagnetPopup({ isOpen, onClose, onSubmit, influencerName }: L
                   placeholder="אימייל"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl text-[14px] outline-none transition-all focus:ring-2"
+                  className="w-full border-none rounded-lg px-4 py-3 text-right outline-none transition-all focus:ring-2 focus:ring-purple-500/20"
                   style={{
-                    backgroundColor: '#f4f5f7',
-                    border: '1px solid #e5e5ea',
-                    color: '#0c1013',
+                    backgroundColor: '#f3f4f6',
+                    color: '#191c1e',
                   }}
-                  dir="ltr"
                   required
                 />
-              </div>
 
-              <button
-                type="submit"
-                disabled={isSubmitting || !name.trim() || !email.trim()}
-                className="w-full py-3.5 rounded-2xl text-[15px] font-bold text-white transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
-                style={{ backgroundColor: '#7c3aed' }}
-              >
-                {isSubmitting ? 'שולח...' : 'קבלו גישה'}
-              </button>
+                {/* CTA — premium gradient per Stitch */}
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !name.trim() || !email.trim()}
+                  className="w-full text-white font-bold py-4 rounded-lg mt-4 text-lg hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
+                  style={{
+                    background: 'linear-gradient(135deg, #630ed4 0%, #7c3aed 100%)',
+                    boxShadow: '0 10px 30px -10px rgba(124, 58, 237, 0.4)',
+                  }}
+                >
+                  {isSubmitting ? 'שולח...' : 'קבלו גישה'}
+                </button>
+              </form>
 
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-full mt-2 py-2 text-[13px] transition-colors"
-                style={{ color: '#999' }}
-              >
-                לא עכשיו
-              </button>
-            </form>
+              {/* Footer Note — per Stitch */}
+              <p className="mt-6 text-[11px] font-light" style={{ color: '#7b7487' }}>
+                אנחנו שונאים ספאם בדיוק כמוך. ניתן להסיר את עצמכם בכל עת.
+              </p>
+            </div>
+
+            {/* Subtle decorative gradient bar at bottom per Stitch */}
+            <div
+              className="h-1.5 opacity-30"
+              style={{ background: 'linear-gradient(135deg, #630ed4 0%, #7c3aed 100%)' }}
+            />
           </motion.div>
         </motion.div>
       )}

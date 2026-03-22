@@ -17,48 +17,55 @@ interface DiscoveryRowProps {
 
 export function DiscoveryRow({ title, subtitle, color, items, onItemClick, slug, reverse = false, duration = 30 }: DiscoveryRowProps) {
   return (
-    <div className="mb-5">
-      {/* Category header — centered like the marquee */}
-      <div className="w-[60%] mx-auto mb-2" dir="rtl">
-        <h3 className="text-[16px] font-bold leading-tight" style={{ color: '#0c1013' }}>
-          {title}
-        </h3>
-        {subtitle && (
-          <p className="text-[12px] mt-0.5" style={{ color: '#676767' }}>
-            {subtitle}
-          </p>
-        )}
+    <section className="mb-10">
+      {/* Section header — per Stitch: px-6, flex justify-between, "הכל" button */}
+      <div className="px-6 flex justify-between items-end mb-4" dir="rtl">
+        <div>
+          <h2 className="text-base font-bold" style={{ color: '#191c1e' }}>
+            {title}
+          </h2>
+          {subtitle && (
+            <p className="text-xs" style={{ color: '#4a4455' }}>
+              {subtitle}
+            </p>
+          )}
+        </div>
+        <button className="text-sm font-bold" style={{ color: '#630ed4' }}>
+          הכל
+        </button>
       </div>
 
-      {/* Centered marquee container with fade edges */}
-      <div className="w-[60%] mx-auto relative overflow-hidden">
-        <Marquee
-          reverse={reverse}
-          pauseOnHover
-          duration={duration}
-          repeat={10}
-          gap="0.75rem"
-        >
-          {items.map((item, idx) => (
-            <DiscoveryCard
-              key={item.postId || item.shortcode || `${slug}-${idx}`}
-              item={item}
-              color={color}
-              onClick={(clickedItem) => onItemClick(clickedItem, title, slug)}
-            />
-          ))}
-        </Marquee>
+      {/* Horizontal scroll with marquee — full width px-6 per Stitch */}
+      <div className="relative overflow-hidden">
+        <div className="px-6">
+          <Marquee
+            reverse={reverse}
+            pauseOnHover
+            duration={duration}
+            repeat={10}
+            gap="1rem"
+          >
+            {items.map((item, idx) => (
+              <DiscoveryCard
+                key={item.postId || item.shortcode || `${slug}-${idx}`}
+                item={item}
+                color={color}
+                onClick={(clickedItem) => onItemClick(clickedItem, title, slug)}
+              />
+            ))}
+          </Marquee>
+        </div>
 
-        {/* Fade edges */}
+        {/* Fade edges — match surface bg #f8f9fb per Stitch */}
         <div
-          className="pointer-events-none absolute inset-y-0 left-0 w-1/5 z-10"
-          style={{ background: 'linear-gradient(to right, #f4f5f7, transparent)' }}
+          className="pointer-events-none absolute inset-y-0 left-0 w-12 z-10"
+          style={{ background: 'linear-gradient(to right, #f8f9fb, transparent)' }}
         />
         <div
-          className="pointer-events-none absolute inset-y-0 right-0 w-1/5 z-10"
-          style={{ background: 'linear-gradient(to left, #f4f5f7, transparent)' }}
+          className="pointer-events-none absolute inset-y-0 right-0 w-12 z-10"
+          style={{ background: 'linear-gradient(to left, #f8f9fb, transparent)' }}
         />
       </div>
-    </div>
+    </section>
   );
 }
