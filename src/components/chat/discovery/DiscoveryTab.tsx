@@ -188,7 +188,7 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
                 color={row.category.color}
                 items={row.items}
                 onItemClick={handleItemClick}
-                layout={idx % 2 === 0 ? 'masonry' : 'marquee'}
+                layout={idx % 2 === 0 ? 'masonry' : 'scroll'}
               />
             ))}
 

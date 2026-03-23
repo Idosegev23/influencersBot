@@ -1,6 +1,5 @@
 'use client';
 
-import { useRef, useState } from 'react';
 import { getProxiedImageUrl, getProxiedImageByShortcode } from '@/lib/image-utils';
 import type { DiscoveryItem } from '@/lib/discovery/types';
 
@@ -11,7 +10,7 @@ interface DiscoveryRowProps {
   items: DiscoveryItem[];
   onItemClick: (item: DiscoveryItem, categoryTitle: string, categorySlug: string) => void;
   slug: string;
-  layout: 'masonry' | 'marquee';
+  layout: 'masonry' | 'scroll';
 }
 
 function getThumb(item: DiscoveryItem) {
@@ -23,30 +22,22 @@ function getThumb(item: DiscoveryItem) {
 }
 
 /**
- * Interleaving pattern for masonry — alternates tall/short across 2 columns
- * so that the columns mesh together with no dead white space.
- *
- * Pattern (indexes): col-right [0,3,4] col-left [1,2,5]
- * Aspect:            col-right: 9:16, 4:5, 9:16  |  col-left: 4:5, 9:16, 4:5
- *
- * Height sum per col (relative):
- *   right: 1.778 + 1.25 + 1.778 = 4.806
- *   left:  1.25 + 1.778 + 1.25  = 4.278
- * Close enough — the slight offset creates a natural Pinterest stagger.
+ * Masonry interleave pattern per column position:
+ *   Right col: tall → short → tall
+ *   Left col:  short → tall → short
+ * Cards mesh like puzzle pieces — no dead white space.
  */
-const MASONRY_PATTERN: Array<'tall' | 'short'> = [
-  'tall', 'short', 'tall',   // right column
-  'short', 'tall', 'short',  // left column
-];
+const RIGHT_PATTERN: Array<'tall' | 'short'> = ['tall', 'short', 'tall'];
+const LEFT_PATTERN: Array<'tall' | 'short'> = ['short', 'tall', 'short'];
 
 export function DiscoveryRow({ title, subtitle, color, items, onItemClick, slug, layout }: DiscoveryRowProps) {
-  if (layout === 'marquee') {
+  if (layout === 'scroll') {
     return (
       <section className="space-y-3" dir="rtl">
         <div className="px-5">
           <SectionHeader title={title} subtitle={subtitle} color={color} />
         </div>
-        <MarqueeScroll
+        <HorizontalScroll
           items={items.slice(0, 12)}
           color={color}
           slug={slug}
@@ -59,12 +50,11 @@ export function DiscoveryRow({ title, subtitle, color, items, onItemClick, slug,
 
   // === MASONRY layout ===
   const capped = items.slice(0, 6);
-  // Split into 2 columns: even indices → right, odd → left (RTL)
-  const rightCol: { item: DiscoveryItem; idx: number }[] = [];
-  const leftCol: { item: DiscoveryItem; idx: number }[] = [];
+  const rightCol: DiscoveryItem[] = [];
+  const leftCol: DiscoveryItem[] = [];
   capped.forEach((item, i) => {
-    if (i % 2 === 0) rightCol.push({ item, idx: i });
-    else leftCol.push({ item, idx: i });
+    if (i % 2 === 0) rightCol.push(item);
+    else leftCol.push(item);
   });
 
   return (
@@ -73,12 +63,12 @@ export function DiscoveryRow({ title, subtitle, color, items, onItemClick, slug,
       <div className="flex gap-[10px]">
         {/* Right column (first in RTL) */}
         <div className="flex-1 flex flex-col gap-[10px]">
-          {rightCol.map(({ item, idx }) => {
-            const patternIdx = idx < MASONRY_PATTERN.length ? idx : idx % MASONRY_PATTERN.length;
-            const aspect = MASONRY_PATTERN[patternIdx] === 'tall' ? 'aspect-[9/16]' : 'aspect-[4/5]';
+          {rightCol.map((item, pos) => {
+            const aspect = RIGHT_PATTERN[pos % RIGHT_PATTERN.length] === 'tall'
+              ? 'aspect-[9/16]' : 'aspect-[4/5]';
             return (
               <PinCard
-                key={item.postId || item.shortcode || `${slug}-${idx}`}
+                key={item.postId || item.shortcode || `${slug}-r${pos}`}
                 item={item}
                 color={color}
                 aspect={aspect}
@@ -89,12 +79,12 @@ export function DiscoveryRow({ title, subtitle, color, items, onItemClick, slug,
         </div>
         {/* Left column */}
         <div className="flex-1 flex flex-col gap-[10px]">
-          {leftCol.map(({ item, idx }) => {
-            const patternIdx = idx < MASONRY_PATTERN.length ? idx : idx % MASONRY_PATTERN.length;
-            const aspect = MASONRY_PATTERN[patternIdx] === 'tall' ? 'aspect-[9/16]' : 'aspect-[4/5]';
+          {leftCol.map((item, pos) => {
+            const aspect = LEFT_PATTERN[pos % LEFT_PATTERN.length] === 'tall'
+              ? 'aspect-[9/16]' : 'aspect-[4/5]';
             return (
               <PinCard
-                key={item.postId || item.shortcode || `${slug}-${idx}`}
+                key={item.postId || item.shortcode || `${slug}-l${pos}`}
                 item={item}
                 color={color}
                 aspect={aspect}
@@ -108,8 +98,8 @@ export function DiscoveryRow({ title, subtitle, color, items, onItemClick, slug,
   );
 }
 
-// ── Infinite marquee horizontal scroll ──
-function MarqueeScroll({
+// ── Manual swipeable horizontal scroll (mobile-friendly) ──
+function HorizontalScroll({
   items,
   color,
   slug,
@@ -122,42 +112,23 @@ function MarqueeScroll({
   title: string;
   onItemClick: (item: DiscoveryItem, categoryTitle: string, categorySlug: string) => void;
 }) {
-  const trackRef = useRef<HTMLDivElement>(null);
-  const [paused, setPaused] = useState(false);
-
-  // Calculate total width for animation
-  const cardW = 150; // px per card
-  const gap = 10;
-  const totalW = items.length * (cardW + gap);
-
-  // Duplicate items for seamless loop
-  const doubled = [...items, ...items];
-
   return (
-    <div
-      className="relative overflow-hidden -mx-5"
-      onPointerEnter={() => setPaused(true)}
-      onPointerLeave={() => setPaused(false)}
-    >
+    <div className="relative -mx-5">
       <div
-        ref={trackRef}
-        className="flex gap-[10px] px-5 will-change-transform"
-        style={{
-          animation: `marquee-scroll ${items.length * 3}s linear infinite`,
-          animationPlayState: paused ? 'paused' : 'running',
-          width: `${totalW * 2 + gap}px`,
-        }}
+        className="flex overflow-x-auto hide-scrollbar gap-[10px] px-5 pb-2 snap-x snap-mandatory"
+        style={{ WebkitOverflowScrolling: 'touch' }}
       >
-        {doubled.map((item, idx) => {
+        {items.map((item, idx) => {
           const thumb = getThumb(item);
           const isReel = item.mediaType === 'reel' || item.mediaType === 'video';
+
           return (
             <button
-              key={`${item.postId || item.shortcode || slug}-marquee-${idx}`}
+              key={`${item.postId || item.shortcode || slug}-scroll-${idx}`}
               onClick={() => onItemClick(item, title, slug)}
-              className="relative flex-shrink-0 rounded-2xl overflow-hidden active:scale-[0.97] transition-transform"
+              className="relative flex-shrink-0 rounded-2xl overflow-hidden active:scale-[0.97] transition-transform snap-start"
               style={{
-                width: `${cardW}px`,
+                width: '150px',
                 aspectRatio: '4/5',
                 boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
               }}
@@ -193,14 +164,6 @@ function MarqueeScroll({
           );
         })}
       </div>
-
-      {/* CSS keyframes for the marquee */}
-      <style jsx>{`
-        @keyframes marquee-scroll {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-${totalW}px); }
-        }
-      `}</style>
     </div>
   );
 }
