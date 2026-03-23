@@ -127,6 +127,14 @@ export class SandwichBot {
       console.log(`   → Confidence: ${(classification.confidence * 100).toFixed(0)}%`);
     }
 
+    // media_news accounts: force archetype to 'general' — keyword router
+    // matches nonsense like "coupons" for "האח הגדול" or "parenting" for "אושר כהן"
+    if (accountArchetype === 'media_news' && classification.primaryArchetype !== 'general') {
+      console.log(`   → Override: ${classification.primaryArchetype} → general (media_news account)`);
+      classification.primaryArchetype = 'general';
+      classification.confidence = 0.8;
+    }
+
     // ==========================================
     // Retrieve Knowledge Base (skip if cached)
     // ==========================================
@@ -139,10 +147,14 @@ export class SandwichBot {
     } else {
       console.log('\n📚 Retrieving knowledge...');
 
-      // Enrich query with conversation context for follow-up messages
-      let knowledgeQuery = input.userMessage;
+      // Strip hidden context from message before using as RAG query
+      // The [הקשר הלוק:] block pollutes vector search with metadata
+      const cleanMessage = input.userMessage.split('\n\n[הקשר הלוק:]')[0].trim();
 
-      const shouldEnrich = input.userMessage.length < 80;
+      // Enrich query with conversation context for follow-up messages
+      let knowledgeQuery = cleanMessage;
+
+      const shouldEnrich = cleanMessage.length < 80;
       if (shouldEnrich) {
         const contextParts: string[] = [];
 
@@ -169,7 +181,7 @@ export class SandwichBot {
         }
 
         if (contextParts.length > 0) {
-          knowledgeQuery = `${contextParts.join(' ')} ${input.userMessage}`;
+          knowledgeQuery = `${contextParts.join(' ')} ${cleanMessage}`;
           console.log(`   → Enriched query with conversation context (${knowledgeQuery.length} chars)${input.fromSuggestion ? ' [suggestion+context]' : ''}`);
         } else if (input.fromSuggestion) {
           console.log(`   → Suggestion click — no history available for enrichment`);
