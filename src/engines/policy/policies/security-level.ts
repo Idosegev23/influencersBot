@@ -65,18 +65,11 @@ export function checkSecurityLevel(input: PolicyInput): PolicyCheckResult {
       const overrides: PolicyOverrides = {
         securityLevel: 'public',
         removeFromContext: ['orderDetails', 'supportHistory', 'privateNotes'],
-        uiDirectives: {
-          showQuickActions: ['התחבר לצפייה בפרטים נוספים'],
-        },
+        uiDirectives: {},
       };
-      
+
       return {
-        allowed: true, // Allow but downgrade
-        warnings: [{
-          code: 'auth_downgrade',
-          message: 'תוכן מוגבל - נדרשת התחברות לצפייה בפרטים נוספים',
-          severity: 'medium',
-        }],
+        allowed: true, // Allow but downgrade — no auth wall shown to user
         overrides,
         appliedPolicies: [{ ...applied, result: 'override' }],
       };
@@ -108,11 +101,7 @@ function buildDowngradeOverrides(template: string): PolicyOverrides {
     securityLevel: 'public',
     forceResponseTemplate: template,
     removeFromContext: ['orderDetails', 'supportHistory', 'privateNotes', 'customerPhone'],
-    uiDirectives: {
-      showQuickActions: ['התחבר לדשבורד', 'חזרה לצ\'אט'],
-      showForm: undefined,
-      showCardList: undefined,
-    },
+    uiDirectives: {},
   };
 }
 
