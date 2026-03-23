@@ -62,7 +62,7 @@ import type { EngineContext, AccountContext, SessionContext, UserContext, Knowle
 import { processSandwichMessageWithMetadata } from '@/lib/chatbot/sandwichBot';
 import { buildConversationContext, trimToTokenBudget, updateRollingSummary, shouldUpdateSummary } from '@/lib/chatbot/conversation-memory';
 import { createPipelineMetrics, withMetrics, logPipelineMetrics, recordMetrics } from '@/lib/metrics/pipeline-metrics';
-import { getCachedSuggestionResponse, cacheSuggestionResponse, prewarmSuggestionCache } from '@/lib/suggestion-cache';
+import { getCachedSuggestionRAG, cacheSuggestionRAG, prewarmSuggestionRAG, type CachedRAGResult } from '@/lib/suggestion-cache';
 import { buildPersonalityFromDB } from '@/lib/chatbot/personality-wrapper';
 import { getSmartThinkingMessage } from '@/lib/chatbot/thinking-messages';
 
@@ -211,75 +211,18 @@ export async function POST(req: NextRequest) {
         pm.data.accountId = accountId;
         if (fromSuggestion) pm.data.fromSuggestion = true;
 
-        // === EARLY SUGGESTION CACHE CHECK (before heavy parallel block) ===
-        // Saves ~2s by skipping session/history/personality/understanding/decision/policy
-        // Skip early cache when session has a lead (registered user) — responses should be personalized with their name
+        // === EARLY RAG CACHE CHECK (Warm RAG, Fresh Voice) ===
+        // On suggestion click: check if RAG results are cached.
+        // If yes → skip RAG retrieval (~3-5s saved), but LLM always runs fresh → unique response each time.
+        let cachedRAG: CachedRAGResult | null = null;
         if (fromSuggestion && accountId) {
-          // Quick parallel check: cache + lead_id (single column, no full session load)
-          const [cachedResponse, sessionLeadCheck] = await Promise.all([
-            getCachedSuggestionResponse(accountId, message),
-            (rawSessionId && isValidSessionId(rawSessionId))
-              ? supabase
-                  .from('chat_sessions')
-                  .select('lead_id')
-                  .eq('id', rawSessionId)
-                  .maybeSingle()
-                  .then(r => r.data?.lead_id)
-              : Promise.resolve(null),
-          ]);
-          const earlyCacheMs = Date.now() - startedAt - cacheLoadMs;
-          if (cachedResponse && !sessionLeadCheck) {
-            const latencyMs = Date.now() - startedAt;
-            console.log(`[Stream] Suggestion cache HIT (early) — ${latencyMs}ms total (cache lookup: ${earlyCacheMs}ms)`);
-
-            // Create/validate session for saving messages
-            let earlySessionId = rawSessionId;
-            if (!earlySessionId || !isValidSessionId(earlySessionId)) {
-              const session = await createChatSession(influencer.id);
-              earlySessionId = session?.id;
-            }
-
-            controller.enqueue(encodeEvent({
-              type: 'meta',
-              traceId,
-              requestId,
-              decisionId: 'cached',
-              sessionId: earlySessionId,
-              anonId: `anon_${earlySessionId?.slice(0, 8) || 'guest'}`,
-              uiDirectives: {},
-            }));
-            controller.enqueue(encodeEvent({ type: 'delta', text: cachedResponse }));
-            controller.enqueue(encodeEvent({
-              type: 'done',
-              responseId: null,
-              latencyMs,
-              tokens: { input: 0, output: 0 },
-              fullText: cachedResponse,
-            }));
-
-            // Save messages in after() to not block response
-            after(async () => {
-              try {
-                await Promise.all([
-                  saveChatMessage(earlySessionId, 'user', displayMessage),
-                  saveChatMessage(earlySessionId, 'assistant', cachedResponse),
-                ]);
-              } catch (err: any) {
-                console.error('[Stream] after() save failed (cached):', err.message);
-              }
-            });
-
-            pm.set('totalMs', latencyMs);
-            pm.data.fromSuggestion = true;
-            logPipelineMetrics(pm);
-            recordMetrics(pm);
-            controller.close();
-            return;
-          }
-          if (sessionLeadCheck && cachedResponse) {
-            console.log(`[Stream] Suggestion cache HIT skipped — session has lead_id, need personalized response`);
+          const ragCacheStart = Date.now();
+          cachedRAG = await getCachedSuggestionRAG(accountId, message);
+          const ragCacheMs = Date.now() - ragCacheStart;
+          if (cachedRAG) {
+            console.log(`[Stream] RAG cache HIT (${ragCacheMs}ms) — archetype: ${cachedRAG.archetype}, LLM will run fresh`);
           } else {
-            console.log(`[Stream] Early suggestion cache MISS (${earlyCacheMs}ms) — continuing full pipeline`);
+            console.log(`[Stream] RAG cache MISS (${ragCacheMs}ms) — full pipeline`);
           }
         }
 
@@ -696,8 +639,8 @@ export async function POST(req: NextRequest) {
         let responseId: string | null = null;
         let tokenInfo = { input: 0, output: 0 };
 
-        // NOTE: Suggestion cache check moved BEFORE parallel block (early exit above)
-        // If we're here with fromSuggestion=true, it was a cache MISS
+        // NOTE: RAG cache (Warm RAG, Fresh Voice) is checked before parallel block.
+        // If cachedRAG is set, sandwich bot will skip RAG retrieval but LLM always runs fresh.
 
         try {
           // Process with Sandwich Bot (all 3 layers!) with REAL streaming
@@ -738,6 +681,10 @@ export async function POST(req: NextRequest) {
             previousResponseId: session?.last_response_id || previousResponseId || null,
             fromSuggestion: !!fromSuggestion,
             chunkId: chunkId || undefined,
+            // Inject cached RAG results (Warm RAG, Fresh Voice) — LLM runs fresh
+            cachedKnowledgeBase: cachedRAG?.knowledgeBase,
+            cachedArchetype: cachedRAG?.archetype,
+            cachedConfidence: cachedRAG?.confidence,
             // Proactive enrichment (Steps 1-4)
             suggestedClarifications: understanding.suggestedClarifications?.length ? understanding.suggestedClarifications : undefined,
             activeCoupons: activeCoupons.length > 0 ? activeCoupons : undefined,
@@ -766,10 +713,14 @@ export async function POST(req: NextRequest) {
           // Capture Responses API response ID for context chaining
           responseId = sandwichResult.responseId || null;
 
-          // Cache response for future suggestion clicks (fire-and-forget)
-          if (fromSuggestion && accountId && fullText.length > 10) {
-            cacheSuggestionResponse(accountId, message, fullText, sandwichResult.metadata?.archetype)
-              .catch(() => {});
+          // Cache RAG results for future suggestion clicks (fire-and-forget)
+          // Only cache if we didn't already have cached RAG (avoid redundant writes)
+          if (fromSuggestion && accountId && !cachedRAG && fullText.length > 10) {
+            cacheSuggestionRAG(accountId, message, {
+              knowledgeBase: sandwichResult.metadata.knowledgeBase,
+              archetype: sandwichResult.metadata.archetype,
+              confidence: sandwichResult.metadata.confidence,
+            }).catch(() => {});
           }
 
           const streamDurationMs = Date.now() - streamStartMs;
@@ -850,20 +801,17 @@ export async function POST(req: NextRequest) {
               }),
             ]);
 
-            // Pre-warm cache for LLM-generated suggestions
-            // Extract <<SUGGESTIONS>> from the response and cache each one
-            // so that NEXT click on these suggestions hits the cache
+            // Pre-warm RAG cache for LLM-generated suggestions (no LLM calls — just DB queries)
+            // Extract <<SUGGESTIONS>> from the response and pre-fetch RAG for each one
             if (accountId && fullText.includes('<<SUGGESTIONS>>')) {
               try {
                 const sugMatch = fullText.match(/<<SUGGESTIONS>>(.*?)<<\/SUGGESTIONS>>/);
                 if (sugMatch?.[1]) {
                   const llmSuggestions = sugMatch[1].split('|').map(s => s.trim()).filter(s => s.length > 2);
                   if (llmSuggestions.length > 0) {
-                    console.log(`[Stream] after() pre-warming ${llmSuggestions.length} LLM suggestions`);
-                    const influencerName = influencer.display_name || influencer.username || username || 'Unknown';
-                    // Fire-and-forget — don't block after() completion
-                    prewarmSuggestionCache(accountId, username, influencerName, llmSuggestions.slice(0, 3), [...conversationHistory, { role: 'user' as const, content: message }, { role: 'assistant' as const, content: fullText }])
-                      .catch(err => console.error('[Stream] suggestion prewarm failed:', err.message));
+                    console.log(`[Stream] after() pre-warming RAG for ${llmSuggestions.length} LLM suggestions (no LLM calls)`);
+                    prewarmSuggestionRAG(accountId, llmSuggestions.slice(0, 3))
+                      .catch(err => console.error('[Stream] RAG prewarm failed:', err.message));
                   }
                 }
               } catch (sugErr) {

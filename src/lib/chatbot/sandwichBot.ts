@@ -48,6 +48,10 @@ export interface SandwichBotInput {
   widgetConfig?: any; // Widget-specific config from accounts.config.widget
   fromSuggestion?: boolean; // Suggestion click — check DB cache for pre-generated response
   chunkId?: string; // Direct chunk ID from content feed — skip RAG search, inject chunk directly
+  // Pre-fetched RAG results (from suggestion cache — skips RAG retrieval, LLM runs fresh)
+  cachedKnowledgeBase?: KnowledgeBase;
+  cachedArchetype?: string;
+  cachedConfidence?: number;
   // Proactive conversation enrichment (from understanding engine + stream/route)
   suggestedClarifications?: string[]; // Questions to ask when intent is ambiguous
   activeCoupons?: Array<{ brand_name: string; coupon_code: string; description?: string }>; // Available coupons for proactive mention
@@ -62,6 +66,7 @@ export interface SandwichBotOutput {
     confidence: number;
     guardrailsTriggered: any[];
     personalityApplied: boolean;
+    knowledgeBase?: KnowledgeBase; // Exposed for RAG caching on suggestion clicks
   };
 }
 
@@ -80,85 +85,87 @@ export class SandwichBot {
     console.log(`${'='.repeat(60)}`);
 
     // ==========================================
-    // LAYER 2: Route to Archetype
+    // LAYER 2: Route to Archetype (skip if cached)
     // ==========================================
-    console.log('\n📍 [Layer 2] Routing to archetype...');
-    
-    const classification = await routeToArchetype({
-      userMessage: input.userMessage,
-      conversationHistory: input.conversationHistory,
-      accountContext: {
-        accountId: input.accountId,
-        username: input.username,
-      },
-    });
+    let classification: { primaryArchetype: string; confidence: number };
 
-    console.log(`   → Archetype: ${classification.primaryArchetype}`);
-    console.log(`   → Confidence: ${(classification.confidence * 100).toFixed(0)}%`);
-
-    // ==========================================
-    // Retrieve Knowledge Base (with smart follow-up detection)
-    // ==========================================
-    console.log('\n📚 Retrieving knowledge...');
-
-    const lastAssistant = input.conversationHistory?.length
-      ? [...input.conversationHistory].reverse().find(m => m.role === 'assistant')
-      : null;
-
-    // Enrich query with conversation context for follow-up messages
-    // e.g. "תני לי את המתכון" → "פסטה רביולי ... תני לי את המתכון"
-    // Skip enrichment for suggestion clicks — they are standalone questions,
-    // and prepending history pollutes the embedding search
-    let knowledgeQuery = input.userMessage;
-
-    // Enrich query with context — both for regular messages and suggestion clicks
-    // Suggestions need context too: "שגרת טיפוח פנים" should find hair content if conversation is about hair
-    const shouldEnrich = input.userMessage.length < 80;
-    if (shouldEnrich) {
-      const contextParts: string[] = [];
-
-      if (input.mode === 'dm') {
-        // DM: use last user messages as context (not bot responses which are long/noisy)
-        // This helps follow-ups like "משרה מלאה?" connect to "מנהלת פרויקטים"
-        const recentUserMsgs = (input.conversationHistory || [])
-          .filter(m => m.role === 'user')
-          .slice(-3);
-        for (const msg of recentUserMsgs) {
-          contextParts.push(msg.content.substring(0, 150));
-        }
-        // Add rolling summary for broader context
-        if (input.rollingSummary) {
-          contextParts.push(input.rollingSummary.substring(0, 200));
-        }
-      } else {
-        // Widget: use rolling summary + last user messages for topic continuity
-        if (input.rollingSummary) {
-          contextParts.push(input.rollingSummary.substring(0, 200));
-        }
-        // Use recent user messages (not assistant — too long/noisy for embedding)
-        const recentUserMsgs = (input.conversationHistory || [])
-          .filter(m => m.role === 'user')
-          .slice(-2);
-        for (const msg of recentUserMsgs) {
-          contextParts.push(msg.content.substring(0, 150));
-        }
-      }
-
-      if (contextParts.length > 0) {
-        knowledgeQuery = `${contextParts.join(' ')} ${input.userMessage}`;
-        console.log(`   → Enriched query with conversation context (${knowledgeQuery.length} chars)${input.fromSuggestion ? ' [suggestion+context]' : ''}`);
-      } else if (input.fromSuggestion) {
-        console.log(`   → Suggestion click — no history available for enrichment`);
-      }
+    if (input.cachedArchetype) {
+      // Use pre-cached archetype from RAG cache (suggestion click)
+      classification = {
+        primaryArchetype: input.cachedArchetype,
+        confidence: input.cachedConfidence ?? 0.8,
+      };
+      console.log(`\n📍 [Layer 2] Using cached archetype: ${classification.primaryArchetype} (${(classification.confidence * 100).toFixed(0)}%)`);
+    } else {
+      console.log('\n📍 [Layer 2] Routing to archetype...');
+      classification = await routeToArchetype({
+        userMessage: input.userMessage,
+        conversationHistory: input.conversationHistory,
+        accountContext: {
+          accountId: input.accountId,
+          username: input.username,
+        },
+      });
+      console.log(`   → Archetype: ${classification.primaryArchetype}`);
+      console.log(`   → Confidence: ${(classification.confidence * 100).toFixed(0)}%`);
     }
 
+    // ==========================================
+    // Retrieve Knowledge Base (skip if cached)
+    // ==========================================
     let knowledgeBase: KnowledgeBase;
-    knowledgeBase = await this.retrieveKnowledge(
-      input.accountId,
-      classification.primaryArchetype,
-      knowledgeQuery,
-      input.rollingSummary
-    );
+
+    if (input.cachedKnowledgeBase) {
+      // Use pre-cached RAG results (suggestion click — LLM still runs fresh)
+      knowledgeBase = input.cachedKnowledgeBase;
+      console.log(`\n📚 Using cached RAG results (posts: ${knowledgeBase.posts.length}, coupons: ${knowledgeBase.coupons.length})`);
+    } else {
+      console.log('\n📚 Retrieving knowledge...');
+
+      // Enrich query with conversation context for follow-up messages
+      let knowledgeQuery = input.userMessage;
+
+      const shouldEnrich = input.userMessage.length < 80;
+      if (shouldEnrich) {
+        const contextParts: string[] = [];
+
+        if (input.mode === 'dm') {
+          const recentUserMsgs = (input.conversationHistory || [])
+            .filter(m => m.role === 'user')
+            .slice(-3);
+          for (const msg of recentUserMsgs) {
+            contextParts.push(msg.content.substring(0, 150));
+          }
+          if (input.rollingSummary) {
+            contextParts.push(input.rollingSummary.substring(0, 200));
+          }
+        } else {
+          if (input.rollingSummary) {
+            contextParts.push(input.rollingSummary.substring(0, 200));
+          }
+          const recentUserMsgs = (input.conversationHistory || [])
+            .filter(m => m.role === 'user')
+            .slice(-2);
+          for (const msg of recentUserMsgs) {
+            contextParts.push(msg.content.substring(0, 150));
+          }
+        }
+
+        if (contextParts.length > 0) {
+          knowledgeQuery = `${contextParts.join(' ')} ${input.userMessage}`;
+          console.log(`   → Enriched query with conversation context (${knowledgeQuery.length} chars)${input.fromSuggestion ? ' [suggestion+context]' : ''}`);
+        } else if (input.fromSuggestion) {
+          console.log(`   → Suggestion click — no history available for enrichment`);
+        }
+      }
+
+      knowledgeBase = await this.retrieveKnowledge(
+        input.accountId,
+        classification.primaryArchetype as any,
+        knowledgeQuery,
+        input.rollingSummary
+      );
+    }
 
     // If chunkId provided (from content feed), inject that chunk directly into knowledge
     if (input.chunkId) {
@@ -197,7 +204,7 @@ export class SandwichBot {
     console.log(`   ⚡ Streaming mode: ${input.onToken ? 'YES' : 'NO'}`);
     
     const archetypeResult = await processWithArchetype(
-      classification.primaryArchetype,
+      classification.primaryArchetype as any,
       input.userMessage,
       knowledgeBase,
       {
@@ -256,6 +263,8 @@ export class SandwichBot {
         confidence: classification.confidence,
         guardrailsTriggered: archetypeResult.triggeredGuardrails,
         personalityApplied: true,
+        // Expose knowledgeBase for RAG caching (only when freshly retrieved, not from cache)
+        knowledgeBase: input.cachedKnowledgeBase ? undefined : knowledgeBase,
       },
     };
   }

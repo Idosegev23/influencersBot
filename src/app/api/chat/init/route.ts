@@ -7,7 +7,7 @@
 import { NextResponse, after } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAccountByUsername } from '@/lib/supabase';
-import { prewarmSuggestionCache } from '@/lib/suggestion-cache';
+import { prewarmSuggestionRAG } from '@/lib/suggestion-cache';
 
 export async function GET(request: Request) {
   try {
@@ -95,16 +95,17 @@ export async function GET(request: Request) {
       .select('id', { count: 'exact', head: true })
       .eq('account_id', account.id);
 
-    // Pre-warm suggestion cache AFTER response is sent (Lambda stays alive via after())
+    // Pre-warm RAG cache (NOT LLM) AFTER response is sent (Lambda stays alive via after())
+    // This is cheap — only DB vector search, no AI model calls
     const allSuggestions = [...quickReplies, ...topicSuggestions.slice(0, 6)];
     const suggestionsToPrewarm = allSuggestions.slice(0, 4);
     after(async () => {
-      console.log(`[Chat Init] after() starting prewarm for ${suggestionsToPrewarm.length} suggestions`);
+      console.log(`[Chat Init] after() starting RAG prewarm for ${suggestionsToPrewarm.length} suggestions (no LLM)`);
       try {
-        await prewarmSuggestionCache(account.id, username, displayName, suggestionsToPrewarm);
-        console.log(`[Chat Init] after() prewarm completed`);
+        await prewarmSuggestionRAG(account.id, suggestionsToPrewarm);
+        console.log(`[Chat Init] after() RAG prewarm completed`);
       } catch (err: any) {
-        console.error('[Chat Init] after() prewarm failed:', err.message);
+        console.error('[Chat Init] after() RAG prewarm failed:', err.message);
       }
     });
 
