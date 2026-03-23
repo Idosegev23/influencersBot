@@ -1,4 +1,4 @@
-# Google Stitch Prompts — InfluencerBot Platform
+# Google Stitch Prompts — bestieAI Platform
 ## מדריך פרומפטים מלא לכל מסכי המערכת
 
 > **הנחיות כלליות לכל הפרומפטים (Design System):**

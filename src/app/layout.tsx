@@ -4,14 +4,14 @@ import CookieConsent from "@/components/CookieConsent";
 import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
 
 export const metadata: Metadata = {
-  title: "InfluencerBot - AI Chatbot Platform for Influencers",
-  description: "Create personalized AI chatbots for influencers. Powered by OpenAI.",
-  keywords: ["influencer", "chatbot", "AI", "Instagram", "marketing"],
+  title: "bestieAI - AI Chatbot Platform",
+  description: "Create personalized AI chatbots. Powered by OpenAI.",
+  keywords: ["chatbot", "AI", "Instagram", "marketing"],
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "InfluencerBot",
+    title: "bestieAI",
   },
   formatDetection: {
     telephone: false,
@@ -19,14 +19,14 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "he_IL",
-    siteName: "InfluencerBot",
-    title: "InfluencerBot - AI Chatbot Platform for Influencers",
-    description: "Create personalized AI chatbots for influencers. Powered by OpenAI.",
+    siteName: "bestieAI",
+    title: "bestieAI - AI Chatbot Platform",
+    description: "Create personalized AI chatbots. Powered by OpenAI.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "InfluencerBot",
-    description: "Create personalized AI chatbots for influencers.",
+    title: "bestieAI",
+    description: "Create personalized AI chatbots.",
   },
 };
 

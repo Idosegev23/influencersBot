@@ -67,7 +67,7 @@
 
 1. כנס ל-https://developers.facebook.com/apps/
 2. Create App → Use case: "Other" → App type: "Business"
-3. תן שם (למשל "InfluencerBot Platform")
+3. תן שם (למשל "bestieAI Platform")
 4. ב-Dashboard, הוסף את ה-product: **Instagram**
 5. בחר **Instagram Login** (לא Facebook Login)
 

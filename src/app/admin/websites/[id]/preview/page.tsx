@@ -46,7 +46,7 @@ export default function WebsitePreviewPage() {
   }, [accountId]);
 
   const handleCopyCode = () => {
-    const snippet = `<!-- InfluencerBot Widget -->\n<script src="${window.location.origin}/widget.js" data-account-id="${accountId}"></script>`;
+    const snippet = `<!-- bestieAI Widget -->\n<script src="${window.location.origin}/widget.js" data-account-id="${accountId}"></script>`;
     navigator.clipboard.writeText(snippet);
     setCodeCopied(true);
     setTimeout(() => setCodeCopied(false), 3000);
@@ -201,7 +201,7 @@ export default function WebsitePreviewPage() {
                   className="text-xs p-3 rounded-xl bg-[#f8f9fc] text-[#4b5563] overflow-x-auto leading-relaxed"
                   style={{ direction: 'ltr', fontFamily: 'monospace' }}
                 >
-{`<!-- InfluencerBot Widget -->
+{`<!-- bestieAI Widget -->
 <script
   src="${typeof window !== 'undefined' ? window.location.origin : ''}/widget.js"
   data-account-id="${accountId}">

@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
-const COOKIE_NAME = 'influencerbot_admin_session';
+const COOKIE_NAME = 'bestieai_admin_session';
 
 async function checkAuth(): Promise<boolean> {
   const cookieStore = await cookies();

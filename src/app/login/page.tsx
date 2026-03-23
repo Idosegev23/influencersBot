@@ -80,7 +80,7 @@ function LoginForm() {
               התחברות למערכת
             </h1>
             <p className="text-sm text-gray-600">
-              InfluencerBot Management
+              bestieAI Management
             </p>
           </div>
 
@@ -181,7 +181,7 @@ function LoginForm() {
               יש בעיה בהתחברות?{' '}
               <button
                 onClick={() => {
-                  alert('צור קשר עם התמיכה בכתובת support@influencerbot.com');
+                  alert('צור קשר עם התמיכה בכתובת support@bestieai.com');
                 }}
                 className="text-purple-600 underline hover:text-purple-700 transition-colors"
               >

@@ -1,7 +1,7 @@
 {
-  "name": "InfluencerBot",
-  "short_name": "InfluBot",
-  "description": "AI Chatbot Platform for Influencers",
+  "name": "bestieAI",
+  "short_name": "bestieAI",
+  "description": "AI Chatbot Platform",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f0a1a",

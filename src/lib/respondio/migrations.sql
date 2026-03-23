@@ -4,7 +4,7 @@
 -- ============================================
 
 -- 1. Channel-to-Account mapping table
--- Maps Respond.io channels to InfluencerBot accounts
+-- Maps Respond.io channels to bestieAI accounts
 CREATE TABLE IF NOT EXISTS respondio_channel_mappings (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,

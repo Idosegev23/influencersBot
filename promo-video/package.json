@@ -1,7 +1,7 @@
 {
-  "name": "influencerbot-promo",
+  "name": "bestieai-promo",
   "version": "1.0.0",
-  "description": "Professional promo video for InfluencerBot",
+  "description": "Professional promo video for bestieAI",
   "scripts": {
     "start": "remotion preview",
     "build": "remotion render Video out/video.mp4",

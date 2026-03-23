@@ -86,7 +86,7 @@ export default function AdminLogin() {
         <div className="admin-card p-6 sm:p-8">
           <div className="text-center mb-6">
             <h1 className="text-xl font-bold mb-1" style={{ color: '#ede9f8' }}>פאנל ניהול</h1>
-            <p className="text-sm" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>InfluencerBot</p>
+            <p className="text-sm" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>bestieAI</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">

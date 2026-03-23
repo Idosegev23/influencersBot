@@ -1,4 +1,4 @@
-# OpenAI Usage Map — influencerbot
+# OpenAI Usage Map — bestieai
 
 > Generated: 2026-02-21 | Audit scope: all `src/` and `scripts/` files
 

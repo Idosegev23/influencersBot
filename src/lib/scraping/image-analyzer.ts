@@ -179,7 +179,7 @@ async function analyzeImageWithVision(
   try {
     const response = await fetch(imageUrl, {
       signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT),
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; InfluencerBot/1.0)' },
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; bestieAI/1.0)' },
     });
 
     if (!response.ok) return null;

@@ -162,7 +162,7 @@ export default function AddWebsitePage() {
   };
 
   const handleCopyCode = () => {
-    const snippet = `<!-- InfluencerBot Widget -->\n<script src="${window.location.origin}/widget.js" data-account-id="${state.accountId}"></script>`;
+    const snippet = `<!-- bestieAI Widget -->\n<script src="${window.location.origin}/widget.js" data-account-id="${state.accountId}"></script>`;
     navigator.clipboard.writeText(snippet);
     setCodeCopied(true);
     setTimeout(() => setCodeCopied(false), 3000);

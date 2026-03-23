@@ -1,4 +1,4 @@
-# Feature Deck — InfluencerBot Platform
+# Feature Deck — bestieAI Platform
 
 **גרסה:** 1.0 | **תאריך:** מרץ 2026
 **מוצר:** פלטפורמת SaaS לניהול משפיענים עם AI

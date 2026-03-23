@@ -2,7 +2,7 @@
 
 ## Status: In Progress (March 2026)
 
-Meta App **"InfluencerBot API"** created and configured with:
+Meta App **"bestieAI API"** created and configured with:
 - Instagram messaging & content use case
 - WhatsApp use case
 - Test Instagram account connected with tester role + access token generated
@@ -169,7 +169,7 @@ Influencer connects → OAuth flow → Access token saved to ig_graph_connection
 
 ## Meta App Details
 
-- **App Name:** InfluencerBot API
+- **App Name:** bestieAI API
 - **Instagram App ID:** 1078098345377774
 - **Status:** Development Mode (Unpublished)
 - **Use Cases:** Instagram messaging & content + WhatsApp

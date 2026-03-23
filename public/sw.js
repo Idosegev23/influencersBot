@@ -1,5 +1,5 @@
-// InfluencerBot Service Worker
-const CACHE_NAME = 'influencerbot-v1';
+// bestieAI Service Worker
+const CACHE_NAME = 'bestieai-v1';
 const STATIC_ASSETS = [
   '/',
   '/offline.html',

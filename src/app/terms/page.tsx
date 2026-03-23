@@ -3,8 +3,8 @@ import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 
 export const metadata: Metadata = {
-  title: 'תנאי שימוש | InfluencerBot',
-  description: 'תנאי השימוש של InfluencerBot - פלטפורמת הצ\'אטבוטים למשפיענים',
+  title: 'תנאי שימוש | bestieAI',
+  description: 'תנאי השימוש של bestieAI - פלטפורמת הצ\'אטבוטים למשפיענים',
 };
 
 export default function TermsPage() {
@@ -32,14 +32,14 @@ export default function TermsPage() {
           <section className="mb-8">
             <h2 className="text-2xl font-semibold text-gray-900 mb-4">1. הסכמה לתנאים</h2>
             <p className="text-gray-600 leading-relaxed">
-              על ידי גישה לאתר InfluencerBot ושימוש בו, אתם מסכימים לציית לתנאי שימוש אלה ולכל החוקים והתקנות החלים. אם אינכם מסכימים לתנאים אלה, אנא הימנעו משימוש באתר.
+              על ידי גישה לאתר bestieAI ושימוש בו, אתם מסכימים לציית לתנאי שימוש אלה ולכל החוקים והתקנות החלים. אם אינכם מסכימים לתנאים אלה, אנא הימנעו משימוש באתר.
             </p>
           </section>
 
           <section className="mb-8">
             <h2 className="text-2xl font-semibold text-gray-900 mb-4">2. תיאור השירות</h2>
             <p className="text-gray-600 leading-relaxed">
-              InfluencerBot מספקת פלטפורמה ליצירת צ'אטבוטים מבוססי AI עבור משפיענים ויוצרי תוכן. השירות כולל:
+              bestieAI מספקת פלטפורמה ליצירת צ'אטבוטים מבוססי AI עבור משפיענים ויוצרי תוכן. השירות כולל:
             </p>
             <ul className="list-disc list-inside text-gray-600 mt-4 space-y-2">
               <li>יצירה אוטומטית של צ'אטבוט מותאם אישית</li>
@@ -65,7 +65,7 @@ export default function TermsPage() {
           <section className="mb-8">
             <h2 className="text-2xl font-semibold text-gray-900 mb-4">4. קניין רוחני</h2>
             <p className="text-gray-600 leading-relaxed">
-              כל הזכויות בפלטפורמה, כולל הקוד, העיצוב והתוכן, שייכות ל-InfluencerBot. התוכן שמזינים המשפיענים נשאר בבעלותם.
+              כל הזכויות בפלטפורמה, כולל הקוד, העיצוב והתוכן, שייכות ל-bestieAI. התוכן שמזינים המשפיענים נשאר בבעלותם.
             </p>
           </section>
 

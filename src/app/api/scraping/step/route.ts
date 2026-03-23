@@ -12,7 +12,7 @@ import { runPreprocessing } from '@/lib/scraping/preprocessing';
 import { runGeminiBuilder, savePersonaToDatabase } from '@/lib/ai/gemini-persona-builder';
 import { cookies } from 'next/headers';
 
-const ADMIN_COOKIE_NAME = 'influencerbot_admin_session';
+const ADMIN_COOKIE_NAME = 'bestieai_admin_session';
 
 async function checkAdminAuth(): Promise<boolean> {
   const cookieStore = await cookies();

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 
-const COOKIE_NAME = 'influencerbot_admin_session';
+const COOKIE_NAME = 'bestieai_admin_session';
 
 // Check admin authentication
 async function checkAuth(): Promise<boolean> {
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
         .from('users')
         .upsert({
           account_id: accountId,
-          email: `${subdomain || username}@influencerbot.local`,
+          email: `${subdomain || username}@bestieai.local`,
           full_name: username,
           role: 'influencer',
         }, {

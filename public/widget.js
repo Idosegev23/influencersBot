@@ -1,7 +1,6 @@
 /**
- * InfluencerBot Website Widget v3.0
+ * bestieAI Website Widget v3.0
  * Standalone embeddable chat widget — no dependencies
- * Matches Figma spec 68:448 (Leaders-Chat)
  *
  * Usage:
  * <script src="https://yourapp.com/widget.js" data-account-id="xxx"></script>
@@ -18,7 +17,7 @@
   var BASE_URL = SCRIPT && SCRIPT.src ? new URL(SCRIPT.src).origin : '';
 
   if (!ACCOUNT_ID) {
-    console.error('[InfluencerBot Widget] Missing data-account-id attribute');
+    console.error('[bestieAI Widget] Missing data-account-id attribute');
     return;
   }
 

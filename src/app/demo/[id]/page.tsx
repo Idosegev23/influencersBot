@@ -52,7 +52,7 @@ export default function DemoPage() {
   }, [accountId]);
 
   const handleCopyCode = () => {
-    const snippet = `<!-- InfluencerBot Widget -->\n<script src="${window.location.origin}/widget.js" data-account-id="${accountId}"></script>`;
+    const snippet = `<!-- bestieAI Widget -->\n<script src="${window.location.origin}/widget.js" data-account-id="${accountId}"></script>`;
     navigator.clipboard.writeText(snippet);
     setCodeCopied(true);
     setTimeout(() => setCodeCopied(false), 3000);

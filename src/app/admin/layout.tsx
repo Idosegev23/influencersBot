@@ -28,7 +28,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Top Navigation Bar */}
       <nav className="fixed top-0 w-full z-50 h-16 flex items-center justify-between px-8 neon-glass-nav">
         <div className="flex items-center gap-6">
-          <span className="text-xl font-black tracking-tight neon-brand font-headline">InfluencerBot</span>
+          <span className="text-xl font-black tracking-tight neon-brand font-headline">bestieAI</span>
           <div className="hidden md:flex gap-6 items-center">
             <Link href="/admin/dashboard" className="text-[#474747] font-medium hover:text-[#9334EB] transition-colors text-sm">דשבורד</Link>
             <Link href="/admin/influencers" className="text-[#474747] font-medium hover:text-[#9334EB] transition-colors text-sm">משפיענים</Link>
@@ -103,7 +103,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <a className="text-[#474747] opacity-80 hover:text-[#DC2627] transition-colors" href="#">תמיכה</a>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-[#9334EB]">InfluencerBot</span>
+          <span className="text-sm font-semibold text-[#9334EB]">bestieAI</span>
           <span className="text-[#474747] opacity-60">© 2024 כל הזכויות שמורות</span>
         </div>
       </footer>

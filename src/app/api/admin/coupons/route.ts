@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 
-const COOKIE_NAME = 'influencerbot_admin_session';
+const COOKIE_NAME = 'bestieai_admin_session';
 
 // Check admin authentication
 async function checkAuth(): Promise<boolean> {

@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { hashPassword, verifyPassword } from '@/lib/utils';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
-const COOKIE_NAME = 'influencerbot_admin_session';
+const COOKIE_NAME = 'bestieai_admin_session';
 
 // Check if authenticated
 export async function GET() {

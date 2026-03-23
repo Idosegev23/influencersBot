@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
 
     // Check authentication (influencer or admin)
     const cookieStore = await cookies();
-    const adminCookie = cookieStore.get('influencerbot_admin_session');
+    const adminCookie = cookieStore.get('bestieai_admin_session');
     const isAdmin = adminCookie?.value === 'authenticated';
     const isAuth = await checkAuth(username);
     

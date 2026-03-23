@@ -1,4 +1,4 @@
-# 🎬 InfluencerBot Promo Video
+# 🎬 bestieAI Promo Video
 
 סרטון שיווקי מקצועי שנבנה עם Remotion.
 

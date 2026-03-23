@@ -262,8 +262,8 @@ export default function PrivacyPage() {
           <FadeInSection>
             <PolicyCard id="overview" number="01" title="סקירה כללית" subtitle="Overview" icon={Eye}>
               <p>
-                ברוכים הבאים למדיניות הפרטיות של <strong className="text-white">Leaders InfluencerBot</strong> (להלן: &quot;השירות&quot;, &quot;הפלטפורמה&quot;, &quot;אנחנו&quot;).
-                השירות מופעל על ידי <strong className="text-white">Leaders</strong> ומספק פלטפורמת צ&apos;אטבוטים מבוססת בינה מלאכותית עבור משפיענים ויוצרי תוכן.
+                ברוכים הבאים למדיניות הפרטיות של <strong className="text-white">bestieAI</strong> (להלן: &quot;השירות&quot;, &quot;הפלטפורמה&quot;, &quot;אנחנו&quot;).
+                השירות מופעל על ידי <strong className="text-white">bestieAI</strong> ומספק פלטפורמת צ&apos;אטבוטים מבוססת בינה מלאכותית עבור משפיענים ויוצרי תוכן.
               </p>
               <p>
                 מדיניות זו מתארת כיצד אנו אוספים, משתמשים, שומרים ומגנים על המידע האישי שלך בעת שימוש בפלטפורמה שלנו,
@@ -750,7 +750,7 @@ export default function PrivacyPage() {
               <Link href="/privacy" className="text-indigo-400">מדיניות פרטיות</Link>
               <Link href="/contact" className="hover:text-gray-300 transition-colors">יצירת קשר</Link>
             </div>
-            <p>&copy; {new Date().getFullYear()} Leaders. כל הזכויות שמורות.</p>
+            <p>&copy; {new Date().getFullYear()} bestieAI. כל הזכויות שמורות.</p>
           </div>
         </div>
       </footer>

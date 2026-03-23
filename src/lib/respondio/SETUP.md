@@ -95,7 +95,7 @@ src/app/api/webhooks/respondio/
 ## Multi-Tenant Support
 
 The system supports multiple influencers through `respondio_channel_mappings`:
-- Each Instagram channel in Respond.io maps to one InfluencerBot account
+- Each Instagram channel in Respond.io maps to one bestieAI account
 - The bot automatically loads the correct personality, knowledge, and persona
 - DM sessions are scoped per contact + per account
 
