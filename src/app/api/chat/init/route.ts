@@ -44,50 +44,84 @@ export async function GET(request: Request) {
     const config = (account.config || {}) as any;
     const displayName = config.display_name || username;
 
+    // ── Check if media_news account ──
+    const isMediaNews = config.archetype === 'media_news';
+
     // ── Greeting: prefer user-configured, fallback to auto-generated ──
     let greeting: string;
-    if (config.greeting_message) {
-      greeting = config.greeting_message;
-    } else {
-      greeting = `שלום! אני הבוט של ${persona?.name || displayName} 😊`;
-      if (persona?.voice_rules?.tone) {
-        greeting += `\nאני כאן כדי לעזור לך עם שאלות, המלצות וקופונים בלעדיים. במה אפשר לעזור?`;
-      } else {
-        greeting += `\nאיך אפשר לעזור?`;
-      }
-    }
-
-    // ── Quick replies: prefer user-configured, fallback to persona topics ──
     let quickReplies: string[];
-    if (config.suggested_questions?.length > 0) {
-      quickReplies = config.suggested_questions;
-    } else {
-      quickReplies = [];
-      if (persona?.knowledge_map?.coreTopics?.length > 0) {
-        const topTopics = persona.knowledge_map.coreTopics.slice(0, 3);
-        quickReplies.push(...topTopics.map((t: any) => `ספר/י לי על ${t.name}`));
-      }
-      quickReplies.push('יש קופונים?');
-    }
-
-    // Build topic-based suggestion pool for fast follow-ups
     const topicSuggestions: string[] = [];
-    // Start with user-configured questions if available
-    if (config.suggested_questions?.length > 0) {
-      topicSuggestions.push(...config.suggested_questions);
-    }
-    // Add persona-generated suggestions
-    if (persona?.knowledge_map?.coreTopics?.length > 0) {
-      for (const topic of persona.knowledge_map.coreTopics.slice(0, 8)) {
-        const name = topic.name || topic;
-        if (typeof name === 'string' && name.length > 0 && name.length < 30) {
-          topicSuggestions.push(`מה חדש ב${name}?`);
-          topicSuggestions.push(`ספרו לי על ${name}`);
+
+    if (isMediaNews) {
+      // Media/News accounts: greeting with hot topics
+      const { getTopHotTopics } = await import('@/lib/hot-topics/query');
+      const hotTopics = await getTopHotTopics(3, ['breaking', 'hot']);
+
+      if (hotTopics.length > 0) {
+        const statusEmoji = (s: string) => s === 'breaking' ? '🔴' : '🔥';
+        greeting = `מה קורה! הנה מה שחם עכשיו:`;
+        for (const topic of hotTopics) {
+          const summary = topic.summary || topic.topic_name;
+          greeting += `\n${statusEmoji(topic.status)} ${summary}`;
+        }
+        greeting += `\n\nעל מה תרצו לשמוע?`;
+
+        quickReplies = hotTopics.map((t) => `ספרו לי על ${t.topic_name}`);
+        quickReplies.push('מה עוד חם?');
+
+        // Topic suggestions from hot topics
+        for (const topic of hotTopics) {
+          topicSuggestions.push(`ספרו לי על ${topic.topic_name}`);
+          topicSuggestions.push(`מה חדש ב${topic.topic_name}?`);
+        }
+        topicSuggestions.push('מה חדש?', 'מה הטרנד?', 'מה עוד חם?');
+      } else {
+        // No hot topics yet — fallback
+        greeting = `שלום! אני הבוט של ${persona?.name || displayName}`;
+        greeting += `\nשאלו אותי מה חדש בעולם הבידור!`;
+        quickReplies = ['מה חדש?', 'מה חם עכשיו?', 'ספרו לי על הריאליטי'];
+        topicSuggestions.push('מה חדש?', 'מה חם עכשיו?', 'חדשות סלבס');
+      }
+    } else {
+      // Regular accounts: existing behavior
+      if (config.greeting_message) {
+        greeting = config.greeting_message;
+      } else {
+        greeting = `שלום! אני הבוט של ${persona?.name || displayName} 😊`;
+        if (persona?.voice_rules?.tone) {
+          greeting += `\nאני כאן כדי לעזור לך עם שאלות, המלצות וקופונים בלעדיים. במה אפשר לעזור?`;
+        } else {
+          greeting += `\nאיך אפשר לעזור?`;
         }
       }
+
+      // ── Quick replies: prefer user-configured, fallback to persona topics ──
+      if (config.suggested_questions?.length > 0) {
+        quickReplies = config.suggested_questions;
+      } else {
+        quickReplies = [];
+        if (persona?.knowledge_map?.coreTopics?.length > 0) {
+          const topTopics = persona.knowledge_map.coreTopics.slice(0, 3);
+          quickReplies.push(...topTopics.map((t: any) => `ספר/י לי על ${t.name}`));
+        }
+        quickReplies.push('יש קופונים?');
+      }
+
+      // Build topic-based suggestion pool for fast follow-ups
+      if (config.suggested_questions?.length > 0) {
+        topicSuggestions.push(...config.suggested_questions);
+      }
+      if (persona?.knowledge_map?.coreTopics?.length > 0) {
+        for (const topic of persona.knowledge_map.coreTopics.slice(0, 8)) {
+          const name = topic.name || topic;
+          if (typeof name === 'string' && name.length > 0 && name.length < 30) {
+            topicSuggestions.push(`מה חדש ב${name}?`);
+            topicSuggestions.push(`ספרו לי על ${name}`);
+          }
+        }
+      }
+      topicSuggestions.push('יש קופון הנחה?', 'מה הכי שווה עכשיו?', 'ספרו לי עוד');
     }
-    // Add generic suggestions
-    topicSuggestions.push('יש קופון הנחה?', 'מה הכי שווה עכשיו?', 'ספרו לי עוד');
 
     // Load partnerships count for marketing disclaimer
     const { count: partnershipsCount } = await supabase

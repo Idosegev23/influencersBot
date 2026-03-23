@@ -9,6 +9,7 @@ import { DiscoveryRow } from './DiscoveryRow';
 import { DiscoveryModal } from './DiscoveryModal';
 import { LeadMagnetPopup } from './LeadMagnetPopup';
 import { QuestionsView } from './QuestionsView';
+import { NewsDiscoveryTab } from './NewsDiscoveryTab';
 import type { DiscoveryItem } from '@/lib/discovery/types';
 
 interface DiscoveryTabProps {
@@ -18,6 +19,7 @@ interface DiscoveryTabProps {
   initialCategory?: string | null;
   onAskInChat: (message: string, enrichedData?: string) => void;
   onCategoryOpened?: () => void;
+  influencerType?: string;
 }
 
 /** Max sections to show initially */
@@ -25,7 +27,18 @@ const INITIAL_VISIBLE = 5;
 
 /** Pinterest masonry layout for all rows */
 
-export default function DiscoveryTab({ username, influencerName, sessionId, initialCategory, onAskInChat, onCategoryOpened }: DiscoveryTabProps) {
+export default function DiscoveryTab({ username, influencerName, sessionId, initialCategory, onAskInChat, onCategoryOpened, influencerType }: DiscoveryTabProps) {
+  // Media/News accounts get a completely different discovery layout
+  if (influencerType === 'media_news') {
+    return (
+      <NewsDiscoveryTab
+        username={username}
+        influencerName={influencerName}
+        onAskInChat={onAskInChat}
+      />
+    );
+  }
+
   const { rows, loading, error } = useDiscoveryAll({ username });
   const {
     questionsData,

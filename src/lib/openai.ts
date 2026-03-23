@@ -274,6 +274,8 @@ const CONTENT_TYPES_BY_INFLUENCER: Record<InfluencerType, string[]> = {
   parenting: ['tip', 'story', 'recommendation', 'moment', 'review'],
   tech: ['review', 'tutorial', 'tip', 'unboxing'],
   travel: ['review', 'tip', 'recommendation', 'story', 'itinerary'],
+  home: [],
+  media_news: [],
   other: ['tip', 'review', 'story', 'moment', 'recommendation']
 };
 
@@ -662,6 +664,8 @@ export async function generateGreetingAndQuestions(
       parenting: ['איזה טיפ יש לך להורים?', 'מה הילדים אוהבים?', 'איך מאזנים בין עבודה למשפחה?', 'יש קופונים לציוד לילדים?'],
       travel: ['לאן כדאי לטוס?', 'יש המלצה למלון?', 'איזה יעד מומלץ למשפחות?', 'יש קופון לטיסות?'],
       lifestyle: ['מה ההמלצה החמה שלך?', 'יש קופונים?', 'איזה טיפ יש לך לחיים?', 'מה חדש אצלך?'],
+      home: [],
+      media_news: [],
       other: ['איך אפשר לעזור?', 'יש המלצות?', 'מה חדש?', 'יש קופונים?']
     };
     
@@ -697,6 +701,8 @@ export function buildInfluencerInstructions(
     parenting: 'אתה מומחה להורות ומשפחה. עזור עם שאלות על גידול ילדים, טיפים להורים, ומוצרים לילדים.',
     travel: 'אתה מומחה לטיולים. עזור עם שאלות על יעדים, מלונות, וטיפים לטיולים.',
     beauty: 'אתה מומחה ליופי וטיפוח. עזור עם שאלות על איפור, טיפוח עור, ומוצרי יופי.',
+    home: '',
+    media_news: '',
     other: 'אתה עוזר אישי. עזור עם שאלות כלליות ומתן המלצות.',
   };
 

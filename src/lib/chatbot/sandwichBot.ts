@@ -21,8 +21,12 @@ const ARCHETYPE_FALLBACK_SUGGESTIONS: Record<string, string> = {
   fashion: 'מה ללבוש?|טרנד חדש|המלצה לאאוטפיט',
   fitness: 'אימון מהיר|טיפ לכושר|תוכנית אימונים',
   coupons: 'קופונים פעילים|מבצע חדש|הנחה למותג',
+  news: 'מה חם עכשיו?|חדשות סלבס|מה חדש בריאליטי?',
   general: 'ספרי לי עוד|יש קופון?|מה חדש?',
 };
+
+// Patterns that indicate "what's new?" intent for news accounts
+const HOT_TOPIC_INTENT_PATTERNS = /מה חדש|מה קורה|חדשות|מה הטרנד|מה חם|טרנד|מה קרה|עדכונים|מה היה היום|ספרו לי/;
 
 function getArchetypeFallbackSuggestions(archetype: string): string {
   return ARCHETYPE_FALLBACK_SUGGESTIONS[archetype] || ARCHETYPE_FALLBACK_SUGGESTIONS.general;
@@ -165,6 +169,45 @@ export class SandwichBot {
         knowledgeQuery,
         input.rollingSummary
       );
+    }
+
+    // If media_news account and "what's new?" intent, inject hot topics
+    if (HOT_TOPIC_INTENT_PATTERNS.test(input.userMessage)) {
+      try {
+        const { data: account } = await supabase
+          .from('accounts')
+          .select('config')
+          .eq('id', input.accountId)
+          .single();
+
+        if ((account?.config as any)?.archetype === 'media_news') {
+          const { getTopHotTopics } = await import('@/lib/hot-topics/query');
+          const hotTopics = await getTopHotTopics(5, ['breaking', 'hot']);
+
+          if (hotTopics.length > 0) {
+            console.log(`   🔥 Injecting ${hotTopics.length} hot topics for media_news account`);
+            const hotTopicsText = hotTopics
+              .map((t, i) => {
+                const statusLabel = t.status === 'breaking' ? '[בריקינג]' : '[חם]';
+                return `${i + 1}. ${statusLabel} ${t.topic_name}: ${t.summary || 'נושא חם'}  (${t.coverage_count} ערוצים כיסו, ${t.total_posts} פוסטים)`;
+              })
+              .join('\n');
+
+            // Inject as a post so it appears in the knowledge context
+            knowledgeBase.posts = [
+              {
+                shortcode: 'hot-topics',
+                caption: `🔥 נושאים חמים עכשיו:\n${hotTopicsText}`,
+                media_url: '',
+                timestamp: new Date().toISOString(),
+              } as any,
+              ...knowledgeBase.posts,
+            ];
+          }
+        }
+      } catch (err) {
+        console.error('[SandwichBot] Failed to inject hot topics:', err);
+      }
     }
 
     // If chunkId provided (from content feed), inject that chunk directly into knowledge

@@ -130,6 +130,38 @@ export const themePresets: Record<InfluencerType, InfluencerTheme> = {
     style: "playful",
     darkMode: false,
   },
+  home: {
+    colors: {
+      primary: '#6366f1',
+      accent: '#818cf8',
+      background: '#ffffff',
+      text: '#111827',
+      surface: '#f9fafb',
+      border: '#e5e7eb',
+    },
+    fonts: {
+      heading: 'Heebo',
+      body: 'Heebo',
+    },
+    style: 'minimal',
+    darkMode: false,
+  },
+  media_news: {
+    colors: {
+      primary: '#6366f1',
+      accent: '#818cf8',
+      background: '#ffffff',
+      text: '#111827',
+      surface: '#f9fafb',
+      border: '#e5e7eb',
+    },
+    fonts: {
+      heading: 'Heebo',
+      body: 'Heebo',
+    },
+    style: 'minimal',
+    darkMode: false,
+  },
   other: {
     colors: {
       primary: '#6366f1',

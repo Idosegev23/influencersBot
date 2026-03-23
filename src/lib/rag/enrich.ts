@@ -29,6 +29,7 @@ interface EnrichmentResult {
   syntheticQueriesAdded: number;
   translationsAdded: number;
   partnershipsEnriched: number;
+  entitiesExtracted: number;
   durationMs: number;
   errors: string[];
 }
@@ -60,6 +61,7 @@ export async function enrichAccountChunks(
     skipCleanup?: boolean;
     skipPartnershipEnrich?: boolean;
     skipTopicClassification?: boolean;
+    skipEntityExtraction?: boolean;
     geminiApiKey?: string;
     openaiApiKey?: string;
   }
@@ -73,6 +75,7 @@ export async function enrichAccountChunks(
     syntheticQueriesAdded: 0,
     translationsAdded: 0,
     partnershipsEnriched: 0,
+    entitiesExtracted: 0,
     durationMs: 0,
     errors: [],
   };
@@ -136,6 +139,50 @@ export async function enrichAccountChunks(
     } catch (err: any) {
       result.errors.push(`Topic classification failed: ${err.message}`);
       log.error('Topic classification failed', { error: err.message }, accountId);
+    }
+  }
+
+  // --- Step 6: Entity extraction (media_news accounts only) ---
+  if (!options?.skipEntityExtraction) {
+    try {
+      // Check if account is media_news archetype
+      const { data: account } = await supabase
+        .from('accounts')
+        .select('config')
+        .eq('id', accountId)
+        .single();
+
+      const archetype = (account?.config as any)?.archetype;
+
+      if (archetype === 'media_news') {
+        const { extractEntitiesForAccount } = await import('@/lib/hot-topics/extract-entities');
+
+        // Load chunks that haven't been entity-extracted yet
+        const { data: chunks } = await supabase
+          .from('document_chunks')
+          .select('id, chunk_text, entity_type, metadata')
+          .eq('account_id', accountId)
+          .in('entity_type', ['post', 'transcription', 'highlight'])
+          .gt('token_count', 25);
+
+        if (chunks && chunks.length > 0) {
+          const { extracted, errors: extractErrors } = await extractEntitiesForAccount(
+            accountId,
+            chunks,
+            { dryRun: options?.dryRun, geminiApiKey: options?.geminiApiKey }
+          );
+          result.entitiesExtracted = extracted;
+          if (extractErrors.length > 0) {
+            result.errors.push(...extractErrors.slice(0, 3));
+          }
+          log.info(`Entity extraction: ${extracted} entities from ${chunks.length} chunks`, {}, accountId);
+        }
+      } else {
+        log.info('Entity extraction: skipped (not media_news archetype)', {}, accountId);
+      }
+    } catch (err: any) {
+      result.errors.push(`Entity extraction failed: ${err.message}`);
+      log.error('Entity extraction failed', { error: err.message }, accountId);
     }
   }
 

@@ -28,6 +28,8 @@ import {
   CheckCircle,
   ArrowRight,
   Compass,
+  Flame,
+  Home,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { getInfluencerByUsername, getBrandsByInfluencer, getContentByInfluencer, type Brand } from '@/lib/supabase';
@@ -99,6 +101,8 @@ const typeIcons: Record<InfluencerType, typeof ChefHat> = {
   beauty: Sparkles,
   parenting: Baby,
   travel: Plane,
+  home: Home,
+  media_news: Flame,
   other: MessageCircle,
 };
 
@@ -111,6 +115,8 @@ const typeLabels: Record<InfluencerType, string> = {
   beauty: 'טיפוח ויופי',
   parenting: 'הורות ומשפחה',
   travel: 'טיולים והמלצות',
+  home: 'בית ועיצוב',
+  media_news: 'חדשות ובידור',
   other: 'טיפים והמלצות',
 };
 
@@ -209,6 +215,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [topicSuggestions, setTopicSuggestions] = useState<string[]>([]);
   const [quickReplies, setQuickReplies] = useState<string[]>([]);
   const [hasCommercialContent, setHasCommercialContent] = useState(false);
+  const [hotTopicPills, setHotTopicPills] = useState<{ name: string; summary: string | null; status: string }[]>([]);
   const userMsgCountRef = useRef(0);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -416,11 +423,21 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     
     loadData();
 
-    // Preload discovery categories for the empty state
+    // Preload discovery categories for the empty state (skip for media_news — uses hot topics instead)
     fetch(`/api/discovery/categories?username=${encodeURIComponent(username)}`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data?.categories) setDiscoveryCategories(data.categories.filter((c: DiscoveryCategoryAvailability) => c.available));
+      })
+      .catch(() => {});
+
+    // Preload hot topic pills for media_news accounts
+    fetch(`/api/discovery/hot-topics?limit=6&status=breaking,hot`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.topics?.length > 0) {
+          setHotTopicPills(data.topics.map((t: any) => ({ name: t.topic_name, summary: t.summary, status: t.status })));
+        }
       })
       .catch(() => {});
 
@@ -1032,8 +1049,69 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         </motion.div>
                       )}
 
-                      {/* Discovery category pills — horizontal scroll with arrow */}
-                      {(influencer.tabs || DEFAULT_TABS).some((t: { id: string }) => t.id === 'discover') && discoveryCategories.length > 0 && (
+                      {/* Hot topic pills for media_news accounts */}
+                      {influencer.influencer_type === 'media_news' && hotTopicPills.length > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.4, delay: 0.4 }}
+                          className="discovery-pills-row"
+                        >
+                          <div className="discovery-pills-scroll">
+                            {hotTopicPills.map((topic, i) => (
+                              <motion.button
+                                key={topic.name}
+                                initial={{ opacity: 0, y: 6 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.45 + i * 0.05, duration: 0.3 }}
+                                whileTap={{ scale: 0.96 }}
+                                onClick={async () => {
+                                  if (isTyping || isStreamActive) return;
+                                  const visibleMsg = `ספרו לי על ${topic.name}`;
+                                  const enrichedMsg = topic.summary
+                                    ? `[נושא חם: ${topic.name} (${topic.status})\nתקציר: ${topic.summary}]\n\n${visibleMsg}`
+                                    : visibleMsg;
+                                  const userMsg: Message = { id: Date.now().toString(), role: 'user', content: visibleMsg };
+                                  setMessages(prev => [...prev, userMsg]);
+                                  setIsTyping(true);
+                                  const assistantMessageId = (Date.now() + 1).toString();
+                                  setStreamingMessageId(assistantMessageId);
+                                  setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant', content: '' }]);
+                                  await sendStreamMessage({
+                                    message: enrichedMsg,
+                                    username,
+                                    sessionId: sessionId || undefined,
+                                    previousResponseId: responseId || undefined,
+                                    clientMessageId: assistantMessageId,
+                                  });
+                                }}
+                                className="suggestion-pill whitespace-nowrap flex-shrink-0"
+                                style={{
+                                  background: topic.status === 'breaking' ? '#FFF0F0' : '#FFF8F0',
+                                  borderColor: topic.status === 'breaking' ? '#FFD0D0' : '#FFE8D0',
+                                }}
+                              >
+                                <span>{topic.status === 'breaking' ? '🔴' : '🔥'} {topic.name}</span>
+                              </motion.button>
+                            ))}
+                            <motion.button
+                              initial={{ opacity: 0, y: 6 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: 0.75, duration: 0.3 }}
+                              whileTap={{ scale: 0.96 }}
+                              onClick={() => setActiveTab('discover')}
+                              className="suggestion-pill flex items-center gap-1 whitespace-nowrap flex-shrink-0"
+                              style={{ background: '#FFF3E5', borderColor: '#FFE0B2' }}
+                            >
+                              <Flame className="w-3.5 h-3.5" style={{ color: '#FF6B00' }} />
+                              <span>מה עוד חם?</span>
+                            </motion.button>
+                          </div>
+                        </motion.div>
+                      )}
+
+                      {/* Discovery category pills — horizontal scroll with arrow (non-news accounts) */}
+                      {influencer.influencer_type !== 'media_news' && (influencer.tabs || DEFAULT_TABS).some((t: { id: string }) => t.id === 'discover') && discoveryCategories.length > 0 && (
                         <motion.div
                           initial={{ opacity: 0, y: 8 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -1085,7 +1163,6 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                   const assistantMessageId = (Date.now() + 1).toString();
                                   setStreamingMessageId(assistantMessageId);
                                   setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant', content: '' }]);
-                                  // Keep isTyping=true — thinking message / dots stay visible until first stream token
                                   await sendStreamMessage({
                                     message: enrichedMsg,
                                     username,
@@ -1795,6 +1872,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   influencerName={influencer.display_name || ''}
                   sessionId={sessionId || undefined}
                   initialCategory={initialDiscoverySlug}
+                  influencerType={influencer.influencer_type}
                   onAskInChat={async (message, enrichedData) => {
                     setActiveTab('chat');
                     maybeShowLeadPopup();

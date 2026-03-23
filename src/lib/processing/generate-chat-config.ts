@@ -20,6 +20,8 @@ const TYPE_KEYWORDS: Record<InfluencerType, string[]> = {
   lifestyle: ['לייפסטייל', 'לייף-סטייל', 'lifestyle', 'חיים', 'שגרה', 'יומיום', 'זוגיות'],
   parenting: ['אמהות', 'הורות', 'ילדים', 'תינוק', 'parenting', 'mom', 'משפחה', 'אמא'],
   travel: ['טיולים', 'טיול', 'travel', 'מסע', 'יעד', 'חופשה', 'vacation'],
+  home: [],
+  media_news: [],
   other: [],
 };
 
