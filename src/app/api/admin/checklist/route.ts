@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 // ─── Default checklist template ───
 const CHECKLIST_TEMPLATE: { section: string; tasks: { key: string; title: string }[] }[] = [
@@ -100,6 +102,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Check if checklist exists
+  const supabase = getSupabase();
   const { data: existing, error: fetchErr } = await supabase
     .from('account_checklist')
     .select('*')
@@ -147,6 +150,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Missing task id' }, { status: 400 });
   }
 
+  const supabase = getSupabase();
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
 
   if (typeof completed === 'boolean') {
@@ -182,6 +186,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing accountId' }, { status: 400 });
   }
 
+  const supabase = getSupabase();
   if (action === 'reset') {
     // Delete existing and re-create
     await supabase

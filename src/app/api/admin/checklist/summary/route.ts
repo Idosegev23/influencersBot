@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 // GET — returns checklist progress for all accounts (or a specific one)
 export async function GET(req: NextRequest) {
   const accountId = req.nextUrl.searchParams.get('accountId');
 
+  const supabase = getSupabase();
   let query = supabase
     .from('account_checklist')
     .select('account_id, completed');
