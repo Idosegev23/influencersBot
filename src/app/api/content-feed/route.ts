@@ -49,51 +49,42 @@ function decodeHtmlEntities(text: string): string {
  * Keeps only readable Hebrew/English recipe content.
  */
 function cleanWebContent(text: string): string {
-  // Step 1: Find the last numbered instruction step and cut everything after it
-  // Pattern: last line starting with a number followed by period/dot like "14. ..."
-  const lastStepMatch = text.match(/^(\d+)\.\s+.+$/gm);
-  if (lastStepMatch && lastStepMatch.length > 2) {
-    const lastStep = lastStepMatch[lastStepMatch.length - 1];
-    const lastStepIdx = text.lastIndexOf(lastStep);
-    if (lastStepIdx !== -1) {
-      // Keep everything up to and including the last step
-      text = text.slice(0, lastStepIdx + lastStep.length);
-    }
+  // ── Step 0: Hard cut at known junk boundaries (before any regex) ──
+  // Cut at JSON fragment leak: `" }` or `"}`
+  const jsonLeakIdx = text.indexOf('" }');
+  if (jsonLeakIdx !== -1 && jsonLeakIdx > 200) {
+    text = text.slice(0, jsonLeakIdx).trim();
+  }
+  const jsonLeakIdx2 = text.indexOf('"}');
+  if (jsonLeakIdx2 !== -1 && jsonLeakIdx2 > 200) {
+    text = text.slice(0, jsonLeakIdx2).trim();
   }
 
+  // ── Step 1: Strip HTML/CSS/JS blocks ──
   let cleaned = text
-    // Remove JSON-like fragments: "} מרכיבים 29..." pattern
-    .replace(/"\s*\}\s*מרכיבים\s*\d+[\s\S]*/g, '')
-    // Remove <style>...</style> and <script>...</script> blocks
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-    // Remove CSS blocks: .className { ... } and #id { ... }
+    .replace(/<[^>]+>/g, ' ')
     .replace(/[.#][a-zA-Z_][\w\s.:#>,~+\-\[\]=*"'^$()]*\{[^}]*\}/g, '')
     .replace(/@media[^{]*\{[\s\S]*?\}\s*\}/g, '')
-    // Remove remaining HTML tags
-    .replace(/<[^>]+>/g, ' ')
-    // Remove jQuery/JS/localStorage patterns
-    .replace(/jQuery[\s\S]*?(?:\}\);|\}\))/g, '')
-    .replace(/localStorage\.\w+\([^)]*\)/g, '')
+    .replace(/jQuery[\s\S]*$/g, '')  // Everything from jQuery onwards is junk
+    .replace(/localStorage[\s\S]*$/g, '')
     .replace(/var\s+\w+\s*=[\s\S]*?;/g, '')
     .replace(/function\s*\w*\s*\([^)]*\)\s*\{[\s\S]*?\}/g, '')
-    // Remove CSS property lines
+    .replace(/\/\*[^*]*\*\//g, '')
+    .replace(/https?:\/\/\S+/g, '')
+    // Cut at nutrition table / popup junk
+    .replace(/ערכים תזונתיים[\s\S]*/g, '')
+    .replace(/מידע נוסף מידע נוסף[\s\S]*/g, '')
+    .replace(/×\s*תודה שנרשמת[\s\S]*/g, '')
+    // Clean CSS property fragments
     .replace(/[a-z\-]+:\s*[#\d]+px[^;\n]*;/g, '')
     .replace(/[a-z\-]+:\s*#[0-9a-f]+[^;\n]*;/g, '')
-    // Remove URLs
-    .replace(/https?:\/\/\S+/g, '')
-    // Remove nutrition table fragments: "קלוריות 755.8 קק״ל..."
-    .replace(/ערכים תזונתיים[\s\S]*?סגור/g, '')
-    .replace(/מידע נוסף[\s\S]*?סגור/g, '')
-    // Remove "× תודה שנרשמת" subscription popups
-    .replace(/×[\s\S]*?כפתור האימות/g, '')
-    // Remove /\* CSS comments \*/
-    .replace(/\/\*[^*]*\*\//g, '')
-    // Clean up whitespace
     .replace(/[ \t]+/g, ' ')
     .replace(/\n\s*\n(\s*\n)+/g, '\n\n');
 
-  // Deduplicate: if "אופן הכנה" appears multiple times, keep only the first block
+  // ── Step 2: Deduplicate sections ──
+  // If "אופן הכנה" appears twice, keep only the first occurrence + its content
   const prepIdx = cleaned.indexOf('אופן הכנה');
   if (prepIdx !== -1) {
     const secondIdx = cleaned.indexOf('אופן הכנה', prepIdx + 10);
@@ -102,35 +93,20 @@ function cleanWebContent(text: string): string {
     }
   }
 
-  // Also deduplicate "מרכיבים" — if the ingredients list appears twice
-  const ingIdx = cleaned.indexOf('מרכיבים');
-  if (ingIdx !== -1) {
-    // Look for a second "מרכיבים" that isn't part of "X מרכיבים" (count)
-    const afterFirst = cleaned.slice(ingIdx + 7);
-    const secondIngMatch = afterFirst.match(/(?:^|\n)\s*(?:חמין|חיטה|אורז|ג'חנון|ביצים)\s/m);
-    // If we find section headers repeating, it's a duplicate
-    const secondIngIdx = afterFirst.indexOf('\nמרכיבים');
-    if (secondIngIdx !== -1) {
-      cleaned = cleaned.slice(0, ingIdx + 7 + secondIngIdx).trim();
-    }
-  }
-
-  // Line-level cleanup
+  // ── Step 3: Line-level cleanup ──
   const lines = cleaned.split('\n');
   const cleanLines = lines.filter(line => {
-    const trimmed = line.trim();
-    if (trimmed.length < 2) return false;
-    // Skip CSS/JS fragments
-    if (/^[.#@][\w-]+/.test(trimmed) && !trimmed.includes(' ')) return false;
-    if (/^\w+\(/.test(trimmed) && !trimmed.match(/^\d/)) return false;
-    if (/^[{};]$/.test(trimmed)) return false;
-    if (/^\/\*/.test(trimmed)) return false;
-    // Skip "success:" or "jQuery" leftovers
-    if (/^(success|jQuery|localStorage|let |const |if\s*\()/.test(trimmed)) return false;
-    // Skip single symbols
-    if (trimmed.length < 3 && !/[\u0590-\u05FF\d]/.test(trimmed)) return false;
-    // Skip nutrition data lines like "קלוריות 755.8 קק״ל 9069.7 קק״ל"
-    if (/^\w+\s+\d+\.\d+\s+(קק״ל|גרם|מ״ג)/.test(trimmed)) return false;
+    const t = line.trim();
+    if (t.length < 2) return false;
+    if (/^[.#@][\w-]+$/.test(t)) return false; // CSS selector
+    if (/^[{};]$/.test(t)) return false;
+    if (/^\/\*/.test(t)) return false;
+    if (/^(success|jQuery|localStorage|let |const |if\s*\(|var )/.test(t)) return false;
+    if (t.length < 3 && !/[\u0590-\u05FF\d]/.test(t)) return false;
+    // Skip repeated nutrition summary lines
+    if (/^\w+\s+\d+\.\d+\s+(קק״ל|גרם|מ״ג)/.test(t)) return false;
+    // Skip "סגור" (close button text)
+    if (t === 'סגור') return false;
     return true;
   });
 
@@ -343,11 +319,16 @@ export async function GET(request: NextRequest) {
     const description = decodeHtmlEntities(heSummary || extractDescription(text));
     const meta = extractMeta(text, topic);
 
-    // Clean full text: strip metadata prefixes + HTML/CSS/JS junk
+    // Clean full text: strip metadata prefixes + meta fields already in pills + HTML/CSS/JS junk
     const rawText = text
       .replace(/^Title:\s*.+?\n/m, '')
       .replace(/^Description:\s*.+?\n/m, '')
       .replace(/^\[סיכום:.*?\]\n?/m, '')
+      // Strip meta lines already shown as pills
+      .replace(/^זמן כולל:.*$/m, '')
+      .replace(/^כמות מנות:.*$/m, '')
+      .replace(/^רמת קושי:.*$/m, '')
+      .replace(/^קלוריות:.*$/m, '')
       .trim();
     const fullText = decodeHtmlEntities(
       chunk.entity_type === 'website' ? cleanWebContent(rawText) : rawText
