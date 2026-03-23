@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ChefHat, Shirt, Sparkles, Dumbbell, Cpu, Plane, Baby, Heart,
+  ChefHat, Shirt, Sparkles, Dumbbell, Cpu, Plane, Baby, Heart, Home,
   Clock, ChevronLeft, Loader2, Star, UtensilsCrossed, Search,
   X, ExternalLink, MessageCircle,
 } from 'lucide-react';
@@ -120,6 +120,16 @@ const TYPE_CONFIG: Record<string, {
     askLabel: 'שאלו אותי על זה',
     accentColor: '#883fe2',
     accentBg: '#f1e9fd',
+    emptyText: 'אין עדיין תוכן',
+    headerStyle: 'default',
+  },
+  home: {
+    icon: Home,
+    subtitle: 'בית ועיצוב',
+    askPrefix: 'ספרו לי על',
+    askLabel: 'שאלו אותי על זה',
+    accentColor: '#2e7d32',
+    accentBg: '#e8f5e9',
     emptyText: 'אין עדיין תוכן',
     headerStyle: 'default',
   },

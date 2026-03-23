@@ -13,6 +13,7 @@ const TYPE_TO_TOPIC: Record<string, string> = {
   travel: 'lifestyle',
   parenting: 'lifestyle',
   lifestyle: 'lifestyle',
+  home: 'home',
   other: 'lifestyle',
 };
 
