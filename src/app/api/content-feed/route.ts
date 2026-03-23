@@ -14,6 +14,7 @@ const TYPE_TO_TOPIC: Record<string, string> = {
   parenting: 'lifestyle',
   lifestyle: 'lifestyle',
   home: 'home',
+  media_news: 'lifestyle',
   other: 'lifestyle',
 };
 

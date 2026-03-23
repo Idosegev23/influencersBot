@@ -3,7 +3,7 @@
 // ============================================
 
 // Influencer Types
-export type InfluencerType = 'food' | 'fashion' | 'tech' | 'lifestyle' | 'fitness' | 'beauty' | 'parenting' | 'travel' | 'home' | 'other';
+export type InfluencerType = 'food' | 'fashion' | 'tech' | 'lifestyle' | 'fitness' | 'beauty' | 'parenting' | 'travel' | 'home' | 'media_news' | 'other';
 
 export interface InfluencerTheme {
   colors: {

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ChefHat, Shirt, Sparkles, Dumbbell, Cpu, Plane, Baby, Heart, Home,
+  ChefHat, Shirt, Sparkles, Dumbbell, Cpu, Plane, Baby, Heart, Home, Newspaper,
   Clock, ChevronLeft, Loader2, Star, UtensilsCrossed, Search,
   X, ExternalLink, MessageCircle,
 } from 'lucide-react';
@@ -131,6 +131,16 @@ const TYPE_CONFIG: Record<string, {
     accentColor: '#2e7d32',
     accentBg: '#e8f5e9',
     emptyText: 'אין עדיין תוכן',
+    headerStyle: 'default',
+  },
+  media_news: {
+    icon: Newspaper,
+    subtitle: 'עדכונים חמים',
+    askPrefix: 'ספרו לי על',
+    askLabel: 'קראו עוד',
+    accentColor: '#d32f2f',
+    accentBg: '#ffebee',
+    emptyText: 'אין עדיין עדכונים',
     headerStyle: 'default',
   },
   other: {
