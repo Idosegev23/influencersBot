@@ -253,10 +253,9 @@ async function handleFashionFeed(
       for (const c of chunks) {
         const srcId = c.metadata?.originalSourceId;
         if (srcId && !transcriptionMap[srcId]) {
-          // Take first 120 chars as description
           const text = (c.chunk_text || '').replace(/^\[סיכום:.*?\]\s*/m, '').trim();
           if (text.length > 20) {
-            transcriptionMap[srcId] = text.length > 150 ? text.slice(0, 147) + '...' : text;
+            transcriptionMap[srcId] = text; // full text, not truncated
           }
         }
       }
@@ -273,9 +272,13 @@ async function handleFashionFeed(
     const skipTitles = ['📚', 'המרוץ למליון', 'המירוץ למליון', 'אהבת אמת'];
     if (skipTitles.some(t => brand.includes(t))) continue;
 
-    const desc = transcriptionMap[hi.id] || '';
+    const fullTranscription = transcriptionMap[hi.id] || '';
+    // Short description for the card display
+    const shortDesc = fullTranscription.length > 150
+      ? fullTranscription.slice(0, 147) + '...'
+      : fullTranscription;
     // Extract a short title from the description or use brand
-    const titleFromDesc = desc.split(/[|.\n]/).find(s => s.trim().length > 3)?.trim();
+    const titleFromDesc = fullTranscription.split(/[|.\n]/).find(s => s.trim().length > 3)?.trim();
     const title = titleFromDesc
       ? (titleFromDesc.length > 60 ? titleFromDesc.slice(0, 57) + '...' : titleFromDesc)
       : brand;
@@ -283,14 +286,14 @@ async function handleFashionFeed(
     const meta: Record<string, string> = {};
     if (brand) meta.brand = brand;
     // Extract size from transcription if available
-    const sizeMatch = desc.match(/מידה\s+(xs|s|m|l|xl|xxl|\d+)/i);
+    const sizeMatch = fullTranscription.match(/מידה\s+(xs|s|m|l|xl|xxl|\d+)/i);
     if (sizeMatch) meta.size = `מידה ${sizeMatch[1].toUpperCase()}`;
 
     items.push({
       id: hi.id,
       title,
-      description: desc,
-      fullText: desc,
+      description: shortDesc,
+      fullText: fullTranscription, // full content for the chatbot
       imageUrl: hi.thumbnail_url,
       meta,
       entityType: 'highlight',

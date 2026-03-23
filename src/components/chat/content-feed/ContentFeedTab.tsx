@@ -349,6 +349,17 @@ function LookCard({ item, config, onAsk, index }: { item: ContentCard; config: t
   // Alternate tall/short for railroad-track effect
   const isTall = index % 3 !== 1;
 
+  // Build a question with the FULL content of this specific look
+  const askAboutLook = () => {
+    const content = item.fullText || item.description || '';
+    const brandLabel = brandName ? ` של ${brandName}` : '';
+    // Include the actual content so the chatbot answers about THIS specific look
+    const question = content
+      ? `ספרי לי על הלוק הספציפי הזה${brandLabel}. הנה התוכן המלא:\n${content}`
+      : `${config.askPrefix} "${brandName || item.title}"`;
+    onAsk(question, item.id);
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -358,7 +369,7 @@ function LookCard({ item, config, onAsk, index }: { item: ContentCard; config: t
         if (hasSource) {
           window.open(item.sourceUrl!, '_blank');
         } else {
-          onAsk(`${config.askPrefix} "${brandName || item.title}"`, item.id);
+          askAboutLook();
         }
       }}
     >
@@ -383,7 +394,7 @@ function LookCard({ item, config, onAsk, index }: { item: ContentCard; config: t
           <div className="cf-look-card__bottom">
             {size && <span className="cf-look-card__size">{size}</span>}
             <button
-              onClick={(e) => { e.stopPropagation(); onAsk(`${config.askPrefix} "${brandName || item.title}"`, item.id); }}
+              onClick={(e) => { e.stopPropagation(); askAboutLook(); }}
               className="cf-look-card__cta"
             >
               <ShoppingBag className="w-3 h-3" />
