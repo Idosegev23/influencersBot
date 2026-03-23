@@ -1,7 +1,5 @@
 'use client';
 
-import { useRef, useEffect } from 'react';
-
 interface NewsTickerProps {
   headlines: Array<{
     text: string;
@@ -11,52 +9,15 @@ interface NewsTickerProps {
 }
 
 export function NewsTicker({ headlines }: NewsTickerProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const animationRef = useRef<number>(0);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el || headlines.length === 0) return;
-
-    let scrollPos = 0;
-    let isPaused = false;
-
-    const animate = () => {
-      if (!isPaused && el) {
-        scrollPos += 0.4;
-        if (scrollPos >= el.scrollWidth / 2) {
-          scrollPos = 0;
-        }
-        el.scrollLeft = scrollPos;
-      }
-      animationRef.current = requestAnimationFrame(animate);
-    };
-
-    const handleTouch = () => { isPaused = true; };
-    const handleRelease = () => { isPaused = false; };
-
-    el.addEventListener('touchstart', handleTouch);
-    el.addEventListener('touchend', handleRelease);
-    el.addEventListener('mouseenter', handleTouch);
-    el.addEventListener('mouseleave', handleRelease);
-
-    animationRef.current = requestAnimationFrame(animate);
-
-    return () => {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
-      el.removeEventListener('touchstart', handleTouch);
-      el.removeEventListener('touchend', handleRelease);
-      el.removeEventListener('mouseenter', handleTouch);
-      el.removeEventListener('mouseleave', handleRelease);
-    };
-  }, [headlines]);
-
   if (headlines.length === 0) return null;
 
   const statusDot = (s: string) => s === 'breaking' ? '#FF3B30' : s === 'hot' ? '#FF9500' : '#AF52DE';
 
-  // Duplicate for seamless loop
+  // Duplicate for seamless CSS loop
   const items = [...headlines, ...headlines];
+
+  // Calculate animation duration based on content length
+  const duration = Math.max(headlines.length * 5, 20);
 
   return (
     <div
@@ -66,11 +27,24 @@ export function NewsTicker({ headlines }: NewsTickerProps) {
         padding: '10px 0',
       }}
     >
-      <div
-        ref={scrollRef}
-        className="flex gap-8 whitespace-nowrap overflow-hidden"
-        dir="rtl"
-      >
+      <style>{`
+        @keyframes ticker-scroll {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(50%); }
+        }
+        .ticker-track {
+          animation: ticker-scroll ${duration}s linear infinite;
+          display: flex;
+          gap: 2rem;
+          width: max-content;
+          direction: rtl;
+        }
+        .ticker-track:hover,
+        .ticker-track:active {
+          animation-play-state: paused;
+        }
+      `}</style>
+      <div className="ticker-track">
         {items.map((headline, idx) => (
           <button
             key={idx}

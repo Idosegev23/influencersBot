@@ -89,6 +89,19 @@ export class SandwichBot {
     console.log(`${'='.repeat(60)}`);
 
     // ==========================================
+    // Resolve account archetype (media_news, etc.) — used for prompt tuning
+    // ==========================================
+    let accountArchetype: string | undefined;
+    try {
+      const { data: acctRow } = await supabase
+        .from('accounts')
+        .select('config')
+        .eq('id', input.accountId)
+        .single();
+      accountArchetype = (acctRow?.config as any)?.archetype;
+    } catch {}
+
+    // ==========================================
     // LAYER 2: Route to Archetype (skip if cached)
     // ==========================================
     let classification: { primaryArchetype: string; confidence: number };
@@ -174,13 +187,7 @@ export class SandwichBot {
     // If media_news account and "what's new?" intent, inject hot topics
     if (HOT_TOPIC_INTENT_PATTERNS.test(input.userMessage)) {
       try {
-        const { data: account } = await supabase
-          .from('accounts')
-          .select('config')
-          .eq('id', input.accountId)
-          .single();
-
-        if ((account?.config as any)?.archetype === 'media_news') {
+        if (accountArchetype === 'media_news') {
           const { getTopHotTopics } = await import('@/lib/hot-topics/query');
           const hotTopics = await getTopHotTopics(5, ['breaking', 'hot']);
 
@@ -257,6 +264,7 @@ export class SandwichBot {
           accountId: input.accountId,
           username: input.username,
           influencerName: input.influencerName,
+          accountArchetype,
         },
         onToken: input.onToken,
         modelTier: input.modelTier,

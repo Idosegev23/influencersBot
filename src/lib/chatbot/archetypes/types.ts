@@ -100,6 +100,7 @@ export interface ArchetypeInput {
     accountId: string;
     username: string;
     influencerName: string;
+    accountArchetype?: string; // 'media_news' etc.
   };
   onToken?: (token: string) => void; // Real-time streaming callback
   modelTier?: 'nano' | 'standard' | 'full'; // From decision engine modelStrategy
