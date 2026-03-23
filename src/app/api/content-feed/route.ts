@@ -242,20 +242,26 @@ async function handleFashionFeed(
   const hlItemIds = (hlItems || []).map(h => h.id);
   let transcriptionMap: Record<string, string> = {};
   if (hlItemIds.length > 0) {
-    const { data: chunks } = await supabase
-      .from('document_chunks')
-      .select('metadata, chunk_text')
-      .eq('account_id', accountId)
-      .eq('entity_type', 'transcription')
-      .limit(300);
+    // Fetch in batches of 200 IDs to match against originalSourceId
+    const batchSize = 200;
+    for (let i = 0; i < hlItemIds.length; i += batchSize) {
+      const batch = hlItemIds.slice(i, i + batchSize);
+      const { data: chunks } = await supabase
+        .from('document_chunks')
+        .select('metadata, chunk_text')
+        .eq('account_id', accountId)
+        .eq('entity_type', 'transcription')
+        .in('metadata->>originalSourceId', batch)
+        .limit(500);
 
-    if (chunks) {
-      for (const c of chunks) {
-        const srcId = c.metadata?.originalSourceId;
-        if (srcId && !transcriptionMap[srcId]) {
-          const text = (c.chunk_text || '').replace(/^\[סיכום:.*?\]\s*/m, '').trim();
-          if (text.length > 20) {
-            transcriptionMap[srcId] = text; // full text, not truncated
+      if (chunks) {
+        for (const c of chunks) {
+          const srcId = c.metadata?.originalSourceId;
+          if (srcId && !transcriptionMap[srcId]) {
+            const text = (c.chunk_text || '').replace(/^\[סיכום:.*?\]\s*/m, '').trim();
+            if (text.length > 20) {
+              transcriptionMap[srcId] = text; // full text, not truncated
+            }
           }
         }
       }

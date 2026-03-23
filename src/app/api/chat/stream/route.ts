@@ -165,7 +165,9 @@ export async function POST(req: NextRequest) {
         // Validate & sanitize
         const message = sanitizeChatMessage(rawMessage);
         const username = sanitizeUsername(rawUsername);
-        
+        // Extract clean display message (strip hidden context) for DB storage
+        const displayMessage = message.split('\n\n[הקשר הלוק:]')[0].trim();
+
         if (!message || message.length < 1) {
           controller.enqueue(encodeEvent({
             type: 'error',
@@ -258,7 +260,7 @@ export async function POST(req: NextRequest) {
             after(async () => {
               try {
                 await Promise.all([
-                  saveChatMessage(earlySessionId, 'user', message),
+                  saveChatMessage(earlySessionId, 'user', displayMessage),
                   saveChatMessage(earlySessionId, 'assistant', cachedResponse),
                 ]);
               } catch (err: any) {
@@ -530,7 +532,7 @@ export async function POST(req: NextRequest) {
 
           // Save messages and update session
           await Promise.all([
-            saveChatMessage(currentSessionId, 'user', message),
+            saveChatMessage(currentSessionId, 'user', displayMessage),
             saveChatMessage(currentSessionId, 'assistant', supportResult.response || ''),
             supabase
               .from('chat_sessions')
@@ -822,7 +824,7 @@ export async function POST(req: NextRequest) {
         after(async () => {
           try {
             await Promise.all([
-              saveChatMessage(currentSessionId, 'user', message),
+              saveChatMessage(currentSessionId, 'user', displayMessage),
               saveChatMessage(currentSessionId, 'assistant', fullText),
               responseId
                 ? supabase

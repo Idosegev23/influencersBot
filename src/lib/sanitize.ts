@@ -115,8 +115,8 @@ export function limitMessageLength(input: string, maxLength = 2000): string {
 export function sanitizeChatMessage(input: string): string {
   let message = input;
   
-  // Limit length first
-  message = limitMessageLength(message, 2000);
+  // Limit length — allow longer messages for content-feed context
+  message = limitMessageLength(message, 4000);
   
   // Remove prompt injection attempts
   message = sanitizePromptInput(message);

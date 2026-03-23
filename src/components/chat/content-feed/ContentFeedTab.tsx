@@ -353,8 +353,18 @@ function LookCard({ item, config, onAsk, index }: { item: ContentCard; config: t
   const askAboutLook = () => {
     const brandLabel = brandName || item.title;
     const displayMessage = `ספרי לי על הלוק הזה של ${brandLabel} 👗`;
-    const fullContent = item.fullText || item.description || '';
-    onAsk(displayMessage, item.id, fullContent);
+    // Always build context — include item ID, brand, title, and transcription
+    const contextParts: string[] = [];
+    contextParts.push(`[מזהה לוק: ${item.id}]`);
+    if (brandName) contextParts.push(`[מותג: ${brandName}]`);
+    contextParts.push(`[כותרת: ${item.title}]`);
+    if (item.fullText) {
+      contextParts.push(item.fullText);
+    } else if (item.description) {
+      contextParts.push(item.description);
+    }
+    const hiddenContext = contextParts.join('\n');
+    onAsk(displayMessage, item.id, hiddenContext);
   };
 
   return (
