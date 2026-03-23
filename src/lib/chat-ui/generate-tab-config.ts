@@ -172,8 +172,8 @@ export async function generateTabConfig(accountId: string): Promise<TabGeneratio
   tabs.push({ id: 'discover', label: 'גלו', type: 'discover' });
 
   // Content/products tab — depends on archetype
-  if (archetype === 'influencer') {
-    // Influencers get content_feed with type-specific label
+  if (archetype === 'influencer' && influencerType !== 'parenting') {
+    // Influencers get content_feed with type-specific label (parenting lives under גלו)
     const contentFeedLabel = CONTENT_FEED_LABELS[influencerType] || CONTENT_FEED_LABELS['other'];
     tabs.push({ id: 'content_feed', label: contentFeedLabel, type: 'content_feed' });
   } else if (archetype === 'brand' || archetype === 'local_business') {

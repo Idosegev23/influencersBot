@@ -341,14 +341,17 @@ function RecipeCard({ item, config, onAsk, onOpen, isNew }: { item: ContentCard;
 
 // ─── Look card — tall image, dark gradient, brand name, editorial serif ───
 
-function LookCard({ item, config, onAsk }: { item: ContentCard; config: typeof TYPE_CONFIG['fashion']; onAsk: (q: string, chunkId?: string) => void }) {
+function LookCard({ item, config, onAsk, index }: { item: ContentCard; config: typeof TYPE_CONFIG['fashion']; onAsk: (q: string, chunkId?: string) => void; index: number }) {
   const brandName = item.meta.brand || item.meta.partner || null;
+  const size = item.meta.size || null;
+  // Alternate tall/short for railroad-track effect
+  const isTall = index % 3 !== 1;
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      className="cf-look-card"
+      className={`cf-look-card ${isTall ? 'cf-look-card--tall' : 'cf-look-card--short'}`}
     >
       <div className="cf-look-card__img">
         {item.imageUrl ? (
@@ -366,14 +369,17 @@ function LookCard({ item, config, onAsk }: { item: ContentCard; config: typeof T
             </span>
           )}
           <h3 className="cf-look-card__title">{item.title}</h3>
-          <button
-            onClick={(e) => { e.stopPropagation(); onAsk(`${config.askPrefix} "${item.title}"`, item.id); }}
-            className="cf-look-card__cta"
-          >
-            <ShoppingBag className="w-3 h-3" />
-            {config.askLabel}
-            <ChevronLeft className="w-3 h-3" />
-          </button>
+          <div className="cf-look-card__bottom">
+            {size && <span className="cf-look-card__size">{size}</span>}
+            <button
+              onClick={(e) => { e.stopPropagation(); onAsk(`${config.askPrefix} "${item.title}"`, item.id); }}
+              className="cf-look-card__cta"
+            >
+              <ShoppingBag className="w-3 h-3" />
+              {config.askLabel}
+              <ChevronLeft className="w-3 h-3" />
+            </button>
+          </div>
         </div>
       </div>
     </motion.div>
@@ -599,12 +605,12 @@ export default function ContentFeedTab({ username, influencerType, tabLabel, onA
   }, [items, searchQuery, influencerType, beautyCategory]);
 
   // Choose card component based on type
-  const renderCard = (item: ContentCard) => {
+  const renderCard = (item: ContentCard, index: number) => {
     switch (influencerType) {
       case 'food':
         return <RecipeCard key={item.id} item={item} config={config} onAsk={onAskAbout} onOpen={openModal} isNew={newItemIds.has(item.id)} />;
       case 'fashion':
-        return <LookCard key={item.id} item={item} config={config} onAsk={onAskAbout} />;
+        return <LookCard key={item.id} item={item} config={config} onAsk={onAskAbout} index={index} />;
       case 'beauty':
         return <BeautyCard key={item.id} item={item} config={config} onAsk={onAskAbout} />;
       case 'tech':
@@ -729,7 +735,7 @@ export default function ContentFeedTab({ username, influencerType, tabLabel, onA
             <>
               <div className={`cf-grid ${gridClass}`}>
                 <AnimatePresence>
-                  {filteredItems.map(item => renderCard(item))}
+                  {filteredItems.map((item, i) => renderCard(item, i))}
                 </AnimatePresence>
               </div>
 

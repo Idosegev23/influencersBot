@@ -2745,8 +2745,8 @@ h1, h2, h3, h4, h5, h6 {
 
 /* ── Grid layouts ── */
 .cf-grid { display: flex; flex-direction: column; gap: 12px; }
-.cf-grid--masonry { column-count: 2; column-gap: 12px; display: block; }
-.cf-grid--masonry > * { break-inside: avoid; margin-bottom: 12px; }
+.cf-grid--masonry { column-count: 2; column-gap: 10px; display: block; }
+.cf-grid--masonry > * { break-inside: avoid; margin-bottom: 10px; }
 .cf-grid--beauty { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .cf-grid--list { display: flex; flex-direction: column; gap: 10px; }
 .cf-grid--wide { display: flex; flex-direction: column; gap: 14px; }
@@ -2833,9 +2833,12 @@ h1, h2, h3, h4, h5, h6 {
   transition: transform 0.25s;
   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
+/* Railroad-track: alternate tall / short cards */
+.cf-look-card--tall .cf-look-card__img { aspect-ratio: 3/5; }
+.cf-look-card--short .cf-look-card__img { aspect-ratio: 3/4; }
 .cf-look-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.12); }
 .cf-look-card__img {
-  width: 100%; aspect-ratio: 3/4; overflow: hidden; position: relative;
+  width: 100%; overflow: hidden; position: relative;
 }
 .cf-look-card__img img { width: 100%; height: 100%; object-fit: cover; }
 .cf-look-card__placeholder {
@@ -2845,20 +2848,29 @@ h1, h2, h3, h4, h5, h6 {
 }
 .cf-look-card__overlay {
   position: absolute; bottom: 0; left: 0; right: 0;
-  padding: 24px 14px 16px;
-  background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 60%, transparent 100%);
-  display: flex; flex-direction: column; gap: 6px;
+  padding: 28px 14px 16px;
+  background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.5) 50%, transparent 100%);
+  display: flex; flex-direction: column; gap: 5px;
 }
 .cf-look-card__brand {
   display: inline-flex; align-items: center; gap: 4px;
-  font-size: 10px; font-weight: 600; letter-spacing: 0.5px;
-  color: rgba(255,255,255,0.7); text-transform: uppercase;
+  font-size: 10px; font-weight: 700; letter-spacing: 1px;
+  color: rgba(255,255,255,0.65); text-transform: uppercase;
 }
 .cf-look-card__title {
-  font-size: 16px; font-weight: 700; color: white;
+  font-size: 15px; font-weight: 700; color: white;
   font-family: 'Noto Serif Hebrew', 'Noto Serif', serif;
   text-shadow: 0 1px 6px rgba(0,0,0,0.4);
   line-height: 1.35;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.cf-look-card__bottom {
+  display: flex; align-items: center; gap: 8px; margin-top: 2px;
+}
+.cf-look-card__size {
+  font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.7);
+  background: rgba(255,255,255,0.12);
+  padding: 3px 8px; border-radius: 6px;
 }
 .cf-look-card__cta {
   display: inline-flex; align-items: center; gap: 4px;
