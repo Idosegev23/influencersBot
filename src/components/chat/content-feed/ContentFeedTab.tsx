@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChefHat, Shirt, Sparkles, Dumbbell, Cpu, Plane, Baby, Heart, Home, Newspaper,
   Clock, ChevronLeft, Loader2, Star, UtensilsCrossed, Search,
-  X, ExternalLink, MessageCircle,
+  X, ExternalLink, MessageCircle, ShoppingBag, Tag, Flame,
 } from 'lucide-react';
 import type { InfluencerType } from '@/types';
 import { getProxiedImageUrl } from '@/lib/image-utils';
@@ -287,9 +287,9 @@ function RecipeModal({
   );
 }
 
-// ─── Recipe card — masonry grid, meta pills, warm palette ───
+// ─── Recipe card — masonry grid, purple palette, meta pills, badge ───
 
-function RecipeCard({ item, config, onAsk, onOpen }: { item: ContentCard; config: typeof TYPE_CONFIG['food']; onAsk: (q: string, chunkId?: string) => void; onOpen: (item: ContentCard) => void }) {
+function RecipeCard({ item, config, onAsk, onOpen, isNew }: { item: ContentCard; config: typeof TYPE_CONFIG['food']; onAsk: (q: string, chunkId?: string) => void; onOpen: (item: ContentCard) => void; isNew?: boolean }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -297,22 +297,28 @@ function RecipeCard({ item, config, onAsk, onOpen }: { item: ContentCard; config
       className="cf-recipe-card"
       onClick={() => onOpen(item)}
     >
-      {item.imageUrl && (
-        <div className="cf-recipe-card__img">
+      <div className="cf-recipe-card__img-wrap">
+        {item.imageUrl && (
           <img src={getProxiedImageUrl(item.imageUrl)} alt={item.title} loading="lazy" />
-        </div>
-      )}
+        )}
+        {isNew && (
+          <span className="cf-recipe-card__badge">
+            <Flame className="w-3 h-3" />
+            חדש
+          </span>
+        )}
+      </div>
       <div className="cf-recipe-card__body">
         <h3 className="cf-recipe-card__title">{item.title}</h3>
-        {Object.keys(item.meta).length > 0 && (
+        {(item.meta.time || item.meta.items) && (
           <div className="cf-recipe-card__pills">
             {item.meta.time && (
-              <span className="cf-pill">
+              <span className="cf-pill cf-pill--purple">
                 <Clock className="w-3 h-3" /> {item.meta.time}
               </span>
             )}
             {item.meta.items && (
-              <span className="cf-pill">
+              <span className="cf-pill cf-pill--purple">
                 <UtensilsCrossed className="w-3 h-3" /> {item.meta.items}
               </span>
             )}
@@ -323,20 +329,21 @@ function RecipeCard({ item, config, onAsk, onOpen }: { item: ContentCard; config
         )}
         <button
           onClick={(e) => { e.stopPropagation(); onAsk(`${config.askPrefix} "${item.title}"`, item.id); }}
-          className="cf-card-cta"
-          style={{ color: config.accentColor }}
+          className="cf-recipe-card__cta"
         >
+          <MessageCircle className="w-3.5 h-3.5" />
           {config.askLabel}
-          <ChevronLeft className="w-3.5 h-3.5" />
         </button>
       </div>
     </motion.div>
   );
 }
 
-// ─── Look card — tall image, overlay, editorial serif ───
+// ─── Look card — tall image, dark gradient, brand name, editorial serif ───
 
 function LookCard({ item, config, onAsk }: { item: ContentCard; config: typeof TYPE_CONFIG['fashion']; onAsk: (q: string, chunkId?: string) => void }) {
+  const brandName = item.meta.brand || item.meta.partner || null;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -352,11 +359,18 @@ function LookCard({ item, config, onAsk }: { item: ContentCard; config: typeof T
           </div>
         )}
         <div className="cf-look-card__overlay">
+          {brandName && (
+            <span className="cf-look-card__brand">
+              <Tag className="w-3 h-3" />
+              {brandName}
+            </span>
+          )}
           <h3 className="cf-look-card__title">{item.title}</h3>
           <button
             onClick={(e) => { e.stopPropagation(); onAsk(`${config.askPrefix} "${item.title}"`, item.id); }}
             className="cf-look-card__cta"
           >
+            <ShoppingBag className="w-3 h-3" />
             {config.askLabel}
             <ChevronLeft className="w-3 h-3" />
           </button>
@@ -366,9 +380,14 @@ function LookCard({ item, config, onAsk }: { item: ContentCard; config: typeof T
   );
 }
 
-// ─── Beauty card — full-width horizontal, pastel pink/purple, immersive ───
+// ─── Beauty card — square image, pink/mauve palette, metadata chips ───
 
 function BeautyCard({ item, config, onAsk }: { item: ContentCard; config: typeof TYPE_CONFIG['beauty']; onAsk: (q: string, chunkId?: string) => void }) {
+  // Extract beauty-specific metadata
+  const steps = item.meta.steps || null;
+  const skinType = item.meta.skin_type || item.meta.type || null;
+  const metaLine = [steps, skinType].filter(Boolean).join(' • ');
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -376,26 +395,36 @@ function BeautyCard({ item, config, onAsk }: { item: ContentCard; config: typeof
       className="cf-beauty-card"
       onClick={() => onAsk(`${config.askPrefix} "${item.title}"`, item.id)}
     >
-      {item.imageUrl && (
-        <div className="cf-beauty-card__img">
+      <div className="cf-beauty-card__img">
+        {item.imageUrl ? (
           <img src={getProxiedImageUrl(item.imageUrl)} alt={item.title} loading="lazy" />
-        </div>
-      )}
+        ) : (
+          <div className="cf-beauty-card__placeholder">
+            <Sparkles className="w-8 h-8" style={{ color: '#805062' }} />
+          </div>
+        )}
+      </div>
       <div className="cf-beauty-card__body">
         <h3 className="cf-beauty-card__title">{item.title}</h3>
+        {metaLine && (
+          <p className="cf-beauty-card__meta">{metaLine}</p>
+        )}
         {item.description && (
           <p className="cf-beauty-card__desc">{item.description}</p>
         )}
-        {item.meta.steps && (
-          <span className="cf-pill cf-pill--pink">
-            {item.meta.steps}
-          </span>
-        )}
       </div>
-      <ChevronLeft className="w-4 h-4 flex-shrink-0 cf-beauty-card__arrow" />
     </motion.div>
   );
 }
+
+// ─── Beauty sub-tabs (category filter) ───
+const BEAUTY_CATEGORIES = [
+  { id: 'all', label: 'הכל' },
+  { id: 'face', label: 'פנים' },
+  { id: 'hair', label: 'שיער' },
+  { id: 'body', label: 'גוף' },
+  { id: 'makeup', label: 'איפור' },
+];
 
 // ─── Review card — tech, with stars ───
 
@@ -495,6 +524,7 @@ export default function ContentFeedTab({ username, influencerType, tabLabel, onA
   const [offset, setOffset] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItem, setSelectedItem] = useState<ContentCard | null>(null);
+  const [beautyCategory, setBeautyCategory] = useState('all');
 
   const config = TYPE_CONFIG[influencerType] || TYPE_CONFIG.other;
   const Icon = config.icon;
@@ -539,19 +569,40 @@ export default function ContentFeedTab({ username, influencerType, tabLabel, onA
     }
   };
 
-  // Filter items by search query
-  const filteredItems = searchQuery
-    ? items.filter(item =>
-        item.title.includes(searchQuery) ||
-        item.description.includes(searchQuery)
-      )
-    : items;
+  // Detect "new" items (first 3 items assumed newest)
+  const newItemIds = useMemo(() => new Set(items.slice(0, 3).map(i => i.id)), [items]);
+
+  // Filter items by search query + beauty category
+  const filteredItems = useMemo(() => {
+    let result = items;
+    if (searchQuery) {
+      result = result.filter(item =>
+        item.title.includes(searchQuery) || item.description.includes(searchQuery)
+      );
+    }
+    if (influencerType === 'beauty' && beautyCategory !== 'all') {
+      const catMap: Record<string, string[]> = {
+        face: ['פנים', 'סרום', 'קרם', 'ניקוי', 'face', 'serum', 'moisturizer'],
+        hair: ['שיער', 'hair', 'שמפו', 'מסכה לשיער'],
+        body: ['גוף', 'body', 'קרם גוף', 'פילינג'],
+        makeup: ['איפור', 'makeup', 'שפתון', 'מסקרה', 'פאונדיישן', 'בסיס'],
+      };
+      const keywords = catMap[beautyCategory] || [];
+      result = result.filter(item =>
+        keywords.some(kw =>
+          item.title.includes(kw) || item.description.includes(kw) ||
+          (item.meta.category || '').includes(kw) || (item.topic || '').includes(kw)
+        )
+      );
+    }
+    return result;
+  }, [items, searchQuery, influencerType, beautyCategory]);
 
   // Choose card component based on type
   const renderCard = (item: ContentCard) => {
     switch (influencerType) {
       case 'food':
-        return <RecipeCard key={item.id} item={item} config={config} onAsk={onAskAbout} onOpen={openModal} />;
+        return <RecipeCard key={item.id} item={item} config={config} onAsk={onAskAbout} onOpen={openModal} isNew={newItemIds.has(item.id)} />;
       case 'fashion':
         return <LookCard key={item.id} item={item} config={config} onAsk={onAskAbout} />;
       case 'beauty':
@@ -569,6 +620,8 @@ export default function ContentFeedTab({ username, influencerType, tabLabel, onA
   const gridClass =
     influencerType === 'food' || influencerType === 'fashion' || influencerType === 'tech'
       ? 'cf-grid--masonry'
+      : influencerType === 'beauty'
+      ? 'cf-grid--beauty'
       : influencerType === 'travel'
       ? 'cf-grid--wide'
       : 'cf-grid--list';
@@ -581,32 +634,85 @@ export default function ContentFeedTab({ username, influencerType, tabLabel, onA
     );
   }
 
+  // ── Type-specific header rendering ──
+  const renderHeader = () => {
+    if (influencerType === 'fashion') {
+      return (
+        <div className="cf-header cf-header--fashion">
+          <h2 className="cf-header__title cf-header__title--serif">{tabLabel}</h2>
+          <div className="cf-header__line" />
+          <p className="cf-header__subtitle">{config.subtitle}</p>
+        </div>
+      );
+    }
+    if (influencerType === 'beauty') {
+      return (
+        <div className="cf-header cf-header--beauty">
+          <div className="cf-header__glass">
+            <div className="cf-header__icon" style={{ background: config.accentBg }}>
+              <Icon className="w-5 h-5" style={{ color: config.accentColor }} />
+            </div>
+            <h2 className="cf-header__title">{tabLabel}</h2>
+            <p className="cf-header__subtitle">{config.subtitle}</p>
+          </div>
+          {/* Category sub-tabs */}
+          <div className="cf-beauty-tabs">
+            {BEAUTY_CATEGORIES.map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => setBeautyCategory(cat.id)}
+                className={`cf-beauty-tabs__btn ${beautyCategory === cat.id ? 'cf-beauty-tabs__btn--active' : ''}`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    if (influencerType === 'food') {
+      return (
+        <div className="cf-header cf-header--recipe">
+          <div className="cf-header__icon" style={{ background: config.accentBg }}>
+            <Icon className="w-6 h-6" style={{ color: config.accentColor }} />
+          </div>
+          <h2 className="cf-header__title">{tabLabel}</h2>
+          <p className="cf-header__subtitle">{config.subtitle}</p>
+        </div>
+      );
+    }
+    // Default header
+    return (
+      <div className="cf-header">
+        <div className="cf-header__icon" style={{ background: config.accentBg }}>
+          <Icon className="w-6 h-6" style={{ color: config.accentColor }} />
+        </div>
+        <h2 className="cf-header__title">{tabLabel}</h2>
+        <p className="cf-header__subtitle">{config.subtitle}</p>
+      </div>
+    );
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className={`cf-tab cf-tab--${config.headerStyle} h-full overflow-y-auto pb-32`}
+      className={`cf-tab cf-tab--${influencerType} h-full overflow-y-auto pb-32`}
       dir="rtl"
     >
       <div className="px-4 py-5">
         <div className="max-w-[700px] mx-auto">
           {/* Header */}
-          <div className="cf-header">
-            <div className="cf-header__icon" style={{ background: config.accentBg }}>
-              <Icon className="w-6 h-6" style={{ color: config.accentColor }} />
-            </div>
-            <h2 className="cf-header__title">{tabLabel}</h2>
-            <p className="cf-header__subtitle">{config.subtitle}</p>
-          </div>
+          {renderHeader()}
 
           {/* Search */}
           {items.length > 5 && (
-            <div className="cf-search">
+            <div className={`cf-search ${influencerType === 'food' ? 'cf-search--recipe' : ''}`}>
               <Search className="w-4 h-4 cf-search__icon" />
               <input
                 type="text"
-                placeholder="חפשו תוכן..."
+                placeholder={influencerType === 'food' ? 'חפשו מתכון...' : influencerType === 'beauty' ? 'חפשו מוצר או שגרה...' : 'חפשו תוכן...'}
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 className="cf-search__input"
@@ -617,7 +723,7 @@ export default function ContentFeedTab({ username, influencerType, tabLabel, onA
           {/* Content */}
           {filteredItems.length === 0 ? (
             <div className="text-center py-12">
-              <p className="cf-empty">{searchQuery ? 'לא נמצאו תוצאות' : config.emptyText}</p>
+              <p className="cf-empty">{searchQuery || beautyCategory !== 'all' ? 'לא נמצאו תוצאות' : config.emptyText}</p>
             </div>
           ) : (
             <>
@@ -648,7 +754,7 @@ export default function ContentFeedTab({ username, influencerType, tabLabel, onA
         </div>
       </div>
 
-      {/* Recipe detail modal — portal to body to escape stacking context */}
+      {/* Detail modal — portal to body */}
       {typeof document !== 'undefined' && createPortal(
         <AnimatePresence>
           {selectedItem && (
