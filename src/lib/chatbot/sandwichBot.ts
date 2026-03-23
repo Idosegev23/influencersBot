@@ -12,6 +12,7 @@ import {
   hasRelevantKnowledge,
   type KnowledgeBase,
 } from './knowledge-retrieval';
+import { supabase } from '@/lib/supabase';
 
 // Fallback suggestions per archetype when LLM omits <<SUGGESTIONS>>
 const ARCHETYPE_FALLBACK_SUGGESTIONS: Record<string, string> = {
@@ -46,6 +47,7 @@ export interface SandwichBotInput {
   mode?: 'widget' | 'social' | 'dm'; // Widget = sales-oriented, Social = engagement, DM = Instagram direct messages
   widgetConfig?: any; // Widget-specific config from accounts.config.widget
   fromSuggestion?: boolean; // Suggestion click — check DB cache for pre-generated response
+  chunkId?: string; // Direct chunk ID from content feed — skip RAG search, inject chunk directly
 }
 
 export interface SandwichBotOutput {
@@ -153,6 +155,36 @@ export class SandwichBot {
       knowledgeQuery,
       input.rollingSummary
     );
+
+    // If chunkId provided (from content feed), inject that chunk directly into knowledge
+    if (input.chunkId) {
+      try {
+        const { data: chunk } = await supabase
+          .from('document_chunks')
+          .select('chunk_text, entity_type, metadata')
+          .eq('id', input.chunkId)
+          .single();
+
+        if (chunk?.chunk_text) {
+          console.log(`   📌 Injecting content-feed chunk ${input.chunkId} (${chunk.chunk_text.length} chars)`);
+          // Inject as a website/post entry so the archetype prompt includes it
+          if (chunk.entity_type === 'website') {
+            knowledgeBase.websites = [
+              { url: chunk.metadata?.source_url || '', content: chunk.chunk_text, title: chunk.metadata?.title || '', scraped_at: '' },
+              ...knowledgeBase.websites,
+            ];
+          } else {
+            // Post or transcription — inject as a post
+            knowledgeBase.posts = [
+              { shortcode: chunk.metadata?.shortcode || '', caption: chunk.chunk_text, media_url: '', timestamp: '' } as any,
+              ...knowledgeBase.posts,
+            ];
+          }
+        }
+      } catch (err) {
+        console.error('[SandwichBot] Failed to fetch chunk:', err);
+      }
+    }
 
     // ==========================================
     // LAYER 2 + 3: Process with Archetype (includes Guardrails)

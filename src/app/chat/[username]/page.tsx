@@ -1841,7 +1841,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 username={username}
                 influencerType={(influencer.influencer_type as InfluencerType) || 'other'}
                 tabLabel={(influencer.tabs || DEFAULT_TABS).find((t: { id: string }) => t.id === 'content_feed')?.label || 'תוכן'}
-                onAskAbout={(question: string) => {
+                onAskAbout={(question: string, chunkId?: string) => {
                   setActiveTab('chat');
                   maybeShowLeadPopup();
                   const userMsg = { id: Date.now().toString(), role: 'user' as const, content: question };
@@ -1857,6 +1857,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                     sessionId: sessionId || undefined,
                     previousResponseId: responseId || undefined,
                     clientMessageId: assistantMessageId,
+                    chunkId,
                   });
                 }}
               />

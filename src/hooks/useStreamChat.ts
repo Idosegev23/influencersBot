@@ -102,6 +102,7 @@ export function useStreamChat(options: UseStreamChatOptions = {}) {
     previousResponseId?: string;
     clientMessageId?: string;
     fromSuggestion?: boolean;
+    chunkId?: string;
   }) => {
     // Cancel any existing stream
     if (abortControllerRef.current) {

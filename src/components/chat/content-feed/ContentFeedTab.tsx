@@ -28,7 +28,7 @@ interface ContentFeedTabProps {
   username: string;
   influencerType: InfluencerType;
   tabLabel: string;
-  onAskAbout: (question: string) => void;
+  onAskAbout: (question: string, chunkId?: string) => void;
 }
 
 // ─── Type-specific config ───
@@ -146,7 +146,7 @@ function RecipeModal({
   item: ContentCard;
   config: typeof TYPE_CONFIG['food'];
   onClose: () => void;
-  onAsk: (q: string) => void;
+  onAsk: (q: string, chunkId?: string) => void;
 }) {
   // Split content into sections (ingredients, instructions, etc.)
   const lines = item.fullText
@@ -239,7 +239,7 @@ function RecipeModal({
           <div className="cf-modal__actions">
             <button
               onClick={() => {
-                onAsk(`${config.askPrefix} "${item.title}"`);
+                onAsk(`${config.askPrefix} "${item.title}"`, item.id);
                 onClose();
               }}
               className="cf-modal__btn cf-modal__btn--primary"
