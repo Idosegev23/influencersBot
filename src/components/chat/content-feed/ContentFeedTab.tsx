@@ -269,7 +269,7 @@ function RecipeModal({
 
 // ─── Recipe card — masonry grid, meta pills, warm palette ───
 
-function RecipeCard({ item, config, onAsk, onOpen }: { item: ContentCard; config: typeof TYPE_CONFIG['food']; onAsk: (q: string) => void; onOpen: (item: ContentCard) => void }) {
+function RecipeCard({ item, config, onAsk, onOpen }: { item: ContentCard; config: typeof TYPE_CONFIG['food']; onAsk: (q: string, chunkId?: string) => void; onOpen: (item: ContentCard) => void }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -302,7 +302,7 @@ function RecipeCard({ item, config, onAsk, onOpen }: { item: ContentCard; config
           <p className="cf-recipe-card__desc">{item.description}</p>
         )}
         <button
-          onClick={(e) => { e.stopPropagation(); onAsk(`${config.askPrefix} "${item.title}"`); }}
+          onClick={(e) => { e.stopPropagation(); onAsk(`${config.askPrefix} "${item.title}"`, item.id); }}
           className="cf-card-cta"
           style={{ color: config.accentColor }}
         >
@@ -316,7 +316,7 @@ function RecipeCard({ item, config, onAsk, onOpen }: { item: ContentCard; config
 
 // ─── Look card — tall image, overlay, editorial serif ───
 
-function LookCard({ item, config, onAsk }: { item: ContentCard; config: typeof TYPE_CONFIG['fashion']; onAsk: (q: string) => void }) {
+function LookCard({ item, config, onAsk }: { item: ContentCard; config: typeof TYPE_CONFIG['fashion']; onAsk: (q: string, chunkId?: string) => void }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -334,7 +334,7 @@ function LookCard({ item, config, onAsk }: { item: ContentCard; config: typeof T
         <div className="cf-look-card__overlay">
           <h3 className="cf-look-card__title">{item.title}</h3>
           <button
-            onClick={(e) => { e.stopPropagation(); onAsk(`${config.askPrefix} "${item.title}"`); }}
+            onClick={(e) => { e.stopPropagation(); onAsk(`${config.askPrefix} "${item.title}"`, item.id); }}
             className="cf-look-card__cta"
           >
             {config.askLabel}
@@ -348,13 +348,13 @@ function LookCard({ item, config, onAsk }: { item: ContentCard; config: typeof T
 
 // ─── Beauty card — full-width horizontal, pastel pink/purple, immersive ───
 
-function BeautyCard({ item, config, onAsk }: { item: ContentCard; config: typeof TYPE_CONFIG['beauty']; onAsk: (q: string) => void }) {
+function BeautyCard({ item, config, onAsk }: { item: ContentCard; config: typeof TYPE_CONFIG['beauty']; onAsk: (q: string, chunkId?: string) => void }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       className="cf-beauty-card"
-      onClick={() => onAsk(`${config.askPrefix} "${item.title}"`)}
+      onClick={() => onAsk(`${config.askPrefix} "${item.title}"`, item.id)}
     >
       {item.imageUrl && (
         <div className="cf-beauty-card__img">
@@ -379,7 +379,7 @@ function BeautyCard({ item, config, onAsk }: { item: ContentCard; config: typeof
 
 // ─── Review card — tech, with stars ───
 
-function ReviewCard({ item, config, onAsk }: { item: ContentCard; config: typeof TYPE_CONFIG['tech']; onAsk: (q: string) => void }) {
+function ReviewCard({ item, config, onAsk }: { item: ContentCard; config: typeof TYPE_CONFIG['tech']; onAsk: (q: string, chunkId?: string) => void }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -402,7 +402,7 @@ function ReviewCard({ item, config, onAsk }: { item: ContentCard; config: typeof
           <p className="cf-review-card__desc">{item.description}</p>
         )}
         <button
-          onClick={() => onAsk(`${config.askPrefix} "${item.title}"`)}
+          onClick={() => onAsk(`${config.askPrefix} "${item.title}"`, item.id)}
           className="cf-card-cta"
           style={{ color: config.accentColor }}
         >
@@ -416,13 +416,13 @@ function ReviewCard({ item, config, onAsk }: { item: ContentCard; config: typeof
 
 // ─── Destination card — wide image with overlay for travel ───
 
-function DestinationCard({ item, config, onAsk }: { item: ContentCard; config: typeof TYPE_CONFIG['travel']; onAsk: (q: string) => void }) {
+function DestinationCard({ item, config, onAsk }: { item: ContentCard; config: typeof TYPE_CONFIG['travel']; onAsk: (q: string, chunkId?: string) => void }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       className="cf-destination-card"
-      onClick={() => onAsk(`${config.askPrefix} "${item.title}"`)}
+      onClick={() => onAsk(`${config.askPrefix} "${item.title}"`, item.id)}
     >
       <div className="cf-destination-card__img">
         {item.imageUrl ? (
@@ -443,13 +443,13 @@ function DestinationCard({ item, config, onAsk }: { item: ContentCard; config: t
 
 // ─── Generic card — list style ───
 
-function GenericCard({ item, config, onAsk }: { item: ContentCard; config: typeof TYPE_CONFIG['other']; onAsk: (q: string) => void }) {
+function GenericCard({ item, config, onAsk }: { item: ContentCard; config: typeof TYPE_CONFIG['other']; onAsk: (q: string, chunkId?: string) => void }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       className="cf-generic-card"
-      onClick={() => onAsk(`${config.askPrefix} "${item.title}"`)}
+      onClick={() => onAsk(`${config.askPrefix} "${item.title}"`, item.id)}
     >
       {item.imageUrl && (
         <div className="cf-generic-card__thumb">
