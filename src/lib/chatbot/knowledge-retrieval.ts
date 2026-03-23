@@ -239,7 +239,7 @@ export async function retrieveKnowledge(
     contentPromises.rag = retrieveContext({
       accountId,
       query: userMessage,
-      topK: isMediaNews ? 18 : 12, // media_news: more chunks since no coupons/partnerships take up context
+      topK: isMediaNews ? 28 : 12, // media_news: more chunks since no coupons/partnerships take up context
       conversationSummary: rollingSummary,
       archetype: accountArchetype,
     });

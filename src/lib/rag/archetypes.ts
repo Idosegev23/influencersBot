@@ -139,8 +139,8 @@ export const ARCHETYPE_CONFIGS: Record<AccountArchetype, ArchetypeConfig> = {
       document: 0,
     },
     typeCaps: {
-      post: 10,
-      transcription: 12,
+      post: 12,
+      transcription: 18,
       highlight: 4,
       website: 0,
       knowledge_base: 3,
