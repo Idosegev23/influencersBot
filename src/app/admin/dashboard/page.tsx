@@ -208,13 +208,6 @@ function DashboardContent() {
           אונבורדינג
         </Link>
 
-        <Link
-          href="/admin/brand-logos"
-          className="neon-pill neon-pill-ghost flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition-all"
-        >
-          <span className="material-symbols-outlined text-[18px]">image</span>
-          לוגואים
-        </Link>
       </div>
 
       {/* ===== Social Tab ===== */}

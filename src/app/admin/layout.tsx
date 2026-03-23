@@ -8,9 +8,6 @@ const NAV_ITEMS = [
   { href: '/admin/influencers', label: 'משפיענים', icon: 'group' },
   { href: '/admin/add', label: 'קליטה', icon: 'person_add' },
   { href: '/admin/onboarding', label: 'אונבורדינג', icon: 'checklist' },
-  { href: '/admin/brand-logos', label: 'לוגואים', icon: 'loyalty' },
-  { href: '/admin/rules', label: 'חוקים', icon: 'gavel' },
-  { href: '/admin/experiments', label: 'ניסויים', icon: 'science' },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

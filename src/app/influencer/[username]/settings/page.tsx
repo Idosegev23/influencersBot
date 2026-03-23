@@ -61,11 +61,30 @@ export default function SettingsPage({
           setGreetingMessage((inf as any).config.widget.welcomeMessage);
         }
 
-        // Load suggested questions
-        const questions = inf.suggested_questions
+        // Load suggested questions: config first, then fallback to persona topics
+        const configQuestions = inf.suggested_questions
           || (inf as any).config?.suggested_questions
           || [];
-        setSuggestedQuestions(questions);
+
+        if (configQuestions.length > 0) {
+          setSuggestedQuestions(configQuestions);
+        } else {
+          // Fallback: load from persona knowledge_map (same source chat uses)
+          try {
+            const initRes = await fetch(`/api/chat/init?username=${username}`);
+            if (initRes.ok) {
+              const initData = await initRes.json();
+              if (initData.quickReplies?.length > 0) {
+                setSuggestedQuestions(initData.quickReplies);
+              }
+              if (!inf.greeting_message && initData.greeting) {
+                setGreetingMessage(initData.greeting);
+              }
+            }
+          } catch (e) {
+            // Non-critical — settings page still works without defaults
+          }
+        }
       } catch (err) {
         console.error('Error loading settings:', err);
       } finally {

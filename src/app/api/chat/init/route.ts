@@ -40,31 +40,43 @@ export async function GET(request: Request) {
       .eq('account_id', account.id)
       .single();
 
-    // Extract display name from config
-    const displayName = (account.config as any)?.display_name || username;
+    // Extract display name and config
+    const config = (account.config || {}) as any;
+    const displayName = config.display_name || username;
 
-    // Build greeting message
-    let greeting = `שלום! אני הבוט של ${persona?.name || displayName} 😊`;
-    
-    if (persona?.voice_rules?.tone) {
-      // Use voice_rules to craft a better greeting
-      greeting += `\nאני כאן כדי לעזור לך עם שאלות, המלצות וקופונים בלעדיים. במה אפשר לעזור?`;
+    // ── Greeting: prefer user-configured, fallback to auto-generated ──
+    let greeting: string;
+    if (config.greeting_message) {
+      greeting = config.greeting_message;
     } else {
-      greeting += `\nאיך אפשר לעזור?`;
+      greeting = `שלום! אני הבוט של ${persona?.name || displayName} 😊`;
+      if (persona?.voice_rules?.tone) {
+        greeting += `\nאני כאן כדי לעזור לך עם שאלות, המלצות וקופונים בלעדיים. במה אפשר לעזור?`;
+      } else {
+        greeting += `\nאיך אפשר לעזור?`;
+      }
     }
 
-    // Get quick replies from knowledge map
-    const quickReplies: string[] = [];
-
-    if (persona?.knowledge_map?.coreTopics?.length > 0) {
-      const topTopics = persona.knowledge_map.coreTopics.slice(0, 3);
-      quickReplies.push(...topTopics.map((t: any) => `ספר/י לי על ${t.name}`));
+    // ── Quick replies: prefer user-configured, fallback to persona topics ──
+    let quickReplies: string[];
+    if (config.suggested_questions?.length > 0) {
+      quickReplies = config.suggested_questions;
+    } else {
+      quickReplies = [];
+      if (persona?.knowledge_map?.coreTopics?.length > 0) {
+        const topTopics = persona.knowledge_map.coreTopics.slice(0, 3);
+        quickReplies.push(...topTopics.map((t: any) => `ספר/י לי על ${t.name}`));
+      }
+      quickReplies.push('יש קופונים?');
     }
-
-    quickReplies.push('יש קופונים?');
 
     // Build topic-based suggestion pool for fast follow-ups
     const topicSuggestions: string[] = [];
+    // Start with user-configured questions if available
+    if (config.suggested_questions?.length > 0) {
+      topicSuggestions.push(...config.suggested_questions);
+    }
+    // Add persona-generated suggestions
     if (persona?.knowledge_map?.coreTopics?.length > 0) {
       for (const topic of persona.knowledge_map.coreTopics.slice(0, 8)) {
         const name = topic.name || topic;

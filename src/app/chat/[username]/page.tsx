@@ -207,6 +207,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [showLeadPopup, setShowLeadPopup] = useState(false);
   const [leadInfo, setLeadInfo] = useState<{ firstName: string; serialNumber: string } | null>(null);
   const [topicSuggestions, setTopicSuggestions] = useState<string[]>([]);
+  const [quickReplies, setQuickReplies] = useState<string[]>([]);
   const [hasCommercialContent, setHasCommercialContent] = useState(false);
   const userMsgCountRef = useRef(0);
 
@@ -426,6 +427,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     fetch(`/api/chat/init?username=${encodeURIComponent(username)}`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
+        if (data?.quickReplies) setQuickReplies(data.quickReplies);
         if (data?.topicSuggestions) setTopicSuggestions(data.topicSuggestions);
         if (data?.hasCommercialContent) setHasCommercialContent(true);
       })
@@ -1000,6 +1002,34 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           </p>
                         )}
                       </motion.div>
+
+                      {/* Quick reply pills — editable suggested questions */}
+                      {quickReplies.length > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.4, delay: 0.35 }}
+                          className="flex flex-wrap justify-center gap-2 max-w-[670px] w-full px-2"
+                        >
+                          {quickReplies.map((q, i) => (
+                            <motion.button
+                              key={i}
+                              initial={{ opacity: 0, y: 6 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: 0.4 + i * 0.05, duration: 0.3 }}
+                              whileTap={{ scale: 0.96 }}
+                              onClick={() => {
+                                if (isTyping || isStreamActive) return;
+                                maybeShowLeadPopup();
+                                sendQuickMessage(q);
+                              }}
+                              className="suggestion-pill whitespace-nowrap flex-shrink-0"
+                            >
+                              {q}
+                            </motion.button>
+                          ))}
+                        </motion.div>
+                      )}
 
                       {/* Discovery category pills — horizontal scroll with arrow */}
                       {(influencer.tabs || DEFAULT_TABS).some((t: { id: string }) => t.id === 'discover') && discoveryCategories.length > 0 && (
