@@ -252,6 +252,18 @@ function createDefaultResult(message: string, processingTimeMs: number): Underst
   const orderRegex = /#?\d{5,10}|הזמנה\s*\d+/g;
   const orderNumbers = message.match(orderRegex) || [];
 
+  // Generate basic clarifications for short/ambiguous messages
+  const suggestedClarifications: string[] = [];
+  if (message.length < 30 && intent === 'general') {
+    suggestedClarifications.push('ספר/י לי עוד — מה בדיוק מעניין אותך?');
+  }
+  if (intent === 'coupon' && !lowerMessage.match(/\b\w{3,}\b/g)?.some(w => !['קופון','הנחה','קוד','יש','לי'].includes(w))) {
+    suggestedClarifications.push('לאיזה מותג את/ה מחפש/ת קופון?');
+  }
+  if (intent === 'support' && orderNumbers.length === 0) {
+    suggestedClarifications.push('יש לך מספר הזמנה שאני יכול/ה לבדוק?');
+  }
+
   return {
     intent,
     confidence: 0.5, // Low confidence for fallback
@@ -269,7 +281,7 @@ function createDefaultResult(message: string, processingTimeMs: number): Underst
     sentiment: 'neutral',
     isRepeat: false,
     ambiguity: ['Fallback analysis used'],
-    suggestedClarifications: [],
+    suggestedClarifications,
     risk: {
       privacy: phoneNumbers.length > 0,
       legal: false,

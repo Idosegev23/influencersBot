@@ -127,6 +127,9 @@ export async function processWithArchetype(
     previousResponseId?: string | null;
     mode?: 'widget' | 'social' | 'dm';
     widgetConfig?: any;
+    suggestedClarifications?: string[];
+    activeCoupons?: Array<{ brand_name: string; coupon_code: string; description?: string }>;
+    conversationTopics?: string[];
   }
 ) {
   console.log('\n' + '='.repeat(80));
@@ -175,6 +178,9 @@ export async function processWithArchetype(
     previousResponseId: context.previousResponseId,
     mode: context.mode,
     widgetConfig: context.widgetConfig,
+    suggestedClarifications: context.suggestedClarifications,
+    activeCoupons: context.activeCoupons,
+    conversationTopics: context.conversationTopics,
   });
   
   console.log('\n' + '='.repeat(80));

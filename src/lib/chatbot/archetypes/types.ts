@@ -107,6 +107,10 @@ export interface ArchetypeInput {
   previousResponseId?: string | null; // OpenAI Responses API: chain context across turns
   mode?: 'widget' | 'social' | 'dm'; // Widget = sales-oriented, Social = engagement, DM = Instagram direct messages
   widgetConfig?: any; // Widget-specific config from accounts.config.widget (prompt overrides, FAQ, etc.)
+  // Proactive conversation enrichment
+  suggestedClarifications?: string[]; // From understanding engine — questions to ask when ambiguous
+  activeCoupons?: Array<{ brand_name: string; coupon_code: string; description?: string }>; // For proactive coupon hints
+  conversationTopics?: string[]; // From rolling_summary — recurring topics for deepening
 }
 
 export interface ArchetypeOutput {

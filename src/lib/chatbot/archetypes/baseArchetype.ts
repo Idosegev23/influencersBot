@@ -342,6 +342,40 @@ export abstract class BaseArchetype {
   }
 
   /**
+   * Build proactive conversation enrichment block for the system prompt.
+   * Combines: clarifications (step 1), coupon hints (step 2+3), deepening topics (step 4).
+   */
+  private buildProactiveBlock(input: ArchetypeInput): string {
+    const sections: string[] = [];
+
+    // Step 1: Suggested clarifications from understanding engine
+    if (input.suggestedClarifications?.length) {
+      sections.push(
+        `\n🔍 שאלות הבהרה מומלצות (אם ההודעה לא ברורה מספיק, שאל/י אחת מהן בטבעיות):\n${input.suggestedClarifications.map(q => `• "${q}"`).join('\n')}`
+      );
+    }
+
+    // Step 2+3: Active coupons for proactive mention in response + suggestions
+    if (input.activeCoupons?.length) {
+      const couponList = input.activeCoupons.slice(0, 5).map(c =>
+        `• ${c.brand_name}: קוד ${c.coupon_code}${c.description ? ` (${c.description})` : ''}`
+      ).join('\n');
+      sections.push(
+        `\n🎁 קופונים פעילים — אם בשיחה עולה מותג שיש לו קופון, הזכר/י את הקופון בטבעיות (לא בכוח!):\n${couponList}\n• אם הנושא רלוונטי — שלב/י הזכרה קצרה בתשובה: "אגב, יש לי קוד הנחה ל-X אם מעניין אותך"\n• אחת מ-3 ההצעות (SUGGESTIONS) יכולה להיות על קופון רלוונטי`
+      );
+    }
+
+    // Step 4: Conversation deepening based on rolling summary / recurring topics
+    if (input.conversationTopics?.length) {
+      sections.push(
+        `\n💡 נושאים שחוזרים בשיחה (הזדמנות להעמקה):\n${input.conversationTopics.map(t => `• ${t}`).join('\n')}\n• אם המשתמש/ת חוזר/ת לנושא — הציע/י להעמיק: "שמתי לב שזה מעניין אותך — רוצה שאפרט?"\n• שלב/י את הנושאים האלה בהצעות (SUGGESTIONS) כשמתאים`
+      );
+    }
+
+    return sections.length > 0 ? '\n' + sections.join('\n') : '';
+  }
+
+  /**
    * Generate AI response using OpenAI Responses API (GPT-5.2)
    * Uses previous_response_id for server-side context chaining.
    * Supports real-time streaming via onToken callback.
@@ -432,6 +466,7 @@ ${input.mode === 'widget' && input.widgetConfig?._recommendationBlock ? `\n${inp
 • **תשובות לשאלה שלך** (המשתמש ענה "שמנת" / "לאירוח"): תן/י את התשובה המלאה בהתאם לבחירה, בלי עוד שאלות.
 • **אחרי כל תשובה**: הציע/י בקצרה המשך טבעי אחד בתוך הטקסט.
 • 1-2 אימוג'ים מקסימום לכל תשובה.
+${this.buildProactiveBlock(input)}
 
 ${input.mode === 'widget' ? `📌 בווידג'ט — 🚫 אל תוסיף <<SUGGESTIONS>>. אין כפתורי המשך בווידג'ט. סיים את התשובה ב-CTA טבעי בתוך הטקסט.` : `📌 המלצות המשך:
 בסוף **כל** תשובה, הוסף שורה אחרונה בפורמט הזה בדיוק:

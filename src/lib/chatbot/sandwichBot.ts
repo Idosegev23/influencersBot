@@ -48,6 +48,10 @@ export interface SandwichBotInput {
   widgetConfig?: any; // Widget-specific config from accounts.config.widget
   fromSuggestion?: boolean; // Suggestion click — check DB cache for pre-generated response
   chunkId?: string; // Direct chunk ID from content feed — skip RAG search, inject chunk directly
+  // Proactive conversation enrichment (from understanding engine + stream/route)
+  suggestedClarifications?: string[]; // Questions to ask when intent is ambiguous
+  activeCoupons?: Array<{ brand_name: string; coupon_code: string; description?: string }>; // Available coupons for proactive mention
+  conversationTopics?: string[]; // Topics from rolling_summary for deepening
 }
 
 export interface SandwichBotOutput {
@@ -210,6 +214,9 @@ export class SandwichBot {
         previousResponseId: input.previousResponseId,
         mode: input.mode,
         widgetConfig: input.widgetConfig,
+        suggestedClarifications: input.suggestedClarifications,
+        activeCoupons: input.activeCoupons,
+        conversationTopics: input.conversationTopics,
       }
     );
 

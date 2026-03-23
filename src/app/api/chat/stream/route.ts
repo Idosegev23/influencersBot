@@ -712,6 +712,22 @@ export async function POST(req: NextRequest) {
           // Await lead name (started in parallel with decision engine)
           const leadName = await leadNamePromise;
 
+          // Build proactive enrichment data
+          const activeCoupons = brands
+            .filter(b => b.coupon_code)
+            .map(b => ({ brand_name: b.brand_name, coupon_code: b.coupon_code, description: b.description }));
+
+          // Extract recurring topics from rolling summary for deepening (Step 4)
+          const conversationTopics: string[] = [];
+          if (session?.rolling_summary) {
+            // Extract key phrases from the rolling summary (simple heuristic)
+            const summary = session.rolling_summary as string;
+            const topicMatches = summary.match(/(?:דיברנו על|שאל(?:ה|) על|מתעניינ(?:ת|) ב|נושא[:]?\s*)([^,.;]+)/g);
+            if (topicMatches?.length) {
+              conversationTopics.push(...topicMatches.slice(0, 3).map(t => t.replace(/^(?:דיברנו על|שאל(?:ה|) על|מתעניינ(?:ת|) ב|נושא[:]?\s*)/, '').trim()));
+            }
+          }
+
           const sandwichResult = await processSandwichMessageWithMetadata({
             userMessage: message,
             accountId,
@@ -725,6 +741,10 @@ export async function POST(req: NextRequest) {
             previousResponseId: session?.last_response_id || previousResponseId || null,
             fromSuggestion: !!fromSuggestion,
             chunkId: chunkId || undefined,
+            // Proactive enrichment (Steps 1-4)
+            suggestedClarifications: understanding.suggestedClarifications?.length ? understanding.suggestedClarifications : undefined,
+            activeCoupons: activeCoupons.length > 0 ? activeCoupons : undefined,
+            conversationTopics: conversationTopics.length > 0 ? conversationTopics : undefined,
             // Real-time streaming: tokens go directly to client as they arrive from OpenAI
             onToken: (token: string) => {
               if (!firstTokenSent) {
