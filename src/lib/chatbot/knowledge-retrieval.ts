@@ -222,10 +222,12 @@ export async function retrieveKnowledge(
   getMetrics()?.set('retrievalPath', ragAvailable ? 'rag+direct' : 'fts');
 
   // Direct DB queries — ALWAYS run regardless of RAG availability
+  // media_news accounts skip coupons & partnerships (irrelevant for news channels)
+  const isMediaNews = accountArchetype === 'media_news';
   const directPromises = {
     websites: fetchRelevantWebsites(supabase, accountId, userMessage, 3),
-    coupons: fetchRelevantCoupons(supabase, accountId, [], archetype, userMessage),
-    partnerships: fetchRelevantPartnerships(supabase, accountId, [], userMessage),
+    coupons: isMediaNews ? Promise.resolve([]) : fetchRelevantCoupons(supabase, accountId, [], archetype, userMessage),
+    partnerships: isMediaNews ? Promise.resolve([]) : fetchRelevantPartnerships(supabase, accountId, [], userMessage),
     insights: fetchRelevantInsights(supabase, accountId, archetype, 3),
     manualKnowledge: fetchManualKnowledge(supabase, accountId),
     discoveryLists: fetchRelevantDiscoveryLists(supabase, accountId, userMessage, 3),
@@ -237,7 +239,7 @@ export async function retrieveKnowledge(
     contentPromises.rag = retrieveContext({
       accountId,
       query: userMessage,
-      topK: 12,
+      topK: isMediaNews ? 18 : 12, // media_news: more chunks since no coupons/partnerships take up context
       conversationSummary: rollingSummary,
       archetype: accountArchetype,
     });
