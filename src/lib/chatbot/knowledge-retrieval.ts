@@ -913,7 +913,7 @@ async function fetchRelevantCoupons(
       
       const { data: fallbackData, error: fallbackError } = await supabase
         .from('coupons')
-        .select('id, code, description, discount_type, discount_value, partnership_id, start_date, end_date')
+        .select('id, code, brand_name, description, discount_type, discount_value, partnership_id, start_date, end_date')
         .eq('account_id', accountId)
         .eq('is_active', true)
         .order('created_at', { ascending: false })
@@ -944,7 +944,7 @@ async function fetchRelevantCoupons(
           }
           
           allCoupons.push({
-            brand: (partnership as any)?.brand_name || 'מותג',
+            brand: c.brand_name || (partnership as any)?.brand_name || 'מותג',
             code: c.code,
             discount: discount,
             category: (partnership as any)?.category || 'general',

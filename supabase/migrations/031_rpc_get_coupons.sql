@@ -21,7 +21,7 @@ AS $$
     c.description,
     c.discount_type,
     c.discount_value,
-    p.brand_name,
+    COALESCE(c.brand_name, p.brand_name) as brand_name,
     p.category,
     p.link
   FROM coupons c
