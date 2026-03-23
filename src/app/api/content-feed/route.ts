@@ -44,6 +44,62 @@ function decodeHtmlEntities(text: string): string {
 }
 
 /**
+ * Strip HTML/CSS/JS junk from website-scraped chunk text.
+ * Keeps only readable Hebrew/English recipe content.
+ */
+function cleanWebContent(text: string): string {
+  let cleaned = text
+    // Remove <style>...</style> blocks
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    // Remove <script>...</script> blocks
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    // Remove inline CSS blocks: .className { ... }
+    .replace(/\.[a-zA-Z_#][\w\s.:#>,~+\-\[\]=*"'^$()]*\{[^}]*\}/g, '')
+    // Remove @media blocks
+    .replace(/@media[^{]*\{[\s\S]*?\}\s*\}/g, '')
+    // Remove remaining HTML tags
+    .replace(/<[^>]+>/g, ' ')
+    // Remove jQuery/JS patterns
+    .replace(/jQuery\([\s\S]*?\}\);?/g, '')
+    .replace(/var\s+\w+\s*=[\s\S]*?;/g, '')
+    .replace(/function\s*\w*\s*\([^)]*\)\s*\{[\s\S]*?\}/g, '')
+    .replace(/\.\w+\s*\{[^}]*\}/g, '')
+    // Remove CSS-like properties that leaked through
+    .replace(/[a-z\-]+:\s*[#\d]+px[^;\n]*;/g, '')
+    .replace(/[a-z\-]+:\s*#[0-9a-f]+[^;\n]*;/g, '')
+    // Remove URLs
+    .replace(/https?:\/\/\S+/g, '')
+    // Clean up whitespace
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n\s*\n(\s*\n)+/g, '\n\n');
+
+  // Deduplicate: if "אופן הכנה" appears multiple times, keep only the first block
+  const prepIdx = cleaned.indexOf('אופן הכנה');
+  if (prepIdx !== -1) {
+    const secondIdx = cleaned.indexOf('אופן הכנה', prepIdx + 10);
+    if (secondIdx !== -1) {
+      cleaned = cleaned.slice(0, secondIdx).trim();
+    }
+  }
+
+  // Remove lines that look like junk (very short single-char lines, CSS class names, etc.)
+  const lines = cleaned.split('\n');
+  const cleanLines = lines.filter(line => {
+    const trimmed = line.trim();
+    if (trimmed.length < 2) return false;
+    // Skip lines that are just CSS class names or JS fragments
+    if (/^[.#@][\w-]+/.test(trimmed) && !trimmed.includes(' ')) return false;
+    if (/^\w+\(/.test(trimmed)) return false; // function calls
+    if (/^[{};]$/.test(trimmed)) return false;
+    // Skip lines that are just "×" or similar single symbols
+    if (trimmed.length < 3 && !/[\u0590-\u05FF\d]/.test(trimmed)) return false;
+    return true;
+  });
+
+  return cleanLines.join('\n').trim();
+}
+
+/**
  * Extract a title from chunk text.
  * Website chunks often have "Title: ..." or "שם מוצר: ..." patterns.
  * Post chunks start with the caption.
@@ -99,13 +155,27 @@ function extractMeta(text: string, topic: string): Record<string, string> {
   const meta: Record<string, string> = {};
 
   if (topic === 'food') {
-    // Look for prep time
-    const timeMatch = text.match(/זמן הכנה\s*(\d+)/);
-    if (timeMatch) meta.time = `${timeMatch[1]} דק׳`;
+    // Look for total time: "זמן כולל: 13 שעות ו-20 דק׳" or "זמן כולל13 שעות..."
+    const totalTimeMatch = text.match(/זמן כולל[:\s]*(\d+\s*שעות?(?:\s*ו[-\s]*\d+\s*דק[׳']?)?|\d+\s*דק[׳']?)/);
+    if (totalTimeMatch) {
+      meta.time = totalTimeMatch[1].trim();
+    } else {
+      // Fallback: "זמן הכנה 30" (minutes only)
+      const prepMatch = text.match(/זמן הכנה[:\s]*(\d+)/);
+      if (prepMatch) meta.time = `${prepMatch[1]} דק׳`;
+    }
 
-    // Look for ingredients count
-    const ingredientsMatch = text.match(/מרכיבים\s*(\d+)/);
+    // Look for ingredients count: "מרכיבים: 29" or "מרכיבים29" or "מרכיבים 29"
+    const ingredientsMatch = text.match(/מרכיבים[:\s]*(\d+)/);
     if (ingredientsMatch) meta.items = `${ingredientsMatch[1]} מרכיבים`;
+
+    // Difficulty level
+    const diffMatch = text.match(/רמת קושי[:\s]*(בסיסי|קל|בינוני|מתקדם|קשה)/);
+    if (diffMatch) meta.difficulty = diffMatch[1];
+
+    // Servings
+    const servingsMatch = text.match(/כמות מנות[:\s]*(\d+)/);
+    if (servingsMatch) meta.servings = `${servingsMatch[1]} מנות`;
   }
 
   if (topic === 'beauty' || topic === 'health') {
@@ -232,13 +302,14 @@ export async function GET(request: NextRequest) {
     const description = decodeHtmlEntities(heSummary || extractDescription(text));
     const meta = extractMeta(text, topic);
 
-    // Clean full text: strip metadata prefixes for display
+    // Clean full text: strip metadata prefixes + HTML/CSS/JS junk
+    const rawText = text
+      .replace(/^Title:\s*.+?\n/m, '')
+      .replace(/^Description:\s*.+?\n/m, '')
+      .replace(/^\[סיכום:.*?\]\n?/m, '')
+      .trim();
     const fullText = decodeHtmlEntities(
-      text
-        .replace(/^Title:\s*.+?\n/m, '')
-        .replace(/^Description:\s*.+?\n/m, '')
-        .replace(/^\[סיכום:.*?\]\n?/m, '')
-        .trim()
+      chunk.entity_type === 'website' ? cleanWebContent(rawText) : rawText
     );
 
     items.push({

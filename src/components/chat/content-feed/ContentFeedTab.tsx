@@ -146,11 +146,20 @@ function RecipeModal({
   onClose: () => void;
   onAsk: (q: string) => void;
 }) {
-  // Format fullText into paragraphs
-  const paragraphs = item.fullText
+  // Split content into sections (ingredients, instructions, etc.)
+  const lines = item.fullText
     .split('\n')
     .map(l => l.trim())
     .filter(l => l.length > 0);
+
+  // Detect section headers for styling
+  const sectionHeaders = ['מרכיבים', 'אופן הכנה', 'הוראות הכנה', 'שלבי הכנה'];
+  const isSectionHeader = (line: string) =>
+    sectionHeaders.some(h => line.startsWith(h) && line.length < h.length + 15);
+  const isIngredient = (line: string) =>
+    line.startsWith('-') || line.startsWith('•') || /^\d+\/?\d*\s*(כוס|כף|כפית|גרם|מ"ל|יח'|ק"ג)/.test(line);
+  const isStep = (line: string) =>
+    /^\d+[\.\)]?\s/.test(line);
 
   const postUrl = item.shortcode
     ? `https://www.instagram.com/p/${item.shortcode}/`
@@ -201,14 +210,29 @@ function RecipeModal({
                   <UtensilsCrossed className="w-3.5 h-3.5" /> {item.meta.items}
                 </span>
               )}
+              {item.meta.servings && (
+                <span className="cf-pill">{item.meta.servings}</span>
+              )}
+              {item.meta.difficulty && (
+                <span className="cf-pill">{item.meta.difficulty}</span>
+              )}
             </div>
           )}
 
-          {/* Full text */}
+          {/* Full text — formatted with section headers */}
           <div className="cf-modal__text">
-            {paragraphs.map((p, i) => (
-              <p key={i}>{p}</p>
-            ))}
+            {lines.map((line, i) => {
+              if (isSectionHeader(line)) {
+                return <h3 key={i} className="cf-modal__section">{line}</h3>;
+              }
+              if (isIngredient(line)) {
+                return <p key={i} className="cf-modal__ingredient">{line}</p>;
+              }
+              if (isStep(line)) {
+                return <p key={i} className="cf-modal__step">{line}</p>;
+              }
+              return <p key={i}>{line}</p>;
+            })}
           </div>
 
           {/* CTAs */}

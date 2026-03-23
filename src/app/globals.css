@@ -2898,10 +2898,23 @@ h1, h2, h3, h4, h5, h6 {
 }
 .cf-modal__text {
   font-size: 14px; line-height: 1.7; color: #444;
-  margin-bottom: 20px; white-space: pre-wrap;
+  margin-bottom: 20px;
 }
 .cf-modal__text p {
   margin-bottom: 6px;
+}
+.cf-modal__section {
+  font-size: 16px; font-weight: 700; color: #1a1a2e;
+  margin-top: 16px; margin-bottom: 8px;
+  padding-bottom: 6px; border-bottom: 1px solid #f0f0f0;
+}
+.cf-modal__ingredient {
+  font-size: 14px; color: #555; margin-bottom: 4px;
+  padding-right: 8px; line-height: 1.6;
+}
+.cf-modal__step {
+  font-size: 14px; color: #444; margin-bottom: 10px;
+  line-height: 1.7; padding-right: 4px;
 }
 .cf-modal__actions {
   display: flex; gap: 10px; flex-wrap: wrap;
