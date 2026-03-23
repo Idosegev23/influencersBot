@@ -263,6 +263,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     meta: streamMeta,
     cards: streamCards,
     text: streamText,
+    thinkingText,
     sendMessage: sendStreamMessage,
     cancel: cancelStream,
   } = useStreamChat({
@@ -1413,11 +1414,17 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                               />
                             </div>
                           )}
-                          <div className="typing-indicator">
-                            <div className="typing-dot" />
-                            <div className="typing-dot" />
-                            <div className="typing-dot" />
-                          </div>
+                          {thinkingText ? (
+                            <div className="thinking-message bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl rounded-br-md px-4 py-2 text-sm text-gray-600 dark:text-gray-300">
+                              {thinkingText}
+                            </div>
+                          ) : (
+                            <div className="typing-indicator">
+                              <div className="typing-dot" />
+                              <div className="typing-dot" />
+                              <div className="typing-dot" />
+                            </div>
+                          )}
                         </motion.div>
                       )}
                       {messages.length > 0 && !isTyping && !isStreamActive && (
