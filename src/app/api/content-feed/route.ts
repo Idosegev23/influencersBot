@@ -26,6 +26,7 @@ interface ContentCard {
   entityType: string;
   topic: string;
   shortcode: string | null;
+  sourceUrl: string | null; // website source URL or Instagram post URL
 }
 
 /**
@@ -48,27 +49,46 @@ function decodeHtmlEntities(text: string): string {
  * Keeps only readable Hebrew/English recipe content.
  */
 function cleanWebContent(text: string): string {
+  // Step 1: Find the last numbered instruction step and cut everything after it
+  // Pattern: last line starting with a number followed by period/dot like "14. ..."
+  const lastStepMatch = text.match(/^(\d+)\.\s+.+$/gm);
+  if (lastStepMatch && lastStepMatch.length > 2) {
+    const lastStep = lastStepMatch[lastStepMatch.length - 1];
+    const lastStepIdx = text.lastIndexOf(lastStep);
+    if (lastStepIdx !== -1) {
+      // Keep everything up to and including the last step
+      text = text.slice(0, lastStepIdx + lastStep.length);
+    }
+  }
+
   let cleaned = text
-    // Remove <style>...</style> blocks
+    // Remove JSON-like fragments: "} מרכיבים 29..." pattern
+    .replace(/"\s*\}\s*מרכיבים\s*\d+[\s\S]*/g, '')
+    // Remove <style>...</style> and <script>...</script> blocks
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-    // Remove <script>...</script> blocks
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-    // Remove inline CSS blocks: .className { ... }
-    .replace(/\.[a-zA-Z_#][\w\s.:#>,~+\-\[\]=*"'^$()]*\{[^}]*\}/g, '')
-    // Remove @media blocks
+    // Remove CSS blocks: .className { ... } and #id { ... }
+    .replace(/[.#][a-zA-Z_][\w\s.:#>,~+\-\[\]=*"'^$()]*\{[^}]*\}/g, '')
     .replace(/@media[^{]*\{[\s\S]*?\}\s*\}/g, '')
     // Remove remaining HTML tags
     .replace(/<[^>]+>/g, ' ')
-    // Remove jQuery/JS patterns
-    .replace(/jQuery\([\s\S]*?\}\);?/g, '')
+    // Remove jQuery/JS/localStorage patterns
+    .replace(/jQuery[\s\S]*?(?:\}\);|\}\))/g, '')
+    .replace(/localStorage\.\w+\([^)]*\)/g, '')
     .replace(/var\s+\w+\s*=[\s\S]*?;/g, '')
     .replace(/function\s*\w*\s*\([^)]*\)\s*\{[\s\S]*?\}/g, '')
-    .replace(/\.\w+\s*\{[^}]*\}/g, '')
-    // Remove CSS-like properties that leaked through
+    // Remove CSS property lines
     .replace(/[a-z\-]+:\s*[#\d]+px[^;\n]*;/g, '')
     .replace(/[a-z\-]+:\s*#[0-9a-f]+[^;\n]*;/g, '')
     // Remove URLs
     .replace(/https?:\/\/\S+/g, '')
+    // Remove nutrition table fragments: "קלוריות 755.8 קק״ל..."
+    .replace(/ערכים תזונתיים[\s\S]*?סגור/g, '')
+    .replace(/מידע נוסף[\s\S]*?סגור/g, '')
+    // Remove "× תודה שנרשמת" subscription popups
+    .replace(/×[\s\S]*?כפתור האימות/g, '')
+    // Remove /\* CSS comments \*/
+    .replace(/\/\*[^*]*\*\//g, '')
     // Clean up whitespace
     .replace(/[ \t]+/g, ' ')
     .replace(/\n\s*\n(\s*\n)+/g, '\n\n');
@@ -82,17 +102,35 @@ function cleanWebContent(text: string): string {
     }
   }
 
-  // Remove lines that look like junk (very short single-char lines, CSS class names, etc.)
+  // Also deduplicate "מרכיבים" — if the ingredients list appears twice
+  const ingIdx = cleaned.indexOf('מרכיבים');
+  if (ingIdx !== -1) {
+    // Look for a second "מרכיבים" that isn't part of "X מרכיבים" (count)
+    const afterFirst = cleaned.slice(ingIdx + 7);
+    const secondIngMatch = afterFirst.match(/(?:^|\n)\s*(?:חמין|חיטה|אורז|ג'חנון|ביצים)\s/m);
+    // If we find section headers repeating, it's a duplicate
+    const secondIngIdx = afterFirst.indexOf('\nמרכיבים');
+    if (secondIngIdx !== -1) {
+      cleaned = cleaned.slice(0, ingIdx + 7 + secondIngIdx).trim();
+    }
+  }
+
+  // Line-level cleanup
   const lines = cleaned.split('\n');
   const cleanLines = lines.filter(line => {
     const trimmed = line.trim();
     if (trimmed.length < 2) return false;
-    // Skip lines that are just CSS class names or JS fragments
+    // Skip CSS/JS fragments
     if (/^[.#@][\w-]+/.test(trimmed) && !trimmed.includes(' ')) return false;
-    if (/^\w+\(/.test(trimmed)) return false; // function calls
+    if (/^\w+\(/.test(trimmed) && !trimmed.match(/^\d/)) return false;
     if (/^[{};]$/.test(trimmed)) return false;
-    // Skip lines that are just "×" or similar single symbols
+    if (/^\/\*/.test(trimmed)) return false;
+    // Skip "success:" or "jQuery" leftovers
+    if (/^(success|jQuery|localStorage|let |const |if\s*\()/.test(trimmed)) return false;
+    // Skip single symbols
     if (trimmed.length < 3 && !/[\u0590-\u05FF\d]/.test(trimmed)) return false;
+    // Skip nutrition data lines like "קלוריות 755.8 קק״ל 9069.7 קק״ל"
+    if (/^\w+\s+\d+\.\d+\s+(קק״ל|גרם|מ״ג)/.test(trimmed)) return false;
     return true;
   });
 
@@ -297,7 +335,10 @@ export async function GET(request: NextRequest) {
     seen.add(normalizedTitle);
 
     const shortcode = chunk.metadata?.shortcode || null;
-    const imageUrl = shortcode ? (postImages[shortcode] || null) : null;
+    // Image: Instagram posts use shortcode→thumbnail, website chunks use metadata.image_url
+    const imageUrl = shortcode
+      ? (postImages[shortcode] || null)
+      : (chunk.metadata?.image_url || null);
     const heSummary = chunk.metadata?.he_summary && chunk.metadata.he_summary !== 'null' ? chunk.metadata.he_summary : null;
     const description = decodeHtmlEntities(heSummary || extractDescription(text));
     const meta = extractMeta(text, topic);
@@ -312,6 +353,11 @@ export async function GET(request: NextRequest) {
       chunk.entity_type === 'website' ? cleanWebContent(rawText) : rawText
     );
 
+    // Source URL: Instagram post link or website source
+    const sourceUrl = shortcode
+      ? `https://www.instagram.com/p/${shortcode}/`
+      : (chunk.metadata?.source_url || null);
+
     items.push({
       id: chunk.id,
       title,
@@ -322,6 +368,7 @@ export async function GET(request: NextRequest) {
       entityType: chunk.entity_type,
       topic: chunk.topic || topic,
       shortcode,
+      sourceUrl,
     });
   }
 

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChefHat, Shirt, Sparkles, Dumbbell, Cpu, Plane, Baby, Heart,
@@ -20,6 +21,7 @@ interface ContentCard {
   entityType: string;
   topic: string;
   shortcode: string | null;
+  sourceUrl: string | null;
 }
 
 interface ContentFeedTabProps {
@@ -161,9 +163,7 @@ function RecipeModal({
   const isStep = (line: string) =>
     /^\d+[\.\)]?\s/.test(line);
 
-  const postUrl = item.shortcode
-    ? `https://www.instagram.com/p/${item.shortcode}/`
-    : null;
+  const postUrl = item.sourceUrl || null;
 
   return (
     <motion.div
@@ -257,7 +257,7 @@ function RecipeModal({
                 className="cf-modal__btn cf-modal__btn--secondary"
               >
                 <ExternalLink className="w-4 h-4" />
-                צפו בפוסט
+                {item.shortcode ? 'צפו בפוסט' : 'למתכון המלא'}
               </a>
             )}
           </div>
@@ -628,17 +628,20 @@ export default function ContentFeedTab({ username, influencerType, tabLabel, onA
         </div>
       </div>
 
-      {/* Recipe detail modal */}
-      <AnimatePresence>
-        {selectedItem && (
-          <RecipeModal
-            item={selectedItem}
-            config={config}
-            onClose={closeModal}
-            onAsk={onAskAbout}
-          />
-        )}
-      </AnimatePresence>
+      {/* Recipe detail modal — portal to body to escape stacking context */}
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {selectedItem && (
+            <RecipeModal
+              item={selectedItem}
+              config={config}
+              onClose={closeModal}
+              onAsk={onAskAbout}
+            />
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </motion.div>
   );
 }
