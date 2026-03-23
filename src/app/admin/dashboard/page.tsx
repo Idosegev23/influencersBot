@@ -43,6 +43,9 @@ function DashboardContent() {
   const [copiedManageId, setCopiedManageId] = useState<string | null>(null);
   const [generatingTokenId, setGeneratingTokenId] = useState<string | null>(null);
 
+  // Checklist progress per account
+  const [checklistProgress, setChecklistProgress] = useState<Record<string, { total: number; completed: number }>>({});
+
   useEffect(() => {
     if (createdSubdomain) {
       setShowCreatedNotification(true);
@@ -52,7 +55,20 @@ function DashboardContent() {
 
   useEffect(() => {
     fetchInfluencers();
+    fetchChecklistProgress();
   }, []);
+
+  const fetchChecklistProgress = async () => {
+    try {
+      const res = await fetch('/api/admin/checklist/summary');
+      if (res.ok) {
+        const data = await res.json();
+        setChecklistProgress(data.progress || {});
+      }
+    } catch (err) {
+      console.error('Error fetching checklist progress:', err);
+    }
+  };
 
   // Fetch websites when tab first activated
   const fetchWebsites = useCallback(async () => {
@@ -366,6 +382,41 @@ function DashboardContent() {
                     </div>
                   </div>
 
+                  {/* Checklist progress */}
+                  {(() => {
+                    const cp = checklistProgress[influencer.id];
+                    if (!cp) return null;
+                    const pct = Math.round((cp.completed / cp.total) * 100);
+                    const isDone = pct === 100;
+                    return (
+                      <Link
+                        href={`/admin/influencers/${influencer.id}/checklist`}
+                        className="mt-3 block group/cl"
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[11px] font-medium text-[#4b5563] group-hover/cl:text-[#9334EB] transition-colors flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[13px]">checklist</span>
+                            צ׳קליסט
+                          </span>
+                          <span className={`text-[11px] font-bold ${isDone ? 'text-[#059669]' : 'text-[#9334EB]'}`}>
+                            {cp.completed}/{cp.total}
+                          </span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-[#f3f4f6] overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{
+                              width: `${pct}%`,
+                              background: isDone
+                                ? 'linear-gradient(90deg, #059669, #17a34a)'
+                                : 'linear-gradient(90deg, #9334EB, #2663EB)',
+                            }}
+                          />
+                        </div>
+                      </Link>
+                    );
+                  })()}
+
                   <div className="flex items-center gap-2 mt-4 pt-4 border-t border-[#d1d5db]/10">
                     <a
                       href={`/chat/${influencer.username}`}
@@ -382,6 +433,13 @@ function DashboardContent() {
                     >
                       <span className="material-symbols-outlined text-[14px]">settings</span>
                       ניהול
+                    </Link>
+                    <Link
+                      href={`/admin/influencers/${influencer.id}/checklist`}
+                      className="neon-pill neon-pill-ghost flex items-center justify-center gap-1 px-3 py-2 text-sm"
+                      title="צ׳קליסט"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">checklist</span>
                     </Link>
                     <button
                       onClick={() => handleDelete(influencer)}

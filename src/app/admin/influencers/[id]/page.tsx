@@ -305,6 +305,13 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
             צפה בצ&apos;אט
           </Link>
           <Link
+            href={`/admin/influencers/${id}/checklist`}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full border border-[#d1d5db]/40 text-sm font-semibold text-[#474747] bg-white hover:border-[#059669] hover:text-[#059669] transition-all"
+          >
+            <span className="material-symbols-outlined text-[18px]">checklist</span>
+            צ׳קליסט טכני
+          </Link>
+          <Link
             href={`/admin/chatbot-persona/${id}`}
             className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold text-white shadow-lg transition-all hover:shadow-xl"
             style={{ background: 'linear-gradient(135deg, #9334EB 0%, #2663EB 100%)' }}
