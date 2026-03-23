@@ -28,7 +28,7 @@ interface ContentFeedTabProps {
   username: string;
   influencerType: InfluencerType;
   tabLabel: string;
-  onAskAbout: (question: string, chunkId?: string) => void;
+  onAskAbout: (question: string, chunkId?: string, hiddenContext?: string) => void;
 }
 
 // ─── Type-specific config ───
@@ -341,7 +341,7 @@ function RecipeCard({ item, config, onAsk, onOpen, isNew }: { item: ContentCard;
 
 // ─── Look card — tall image, dark gradient, brand name, editorial serif ───
 
-function LookCard({ item, config, onAsk, index }: { item: ContentCard; config: typeof TYPE_CONFIG['fashion']; onAsk: (q: string, chunkId?: string) => void; index: number }) {
+function LookCard({ item, config, onAsk, index }: { item: ContentCard; config: typeof TYPE_CONFIG['fashion']; onAsk: (q: string, chunkId?: string, hiddenContext?: string) => void; index: number }) {
   const brandName = item.meta.brand || null;
   const size = item.meta.size || null;
   const isSponsored = !!item.meta.sponsored;
@@ -349,15 +349,12 @@ function LookCard({ item, config, onAsk, index }: { item: ContentCard; config: t
   // Alternate tall/short for railroad-track effect
   const isTall = index % 3 !== 1;
 
-  // Build a question with the FULL content of this specific look
+  // Clean display message for chat + full content sent behind the scenes
   const askAboutLook = () => {
-    const content = item.fullText || item.description || '';
-    const brandLabel = brandName ? ` של ${brandName}` : '';
-    // Include the actual content so the chatbot answers about THIS specific look
-    const question = content
-      ? `ספרי לי על הלוק הספציפי הזה${brandLabel}. הנה התוכן המלא:\n${content}`
-      : `${config.askPrefix} "${brandName || item.title}"`;
-    onAsk(question, item.id);
+    const brandLabel = brandName || item.title;
+    const displayMessage = `ספרי לי על הלוק הזה של ${brandLabel} 👗`;
+    const fullContent = item.fullText || item.description || '';
+    onAsk(displayMessage, item.id, fullContent);
   };
 
   return (

@@ -1841,9 +1841,10 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 username={username}
                 influencerType={(influencer.influencer_type as InfluencerType) || 'other'}
                 tabLabel={(influencer.tabs || DEFAULT_TABS).find((t: { id: string }) => t.id === 'content_feed')?.label || 'תוכן'}
-                onAskAbout={(question: string, chunkId?: string) => {
+                onAskAbout={(question: string, chunkId?: string, hiddenContext?: string) => {
                   setActiveTab('chat');
                   maybeShowLeadPopup();
+                  // Show the clean display message in chat (not the hidden context)
                   const userMsg = { id: Date.now().toString(), role: 'user' as const, content: question };
                   setMessages(prev => [...prev, userMsg]);
                   setIsTyping(true);
@@ -1851,8 +1852,12 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   setStreamingMessageId(assistantMessageId);
                   setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant' as const, content: '' }]);
                   setIsTyping(false);
+                  // Send the full context to the API (hidden from user)
+                  const apiMessage = hiddenContext
+                    ? `${question}\n\n[הקשר הלוק:]\n${hiddenContext}`
+                    : question;
                   sendStreamMessage({
-                    message: question,
+                    message: apiMessage,
                     username,
                     sessionId: sessionId || undefined,
                     previousResponseId: responseId || undefined,

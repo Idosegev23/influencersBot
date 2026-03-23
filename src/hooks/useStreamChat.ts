@@ -103,6 +103,7 @@ export function useStreamChat(options: UseStreamChatOptions = {}) {
     clientMessageId?: string;
     fromSuggestion?: boolean;
     chunkId?: string;
+    hiddenContext?: string; // extra context sent to API but not shown in chat
   }) => {
     // Cancel any existing stream
     if (abortControllerRef.current) {
