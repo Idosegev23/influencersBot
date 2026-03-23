@@ -23,7 +23,7 @@ export function NewsTicker({ headlines }: NewsTickerProps) {
 
     const animate = () => {
       if (!isPaused && el) {
-        scrollPos += 0.5;
+        scrollPos += 0.4;
         if (scrollPos >= el.scrollWidth / 2) {
           scrollPos = 0;
         }
@@ -53,31 +53,40 @@ export function NewsTicker({ headlines }: NewsTickerProps) {
 
   if (headlines.length === 0) return null;
 
-  const statusEmoji = (s: string) => s === 'breaking' ? '🔴' : s === 'hot' ? '🔥' : '📢';
+  const statusDot = (s: string) => s === 'breaking' ? '#FF3B30' : s === 'hot' ? '#FF9500' : '#AF52DE';
 
-  // Duplicate headlines for seamless loop
+  // Duplicate for seamless loop
   const items = [...headlines, ...headlines];
 
   return (
     <div
-      className="w-full overflow-hidden py-2.5 px-1"
-      style={{ background: 'linear-gradient(90deg, #1a1a2e, #16213e)' }}
+      className="w-full overflow-hidden"
+      style={{
+        background: 'linear-gradient(90deg, #0A0A0A, #1A1A2E, #0A0A0A)',
+        padding: '10px 0',
+      }}
     >
       <div
         ref={scrollRef}
-        className="flex gap-6 whitespace-nowrap overflow-hidden"
+        className="flex gap-8 whitespace-nowrap overflow-hidden"
         dir="rtl"
       >
         {items.map((headline, idx) => (
           <button
             key={idx}
             onClick={headline.onClick}
-            className="inline-flex items-center gap-1.5 text-[12px] font-medium shrink-0 active:opacity-70 transition-opacity"
-            style={{ color: '#e0e0e0' }}
+            className="inline-flex items-center gap-2 text-[12px] shrink-0 active:opacity-70 transition-opacity"
           >
-            <span>{statusEmoji(headline.status)}</span>
-            <span>{headline.text}</span>
-            <span style={{ color: '#555' }}>|</span>
+            <span
+              className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+              style={{
+                backgroundColor: statusDot(headline.status),
+                boxShadow: `0 0 6px ${statusDot(headline.status)}`,
+              }}
+            />
+            <span style={{ color: 'rgba(255,255,255,0.8)', fontWeight: 500 }}>
+              {headline.text}
+            </span>
           </button>
         ))}
       </div>

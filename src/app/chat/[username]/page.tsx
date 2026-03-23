@@ -1068,8 +1068,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                 onClick={async () => {
                                   if (isTyping || isStreamActive) return;
                                   const visibleMsg = `ספרו לי על ${topic.name}`;
-                                  const enrichedMsg = topic.summary
-                                    ? `[נושא חם: ${topic.name} (${topic.status})\nתקציר: ${topic.summary}]\n\n${visibleMsg}`
+                                  const apiMessage = topic.summary
+                                    ? `${visibleMsg}\n\n[הקשר הלוק:]\n[נושא חם: ${topic.name} (${topic.status})\nתקציר: ${topic.summary}]`
                                     : visibleMsg;
                                   const userMsg: Message = { id: Date.now().toString(), role: 'user', content: visibleMsg };
                                   setMessages(prev => [...prev, userMsg]);
@@ -1078,7 +1078,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                   setStreamingMessageId(assistantMessageId);
                                   setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant', content: '' }]);
                                   await sendStreamMessage({
-                                    message: enrichedMsg,
+                                    message: apiMessage,
                                     username,
                                     sessionId: sessionId || undefined,
                                     previousResponseId: responseId || undefined,
@@ -1885,8 +1885,12 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                     setStreamingMessageId(assistantMessageId);
                     setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant' as const, content: '' }]);
                     setIsTyping(false);
+                    // Send full context to API (hidden from user) — same pattern as ContentFeedTab
+                    const apiMessage = enrichedData
+                      ? `${message}\n\n[הקשר הלוק:]\n${enrichedData}`
+                      : message;
                     await sendStreamMessage({
-                      message: enrichedData || message,
+                      message: apiMessage,
                       username,
                       sessionId: sessionId || undefined,
                       previousResponseId: responseId || undefined,
