@@ -64,6 +64,7 @@ import { buildConversationContext, trimToTokenBudget, updateRollingSummary, shou
 import { createPipelineMetrics, withMetrics, logPipelineMetrics, recordMetrics } from '@/lib/metrics/pipeline-metrics';
 import { getCachedSuggestionResponse, cacheSuggestionResponse, prewarmSuggestionCache } from '@/lib/suggestion-cache';
 import { buildPersonalityFromDB } from '@/lib/chatbot/personality-wrapper';
+import { getSmartThinkingMessage } from '@/lib/chatbot/thinking-messages';
 
 // ============================================
 // Stream Event Types
@@ -602,15 +603,9 @@ export async function POST(req: NextRequest) {
         controller.enqueue(encodeEvent(metaEvent));
 
         // === SEND THINKING INDICATOR (immediate — reduces perceived latency) ===
-        const thinkingTexts = [
-          'רגע, בודק... 🔍',
-          'שנייה, בודק...',
-          'אחלה, תן לי רגע...',
-          'בודק את זה...',
-        ];
         controller.enqueue(encodeEvent({
           type: 'thinking',
-          text: thinkingTexts[Math.floor(Math.random() * thinkingTexts.length)],
+          text: getSmartThinkingMessage(message),
         }));
 
         // === SEND CARDS (if needed) ===
