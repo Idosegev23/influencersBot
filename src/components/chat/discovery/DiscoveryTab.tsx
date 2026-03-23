@@ -23,8 +23,7 @@ interface DiscoveryTabProps {
 /** Max sections to show initially */
 const INITIAL_VISIBLE = 5;
 
-/** Layout cycle: hero first, then scroll/grid alternating */
-const LAYOUT_CYCLE: Array<'scroll' | 'grid'> = ['scroll', 'grid', 'scroll', 'grid', 'scroll', 'grid'];
+/** Pinterest masonry layout for all rows */
 
 export default function DiscoveryTab({ username, influencerName, sessionId, initialCategory, onAskInChat, onCategoryOpened }: DiscoveryTabProps) {
   const { rows, loading, error } = useDiscoveryAll({ username });
@@ -180,29 +179,17 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
         {/* Content rows */}
         {!loading && rows.length > 0 && (
           <div className="px-5 pb-4 space-y-[28px]">
-            {visibleRows.map((row, idx) => {
-              let layout: 'scroll' | 'hero' | 'grid';
-              if (idx === 0 && row.items.length >= 3) {
-                layout = 'hero';
-              } else {
-                const cycleIdx = idx === 0 ? 0 : idx - 1;
-                layout = LAYOUT_CYCLE[cycleIdx % LAYOUT_CYCLE.length] || 'scroll';
-                if (layout === 'grid' && row.items.length < 2) layout = 'scroll';
-              }
-
-              return (
-                <DiscoveryRow
-                  key={row.category.slug}
-                  slug={row.category.slug}
-                  title={row.category.title}
-                  subtitle={row.category.subtitle}
-                  color={row.category.color}
-                  items={row.items}
-                  onItemClick={handleItemClick}
-                  layout={layout}
-                />
-              );
-            })}
+            {visibleRows.map((row) => (
+              <DiscoveryRow
+                key={row.category.slug}
+                slug={row.category.slug}
+                title={row.category.title}
+                subtitle={row.category.subtitle}
+                color={row.category.color}
+                items={row.items}
+                onItemClick={handleItemClick}
+              />
+            ))}
 
             {/* Show more button */}
             {hasMore && (

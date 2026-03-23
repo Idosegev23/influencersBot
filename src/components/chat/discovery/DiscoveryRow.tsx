@@ -1,6 +1,5 @@
 'use client';
 
-import { useRef } from 'react';
 import { getProxiedImageUrl, getProxiedImageByShortcode } from '@/lib/image-utils';
 import type { DiscoveryItem } from '@/lib/discovery/types';
 
@@ -11,7 +10,7 @@ interface DiscoveryRowProps {
   items: DiscoveryItem[];
   onItemClick: (item: DiscoveryItem, categoryTitle: string, categorySlug: string) => void;
   slug: string;
-  layout?: 'scroll' | 'hero' | 'grid';
+  layout?: 'masonry';
 }
 
 function getThumb(item: DiscoveryItem) {
@@ -22,139 +21,42 @@ function getThumb(item: DiscoveryItem) {
       : null;
 }
 
-export function DiscoveryRow({ title, subtitle, color, items, onItemClick, slug, layout = 'scroll' }: DiscoveryRowProps) {
+/** Pinterest-style masonry layout — all cards portrait (9:16 or 4:5) */
+export function DiscoveryRow({ title, subtitle, color, items, onItemClick, slug }: DiscoveryRowProps) {
+  return (
+    <section className="space-y-3" dir="rtl">
+      <SectionHeader title={title} subtitle={subtitle} color={color} />
+      <div className="columns-2 sm:columns-3 gap-[10px]" style={{ columnFill: 'balance' }}>
+        {items.slice(0, 9).map((item, idx) => {
+          const isReel = item.mediaType === 'reel' || item.mediaType === 'video';
+          // Reels/videos → 9:16, images → 4:5
+          const aspect = isReel ? 'aspect-[9/16]' : 'aspect-[4/5]';
 
-  // === HERO layout ===
-  if (layout === 'hero' && items.length >= 3) {
-    const featured = items[0];
-    const featuredThumb = getThumb(featured);
-    const isReel = featured.mediaType === 'reel' || featured.mediaType === 'video';
-
-    return (
-      <section className="space-y-4" dir="rtl">
-        <SectionHeader title={title} subtitle={subtitle} color={color} />
-        <div className="space-y-[10px]">
-          {/* Large 16:9 card */}
-          <button
-            onClick={() => onItemClick(featured, title, slug)}
-            className="relative aspect-[16/9] w-full rounded-2xl overflow-hidden active:scale-[0.98] transition-transform"
-            style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}
-          >
-            {featuredThumb ? (
-              <img src={featuredThumb} alt="" className="w-full h-full object-cover" loading="lazy" />
-            ) : (
-              <div className="w-full h-full" style={{ background: `linear-gradient(135deg, ${color}30, ${color}10)` }} />
-            )}
-            <div className="absolute inset-0 card-gradient" />
-            <div className="absolute top-3 right-3 bg-[#b5116b] text-white text-[10px] font-bold px-3 py-1 rounded-full">
-              {featured.metricLabel && featured.metricValue
-                ? formatMetric(featured.metricValue, featured.metricLabel)
-                : 'מומלץ'}
-            </div>
-            {isReel && <ReelBadge />}
-            <div className="absolute bottom-4 right-4 left-4">
-              <p className="text-white font-bold text-lg text-shadow-premium line-clamp-2 text-right">
-                {featured.aiTitle || featured.captionExcerpt}
-              </p>
-            </div>
-          </button>
-
-          {/* 2-col mobile, 3-col desktop grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-[10px]">
-            {items.slice(1, 4).map((item, idx) => (
-              <CardCompact
-                key={item.postId || item.shortcode || `${slug}-${idx + 1}`}
-                item={item}
-                color={color}
-                onClick={() => onItemClick(item, title, slug)}
-              />
-            ))}
-          </div>
-        </div>
-      </section>
-    );
-  }
-
-  // === GRID layout: 2-col mobile, 3-col desktop ===
-  if (layout === 'grid' && items.length >= 2) {
-    return (
-      <section className="space-y-4" dir="rtl">
-        <SectionHeader title={title} subtitle={subtitle} color={color} />
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-[10px]">
-          {items.slice(0, 6).map((item, idx) => (
-            <CardCompact
+          return (
+            <PinCard
               key={item.postId || item.shortcode || `${slug}-${idx}`}
               item={item}
               color={color}
+              aspect={aspect}
               onClick={() => onItemClick(item, title, slug)}
             />
-          ))}
-        </div>
-      </section>
-    );
-  }
-
-  // === DEFAULT: horizontal scroll ===
-  return (
-    <section className="space-y-4" dir="rtl">
-      <SectionHeader title={title} subtitle={subtitle} color={color} />
-      <div className="relative -mx-5">
-        <div className="flex overflow-x-auto hide-scrollbar gap-[10px] px-5 pb-2">
-          {items.map((item, idx) => {
-            const thumb = getThumb(item);
-            const isReel = item.mediaType === 'reel' || item.mediaType === 'video';
-
-            return (
-              <button
-                key={item.postId || item.shortcode || `${slug}-${idx}`}
-                onClick={() => onItemClick(item, title, slug)}
-                className="relative flex-shrink-0 w-[155px] h-[220px] sm:w-[190px] sm:h-[260px] rounded-2xl overflow-hidden active:scale-[0.96] transition-transform"
-                style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}
-              >
-                {thumb ? (
-                  <img src={thumb} alt="" className="w-full h-full object-cover" loading="lazy" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${color}30, ${color}10)` }}>
-                    <span className="text-2xl opacity-20">📷</span>
-                  </div>
-                )}
-                <div className="absolute inset-0 card-gradient" />
-
-                {item.rank && (
-                  <div className="absolute top-3 right-3 w-7 h-7 bg-white/90 backdrop-blur rounded-full flex items-center justify-center text-[12px] font-bold" style={{ color: '#191c1e' }}>
-                    #{item.rank}
-                  </div>
-                )}
-
-                {isReel && <ReelBadge />}
-
-                <div className="absolute bottom-3 right-3 left-3">
-                  {item.metricValue != null && item.metricLabel && (
-                    <span className="inline-block bg-white/15 backdrop-blur-md text-white text-[9px] font-semibold px-2 py-0.5 rounded-full mb-1">
-                      {formatMetric(item.metricValue, item.metricLabel)}
-                    </span>
-                  )}
-                  <p className="text-white font-bold text-[12px] sm:text-[13px] text-shadow-premium line-clamp-2 text-right">
-                    {item.aiTitle || item.captionExcerpt}
-                  </p>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+          );
+        })}
       </div>
     </section>
   );
 }
 
-// ── Compact card (grid) ──
-function CardCompact({
+// ── Pinterest-style pin card ──
+function PinCard({
   item,
   color,
+  aspect,
   onClick,
 }: {
   item: DiscoveryItem;
   color: string;
+  aspect: string;
   onClick: () => void;
 }) {
   const thumb = getThumb(item);
@@ -163,18 +65,33 @@ function CardCompact({
   return (
     <button
       onClick={onClick}
-      className="relative h-[160px] sm:h-[190px] rounded-2xl overflow-hidden active:scale-[0.96] transition-transform"
+      className={`relative w-full ${aspect} rounded-2xl overflow-hidden active:scale-[0.97] transition-transform mb-[10px] break-inside-avoid`}
       style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}
     >
       {thumb ? (
-        <img src={thumb} alt="" className="w-full h-full object-cover" loading="lazy" />
+        <img src={thumb} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
       ) : (
-        <div className="w-full h-full" style={{ background: `linear-gradient(135deg, ${color}30, ${color}10)` }} />
+        <div className="absolute inset-0 w-full h-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${color}30, ${color}10)` }}>
+          <span className="text-2xl opacity-20">&#x1f4f7;</span>
+        </div>
       )}
       <div className="absolute inset-0 card-gradient" />
+
+      {item.rank && (
+        <div className="absolute top-3 right-3 w-7 h-7 bg-white/90 backdrop-blur rounded-full flex items-center justify-center text-[12px] font-bold" style={{ color: '#191c1e' }}>
+          #{item.rank}
+        </div>
+      )}
+
       {isReel && <ReelBadge />}
+
       <div className="absolute bottom-3 right-3 left-3">
-        <p className="text-white font-bold text-sm text-shadow-premium line-clamp-2 text-right">
+        {item.metricValue != null && item.metricLabel && (
+          <span className="inline-block bg-white/15 backdrop-blur-md text-white text-[9px] font-semibold px-2 py-0.5 rounded-full mb-1">
+            {formatMetric(item.metricValue, item.metricLabel)}
+          </span>
+        )}
+        <p className="text-white font-bold text-[12px] sm:text-[13px] text-shadow-premium line-clamp-2 text-right">
           {item.aiTitle || item.captionExcerpt}
         </p>
       </div>
