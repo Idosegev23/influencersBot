@@ -342,8 +342,10 @@ function RecipeCard({ item, config, onAsk, onOpen, isNew }: { item: ContentCard;
 // ─── Look card — tall image, dark gradient, brand name, editorial serif ───
 
 function LookCard({ item, config, onAsk, index }: { item: ContentCard; config: typeof TYPE_CONFIG['fashion']; onAsk: (q: string, chunkId?: string) => void; index: number }) {
-  const brandName = item.meta.brand || item.meta.partner || null;
+  const brandName = item.meta.brand || null;
   const size = item.meta.size || null;
+  const isSponsored = !!item.meta.sponsored;
+  const hasSource = !!item.sourceUrl;
   // Alternate tall/short for railroad-track effect
   const isTall = index % 3 !== 1;
 
@@ -352,10 +354,17 @@ function LookCard({ item, config, onAsk, index }: { item: ContentCard; config: t
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       className={`cf-look-card ${isTall ? 'cf-look-card--tall' : 'cf-look-card--short'}`}
+      onClick={() => {
+        if (hasSource) {
+          window.open(item.sourceUrl!, '_blank');
+        } else {
+          onAsk(`${config.askPrefix} "${brandName || item.title}"`, item.id);
+        }
+      }}
     >
       <div className="cf-look-card__img">
         {item.imageUrl ? (
-          <img src={getProxiedImageUrl(item.imageUrl)} alt={item.title} loading="lazy" />
+          <img src={getProxiedImageUrl(item.imageUrl)} alt={brandName || item.title} loading="lazy" />
         ) : (
           <div className="cf-look-card__placeholder">
             <Shirt className="w-8 h-8" style={{ color: '#999' }} />
@@ -368,11 +377,13 @@ function LookCard({ item, config, onAsk, index }: { item: ContentCard; config: t
               {brandName}
             </span>
           )}
-          <h3 className="cf-look-card__title">{item.title}</h3>
+          {isSponsored && (
+            <span className="cf-look-card__sponsored">שיתוף פעולה</span>
+          )}
           <div className="cf-look-card__bottom">
             {size && <span className="cf-look-card__size">{size}</span>}
             <button
-              onClick={(e) => { e.stopPropagation(); onAsk(`${config.askPrefix} "${item.title}"`, item.id); }}
+              onClick={(e) => { e.stopPropagation(); onAsk(`${config.askPrefix} "${brandName || item.title}"`, item.id); }}
               className="cf-look-card__cta"
             >
               <ShoppingBag className="w-3 h-3" />

@@ -203,6 +203,151 @@ function extractMeta(text: string, topic: string): Record<string, string> {
   return meta;
 }
 
+// ─── Fashion-specific feed: pull from Instagram data directly ───
+
+async function handleFashionFeed(
+  supabase: ReturnType<typeof createClient>,
+  accountId: string,
+  limit: number,
+  offset: number,
+) {
+  // 1. Fetch highlight collections with item counts
+  const { data: highlights } = await supabase
+    .from('instagram_highlights')
+    .select('id, title')
+    .eq('account_id', accountId);
+
+  const hlTitleMap: Record<string, string> = {};
+  if (highlights) highlights.forEach(h => { hlTitleMap[h.id] = h.title; });
+
+  // 2. Fetch highlight items with thumbnails (the actual look images)
+  const { data: hlItems } = await supabase
+    .from('instagram_highlight_items')
+    .select('id, highlight_id, thumbnail_url, media_type, posted_at')
+    .eq('account_id', accountId)
+    .not('thumbnail_url', 'is', null)
+    .order('posted_at', { ascending: false })
+    .limit(200);
+
+  // 3. Fetch Instagram posts with images
+  const { data: posts } = await supabase
+    .from('instagram_posts')
+    .select('id, shortcode, caption, thumbnail_url, media_urls, mentions, is_sponsored, likes_count, posted_at')
+    .eq('account_id', accountId)
+    .not('thumbnail_url', 'is', null)
+    .order('posted_at', { ascending: false })
+    .limit(100);
+
+  // 4. Get transcription descriptions for highlight items (for richer text)
+  const hlItemIds = (hlItems || []).map(h => h.id);
+  let transcriptionMap: Record<string, string> = {};
+  if (hlItemIds.length > 0) {
+    const { data: chunks } = await supabase
+      .from('document_chunks')
+      .select('metadata, chunk_text')
+      .eq('account_id', accountId)
+      .eq('entity_type', 'transcription')
+      .limit(300);
+
+    if (chunks) {
+      for (const c of chunks) {
+        const srcId = c.metadata?.originalSourceId;
+        if (srcId && !transcriptionMap[srcId]) {
+          // Take first 120 chars as description
+          const text = (c.chunk_text || '').replace(/^\[סיכום:.*?\]\s*/m, '').trim();
+          if (text.length > 20) {
+            transcriptionMap[srcId] = text.length > 150 ? text.slice(0, 147) + '...' : text;
+          }
+        }
+      }
+    }
+  }
+
+  // 5. Build unified items list
+  const items: ContentCard[] = [];
+
+  // Add highlight items as look cards
+  for (const hi of (hlItems || [])) {
+    const brand = hlTitleMap[hi.highlight_id] || '';
+    // Skip non-fashion highlights (TV shows, books, etc.)
+    const skipTitles = ['📚', 'המרוץ למליון', 'המירוץ למליון', 'אהבת אמת'];
+    if (skipTitles.some(t => brand.includes(t))) continue;
+
+    const desc = transcriptionMap[hi.id] || '';
+    // Extract a short title from the description or use brand
+    const titleFromDesc = desc.split(/[|.\n]/).find(s => s.trim().length > 3)?.trim();
+    const title = titleFromDesc
+      ? (titleFromDesc.length > 60 ? titleFromDesc.slice(0, 57) + '...' : titleFromDesc)
+      : brand;
+
+    const meta: Record<string, string> = {};
+    if (brand) meta.brand = brand;
+    // Extract size from transcription if available
+    const sizeMatch = desc.match(/מידה\s+(xs|s|m|l|xl|xxl|\d+)/i);
+    if (sizeMatch) meta.size = `מידה ${sizeMatch[1].toUpperCase()}`;
+
+    items.push({
+      id: hi.id,
+      title,
+      description: desc,
+      fullText: desc,
+      imageUrl: hi.thumbnail_url,
+      meta,
+      entityType: 'highlight',
+      topic: 'fashion',
+      shortcode: null,
+      sourceUrl: null,
+    });
+  }
+
+  // Add Instagram posts as look cards
+  for (const post of (posts || [])) {
+    const caption = (post.caption || '').trim();
+    const firstLine = caption.split('\n')[0]?.trim() || '';
+    const title = firstLine.length > 60 ? firstLine.slice(0, 57) + '...' : (firstLine || 'פוסט');
+    const description = caption.length > 150 ? caption.slice(0, 147) + '...' : caption;
+
+    const meta: Record<string, string> = {};
+    // Extract brand from mentions
+    const mentions = (post.mentions || []) as string[];
+    if (mentions.length > 0) {
+      meta.brand = mentions[0].replace(/^@/, '');
+    }
+    if (post.is_sponsored) meta.sponsored = 'שיתוף פעולה';
+    if (post.likes_count) meta.likes = `${post.likes_count} ❤️`;
+
+    const imageUrl = post.thumbnail_url || ((post.media_urls as string[])?.[0]) || null;
+
+    items.push({
+      id: post.id,
+      title,
+      description,
+      fullText: caption,
+      imageUrl,
+      meta,
+      entityType: 'post',
+      topic: 'fashion',
+      shortcode: post.shortcode,
+      sourceUrl: post.shortcode ? `https://www.instagram.com/p/${post.shortcode}/` : null,
+    });
+  }
+
+  // Sort by variety: interleave highlights and posts
+  // First highlights (brand looks), then posts
+  const total = items.length;
+  const paginated = items.slice(offset, offset + limit);
+
+  return NextResponse.json({
+    items: paginated,
+    total,
+    topic: 'fashion',
+    influencerType: 'fashion',
+    hasMore: offset + limit < total,
+  });
+}
+
+// ─── Generic (non-fashion) feed from document_chunks ───
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const username = searchParams.get('username');
@@ -229,6 +374,12 @@ export async function GET(request: NextRequest) {
   }
 
   const influencerType = account.config?.influencer_type || 'other';
+
+  // Fashion accounts use a completely different data source
+  if (influencerType === 'fashion') {
+    return handleFashionFeed(supabase, account.id, limit, offset);
+  }
+
   const topic = topicOverride || TYPE_TO_TOPIC[influencerType] || 'lifestyle';
 
   // Fetch topic-matched chunks (website/transcription with topic, posts may lack topic)
@@ -242,18 +393,13 @@ export async function GET(request: NextRequest) {
     .order('token_count', { ascending: false })
     .limit(fetchLimit);
 
-  // Also fetch null-topic chunks as fallback:
-  // - posts (all types)
-  // - transcriptions for fashion (most fashion highlight transcriptions lack topic)
-  const nullTopicTypes = influencerType === 'fashion'
-    ? ['post', 'transcription']
-    : ['post'];
+  // Also fetch null-topic posts as fallback
   const { data: nullTopicPosts } = await supabase
     .from('document_chunks')
     .select('id, chunk_text, entity_type, topic, metadata, token_count')
     .eq('account_id', account.id)
     .is('topic', null)
-    .in('entity_type', nullTopicTypes)
+    .in('entity_type', ['post'])
     .order('token_count', { ascending: false })
     .limit(fetchLimit);
 
@@ -299,39 +445,6 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // For transcription chunks from highlights: fetch thumbnail from instagram_highlight_items
-  const highlightSourceIds = chunks
-    .filter(c => c.entity_type === 'transcription' && c.metadata?.originalSourceId)
-    .map(c => c.metadata.originalSourceId as string);
-
-  let highlightImages: Record<string, { thumbnail: string; highlightTitle: string }> = {};
-  if (highlightSourceIds.length > 0) {
-    const { data: hlItems } = await supabase
-      .from('instagram_highlight_items')
-      .select('id, thumbnail_url, highlight_id')
-      .in('id', highlightSourceIds.slice(0, 100)); // batch limit
-
-    if (hlItems && hlItems.length > 0) {
-      // Get highlight titles for brand names
-      const hlIds = [...new Set(hlItems.map(h => h.highlight_id))];
-      const { data: hlData } = await supabase
-        .from('instagram_highlights')
-        .select('id, title')
-        .in('id', hlIds);
-      const hlTitles: Record<string, string> = {};
-      if (hlData) hlData.forEach(h => { hlTitles[h.id] = h.title; });
-
-      for (const hi of hlItems) {
-        if (hi.thumbnail_url) {
-          highlightImages[hi.id] = {
-            thumbnail: hi.thumbnail_url,
-            highlightTitle: hlTitles[hi.highlight_id] || '',
-          };
-        }
-      }
-    }
-  }
-
   // Deduplicate by title
   const seen = new Set<string>();
   const items: ContentCard[] = [];
@@ -351,16 +464,11 @@ export async function GET(request: NextRequest) {
     seen.add(normalizedTitle);
 
     const shortcode = chunk.metadata?.shortcode || null;
-    const originalSourceId = chunk.metadata?.originalSourceId || null;
 
-    // Image resolution: shortcode→post thumbnail, highlight→highlight thumbnail, website→metadata
+    // Image resolution: shortcode→post thumbnail, metadata→image_url
     let imageUrl: string | null = null;
-    let brandFromHighlight: string | null = null;
     if (shortcode && postImages[shortcode]) {
       imageUrl = postImages[shortcode];
-    } else if (originalSourceId && highlightImages[originalSourceId]) {
-      imageUrl = highlightImages[originalSourceId].thumbnail;
-      brandFromHighlight = highlightImages[originalSourceId].highlightTitle || null;
     } else {
       imageUrl = chunk.metadata?.image_url || null;
     }
@@ -369,19 +477,11 @@ export async function GET(request: NextRequest) {
     const description = decodeHtmlEntities(heSummary || extractDescription(text));
     const meta = extractMeta(text, topic);
 
-    // For fashion: inject brand from highlight title + extract size info
-    if (influencerType === 'fashion') {
-      if (brandFromHighlight) meta.brand = brandFromHighlight;
-      const sizeMatch = text.match(/מידה\s+(xs|s|m|l|xl|xxl|\d+)/i);
-      if (sizeMatch) meta.size = `מידה ${sizeMatch[1].toUpperCase()}`;
-    }
-
     // Clean full text: strip metadata prefixes + meta fields already in pills + HTML/CSS/JS junk
     const rawText = text
       .replace(/^Title:\s*.+?\n/m, '')
       .replace(/^Description:\s*.+?\n/m, '')
       .replace(/^\[סיכום:.*?\]\n?/m, '')
-      // Strip meta lines already shown as pills
       .replace(/^זמן כולל:.*$/m, '')
       .replace(/^כמות מנות:.*$/m, '')
       .replace(/^רמת קושי:.*$/m, '')
