@@ -544,7 +544,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
         const assistantMessageId = (Date.now() + 1).toString();
         setStreamingMessageId(assistantMessageId);
         setMessages((prev) => [...prev, { id: assistantMessageId, role: 'assistant', content: '' }]);
-        setIsTyping(false);
+        // Keep isTyping=true — thinking message / dots stay visible until first stream token
         sendStreamMessage({
           message: fakeInput,
           username,
@@ -1085,7 +1085,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                   const assistantMessageId = (Date.now() + 1).toString();
                                   setStreamingMessageId(assistantMessageId);
                                   setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant', content: '' }]);
-                                  setIsTyping(false);
+                                  // Keep isTyping=true — thinking message / dots stay visible until first stream token
                                   await sendStreamMessage({
                                     message: enrichedMsg,
                                     username,
@@ -1273,7 +1273,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                           content: '',
                                         };
                                         setMessages((prev) => [...prev, streamingMessage]);
-                                        setIsTyping(false);
+                                        // Keep isTyping=true — thinking message / dots stay visible until first stream token
                                         await sendStreamMessage({
                                           message: text,
                                           username,
@@ -1396,7 +1396,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         );
                       })()}
 
-                      {isTyping && (
+                      {(isTyping || (isStreamActive && thinkingText && !streamText)) && (
                         <motion.div
                           initial={{ opacity: 0, y: 6 }}
                           animate={{ opacity: 1, y: 0 }}
