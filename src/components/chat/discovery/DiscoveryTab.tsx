@@ -179,7 +179,7 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
         {/* Content rows */}
         {!loading && rows.length > 0 && (
           <div className="px-5 pb-4 space-y-[28px]">
-            {visibleRows.map((row) => (
+            {visibleRows.map((row, idx) => (
               <DiscoveryRow
                 key={row.category.slug}
                 slug={row.category.slug}
@@ -188,6 +188,7 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
                 color={row.category.color}
                 items={row.items}
                 onItemClick={handleItemClick}
+                layout={idx % 2 === 0 ? 'masonry' : 'marquee'}
               />
             ))}
 
