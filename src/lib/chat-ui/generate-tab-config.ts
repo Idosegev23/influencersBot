@@ -4,11 +4,11 @@
  * Used by: scan-account.ts, generate-tab-config script, content-processor
  *
  * Tab structure per archetype:
- *   influencer:       צ׳אט | גלו | [קופונים] | [בעיה בהזמנה]
- *   brand:            צ׳אט | גלו | מוצרים | [מבצעים] | [שירות לקוחות]
- *   media_news:       צ׳אט | גלו | עדכונים אחרונים | [קופונים]
+ *   influencer:       צ׳אט | גלו | content_feed (per type) | [קופונים] | [בעיה במוצר]
+ *   brand:            צ׳אט | גלו | מוצרים | [מבצעים] | [בעיה במוצר]
+ *   media_news:       צ׳אט | גלו | [קופונים]
  *   service_provider: צ׳אט | גלו | שירותים
- *   local_business:   צ׳אט | גלו | מוצרים | [הטבות] | [בעיה בהזמנה]
+ *   local_business:   צ׳אט | גלו | מוצרים | [הטבות] | [בעיה במוצר]
  *   tech_creator:     צ׳אט | גלו | סקירות
  */
 
@@ -28,25 +28,20 @@ interface TabGenerationResult {
   greeting_message: string;
 }
 
-// ─── Type-specific tab label by archetype × influencer_type ───
+// ─── Type-specific content_feed label by influencer_type ───
 
-const TOPICS_TAB_LABELS: Record<string, Record<string, string>> = {
-  influencer: {
-    food: 'מתכונים',
-    beauty: 'טיפוח',
-    parenting: 'טיפים',
-    fashion: 'לוקים',
-    fitness: 'אימונים',
-    travel: 'יעדים',
-    tech: 'סקירות',
-    lifestyle: 'המלצות',
-    other: 'תוכן',
-  },
-  brand: { _default: 'מוצרים' },
-  media_news: { _default: 'עדכונים' },
-  service_provider: { _default: 'שירותים' },
-  local_business: { _default: 'מוצרים' },
-  tech_creator: { _default: 'סקירות' },
+const CONTENT_FEED_LABELS: Record<string, string> = {
+  food: 'מתכונים',
+  beauty: 'טיפוח',
+  parenting: 'טיפים',
+  fashion: 'לוקים',
+  fitness: 'אימונים',
+  travel: 'יעדים',
+  tech: 'סקירות',
+  home: 'בית ועיצוב',
+  lifestyle: 'המלצות',
+  media_news: 'עדכונים',
+  other: 'תוכן',
 };
 
 const COUPONS_LABELS: Record<string, string> = {
@@ -58,11 +53,8 @@ const COUPONS_LABELS: Record<string, string> = {
   tech_creator: 'דילים',
 };
 
-const SUPPORT_LABELS: Record<string, string> = {
-  influencer: 'בעיה בהזמנה',
-  brand: 'שירות לקוחות',
-  local_business: 'בעיה בהזמנה',
-};
+// Support tab — only for influencer, brand, local_business
+const SUPPORT_ARCHETYPES = new Set(['influencer', 'brand', 'local_business']);
 
 const SUBTITLE_TEMPLATES: Record<string, Record<string, string>> = {
   influencer: {
@@ -73,13 +65,14 @@ const SUBTITLE_TEMPLATES: Record<string, Record<string, string>> = {
     fitness: 'אני כאן לעזור עם אימונים, תזונה וקופונים',
     travel: 'אני כאן לעזור עם יעדים, טיולים וקופונים',
     tech: 'אני כאן לעזור עם סקירות, המלצות ודילים',
+    home: 'אני כאן לעזור עם בית, עיצוב והמלצות',
     lifestyle: 'אני כאן לעזור עם טיפים, המלצות וקופונים',
     other: 'אני כאן לעזור עם טיפים, המלצות וקופונים',
   },
   brand: {
     food: 'אני כאן לעזור עם מוצרים, מתכונים ומבצעים',
     beauty: 'אני כאן לעזור עם מוצרים, טיפוח ומבצעים',
-    parenting: 'אני כאן לעזור עם מוצרים, המלצות ומבצעים',
+    home: 'אני כאן לעזור עם מוצרים, עיצוב ופתרונות',
     other: 'אני כאן לעזור עם מוצרים, המלצות ומבצעים',
   },
   media_news: { _default: 'אני כאן לעזור עם חדשות, עדכונים ובידור' },
@@ -100,10 +93,11 @@ const HEADER_LABELS: Record<string, Record<string, string>> = {
     fitness: 'אימונים ותזונה',
     travel: 'טיולים והמלצות',
     tech: 'סקירות והמלצות',
+    home: 'בית ועיצוב',
     lifestyle: 'טיפים והמלצות',
     other: 'טיפים והמלצות',
   },
-  brand: { _default: 'מותג' },
+  brand: { home: 'בית ועיצוב', _default: 'מותג' },
   media_news: { _default: 'חדשות ומדיה' },
   service_provider: { _default: 'נותן שירות' },
   local_business: { food: 'אוכל ומעדנייה', _default: 'עסק מקומי' },
@@ -156,60 +150,49 @@ export async function generateTabConfig(accountId: string): Promise<TabGeneratio
   const influencerType = config.influencer_type || 'other';
   const displayName = config.display_name || config.username || accountId;
 
-  // Get entity types from RAG chunks
-  const { data: etData } = await supabase
-    .from('document_chunks')
-    .select('entity_type')
-    .eq('account_id', accountId);
-  const entityTypes = [...new Set((etData || []).map((r: { entity_type: string }) => r.entity_type).filter(Boolean))];
-
   // Check coupons
   const { count: couponCount } = await supabase
     .from('coupons')
     .select('id', { count: 'exact', head: true })
     .eq('account_id', accountId);
 
-  // Check partnerships
-  const { count: partnershipCount } = await supabase
-    .from('partnerships')
-    .select('id', { count: 'exact', head: true })
+  // Get entity types from RAG chunks (for coupon detection)
+  const { data: etData } = await supabase
+    .from('document_chunks')
+    .select('entity_type')
     .eq('account_id', accountId);
+  const entityTypes = [...new Set((etData || []).map((r: { entity_type: string }) => r.entity_type).filter(Boolean))];
 
   const hasCoupons = (couponCount || 0) > 0 || entityTypes.includes('coupon');
-  const hasPartnerships = (partnershipCount || 0) > 0;
 
-  // Build tabs: chat + גלו + [type-specific] + [coupons] + [support]
+  // Build tabs: chat + גלו + [content/products/services] + [coupons] + [support]
   const tabs: TabConfig[] = [{ id: 'chat', label: 'צ׳אט', type: 'chat' }];
 
-  // גלו — always present, universal discover tab
+  // גלו — always present
   tabs.push({ id: 'discover', label: 'גלו', type: 'discover' });
 
-  // Content feed tab for influencers — per influencer_type
+  // Content/products tab — depends on archetype
   if (archetype === 'influencer') {
-    const contentFeedLabel = TOPICS_TAB_LABELS.influencer[influencerType] || TOPICS_TAB_LABELS.influencer['other'] || 'תוכן';
+    // Influencers get content_feed with type-specific label
+    const contentFeedLabel = CONTENT_FEED_LABELS[influencerType] || CONTENT_FEED_LABELS['other'];
     tabs.push({ id: 'content_feed', label: contentFeedLabel, type: 'content_feed' });
-  }
-
-  // Type-specific tab (for non-influencer archetypes)
-  if (archetype === 'brand' || archetype === 'local_business') {
+  } else if (archetype === 'brand' || archetype === 'local_business') {
     tabs.push({ id: 'topics', label: 'מוצרים', type: 'topics' });
-  } else if (archetype === 'media_news') {
-    tabs.push({ id: 'topics', label: 'עדכונים אחרונים', type: 'topics' });
   } else if (archetype === 'service_provider') {
     tabs.push({ id: 'topics', label: 'שירותים', type: 'topics' });
   } else if (archetype === 'tech_creator') {
     tabs.push({ id: 'topics', label: 'סקירות', type: 'topics' });
   }
+  // media_news: NO separate content tab — updates live under גלו
 
   // Coupons — only if data exists
   if (hasCoupons) {
     tabs.push({ id: 'coupons', label: COUPONS_LABELS[archetype] || 'קופונים', type: 'coupons' });
   }
 
-  // Support — only for relevant archetypes + has partnerships
-  const supportLabel = SUPPORT_LABELS[archetype];
-  if (supportLabel && hasPartnerships) {
-    tabs.push({ id: 'support', label: supportLabel, type: 'support' });
+  // Support ("בעיה במוצר") — only for influencer, brand, local_business
+  if (SUPPORT_ARCHETYPES.has(archetype)) {
+    tabs.push({ id: 'support', label: 'בעיה במוצר', type: 'support' });
   }
 
   const chatSubtitle = resolveLabel(SUBTITLE_TEMPLATES, archetype, influencerType);
