@@ -388,7 +388,7 @@ export abstract class BaseArchetype {
 
     try {
       // Build context from knowledge base
-      const kbContext = this.buildKnowledgeContext(input.knowledgeBase);
+      const kbContext = this.buildKnowledgeContext(input.knowledgeBase, input.accountContext.accountArchetype);
 
       // Build personality + persona context prompt (always — not just for streaming)
       let personalityBlock = '';
@@ -756,10 +756,18 @@ ${userNameLine}
    * Build knowledge context string from knowledge base.
    * Delegates to compactKnowledgeContext for dedup + trimming.
    */
-  private buildKnowledgeContext(kb: any): string {
+  private buildKnowledgeContext(kb: any, accountArchetype?: string): string {
     if (!kb) return '📚 **בסיס ידע:** אין מידע זמין כרגע.';
 
-    const { context, stats } = compactKnowledgeContext(kb);
+    // media_news: more posts & transcriptions, no partnerships/coupons
+    const overrides = accountArchetype === 'media_news' ? {
+      maxPosts: 12,
+      maxTranscriptions: 18,
+      maxPartnerships: 0,
+      maxHighlights: 4,
+    } : undefined;
+
+    const { context, stats } = compactKnowledgeContext(kb, overrides);
 
     console.log(`[BaseArchetype] Knowledge context: ${stats.inputChars} → ${stats.outputChars} chars (${stats.reductionPct}% reduction, ${stats.deduplicatedItems} deduped)`);
 
