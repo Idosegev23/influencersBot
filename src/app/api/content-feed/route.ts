@@ -20,11 +20,27 @@ interface ContentCard {
   id: string;
   title: string;
   description: string;
+  fullText: string;
   imageUrl: string | null;
   meta: Record<string, string>; // e.g. { time: '30 דק׳', items: '6 מרכיבים' }
   entityType: string;
   topic: string;
   shortcode: string | null;
+}
+
+/**
+ * Decode HTML entities (&#8217; → ', &#8211; → –, &amp; → &, etc.)
+ */
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, code) => String.fromCharCode(parseInt(code, 16)))
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&nbsp;/g, ' ');
 }
 
 /**
@@ -203,7 +219,7 @@ export async function GET(request: NextRequest) {
     if (/%[0-9a-f]{2}/i.test(text.slice(0, 100)) && !text.includes('Title:')) continue;
     if (text.startsWith('[סיכום: null]') && !text.includes('Title:')) continue;
 
-    const title = extractTitle(text, chunk.entity_type);
+    const title = decodeHtmlEntities(extractTitle(text, chunk.entity_type));
     const normalizedTitle = title.toLowerCase().replace(/\s+/g, ' ').trim();
 
     if (seen.has(normalizedTitle) || title === 'תוכן') continue;
@@ -213,13 +229,23 @@ export async function GET(request: NextRequest) {
     const shortcode = chunk.metadata?.shortcode || null;
     const imageUrl = shortcode ? (postImages[shortcode] || null) : null;
     const heSummary = chunk.metadata?.he_summary && chunk.metadata.he_summary !== 'null' ? chunk.metadata.he_summary : null;
-    const description = heSummary || extractDescription(text);
+    const description = decodeHtmlEntities(heSummary || extractDescription(text));
     const meta = extractMeta(text, topic);
+
+    // Clean full text: strip metadata prefixes for display
+    const fullText = decodeHtmlEntities(
+      text
+        .replace(/^Title:\s*.+?\n/m, '')
+        .replace(/^Description:\s*.+?\n/m, '')
+        .replace(/^\[סיכום:.*?\]\n?/m, '')
+        .trim()
+    );
 
     items.push({
       id: chunk.id,
       title,
       description,
+      fullText,
       imageUrl,
       meta,
       entityType: chunk.entity_type,

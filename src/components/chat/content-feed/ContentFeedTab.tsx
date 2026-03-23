@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChefHat, Shirt, Sparkles, Dumbbell, Cpu, Plane, Baby, Heart,
   Clock, ChevronLeft, Loader2, Star, UtensilsCrossed, Search,
+  X, ExternalLink, MessageCircle,
 } from 'lucide-react';
 import type { InfluencerType } from '@/types';
 import { getProxiedImageUrl } from '@/lib/image-utils';
@@ -13,6 +14,7 @@ interface ContentCard {
   id: string;
   title: string;
   description: string;
+  fullText: string;
   imageUrl: string | null;
   meta: Record<string, string>;
   entityType: string;
@@ -131,14 +133,125 @@ const TYPE_CONFIG: Record<string, {
   },
 };
 
+// ─── Recipe Detail Modal ───
+
+function RecipeModal({
+  item,
+  config,
+  onClose,
+  onAsk,
+}: {
+  item: ContentCard;
+  config: typeof TYPE_CONFIG['food'];
+  onClose: () => void;
+  onAsk: (q: string) => void;
+}) {
+  // Format fullText into paragraphs
+  const paragraphs = item.fullText
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => l.length > 0);
+
+  const postUrl = item.shortcode
+    ? `https://www.instagram.com/p/${item.shortcode}/`
+    : null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="cf-modal-backdrop"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 40, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 40, scale: 0.97 }}
+        transition={{ type: 'spring', damping: 28, stiffness: 350 }}
+        className="cf-modal"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Close button */}
+        <button onClick={onClose} className="cf-modal__close">
+          <X className="w-5 h-5" />
+        </button>
+
+        {/* Image */}
+        {item.imageUrl && (
+          <div className="cf-modal__img">
+            <img src={getProxiedImageUrl(item.imageUrl)} alt={item.title} />
+          </div>
+        )}
+
+        {/* Content */}
+        <div className="cf-modal__content">
+          <h2 className="cf-modal__title">{item.title}</h2>
+
+          {/* Meta pills */}
+          {Object.keys(item.meta).length > 0 && (
+            <div className="cf-modal__pills">
+              {item.meta.time && (
+                <span className="cf-pill">
+                  <Clock className="w-3.5 h-3.5" /> {item.meta.time}
+                </span>
+              )}
+              {item.meta.items && (
+                <span className="cf-pill">
+                  <UtensilsCrossed className="w-3.5 h-3.5" /> {item.meta.items}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Full text */}
+          <div className="cf-modal__text">
+            {paragraphs.map((p, i) => (
+              <p key={i}>{p}</p>
+            ))}
+          </div>
+
+          {/* CTAs */}
+          <div className="cf-modal__actions">
+            <button
+              onClick={() => {
+                onAsk(`${config.askPrefix} "${item.title}"`);
+                onClose();
+              }}
+              className="cf-modal__btn cf-modal__btn--primary"
+              style={{ background: config.accentColor }}
+            >
+              <MessageCircle className="w-4 h-4" />
+              שאלו אותי על זה
+            </button>
+
+            {postUrl && (
+              <a
+                href={postUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="cf-modal__btn cf-modal__btn--secondary"
+              >
+                <ExternalLink className="w-4 h-4" />
+                צפו בפוסט
+              </a>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 // ─── Recipe card — masonry grid, meta pills, warm palette ───
 
-function RecipeCard({ item, config, onAsk }: { item: ContentCard; config: typeof TYPE_CONFIG['food']; onAsk: (q: string) => void }) {
+function RecipeCard({ item, config, onAsk, onOpen }: { item: ContentCard; config: typeof TYPE_CONFIG['food']; onAsk: (q: string) => void; onOpen: (item: ContentCard) => void }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       className="cf-recipe-card"
+      onClick={() => onOpen(item)}
     >
       {item.imageUrl && (
         <div className="cf-recipe-card__img">
@@ -165,7 +278,7 @@ function RecipeCard({ item, config, onAsk }: { item: ContentCard; config: typeof
           <p className="cf-recipe-card__desc">{item.description}</p>
         )}
         <button
-          onClick={() => onAsk(`${config.askPrefix} "${item.title}"`)}
+          onClick={(e) => { e.stopPropagation(); onAsk(`${config.askPrefix} "${item.title}"`); }}
           className="cf-card-cta"
           style={{ color: config.accentColor }}
         >
@@ -337,9 +450,18 @@ export default function ContentFeedTab({ username, influencerType, tabLabel, onA
   const [loadingMore, setLoadingMore] = useState(false);
   const [offset, setOffset] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedItem, setSelectedItem] = useState<ContentCard | null>(null);
 
   const config = TYPE_CONFIG[influencerType] || TYPE_CONFIG.other;
   const Icon = config.icon;
+
+  const openModal = useCallback((item: ContentCard) => {
+    setSelectedItem(item);
+  }, []);
+
+  const closeModal = useCallback(() => {
+    setSelectedItem(null);
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -385,7 +507,7 @@ export default function ContentFeedTab({ username, influencerType, tabLabel, onA
   const renderCard = (item: ContentCard) => {
     switch (influencerType) {
       case 'food':
-        return <RecipeCard key={item.id} item={item} config={config} onAsk={onAskAbout} />;
+        return <RecipeCard key={item.id} item={item} config={config} onAsk={onAskAbout} onOpen={openModal} />;
       case 'fashion':
         return <LookCard key={item.id} item={item} config={config} onAsk={onAskAbout} />;
       case 'beauty':
@@ -481,6 +603,18 @@ export default function ContentFeedTab({ username, influencerType, tabLabel, onA
           )}
         </div>
       </div>
+
+      {/* Recipe detail modal */}
+      <AnimatePresence>
+        {selectedItem && (
+          <RecipeModal
+            item={selectedItem}
+            config={config}
+            onClose={closeModal}
+            onAsk={onAskAbout}
+          />
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
