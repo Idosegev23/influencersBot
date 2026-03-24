@@ -282,6 +282,40 @@ export async function retrieveKnowledge(
     highlights = results.highlights || [];
   }
 
+  // media_news: supplement with most recent posts (RAG may miss them due to identical created_at)
+  if (isMediaNews) {
+    try {
+      const existingPostIds = new Set(posts.map((p: any) => p.post_id || p.id));
+      const { data: recentPosts } = await supabase
+        .from('instagram_posts')
+        .select('id, post_id, caption, posted_at, views_count, likes_count, type')
+        .eq('account_id', accountId)
+        .order('posted_at', { ascending: false })
+        .limit(8);
+      if (recentPosts) {
+        let added = 0;
+        for (const rp of recentPosts) {
+          if (!existingPostIds.has(rp.post_id) && !existingPostIds.has(rp.id)) {
+            posts.push({
+              id: rp.id,
+              post_id: rp.post_id,
+              caption: rp.caption,
+              posted_at: rp.posted_at,
+              views_count: rp.views_count,
+              likes_count: rp.likes_count,
+              type: rp.type,
+            } as any);
+            existingPostIds.add(rp.post_id || rp.id);
+            added++;
+          }
+        }
+        if (added > 0) console.log(`[Knowledge Retrieval] 📰 media_news: added ${added} recent posts as supplement`);
+      }
+    } catch (e) {
+      // Non-critical — don't block on supplement failure
+    }
+  }
+
   // Merge websites: direct DB (full content) + RAG (semantic excerpts), deduplicate by URL
   const mergedWebsites = mergeWebsites(directWebsites, ragWebsites);
 

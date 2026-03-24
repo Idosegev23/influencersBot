@@ -17,7 +17,7 @@ export function NewsTicker({ headlines }: NewsTickerProps) {
   const items = [...headlines, ...headlines];
 
   // Calculate animation duration based on content length
-  const duration = Math.max(headlines.length * 5, 20);
+  const duration = Math.max(headlines.length * 12, 40);
 
   return (
     <div
