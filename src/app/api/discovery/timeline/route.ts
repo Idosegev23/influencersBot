@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
 
     const { data: posts, error } = await supabase
       .from('instagram_posts')
-      .select('id, caption, likes_count, comments_count, views_count, posted_at, thumbnail_url, media_url')
+      .select('id, caption, likes_count, comments_count, views_count, posted_at, thumbnail_url, media_urls')
       .eq('account_id', account.id)
       .order('posted_at', { ascending: false })
       .limit(limit);
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
         postedAt: p.posted_at,
         likes: p.likes_count || 0,
         views: p.views_count || 0,
-        thumbnailUrl: p.thumbnail_url || p.media_url || null,
+        thumbnailUrl: p.thumbnail_url || (Array.isArray(p.media_urls) ? p.media_urls[0] : null) || null,
       };
     });
 

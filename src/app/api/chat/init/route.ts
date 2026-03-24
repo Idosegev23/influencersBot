@@ -58,11 +58,11 @@ export async function GET(request: Request) {
       const hotTopics = await getTopHotTopics(3, ['breaking', 'hot']);
 
       if (hotTopics.length > 0) {
-        const statusEmoji = (s: string) => s === 'breaking' ? '🔴' : '🔥';
+        const statusMarker = (s: string) => s === 'breaking' ? '[BREAKING]' : '[HOT]';
         greeting = `מה קורה! הנה מה שחם עכשיו:`;
         for (const topic of hotTopics) {
           const summary = topic.summary || topic.topic_name;
-          greeting += `\n${statusEmoji(topic.status)} ${summary}`;
+          greeting += `\n${statusMarker(topic.status)} ${summary}`;
         }
         greeting += `\n\nעל מה תרצו לשמוע?`;
 
@@ -87,7 +87,7 @@ export async function GET(request: Request) {
       if (config.greeting_message) {
         greeting = config.greeting_message;
       } else {
-        greeting = `שלום! אני הבוט של ${persona?.name || displayName} 😊`;
+        greeting = `שלום! אני הבוט של ${persona?.name || displayName}`;
         if (persona?.voice_rules?.tone) {
           greeting += `\nאני כאן כדי לעזור לך עם שאלות, המלצות וקופונים בלעדיים. במה אפשר לעזור?`;
         } else {

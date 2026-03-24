@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Eye } from 'lucide-react';
 import { getProxiedImageUrl, getProxiedImageByShortcode } from '@/lib/image-utils';
 import type { DiscoveryItem } from '@/lib/discovery/types';
 
@@ -215,7 +216,7 @@ export function DiscoveryModal({
                 </div>
               ) : (
                 <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: '#e7e8ea' }}>
-                  <span className="text-4xl opacity-25">📷</span>
+                  <Eye className="w-8 h-8 opacity-15" />
                 </div>
               )}
 

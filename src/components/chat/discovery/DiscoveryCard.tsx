@@ -70,7 +70,7 @@ export function DiscoveryCard({ item, color, onClick, variant = 'default' }: Dis
           className="absolute inset-0 w-full h-full flex items-center justify-center"
           style={{ background: `linear-gradient(135deg, ${color}30, ${color}10)` }}
         >
-          <span className="text-3xl opacity-25">📷</span>
+          <span className="text-3xl opacity-15" style={{ color: '#999' }}>?</span>
         </div>
       )}
 

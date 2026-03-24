@@ -1091,7 +1091,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                   borderColor: topic.status === 'breaking' ? '#FFD0D0' : '#FFE8D0',
                                 }}
                               >
-                                <span>{topic.status === 'breaking' ? '🔴' : '🔥'} {topic.name}</span>
+                                <span>{topic.name}</span>
                               </motion.button>
                             ))}
                             <motion.button
