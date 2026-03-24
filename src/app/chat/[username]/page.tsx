@@ -1907,6 +1907,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
               <ProductsCatalogTab
                 key="products"
                 accountId={influencer.id}
+                accountType={influencer.influencer_type}
                 onAskAbout={(question: string) => {
                   setActiveTab('chat');
                   maybeShowLeadPopup();
