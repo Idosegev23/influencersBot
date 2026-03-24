@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, Eye, Clock, Flame, ChevronLeft } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Loader2, Eye, Clock, Flame, TrendingUp } from 'lucide-react';
 import { NewsTicker } from './NewsTicker';
 import { getProxiedImageUrl } from '@/lib/image-utils';
 import type { HotTopic } from '@/lib/hot-topics/types';
@@ -50,15 +50,150 @@ function timeAgo(dateStr: string): string {
   return 'שבוע+';
 }
 
-const STATUS_CONFIG: Record<string, { color: string; label: string }> = {
-  breaking: { color: '#FF3B30', label: 'BREAKING' },
-  hot: { color: '#FF9500', label: 'HOT' },
-  cooling: { color: '#AF52DE', label: 'TRENDING' },
-  archive: { color: '#8E8E93', label: 'ARCHIVE' },
+const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
+  breaking: { color: '#FF3B30', bg: '#FFF1F0', label: 'BREAKING' },
+  hot: { color: '#FF9500', bg: '#FFF8F0', label: 'HOT' },
+  cooling: { color: '#AF52DE', bg: '#F8F0FF', label: 'TRENDING' },
+  archive: { color: '#8E8E93', bg: '#F2F2F7', label: 'ARCHIVE' },
 };
 
 // ============================================
-// Component
+// Sub-components
+// ============================================
+
+/** Image card with gradient overlay — used for hero and grid */
+function ImageCard({
+  thumbnailUrl,
+  headline,
+  views,
+  postedAt,
+  badge,
+  aspectRatio = '16/10',
+  headlineSize = '18px',
+  onClick,
+}: {
+  thumbnailUrl: string;
+  headline: string;
+  views: number;
+  postedAt: string;
+  badge?: { label: string; color: string };
+  aspectRatio?: string;
+  headlineSize?: string;
+  onClick: () => void;
+}) {
+  return (
+    <motion.button
+      whileTap={{ scale: 0.97 }}
+      onClick={onClick}
+      className="w-full relative overflow-hidden text-right"
+      style={{ borderRadius: '20px', aspectRatio }}
+    >
+      <img
+        src={getProxiedImageUrl(thumbnailUrl)}
+        alt=""
+        className="absolute inset-0 w-full h-full object-cover"
+        loading="lazy"
+      />
+      <div
+        className="absolute inset-0"
+        style={{ background: 'linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.2) 50%, transparent 65%)' }}
+      />
+      {badge && (
+        <div className="absolute top-3 right-3">
+          <span
+            className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg"
+            style={{ background: badge.color, color: '#FFF' }}
+          >
+            {badge.label}
+          </span>
+        </div>
+      )}
+      {views > 0 && (
+        <div className="absolute top-3 left-3">
+          <span
+            className="text-[9px] font-bold px-2 py-1 rounded-lg flex items-center gap-1"
+            style={{ background: 'rgba(0,0,0,0.45)', color: '#FFF', backdropFilter: 'blur(8px)' }}
+          >
+            <Eye className="w-3 h-3" />
+            {formatViews(views)}
+          </span>
+        </div>
+      )}
+      <div className="absolute bottom-0 left-0 right-0 p-4" dir="rtl">
+        <h3
+          className="font-black leading-[1.2] text-white line-clamp-2"
+          style={{ fontSize: headlineSize }}
+        >
+          {headline}
+        </h3>
+        <p className="text-[11px] mt-1.5 flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.55)' }}>
+          <Clock className="w-3 h-3" />
+          {timeAgo(postedAt)}
+        </p>
+      </div>
+    </motion.button>
+  );
+}
+
+/** List-style card with side thumbnail */
+function ListCard({
+  headline,
+  thumbnailUrl,
+  views,
+  postedAt,
+  onClick,
+}: {
+  headline: string;
+  thumbnailUrl: string | null;
+  views: number;
+  postedAt: string;
+  onClick: () => void;
+}) {
+  return (
+    <motion.button
+      whileTap={{ scale: 0.98 }}
+      onClick={onClick}
+      className="w-full flex items-stretch overflow-hidden text-right"
+      style={{
+        borderRadius: '16px',
+        background: '#FFF',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.04), 0 0 0 0.5px rgba(0,0,0,0.03)',
+        minHeight: '90px',
+      }}
+    >
+      <div className="flex-1 p-3.5 flex flex-col justify-center min-w-0" dir="rtl">
+        <p className="text-[13px] font-semibold leading-snug line-clamp-2" style={{ color: '#1C1C1E' }}>
+          {headline}
+        </p>
+        <div className="flex items-center gap-3 mt-2 text-[10px]" style={{ color: '#AEAEB2' }}>
+          <span className="flex items-center gap-0.5">
+            <Clock className="w-2.5 h-2.5" />
+            {timeAgo(postedAt)}
+          </span>
+          {views > 0 && (
+            <span className="flex items-center gap-0.5">
+              <Eye className="w-2.5 h-2.5" />
+              {formatViews(views)}
+            </span>
+          )}
+        </div>
+      </div>
+      {thumbnailUrl && (
+        <div className="flex-shrink-0 w-[90px]">
+          <img
+            src={getProxiedImageUrl(thumbnailUrl)}
+            alt=""
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
+        </div>
+      )}
+    </motion.button>
+  );
+}
+
+// ============================================
+// Main Component
 // ============================================
 
 export function NewsDiscoveryTab({ username, influencerName, onAskInChat }: NewsDiscoveryTabProps) {
@@ -97,7 +232,7 @@ export function NewsDiscoveryTab({ username, influencerName, onAskInChat }: News
     onAskInChat(`ספרו לי על ${topic.topic_name}`, enrichedContext);
   }, [onAskInChat]);
 
-  const handleTimelineClick = useCallback((item: TimelineItem) => {
+  const handlePostClick = useCallback((item: TimelineItem) => {
     const enrichedContext = `[פוסט אחרון: ${item.headline}\nתקציר: ${item.preview}\nפורסם: ${item.postedAt}\nצפיות: ${item.views}, לייקים: ${item.likes}]`;
     onAskInChat(item.headline.length > 40 ? item.headline.substring(0, 40) + '...' : item.headline, enrichedContext);
   }, [onAskInChat]);
@@ -107,9 +242,12 @@ export function NewsDiscoveryTab({ username, influencerName, onAskInChat }: News
   const hotOnly = hotTopics.filter(t => t.status === 'hot');
   const allTopics = [...breakingTopics, ...hotOnly, ...hotTopics.filter(t => t.status === 'cooling')];
   const heroTopic = breakingTopics[0] || hotOnly[0];
+
   const postsWithImages = timeline.filter(t => t.thumbnailUrl);
+  const postsNoImages = timeline.filter(t => !t.thumbnailUrl);
   const heroPost = postsWithImages[0];
-  const remainingPosts = postsWithImages.slice(1);
+  const gridPosts = postsWithImages.slice(1, 3);
+  const listPosts = postsWithImages.slice(3);
 
   // Ticker
   const tickerHeadlines = [...breakingTopics, ...hotOnly].slice(0, 8).map(t => ({
@@ -135,118 +273,129 @@ export function NewsDiscoveryTab({ username, influencerName, onAskInChat }: News
         </div>
       )}
 
-      {/* Main Content */}
+      {/* ═══════════════════════════════════════ */}
+      {/* MAIN CONTENT                            */}
+      {/* ═══════════════════════════════════════ */}
       {!loading && (hotTopics.length > 0 || timeline.length > 0) && (
         <>
           {/* ── Ticker ── */}
           {tickerHeadlines.length > 0 && <NewsTicker headlines={tickerHeadlines} />}
 
-          {/* ── Hero Card (Apple News style) ── */}
-          {heroPost && (
-            <motion.button
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              whileTap={{ scale: 0.985 }}
-              onClick={() => handleTimelineClick(heroPost)}
-              className="w-full relative overflow-hidden"
-              style={{ aspectRatio: '16/10' }}
+          {/* ── HERO POST ── */}
+          {heroPost && heroPost.thumbnailUrl && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="px-4 pt-4"
             >
-              <img
-                src={getProxiedImageUrl(heroPost.thumbnailUrl || '')}
-                alt=""
-                className="absolute inset-0 w-full h-full object-cover"
+              <ImageCard
+                thumbnailUrl={heroPost.thumbnailUrl}
+                headline={heroPost.headline}
+                views={heroPost.views}
+                postedAt={heroPost.postedAt}
+                badge={heroTopic ? { label: STATUS_CONFIG[heroTopic.status]?.label || 'LIVE', color: STATUS_CONFIG[heroTopic.status]?.color || '#FF3B30' } : undefined}
+                aspectRatio="16/10"
+                headlineSize="20px"
+                onClick={() => handlePostClick(heroPost)}
               />
-              <div
-                className="absolute inset-0"
-                style={{ background: 'linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.35) 40%, rgba(0,0,0,0.1) 70%)' }}
-              />
-              {/* Breaking badge */}
-              {heroTopic && (
-                <div className="absolute top-3 right-3">
-                  <span
-                    className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md"
-                    style={{
-                      background: STATUS_CONFIG[heroTopic.status]?.color || '#FF3B30',
-                      color: '#FFF',
-                    }}
-                  >
-                    {STATUS_CONFIG[heroTopic.status]?.label}
-                  </span>
-                </div>
-              )}
-              {/* Content */}
-              <div className="absolute bottom-0 left-0 right-0 p-5" dir="rtl">
-                <p className="text-[11px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'rgba(255,255,255,0.6)' }}>
-                  {influencerName}
-                </p>
-                <h1 className="font-black text-[22px] leading-[1.2] text-white mb-2 line-clamp-2">
-                  {heroPost.headline}
-                </h1>
-                <div className="flex items-center gap-3 text-[11px]" style={{ color: 'rgba(255,255,255,0.6)' }}>
-                  <span className="flex items-center gap-1">
-                    <Eye className="w-3 h-3" />
-                    {formatViews(heroPost.views)}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    {timeAgo(heroPost.postedAt)}
-                  </span>
-                </div>
-              </div>
-            </motion.button>
+            </motion.div>
           )}
 
-          {/* ── Hot Topics Section ── */}
+          {/* ── TWO-UP GRID ── */}
+          {gridPosts.length > 0 && (
+            <div className="px-4 pt-3 grid grid-cols-2 gap-2.5">
+              {gridPosts.map((item, i) => (
+                item.thumbnailUrl ? (
+                  <motion.div
+                    key={item.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.08 }}
+                  >
+                    <ImageCard
+                      thumbnailUrl={item.thumbnailUrl}
+                      headline={item.headline}
+                      views={item.views}
+                      postedAt={item.postedAt}
+                      aspectRatio="3/4"
+                      headlineSize="14px"
+                      onClick={() => handlePostClick(item)}
+                    />
+                  </motion.div>
+                ) : null
+              ))}
+            </div>
+          )}
+
+          {/* ── HOT TOPICS ── */}
           {allTopics.length > 0 && (
-            <section className="px-4 pt-5 pb-1" dir="rtl">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Flame className="w-4 h-4" style={{ color: '#FF3B30' }} />
-                  <h2 className="text-[15px] font-bold" style={{ color: '#1C1C1E' }}>נושאים חמים</h2>
-                </div>
+            <section className="pt-5 pb-1" dir="rtl">
+              <div className="flex items-center gap-2 px-4 mb-3">
+                <Flame className="w-4 h-4" style={{ color: '#FF3B30' }} />
+                <h2 className="text-[16px] font-bold" style={{ color: '#1C1C1E' }}>
+                  נושאים חמים
+                </h2>
               </div>
 
-              {/* Horizontal scroll of topic pills */}
-              <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-2">
-                {allTopics.slice(0, 8).map((topic, i) => {
+              <div className="px-4 space-y-2">
+                {allTopics.slice(0, 6).map((topic, i) => {
                   const cfg = STATUS_CONFIG[topic.status] || STATUS_CONFIG.hot;
                   return (
                     <motion.button
                       key={topic.id}
-                      initial={{ opacity: 0, x: 12 }}
+                      initial={{ opacity: 0, x: 8 }}
                       animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.05 }}
-                      whileTap={{ scale: 0.95 }}
+                      transition={{ delay: i * 0.04 }}
+                      whileTap={{ scale: 0.98 }}
                       onClick={() => handleTopicClick(topic)}
-                      className="flex-shrink-0 text-right overflow-hidden"
+                      className="w-full text-right overflow-hidden flex items-stretch"
                       style={{
-                        width: '180px',
                         borderRadius: '16px',
                         background: '#FFF',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 0 0 0.5px rgba(0,0,0,0.04)',
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.04), 0 0 0 0.5px rgba(0,0,0,0.03)',
                       }}
                     >
-                      {/* Color accent */}
-                      <div className="h-1" style={{ background: cfg.color }} />
-                      <div className="p-3">
-                        <div className="flex items-center gap-1.5 mb-1.5">
+                      {/* Color accent bar */}
+                      <div className="w-1 flex-shrink-0" style={{ background: cfg.color }} />
+                      <div className="flex-1 p-3.5">
+                        <div className="flex items-center gap-2 mb-1.5">
                           <span
-                            className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${topic.status === 'breaking' ? 'animate-pulse' : ''}`}
-                            style={{ background: `${cfg.color}18`, color: cfg.color }}
+                            className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md ${topic.status === 'breaking' ? 'animate-pulse' : ''}`}
+                            style={{ background: cfg.bg, color: cfg.color }}
                           >
                             {cfg.label}
                           </span>
-                          <span className="text-[9px] font-bold" style={{ color: cfg.color }}>
-                            {Math.round(topic.heat_score)}
-                          </span>
+                          <div className="flex-1" />
+                          <div className="flex items-center gap-1">
+                            <TrendingUp className="w-3 h-3" style={{ color: cfg.color }} />
+                            <span className="text-[10px] font-bold" style={{ color: cfg.color }}>
+                              {Math.round(topic.heat_score)}
+                            </span>
+                          </div>
                         </div>
-                        <p className="text-[13px] font-bold leading-snug line-clamp-2" style={{ color: '#1C1C1E' }}>
+                        <h3 className="text-[14px] font-bold leading-snug" style={{ color: '#1C1C1E' }}>
                           {topic.topic_name}
-                        </p>
+                        </h3>
                         {topic.summary && (
-                          <p className="text-[10px] leading-relaxed mt-1 line-clamp-2" style={{ color: '#8E8E93' }}>
+                          <p className="text-[11px] leading-relaxed mt-1 line-clamp-2" style={{ color: '#8E8E93' }}>
                             {topic.summary}
                           </p>
+                        )}
+                        {topic.tags && topic.tags.length > 0 && (
+                          <div className="flex items-center gap-1.5 mt-2">
+                            {topic.tags.slice(0, 3).map(tag => (
+                              <span
+                                key={tag}
+                                className="text-[9px] px-1.5 py-0.5 rounded-full"
+                                style={{ background: '#F2F2F7', color: '#8E8E93' }}
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                            <span className="text-[9px]" style={{ color: '#C7C7CC' }}>
+                              {topic.coverage_count} ערוצים
+                            </span>
+                          </div>
                         )}
                       </div>
                     </motion.button>
@@ -256,115 +405,44 @@ export function NewsDiscoveryTab({ username, influencerName, onAskInChat }: News
             </section>
           )}
 
-          {/* ── Latest Posts (Apple News cards) ── */}
-          {remainingPosts.length > 0 && (
-            <section className="px-4 pt-3 pb-2" dir="rtl">
-              <h2 className="text-[15px] font-bold mb-3" style={{ color: '#1C1C1E' }}>
-                פוסטים אחרונים
+          {/* ── MORE POSTS (list style) ── */}
+          {listPosts.length > 0 && (
+            <section className="px-4 pt-4 pb-1" dir="rtl">
+              <h2 className="text-[16px] font-bold mb-3" style={{ color: '#1C1C1E' }}>
+                עוד מהערוץ
               </h2>
-
-              {/* Top 2 — side by side large cards */}
-              <div className="grid grid-cols-2 gap-2.5 mb-2.5">
-                {remainingPosts.slice(0, 2).map((item, i) => (
-                  <motion.button
-                    key={item.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.06 }}
-                    whileTap={{ scale: 0.97 }}
-                    onClick={() => handleTimelineClick(item)}
-                    className="relative overflow-hidden text-right"
-                    style={{ borderRadius: '16px', aspectRatio: '3/4' }}
-                  >
-                    <img
-                      src={getProxiedImageUrl(item.thumbnailUrl || '')}
-                      alt=""
-                      className="absolute inset-0 w-full h-full object-cover"
-                    />
-                    <div
-                      className="absolute inset-0"
-                      style={{ background: 'linear-gradient(0deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.15) 50%, transparent 70%)' }}
-                    />
-                    {/* Views */}
-                    <div className="absolute top-2.5 left-2.5">
-                      <span
-                        className="text-[9px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5"
-                        style={{ background: 'rgba(0,0,0,0.5)', color: '#FFF', backdropFilter: 'blur(8px)' }}
-                      >
-                        <Eye className="w-2.5 h-2.5" />
-                        {formatViews(item.views)}
-                      </span>
-                    </div>
-                    <div className="absolute bottom-0 left-0 right-0 p-3">
-                      <p className="text-[13px] font-bold leading-snug text-white line-clamp-3">
-                        {item.headline}
-                      </p>
-                      <p className="text-[10px] mt-1" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                        {timeAgo(item.postedAt)}
-                      </p>
-                    </div>
-                  </motion.button>
-                ))}
-              </div>
-
-              {/* Rest — list cards with thumbnail on the side */}
               <div className="space-y-2">
-                {remainingPosts.slice(2).map((item, i) => (
-                  <motion.button
+                {listPosts.map((item, i) => (
+                  <motion.div
                     key={item.id}
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.15 + i * 0.03 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => handleTimelineClick(item)}
-                    className="w-full flex items-stretch overflow-hidden text-right"
-                    style={{
-                      borderRadius: '14px',
-                      background: '#FFF',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 0 0 0.5px rgba(0,0,0,0.03)',
-                      minHeight: '88px',
-                    }}
+                    transition={{ delay: 0.1 + i * 0.03 }}
                   >
-                    {/* Text */}
-                    <div className="flex-1 p-3 flex flex-col justify-center min-w-0">
-                      <p className="text-[13px] font-semibold leading-snug line-clamp-2" style={{ color: '#1C1C1E' }}>
-                        {item.headline}
-                      </p>
-                      <div className="flex items-center gap-2.5 mt-1.5 text-[10px]" style={{ color: '#AEAEB2' }}>
-                        <span>{timeAgo(item.postedAt)}</span>
-                        {item.views > 0 && (
-                          <span className="flex items-center gap-0.5">
-                            <Eye className="w-2.5 h-2.5" />
-                            {formatViews(item.views)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    {/* Thumbnail */}
-                    <div className="flex-shrink-0 w-[88px]">
-                      <img
-                        src={getProxiedImageUrl(item.thumbnailUrl || '')}
-                        alt=""
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  </motion.button>
+                    <ListCard
+                      headline={item.headline}
+                      thumbnailUrl={item.thumbnailUrl}
+                      views={item.views}
+                      postedAt={item.postedAt}
+                      onClick={() => handlePostClick(item)}
+                    />
+                  </motion.div>
                 ))}
               </div>
             </section>
           )}
 
-          {/* ── Posts without thumbnails ── */}
-          {timeline.filter(t => !t.thumbnailUrl).length > 0 && (
+          {/* ── TEXT-ONLY POSTS ── */}
+          {postsNoImages.length > 0 && (
             <section className="px-4 pt-3" dir="rtl">
-              {timeline.filter(t => !t.thumbnailUrl).map((item, i) => (
+              {postsNoImages.map((item, i) => (
                 <motion.button
                   key={item.id}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  transition={{ delay: 0.2 + i * 0.03 }}
+                  transition={{ delay: 0.15 + i * 0.03 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => handleTimelineClick(item)}
+                  onClick={() => handlePostClick(item)}
                   className="w-full text-right py-3 flex items-start gap-3"
                   style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}
                 >
