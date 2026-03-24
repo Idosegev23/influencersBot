@@ -424,115 +424,93 @@ function ProductCard({ product, onClick }: { product: Product; onClick: () => vo
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      className="group rounded-2xl overflow-hidden cursor-pointer transition-shadow hover:shadow-md"
+      className="group rounded-2xl overflow-hidden cursor-pointer"
       style={{
-        background: 'var(--chat-bg, #fff)',
         border: product.is_featured
           ? '1.5px solid rgba(251,191,36,0.4)'
           : '1px solid var(--border-color, #e5e7eb)',
       }}
       onClick={onClick}
     >
-      {/* Image area */}
-      {hasImage ? (
-        <div className="relative h-40 overflow-hidden">
+      {/* Full card is the image with text overlay */}
+      <div className="relative w-full overflow-hidden" style={{ aspectRatio: '4 / 5' }}>
+        {hasImage ? (
           <img
             src={product.image_url}
             alt={displayName}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             loading="lazy"
           />
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 50%)' }} />
-          {/* Badges */}
-          <div className="absolute top-2 right-2 flex gap-1">
-            {product.is_featured && (
-              <span className="flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-md font-medium backdrop-blur-sm"
-                style={{ background: 'rgba(251,191,36,0.3)', color: '#fbbf24' }}>
-                <Star className="w-2.5 h-2.5" />
-              </span>
-            )}
-            {product.is_on_sale && (
-              <span className="flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-md font-medium backdrop-blur-sm"
-                style={{ background: 'rgba(239,68,68,0.3)', color: '#f87171' }}>
-                <Flame className="w-2.5 h-2.5" />
-              </span>
-            )}
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center" style={{
+            background: `linear-gradient(160deg, ${color}25 0%, ${color}08 60%, var(--chat-bg, #fff) 100%)`,
+          }}>
+            <ShoppingBag className="w-14 h-14 opacity-15" style={{ color }} />
           </div>
-          {/* Price on image */}
-          {product.price != null && (
-            <div className="absolute bottom-2 left-2 flex items-center gap-1.5">
-              <span className="text-base font-bold text-white">₪{product.price}</span>
-              {product.is_on_sale && product.original_price && (
-                <span className="text-[10px] line-through text-white/50">₪{product.original_price}</span>
-              )}
-            </div>
-          )}
-        </div>
-      ) : (
-        /* No image — gradient header with icon */
-        <div className="relative h-20 flex items-center justify-center" style={{
-          background: `linear-gradient(135deg, ${color}22, ${color}0a)`,
-        }}>
-          <ShoppingBag className="w-8 h-8 opacity-20" style={{ color }} />
-          <div className="absolute top-2 right-2 flex gap-1">
-            {product.is_featured && <Star className="w-3 h-3" style={{ color: '#fbbf24' }} />}
-            {product.is_on_sale && <Flame className="w-3 h-3" style={{ color: '#f87171' }} />}
-          </div>
-          {product.price != null && (
-            <div className="absolute bottom-2 left-2">
-              <span className="text-sm font-bold" style={{ color }}>₪{product.price}</span>
-              {product.is_on_sale && product.original_price && (
-                <span className="text-[10px] ml-1 line-through" style={{ color: 'var(--text-secondary, #9ca3af)' }}>₪{product.original_price}</span>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Content */}
-      <div className="p-3" dir="rtl">
-        <h3 className="font-semibold text-[13px] leading-tight line-clamp-2"
-          style={{ color: 'var(--text-primary, #1f2937)' }}>
-          {displayName}
-        </h3>
-
-        {/* Description */}
-        {(ai.whatItDoes || product.description) && (
-          <p className="text-[11px] mt-1.5 leading-relaxed line-clamp-2"
-            style={{ color: 'var(--text-secondary, #6b7280)' }}>
-            {ai.whatItDoes || product.description}
-          </p>
         )}
 
-        {/* Tags row */}
-        <div className="flex flex-wrap gap-1 mt-2">
-          {ai.sellingPoints?.slice(0, 2).map((sp, i) => (
-            <span key={i} className="text-[9px] px-1.5 py-0.5 rounded-full"
-              style={{ background: `${color}10`, color, border: `1px solid ${color}20` }}>
-              {sp}
+        {/* Gradient overlay for text readability */}
+        <div className="absolute inset-0" style={{
+          background: hasImage
+            ? 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.2) 40%, transparent 60%)'
+            : 'linear-gradient(to top, rgba(0,0,0,0.06) 0%, transparent 40%)',
+        }} />
+
+        {/* Top badges */}
+        <div className="absolute top-2.5 right-2.5 flex gap-1.5" dir="rtl">
+          {product.is_featured && (
+            <span className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg font-semibold backdrop-blur-md"
+              style={{ background: 'rgba(251,191,36,0.3)', color: '#fbbf24' }}>
+              <Star className="w-3 h-3" /> מומלץ
             </span>
-          ))}
-          {product.volume && (
-            <span className="text-[9px] px-1.5 py-0.5 rounded-full"
-              style={{ background: 'var(--input-bg, #f3f4f6)', color: 'var(--text-secondary, #9ca3af)' }}>
-              {product.volume}
+          )}
+          {product.is_on_sale && (
+            <span className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg font-semibold backdrop-blur-md"
+              style={{ background: 'rgba(239,68,68,0.3)', color: '#f87171' }}>
+              <Flame className="w-3 h-3" /> מבצע
             </span>
           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between mt-2 pt-2" style={{ borderTop: '1px solid var(--border-color, #f3f4f6)' }}>
-          <span className="text-[10px]" style={{ color }}>
-            {CATEGORY_LABELS[product.category || ''] || product.category?.replace(/_/g, ' ') || ''}
-          </span>
-          {product.product_url && (
-            <a href={product.product_url} target="_blank" rel="noopener noreferrer"
-              className="p-1 rounded-md transition-colors hover:bg-black/5"
-              style={{ color: 'var(--text-secondary, #9ca3af)' }}
-              onClick={e => e.stopPropagation()}>
-              <ExternalLink className="w-3 h-3" />
-            </a>
+        {/* Bottom text overlay */}
+        <div className="absolute bottom-0 left-0 right-0 p-3.5" dir="rtl">
+          <h3 className="font-bold text-[15px] leading-snug line-clamp-2"
+            style={{ color: hasImage ? '#fff' : 'var(--text-primary, #1f2937)' }}>
+            {displayName}
+          </h3>
+
+          {(ai.whatItDoes || product.description) && (
+            <p className="text-[11px] mt-1 leading-relaxed line-clamp-2"
+              style={{ color: hasImage ? 'rgba(255,255,255,0.8)' : 'var(--text-secondary, #6b7280)' }}>
+              {ai.whatItDoes || product.description}
+            </p>
           )}
+
+          <div className="flex items-center justify-between mt-2">
+            <div className="flex items-center gap-2">
+              {product.price != null && (
+                <span className="text-base font-bold"
+                  style={{ color: hasImage ? '#fff' : 'var(--color-primary, #7c3aed)' }}>
+                  ₪{product.price}
+                </span>
+              )}
+              {product.is_on_sale && product.original_price && (
+                <span className="text-[10px] line-through"
+                  style={{ color: hasImage ? 'rgba(255,255,255,0.5)' : 'var(--text-secondary, #9ca3af)' }}>
+                  ₪{product.original_price}
+                </span>
+              )}
+            </div>
+            {product.volume && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full backdrop-blur-sm"
+                style={{
+                  background: hasImage ? 'rgba(255,255,255,0.15)' : 'var(--input-bg, #f3f4f6)',
+                  color: hasImage ? 'rgba(255,255,255,0.8)' : 'var(--text-secondary, #9ca3af)',
+                }}>
+                {product.volume}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </motion.div>
@@ -613,7 +591,7 @@ export default function ProductsCatalogTab({ accountId, onAskAbout, accountType 
           {items.length}
         </span>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2.5">
         {items.map(p => (
           <ProductCard key={p.id} product={p} onClick={() => setSelectedProduct(p)} />
         ))}
@@ -705,9 +683,9 @@ export default function ProductsCatalogTab({ accountId, onAskAbout, accountType 
               style={{ color: 'var(--text-primary, #1f2937)' }}>
               <Star className="w-3.5 h-3.5 text-amber-400" /> מומלצים
             </h3>
-            <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
+            <div className="flex gap-2.5 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
               {products.filter(p => p.is_featured).map(p => (
-                <div key={p.id} className="shrink-0 w-44">
+                <div key={p.id} className="shrink-0 w-40">
                   <ProductCard product={p} onClick={() => setSelectedProduct(p)} />
                 </div>
               ))}
@@ -729,7 +707,7 @@ export default function ProductsCatalogTab({ accountId, onAskAbout, accountType 
             {noLine.length > 0 && renderSection('מוצרים נוספים', noLine, 'var(--text-secondary, #9ca3af)')}
           </>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2.5">
             {filtered.map(p => (
               <ProductCard key={p.id} product={p} onClick={() => setSelectedProduct(p)} />
             ))}
