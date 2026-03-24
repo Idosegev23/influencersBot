@@ -10,141 +10,116 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Add a product
+// GET — list products for an account
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const accountId = searchParams.get('accountId');
+    const category = searchParams.get('category');
+
+    if (!accountId) {
+      return NextResponse.json({ error: 'Missing accountId' }, { status: 400 });
+    }
+
+    let query = supabase
+      .from('widget_products')
+      .select('id, name, name_he, description, price, original_price, currency, category, subcategory, product_line, volume, key_ingredients, benefits, target_audience, image_url, product_url, is_available, is_on_sale, is_featured, priority, ai_profile')
+      .eq('account_id', accountId)
+      .order('category')
+      .order('name');
+
+    if (category) query = query.eq('category', category);
+
+    const { data, error } = await query;
+    if (error) {
+      return NextResponse.json({ error: 'Failed to fetch products' }, { status: 500 });
+    }
+
+    return NextResponse.json({ products: data || [], total: data?.length || 0 });
+  } catch (error) {
+    console.error('Error fetching products:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+// POST — add a product
 export async function POST(req: NextRequest) {
   try {
     const { accountId, product } = await req.json();
 
-    if (!accountId || !product) {
-      return NextResponse.json(
-        { error: 'Missing accountId or product' },
-        { status: 400 }
-      );
+    if (!accountId || !product?.name) {
+      return NextResponse.json({ error: 'Missing accountId or product name' }, { status: 400 });
     }
 
-    // Get current persona
-    const { data: persona, error: fetchError } = await supabase
-      .from('chatbot_persona')
-      .select('gemini_raw_output')
-      .eq('account_id', accountId)
+    const { data, error } = await supabase
+      .from('widget_products')
+      .insert({
+        account_id: accountId,
+        name: product.name,
+        name_he: product.name_he || product.name,
+        description: product.description || null,
+        price: product.price || null,
+        category: product.category || 'general',
+        subcategory: product.subcategory || null,
+        product_line: product.product_line || null,
+        image_url: product.image_url || null,
+        product_url: product.product_url || null,
+        is_available: true,
+      })
+      .select()
       .single();
 
-    if (fetchError) {
-      return NextResponse.json(
-        { error: 'Persona not found' },
-        { status: 404 }
-      );
+    if (error) {
+      return NextResponse.json({ error: 'Failed to add product', details: error.message }, { status: 500 });
     }
 
-    // Add product to gemini_raw_output
-    const geminiData = persona.gemini_raw_output || {};
-    const products = geminiData.products || [];
-    products.push({
-      ...product,
-      id: `manual_${Date.now()}`,
-      source: 'manual',
-    });
-
-    const { error: updateError } = await supabase
-      .from('chatbot_persona')
-      .update({
-        gemini_raw_output: {
-          ...geminiData,
-          products,
-        },
-      })
-      .eq('account_id', accountId);
-
-    if (updateError) {
-      return NextResponse.json(
-        { error: 'Failed to update' },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ success: true, product });
+    return NextResponse.json({ success: true, product: data });
   } catch (error) {
     console.error('Error adding product:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
-// Update a product
+// PATCH — update a product
 export async function PATCH(req: NextRequest) {
   try {
     const { accountId, productId, updates } = await req.json();
 
     if (!accountId || !productId) {
-      return NextResponse.json(
-        { error: 'Missing accountId or productId' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Missing accountId or productId' }, { status: 400 });
     }
 
-    // Get current persona
-    const { data: persona, error: fetchError } = await supabase
-      .from('chatbot_persona')
-      .select('gemini_raw_output')
+    const allowedFields = [
+      'name', 'name_he', 'description', 'price', 'original_price',
+      'category', 'subcategory', 'product_line', 'volume',
+      'key_ingredients', 'benefits', 'target_audience',
+      'image_url', 'product_url', 'is_available', 'is_on_sale', 'is_featured', 'priority',
+    ];
+    const safeUpdates: Record<string, any> = {};
+    for (const key of allowedFields) {
+      if (updates[key] !== undefined) safeUpdates[key] = updates[key];
+    }
+
+    const { data, error } = await supabase
+      .from('widget_products')
+      .update(safeUpdates)
+      .eq('id', productId)
       .eq('account_id', accountId)
+      .select()
       .single();
 
-    if (fetchError) {
-      return NextResponse.json(
-        { error: 'Persona not found' },
-        { status: 404 }
-      );
+    if (error) {
+      return NextResponse.json({ error: 'Failed to update', details: error.message }, { status: 500 });
     }
 
-    // Update product in gemini_raw_output
-    const geminiData = persona.gemini_raw_output || {};
-    const products = geminiData.products || [];
-    const productIndex = products.findIndex((p: any) => 
-      p.id === productId || p.product_id === productId
-    );
-
-    if (productIndex === -1) {
-      return NextResponse.json(
-        { error: 'Product not found' },
-        { status: 404 }
-      );
-    }
-
-    products[productIndex] = {
-      ...products[productIndex],
-      ...updates,
-    };
-
-    const { error: updateError } = await supabase
-      .from('chatbot_persona')
-      .update({
-        gemini_raw_output: {
-          ...geminiData,
-          products,
-        },
-      })
-      .eq('account_id', accountId);
-
-    if (updateError) {
-      return NextResponse.json(
-        { error: 'Failed to update' },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, product: data });
   } catch (error) {
     console.error('Error updating product:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
-// Delete a product
+// DELETE — remove a product
 export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -152,55 +127,22 @@ export async function DELETE(req: NextRequest) {
     const productId = searchParams.get('productId');
 
     if (!accountId || !productId) {
-      return NextResponse.json(
-        { error: 'Missing accountId or productId' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Missing accountId or productId' }, { status: 400 });
     }
 
-    // Get current persona
-    const { data: persona, error: fetchError } = await supabase
-      .from('chatbot_persona')
-      .select('gemini_raw_output')
-      .eq('account_id', accountId)
-      .single();
-
-    if (fetchError) {
-      return NextResponse.json(
-        { error: 'Persona not found' },
-        { status: 404 }
-      );
-    }
-
-    // Remove product from gemini_raw_output
-    const geminiData = persona.gemini_raw_output || {};
-    const products = (geminiData.products || []).filter((p: any) => 
-      p.id !== productId && p.product_id !== productId
-    );
-
-    const { error: updateError } = await supabase
-      .from('chatbot_persona')
-      .update({
-        gemini_raw_output: {
-          ...geminiData,
-          products,
-        },
-      })
+    const { error } = await supabase
+      .from('widget_products')
+      .delete()
+      .eq('id', productId)
       .eq('account_id', accountId);
 
-    if (updateError) {
-      return NextResponse.json(
-        { error: 'Failed to delete' },
-        { status: 500 }
-      );
+    if (error) {
+      return NextResponse.json({ error: 'Failed to delete', details: error.message }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting product:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
