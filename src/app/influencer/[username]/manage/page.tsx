@@ -29,6 +29,9 @@ import {
   Percent,
   ToggleLeft,
   ToggleRight,
+  Sparkles,
+  ShoppingBag,
+  Flame,
 } from 'lucide-react';
 
 const contentTypeLabels: Record<string, { label: string; icon: any; color: string }> = {
@@ -170,10 +173,14 @@ export default function ManagePage({
         }
       }
 
-      // Load products
-      if (inf.persona?.gemini_raw_output) {
-        setProducts(inf.persona.gemini_raw_output.products || []);
-      }
+      // Load products from widget_products table
+      try {
+        const productsRes = await fetch(`/api/influencer/content/products?accountId=${inf.id}`);
+        if (productsRes.ok) {
+          const productsData = await productsRes.json();
+          setProducts(productsData.products || []);
+        }
+      } catch {}
 
       // Load content
       try {
@@ -318,15 +325,15 @@ export default function ManagePage({
   const handleAddProduct = async () => {
     const name = prompt('שם המוצר:');
     if (!name) return;
-    const brand = prompt('מותג (אופציונלי):');
-    const category = prompt('קטגוריה (אופציונלי):');
+    const category = prompt('קטגוריה (food, hair_care, face_care, body_care, spices, general):') || 'general';
+    const price = prompt('מחיר (אופציונלי):');
     try {
       const res = await fetch('/api/influencer/content/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           accountId: influencer.id,
-          product: { name, brand, category },
+          product: { name, category, price: price ? parseFloat(price) : null },
         }),
       });
       if (res.ok) loadData();
@@ -355,9 +362,15 @@ export default function ManagePage({
     (b.brand_name || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredProducts = products.filter(p =>
-    (p.name || p.product_name || '').toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredProducts = products.filter((p: any) => {
+    const q = searchQuery.toLowerCase();
+    // If searchQuery matches a category exactly, filter by category
+    if (p.category === q) return true;
+    if (!q) return true;
+    return (p.name || p.name_he || '').toLowerCase().includes(q) ||
+           (p.description || '').toLowerCase().includes(q) ||
+           (p.category || '').toLowerCase().includes(q);
+  });
 
   const filteredContent = contentItems.filter(c =>
     (c.title || '').toLowerCase().includes(searchQuery.toLowerCase())
@@ -696,45 +709,307 @@ export default function ManagePage({
         {/* ═══ PRODUCTS TAB ═══ */}
         {activeTab === 'products' && (
           <div>
+            {/* Header with stats */}
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold" style={{ color: 'var(--dash-text)' }}>מוצרים</h2>
+              <div>
+                <h2 className="text-xl font-bold" style={{ color: 'var(--dash-text)' }}>קטלוג מוצרים</h2>
+                <p className="text-sm mt-1" style={{ color: 'var(--dash-text-2)' }}>
+                  {products.length} מוצרים{products.filter((p: any) => p.ai_profile?.whatItDoes).length > 0 && (
+                    <span className="inline-flex items-center gap-1 mr-2">
+                      <Sparkles className="w-3 h-3" style={{ color: '#a78bfa' }} />
+                      <span style={{ color: '#a78bfa' }}>{products.filter((p: any) => p.ai_profile?.whatItDoes).length} עם פרופיל AI</span>
+                    </span>
+                  )}
+                </p>
+              </div>
               <button onClick={handleAddProduct} className="flex items-center gap-2 px-4 py-2 rounded-xl transition-colors btn-primary">
                 <Plus className="w-4 h-4" />
                 הוסף מוצר
               </button>
             </div>
 
+            {/* Category navigation */}
+            {products.length > 0 && (() => {
+              const categories = [...new Set(products.map((p: any) => p.category).filter(Boolean))];
+              const categoryColors: Record<string, string> = {
+                hair_care: '#ec4899', face_care: '#f472b6', body_care: '#fb923c',
+                makeup: '#e879f9', fragrance: '#c084fc', skincare: '#34d399',
+                food: '#f59e0b', spices: '#ef4444', paint: '#3b82f6',
+                tools: '#6b7280', service: '#8b5cf6', general: '#64748b',
+                other: '#94a3b8',
+              };
+              return categories.length > 1 ? (
+                <div className="flex gap-2 mb-6 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm whitespace-nowrap transition-all"
+                    style={{
+                      background: !searchQuery ? 'var(--color-primary)' : 'rgba(255,255,255,0.04)',
+                      color: !searchQuery ? '#fff' : 'var(--dash-text-2)',
+                      border: `1px solid ${!searchQuery ? 'transparent' : 'var(--dash-glass-border)'}`,
+                    }}
+                  >
+                    <ShoppingBag className="w-4 h-4" />
+                    הכל
+                    <span className="text-xs opacity-70">{products.length}</span>
+                  </button>
+                  {categories.map(cat => {
+                    const count = products.filter((p: any) => p.category === cat).length;
+                    const isActive = searchQuery === cat;
+                    const color = categoryColors[cat] || '#64748b';
+                    return (
+                      <button
+                        key={cat}
+                        onClick={() => setSearchQuery(isActive ? '' : cat)}
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm whitespace-nowrap transition-all"
+                        style={{
+                          background: isActive ? `${color}20` : 'rgba(255,255,255,0.04)',
+                          color: isActive ? color : 'var(--dash-text-2)',
+                          border: `1px solid ${isActive ? `${color}40` : 'var(--dash-glass-border)'}`,
+                        }}
+                      >
+                        <span className="w-2 h-2 rounded-full" style={{ background: color }} />
+                        {cat.replace(/_/g, ' ')}
+                        <span className="text-xs opacity-70">{count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null;
+            })()}
+
             {filteredProducts.length === 0 ? (
-              <div className="text-center py-16 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                <Package className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--dash-text-3)' }} />
+              <div className="text-center py-20 rounded-2xl" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                <Package className="w-20 h-20 mx-auto mb-4" style={{ color: 'var(--dash-text-3)', opacity: 0.4 }} />
                 <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--dash-text)' }}>אין מוצרים עדיין</h3>
+                <p style={{ color: 'var(--dash-text-2)' }}>הוסיפו מוצרים או הריצו סריקת מוצרים מהאתר</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredProducts.map((product, idx) => (
-                  <div key={product.id || idx} className="p-4 rounded-xl border transition-all" style={cardStyle}>
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1">
-                        <h3 className="font-semibold" style={{ color: 'var(--dash-text)' }}>
-                          {product.name || product.product_name}
-                        </h3>
-                        {product.brand && (
-                          <p className="text-sm mt-1" style={{ color: 'var(--dash-text-2)' }}>מותג: {product.brand}</p>
+              /* Group by product_line, then render sections */
+              (() => {
+                // Build grouped structure: product_line → products
+                const grouped = new Map<string, any[]>();
+                const noLine: any[] = [];
+                for (const p of filteredProducts) {
+                  if (p.product_line) {
+                    const key = p.product_line;
+                    if (!grouped.has(key)) grouped.set(key, []);
+                    grouped.get(key)!.push(p);
+                  } else {
+                    noLine.push(p);
+                  }
+                }
+                // Sort groups by size desc
+                const sortedGroups = [...grouped.entries()].sort((a, b) => b[1].length - a[1].length);
+                // If only 1 group or all ungrouped, show flat
+                const showGrouped = sortedGroups.length > 1 || (sortedGroups.length === 1 && noLine.length > 0);
+
+                const renderProductCard = (product: any, size: 'sm' | 'md' | 'lg' = 'md') => {
+                  const aiProfile = product.ai_profile || {};
+                  const hasAI = !!aiProfile.whatItDoes;
+                  const isFeatured = product.is_featured;
+                  const isOnSale = product.is_on_sale;
+
+                  return (
+                    <div
+                      key={product.id}
+                      className="group relative rounded-2xl border overflow-hidden transition-all duration-300"
+                      style={{
+                        background: 'rgba(255,255,255,0.03)',
+                        borderColor: isFeatured ? 'rgba(251,191,36,0.3)' : 'var(--dash-glass-border)',
+                      }}
+                    >
+                      {/* Image or gradient placeholder */}
+                      {product.image_url ? (
+                        <div className={`relative overflow-hidden ${size === 'lg' ? 'h-48' : size === 'md' ? 'h-36' : 'h-28'}`}>
+                          <Image
+                            src={product.image_url}
+                            alt={product.name_he || product.name}
+                            fill
+                            className="object-cover transition-transform duration-500 group-hover:scale-105"
+                            unoptimized
+                          />
+                          <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 60%)' }} />
+                          {/* Price on image */}
+                          {product.price && (
+                            <div className="absolute bottom-3 left-3 flex items-center gap-1.5">
+                              <span className="text-lg font-bold text-white">
+                                ₪{product.price}
+                              </span>
+                              {isOnSale && product.original_price && (
+                                <span className="text-xs line-through" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                                  ₪{product.original_price}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {/* Badges on image */}
+                          <div className="absolute top-3 right-3 flex gap-1.5">
+                            {isFeatured && (
+                              <span className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg font-medium backdrop-blur-sm"
+                                style={{ background: 'rgba(251,191,36,0.2)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)' }}>
+                                <Star className="w-3 h-3" /> מומלץ
+                              </span>
+                            )}
+                            {isOnSale && (
+                              <span className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg font-medium backdrop-blur-sm"
+                                style={{ background: 'rgba(239,68,68,0.2)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)' }}>
+                                <Flame className="w-3 h-3" /> מבצע
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        /* No image — decorative header */
+                        <div className={`relative ${size === 'lg' ? 'h-20' : 'h-14'}`} style={{
+                          background: `linear-gradient(135deg, rgba(99,102,241,0.12) 0%, rgba(168,85,247,0.08) 100%)`,
+                        }}>
+                          <div className="absolute top-3 right-3 flex gap-1.5">
+                            {isFeatured && (
+                              <span className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg font-medium"
+                                style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24' }}>
+                                <Star className="w-3 h-3" /> מומלץ
+                              </span>
+                            )}
+                            {isOnSale && (
+                              <span className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg font-medium"
+                                style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171' }}>
+                                <Flame className="w-3 h-3" /> מבצע
+                              </span>
+                            )}
+                          </div>
+                          {product.price && (
+                            <div className="absolute bottom-3 left-3">
+                              <span className="text-sm font-bold" style={{ color: 'var(--color-primary)' }}>
+                                ₪{product.price}
+                              </span>
+                              {isOnSale && product.original_price && (
+                                <span className="text-xs line-through mr-1.5" style={{ color: 'var(--dash-text-3)' }}>
+                                  ₪{product.original_price}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Content */}
+                      <div className="p-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="font-semibold text-sm leading-snug" style={{ color: 'var(--dash-text)' }}>
+                            {product.name_he || product.name}
+                          </h3>
+                          {!product.image_url && product.price && !product.is_on_sale && (
+                            <span className="text-sm font-bold shrink-0" style={{ color: 'var(--color-primary)' }}>
+                              ₪{product.price}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* AI insight or description */}
+                        {hasAI ? (
+                          <p className="text-xs mt-1.5 leading-relaxed line-clamp-2" style={{ color: 'var(--dash-text-2)' }}>
+                            {aiProfile.whatItDoes}
+                          </p>
+                        ) : product.description ? (
+                          <p className="text-xs mt-1.5 leading-relaxed line-clamp-2" style={{ color: 'var(--dash-text-2)' }}>
+                            {product.description}
+                          </p>
+                        ) : null}
+
+                        {/* Selling points (from AI) */}
+                        {hasAI && aiProfile.sellingPoints?.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2.5">
+                            {aiProfile.sellingPoints.slice(0, 2).map((sp: string, i: number) => (
+                              <span key={i} className="text-[10px] px-2 py-0.5 rounded-full"
+                                style={{ background: 'rgba(99,102,241,0.08)', color: '#a5b4fc' }}>
+                                {sp}
+                              </span>
+                            ))}
+                          </div>
                         )}
-                        {product.category && (
-                          <p className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>קטגוריה: {product.category}</p>
-                        )}
+
+                        {/* Subcategory + volume row */}
+                        <div className="flex items-center gap-2 mt-3 pt-3" style={{ borderTop: '1px solid var(--dash-glass-border)' }}>
+                          {product.subcategory && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full"
+                              style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--dash-text-3)' }}>
+                              {product.subcategory.replace(/_/g, ' ')}
+                            </span>
+                          )}
+                          {product.volume && (
+                            <span className="text-[10px]" style={{ color: 'var(--dash-text-3)' }}>
+                              {product.volume}
+                            </span>
+                          )}
+                          <div className="flex-1" />
+                          {product.product_url && (
+                            <a href={product.product_url} target="_blank" rel="noopener noreferrer"
+                              className="text-[10px] flex items-center gap-0.5 hover:underline transition-colors"
+                              style={{ color: 'var(--dash-text-3)' }}>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          )}
+                          <button
+                            onClick={() => handleDeleteProduct(product.id)}
+                            className="opacity-0 group-hover:opacity-100 p-1 text-red-400/60 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        onClick={() => handleDeleteProduct(product.id || product.product_id)}
-                        className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
                     </div>
+                  );
+                };
+
+                if (!showGrouped) {
+                  // Flat layout — all products in one beautiful grid
+                  const allProducts = [...(sortedGroups[0]?.[1] || []), ...noLine];
+                  return (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {allProducts.map(p => renderProductCard(p, 'md'))}
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-8">
+                    {sortedGroups.map(([lineName, lineProducts]) => (
+                      <div key={lineName}>
+                        {/* Series header */}
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-1 h-6 rounded-full" style={{ background: 'var(--color-primary)' }} />
+                          <h3 className="font-bold text-lg" style={{ color: 'var(--dash-text)' }}>
+                            {lineName}
+                          </h3>
+                          <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--dash-text-3)' }}>
+                            {lineProducts.length} מוצרים
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                          {lineProducts.map(p => renderProductCard(p, 'md'))}
+                        </div>
+                      </div>
+                    ))}
+                    {noLine.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-1 h-6 rounded-full" style={{ background: 'var(--dash-text-3)' }} />
+                          <h3 className="font-bold text-lg" style={{ color: 'var(--dash-text)' }}>
+                            מוצרים נוספים
+                          </h3>
+                          <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--dash-text-3)' }}>
+                            {noLine.length}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                          {noLine.map(p => renderProductCard(p, 'md'))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
+                );
+              })()
             )}
           </div>
         )}
