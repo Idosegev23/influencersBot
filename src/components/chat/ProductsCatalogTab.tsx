@@ -123,7 +123,7 @@ function ProductModal({
   product: Product;
   allProducts: Product[];
   onClose: () => void;
-  onAskAbout: (q: string) => void;
+  onAskAbout: (q: string, hiddenContext?: string) => void;
   isFood: boolean;
   isBeauty: boolean;
 }) {
@@ -411,111 +411,213 @@ function ProductModal({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Product Card                                                       */
+/*  Card primitives                                                    */
 /* ------------------------------------------------------------------ */
 
-function ProductCard({ product, onClick, size = 'small' }: { product: Product; onClick: () => void; size?: 'small' | 'wide' }) {
+/** Shared image + overlay card used everywhere */
+function PinCard({ product, onClick, aspect = '4/5', className = '' }: {
+  product: Product; onClick: () => void; aspect?: string; className?: string;
+}) {
   const displayName = product.name_he || product.name;
   const color = getCategoryColor(product.category);
   const hasImage = !!product.image_url;
-  const isWide = size === 'wide';
 
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.97 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="group rounded-xl overflow-hidden cursor-pointer"
-      style={{
-        border: product.is_featured
-          ? '1.5px solid rgba(251,191,36,0.35)'
-          : '1px solid var(--border-color, #e5e7eb)',
-        gridColumn: isWide ? 'span 2' : 'span 1',
-      }}
+    <button
+      className={`relative w-full rounded-2xl overflow-hidden active:scale-[0.97] transition-transform ${className}`}
+      style={{ aspectRatio: aspect, boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}
       onClick={onClick}
     >
-      <div className="relative w-full overflow-hidden" style={{ aspectRatio: isWide ? '2 / 1' : '3 / 4' }}>
-        {hasImage ? (
-          <img
-            src={product.image_url}
-            alt={displayName}
-            className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-            loading="lazy"
-          />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center" style={{
-            background: `linear-gradient(145deg, ${color}20 0%, ${color}08 50%, var(--chat-bg, #fff) 100%)`,
-          }}>
-            <ShoppingBag className={`${isWide ? 'w-10 h-10' : 'w-8 h-8'} opacity-[0.12]`} style={{ color }} />
-          </div>
-        )}
-
-        {/* Gradient for text */}
+      {hasImage ? (
+        <img src={product.image_url} alt={displayName}
+          className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+      ) : (
         <div className="absolute inset-0" style={{
-          background: hasImage
-            ? 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.15) 50%, transparent 70%)'
-            : 'linear-gradient(to top, rgba(0,0,0,0.04) 0%, transparent 50%)',
-        }} />
-
-        {/* Badges */}
-        {(product.is_featured || product.is_on_sale) && (
-          <div className="absolute top-1.5 right-1.5 flex gap-1" dir="rtl">
-            {product.is_featured && (
-              <Star className="w-3 h-3 drop-shadow" style={{ color: '#fbbf24' }} />
-            )}
-            {product.is_on_sale && (
-              <Flame className="w-3 h-3 drop-shadow" style={{ color: '#f87171' }} />
-            )}
-          </div>
-        )}
-
-        {/* Bottom info */}
-        <div className="absolute bottom-0 left-0 right-0 p-2" dir="rtl">
-          <h3 className={`font-bold leading-tight ${isWide ? 'text-[13px] line-clamp-1' : 'text-[11px] line-clamp-2'}`}
-            style={{ color: hasImage ? '#fff' : 'var(--text-primary, #1f2937)', textShadow: hasImage ? '0 1px 3px rgba(0,0,0,0.3)' : 'none' }}>
-            {displayName}
-          </h3>
-          {product.price != null && (
-            <div className="flex items-center gap-1 mt-0.5">
-              <span className={`font-bold ${isWide ? 'text-xs' : 'text-[11px]'}`}
-                style={{ color: hasImage ? '#fff' : 'var(--color-primary, #7c3aed)' }}>
-                ₪{product.price}
-              </span>
-              {product.is_on_sale && product.original_price && (
-                <span className="text-[9px] line-through"
-                  style={{ color: hasImage ? 'rgba(255,255,255,0.5)' : 'var(--text-secondary, #9ca3af)' }}>
-                  ₪{product.original_price}
-                </span>
-              )}
-            </div>
+          background: `linear-gradient(160deg, ${color}28 0%, ${color}0a 60%, var(--chat-bg, #fafafa) 100%)`,
+        }}>
+          <ShoppingBag className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 opacity-[0.08]"
+            style={{ color }} />
+        </div>
+      )}
+      {/* gradient overlay */}
+      <div className="absolute inset-0"
+        style={{ background: hasImage
+          ? 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.15) 50%, transparent 70%)'
+          : 'linear-gradient(to top, rgba(0,0,0,0.05) 0%, transparent 50%)' }} />
+      {/* badges */}
+      {(product.is_featured || product.is_on_sale) && (
+        <div className="absolute top-2 right-2 flex gap-1">
+          {product.is_on_sale && (
+            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full backdrop-blur-md"
+              style={{ background: 'rgba(239,68,68,0.35)', color: '#fff' }}>SALE</span>
+          )}
+          {product.is_featured && (
+            <Star className="w-3.5 h-3.5 drop-shadow-lg" style={{ color: '#fbbf24' }} />
           )}
         </div>
+      )}
+      {/* bottom text */}
+      <div className="absolute bottom-0 left-0 right-0 p-2.5" dir="rtl">
+        <h3 className="font-bold text-[12px] leading-snug line-clamp-2"
+          style={{ color: hasImage ? '#fff' : 'var(--text-primary, #1f2937)',
+            textShadow: hasImage ? '0 1px 4px rgba(0,0,0,0.5)' : 'none' }}>
+          {displayName}
+        </h3>
+        {product.price != null && (
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className="font-bold text-[11px]"
+              style={{ color: hasImage ? '#fff' : 'var(--color-primary, #7c3aed)' }}>
+              ₪{product.price}
+            </span>
+            {product.is_on_sale && product.original_price && (
+              <span className="text-[9px] line-through"
+                style={{ color: hasImage ? 'rgba(255,255,255,0.5)' : 'var(--text-secondary,#9ca3af)' }}>
+                ₪{product.original_price}
+              </span>
+            )}
+          </div>
+        )}
       </div>
-    </motion.div>
+    </button>
   );
 }
 
-/** Bento grid: renders products in a 3-col grid with periodic wide cards */
-function BentoGrid({ products, onSelect }: { products: Product[]; onSelect: (p: Product) => void }) {
-  // Determine which items get the "wide" treatment
-  // Featured items + every 5th item for visual rhythm
-  const wideSet = new Set<number>();
-  products.forEach((p, i) => {
-    if (p.is_featured && wideSet.size < Math.ceil(products.length / 5)) wideSet.add(i);
-  });
-  // Fill remaining wide slots for rhythm (every ~7 items, if not already wide)
-  for (let i = 0; i < products.length && wideSet.size < Math.ceil(products.length / 6); i += 7) {
-    if (!wideSet.has(i)) wideSet.add(i);
-  }
+/** Hero card — near full-screen, one product at a time feel */
+function HeroCard({ product, onClick }: { product: Product; onClick: () => void }) {
+  const ai = product.ai_profile || {};
+  const displayName = product.name_he || product.name;
+  const color = getCategoryColor(product.category);
+  const hasImage = !!product.image_url;
 
   return (
-    <div className="grid grid-cols-3 gap-1.5" style={{ direction: 'rtl' }}>
-      {products.map((p, i) => (
-        <ProductCard
-          key={p.id}
-          product={p}
-          onClick={() => onSelect(p)}
-          size={wideSet.has(i) ? 'wide' : 'small'}
-        />
+    <button
+      className="relative w-full rounded-3xl overflow-hidden active:scale-[0.98] transition-transform"
+      style={{ aspectRatio: '3 / 4', boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}
+      onClick={onClick}
+    >
+      {hasImage ? (
+        <img src={product.image_url} alt={displayName}
+          className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+      ) : (
+        <div className="absolute inset-0" style={{
+          background: `linear-gradient(160deg, ${color}30 0%, ${color}08 50%, var(--chat-bg, #fafafa) 100%)`,
+        }}>
+          <ShoppingBag className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 opacity-[0.06]"
+            style={{ color }} />
+        </div>
+      )}
+      <div className="absolute inset-0"
+        style={{ background: hasImage
+          ? 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.1) 50%, transparent 65%)'
+          : 'linear-gradient(to top, rgba(0,0,0,0.06) 0%, transparent 40%)' }} />
+      {/* Sale / Featured badges */}
+      {(product.is_featured || product.is_on_sale) && (
+        <div className="absolute top-4 right-4 flex gap-2">
+          {product.is_on_sale && (
+            <span className="text-[10px] font-bold px-3 py-1 rounded-full backdrop-blur-md"
+              style={{ background: 'rgba(239,68,68,0.4)', color: '#fff' }}>מבצע</span>
+          )}
+          {product.is_featured && (
+            <span className="text-[10px] font-bold px-3 py-1 rounded-full backdrop-blur-md flex items-center gap-1"
+              style={{ background: 'rgba(251,191,36,0.3)', color: '#fbbf24' }}>
+              <Star className="w-3 h-3" /> מומלץ
+            </span>
+          )}
+        </div>
+      )}
+      {/* Content overlay */}
+      <div className="absolute bottom-0 left-0 right-0 p-5" dir="rtl">
+        <h2 className="font-bold text-xl leading-tight"
+          style={{ color: hasImage ? '#fff' : 'var(--text-primary, #1f2937)',
+            textShadow: hasImage ? '0 2px 8px rgba(0,0,0,0.5)' : 'none' }}>
+          {displayName}
+        </h2>
+        {ai.whatItDoes && (
+          <p className="text-[12px] mt-1.5 leading-relaxed line-clamp-2 opacity-90"
+            style={{ color: hasImage ? 'rgba(255,255,255,0.85)' : 'var(--text-secondary, #6b7280)' }}>
+            {ai.whatItDoes}
+          </p>
+        )}
+        <div className="flex items-center gap-3 mt-3">
+          {product.price != null && (
+            <span className="text-lg font-bold"
+              style={{ color: hasImage ? '#fff' : 'var(--color-primary, #7c3aed)' }}>
+              ₪{product.price}
+            </span>
+          )}
+          {product.volume && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full"
+              style={{
+                background: hasImage ? 'rgba(255,255,255,0.15)' : `${color}12`,
+                color: hasImage ? 'rgba(255,255,255,0.7)' : color,
+                backdropFilter: 'blur(8px)',
+              }}>
+              {product.volume}
+            </span>
+          )}
+        </div>
+        <div className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-semibold px-4 py-2 rounded-full"
+          style={{
+            background: hasImage ? 'rgba(255,255,255,0.2)' : 'var(--color-primary, #7c3aed)',
+            color: hasImage ? '#fff' : '#fff',
+            backdropFilter: 'blur(12px)',
+          }}>
+          לפרטים
+          <ExternalLink className="w-3 h-3" />
+        </div>
+      </div>
+    </button>
+  );
+}
+
+/** Horizontal scroll row — Apple-style carousel */
+function ScrollRow({ title, products, onSelect, accent }: {
+  title: string; products: Product[]; onSelect: (p: Product) => void; accent?: string;
+}) {
+  return (
+    <div className="mb-6">
+      <div className="flex items-center gap-2 mb-2.5 px-1" dir="rtl">
+        <div className="w-1 h-4 rounded-full" style={{ background: accent || 'var(--color-primary, #7c3aed)' }} />
+        <h3 className="font-bold text-[13px]" style={{ color: 'var(--text-primary, #1f2937)' }}>{title}</h3>
+        <span className="text-[9px] px-1.5 py-0.5 rounded-full"
+          style={{ background: 'var(--border-color, #f3f4f6)', color: 'var(--text-secondary,#9ca3af)' }}>
+          {products.length}
+        </span>
+      </div>
+      <div className="flex gap-2.5 overflow-x-auto pb-2 px-1 snap-x snap-mandatory"
+        style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+        {products.map(p => (
+          <div key={p.id} className="shrink-0 snap-start" style={{ width: '140px' }}>
+            <PinCard product={p} onClick={() => onSelect(p)} aspect="4/5" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Masonry 2-col with alternating tall/short — like DiscoveryTab */
+function MasonryGrid({ products, onSelect }: { products: Product[]; onSelect: (p: Product) => void }) {
+  const rightCol: Product[] = [];
+  const leftCol: Product[] = [];
+  products.forEach((p, i) => (i % 2 === 0 ? rightCol : leftCol).push(p));
+
+  const getAspect = (colIndex: number, itemIndex: number) => {
+    // Alternate tall (9/16) and short (4/5) for visual rhythm
+    const pattern = colIndex === 0
+      ? ['9/16', '4/5', '9/16'] // right: tall, short, tall
+      : ['4/5', '9/16', '4/5']; // left: short, tall, short
+    return pattern[itemIndex % 3];
+  };
+
+  return (
+    <div className="flex gap-2.5" dir="rtl">
+      {[rightCol, leftCol].map((col, colIdx) => (
+        <div key={colIdx} className="flex-1 flex flex-col gap-2.5">
+          {col.map((p, i) => (
+            <PinCard key={p.id} product={p} onClick={() => onSelect(p)} aspect={getAspect(colIdx, i)} />
+          ))}
+        </div>
       ))}
     </div>
   );
@@ -585,130 +687,137 @@ export default function ProductsCatalogTab({ accountId, onAskAbout, accountType 
     );
   }
 
-  const renderSection = (title: string, items: Product[], accent?: string) => (
-    <div className="mb-5" key={title}>
-      <div className="flex items-center gap-2 mb-2 px-0.5">
-        <div className="w-1 h-4 rounded-full" style={{ background: accent || 'var(--color-primary, #7c3aed)' }} />
-        <h3 className="font-bold text-xs" style={{ color: 'var(--text-primary, #1f2937)' }}>{title}</h3>
-        <span className="text-[9px] px-1.5 py-0.5 rounded-full"
-          style={{ background: 'var(--border-color, #f3f4f6)', color: 'var(--text-secondary, #9ca3af)' }}>
-          {items.length}
-        </span>
-      </div>
-      <BentoGrid products={items} onSelect={setSelectedProduct} />
-    </div>
-  );
+  // Split products for hybrid layout:
+  // - Hero: top 2 featured (or first 2 with images)
+  // - Carousels: each product_line group
+  // - Masonry: everything else
+  const heroProducts = (searchQuery || activeCategory)
+    ? [] // no hero when filtering
+    : filtered.filter(p => p.is_featured && p.image_url).slice(0, 2).length > 0
+      ? filtered.filter(p => p.is_featured && p.image_url).slice(0, 2)
+      : filtered.filter(p => p.image_url).slice(0, 1);
+
+  const heroIds = new Set(heroProducts.map(p => p.id));
+  const nonHero = filtered.filter(p => !heroIds.has(p.id));
+
+  // Carousel groups (product_line with 3+ items)
+  const carouselGroups: [string, Product[]][] = [];
+  const remaining: Product[] = [];
+  if (!searchQuery && sortedGroups.length > 0) {
+    for (const [name, items] of sortedGroups) {
+      const groupItems = items.filter(p => !heroIds.has(p.id));
+      if (groupItems.length >= 3) {
+        carouselGroups.push([name, groupItems]);
+      } else {
+        remaining.push(...groupItems);
+      }
+    }
+    remaining.push(...noLine.filter(p => !heroIds.has(p.id)));
+  } else {
+    remaining.push(...nonHero);
+  }
 
   return (
     <>
       <div
         ref={scrollRef}
-        className="px-3 py-4 overflow-y-auto"
-        dir="rtl"
-        style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}
+        className="overflow-y-auto"
+        style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', background: '#f8f9fb' }}
       >
-        {/* Header */}
-        <div className="flex items-center gap-1.5 mb-2.5">
-          <ShoppingBag className="w-4 h-4" style={{ color: 'var(--color-primary, #7c3aed)' }} />
-          <h2 className="font-bold text-sm" style={{ color: 'var(--text-primary, #1f2937)' }}>
-            קטלוג מוצרים
-          </h2>
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full"
-            style={{ background: 'var(--color-primary-10, rgba(124,58,237,0.08))', color: 'var(--color-primary, #7c3aed)' }}>
-            {products.length}
-          </span>
-        </div>
-
-        {/* Search */}
-        {products.length > 6 && (
-          <div className="relative mb-2.5">
-            <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'var(--text-secondary, #9ca3af)' }} />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="חיפוש מוצר..."
-              className="w-full pr-8 pl-3 py-2 rounded-lg text-xs focus:outline-none focus:ring-2"
-              style={{
-                background: 'var(--input-bg, #f9fafb)',
-                color: 'var(--text-primary, #1f2937)',
-                border: '1px solid var(--border-color, #e5e7eb)',
-              }}
-            />
-          </div>
-        )}
-
-        {/* Category pills */}
-        {categories.length > 1 && (
-          <div className="flex gap-1 mb-3 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-            <button
-              onClick={() => setActiveCategory(null)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] whitespace-nowrap transition-all"
-              style={{
-                background: !activeCategory ? 'var(--color-primary, #7c3aed)' : 'var(--input-bg, #f3f4f6)',
-                color: !activeCategory ? '#fff' : 'var(--text-secondary, #6b7280)',
-              }}
-            >
-              הכל
-            </button>
-            {categories.map(cat => {
-              const color = CATEGORY_COLORS[cat] || '#64748b';
-              const isActive = activeCategory === cat;
-              return (
-                <button
-                  key={cat}
-                  onClick={() => setActiveCategory(isActive ? null : cat)}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] whitespace-nowrap transition-all"
-                  style={{
-                    background: isActive ? `${color}15` : 'var(--input-bg, #f3f4f6)',
-                    color: isActive ? color : 'var(--text-secondary, #6b7280)',
-                    border: isActive ? `1px solid ${color}25` : '1px solid transparent',
-                  }}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
-                  {CATEGORY_LABELS[cat] || cat.replace(/_/g, ' ')}
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Featured horizontal scroll */}
-        {!searchQuery && !activeCategory && products.filter(p => p.is_featured).length > 0 && (
-          <div className="mb-4">
-            <h3 className="text-[11px] font-semibold mb-2 px-0.5 flex items-center gap-1.5"
-              style={{ color: 'var(--text-primary, #1f2937)' }}>
-              <Star className="w-3 h-3 text-amber-400" /> מומלצים
-            </h3>
-            <div className="flex gap-1.5 overflow-x-auto pb-1.5" style={{ scrollbarWidth: 'none' }}>
-              {products.filter(p => p.is_featured).map(p => (
-                <div key={p.id} className="shrink-0 w-28">
-                  <ProductCard product={p} onClick={() => setSelectedProduct(p)} />
-                </div>
-              ))}
+        <div className="max-w-[700px] mx-auto px-4 pt-4 pb-6" dir="rtl">
+          {/* Search (sticky-ish, compact) */}
+          {products.length > 6 && (
+            <div className="relative mb-3">
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: '#9ca3af' }} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="חיפוש מוצר..."
+                className="w-full pr-9 pl-3 py-2 rounded-xl text-xs focus:outline-none focus:ring-2"
+                style={{ background: '#fff', color: '#1f2937', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
+              />
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Products grid */}
-        {filtered.length === 0 ? (
-          <div className="text-center py-16">
-            <ShoppingBag className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--text-secondary, #d1d5db)' }} />
-            <p className="text-sm" style={{ color: 'var(--text-secondary, #9ca3af)' }}>
-              {searchQuery ? 'לא נמצאו מוצרים' : 'אין מוצרים עדיין'}
-            </p>
-          </div>
-        ) : showGrouped ? (
-          <>
-            {sortedGroups.map(([lineName, items]) => renderSection(lineName, items))}
-            {noLine.length > 0 && renderSection('מוצרים נוספים', noLine, 'var(--text-secondary, #9ca3af)')}
-          </>
-        ) : (
-          <BentoGrid products={filtered} onSelect={setSelectedProduct} />
-        )}
+          {/* Category pills */}
+          {categories.length > 1 && (
+            <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+              <button onClick={() => setActiveCategory(null)}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-medium whitespace-nowrap transition-all"
+                style={{
+                  background: !activeCategory ? 'var(--color-primary, #7c3aed)' : '#fff',
+                  color: !activeCategory ? '#fff' : '#6b7280',
+                  boxShadow: !activeCategory ? 'none' : '0 1px 3px rgba(0,0,0,0.06)',
+                }}>
+                הכל
+              </button>
+              {categories.map(cat => {
+                const catColor = CATEGORY_COLORS[cat] || '#64748b';
+                const isActive = activeCategory === cat;
+                return (
+                  <button key={cat}
+                    onClick={() => setActiveCategory(isActive ? null : cat)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium whitespace-nowrap transition-all"
+                    style={{
+                      background: isActive ? `${catColor}15` : '#fff',
+                      color: isActive ? catColor : '#6b7280',
+                      boxShadow: isActive ? 'none' : '0 1px 3px rgba(0,0,0,0.06)',
+                      border: isActive ? `1px solid ${catColor}30` : '1px solid transparent',
+                    }}>
+                    <span className="w-2 h-2 rounded-full" style={{ background: catColor }} />
+                    {CATEGORY_LABELS[cat] || cat.replace(/_/g, ' ')}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
-        {/* Bottom padding for safe area */}
-        <div className="h-6" />
+          {/* Empty state */}
+          {filtered.length === 0 ? (
+            <div className="text-center py-20">
+              <ShoppingBag className="w-14 h-14 mx-auto mb-3" style={{ color: '#d1d5db' }} />
+              <p className="text-sm" style={{ color: '#9ca3af' }}>
+                {searchQuery ? 'לא נמצאו מוצרים' : 'אין מוצרים עדיין'}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-7">
+              {/* === HERO SECTION === */}
+              {heroProducts.length > 0 && (
+                <div className="space-y-3">
+                  {heroProducts.map(p => (
+                    <HeroCard key={p.id} product={p} onClick={() => setSelectedProduct(p)} />
+                  ))}
+                </div>
+              )}
+
+              {/* === CAROUSEL SECTIONS === */}
+              {carouselGroups.map(([name, items]) => (
+                <ScrollRow key={name} title={name} products={items}
+                  onSelect={setSelectedProduct}
+                  accent={getCategoryColor(items[0]?.category)} />
+              ))}
+
+              {/* === MASONRY DISCOVERY === */}
+              {remaining.length > 0 && (
+                <div>
+                  {carouselGroups.length > 0 && (
+                    <div className="flex items-center gap-2 mb-3 px-1">
+                      <div className="w-1 h-4 rounded-full" style={{ background: 'var(--color-primary, #7c3aed)' }} />
+                      <h3 className="font-bold text-[13px]" style={{ color: '#1f2937' }}>
+                        {remaining.length === nonHero.length ? 'כל המוצרים' : 'עוד מוצרים'}
+                      </h3>
+                    </div>
+                  )}
+                  <MasonryGrid products={remaining} onSelect={setSelectedProduct} />
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="h-8" />
+        </div>
       </div>
 
       {/* Product detail modal */}
