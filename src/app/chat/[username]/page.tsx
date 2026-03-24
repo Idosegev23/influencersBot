@@ -40,6 +40,7 @@ const DiscoveryTab = dynamic(() => import('@/components/chat/discovery/Discovery
 const TopicQuestionsTab = dynamic(() => import('@/components/chat/TopicQuestionsTab'), { ssr: false });
 const ContentFeedTab = dynamic(() => import('@/components/chat/content-feed/ContentFeedTab'), { ssr: false });
 const ProductsCatalogTab = dynamic(() => import('@/components/chat/ProductsCatalogTab'), { ssr: false });
+const BrandSupportTab = dynamic(() => import('@/components/chat/BrandSupportTab'), { ssr: false });
 import { applyTheme, getGoogleFontsUrl } from '@/lib/theme';
 import { getProxiedImageUrl } from '@/lib/image-utils';
 import { BrandCards } from '@/components/chat/BrandCards';
@@ -1670,7 +1671,20 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 </div>
               </motion.div>
             ) : activeTab === 'support' ? (
-              /* ============ SUPPORT TAB — WOW GLASSMORPHIC ============ */
+              /* ============ SUPPORT TAB ============ */
+              (influencer.influencer_type as string) === 'brand' || (influencer.influencer_type as string) === 'local_business' ? (
+              /* --- Brand/Local: Smart product-aware support --- */
+              <motion.div key="support-brand" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="problem-tab h-full">
+                <BrandSupportTab
+                  accountId={influencer.id}
+                  username={username}
+                  brandName={influencer.display_name}
+                  isMobile={isMobile}
+                  coupons={brands.map(b => ({ brand_name: b.brand_name, coupon_code: b.coupon_code, description: b.description, category: b.category }))}
+                />
+              </motion.div>
+              ) : (
+              /* --- Influencer: Original brand-selection support --- */
               <motion.div
                 key="support"
                 initial={{ opacity: 0 }}
@@ -1862,6 +1876,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   </div>
                 </div>
               </motion.div>
+              )
             ) : activeTab === 'discover' ? (
               <motion.div
                 key="discover"
