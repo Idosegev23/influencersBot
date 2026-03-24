@@ -68,7 +68,7 @@ function ImageCard({
   views,
   postedAt,
   badge,
-  aspectRatio = '16/10',
+  aspectRatio = '4/5',
   headlineSize = '18px',
   onClick,
 }: {
@@ -179,11 +179,11 @@ function ListCard({
         </div>
       </div>
       {thumbnailUrl && (
-        <div className="flex-shrink-0 w-[90px]">
+        <div className="flex-shrink-0 w-[80px]" style={{ aspectRatio: '4/5' }}>
           <img
             src={getProxiedImageUrl(thumbnailUrl)}
             alt=""
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover rounded-l-2xl"
             loading="lazy"
           />
         </div>
@@ -294,7 +294,7 @@ export function NewsDiscoveryTab({ username, influencerName, onAskInChat }: News
                 views={heroPost.views}
                 postedAt={heroPost.postedAt}
                 badge={heroTopic ? { label: STATUS_CONFIG[heroTopic.status]?.label || 'LIVE', color: STATUS_CONFIG[heroTopic.status]?.color || '#FF3B30' } : undefined}
-                aspectRatio="16/10"
+                aspectRatio="4/5"
                 headlineSize="20px"
                 onClick={() => handlePostClick(heroPost)}
               />
@@ -317,7 +317,7 @@ export function NewsDiscoveryTab({ username, influencerName, onAskInChat }: News
                       headline={item.headline}
                       views={item.views}
                       postedAt={item.postedAt}
-                      aspectRatio="3/4"
+                      aspectRatio="4/5"
                       headlineSize="14px"
                       onClick={() => handlePostClick(item)}
                     />
