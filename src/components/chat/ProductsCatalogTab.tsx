@@ -167,7 +167,7 @@ function ProductModal({
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-        className="w-full max-w-lg max-h-[80vh] sm:max-h-[90vh] flex flex-col rounded-3xl overflow-hidden"
+        className="w-full max-w-lg max-h-[65vh] sm:max-h-[85vh] flex flex-col rounded-3xl overflow-hidden"
         style={{ background: 'var(--chat-bg, #fff)' }}
         onClick={e => e.stopPropagation()}
       >
