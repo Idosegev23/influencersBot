@@ -277,28 +277,56 @@ export function NewsDiscoveryTab({ username, influencerName, onAskInChat }: News
           {/* ── Ticker ── */}
           {tickerHeadlines.length > 0 && <NewsTicker headlines={tickerHeadlines} />}
 
-          {/* ── MASONRY GRID (3 columns, small cards) ── */}
+          {/* ── PINTEREST GRID (2 rows of horizontal scroll) ── */}
           {postsWithImages.length > 0 && (
-            <div className="px-2 pt-3 grid grid-cols-3 gap-1.5">
-              {postsWithImages.map((item, i) => (
-                <motion.div
-                  key={item.id}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.03 }}
-                >
-                  <ImageCard
-                    thumbnailUrl={item.thumbnailUrl!}
-                    headline={item.headline}
-                    views={item.views}
-                    postedAt={item.postedAt}
-                    badge={i === 0 && heroTopic ? { label: STATUS_CONFIG[heroTopic.status]?.label || 'LIVE', color: STATUS_CONFIG[heroTopic.status]?.color || '#FF3B30' } : undefined}
-                    aspectRatio="4/5"
-                    headlineSize="10px"
-                    onClick={() => handlePostClick(item)}
-                  />
-                </motion.div>
-              ))}
+            <div className="pt-3 flex flex-col gap-1.5">
+              {/* Row 1 */}
+              <div className="flex gap-1.5 overflow-x-auto px-2 pb-1 scrollbar-hide">
+                {postsWithImages.filter((_, i) => i % 2 === 0).map((item, i) => (
+                  <motion.div
+                    key={item.id}
+                    className="flex-shrink-0"
+                    style={{ width: '110px' }}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.04 }}
+                  >
+                    <ImageCard
+                      thumbnailUrl={item.thumbnailUrl!}
+                      headline={item.headline}
+                      views={item.views}
+                      postedAt={item.postedAt}
+                      badge={i === 0 && heroTopic ? { label: STATUS_CONFIG[heroTopic.status]?.label || 'LIVE', color: STATUS_CONFIG[heroTopic.status]?.color || '#FF3B30' } : undefined}
+                      aspectRatio="3/4"
+                      headlineSize="9px"
+                      onClick={() => handlePostClick(item)}
+                    />
+                  </motion.div>
+                ))}
+              </div>
+              {/* Row 2 — offset for stagger */}
+              <div className="flex gap-1.5 overflow-x-auto px-2 pb-1 scrollbar-hide" style={{ paddingRight: '28px' }}>
+                {postsWithImages.filter((_, i) => i % 2 === 1).map((item, i) => (
+                  <motion.div
+                    key={item.id}
+                    className="flex-shrink-0"
+                    style={{ width: '110px' }}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.05 + i * 0.04 }}
+                  >
+                    <ImageCard
+                      thumbnailUrl={item.thumbnailUrl!}
+                      headline={item.headline}
+                      views={item.views}
+                      postedAt={item.postedAt}
+                      aspectRatio="3/4"
+                      headlineSize="9px"
+                      onClick={() => handlePostClick(item)}
+                    />
+                  </motion.div>
+                ))}
+              </div>
             </div>
           )}
 
