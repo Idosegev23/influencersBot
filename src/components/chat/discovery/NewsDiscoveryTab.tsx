@@ -86,7 +86,7 @@ function ImageCard({
       whileTap={{ scale: 0.97 }}
       onClick={onClick}
       className="w-full relative overflow-hidden text-right"
-      style={{ borderRadius: '14px', aspectRatio }}
+      style={{ borderRadius: '12px', aspectRatio }}
     >
       <img
         src={getProxiedImageUrl(thumbnailUrl)}
@@ -119,17 +119,13 @@ function ImageCard({
           </span>
         </div>
       )}
-      <div className="absolute bottom-0 left-0 right-0 p-2.5" dir="rtl">
+      <div className="absolute bottom-0 left-0 right-0 p-1.5" dir="rtl">
         <h3
-          className="font-bold leading-[1.25] text-white line-clamp-2"
+          className="font-semibold leading-[1.2] text-white line-clamp-2"
           style={{ fontSize: headlineSize }}
         >
           {headline}
         </h3>
-        <p className="text-[9px] mt-1 flex items-center gap-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>
-          <Clock className="w-2.5 h-2.5" />
-          {timeAgo(postedAt)}
-        </p>
       </div>
     </motion.button>
   );
@@ -281,52 +277,28 @@ export function NewsDiscoveryTab({ username, influencerName, onAskInChat }: News
           {/* ── Ticker ── */}
           {tickerHeadlines.length > 0 && <NewsTicker headlines={tickerHeadlines} />}
 
-          {/* ── MASONRY GRID (2 columns, compact cards) ── */}
+          {/* ── MASONRY GRID (3 columns, small cards) ── */}
           {postsWithImages.length > 0 && (
-            <div className="px-3 pt-3 flex gap-2">
-              {/* Left column */}
-              <div className="flex-1 flex flex-col gap-2">
-                {leftCol.map((item, i) => (
-                  <motion.div
-                    key={item.id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                  >
-                    <ImageCard
-                      thumbnailUrl={item.thumbnailUrl!}
-                      headline={item.headline}
-                      views={item.views}
-                      postedAt={item.postedAt}
-                      badge={i === 0 && heroTopic ? { label: STATUS_CONFIG[heroTopic.status]?.label || 'LIVE', color: STATUS_CONFIG[heroTopic.status]?.color || '#FF3B30' } : undefined}
-                      aspectRatio={i === 0 ? '4/5' : '1/1'}
-                      headlineSize={i === 0 ? '13px' : '11px'}
-                      onClick={() => handlePostClick(item)}
-                    />
-                  </motion.div>
-                ))}
-              </div>
-              {/* Right column — offset for staggered look */}
-              <div className="flex-1 flex flex-col gap-2 pt-4">
-                {rightCol.map((item, i) => (
-                  <motion.div
-                    key={item.id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.03 + i * 0.05 }}
-                  >
-                    <ImageCard
-                      thumbnailUrl={item.thumbnailUrl!}
-                      headline={item.headline}
-                      views={item.views}
-                      postedAt={item.postedAt}
-                      aspectRatio={i === 0 ? '1/1' : '4/5'}
-                      headlineSize="11px"
-                      onClick={() => handlePostClick(item)}
-                    />
-                  </motion.div>
-                ))}
-              </div>
+            <div className="px-2 pt-3 grid grid-cols-3 gap-1.5">
+              {postsWithImages.map((item, i) => (
+                <motion.div
+                  key={item.id}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.03 }}
+                >
+                  <ImageCard
+                    thumbnailUrl={item.thumbnailUrl!}
+                    headline={item.headline}
+                    views={item.views}
+                    postedAt={item.postedAt}
+                    badge={i === 0 && heroTopic ? { label: STATUS_CONFIG[heroTopic.status]?.label || 'LIVE', color: STATUS_CONFIG[heroTopic.status]?.color || '#FF3B30' } : undefined}
+                    aspectRatio="4/5"
+                    headlineSize="10px"
+                    onClick={() => handlePostClick(item)}
+                  />
+                </motion.div>
+              ))}
             </div>
           )}
 
