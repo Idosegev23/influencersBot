@@ -167,7 +167,7 @@ function ProductModal({
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-        className="w-full max-w-lg max-h-[65vh] sm:max-h-[85vh] flex flex-col rounded-3xl overflow-hidden"
+        className="w-full max-w-lg max-h-[55vh] sm:max-h-[80vh] flex flex-col rounded-3xl overflow-hidden"
         style={{ background: 'var(--chat-bg, #fff)' }}
         onClick={e => e.stopPropagation()}
       >
@@ -175,7 +175,7 @@ function ProductModal({
         <div className="flex-1 overflow-y-auto min-h-0">
         {/* Header image or gradient */}
         {product.image_url ? (
-          <div className="relative h-56 overflow-hidden rounded-t-3xl sm:rounded-t-3xl">
+          <div className="relative h-44 sm:h-56 overflow-hidden rounded-t-3xl sm:rounded-t-3xl">
             <img src={product.image_url} alt={displayName} className="w-full h-full object-cover" />
             <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 60%)' }} />
             <button onClick={onClose} className="absolute top-4 left-4 p-2 rounded-full backdrop-blur-md"
