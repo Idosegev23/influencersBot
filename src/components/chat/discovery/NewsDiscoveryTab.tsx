@@ -2,10 +2,14 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, Eye, Clock, Flame, Zap, TrendingUp } from 'lucide-react';
+import { Loader2, Eye, Clock, Flame, ChevronLeft } from 'lucide-react';
 import { NewsTicker } from './NewsTicker';
 import { getProxiedImageUrl } from '@/lib/image-utils';
 import type { HotTopic } from '@/lib/hot-topics/types';
+
+// ============================================
+// Types
+// ============================================
 
 interface TimelineItem {
   id: string;
@@ -22,6 +26,10 @@ interface NewsDiscoveryTabProps {
   influencerName: string;
   onAskInChat: (message: string, enrichedData?: string) => void;
 }
+
+// ============================================
+// Helpers
+// ============================================
 
 function formatViews(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -42,19 +50,22 @@ function timeAgo(dateStr: string): string {
   return 'שבוע+';
 }
 
-const STATUS_COLORS = {
-  breaking: { bg: '#FF3B30', text: '#FFF', glow: 'rgba(255,59,48,0.3)', label: 'BREAKING' },
-  hot: { bg: '#FF9500', text: '#FFF', glow: 'rgba(255,149,0,0.25)', label: 'HOT' },
-  cooling: { bg: '#AF52DE', text: '#FFF', glow: 'rgba(175,82,222,0.2)', label: 'TRENDING' },
-  archive: { bg: '#8E8E93', text: '#FFF', glow: 'transparent', label: 'ARCHIVE' },
+const STATUS_CONFIG: Record<string, { color: string; label: string }> = {
+  breaking: { color: '#FF3B30', label: 'BREAKING' },
+  hot: { color: '#FF9500', label: 'HOT' },
+  cooling: { color: '#AF52DE', label: 'TRENDING' },
+  archive: { color: '#8E8E93', label: 'ARCHIVE' },
 };
+
+// ============================================
+// Component
+// ============================================
 
 export function NewsDiscoveryTab({ username, influencerName, onAskInChat }: NewsDiscoveryTabProps) {
   const [hotTopics, setHotTopics] = useState<HotTopic[]>([]);
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'feed' | 'topics'>('feed');
 
   useEffect(() => {
     async function fetchData() {
@@ -63,7 +74,6 @@ export function NewsDiscoveryTab({ username, influencerName, onAskInChat }: News
           fetch(`/api/discovery/hot-topics?limit=15&status=breaking,hot,cooling`),
           fetch(`/api/discovery/timeline?username=${encodeURIComponent(username)}&limit=20`),
         ]);
-
         if (topicsRes.ok) {
           const data = await topicsRes.json();
           setHotTopics(data.topics || []);
@@ -81,6 +91,7 @@ export function NewsDiscoveryTab({ username, influencerName, onAskInChat }: News
     fetchData();
   }, [username]);
 
+  // Handlers
   const handleTopicClick = useCallback((topic: HotTopic) => {
     const enrichedContext = `[נושא חם: ${topic.topic_name} (${topic.status})\nתקציר: ${topic.summary || 'אין תקציר'}\nציון חום: ${topic.heat_score}\n${topic.coverage_count} ערוצים כיסו, ${topic.total_posts} פוסטים]`;
     onAskInChat(`ספרו לי על ${topic.topic_name}`, enrichedContext);
@@ -91,11 +102,14 @@ export function NewsDiscoveryTab({ username, influencerName, onAskInChat }: News
     onAskInChat(item.headline.length > 40 ? item.headline.substring(0, 40) + '...' : item.headline, enrichedContext);
   }, [onAskInChat]);
 
-  // Organize data
+  // Data
   const breakingTopics = hotTopics.filter(t => t.status === 'breaking');
   const hotOnly = hotTopics.filter(t => t.status === 'hot');
-  const coolingTopics = hotTopics.filter(t => t.status === 'cooling');
-  const allTopics = [...breakingTopics, ...hotOnly, ...coolingTopics];
+  const allTopics = [...breakingTopics, ...hotOnly, ...hotTopics.filter(t => t.status === 'cooling')];
+  const heroTopic = breakingTopics[0] || hotOnly[0];
+  const postsWithImages = timeline.filter(t => t.thumbnailUrl);
+  const heroPost = postsWithImages[0];
+  const remainingPosts = postsWithImages.slice(1);
 
   // Ticker
   const tickerHeadlines = [...breakingTopics, ...hotOnly].slice(0, 8).map(t => ({
@@ -104,76 +118,71 @@ export function NewsDiscoveryTab({ username, influencerName, onAskInChat }: News
     onClick: () => handleTopicClick(t),
   }));
 
-  // Hero = top timeline post with thumbnail (visual impact)
-  const heroPost = timeline.find(t => t.thumbnailUrl);
-  const heroTopic = breakingTopics[0] || hotOnly[0];
-
   return (
-    <div className="h-full overflow-y-auto" style={{ background: '#000' }}>
+    <div className="h-full overflow-y-auto" style={{ backgroundColor: '#F2F2F7' }}>
       {/* Loading */}
       {loading && (
         <div className="flex flex-col items-center justify-center py-24 gap-3">
           <Loader2 className="w-6 h-6 animate-spin" style={{ color: '#FF3B30' }} />
-          <p className="text-[12px] font-medium" style={{ color: '#666' }}>טוען עדכונים...</p>
+          <p className="text-[12px] font-medium" style={{ color: '#8E8E93' }}>טוען עדכונים...</p>
         </div>
       )}
 
       {/* Error */}
       {error && !loading && (
         <div className="px-5 py-16 text-center">
-          <p className="text-[13px]" style={{ color: '#666' }}>{error}</p>
+          <p className="text-[13px]" style={{ color: '#8E8E93' }}>{error}</p>
         </div>
       )}
 
-      {/* Content */}
+      {/* Main Content */}
       {!loading && (hotTopics.length > 0 || timeline.length > 0) && (
         <>
-          {/* Ticker */}
-          {tickerHeadlines.length > 0 && (
-            <NewsTicker headlines={tickerHeadlines} />
-          )}
+          {/* ── Ticker ── */}
+          {tickerHeadlines.length > 0 && <NewsTicker headlines={tickerHeadlines} />}
 
-          {/* Hero Section — full-width image with overlay */}
+          {/* ── Hero Card (Apple News style) ── */}
           {heroPost && (
             <motion.button
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              whileTap={{ scale: 0.98 }}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              whileTap={{ scale: 0.985 }}
               onClick={() => handleTimelineClick(heroPost)}
               className="w-full relative overflow-hidden"
-              style={{ aspectRatio: '16/9' }}
+              style={{ aspectRatio: '16/10' }}
             >
               <img
                 src={getProxiedImageUrl(heroPost.thumbnailUrl || '')}
                 alt=""
                 className="absolute inset-0 w-full h-full object-cover"
               />
-              {/* Gradient overlay */}
               <div
                 className="absolute inset-0"
-                style={{ background: 'linear-gradient(0deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.3) 40%, transparent 70%)' }}
+                style={{ background: 'linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.35) 40%, rgba(0,0,0,0.1) 70%)' }}
               />
               {/* Breaking badge */}
               {heroTopic && (
                 <div className="absolute top-3 right-3">
                   <span
-                    className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md animate-pulse"
+                    className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md"
                     style={{
-                      background: STATUS_COLORS[heroTopic.status]?.bg || '#FF3B30',
+                      background: STATUS_CONFIG[heroTopic.status]?.color || '#FF3B30',
                       color: '#FFF',
-                      boxShadow: `0 2px 12px ${STATUS_COLORS[heroTopic.status]?.glow || 'rgba(255,59,48,0.4)'}`,
                     }}
                   >
-                    {STATUS_COLORS[heroTopic.status]?.label || 'LIVE'}
+                    {STATUS_CONFIG[heroTopic.status]?.label}
                   </span>
                 </div>
               )}
-              {/* Content overlay */}
-              <div className="absolute bottom-0 left-0 right-0 p-4" dir="rtl">
-                <h2 className="font-black text-[18px] leading-tight text-white mb-1.5 line-clamp-2">
+              {/* Content */}
+              <div className="absolute bottom-0 left-0 right-0 p-5" dir="rtl">
+                <p className="text-[11px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                  {influencerName}
+                </p>
+                <h1 className="font-black text-[22px] leading-[1.2] text-white mb-2 line-clamp-2">
                   {heroPost.headline}
-                </h2>
-                <div className="flex items-center gap-3 text-[11px]" style={{ color: 'rgba(255,255,255,0.7)' }}>
+                </h1>
+                <div className="flex items-center gap-3 text-[11px]" style={{ color: 'rgba(255,255,255,0.6)' }}>
                   <span className="flex items-center gap-1">
                     <Eye className="w-3 h-3" />
                     {formatViews(heroPost.views)}
@@ -187,219 +196,194 @@ export function NewsDiscoveryTab({ username, influencerName, onAskInChat }: News
             </motion.button>
           )}
 
-          {/* Tab switcher */}
-          <div className="sticky top-0 z-20" style={{ background: '#000' }}>
-            <div className="flex" dir="rtl">
-              {([
-                { id: 'feed' as const, label: 'פיד', icon: Zap },
-                { id: 'topics' as const, label: 'נושאים חמים', icon: Flame },
-              ]).map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-3 text-[13px] font-semibold transition-colors relative"
-                  style={{ color: activeTab === tab.id ? '#FFF' : '#666' }}
-                >
-                  <tab.icon className="w-3.5 h-3.5" />
-                  {tab.label}
-                  {activeTab === tab.id && (
-                    <motion.div
-                      layoutId="news-tab-indicator"
-                      className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full"
-                      style={{ background: '#FF3B30' }}
-                    />
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <AnimatePresence mode="wait">
-            {/* FEED TAB — Posts with thumbnails */}
-            {activeTab === 'feed' && (
-              <motion.div
-                key="feed"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ duration: 0.2 }}
-                className="px-3 pt-3 pb-32"
-                dir="rtl"
-              >
-                {/* 2-column grid of posts with thumbnails */}
-                <div className="grid grid-cols-2 gap-2.5">
-                  {timeline.filter(item => item.thumbnailUrl).slice(heroPost ? 1 : 0).map((item, i) => (
-                    <motion.button
-                      key={item.id}
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.04 }}
-                      whileTap={{ scale: 0.96 }}
-                      onClick={() => handleTimelineClick(item)}
-                      className="relative overflow-hidden text-right"
-                      style={{
-                        borderRadius: '14px',
-                        aspectRatio: i % 3 === 0 ? '3/4' : '4/5',
-                      }}
-                    >
-                      <img
-                        src={getProxiedImageUrl(item.thumbnailUrl || '')}
-                        alt=""
-                        className="absolute inset-0 w-full h-full object-cover"
-                      />
-                      <div
-                        className="absolute inset-0"
-                        style={{ background: 'linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.2) 50%, transparent 70%)' }}
-                      />
-                      {/* Views badge */}
-                      <div className="absolute top-2 left-2">
-                        <span
-                          className="text-[9px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5"
-                          style={{ background: 'rgba(0,0,0,0.6)', color: '#FFF', backdropFilter: 'blur(4px)' }}
-                        >
-                          <Eye className="w-2.5 h-2.5" />
-                          {formatViews(item.views)}
-                        </span>
-                      </div>
-                      {/* Content */}
-                      <div className="absolute bottom-0 left-0 right-0 p-2.5">
-                        <p className="text-[12px] font-bold leading-snug text-white line-clamp-3">
-                          {item.headline}
-                        </p>
-                        <p className="text-[10px] mt-1" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                          {timeAgo(item.postedAt)}
-                        </p>
-                      </div>
-                    </motion.button>
-                  ))}
+          {/* ── Hot Topics Section ── */}
+          {allTopics.length > 0 && (
+            <section className="px-4 pt-5 pb-1" dir="rtl">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Flame className="w-4 h-4" style={{ color: '#FF3B30' }} />
+                  <h2 className="text-[15px] font-bold" style={{ color: '#1C1C1E' }}>נושאים חמים</h2>
                 </div>
+              </div>
 
-                {/* Posts without thumbnails — compact list */}
-                {timeline.filter(item => !item.thumbnailUrl).length > 0 && (
-                  <div className="mt-4 space-y-1.5">
-                    {timeline.filter(item => !item.thumbnailUrl).map((item, i) => (
-                      <motion.button
-                        key={item.id}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: 0.2 + i * 0.03 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => handleTimelineClick(item)}
-                        className="w-full text-right p-3 rounded-xl flex items-start gap-3"
-                        style={{ background: '#111' }}
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[13px] font-semibold leading-snug text-white line-clamp-2">
-                            {item.headline}
-                          </p>
-                          <div className="flex items-center gap-2 mt-1.5 text-[10px]" style={{ color: '#666' }}>
-                            <span>{timeAgo(item.postedAt)}</span>
-                            {item.views > 0 && <span>{formatViews(item.views)} צפיות</span>}
-                          </div>
-                        </div>
-                      </motion.button>
-                    ))}
-                  </div>
-                )}
-              </motion.div>
-            )}
-
-            {/* TOPICS TAB — Hot topics */}
-            {activeTab === 'topics' && (
-              <motion.div
-                key="topics"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
-                className="px-3 pt-3 pb-32 space-y-2.5"
-                dir="rtl"
-              >
-                {allTopics.map((topic, i) => {
-                  const statusConfig = STATUS_COLORS[topic.status] || STATUS_COLORS.hot;
+              {/* Horizontal scroll of topic pills */}
+              <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-2">
+                {allTopics.slice(0, 8).map((topic, i) => {
+                  const cfg = STATUS_CONFIG[topic.status] || STATUS_CONFIG.hot;
                   return (
                     <motion.button
                       key={topic.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.04 }}
-                      whileTap={{ scale: 0.97 }}
+                      initial={{ opacity: 0, x: 12 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                      whileTap={{ scale: 0.95 }}
                       onClick={() => handleTopicClick(topic)}
-                      className="w-full text-right overflow-hidden"
+                      className="flex-shrink-0 text-right overflow-hidden"
                       style={{
+                        width: '180px',
                         borderRadius: '16px',
-                        background: i === 0 ? 'linear-gradient(145deg, #1A1A1A, #111)' : '#111',
-                        border: i === 0 ? `1px solid ${statusConfig.bg}33` : '1px solid #222',
+                        background: '#FFF',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 0 0 0.5px rgba(0,0,0,0.04)',
                       }}
                     >
-                      {i === 0 && (
-                        <div className="h-0.5" style={{ background: `linear-gradient(90deg, ${statusConfig.bg}, transparent)` }} />
-                      )}
-                      <div className={i === 0 ? 'p-4' : 'p-3.5'}>
-                        <div className="flex items-center gap-2 mb-2">
+                      {/* Color accent */}
+                      <div className="h-1" style={{ background: cfg.color }} />
+                      <div className="p-3">
+                        <div className="flex items-center gap-1.5 mb-1.5">
                           <span
-                            className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md ${topic.status === 'breaking' ? 'animate-pulse' : ''}`}
-                            style={{
-                              background: statusConfig.bg,
-                              color: '#FFF',
-                              boxShadow: topic.status === 'breaking' ? `0 0 8px ${statusConfig.glow}` : 'none',
-                            }}
+                            className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${topic.status === 'breaking' ? 'animate-pulse' : ''}`}
+                            style={{ background: `${cfg.color}18`, color: cfg.color }}
                           >
-                            {statusConfig.label}
+                            {cfg.label}
                           </span>
-                          {/* Heat bar */}
-                          <div className="flex-1" />
-                          <div className="flex items-center gap-1">
-                            <TrendingUp className="w-3 h-3" style={{ color: statusConfig.bg }} />
-                            <span className="text-[10px] font-bold" style={{ color: statusConfig.bg }}>
-                              {Math.round(topic.heat_score)}
-                            </span>
-                          </div>
+                          <span className="text-[9px] font-bold" style={{ color: cfg.color }}>
+                            {Math.round(topic.heat_score)}
+                          </span>
                         </div>
-                        <h3
-                          className={`font-bold leading-snug mb-1 ${i === 0 ? 'text-[17px]' : 'text-[14px]'}`}
-                          style={{ color: '#FFF' }}
-                        >
+                        <p className="text-[13px] font-bold leading-snug line-clamp-2" style={{ color: '#1C1C1E' }}>
                           {topic.topic_name}
-                        </h3>
+                        </p>
                         {topic.summary && (
-                          <p
-                            className={`leading-relaxed ${i === 0 ? 'text-[12px] line-clamp-3' : 'text-[11px] line-clamp-2'}`}
-                            style={{ color: '#888' }}
-                          >
+                          <p className="text-[10px] leading-relaxed mt-1 line-clamp-2" style={{ color: '#8E8E93' }}>
                             {topic.summary}
                           </p>
-                        )}
-                        {topic.tags && topic.tags.length > 0 && (
-                          <div className="flex items-center gap-1.5 mt-2">
-                            {topic.tags.slice(0, 3).map(tag => (
-                              <span
-                                key={tag}
-                                className="text-[9px] px-2 py-0.5 rounded-full"
-                                style={{ background: '#222', color: '#888' }}
-                              >
-                                {tag}
-                              </span>
-                            ))}
-                            <span className="text-[9px]" style={{ color: '#444' }}>
-                              {topic.coverage_count} ערוצים
-                            </span>
-                          </div>
                         )}
                       </div>
                     </motion.button>
                   );
                 })}
+              </div>
+            </section>
+          )}
 
-                {allTopics.length === 0 && (
-                  <div className="text-center py-12">
-                    <Flame className="w-8 h-8 mx-auto mb-2" style={{ color: '#333' }} />
-                    <p className="text-[13px]" style={{ color: '#666' }}>אין נושאים חמים כרגע</p>
+          {/* ── Latest Posts (Apple News cards) ── */}
+          {remainingPosts.length > 0 && (
+            <section className="px-4 pt-3 pb-2" dir="rtl">
+              <h2 className="text-[15px] font-bold mb-3" style={{ color: '#1C1C1E' }}>
+                פוסטים אחרונים
+              </h2>
+
+              {/* Top 2 — side by side large cards */}
+              <div className="grid grid-cols-2 gap-2.5 mb-2.5">
+                {remainingPosts.slice(0, 2).map((item, i) => (
+                  <motion.button
+                    key={item.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.06 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => handleTimelineClick(item)}
+                    className="relative overflow-hidden text-right"
+                    style={{ borderRadius: '16px', aspectRatio: '3/4' }}
+                  >
+                    <img
+                      src={getProxiedImageUrl(item.thumbnailUrl || '')}
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                    <div
+                      className="absolute inset-0"
+                      style={{ background: 'linear-gradient(0deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.15) 50%, transparent 70%)' }}
+                    />
+                    {/* Views */}
+                    <div className="absolute top-2.5 left-2.5">
+                      <span
+                        className="text-[9px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5"
+                        style={{ background: 'rgba(0,0,0,0.5)', color: '#FFF', backdropFilter: 'blur(8px)' }}
+                      >
+                        <Eye className="w-2.5 h-2.5" />
+                        {formatViews(item.views)}
+                      </span>
+                    </div>
+                    <div className="absolute bottom-0 left-0 right-0 p-3">
+                      <p className="text-[13px] font-bold leading-snug text-white line-clamp-3">
+                        {item.headline}
+                      </p>
+                      <p className="text-[10px] mt-1" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                        {timeAgo(item.postedAt)}
+                      </p>
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
+
+              {/* Rest — list cards with thumbnail on the side */}
+              <div className="space-y-2">
+                {remainingPosts.slice(2).map((item, i) => (
+                  <motion.button
+                    key={item.id}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.15 + i * 0.03 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => handleTimelineClick(item)}
+                    className="w-full flex items-stretch overflow-hidden text-right"
+                    style={{
+                      borderRadius: '14px',
+                      background: '#FFF',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 0 0 0.5px rgba(0,0,0,0.03)',
+                      minHeight: '88px',
+                    }}
+                  >
+                    {/* Text */}
+                    <div className="flex-1 p-3 flex flex-col justify-center min-w-0">
+                      <p className="text-[13px] font-semibold leading-snug line-clamp-2" style={{ color: '#1C1C1E' }}>
+                        {item.headline}
+                      </p>
+                      <div className="flex items-center gap-2.5 mt-1.5 text-[10px]" style={{ color: '#AEAEB2' }}>
+                        <span>{timeAgo(item.postedAt)}</span>
+                        {item.views > 0 && (
+                          <span className="flex items-center gap-0.5">
+                            <Eye className="w-2.5 h-2.5" />
+                            {formatViews(item.views)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {/* Thumbnail */}
+                    <div className="flex-shrink-0 w-[88px]">
+                      <img
+                        src={getProxiedImageUrl(item.thumbnailUrl || '')}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* ── Posts without thumbnails ── */}
+          {timeline.filter(t => !t.thumbnailUrl).length > 0 && (
+            <section className="px-4 pt-3" dir="rtl">
+              {timeline.filter(t => !t.thumbnailUrl).map((item, i) => (
+                <motion.button
+                  key={item.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.2 + i * 0.03 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleTimelineClick(item)}
+                  className="w-full text-right py-3 flex items-start gap-3"
+                  style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}
+                >
+                  <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-2" style={{ background: '#D1D1D6' }} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-semibold leading-snug line-clamp-2" style={{ color: '#1C1C1E' }}>
+                      {item.headline}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1 text-[10px]" style={{ color: '#AEAEB2' }}>
+                      <span>{timeAgo(item.postedAt)}</span>
+                      {item.views > 0 && <span>{formatViews(item.views)} צפיות</span>}
+                    </div>
                   </div>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
+                </motion.button>
+              ))}
+            </section>
+          )}
+
+          <div className="pb-32" />
         </>
       )}
 
@@ -408,14 +392,14 @@ export function NewsDiscoveryTab({ username, influencerName, onAskInChat }: News
         <div className="px-5 py-20 text-center" dir="rtl">
           <div
             className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
-            style={{ background: '#111' }}
+            style={{ background: '#E5E5EA' }}
           >
-            <Zap className="w-6 h-6" style={{ color: '#333' }} />
+            <Flame className="w-6 h-6" style={{ color: '#AEAEB2' }} />
           </div>
-          <p className="text-[14px] font-semibold mb-1" style={{ color: '#FFF' }}>
+          <p className="text-[14px] font-semibold mb-1" style={{ color: '#1C1C1E' }}>
             אין עדכונים כרגע
           </p>
-          <p className="text-[12px]" style={{ color: '#666' }}>
+          <p className="text-[12px]" style={{ color: '#8E8E93' }}>
             חדשות ונושאים חמים יופיעו כאן ברגע שיהיו
           </p>
         </div>

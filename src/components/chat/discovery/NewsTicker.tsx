@@ -24,7 +24,7 @@ export function NewsTicker({ headlines }: NewsTickerProps) {
       className="w-full overflow-hidden"
       style={{
         background: 'linear-gradient(90deg, #0A0A0A, #1A1A2E, #0A0A0A)',
-        padding: '10px 0',
+        padding: '14px 0',
       }}
     >
       <style>{`
@@ -49,7 +49,7 @@ export function NewsTicker({ headlines }: NewsTickerProps) {
           <button
             key={idx}
             onClick={headline.onClick}
-            className="inline-flex items-center gap-2 text-[12px] shrink-0 active:opacity-70 transition-opacity"
+            className="inline-flex items-center gap-2.5 text-[13px] shrink-0 active:opacity-70 transition-opacity"
           >
             <span
               className="w-1.5 h-1.5 rounded-full flex-shrink-0"
