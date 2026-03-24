@@ -158,8 +158,8 @@ function ProductModal({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 flex items-end sm:items-center justify-center"
-      style={{ background: 'rgba(0,0,0,0.5)', zIndex: 70 }}
+      className="fixed inset-x-0 top-0 bottom-[70px] sm:bottom-0 flex items-end sm:items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.45)', zIndex: 55 }}
       onClick={onClose}
     >
       <motion.div
@@ -167,10 +167,12 @@ function ProductModal({
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-        className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl"
+        className="w-full max-w-lg max-h-[80vh] sm:max-h-[90vh] flex flex-col rounded-3xl overflow-hidden"
         style={{ background: 'var(--chat-bg, #fff)' }}
         onClick={e => e.stopPropagation()}
       >
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto min-h-0">
         {/* Header image or gradient */}
         {product.image_url ? (
           <div className="relative h-56 overflow-hidden rounded-t-3xl sm:rounded-t-3xl">
@@ -229,7 +231,7 @@ function ProductModal({
         )}
 
         {/* Body */}
-        <div className="px-5 pb-6 -mt-2 relative" dir="rtl">
+        <div className="px-5 pb-4 -mt-2 relative" dir="rtl">
           {/* Title + price (if no image) */}
           <div className="flex items-start justify-between gap-3 mt-4">
             <div>
@@ -386,24 +388,27 @@ function ProductModal({
             </div>
           )}
 
-          {/* Ask about & buy buttons */}
-          <div className="flex gap-2 mt-5">
-            <button
-              className="flex-1 py-3 rounded-xl text-sm font-semibold transition-transform active:scale-[0.98]"
-              style={{ background: 'var(--color-primary, #7c3aed)', color: '#fff' }}
-              onClick={() => { onAskAbout(`ספרו לי עוד על ${displayName}`, buildProductContext(product)); onClose(); }}
-            >
-              {isFood ? '🍳 שאלו אותי על מתכונים' : '💬 שאלו אותי על המוצר'}
-            </button>
-            {product.product_url && (
-              <a href={product.product_url} target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-4 py-3 rounded-xl text-sm font-semibold transition-transform active:scale-[0.98]"
-                style={{ background: 'var(--input-bg, #f3f4f6)', color: 'var(--text-primary, #374151)' }}
-                onClick={e => e.stopPropagation()}>
-                <ExternalLink className="w-4 h-4" /> לרכישה
-              </a>
-            )}
-          </div>
+        </div>
+        </div>{/* end scrollable content */}
+
+        {/* Sticky CTA buttons — always visible at bottom */}
+        <div className="shrink-0 flex gap-2 px-5 py-4 border-t" dir="rtl"
+          style={{ borderColor: 'var(--border-color, #e5e7eb)', background: 'var(--chat-bg, #fff)' }}>
+          <button
+            className="flex-1 py-3 rounded-xl text-sm font-semibold transition-transform active:scale-[0.98]"
+            style={{ background: 'var(--color-primary, #7c3aed)', color: '#fff' }}
+            onClick={() => { onAskAbout(`ספרו לי עוד על ${displayName}`, buildProductContext(product)); onClose(); }}
+          >
+            {isFood ? '🍳 שאלו אותי על מתכונים' : '💬 שאלו אותי על המוצר'}
+          </button>
+          {product.product_url && (
+            <a href={product.product_url} target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-4 py-3 rounded-xl text-sm font-semibold transition-transform active:scale-[0.98]"
+              style={{ background: 'var(--input-bg, #f3f4f6)', color: 'var(--text-primary, #374151)' }}
+              onClick={e => e.stopPropagation()}>
+              <ExternalLink className="w-4 h-4" /> לרכישה
+            </a>
+          )}
         </div>
       </motion.div>
     </motion.div>
