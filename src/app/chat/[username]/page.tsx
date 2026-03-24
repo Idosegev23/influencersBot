@@ -1672,7 +1672,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
               </motion.div>
             ) : activeTab === 'support' ? (
               /* ============ SUPPORT TAB ============ */
-              (influencer.influencer_type as string) === 'brand' || (influencer.influencer_type as string) === 'local_business' ? (
+              (influencer as any).archetype === 'brand' || (influencer as any).archetype === 'local_business' ? (
               /* --- Brand/Local: Smart product-aware support --- */
               <motion.div key="support-brand" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="problem-tab h-full">
                 <BrandSupportTab
