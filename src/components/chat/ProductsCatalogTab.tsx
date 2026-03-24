@@ -44,8 +44,36 @@ interface Product {
 
 interface ProductsCatalogTabProps {
   accountId: string;
-  onAskAbout: (question: string) => void;
+  onAskAbout: (question: string, hiddenContext?: string) => void;
   accountType?: string; // influencer_type from chat page
+}
+
+/** Build rich hidden context string from a product so the AI model has full info */
+function buildProductContext(product: Product): string {
+  const ai = product.ai_profile || {};
+  const parts: string[] = [];
+  parts.push(`[מוצר: ${product.name_he || product.name}]`);
+  if (product.name_he && product.name && product.name_he !== product.name) {
+    parts.push(`[שם באנגלית: ${product.name}]`);
+  }
+  if (product.category) parts.push(`[קטגוריה: ${CATEGORY_LABELS[product.category] || product.category}]`);
+  if (product.subcategory) parts.push(`[תת-קטגוריה: ${product.subcategory}]`);
+  if (product.product_line) parts.push(`[קו מוצרים: ${product.product_line}]`);
+  if (product.price != null) parts.push(`[מחיר: ₪${product.price}]`);
+  if (product.original_price) parts.push(`[מחיר מקורי: ₪${product.original_price}]`);
+  if (product.volume) parts.push(`[נפח/גודל: ${product.volume}]`);
+  if (product.is_on_sale) parts.push(`[במבצע]`);
+  if (product.is_featured) parts.push(`[מוצר מומלץ]`);
+  if (ai.whatItDoes) parts.push(`[תיאור: ${ai.whatItDoes}]`);
+  if (product.description && product.description !== ai.whatItDoes) parts.push(`[תיאור נוסף: ${product.description}]`);
+  if (product.key_ingredients?.length) parts.push(`[מרכיבים: ${product.key_ingredients.join(', ')}]`);
+  if (product.benefits?.length) parts.push(`[יתרונות: ${product.benefits.join(', ')}]`);
+  if (product.target_audience?.length) parts.push(`[קהל יעד: ${product.target_audience.join(', ')}]`);
+  if (ai.sellingPoints?.length) parts.push(`[נקודות מכירה: ${ai.sellingPoints.join(', ')}]`);
+  if (ai.bestFor?.length) parts.push(`[מתאים ל: ${ai.bestFor.join(', ')}]`);
+  if (ai.pairsWith?.length) parts.push(`[משתלב עם: ${ai.pairsWith.join(', ')}]`);
+  if (product.product_url) parts.push(`[לינק לרכישה: ${product.product_url}]`);
+  return parts.join('\n');
 }
 
 /* ------------------------------------------------------------------ */
@@ -338,7 +366,7 @@ function ProductModal({
                   <button key={r.id}
                     className="shrink-0 w-28 rounded-xl overflow-hidden text-right"
                     style={{ background: 'var(--input-bg, #f9fafb)', border: '1px solid var(--border-color, #e5e7eb)' }}
-                    onClick={() => onAskAbout(`ספרו לי על ${r.name_he || r.name}`)}>
+                    onClick={() => onAskAbout(`ספרו לי על ${r.name_he || r.name}`, buildProductContext(r))}>
                     {r.image_url ? (
                       <img src={r.image_url} alt={r.name_he || r.name} className="w-full h-20 object-cover" />
                     ) : (
@@ -363,7 +391,7 @@ function ProductModal({
             <button
               className="flex-1 py-3 rounded-xl text-sm font-semibold transition-transform active:scale-[0.98]"
               style={{ background: 'var(--color-primary, #7c3aed)', color: '#fff' }}
-              onClick={() => { onAskAbout(`ספרו לי עוד על ${displayName}`); onClose(); }}
+              onClick={() => { onAskAbout(`ספרו לי עוד על ${displayName}`, buildProductContext(product)); onClose(); }}
             >
               {isFood ? '🍳 שאלו אותי על מתכונים' : '💬 שאלו אותי על המוצר'}
             </button>

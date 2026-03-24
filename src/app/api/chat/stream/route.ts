@@ -167,7 +167,7 @@ export async function POST(req: NextRequest) {
         const message = sanitizeChatMessage(rawMessage);
         const username = sanitizeUsername(rawUsername);
         // Extract clean display message (strip hidden context) for DB storage
-        const displayMessage = message.split('\n\n[הקשר הלוק:]')[0].trim();
+        const displayMessage = message.split(/\n\n\[הקשר ה(לוק|מוצר):\]/)[0].trim();
 
         if (!message || message.length < 1) {
           controller.enqueue(encodeEvent({
