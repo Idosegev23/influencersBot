@@ -30,6 +30,7 @@ import {
   Compass,
   Flame,
   Home,
+  ShoppingBag,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { getInfluencerByUsername, getBrandsByInfluencer, getContentByInfluencer, type Brand } from '@/lib/supabase';
@@ -38,6 +39,7 @@ import type { DiscoveryCategoryAvailability } from '@/lib/discovery/types';
 const DiscoveryTab = dynamic(() => import('@/components/chat/discovery/DiscoveryTab'), { ssr: false });
 const TopicQuestionsTab = dynamic(() => import('@/components/chat/TopicQuestionsTab'), { ssr: false });
 const ContentFeedTab = dynamic(() => import('@/components/chat/content-feed/ContentFeedTab'), { ssr: false });
+const ProductsCatalogTab = dynamic(() => import('@/components/chat/ProductsCatalogTab'), { ssr: false });
 import { applyTheme, getGoogleFontsUrl } from '@/lib/theme';
 import { getProxiedImageUrl } from '@/lib/image-utils';
 import { BrandCards } from '@/components/chat/BrandCards';
@@ -127,6 +129,7 @@ const TAB_STYLE: Record<string, { icon: typeof MessageCircle; activeColor: strin
   chat: { icon: MessageCircle, activeColor: '#f1e9fd', activeBg: '#883fe2' },
   discover: { icon: Compass, activeColor: '#f1e9fd', activeBg: '#883fe2' },
   topics: { icon: Sparkles, activeColor: '#f1e9fd', activeBg: '#883fe2' },
+  products: { icon: ShoppingBag, activeColor: '#f1e9fd', activeBg: '#883fe2' },
   content_feed: { icon: Sparkles, activeColor: '#f1e9fd', activeBg: '#883fe2' },
   coupons: { icon: Ticket, activeColor: '#f1e9fd', activeBg: '#883fe2' },
   support: { icon: AlertCircle, activeColor: '#f1e9fd', activeBg: '#883fe2' },
@@ -1900,6 +1903,29 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   onCategoryOpened={() => setInitialDiscoverySlug(null)}
                 />
               </motion.div>
+            ) : activeTab === 'products' ? (
+              <ProductsCatalogTab
+                key="products"
+                accountId={influencer.id}
+                onAskAbout={(question: string) => {
+                  setActiveTab('chat');
+                  maybeShowLeadPopup();
+                  const userMsg = { id: Date.now().toString(), role: 'user' as const, content: question };
+                  setMessages(prev => [...prev, userMsg]);
+                  setIsTyping(true);
+                  const assistantMessageId = (Date.now() + 1).toString();
+                  setStreamingMessageId(assistantMessageId);
+                  setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant' as const, content: '' }]);
+                  setIsTyping(false);
+                  sendStreamMessage({
+                    message: question,
+                    username,
+                    sessionId: sessionId || undefined,
+                    previousResponseId: responseId || undefined,
+                    clientMessageId: assistantMessageId,
+                  });
+                }}
+              />
             ) : activeTab === 'topics' ? (
               <TopicQuestionsTab
                 key="topics"
