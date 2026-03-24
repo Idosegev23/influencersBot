@@ -331,7 +331,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       if (msgId) {
         setMessages(prev => prev.map(m =>
           m.id === msgId
-            ? { ...m, content: error.message || 'אופס, משהו השתבש 😅 נסה לשלוח שוב' }
+            ? { ...m, content: error.message || 'אופס, משהו השתבש. נסה לשלוח שוב' }
             : m
         ));
       }
@@ -718,7 +718,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'אופס, משהו השתבש 😅 נסה לשלוח שוב או לנסח את השאלה אחרת',
+        content: 'אופס, משהו השתבש. נסה לשלוח שוב או לנסח את השאלה אחרת',
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
@@ -1021,8 +1021,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         )}
                       </motion.div>
 
-                      {/* Quick reply pills — editable suggested questions */}
-                      {quickReplies.length > 0 && (
+                      {/* Quick reply pills — only for non-media_news accounts (media_news uses hot topic pills instead) */}
+                      {influencer.influencer_type !== 'media_news' && quickReplies.length > 0 && (
                         <motion.div
                           initial={{ opacity: 0, y: 8 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -2010,7 +2010,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
               const greetingMessage: Message = {
                 id: `lead-greeting-${Date.now()}`,
                 role: 'assistant',
-                content: `היי ${data.firstName}! שמחה שנרשמת 🥰 מעכשיו אני יכולה להתאים לך תוכן אישית. מה תרצה לדעת?`,
+                content: `היי ${data.firstName}! שמחה שנרשמת. מעכשיו אני יכולה להתאים לך תוכן אישית. מה תרצה לדעת?`,
               };
               setMessages((prev) => [...prev, greetingMessage]);
             }}
