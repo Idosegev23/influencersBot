@@ -245,9 +245,9 @@ export function NewsDiscoveryTab({ username, influencerName, onAskInChat }: News
 
   const postsWithImages = timeline.filter(t => t.thumbnailUrl);
   const postsNoImages = timeline.filter(t => !t.thumbnailUrl);
-  const heroPost = postsWithImages[0];
-  const gridPosts = postsWithImages.slice(1, 3);
-  const listPosts = postsWithImages.slice(3);
+  // Split posts into two columns for masonry layout
+  const leftCol = postsWithImages.filter((_, i) => i % 2 === 0);
+  const rightCol = postsWithImages.filter((_, i) => i % 2 === 1);
 
   // Ticker
   const tickerHeadlines = [...breakingTopics, ...hotOnly].slice(0, 8).map(t => ({
@@ -281,49 +281,52 @@ export function NewsDiscoveryTab({ username, influencerName, onAskInChat }: News
           {/* ── Ticker ── */}
           {tickerHeadlines.length > 0 && <NewsTicker headlines={tickerHeadlines} />}
 
-          {/* ── HERO POST ── */}
-          {heroPost && heroPost.thumbnailUrl && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="px-4 pt-4"
-            >
-              <ImageCard
-                thumbnailUrl={heroPost.thumbnailUrl}
-                headline={heroPost.headline}
-                views={heroPost.views}
-                postedAt={heroPost.postedAt}
-                badge={heroTopic ? { label: STATUS_CONFIG[heroTopic.status]?.label || 'LIVE', color: STATUS_CONFIG[heroTopic.status]?.color || '#FF3B30' } : undefined}
-                aspectRatio="4/5"
-                headlineSize="20px"
-                onClick={() => handlePostClick(heroPost)}
-              />
-            </motion.div>
-          )}
-
-          {/* ── TWO-UP GRID ── */}
-          {gridPosts.length > 0 && (
-            <div className="px-4 pt-3 grid grid-cols-2 gap-2.5">
-              {gridPosts.map((item, i) => (
-                item.thumbnailUrl ? (
+          {/* ── MASONRY GRID (2 columns, portrait cards) ── */}
+          {postsWithImages.length > 0 && (
+            <div className="px-3 pt-4 flex gap-2.5">
+              {/* Left column */}
+              <div className="flex-1 flex flex-col gap-2.5">
+                {leftCol.map((item, i) => (
                   <motion.div
                     key={item.id}
-                    initial={{ opacity: 0, y: 8 }}
+                    initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.08 }}
+                    transition={{ delay: i * 0.06 }}
                   >
                     <ImageCard
-                      thumbnailUrl={item.thumbnailUrl}
+                      thumbnailUrl={item.thumbnailUrl!}
+                      headline={item.headline}
+                      views={item.views}
+                      postedAt={item.postedAt}
+                      badge={i === 0 && heroTopic ? { label: STATUS_CONFIG[heroTopic.status]?.label || 'LIVE', color: STATUS_CONFIG[heroTopic.status]?.color || '#FF3B30' } : undefined}
+                      aspectRatio={i === 0 ? '3/5' : '4/5'}
+                      headlineSize={i === 0 ? '16px' : '13px'}
+                      onClick={() => handlePostClick(item)}
+                    />
+                  </motion.div>
+                ))}
+              </div>
+              {/* Right column — offset top for staggered look */}
+              <div className="flex-1 flex flex-col gap-2.5 pt-6">
+                {rightCol.map((item, i) => (
+                  <motion.div
+                    key={item.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.03 + i * 0.06 }}
+                  >
+                    <ImageCard
+                      thumbnailUrl={item.thumbnailUrl!}
                       headline={item.headline}
                       views={item.views}
                       postedAt={item.postedAt}
                       aspectRatio="4/5"
-                      headlineSize="14px"
+                      headlineSize="13px"
                       onClick={() => handlePostClick(item)}
                     />
                   </motion.div>
-                ) : null
-              ))}
+                ))}
+              </div>
             </div>
           )}
 
@@ -401,33 +404,6 @@ export function NewsDiscoveryTab({ username, influencerName, onAskInChat }: News
                     </motion.button>
                   );
                 })}
-              </div>
-            </section>
-          )}
-
-          {/* ── MORE POSTS (list style) ── */}
-          {listPosts.length > 0 && (
-            <section className="px-4 pt-4 pb-1" dir="rtl">
-              <h2 className="text-[16px] font-bold mb-3" style={{ color: '#1C1C1E' }}>
-                עוד מהערוץ
-              </h2>
-              <div className="space-y-2">
-                {listPosts.map((item, i) => (
-                  <motion.div
-                    key={item.id}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 + i * 0.03 }}
-                  >
-                    <ListCard
-                      headline={item.headline}
-                      thumbnailUrl={item.thumbnailUrl}
-                      views={item.views}
-                      postedAt={item.postedAt}
-                      onClick={() => handlePostClick(item)}
-                    />
-                  </motion.div>
-                ))}
               </div>
             </section>
           )}
