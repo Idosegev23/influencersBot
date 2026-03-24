@@ -68,8 +68,8 @@ function ImageCard({
   views,
   postedAt,
   badge,
-  aspectRatio = '4/5',
-  headlineSize = '18px',
+  aspectRatio = '1/1',
+  headlineSize = '12px',
   onClick,
 }: {
   thumbnailUrl: string;
@@ -86,7 +86,7 @@ function ImageCard({
       whileTap={{ scale: 0.97 }}
       onClick={onClick}
       className="w-full relative overflow-hidden text-right"
-      style={{ borderRadius: '20px', aspectRatio }}
+      style={{ borderRadius: '14px', aspectRatio }}
     >
       <img
         src={getProxiedImageUrl(thumbnailUrl)}
@@ -96,12 +96,12 @@ function ImageCard({
       />
       <div
         className="absolute inset-0"
-        style={{ background: 'linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.2) 50%, transparent 65%)' }}
+        style={{ background: 'linear-gradient(0deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.1) 45%, transparent 60%)' }}
       />
       {badge && (
-        <div className="absolute top-3 right-3">
+        <div className="absolute top-2 right-2">
           <span
-            className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg"
+            className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md"
             style={{ background: badge.color, color: '#FFF' }}
           >
             {badge.label}
@@ -109,25 +109,25 @@ function ImageCard({
         </div>
       )}
       {views > 0 && (
-        <div className="absolute top-3 left-3">
+        <div className="absolute top-2 left-2">
           <span
-            className="text-[9px] font-bold px-2 py-1 rounded-lg flex items-center gap-1"
-            style={{ background: 'rgba(0,0,0,0.45)', color: '#FFF', backdropFilter: 'blur(8px)' }}
+            className="text-[8px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5"
+            style={{ background: 'rgba(0,0,0,0.4)', color: '#FFF', backdropFilter: 'blur(6px)' }}
           >
-            <Eye className="w-3 h-3" />
+            <Eye className="w-2.5 h-2.5" />
             {formatViews(views)}
           </span>
         </div>
       )}
-      <div className="absolute bottom-0 left-0 right-0 p-4" dir="rtl">
+      <div className="absolute bottom-0 left-0 right-0 p-2.5" dir="rtl">
         <h3
-          className="font-black leading-[1.2] text-white line-clamp-2"
+          className="font-bold leading-[1.25] text-white line-clamp-2"
           style={{ fontSize: headlineSize }}
         >
           {headline}
         </h3>
-        <p className="text-[11px] mt-1.5 flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.55)' }}>
-          <Clock className="w-3 h-3" />
+        <p className="text-[9px] mt-1 flex items-center gap-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>
+          <Clock className="w-2.5 h-2.5" />
           {timeAgo(postedAt)}
         </p>
       </div>
@@ -281,17 +281,17 @@ export function NewsDiscoveryTab({ username, influencerName, onAskInChat }: News
           {/* ── Ticker ── */}
           {tickerHeadlines.length > 0 && <NewsTicker headlines={tickerHeadlines} />}
 
-          {/* ── MASONRY GRID (2 columns, portrait cards) ── */}
+          {/* ── MASONRY GRID (2 columns, compact cards) ── */}
           {postsWithImages.length > 0 && (
-            <div className="px-3 pt-4 flex gap-2.5">
+            <div className="px-3 pt-3 flex gap-2">
               {/* Left column */}
-              <div className="flex-1 flex flex-col gap-2.5">
+              <div className="flex-1 flex flex-col gap-2">
                 {leftCol.map((item, i) => (
                   <motion.div
                     key={item.id}
-                    initial={{ opacity: 0, y: 10 }}
+                    initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.06 }}
+                    transition={{ delay: i * 0.05 }}
                   >
                     <ImageCard
                       thumbnailUrl={item.thumbnailUrl!}
@@ -299,29 +299,29 @@ export function NewsDiscoveryTab({ username, influencerName, onAskInChat }: News
                       views={item.views}
                       postedAt={item.postedAt}
                       badge={i === 0 && heroTopic ? { label: STATUS_CONFIG[heroTopic.status]?.label || 'LIVE', color: STATUS_CONFIG[heroTopic.status]?.color || '#FF3B30' } : undefined}
-                      aspectRatio={i === 0 ? '3/5' : '4/5'}
-                      headlineSize={i === 0 ? '16px' : '13px'}
+                      aspectRatio={i === 0 ? '4/5' : '1/1'}
+                      headlineSize={i === 0 ? '13px' : '11px'}
                       onClick={() => handlePostClick(item)}
                     />
                   </motion.div>
                 ))}
               </div>
-              {/* Right column — offset top for staggered look */}
-              <div className="flex-1 flex flex-col gap-2.5 pt-6">
+              {/* Right column — offset for staggered look */}
+              <div className="flex-1 flex flex-col gap-2 pt-4">
                 {rightCol.map((item, i) => (
                   <motion.div
                     key={item.id}
-                    initial={{ opacity: 0, y: 10 }}
+                    initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.03 + i * 0.06 }}
+                    transition={{ delay: 0.03 + i * 0.05 }}
                   >
                     <ImageCard
                       thumbnailUrl={item.thumbnailUrl!}
                       headline={item.headline}
                       views={item.views}
                       postedAt={item.postedAt}
-                      aspectRatio="4/5"
-                      headlineSize="13px"
+                      aspectRatio={i === 0 ? '1/1' : '4/5'}
+                      headlineSize="11px"
                       onClick={() => handlePostClick(item)}
                     />
                   </motion.div>
