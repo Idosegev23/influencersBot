@@ -132,10 +132,10 @@ ${(page.page_content || '').substring(0, 3000)}
     // Skip if no name extracted
     if (!data.name || data.name === 'כל המוצרים') return null;
 
-    // Pick best image
+    // Pick best image — image_urls is a Postgres text[] array
     const imageUrl =
+      (Array.isArray(page.image_urls) && page.image_urls.length > 0 ? page.image_urls[0] : null) ||
       page.extracted_data?.images?.[0] ||
-      page.image_urls?.[0] ||
       null;
 
     return {
