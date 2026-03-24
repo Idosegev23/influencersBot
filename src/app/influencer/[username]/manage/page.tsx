@@ -142,7 +142,7 @@ export default function ManagePage({
 
       const infRes = await fetch(`/api/admin/influencers?username=${username}`);
       const infData = await infRes.json();
-      const inf = infData.influencers?.[0];
+      const inf = infData.influencers?.find((i: any) => i.username === username) || infData.influencers?.[0];
       if (!inf) {
         router.push(`/influencer/${username}/login`);
         return;
