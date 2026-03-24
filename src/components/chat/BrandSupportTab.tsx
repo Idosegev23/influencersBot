@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Loader2, Search, ChevronLeft, ArrowRight, X, CheckCircle,
+  Loader2, Search, ChevronLeft, ChevronDown, ArrowRight, X, CheckCircle,
   Package, Truck, RefreshCcw, CreditCard, Tag, MessageCircle,
   ShoppingBag, AlertTriangle, HelpCircle,
 } from 'lucide-react';
@@ -57,6 +57,47 @@ const PROBLEM_TYPES = [
 
 type ProblemTypeId = typeof PROBLEM_TYPES[number]['id'];
 
+const CATEGORY_LABELS: Record<string, string> = {
+  hair_care: 'טיפוח שיער', face_care: 'טיפוח פנים', body_care: 'טיפוח גוף',
+  makeup: 'איפור', fragrance: 'בשמים', skincare: 'טיפוח עור',
+  food: 'אוכל', spices: 'תבלינים', paint: 'צבעים',
+  tools: 'כלים', service: 'שירותים', general: 'כללי', other: 'אחר',
+};
+
+/* ------------------------------------------------------------------ */
+/*  Product Row                                                        */
+/* ------------------------------------------------------------------ */
+
+function ProductRow({ product, onClick }: { product: Product; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="coupon-card w-full">
+      {product.image_url ? (
+        <img src={product.image_url} alt={product.name_he || product.name}
+          className="w-[40px] h-[40px] rounded-xl object-cover flex-shrink-0" />
+      ) : (
+        <div className="w-[40px] h-[40px] rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg, #f3f4f6, #e5e7eb)' }}>
+          <ShoppingBag className="w-4 h-4" style={{ color: '#9ca3af' }} />
+        </div>
+      )}
+      <div className="flex-1 min-w-0 text-right">
+        <p className="font-semibold truncate" style={{ fontSize: '14px', color: '#1a1a2e' }}>
+          {product.name_he || product.name}
+        </p>
+        {product.product_line && (
+          <p className="text-[11px] truncate" style={{ color: '#999' }}>{product.product_line}</p>
+        )}
+      </div>
+      {product.price != null && (
+        <span className="text-[13px] font-semibold flex-shrink-0" style={{ color: 'var(--color-primary, #7c3aed)' }}>
+          ₪{product.price}
+        </span>
+      )}
+      <ChevronLeft className="w-4 h-4 flex-shrink-0" style={{ color: '#ccc' }} />
+    </button>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Main Component                                                     */
 /* ------------------------------------------------------------------ */
@@ -68,6 +109,7 @@ export default function BrandSupportTab({
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
 
   // Selected state
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -104,6 +146,19 @@ export default function BrandSupportTab({
       (p.product_line || '').toLowerCase().includes(q)
     );
   }, [products, searchQuery]);
+
+  // Group products by category for accordion view
+  const groupedByCategory = useMemo(() => {
+    const map = new Map<string, Product[]>();
+    for (const p of filtered) {
+      const cat = p.category || 'other';
+      if (!map.has(cat)) map.set(cat, []);
+      map.get(cat)!.push(p);
+    }
+    return [...map.entries()].sort((a, b) => b[1].length - a[1].length);
+  }, [filtered]);
+
+  const useCategories = products.length > 15 && !searchQuery;
 
   // Visible problem types — show 'coupon' only if there are coupons
   const visibleTypes = useMemo(() => {
@@ -174,6 +229,7 @@ export default function BrandSupportTab({
     setForm({ name: '', phone: '', order: '', details: '' });
     setError(null);
     setSearchQuery('');
+    setExpandedCategory(null);
   };
 
   const goBack = () => {
@@ -239,45 +295,64 @@ export default function BrandSupportTab({
                   <ChevronLeft className="w-5 h-5 flex-shrink-0" style={{ color: '#ccc' }} />
                 </button>
 
-                {/* Product list */}
-                <div className={`flex flex-col gap-2 ${isMobile ? '' : ''}`}>
-                  {filtered.map(product => (
-                    <button
-                      key={product.id}
-                      onClick={() => { setSelectedProduct(product); setStep('type'); }}
-                      className="coupon-card w-full"
-                    >
-                      {product.image_url ? (
-                        <img
-                          src={product.image_url}
-                          alt={product.name_he || product.name}
-                          className="w-[44px] h-[44px] rounded-xl object-cover flex-shrink-0"
-                        />
-                      ) : (
-                        <div className="w-[44px] h-[44px] rounded-xl flex items-center justify-center flex-shrink-0"
-                          style={{ background: 'linear-gradient(135deg, #f3f4f6, #e5e7eb)' }}>
-                          <ShoppingBag className="w-5 h-5" style={{ color: '#9ca3af' }} />
+                {/* Product list — flat if few, category accordion if many */}
+                {useCategories ? (
+                  /* ---- Category accordion ---- */
+                  <div className="flex flex-col gap-2">
+                    {groupedByCategory.map(([cat, items]) => {
+                      const isOpen = expandedCategory === cat;
+                      return (
+                        <div key={cat}>
+                          <button
+                            onClick={() => setExpandedCategory(isOpen ? null : cat)}
+                            className="coupon-card w-full"
+                          >
+                            <div className="w-[44px] h-[44px] rounded-xl flex items-center justify-center flex-shrink-0"
+                              style={{ background: 'linear-gradient(135deg, #f3f4f6, #e5e7eb)' }}>
+                              <Package className="w-5 h-5" style={{ color: '#7c3aed' }} />
+                            </div>
+                            <div className="flex-1 min-w-0 text-right">
+                              <p className="font-semibold" style={{ fontSize: '15px', color: '#1a1a2e' }}>
+                                {CATEGORY_LABELS[cat] || cat.replace(/_/g, ' ')}
+                              </p>
+                              <p className="text-[12px]" style={{ color: '#999' }}>{items.length} מוצרים</p>
+                            </div>
+                            <ChevronDown
+                              className="w-4 h-4 flex-shrink-0 transition-transform"
+                              style={{ color: '#ccc', transform: isOpen ? 'rotate(180deg)' : 'none' }}
+                            />
+                          </button>
+                          <AnimatePresence>
+                            {isOpen && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.2 }}
+                                className="overflow-hidden"
+                              >
+                                <div className="flex flex-col gap-1.5 pr-4 mt-1.5 mb-2">
+                                  {items.map(product => (
+                                    <ProductRow key={product.id} product={product}
+                                      onClick={() => { setSelectedProduct(product); setStep('type'); }} />
+                                  ))}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </div>
-                      )}
-                      <div className="flex-1 min-w-0 text-right">
-                        <p className="font-semibold truncate" style={{ fontSize: '15px', color: '#1a1a2e' }}>
-                          {product.name_he || product.name}
-                        </p>
-                        {product.product_line && (
-                          <p className="text-[12px] truncate" style={{ color: '#999' }}>
-                            {product.product_line}
-                          </p>
-                        )}
-                      </div>
-                      {product.price != null && (
-                        <span className="text-[13px] font-semibold flex-shrink-0" style={{ color: 'var(--color-primary, #7c3aed)' }}>
-                          ₪{product.price}
-                        </span>
-                      )}
-                      <ChevronLeft className="w-4 h-4 flex-shrink-0" style={{ color: '#ccc' }} />
-                    </button>
-                  ))}
-                </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  /* ---- Flat list (few products or searching) ---- */
+                  <div className="flex flex-col gap-2">
+                    {filtered.map(product => (
+                      <ProductRow key={product.id} product={product}
+                        onClick={() => { setSelectedProduct(product); setStep('type'); }} />
+                    ))}
+                  </div>
+                )}
 
                 {filtered.length === 0 && searchQuery && (
                   <p className="text-center text-sm mt-6" style={{ color: '#999' }}>לא נמצאו מוצרים</p>
