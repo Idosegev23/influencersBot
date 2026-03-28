@@ -248,7 +248,7 @@ export default function InfluencerDashboardPage({
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [leads, setLeads] = useState<any[]>([]);
-  const [leadsLoading, setLeadsLoading] = useState(false);
+  const [activeView, setActiveView] = useState<'dashboard' | 'leads'>('dashboard');
 
   useEffect(() => {
     async function load() {
@@ -372,8 +372,130 @@ export default function InfluencerDashboardPage({
       </div>
 
 
+      {/* ── Tab bar (only if leads exist) ── */}
+      {leads.length > 0 && (
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 mt-3">
+          <div className="flex gap-1 p-1 rounded-2xl" style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-glass-border)' }}>
+            {[
+              { id: 'dashboard' as const, label: 'דשבורד', icon: '📊' },
+              { id: 'leads' as const, label: `לידים (${leads.length})`, icon: '👥' },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveView(tab.id)}
+                className="flex-1 py-2 px-4 rounded-xl text-sm font-semibold transition-all duration-200"
+                style={{
+                  background: activeView === tab.id ? 'var(--dash-bg)' : 'transparent',
+                  color: activeView === tab.id ? 'var(--dash-text)' : 'var(--dash-text-3)',
+                  boxShadow: activeView === tab.id ? 'var(--dash-card-shadow)' : 'none',
+                }}
+              >
+                {tab.icon} {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-5 space-y-5">
 
+      {activeView === 'leads' && leads.length > 0 ? (
+        /* ── Leads View ── */
+        <div className="space-y-3">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-lg font-bold" style={{ color: 'var(--dash-text)' }}>לידים ובריפים</h2>
+          </div>
+          {leads.map((lead: any) => {
+            const statusConfig: Record<string, { label: string; color: string }> = {
+              new: { label: 'חדש', color: '#9334EB' },
+              contacted: { label: 'יצרנו קשר', color: '#2663EB' },
+              in_progress: { label: 'בטיפול', color: '#EA580C' },
+              closed: { label: 'נסגר', color: '#16A34A' },
+              archived: { label: 'ארכיון', color: '#6b7280' },
+            };
+            const st = statusConfig[lead.status] || statusConfig.new;
+            const date = new Date(lead.created_at).toLocaleDateString('he-IL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+            return (
+              <Section key={lead.id}>
+                <div className="p-4 sm:p-5">
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-bold text-sm" style={{ color: 'var(--dash-text)' }}>{lead.full_name}</span>
+                        <span
+                          className="px-2 py-0.5 rounded-full text-[11px] font-bold"
+                          style={{ color: st.color, background: `${st.color}18` }}
+                        >
+                          {st.label}
+                        </span>
+                      </div>
+                      {lead.business_name && (
+                        <p className="text-xs" style={{ color: 'var(--dash-text-2)' }}>{lead.business_name}</p>
+                      )}
+                      <p className="text-sm font-medium mt-1" style={{ color: 'var(--color-primary, #9334EB)' }}>{lead.service_name}</p>
+
+                      <div className="flex flex-wrap gap-3 mt-2 text-xs" style={{ color: 'var(--dash-text-3)' }}>
+                        {lead.email && (
+                          <a href={`mailto:${lead.email}`} className="hover:underline">✉ {lead.email}</a>
+                        )}
+                        {lead.phone && (
+                          <a href={`tel:${lead.phone}`} className="hover:underline">📞 {lead.phone}</a>
+                        )}
+                      </div>
+
+                      <div className="mt-3 space-y-1 text-xs" style={{ color: 'var(--dash-text-3)' }}>
+                        {lead.goal && <p><strong>מטרה:</strong> {lead.goal}</p>}
+                        {lead.budget_range && <p><strong>תקציב:</strong> {lead.budget_range}</p>}
+                        {lead.product_description && <p><strong>תיאור:</strong> {lead.product_description}</p>}
+                        {lead.notes && <p><strong>הערות:</strong> {lead.notes}</p>}
+                      </div>
+                    </div>
+
+                    <div className="flex sm:flex-col items-center sm:items-end gap-2 flex-shrink-0">
+                      <span className="text-[11px]" style={{ color: 'var(--dash-text-3)' }}>{date}</span>
+                      <select
+                        value={lead.status}
+                        onChange={async (e) => {
+                          const newStatus = e.target.value;
+                          try {
+                            await fetch('/api/briefs', {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ briefId: lead.id, status: newStatus }),
+                            });
+                            setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: newStatus } : l));
+                          } catch {}
+                        }}
+                        className="text-xs rounded-xl px-2.5 py-1 focus:outline-none"
+                        style={{ background: 'var(--dash-surface)', color: 'var(--dash-text-2)', border: '1px solid var(--dash-glass-border)' }}
+                      >
+                        <option value="new">חדש</option>
+                        <option value="contacted">יצרנו קשר</option>
+                        <option value="in_progress">בטיפול</option>
+                        <option value="closed">נסגר</option>
+                        <option value="archived">ארכיון</option>
+                      </select>
+                      {lead.drive_file_url && (
+                        <a
+                          href={lead.drive_file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs hover:underline"
+                          style={{ color: 'var(--color-primary, #2663EB)' }}
+                        >
+                          📄 צפה ב-Drive
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </Section>
+            );
+          })}
+        </div>
+      ) : (
+        <>
         {/* ── Metrics strip ── */}
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 stagger-children">
           {[
@@ -661,97 +783,8 @@ export default function InfluencerDashboardPage({
             </Section>
           </div>
         </div>
-        {/* Leads Section — only shows if there are leads */}
-        {leads.length > 0 && (
-          <div className="mt-6">
-            <Section>
-              <div className="px-5 pt-5 pb-3 flex items-center justify-between">
-                <div>
-                  <h2 className="text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>לידים ובריפים</h2>
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--dash-text-3)' }}>{leads.length} לידים</p>
-                </div>
-              </div>
-              <div className="px-5 pb-5 space-y-2">
-                {leads.slice(0, 10).map((lead: any) => {
-                  const statusConfig: Record<string, { label: string; color: string }> = {
-                    new: { label: 'חדש', color: '#9334EB' },
-                    contacted: { label: 'יצרנו קשר', color: '#2663EB' },
-                    in_progress: { label: 'בטיפול', color: '#EA580C' },
-                    closed: { label: 'נסגר', color: '#16A34A' },
-                    archived: { label: 'ארכיון', color: '#6b7280' },
-                  };
-                  const st = statusConfig[lead.status] || statusConfig.new;
-                  const date = new Date(lead.created_at).toLocaleDateString('he-IL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-
-                  return (
-                    <div
-                      key={lead.id}
-                      className="p-3 rounded-xl transition-all"
-                      style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-glass-border)' }}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 mb-0.5">
-                            <span className="font-semibold text-sm" style={{ color: 'var(--dash-text)' }}>{lead.full_name}</span>
-                            <span
-                              className="px-1.5 py-0.5 rounded-full text-[10px] font-bold"
-                              style={{ color: st.color, background: `${st.color}18` }}
-                            >
-                              {st.label}
-                            </span>
-                          </div>
-                          <p className="text-xs font-medium" style={{ color: 'var(--color-primary, #9334EB)' }}>{lead.service_name}</p>
-                          <div className="flex flex-wrap gap-2 mt-1 text-[11px]" style={{ color: 'var(--dash-text-3)' }}>
-                            {lead.email && <span>{lead.email}</span>}
-                            {lead.phone && <span>{lead.phone}</span>}
-                            {lead.goal && <span>• {lead.goal}</span>}
-                            {lead.budget_range && <span>• {lead.budget_range}</span>}
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                          <span className="text-[10px]" style={{ color: 'var(--dash-text-3)' }}>{date}</span>
-                          <select
-                            value={lead.status}
-                            onChange={async (e) => {
-                              const newStatus = e.target.value;
-                              try {
-                                await fetch('/api/briefs', {
-                                  method: 'PATCH',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ briefId: lead.id, status: newStatus }),
-                                });
-                                setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: newStatus } : l));
-                              } catch {}
-                            }}
-                            className="text-[11px] rounded-lg px-1.5 py-0.5 focus:outline-none"
-                            style={{ background: 'var(--dash-bg)', color: 'var(--dash-text-2)', border: '1px solid var(--dash-glass-border)' }}
-                          >
-                            <option value="new">חדש</option>
-                            <option value="contacted">יצרנו קשר</option>
-                            <option value="in_progress">בטיפול</option>
-                            <option value="closed">נסגר</option>
-                            <option value="archived">ארכיון</option>
-                          </select>
-                          {lead.drive_file_url && (
-                            <a
-                              href={lead.drive_file_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[11px] hover:underline"
-                              style={{ color: 'var(--color-primary, #2663EB)' }}
-                            >
-                              צפה ב-Drive
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </Section>
-          </div>
-        )}
+        </>
+      )}
       </main>
     </div>
   );
