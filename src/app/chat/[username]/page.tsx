@@ -41,6 +41,7 @@ const TopicQuestionsTab = dynamic(() => import('@/components/chat/TopicQuestions
 const ContentFeedTab = dynamic(() => import('@/components/chat/content-feed/ContentFeedTab'), { ssr: false });
 const ProductsCatalogTab = dynamic(() => import('@/components/chat/ProductsCatalogTab'), { ssr: false });
 const BrandSupportTab = dynamic(() => import('@/components/chat/BrandSupportTab'), { ssr: false });
+const ServicesCatalogTab = dynamic(() => import('@/components/chat/ServicesCatalogTab'), { ssr: false });
 import { applyTheme, getGoogleFontsUrl } from '@/lib/theme';
 import { getProxiedImageUrl } from '@/lib/image-utils';
 import { BrandCards } from '@/components/chat/BrandCards';
@@ -1950,29 +1951,59 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 }}
               />
             ) : activeTab === 'topics' ? (
-              <TopicQuestionsTab
-                key="topics"
-                username={username}
-                tabLabel={(influencer.tabs || DEFAULT_TABS).find((t: { id: string }) => t.id === 'topics')?.label || 'תוכן'}
-                onAskAbout={(question: string) => {
-                  setActiveTab('chat');
-                  maybeShowLeadPopup();
-                  const userMsg = { id: Date.now().toString(), role: 'user' as const, content: question };
-                  setMessages(prev => [...prev, userMsg]);
-                  setIsTyping(true);
-                  const assistantMessageId = (Date.now() + 1).toString();
-                  setStreamingMessageId(assistantMessageId);
-                  setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant' as const, content: '' }]);
-                  setIsTyping(false);
-                  sendStreamMessage({
-                    message: question,
-                    username,
-                    sessionId: sessionId || undefined,
-                    previousResponseId: responseId || undefined,
-                    clientMessageId: assistantMessageId,
-                  });
-                }}
-              />
+              (influencer as any).archetype === 'service_provider' ? (
+                <ServicesCatalogTab
+                  key="services"
+                  accountId={influencer.id}
+                  sessionId={sessionId}
+                  enableBrief={!!(influencer as any).features?.services_tab}
+                  onAskAbout={(question: string, hiddenContext?: string) => {
+                    setActiveTab('chat');
+                    maybeShowLeadPopup();
+                    const userMsg = { id: Date.now().toString(), role: 'user' as const, content: question };
+                    setMessages(prev => [...prev, userMsg]);
+                    setIsTyping(true);
+                    const assistantMessageId = (Date.now() + 1).toString();
+                    setStreamingMessageId(assistantMessageId);
+                    setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant' as const, content: '' }]);
+                    setIsTyping(false);
+                    const apiMessage = hiddenContext
+                      ? `${question}\n\n${hiddenContext}`
+                      : question;
+                    sendStreamMessage({
+                      message: apiMessage,
+                      username,
+                      sessionId: sessionId || undefined,
+                      previousResponseId: responseId || undefined,
+                      clientMessageId: assistantMessageId,
+                    });
+                  }}
+                />
+              ) : (
+                <TopicQuestionsTab
+                  key="topics"
+                  username={username}
+                  tabLabel={(influencer.tabs || DEFAULT_TABS).find((t: { id: string }) => t.id === 'topics')?.label || 'תוכן'}
+                  onAskAbout={(question: string) => {
+                    setActiveTab('chat');
+                    maybeShowLeadPopup();
+                    const userMsg = { id: Date.now().toString(), role: 'user' as const, content: question };
+                    setMessages(prev => [...prev, userMsg]);
+                    setIsTyping(true);
+                    const assistantMessageId = (Date.now() + 1).toString();
+                    setStreamingMessageId(assistantMessageId);
+                    setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant' as const, content: '' }]);
+                    setIsTyping(false);
+                    sendStreamMessage({
+                      message: question,
+                      username,
+                      sessionId: sessionId || undefined,
+                      previousResponseId: responseId || undefined,
+                      clientMessageId: assistantMessageId,
+                    });
+                  }}
+                />
+              )
             ) : activeTab === 'content_feed' ? (
               <ContentFeedTab
                 key="content_feed"

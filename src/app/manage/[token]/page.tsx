@@ -55,7 +55,7 @@ export default function ManagePage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const token = params.token as string;
-  const tabParam = searchParams.get('tab') as 'instructions' | 'faq' | 'pages' | 'knowledge' | 'products' | 'design' | null;
+  const tabParam = searchParams.get('tab') as 'instructions' | 'faq' | 'pages' | 'knowledge' | 'products' | 'design' | 'leads' | null;
 
   // Auth state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -63,9 +63,10 @@ export default function ManagePage() {
   const [accountId, setAccountId] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [domain, setDomain] = useState('');
+  const [hasLeads, setHasLeads] = useState(false);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'instructions' | 'faq' | 'pages' | 'knowledge' | 'products' | 'design'>(tabParam || 'instructions');
+  const [activeTab, setActiveTab] = useState<'instructions' | 'faq' | 'pages' | 'knowledge' | 'products' | 'design' | 'leads'>(tabParam || 'instructions');
 
   // Settings state
   const [settings, setSettings] = useState<WidgetSettings>({});
@@ -104,6 +105,10 @@ export default function ManagePage() {
   const [productsLoading, setProductsLoading] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [extractResult, setExtractResult] = useState<any>(null);
+
+  // Leads state
+  const [leads, setLeads] = useState<any[]>([]);
+  const [leadsLoading, setLeadsLoading] = useState(false);
 
   // Design state
   const [welcomeMessage, setWelcomeMessage] = useState('');
@@ -368,6 +373,34 @@ export default function ManagePage() {
     }
   };
 
+  const loadLeads = async () => {
+    if (!accountId) return;
+    setLeadsLoading(true);
+    try {
+      const res = await fetch(`/api/briefs?accountId=${accountId}`);
+      const data = await res.json();
+      setLeads(data.briefs || []);
+      if ((data.briefs || []).length > 0) setHasLeads(true);
+    } catch (err) {
+      console.error('Failed to load leads:', err);
+    } finally {
+      setLeadsLoading(false);
+    }
+  };
+
+  const updateLeadStatus = async (briefId: string, status: string) => {
+    try {
+      await fetch('/api/briefs', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ briefId, status }),
+      });
+      setLeads(prev => prev.map(l => l.id === briefId ? { ...l, status } : l));
+    } catch (err) {
+      console.error('Failed to update lead status:', err);
+    }
+  };
+
   const extractProducts = async () => {
     setExtracting(true);
     setExtractResult(null);
@@ -426,7 +459,17 @@ export default function ManagePage() {
     if (activeTab === 'pages' && pages.length === 0) loadPages();
     if (activeTab === 'knowledge' && knowledge.length === 0) loadKnowledge();
     if (activeTab === 'products' && products.length === 0) loadProducts();
+    if (activeTab === 'leads' && leads.length === 0) loadLeads();
   }, [activeTab, isAuthenticated]);
+
+  // Check for leads on mount (to show/hide leads tab)
+  useEffect(() => {
+    if (!accountId) return;
+    fetch(`/api/briefs?accountId=${accountId}`)
+      .then(r => r.json())
+      .then(d => { if ((d.briefs || []).length > 0) { setHasLeads(true); setLeads(d.briefs); } })
+      .catch(() => {});
+  }, [accountId]);
 
   // ============================================
   // Render
@@ -464,6 +507,7 @@ export default function ManagePage() {
     { id: 'knowledge' as const, label: 'ידע נוסף', icon: 'menu_book' },
     { id: 'products' as const, label: 'מוצרים', icon: 'shopping_bag' },
     { id: 'design' as const, label: 'הגדרות ווידג\'ט', icon: 'palette' },
+    ...(hasLeads ? [{ id: 'leads' as const, label: 'לידים', icon: 'group_add' }] : []),
   ];
 
   const customShadow = { boxShadow: '0 20px 40px rgba(71, 71, 71, 0.06)' };
@@ -1268,6 +1312,127 @@ export default function ManagePage() {
                   {saving ? 'שומר...' : 'שמור הגדרות'}
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Tab 7: Leads */}
+          {activeTab === 'leads' && (
+            <div>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6 sm:mb-8">
+                <div>
+                  <h1 className="text-2xl sm:text-4xl font-extrabold text-[#1e1b15] font-headline">לידים ובריפים</h1>
+                  <p className="text-[#655e51] mt-2">{leads.length} לידים נכנסו דרך הצ&apos;אט</p>
+                </div>
+                <button
+                  onClick={loadLeads}
+                  disabled={leadsLoading}
+                  className="px-4 py-2 rounded-full text-sm font-medium border border-[#c6c6c6] text-[#655e51] hover:bg-white transition-colors disabled:opacity-50 self-start"
+                >
+                  <span className="material-symbols-outlined align-middle text-[16px] mr-1">refresh</span>
+                  רענן
+                </button>
+              </div>
+
+              {leadsLoading ? (
+                <div className="flex justify-center py-16">
+                  <div className="w-8 h-8 border-2 border-[#006c4e] border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : leads.length === 0 ? (
+                <div className="bg-white rounded-xl p-12 text-center" style={customShadow}>
+                  <span className="material-symbols-outlined text-[48px] text-[#c6c6c6] mb-3 block">group_add</span>
+                  <p className="text-[#655e51]">עדיין אין לידים. ברגע שמישהו ימלא בריף בצ&apos;אט — הוא יופיע כאן.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {leads.map((lead: any) => {
+                    const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
+                      new: { label: 'חדש', color: '#9334EB', bg: 'rgba(147, 52, 235, 0.1)' },
+                      contacted: { label: 'יצרנו קשר', color: '#2663EB', bg: 'rgba(38, 99, 235, 0.1)' },
+                      in_progress: { label: 'בטיפול', color: '#EA580C', bg: 'rgba(234, 88, 12, 0.1)' },
+                      closed: { label: 'נסגר', color: '#16A34A', bg: 'rgba(22, 163, 74, 0.1)' },
+                      archived: { label: 'ארכיון', color: '#6b7280', bg: 'rgba(107, 114, 128, 0.1)' },
+                    };
+                    const st = statusConfig[lead.status] || statusConfig.new;
+                    const date = new Date(lead.created_at).toLocaleDateString('he-IL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+                    return (
+                      <div key={lead.id} className="bg-white rounded-xl p-4 sm:p-6 transition-all hover:shadow-md" style={customShadow}>
+                        <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+                          {/* Lead info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-bold text-[#1e1b15]">{lead.full_name}</span>
+                              <span
+                                className="px-2 py-0.5 rounded-full text-[11px] font-bold"
+                                style={{ color: st.color, background: st.bg }}
+                              >
+                                {st.label}
+                              </span>
+                            </div>
+                            {lead.business_name && (
+                              <p className="text-sm text-[#655e51]">{lead.business_name}</p>
+                            )}
+                            <p className="text-sm font-medium mt-1" style={{ color: '#9334EB' }}>
+                              {lead.service_name}
+                            </p>
+
+                            {/* Contact info */}
+                            <div className="flex flex-wrap gap-3 mt-2 text-xs text-[#655e51]">
+                              {lead.email && (
+                                <a href={`mailto:${lead.email}`} className="flex items-center gap-1 hover:text-[#006c4e]">
+                                  <span className="material-symbols-outlined text-[14px]">mail</span>
+                                  {lead.email}
+                                </a>
+                              )}
+                              {lead.phone && (
+                                <a href={`tel:${lead.phone}`} className="flex items-center gap-1 hover:text-[#006c4e]">
+                                  <span className="material-symbols-outlined text-[14px]">phone</span>
+                                  {lead.phone}
+                                </a>
+                              )}
+                            </div>
+
+                            {/* Brief details */}
+                            <div className="mt-3 space-y-1 text-xs text-[#655e51]">
+                              {lead.goal && <p><strong>מטרה:</strong> {lead.goal}</p>}
+                              {lead.budget_range && <p><strong>תקציב:</strong> {lead.budget_range}</p>}
+                              {lead.product_description && <p><strong>תיאור:</strong> {lead.product_description}</p>}
+                              {lead.notes && <p><strong>הערות:</strong> {lead.notes}</p>}
+                            </div>
+                          </div>
+
+                          {/* Right side: date + actions */}
+                          <div className="flex sm:flex-col items-center sm:items-end gap-2">
+                            <span className="text-[11px] text-[#9ca3af]">{date}</span>
+                            <select
+                              value={lead.status}
+                              onChange={(e) => updateLeadStatus(lead.id, e.target.value)}
+                              className="text-xs border border-[#e5e7eb] rounded-lg px-2 py-1 bg-white text-[#374151] focus:outline-none focus:ring-1 focus:ring-[#9334EB]"
+                            >
+                              <option value="new">חדש</option>
+                              <option value="contacted">יצרנו קשר</option>
+                              <option value="in_progress">בטיפול</option>
+                              <option value="closed">נסגר</option>
+                              <option value="archived">ארכיון</option>
+                            </select>
+                            {lead.drive_file_url && (
+                              <a
+                                href={lead.drive_file_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs flex items-center gap-1 text-[#2663EB] hover:underline"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">description</span>
+                                Drive
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </main>
