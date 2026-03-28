@@ -82,24 +82,26 @@ export default function InfluencersListPage() {
   return (
     <>
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-[#9334EB]/10 border border-[#9334EB]/20 flex items-center justify-center">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-[#9334EB]/10 border border-[#9334EB]/20 flex items-center justify-center flex-shrink-0">
             <span className="material-symbols-outlined text-[#9334EB]">group</span>
           </div>
           <div>
-            <h1 className="text-2xl font-bold font-headline text-[#1f2937]">משפיעניות</h1>
+            <h1 className="text-xl sm:text-2xl font-bold font-headline text-[#1f2937]">משפיעניות</h1>
             <p className="text-sm text-[#d1d5db]">{influencers.length} משפיעניות במערכת</p>
           </div>
         </div>
 
         <div className="flex gap-2">
-          <Link href="/admin/add" className="neon-pill neon-pill-primary flex items-center gap-1.5">
+          <Link href="/admin/add" className="neon-pill neon-pill-primary flex items-center gap-1.5 text-sm">
             <span className="material-symbols-outlined text-[18px]">person_add</span>
-            הוספת חשבון
+            <span className="hidden sm:inline">הוספת חשבון</span>
+            <span className="sm:hidden">הוסף</span>
           </Link>
-          <Link href="/admin/dashboard" className="neon-pill neon-pill-ghost">
-            חזרה לדאשבורד
+          <Link href="/admin/dashboard" className="neon-pill neon-pill-ghost text-sm">
+            <span className="hidden sm:inline">חזרה לדאשבורד</span>
+            <span className="sm:hidden">דאשבורד</span>
           </Link>
         </div>
       </div>
@@ -117,127 +119,159 @@ export default function InfluencersListPage() {
       </div>
 
       {/* Stat summary */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <div className="neon-stat-card">
-          <div className="text-xs text-[#4b5563] mb-1">סה״כ משפיענים</div>
-          <div className="text-2xl font-bold text-[#1f2937]">{influencers.length}</div>
+      <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-8">
+        <div className="neon-stat-card p-3 sm:p-4">
+          <div className="text-[10px] sm:text-xs text-[#4b5563] mb-1">סה״כ משפיענים</div>
+          <div className="text-lg sm:text-2xl font-bold text-[#1f2937]">{influencers.length}</div>
         </div>
-        <div className="neon-stat-card">
-          <div className="text-xs text-[#4b5563] mb-1">IG מחוברים</div>
-          <div className="text-2xl font-bold text-[#1f2937]">
+        <div className="neon-stat-card p-3 sm:p-4">
+          <div className="text-[10px] sm:text-xs text-[#4b5563] mb-1">IG מחוברים</div>
+          <div className="text-lg sm:text-2xl font-bold text-[#1f2937]">
             {influencers.filter(i => i.igConnection && !i.igConnection.tokenExpired).length}
           </div>
         </div>
-        <div className="neon-stat-card">
-          <div className="text-xs text-[#4b5563] mb-1">פרסונה פעילה</div>
-          <div className="text-2xl font-bold text-[#1f2937]">
+        <div className="neon-stat-card p-3 sm:p-4">
+          <div className="text-[10px] sm:text-xs text-[#4b5563] mb-1">פרסונה פעילה</div>
+          <div className="text-lg sm:text-2xl font-bold text-[#1f2937]">
             {influencers.filter(i => i.stats.hasGemini).length}
           </div>
         </div>
       </div>
 
-      {/* Influencers List — horizontal card rows */}
+      {/* Influencers List */}
       <div className="flex flex-col gap-3">
         {filteredInfluencers.map((inf) => (
           <div
             key={inf.id}
-            className="neon-card px-6 py-4 flex items-center gap-5 cursor-pointer transition-all"
+            className="neon-card px-4 sm:px-6 py-4 cursor-pointer transition-all"
             onClick={() => router.push(`/admin/influencers/${inf.id}`)}
           >
-            {/* Avatar placeholder */}
-            <div className="w-12 h-12 rounded-full bg-[#2663EB]/15 border border-[#2663EB]/25 flex items-center justify-center flex-shrink-0">
-              <span className="material-symbols-outlined text-[#2663EB] text-[24px]">person</span>
+            {/* Top row: avatar + name + badges */}
+            <div className="flex items-center gap-3 sm:gap-5">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[#2663EB]/15 border border-[#2663EB]/25 flex items-center justify-center flex-shrink-0">
+                <span className="material-symbols-outlined text-[#2663EB] text-[20px] sm:text-[24px]">person</span>
+              </div>
+
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className="text-sm font-bold text-[#1f2937] truncate">{inf.displayName}</span>
+                <span className="text-xs text-[#d1d5db]">@{inf.username}</span>
+              </div>
+
+              {/* Badges - show inline on desktop, wrap on mobile */}
+              <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
+                {inf.igConnection ? (
+                  inf.igConnection.tokenExpired ? (
+                    <span className="neon-status-expired inline-flex items-center gap-1 text-xs">
+                      <span className="material-symbols-outlined text-[14px]">warning</span>
+                      טוקן פג
+                    </span>
+                  ) : (
+                    <span className="neon-status-connected inline-flex items-center gap-1 text-xs">
+                      <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                      IG מחובר
+                    </span>
+                  )
+                ) : (
+                  <span className="neon-status-disconnected inline-flex items-center gap-1 text-xs">
+                    <span className="material-symbols-outlined text-[14px]">link_off</span>
+                    לא מחובר
+                  </span>
+                )}
+
+                <span className="neon-pill neon-pill-secondary text-xs">
+                  {getTypeBadge(inf.type)}
+                </span>
+
+                {inf.stats.hasGemini ? (
+                  <span className="text-[#9334EB] flex items-center gap-1 text-xs">
+                    <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                    פרסונה
+                  </span>
+                ) : (
+                  <span className="text-[#d1d5db] flex items-center gap-1 text-xs">
+                    <span className="material-symbols-outlined text-[16px]">pending</span>
+                    חסר
+                  </span>
+                )}
+              </div>
+
+              {/* Stats - desktop only inline */}
+              <div className="hidden md:flex items-center gap-4 text-xs text-[#4b5563] mr-auto">
+                <span className="flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[16px]">article</span>
+                  {inf.stats.posts}
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[16px]">mic</span>
+                  {inf.stats.transcriptions}
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[16px]">local_offer</span>
+                  {inf.stats.coupons}
+                </span>
+              </div>
+
+              {/* Action buttons - desktop */}
+              <div className="hidden sm:flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                <Link
+                  href={`/chat/${inf.username}`}
+                  className="neon-action-btn"
+                  title="צפייה בצ׳אט"
+                >
+                  <span className="material-symbols-outlined text-[18px]">visibility</span>
+                </Link>
+                <button
+                  onClick={() => copyIgLink(inf.id)}
+                  className="neon-action-btn"
+                  title="העתק קישור IG"
+                >
+                  <span className="material-symbols-outlined text-[18px]">
+                    {copiedLinkId === inf.id ? 'check' : 'link'}
+                  </span>
+                </button>
+                <Link
+                  href={`/admin/chatbot-persona/${inf.id}`}
+                  className="neon-action-btn"
+                  title="הגדרות"
+                >
+                  <span className="material-symbols-outlined text-[18px]">settings</span>
+                </Link>
+              </div>
             </div>
 
-            {/* Name + username */}
-            <div className="flex flex-col min-w-[160px]">
-              <span className="text-sm font-bold text-[#1f2937]">{inf.displayName}</span>
-              <span className="text-xs text-[#d1d5db]">@{inf.username}</span>
-            </div>
-
-            {/* IG connection status badge */}
-            <div className="flex-shrink-0">
+            {/* Mobile-only: badges + stats row */}
+            <div className="flex flex-wrap items-center gap-2 mt-3 sm:hidden">
               {inf.igConnection ? (
                 inf.igConnection.tokenExpired ? (
-                  <span className="neon-status-expired inline-flex items-center gap-1 text-xs">
-                    <span className="material-symbols-outlined text-[14px]">warning</span>
+                  <span className="neon-status-expired inline-flex items-center gap-1 text-[11px]">
+                    <span className="material-symbols-outlined text-[12px]">warning</span>
                     טוקן פג
                   </span>
                 ) : (
-                  <span className="neon-status-connected inline-flex items-center gap-1 text-xs">
-                    <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                    IG מחובר
+                  <span className="neon-status-connected inline-flex items-center gap-1 text-[11px]">
+                    <span className="material-symbols-outlined text-[12px]">check_circle</span>
+                    IG
                   </span>
                 )
               ) : (
-                <span className="neon-status-disconnected inline-flex items-center gap-1 text-xs">
-                  <span className="material-symbols-outlined text-[14px]">link_off</span>
+                <span className="neon-status-disconnected inline-flex items-center gap-1 text-[11px]">
+                  <span className="material-symbols-outlined text-[12px]">link_off</span>
                   לא מחובר
                 </span>
               )}
-            </div>
 
-            {/* Type badge */}
-            <span className="neon-pill neon-pill-secondary text-xs flex-shrink-0">
-              {getTypeBadge(inf.type)}
-            </span>
+              <span className="neon-pill neon-pill-secondary text-[11px]">
+                {getTypeBadge(inf.type)}
+              </span>
 
-            {/* Persona status */}
-            <div className="flex-shrink-0">
-              {inf.stats.hasGemini ? (
-                <span className="text-[#9334EB] flex items-center gap-1 text-xs">
-                  <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                  פרסונה
-                </span>
-              ) : (
-                <span className="text-[#d1d5db] flex items-center gap-1 text-xs">
-                  <span className="material-symbols-outlined text-[16px]">pending</span>
-                  חסר
-                </span>
-              )}
-            </div>
-
-            {/* Stats */}
-            <div className="flex items-center gap-4 text-xs text-[#4b5563] mr-auto">
-              <span className="flex items-center gap-1">
-                <span className="material-symbols-outlined text-[16px]">article</span>
+              <span className="text-[11px] text-[#4b5563] flex items-center gap-1">
+                <span className="material-symbols-outlined text-[13px]">article</span>
                 {inf.stats.posts}
               </span>
-              <span className="flex items-center gap-1">
-                <span className="material-symbols-outlined text-[16px]">mic</span>
-                {inf.stats.transcriptions}
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="material-symbols-outlined text-[16px]">local_offer</span>
+              <span className="text-[11px] text-[#4b5563] flex items-center gap-1">
+                <span className="material-symbols-outlined text-[13px]">local_offer</span>
                 {inf.stats.coupons}
               </span>
-            </div>
-
-            {/* Action buttons */}
-            <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-              <Link
-                href={`/chat/${inf.username}`}
-                className="neon-action-btn"
-                title="צפייה בצ׳אט"
-              >
-                <span className="material-symbols-outlined text-[18px]">visibility</span>
-              </Link>
-              <button
-                onClick={() => copyIgLink(inf.id)}
-                className="neon-action-btn"
-                title="העתק קישור IG"
-              >
-                <span className="material-symbols-outlined text-[18px]">
-                  {copiedLinkId === inf.id ? 'check' : 'link'}
-                </span>
-              </button>
-              <Link
-                href={`/admin/chatbot-persona/${inf.id}`}
-                className="neon-action-btn"
-                title="הגדרות"
-              >
-                <span className="material-symbols-outlined text-[18px]">settings</span>
-              </Link>
             </div>
           </div>
         ))}

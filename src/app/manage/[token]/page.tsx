@@ -111,6 +111,7 @@ export default function ManagePage() {
 
   // Live preview state
   const [showLivePreview, setShowLivePreview] = useState(false);
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
 
   // ============================================
   // Auth
@@ -471,22 +472,28 @@ export default function ManagePage() {
     <div className="min-h-screen" style={{ backgroundColor: '#fff8f1' }}>
       {/* Glass Header */}
       <header className="fixed top-0 left-0 right-0 z-50" style={{ backgroundColor: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-        <div className="max-w-[1400px] mx-auto px-6 py-4 flex items-center justify-between">
-          {/* Right side (RTL): Brand */}
+        <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
+          {/* Right side (RTL): Brand + hamburger */}
           <div className="flex items-center gap-3">
-            <span className="text-xl font-bold text-[#006c4e] font-headline">Widget Manager</span>
-            {domain && <span className="text-sm text-[#655e51]">{domain}</span>}
+            <button
+              className="md:hidden w-9 h-9 rounded-full flex items-center justify-center text-[#655e51] hover:bg-white/80 transition-colors"
+              onClick={() => setShowMobileSidebar(!showMobileSidebar)}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 22 }}>{showMobileSidebar ? 'close' : 'menu'}</span>
+            </button>
+            <span className="text-lg md:text-xl font-bold text-[#006c4e] font-headline">Widget Manager</span>
+            {domain && <span className="hidden sm:inline text-sm text-[#655e51]">{domain}</span>}
           </div>
           {/* Left side (RTL): Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
             {saveMsg && (
-              <span className={`text-sm px-4 py-1.5 rounded-full font-medium ${saveMsg.includes('הצלחה') ? 'bg-[#65fcc4]/20 text-[#006c4e]' : 'bg-[#FF76B0]/15 text-[#a72f68]'}`}>
+              <span className={`hidden sm:inline text-sm px-4 py-1.5 rounded-full font-medium ${saveMsg.includes('הצלחה') ? 'bg-[#65fcc4]/20 text-[#006c4e]' : 'bg-[#FF76B0]/15 text-[#a72f68]'}`}>
                 {saveMsg}
               </span>
             )}
             <button
               onClick={() => setShowLivePreview(true)}
-              className="flex items-center gap-1.5 px-5 py-2.5 text-sm font-medium rounded-full transition-all"
+              className="hidden sm:flex items-center gap-1.5 px-5 py-2.5 text-sm font-medium rounded-full transition-all"
               style={{ backgroundColor: '#e1e0ff', color: '#575a8c' }}
             >
               <span className="material-symbols-outlined" style={{ fontSize: 18 }}>visibility</span>
@@ -502,10 +509,20 @@ export default function ManagePage() {
         </div>
       </header>
 
+      {/* Mobile sidebar overlay */}
+      {showMobileSidebar && (
+        <div className="fixed inset-0 bg-black/30 z-30 md:hidden" onClick={() => setShowMobileSidebar(false)} />
+      )}
+
       {/* Main layout: Content + Sidebar */}
-      <div className="flex pt-20" dir="rtl">
+      <div className="flex pt-16 md:pt-20" dir="rtl">
         {/* Right-side Sidebar Navigation */}
-        <aside className="h-[calc(100vh-80px)] sticky top-20 right-0 w-72 flex-shrink-0 flex flex-col gap-4 p-6 items-end text-right" style={{ backgroundColor: '#faf2e9' }}>
+        <aside className={`
+          fixed md:sticky top-16 md:top-20 right-0 h-[calc(100vh-64px)] md:h-[calc(100vh-80px)] w-72 flex-shrink-0 flex flex-col gap-4 p-6 items-end text-right z-40
+          transition-transform duration-300 ease-in-out
+          ${showMobileSidebar ? 'translate-x-0' : 'translate-x-full'}
+          md:translate-x-0
+        `} style={{ backgroundColor: '#faf2e9' }}>
           {/* Sidebar Header */}
           <div className="mb-2 w-full text-right">
             <h2 className="text-lg font-bold text-[#006c4e] font-headline">לוח ניהול</h2>
@@ -517,7 +534,7 @@ export default function ManagePage() {
             {tabs.map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => { setActiveTab(tab.id); setShowMobileSidebar(false); }}
                 className={`flex items-center gap-2.5 px-4 py-2.5 text-sm w-full text-right transition-all ${
                   activeTab === tab.id
                     ? 'bg-white text-[#006c4e] rounded-full font-medium'
@@ -533,20 +550,20 @@ export default function ManagePage() {
         </aside>
 
         {/* Content Area */}
-        <main className="flex-1 min-w-0 px-8 py-8 max-w-[1100px]">
+        <main className="flex-1 min-w-0 px-4 md:px-8 py-6 md:py-8 max-w-[1100px]">
           {/* Tab 1: Instructions */}
           {activeTab === 'instructions' && (
             <div>
               {/* Section Title */}
               <div className="mb-8">
-                <h1 className="text-4xl font-extrabold text-[#1e1b15] font-headline">הנחיות לבוט</h1>
+                <h1 className="text-2xl md:text-4xl font-extrabold text-[#1e1b15] font-headline">הנחיות לבוט</h1>
                 <p className="text-[#655e51] mt-2">ספר לבוט איך להתנהג -- ההנחיות האלו מתווספות מעל ההנחיות הבסיסיות</p>
               </div>
 
               {/* Bento Grid */}
-              <div className="grid grid-cols-12 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6">
                 {/* Instructions textarea - col-span-8 */}
-                <div className="col-span-12 lg:col-span-8">
+                <div className="lg:col-span-8">
                   <div className="bg-white p-8 rounded-xl" style={customShadow}>
                     <div className="flex items-center gap-3 mb-4">
                       <span className="material-symbols-outlined text-[#006c4e]" style={{ fontSize: 22 }}>smart_toy</span>
@@ -572,7 +589,7 @@ export default function ManagePage() {
                 </div>
 
                 {/* Tone selection - col-span-4 */}
-                <div className="col-span-12 lg:col-span-4">
+                <div className="lg:col-span-4">
                   <div className="bg-white p-8 rounded-xl h-full" style={customShadow}>
                     <div className="flex items-center gap-3 mb-4">
                       <span className="material-symbols-outlined text-[#575a8c]" style={{ fontSize: 22 }}>record_voice_over</span>
@@ -603,7 +620,7 @@ export default function ManagePage() {
                 </div>
 
                 {/* Focus topics - col-span-6 */}
-                <div className="col-span-12 lg:col-span-6">
+                <div className="lg:col-span-6">
                   <div className="bg-white p-8 rounded-xl" style={customShadow}>
                     <div className="flex items-center gap-3 mb-4">
                       <span className="material-symbols-outlined text-[#006c4e]" style={{ fontSize: 22 }}>bookmark</span>
@@ -625,7 +642,7 @@ export default function ManagePage() {
                 </div>
 
                 {/* Banned topics - col-span-6 */}
-                <div className="col-span-12 lg:col-span-6">
+                <div className="lg:col-span-6">
                   <div className="bg-white p-8 rounded-xl" style={customShadow}>
                     <div className="flex items-center gap-3 mb-4">
                       <span className="material-symbols-outlined text-[#a72f68]" style={{ fontSize: 22 }}>block</span>

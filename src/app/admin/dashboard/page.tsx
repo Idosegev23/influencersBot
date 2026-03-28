@@ -287,9 +287,9 @@ function DashboardContent() {
           </div>
 
           {/* Action bar with sub-filter */}
-          <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-3">
             <div className="flex items-center gap-3">
-              <h2 className="text-xl font-semibold font-headline text-[#1f2937]">חשבונות</h2>
+              <h2 className="text-lg sm:text-xl font-semibold font-headline text-[#1f2937]">חשבונות</h2>
               {/* Sub-filter pills */}
               <div className="flex items-center gap-1 rounded-full p-1 bg-[#d1d5db]/10 border border-[#d1d5db]/15">
                 {([

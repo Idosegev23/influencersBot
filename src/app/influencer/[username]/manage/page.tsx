@@ -405,8 +405,8 @@ export default function ManagePage({
 
   // ─── Coupon edit form (shared between add/edit) ───
   const renderCouponForm = (onSave: () => void, onCancel: () => void) => (
-    <div className="rounded-xl border p-4 space-y-3" style={cardStyle}>
-      <div className="grid grid-cols-2 gap-3">
+    <div className="rounded-xl border p-3 sm:p-4 space-y-3" style={cardStyle}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-2)' }}>קוד קופון</label>
           <input
@@ -444,7 +444,7 @@ export default function ManagePage({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-2)' }}>סוג הנחה</label>
           <select
@@ -494,9 +494,9 @@ export default function ManagePage({
 
   return (
     <div className="min-h-screen" dir="rtl" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
-      <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-8">
+      <main className="relative z-10 max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
         {/* Dynamic Tabs */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+        <div className="flex gap-2 mb-4 sm:mb-6 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
           {tabs.map(tab => {
             const TabIcon = tab.icon;
             const count = tab.id === 'coupons' ? coupons.length
@@ -509,7 +509,7 @@ export default function ManagePage({
               <button
                 key={tab.id}
                 onClick={() => { setActiveTab(tab.id as TabType); setSearchQuery(''); }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium whitespace-nowrap transition-colors ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl font-medium whitespace-nowrap transition-colors text-sm ${
                   activeTab === tab.id ? 'btn-primary' : 'pill pill-neutral'
                 }`}
               >
@@ -538,14 +538,14 @@ export default function ManagePage({
         {/* ═══ COUPONS TAB ═══ */}
         {activeTab === 'coupons' && (
           <div>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold" style={{ color: 'var(--dash-text)' }}>{labels.couponsTitle}</h2>
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+              <h2 className="text-lg sm:text-xl font-bold" style={{ color: 'var(--dash-text)' }}>{labels.couponsTitle}</h2>
               <button
                 onClick={() => {
                   setShowAddCoupon(true);
                   setCouponForm({ discount_type: 'percentage', is_active: true });
                 }}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl transition-colors btn-primary"
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl transition-colors btn-primary text-sm"
               >
                 <Plus className="w-4 h-4" />
                 הוסף קופון
@@ -649,11 +649,11 @@ export default function ManagePage({
         {/* ═══ BRANDS/PARTNERSHIPS TAB ═══ */}
         {activeTab === 'brands' && (
           <div>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold" style={{ color: 'var(--dash-text)' }}>{labels.brandsTitle}</h2>
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+              <h2 className="text-lg sm:text-xl font-bold" style={{ color: 'var(--dash-text)' }}>{labels.brandsTitle}</h2>
               <button
                 onClick={() => router.push(`/influencer/${username}/partnerships/new`)}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl transition-colors btn-primary"
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl transition-colors btn-primary text-sm"
               >
                 <Plus className="w-4 h-4" />
                 הוסף
@@ -710,9 +710,9 @@ export default function ManagePage({
         {activeTab === 'products' && (
           <div>
             {/* Header with stats */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
               <div>
-                <h2 className="text-xl font-bold" style={{ color: 'var(--dash-text)' }}>קטלוג מוצרים</h2>
+                <h2 className="text-lg sm:text-xl font-bold" style={{ color: 'var(--dash-text)' }}>קטלוג מוצרים</h2>
                 <p className="text-sm mt-1" style={{ color: 'var(--dash-text-2)' }}>
                   {products.length} מוצרים{products.filter((p: any) => p.ai_profile?.whatItDoes).length > 0 && (
                     <span className="inline-flex items-center gap-1 mr-2">
@@ -722,7 +722,7 @@ export default function ManagePage({
                   )}
                 </p>
               </div>
-              <button onClick={handleAddProduct} className="flex items-center gap-2 px-4 py-2 rounded-xl transition-colors btn-primary">
+              <button onClick={handleAddProduct} className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl transition-colors btn-primary text-sm">
                 <Plus className="w-4 h-4" />
                 הוסף מוצר
               </button>
@@ -1060,10 +1060,10 @@ export default function ManagePage({
         {/* ═══ SETTINGS TAB ═══ */}
         {activeTab === 'settings' && (
           <div className="max-w-3xl mx-auto">
-            <h2 className="text-xl font-bold mb-6" style={{ color: 'var(--dash-text)' }}>הגדרות צ׳אט</h2>
+            <h2 className="text-lg sm:text-xl font-bold mb-4 sm:mb-6" style={{ color: 'var(--dash-text)' }}>הגדרות צ׳אט</h2>
 
-            <div className="space-y-6">
-              <div className="rounded-xl border p-6" style={cardStyle}>
+            <div className="space-y-4 sm:space-y-6">
+              <div className="rounded-xl border p-4 sm:p-6" style={cardStyle}>
                 <label className="block text-sm font-medium mb-3" style={{ color: 'var(--dash-text-2)' }}>
                   הודעת ברכה
                 </label>
@@ -1077,7 +1077,7 @@ export default function ManagePage({
                 />
               </div>
 
-              <div className="rounded-xl border p-6" style={cardStyle}>
+              <div className="rounded-xl border p-4 sm:p-6" style={cardStyle}>
                 <div className="flex items-center justify-between mb-4">
                   <label className="block text-sm font-medium" style={{ color: 'var(--dash-text-2)' }}>
                     שאלות מוצעות

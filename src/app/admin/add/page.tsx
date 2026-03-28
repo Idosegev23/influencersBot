@@ -88,12 +88,12 @@ export default function AddAccountPage() {
     <div className="max-w-lg mx-auto">
       {!accountId ? (
         /* ── Step 1: Account Creation Form ── */
-        <div className="neon-card p-10">
-          <div className="flex flex-col items-center text-center mb-8">
-            <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6" style={{ background: '#DCFCE8' }}>
-              <span className="material-symbols-outlined text-[48px]" style={{ color: '#9334EB' }}>person_add</span>
+        <div className="neon-card p-5 sm:p-10">
+          <div className="flex flex-col items-center text-center mb-6 sm:mb-8">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center mb-4 sm:mb-6" style={{ background: '#DCFCE8' }}>
+              <span className="material-symbols-outlined text-[36px] sm:text-[48px]" style={{ color: '#9334EB' }}>person_add</span>
             </div>
-            <h1 className="text-2xl font-extrabold tracking-tight mb-2" style={{ color: '#1f2937' }}>הוספת חשבון חדש</h1>
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight mb-2" style={{ color: '#1f2937' }}>הוספת חשבון חדש</h1>
             <p className="text-sm" style={{ color: '#4b5563' }}>הזן את פרטי החשבון החדש כדי להתחיל בניהול</p>
           </div>
 
@@ -154,13 +154,13 @@ export default function AddAccountPage() {
         </div>
       ) : (
         /* ── Step 2: Success — show ID + OAuth link ── */
-        <div className="neon-card p-10" style={{ borderRight: '3px solid #9334EB' }}>
-          <div className="flex items-center gap-6 mb-8">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(23, 163, 74, 0.15)' }}>
-              <span className="material-symbols-outlined text-[32px] font-bold" style={{ color: '#9334EB', fontVariationSettings: "'FILL' 1" }}>check</span>
+        <div className="neon-card p-5 sm:p-10" style={{ borderRight: '3px solid #9334EB' }}>
+          <div className="flex items-center gap-4 sm:gap-6 mb-6 sm:mb-8">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(23, 163, 74, 0.15)' }}>
+              <span className="material-symbols-outlined text-[24px] sm:text-[32px] font-bold" style={{ color: '#9334EB', fontVariationSettings: "'FILL' 1" }}>check</span>
             </div>
             <div>
-              <h2 className="text-2xl font-extrabold tracking-tight" style={{ color: '#1f2937' }}>
+              <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight" style={{ color: '#1f2937' }}>
                 {existed ? 'חשבון קיים נמצא' : 'החשבון נוצר בהצלחה!'}
               </h2>
               <p className="font-bold" style={{ color: '#9334EB' }}>
@@ -171,10 +171,10 @@ export default function AddAccountPage() {
 
           <div className="space-y-4 mb-10">
             {/* Account ID row */}
-            <div className="flex items-center justify-between p-5 rounded-xl" style={{ background: '#f3f4f6' }}>
-              <div className="flex flex-col">
+            <div className="flex items-center justify-between p-3 sm:p-5 rounded-xl" style={{ background: '#f3f4f6' }}>
+              <div className="flex flex-col min-w-0">
                 <span className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: '#817a6c' }}>מזהה חשבון</span>
-                <span className="font-mono font-medium" style={{ color: '#1f2937' }}>{accountId.slice(0, 12)}...</span>
+                <span className="font-mono font-medium text-sm sm:text-base truncate" style={{ color: '#1f2937' }}>{accountId.slice(0, 12)}...</span>
               </div>
               <button
                 onClick={() => copyToClipboard(accountId, 'id')}
@@ -186,10 +186,10 @@ export default function AddAccountPage() {
             </div>
 
             {/* IG Connect link row */}
-            <div className="flex items-center justify-between p-5 rounded-xl" style={{ background: '#f3f4f6' }}>
+            <div className="flex items-center justify-between p-3 sm:p-5 rounded-xl gap-2" style={{ background: '#f3f4f6' }}>
               <div className="flex flex-col min-w-0">
                 <span className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: '#817a6c' }}>חיבור IG</span>
-                <span className="font-medium truncate" style={{ color: '#1f2937' }}>{igConnectLink.slice(0, 35)}...</span>
+                <span className="font-medium text-sm sm:text-base truncate" style={{ color: '#1f2937' }}>{igConnectLink.slice(0, 35)}...</span>
               </div>
               <button
                 onClick={() => copyToClipboard(igConnectLink, 'link')}

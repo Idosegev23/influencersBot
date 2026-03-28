@@ -659,13 +659,13 @@ export default function OnboardingChecklistPage() {
   return (
     <>
       {/* ─── Page Header ─── */}
-      <div className="flex items-start justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(147, 52, 235, 0.15)' }}>
-            <span className="material-symbols-outlined text-[28px]" style={{ color: '#2663EB' }}>checklist</span>
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6 sm:mb-8">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(147, 52, 235, 0.15)' }}>
+            <span className="material-symbols-outlined text-[22px] sm:text-[28px]" style={{ color: '#2663EB' }}>checklist</span>
           </div>
           <div>
-            <h1 className="text-2xl font-extrabold tracking-tight font-headline" style={{ color: '#1f2937' }}>
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight font-headline" style={{ color: '#1f2937' }}>
               אונבורדינג לקוחות
             </h1>
             <p className="text-sm mt-0.5" style={{ color: '#4b5563' }}>
@@ -691,9 +691,9 @@ export default function OnboardingChecklistPage() {
       </div>
 
       {/* ─── Stats Bento Grid ─── */}
-      <div className="grid grid-cols-12 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 mb-6 sm:mb-8">
         {/* Main stat card */}
-        <div className="col-span-8 neon-card p-6">
+        <div className="sm:col-span-8 neon-card p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <span className="material-symbols-outlined text-[20px]" style={{ color: '#4b5563' }}>analytics</span>
@@ -733,10 +733,10 @@ export default function OnboardingChecklistPage() {
         </div>
 
         {/* Accent card */}
-        <div className="col-span-4 neon-card p-6 flex flex-col justify-between" style={{ background: 'rgba(147, 52, 235, 0.08)' }}>
+        <div className="sm:col-span-4 neon-card p-4 sm:p-6 flex flex-col justify-between" style={{ background: 'rgba(147, 52, 235, 0.08)' }}>
           <span className="material-symbols-outlined text-[24px] mb-3" style={{ color: '#2663EB' }}>folder_open</span>
           <div>
-            <span className="text-3xl font-extrabold font-headline" style={{ color: '#1f2937' }}>{checklists.length}</span>
+            <span className="text-2xl sm:text-3xl font-extrabold font-headline" style={{ color: '#1f2937' }}>{checklists.length}</span>
             <p className="text-xs mt-1" style={{ color: '#4b5563' }}>סה״כ צ&apos;קליסטים</p>
           </div>
         </div>

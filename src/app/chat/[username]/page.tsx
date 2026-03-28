@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo, use } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
@@ -180,7 +180,9 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   
-  const [activeTab, setActiveTab] = useState<TabId>('chat');
+  const searchParams = useSearchParams();
+  const initialTab = (searchParams.get('tab') as TabId) || 'chat';
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
