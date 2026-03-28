@@ -247,6 +247,8 @@ export default function InfluencerDashboardPage({
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [leads, setLeads] = useState<any[]>([]);
+  const [leadsLoading, setLeadsLoading] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -258,7 +260,15 @@ export default function InfluencerDashboardPage({
         }
         const statsRes = await fetch(`/api/influencer/dashboard-stats?username=${username}`);
         if (!statsRes.ok) { router.push(`/influencer/${username}`); return; }
-        setData(await statsRes.json());
+        const dashData = await statsRes.json();
+        setData(dashData);
+        // Load leads for this account
+        if (dashData?.influencer?.id) {
+          fetch(`/api/briefs?accountId=${dashData.influencer.id}`)
+            .then(r => r.json())
+            .then(d => setLeads(d.briefs || []))
+            .catch(() => {});
+        }
       } catch (e) {
         console.error('Dashboard load error:', e);
       } finally {
@@ -651,6 +661,97 @@ export default function InfluencerDashboardPage({
             </Section>
           </div>
         </div>
+        {/* Leads Section — only shows if there are leads */}
+        {leads.length > 0 && (
+          <div className="mt-6">
+            <Section>
+              <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>לידים ובריפים</h2>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--dash-text-3)' }}>{leads.length} לידים</p>
+                </div>
+              </div>
+              <div className="px-5 pb-5 space-y-2">
+                {leads.slice(0, 10).map((lead: any) => {
+                  const statusConfig: Record<string, { label: string; color: string }> = {
+                    new: { label: 'חדש', color: '#9334EB' },
+                    contacted: { label: 'יצרנו קשר', color: '#2663EB' },
+                    in_progress: { label: 'בטיפול', color: '#EA580C' },
+                    closed: { label: 'נסגר', color: '#16A34A' },
+                    archived: { label: 'ארכיון', color: '#6b7280' },
+                  };
+                  const st = statusConfig[lead.status] || statusConfig.new;
+                  const date = new Date(lead.created_at).toLocaleDateString('he-IL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+                  return (
+                    <div
+                      key={lead.id}
+                      className="p-3 rounded-xl transition-all"
+                      style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-glass-border)' }}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="font-semibold text-sm" style={{ color: 'var(--dash-text)' }}>{lead.full_name}</span>
+                            <span
+                              className="px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+                              style={{ color: st.color, background: `${st.color}18` }}
+                            >
+                              {st.label}
+                            </span>
+                          </div>
+                          <p className="text-xs font-medium" style={{ color: 'var(--color-primary, #9334EB)' }}>{lead.service_name}</p>
+                          <div className="flex flex-wrap gap-2 mt-1 text-[11px]" style={{ color: 'var(--dash-text-3)' }}>
+                            {lead.email && <span>{lead.email}</span>}
+                            {lead.phone && <span>{lead.phone}</span>}
+                            {lead.goal && <span>• {lead.goal}</span>}
+                            {lead.budget_range && <span>• {lead.budget_range}</span>}
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                          <span className="text-[10px]" style={{ color: 'var(--dash-text-3)' }}>{date}</span>
+                          <select
+                            value={lead.status}
+                            onChange={async (e) => {
+                              const newStatus = e.target.value;
+                              try {
+                                await fetch('/api/briefs', {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ briefId: lead.id, status: newStatus }),
+                                });
+                                setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: newStatus } : l));
+                              } catch {}
+                            }}
+                            className="text-[11px] rounded-lg px-1.5 py-0.5 focus:outline-none"
+                            style={{ background: 'var(--dash-bg)', color: 'var(--dash-text-2)', border: '1px solid var(--dash-glass-border)' }}
+                          >
+                            <option value="new">חדש</option>
+                            <option value="contacted">יצרנו קשר</option>
+                            <option value="in_progress">בטיפול</option>
+                            <option value="closed">נסגר</option>
+                            <option value="archived">ארכיון</option>
+                          </select>
+                          {lead.drive_file_url && (
+                            <a
+                              href={lead.drive_file_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[11px] hover:underline"
+                              style={{ color: 'var(--color-primary, #2663EB)' }}
+                            >
+                              צפה ב-Drive
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Section>
+          </div>
+        )}
       </main>
     </div>
   );
