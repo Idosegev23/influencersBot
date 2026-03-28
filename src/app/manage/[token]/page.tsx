@@ -450,7 +450,7 @@ export default function ManagePage() {
           <div className="w-16 h-16 rounded-full bg-[#FF76B0]/15 flex items-center justify-center mx-auto mb-4">
             <span className="material-symbols-outlined text-[#FF76B0]" style={{ fontSize: 32 }}>lock</span>
           </div>
-          <h1 className="text-xl font-bold text-[#1e1b15] mb-2 font-headline">הלינק לא תקף</h1>
+          <h1 className="text-lg sm:text-xl font-bold text-[#1e1b15] mb-2 font-headline">הלינק לא תקף</h1>
           <p className="text-[#655e51]">הלינק פג תוקף או לא חוקי. פנה למנהל המערכת לקבלת לינק חדש.</p>
         </div>
       </div>
@@ -518,7 +518,7 @@ export default function ManagePage() {
       <div className="flex pt-16 md:pt-20" dir="rtl">
         {/* Right-side Sidebar Navigation */}
         <aside className={`
-          fixed md:sticky top-16 md:top-20 right-0 h-[calc(100vh-64px)] md:h-[calc(100vh-80px)] w-72 flex-shrink-0 flex flex-col gap-4 p-6 items-end text-right z-40
+          fixed md:sticky top-16 md:top-20 right-0 h-[calc(100vh-64px)] md:h-[calc(100vh-80px)] w-64 md:w-72 flex-shrink-0 flex flex-col gap-4 p-4 md:p-6 items-end text-right z-40
           transition-transform duration-300 ease-in-out
           ${showMobileSidebar ? 'translate-x-0' : 'translate-x-full'}
           md:translate-x-0
@@ -556,7 +556,7 @@ export default function ManagePage() {
             <div>
               {/* Section Title */}
               <div className="mb-8">
-                <h1 className="text-2xl md:text-4xl font-extrabold text-[#1e1b15] font-headline">הנחיות לבוט</h1>
+                <h1 className="text-2xl md:text-2xl sm:text-4xl font-extrabold text-[#1e1b15] font-headline">הנחיות לבוט</h1>
                 <p className="text-[#655e51] mt-2">ספר לבוט איך להתנהג -- ההנחיות האלו מתווספות מעל ההנחיות הבסיסיות</p>
               </div>
 
@@ -564,10 +564,10 @@ export default function ManagePage() {
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6">
                 {/* Instructions textarea - col-span-8 */}
                 <div className="lg:col-span-8">
-                  <div className="bg-white p-8 rounded-xl" style={customShadow}>
+                  <div className="bg-white p-4 sm:p-8 rounded-xl" style={customShadow}>
                     <div className="flex items-center gap-3 mb-4">
                       <span className="material-symbols-outlined text-[#006c4e]" style={{ fontSize: 22 }}>smart_toy</span>
-                      <h3 className="text-xl font-bold text-[#1e1b15]">הנחיות מותאמות</h3>
+                      <h3 className="text-lg sm:text-xl font-bold text-[#1e1b15]">הנחיות מותאמות</h3>
                     </div>
                     <div className="relative">
                       <textarea
@@ -593,7 +593,7 @@ export default function ManagePage() {
                   <div className="bg-white p-8 rounded-xl h-full" style={customShadow}>
                     <div className="flex items-center gap-3 mb-4">
                       <span className="material-symbols-outlined text-[#575a8c]" style={{ fontSize: 22 }}>record_voice_over</span>
-                      <h3 className="text-xl font-bold text-[#1e1b15]">טון שיחה</h3>
+                      <h3 className="text-lg sm:text-xl font-bold text-[#1e1b15]">טון שיחה</h3>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       {[
@@ -621,11 +621,11 @@ export default function ManagePage() {
 
                 {/* Focus topics - col-span-6 */}
                 <div className="lg:col-span-6">
-                  <div className="bg-white p-8 rounded-xl" style={customShadow}>
+                  <div className="bg-white p-4 sm:p-8 rounded-xl" style={customShadow}>
                     <div className="flex items-center gap-3 mb-4">
                       <span className="material-symbols-outlined text-[#006c4e]" style={{ fontSize: 22 }}>bookmark</span>
                       <div>
-                        <h3 className="text-xl font-bold text-[#1e1b15]">נושאים לדגש</h3>
+                        <h3 className="text-lg sm:text-xl font-bold text-[#1e1b15]">נושאים לדגש</h3>
                         <p className="text-sm text-[#655e51]">הבוט יתמקד בנושאים האלו</p>
                       </div>
                     </div>
@@ -643,11 +643,11 @@ export default function ManagePage() {
 
                 {/* Banned topics - col-span-6 */}
                 <div className="lg:col-span-6">
-                  <div className="bg-white p-8 rounded-xl" style={customShadow}>
+                  <div className="bg-white p-4 sm:p-8 rounded-xl" style={customShadow}>
                     <div className="flex items-center gap-3 mb-4">
                       <span className="material-symbols-outlined text-[#a72f68]" style={{ fontSize: 22 }}>block</span>
                       <div>
-                        <h3 className="text-xl font-bold text-[#1e1b15]">נושאים חסומים</h3>
+                        <h3 className="text-lg sm:text-xl font-bold text-[#1e1b15]">נושאים חסומים</h3>
                         <p className="text-sm text-[#655e51]">הבוט יסרב לדון בנושאים האלו</p>
                       </div>
                     </div>
@@ -664,7 +664,7 @@ export default function ManagePage() {
                 </div>
 
                 {/* Save button - col-span-12 */}
-                <div className="col-span-12">
+                <div className="lg:col-span-12">
                   <button
                     onClick={savePromptSettings}
                     disabled={saving}
@@ -681,16 +681,16 @@ export default function ManagePage() {
           {/* Tab 2: FAQ */}
           {activeTab === 'faq' && (
             <div>
-              <div className="mb-8">
-                <h1 className="text-4xl font-extrabold text-[#1e1b15] font-headline">שאלות נפוצות</h1>
+              <div className="mb-6 sm:mb-8">
+                <h1 className="text-2xl sm:text-4xl font-extrabold text-[#1e1b15] font-headline">שאלות נפוצות</h1>
                 <p className="text-[#655e51] mt-2">הבוט יענה על שאלות אלו בעדיפות גבוהה</p>
               </div>
 
               <div className="space-y-6">
-                <div className="bg-white p-8 rounded-xl" style={customShadow}>
+                <div className="bg-white p-4 sm:p-8 rounded-xl" style={customShadow}>
                   <div className="flex items-center gap-3 mb-4">
                     <span className="material-symbols-outlined text-[#006c4e]" style={{ fontSize: 22 }}>help</span>
-                    <h3 className="text-xl font-bold text-[#1e1b15]">רשימת שאלות</h3>
+                    <h3 className="text-lg sm:text-xl font-bold text-[#1e1b15]">רשימת שאלות</h3>
                   </div>
 
                   <div className="space-y-3">
@@ -761,9 +761,9 @@ export default function ManagePage() {
           {/* Tab 3: Scraped Pages */}
           {activeTab === 'pages' && (
             <div>
-              <div className="mb-8 flex items-center justify-between">
+              <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h1 className="text-4xl font-extrabold text-[#1e1b15] font-headline">דפים סרוקים</h1>
+                  <h1 className="text-2xl sm:text-4xl font-extrabold text-[#1e1b15] font-headline">דפים סרוקים</h1>
                   <p className="text-[#655e51] mt-2">דפים שנסרקו מהאתר ({pages.length})</p>
                 </div>
                 <button
@@ -790,7 +790,7 @@ export default function ManagePage() {
                     {pages.map(page => (
                       <div key={page.id} className="bg-white rounded-xl overflow-hidden" style={customShadow}>
                         <div
-                          className="p-5 cursor-pointer hover:bg-[#faf2e9]/50 transition-colors"
+                          className="p-3 sm:p-5 cursor-pointer hover:bg-[#faf2e9]/50 transition-colors"
                           onClick={() => setExpandedPage(expandedPage === page.id ? null : page.id)}
                         >
                           <div className="flex items-center gap-3">
@@ -812,10 +812,10 @@ export default function ManagePage() {
                               </div>
                               <div className="text-xs text-[#655e51] truncate mt-0.5">{page.url}</div>
                             </div>
-                            <div className="flex items-center gap-3 mr-4 text-xs text-[#655e51]">
-                              <span>{page.word_count || 0} מילים</span>
+                            <div className="flex items-center gap-2 sm:gap-3 mr-2 sm:mr-4 text-xs text-[#655e51] flex-shrink-0">
+                              <span className="hidden sm:inline">{page.word_count || 0} מילים</span>
                               {page.ragChunks > 0 && (
-                                <span className="px-2.5 py-0.5 rounded-full font-medium" style={{ backgroundColor: '#65fcc4', color: '#006c4e' }}>
+                                <span className="px-2 sm:px-2.5 py-0.5 rounded-full font-medium text-[10px] sm:text-xs" style={{ backgroundColor: '#65fcc4', color: '#006c4e' }}>
                                   {page.ragChunks} chunks
                                 </span>
                               )}
@@ -827,7 +827,7 @@ export default function ManagePage() {
                         </div>
 
                         {expandedPage === page.id && (
-                          <div className="border-t border-[#c6c6c6] p-5" style={{ backgroundColor: '#faf2e9' }}>
+                          <div className="border-t border-[#c6c6c6] p-3 sm:p-5" style={{ backgroundColor: '#faf2e9' }}>
                             {editingPage === page.id ? (
                               <div className="space-y-3">
                                 <textarea
@@ -891,9 +891,9 @@ export default function ManagePage() {
           {/* Tab 4: Knowledge */}
           {activeTab === 'knowledge' && (
             <div>
-              <div className="mb-8 flex items-center justify-between">
+              <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h1 className="text-4xl font-extrabold text-[#1e1b15] font-headline">בסיס ידע</h1>
+                  <h1 className="text-2xl sm:text-4xl font-extrabold text-[#1e1b15] font-headline">בסיס ידע</h1>
                   <p className="text-[#655e51] mt-2">ידע נוסף שהבוט ישתמש בו ({knowledge.length})</p>
                 </div>
                 <div className="flex gap-2">
@@ -918,10 +918,10 @@ export default function ManagePage() {
               <div className="space-y-4">
                 {/* Add knowledge form */}
                 {showAddKnowledge && (
-                  <div className="bg-white p-8 rounded-xl" style={customShadow}>
+                  <div className="bg-white p-4 sm:p-8 rounded-xl" style={customShadow}>
                     <div className="flex items-center gap-3 mb-4">
                       <span className="material-symbols-outlined text-[#006c4e]" style={{ fontSize: 22 }}>add_circle</span>
-                      <h3 className="text-xl font-bold text-[#1e1b15]">הוסף ידע חדש</h3>
+                      <h3 className="text-lg sm:text-xl font-bold text-[#1e1b15]">הוסף ידע חדש</h3>
                     </div>
                     <div className="space-y-3">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -990,8 +990,8 @@ export default function ManagePage() {
                 ) : (
                   <div className="space-y-2">
                     {knowledge.map(entry => (
-                      <div key={entry.id} className={`bg-white p-5 rounded-xl ${!entry.is_active ? 'opacity-60' : ''}`} style={customShadow}>
-                        <div className="flex items-center justify-between">
+                      <div key={entry.id} className={`bg-white p-4 sm:p-5 rounded-xl ${!entry.is_active ? 'opacity-60' : ''}`} style={customShadow}>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-medium text-sm text-[#1e1b15]">{entry.title}</span>
@@ -1006,7 +1006,7 @@ export default function ManagePage() {
                             </div>
                             <p className="text-xs text-[#655e51] mt-1 truncate">{entry.content}</p>
                           </div>
-                          <div className="flex items-center gap-2 mr-4">
+                          <div className="flex items-center gap-2 sm:mr-4">
                             <button
                               onClick={() => toggleKnowledge(entry.id, entry.is_active)}
                               className={`text-xs px-3 py-1 rounded-full transition-colors ${entry.is_active ? 'border border-[#c6c6c6] text-[#655e51] hover:bg-[#faf2e9]' : 'text-[#1e1b15] hover:brightness-95'}`}
@@ -1033,15 +1033,15 @@ export default function ManagePage() {
           {/* Tab 5: Products */}
           {activeTab === 'products' && (
             <div>
-              <div className="mb-8 flex items-center justify-between">
+              <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h1 className="text-4xl font-extrabold text-[#1e1b15] font-headline">קטלוג מוצרים</h1>
+                  <h1 className="text-2xl sm:text-4xl font-extrabold text-[#1e1b15] font-headline">קטלוג מוצרים</h1>
                   <p className="text-[#655e51] mt-2">מוצרים שהבוט מכיר ({products.length})</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <button
                     onClick={loadProducts}
-                    className="px-4 py-2 text-sm rounded-full border border-[#c6c6c6] text-[#655e51] hover:bg-white flex items-center gap-1 transition-colors"
+                    className="px-3 sm:px-4 py-2 text-xs sm:text-sm rounded-full border border-[#c6c6c6] text-[#655e51] hover:bg-white flex items-center gap-1 transition-colors"
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: 16 }}>refresh</span>
                     רענן
@@ -1049,11 +1049,11 @@ export default function ManagePage() {
                   <button
                     onClick={extractProducts}
                     disabled={extracting}
-                    className="px-4 py-2 text-sm font-medium rounded-full text-[#1e1b15] disabled:opacity-50 flex items-center gap-1 hover:brightness-95"
+                    className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-full text-[#1e1b15] disabled:opacity-50 flex items-center gap-1 hover:brightness-95"
                     style={{ backgroundColor: '#65fcc4' }}
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: 16 }}>auto_awesome</span>
-                    {extracting ? 'מחלץ מוצרים...' : 'חלץ מוצרים מהאתר'}
+                    {extracting ? 'מחלץ...' : <><span className="hidden sm:inline">חלץ מוצרים מהאתר</span><span className="sm:hidden">חלץ מוצרים</span></>}
                   </button>
                 </div>
               </div>
@@ -1211,17 +1211,17 @@ export default function ManagePage() {
           {/* Tab 6: Design */}
           {activeTab === 'design' && (
             <div>
-              <div className="mb-8">
-                <h1 className="text-4xl font-extrabold text-[#1e1b15] font-headline">הגדרות ווידג&apos;ט</h1>
+              <div className="mb-6 sm:mb-8">
+                <h1 className="text-2xl sm:text-4xl font-extrabold text-[#1e1b15] font-headline">הגדרות ווידג&apos;ט</h1>
                 <p className="text-[#655e51] mt-2">התאם את המראה וההתנהגות של הווידג&apos;ט</p>
               </div>
 
               <div className="space-y-6">
-                <div className="bg-white p-8 rounded-xl" style={customShadow}>
+                <div className="bg-white p-4 sm:p-8 rounded-xl" style={customShadow}>
                   <div className="flex items-center gap-3 mb-4">
                     <span className="material-symbols-outlined text-[#575a8c]" style={{ fontSize: 22 }}>chat_bubble</span>
                     <div>
-                      <h3 className="text-xl font-bold text-[#1e1b15]">הודעת פתיחה</h3>
+                      <h3 className="text-lg sm:text-xl font-bold text-[#1e1b15]">הודעת פתיחה</h3>
                       <p className="text-sm text-[#655e51]">ההודעה שתופיע כשהווידג&apos;ט נפתח</p>
                     </div>
                   </div>
@@ -1234,10 +1234,10 @@ export default function ManagePage() {
                   />
                 </div>
 
-                <div className="bg-white p-8 rounded-xl" style={customShadow}>
+                <div className="bg-white p-4 sm:p-8 rounded-xl" style={customShadow}>
                   <div className="flex items-center gap-3 mb-4">
                     <span className="material-symbols-outlined text-[#006c4e]" style={{ fontSize: 22 }}>dock_to_bottom</span>
-                    <h3 className="text-xl font-bold text-[#1e1b15]">מיקום ווידג&apos;ט</h3>
+                    <h3 className="text-lg sm:text-xl font-bold text-[#1e1b15]">מיקום ווידג&apos;ט</h3>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     {[
@@ -1285,7 +1285,7 @@ export default function ManagePage() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Top bar */}
-            <div className="flex items-center justify-between w-[390px] mb-3 px-1">
+            <div className="flex items-center justify-between w-[min(390px,calc(100vw-40px))] mb-3 px-1">
               <span className="text-sm font-medium text-white/80 font-headline">
                 צפייה חיה -- {displayName || 'ווידג׳ט'}
               </span>
@@ -1309,8 +1309,8 @@ export default function ManagePage() {
 
             {/* Phone frame */}
             <div
-              className="rounded-[40px] overflow-hidden shadow-2xl"
-              style={{ width: 390, height: 760, border: '8px solid #373226', backgroundColor: '#373226' }}
+              className="rounded-[40px] overflow-hidden shadow-2xl w-[min(390px,calc(100vw-40px))]"
+              style={{ height: 'min(760px, calc(100vh - 120px))', border: '8px solid #373226', backgroundColor: '#373226' }}
             >
               {/* Notch */}
               <div className="relative flex justify-center" style={{ backgroundColor: '#373226', height: 30 }}>
@@ -1342,13 +1342,13 @@ export default function ManagePage() {
 
 function Card({ icon, iconColor, title, description, children }: { icon?: string; iconColor?: string; title: string; description?: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white p-8 rounded-xl" style={{ boxShadow: '0 20px 40px rgba(71, 71, 71, 0.06)' }}>
+    <div className="bg-white p-4 sm:p-8 rounded-xl" style={{ boxShadow: '0 20px 40px rgba(71, 71, 71, 0.06)' }}>
       <div className="flex items-center gap-3 mb-4">
         {icon && (
           <span className="material-symbols-outlined" style={{ fontSize: 22, color: iconColor || '#006c4e' }}>{icon}</span>
         )}
         <div>
-          <h3 className="text-xl font-bold text-[#1e1b15]">{title}</h3>
+          <h3 className="text-lg sm:text-xl font-bold text-[#1e1b15]">{title}</h3>
           {description && <p className="text-sm text-[#655e51]">{description}</p>}
         </div>
       </div>
