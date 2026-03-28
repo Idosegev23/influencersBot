@@ -221,6 +221,7 @@ export async function getInfluencerByUsername(username: string): Promise<Influen
     plan: account.plan || 'free',
     type: account.type,
     archetype: config.archetype,
+    features: config.features || {},
     created_at: account.created_at,
     updated_at: account.updated_at,
     
