@@ -83,10 +83,31 @@ function MiniBriefForm({
     notes: '',
   });
 
-  const set = (key: string, val: string) => setForm((p) => ({ ...p, [key]: val }));
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const set = (key: string, val: string) => {
+    setForm((p) => ({ ...p, [key]: val }));
+    if (errors[key]) setErrors((p) => { const n = { ...p }; delete n[key]; return n; });
+  };
+
+  function validate(): boolean {
+    const e: Record<string, string> = {};
+    if (!form.fullName.trim()) e.fullName = 'שדה חובה';
+    if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      e.email = 'אימייל לא תקין';
+    }
+    if (form.phone.trim() && !/^[\d\-+() ]{7,15}$/.test(form.phone.trim())) {
+      e.phone = 'מספר לא תקין';
+    }
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
+  function handleNext() {
+    if (validate()) setStep(2);
+  }
 
   async function handleSubmit() {
-    if (!form.fullName.trim()) return;
+    if (!validate()) return;
     setSubmitting(true);
 
     try {
@@ -148,14 +169,17 @@ function MiniBriefForm({
 
       {step === 1 ? (
         <div className="space-y-3 flex-1">
-          <input
-            type="text"
-            placeholder="שם מלא *"
-            value={form.fullName}
-            onChange={(e) => set('fullName', e.target.value)}
-            className={inputClasses}
-            autoFocus
-          />
+          <div>
+            <input
+              type="text"
+              placeholder="שם מלא *"
+              value={form.fullName}
+              onChange={(e) => set('fullName', e.target.value)}
+              className={`${inputClasses} ${errors.fullName ? '!border-red-500' : ''}`}
+              autoFocus
+            />
+            {errors.fullName && <p className="text-red-500 text-[11px] mt-1 px-1">{errors.fullName}</p>}
+          </div>
           <input
             type="text"
             placeholder="שם העסק"
@@ -164,22 +188,28 @@ function MiniBriefForm({
             className={inputClasses}
           />
           <div className="grid grid-cols-2 gap-3">
-            <input
-              type="email"
-              placeholder="אימייל"
-              value={form.email}
-              onChange={(e) => set('email', e.target.value)}
-              className={inputClasses}
-              style={{ direction: 'ltr' }}
-            />
-            <input
-              type="tel"
-              placeholder="טלפון"
-              value={form.phone}
-              onChange={(e) => set('phone', e.target.value)}
-              className={inputClasses}
-              style={{ direction: 'ltr' }}
-            />
+            <div>
+              <input
+                type="email"
+                placeholder="אימייל"
+                value={form.email}
+                onChange={(e) => set('email', e.target.value)}
+                className={`${inputClasses} ${errors.email ? '!border-red-500' : ''}`}
+                style={{ direction: 'ltr' }}
+              />
+              {errors.email && <p className="text-red-500 text-[11px] mt-1 px-1">{errors.email}</p>}
+            </div>
+            <div>
+              <input
+                type="tel"
+                placeholder="טלפון"
+                value={form.phone}
+                onChange={(e) => set('phone', e.target.value)}
+                className={`${inputClasses} ${errors.phone ? '!border-red-500' : ''}`}
+                style={{ direction: 'ltr' }}
+              />
+              {errors.phone && <p className="text-red-500 text-[11px] mt-1 px-1">{errors.phone}</p>}
+            </div>
           </div>
         </div>
       ) : (
@@ -255,9 +285,8 @@ function MiniBriefForm({
               ביטול
             </button>
             <button
-              onClick={() => form.fullName.trim() && setStep(2)}
-              disabled={!form.fullName.trim()}
-              className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-black text-white hover:bg-[#222] transition-colors disabled:opacity-40"
+              onClick={handleNext}
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-black text-white hover:bg-[#222] transition-colors"
             >
               המשך →
             </button>
