@@ -22,7 +22,7 @@ interface ServicesCatalogTabProps {
 }
 
 // ---------------------------------------------------------------------------
-// Service icon mapping (Stitch design uses white monochrome icons)
+// Service icon mapping
 // ---------------------------------------------------------------------------
 
 const SERVICE_ICONS: Record<string, string> = {
@@ -38,7 +38,7 @@ const SERVICE_ICONS: Record<string, string> = {
 };
 
 // ---------------------------------------------------------------------------
-// Mini-Brief Form (dark theme)
+// Mini-Brief Form (white bg, black accents)
 // ---------------------------------------------------------------------------
 
 const GOALS = [
@@ -121,7 +121,7 @@ function MiniBriefForm({
   }
 
   const inputClasses =
-    'w-full px-4 py-3 rounded-xl text-sm bg-[#1A1A1A] border border-[#333] text-white placeholder-[#666] focus:border-white focus:ring-1 focus:ring-white outline-none transition-colors';
+    'w-full px-4 py-3 rounded-xl text-sm bg-white border border-[#E0E0E0] text-black placeholder-[#999] focus:border-black focus:ring-1 focus:ring-black outline-none transition-colors';
 
   return (
     <div className="flex flex-col h-full">
@@ -132,16 +132,16 @@ function MiniBriefForm({
             <div
               className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors"
               style={{
-                background: step >= s ? '#fff' : '#333',
-                color: step >= s ? '#000' : '#666',
+                background: step >= s ? '#000' : '#E0E0E0',
+                color: step >= s ? '#fff' : '#999',
               }}
             >
               {step > s ? '✓' : s}
             </div>
-            <span className="text-xs font-medium" style={{ color: step >= s ? '#fff' : '#666' }}>
+            <span className="text-xs font-medium" style={{ color: step >= s ? '#000' : '#999' }}>
               {s === 1 ? 'פרטים' : 'על הפרויקט'}
             </span>
-            {s < 2 && <div className="flex-1 h-0.5 rounded" style={{ background: step > s ? '#fff' : '#333' }} />}
+            {s < 2 && <div className="flex-1 h-0.5 rounded" style={{ background: step > s ? '#000' : '#E0E0E0' }} />}
           </div>
         ))}
       </div>
@@ -193,7 +193,7 @@ function MiniBriefForm({
           />
 
           <div>
-            <label className="block text-xs font-semibold mb-2 text-[#A3A3A3]">מה המטרה העיקרית?</label>
+            <label className="block text-xs font-semibold mb-2 text-[#666]">מה המטרה העיקרית?</label>
             <div className="flex flex-wrap gap-2">
               {GOALS.map((g) => (
                 <button
@@ -202,9 +202,9 @@ function MiniBriefForm({
                   onClick={() => set('goal', form.goal === g ? '' : g)}
                   className="px-3 py-1.5 rounded-full text-xs font-medium border transition-colors"
                   style={{
-                    borderColor: form.goal === g ? '#fff' : '#333',
-                    background: form.goal === g ? 'rgba(255, 255, 255, 0.1)' : '#1A1A1A',
-                    color: form.goal === g ? '#fff' : '#A3A3A3',
+                    borderColor: form.goal === g ? '#000' : '#E0E0E0',
+                    background: form.goal === g ? '#000' : '#fff',
+                    color: form.goal === g ? '#fff' : '#000',
                   }}
                 >
                   {g}
@@ -214,7 +214,7 @@ function MiniBriefForm({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold mb-2 text-[#A3A3A3]">תקציב משוער</label>
+            <label className="block text-xs font-semibold mb-2 text-[#666]">תקציב משוער</label>
             <div className="flex flex-wrap gap-2">
               {BUDGETS.map((b) => (
                 <button
@@ -223,9 +223,9 @@ function MiniBriefForm({
                   onClick={() => set('budgetRange', form.budgetRange === b ? '' : b)}
                   className="px-3 py-1.5 rounded-full text-xs font-medium border transition-colors"
                   style={{
-                    borderColor: form.budgetRange === b ? '#fff' : '#333',
-                    background: form.budgetRange === b ? 'rgba(255, 255, 255, 0.1)' : '#1A1A1A',
-                    color: form.budgetRange === b ? '#fff' : '#A3A3A3',
+                    borderColor: form.budgetRange === b ? '#000' : '#E0E0E0',
+                    background: form.budgetRange === b ? '#000' : '#fff',
+                    color: form.budgetRange === b ? '#fff' : '#000',
                   }}
                 >
                   {b}
@@ -245,19 +245,19 @@ function MiniBriefForm({
       )}
 
       {/* Navigation buttons */}
-      <div className="flex gap-3 mt-4 pt-3 border-t border-[#262626]">
+      <div className="flex gap-3 mt-4 pt-3 border-t border-[#E0E0E0]">
         {step === 1 ? (
           <>
             <button
               onClick={onCancel}
-              className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-[#262626] text-[#A3A3A3] hover:bg-[#333] transition-colors"
+              className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-[#E0E0E0] text-[#666] hover:bg-[#F5F5F5] transition-colors"
             >
               ביטול
             </button>
             <button
               onClick={() => form.fullName.trim() && setStep(2)}
               disabled={!form.fullName.trim()}
-              className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-white text-black hover:bg-gray-100 transition-colors disabled:opacity-40"
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-black text-white hover:bg-[#222] transition-colors disabled:opacity-40"
             >
               המשך →
             </button>
@@ -266,18 +266,18 @@ function MiniBriefForm({
           <>
             <button
               onClick={() => setStep(1)}
-              className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-[#262626] text-[#A3A3A3] hover:bg-[#333] transition-colors"
+              className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-[#E0E0E0] text-[#666] hover:bg-[#F5F5F5] transition-colors"
             >
               ← חזרה
             </button>
             <button
               onClick={handleSubmit}
               disabled={submitting}
-              className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-white text-black hover:bg-gray-100 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-black text-white hover:bg-[#222] transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {submitting ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   <span>שולח...</span>
                 </>
               ) : (
@@ -292,7 +292,7 @@ function MiniBriefForm({
 }
 
 // ---------------------------------------------------------------------------
-// Service Detail Modal (dark theme)
+// Service Detail Modal (white bg, black accents)
 // ---------------------------------------------------------------------------
 
 function ServiceModal({
@@ -337,25 +337,23 @@ function ServiceModal({
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
-      {/* Modal */}
       <div
-        className="relative w-full sm:max-w-md max-h-[90vh] bg-[#111111] rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom duration-300"
+        className="relative w-full sm:max-w-md max-h-[90vh] bg-white rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom duration-300"
         style={{ direction: 'rtl' }}
       >
         {/* Header */}
-        <div className="p-5 pb-4 flex items-start gap-4 bg-[#1A1A1A]">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-white/10">
+        <div className="p-5 pb-4 flex items-start gap-4 bg-[#F5F5F5]">
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-black">
             <span className="material-symbols-outlined text-[24px] text-white">{icon}</span>
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-bold text-white">{service.name}</h3>
-            <p className="text-sm text-[#A3A3A3] mt-1 leading-relaxed">{service.description}</p>
+            <h3 className="text-lg font-bold text-black">{service.name}</h3>
+            <p className="text-sm text-[#666] mt-1 leading-relaxed">{service.description}</p>
           </div>
-          <button onClick={onClose} className="p-1 rounded-full hover:bg-white/10 transition-colors flex-shrink-0">
-            <span className="material-symbols-outlined text-[20px] text-[#666]">close</span>
+          <button onClick={onClose} className="p-1 rounded-full hover:bg-black/5 transition-colors flex-shrink-0">
+            <span className="material-symbols-outlined text-[20px] text-[#999]">close</span>
           </button>
         </div>
 
@@ -363,11 +361,11 @@ function ServiceModal({
         <div className="p-5 flex-1 overflow-y-auto">
           {briefSubmitted ? (
             <div className="text-center py-8">
-              <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-white/10">
+              <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-black">
                 <span className="material-symbols-outlined text-[32px] text-white" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
               </div>
-              <h4 className="text-lg font-bold text-white mb-1">הבריף נשלח בהצלחה!</h4>
-              <p className="text-sm text-[#737373]">נחזור אליך בהקדם</p>
+              <h4 className="text-lg font-bold text-black mb-1">הבריף נשלח בהצלחה!</h4>
+              <p className="text-sm text-[#666]">נחזור אליך בהקדם</p>
             </div>
           ) : showBrief ? (
             <MiniBriefForm
@@ -381,28 +379,28 @@ function ServiceModal({
             <div className="space-y-3">
               <button
                 onClick={handleAsk}
-                className="w-full flex items-center gap-3 p-4 rounded-xl border border-[#262626] hover:border-[#404040] bg-[#1A1A1A] hover:bg-[#222] transition-all text-right"
+                className="w-full flex items-center gap-3 p-4 rounded-xl border border-[#E0E0E0] hover:border-black transition-all text-right"
               >
-                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-white/10">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-black">
                   <span className="material-symbols-outlined text-[20px] text-white">chat</span>
                 </div>
                 <div>
-                  <span className="font-bold text-sm text-white block">שאל אותי על השירות</span>
-                  <span className="text-xs text-[#737373]">דברו איתנו בצ׳אט ונסביר הכל</span>
+                  <span className="font-bold text-sm text-black block">שאל אותי על השירות</span>
+                  <span className="text-xs text-[#666]">דברו איתנו בצ׳אט ונסביר הכל</span>
                 </div>
               </button>
 
               {enableBrief && (
                 <button
                   onClick={() => setShowBrief(true)}
-                  className="w-full flex items-center gap-3 p-4 rounded-xl border border-white/20 hover:border-white/40 bg-white/5 hover:bg-white/10 transition-all text-right"
+                  className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-black hover:bg-[#F5F5F5] transition-all text-right"
                 >
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-white/15">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-black">
                     <span className="material-symbols-outlined text-[20px] text-white">description</span>
                   </div>
                   <div>
-                    <span className="font-bold text-sm text-white block">השאר פרטים לבריף</span>
-                    <span className="text-xs text-[#737373]">מלא טופס קצר ונחזור אליך עם הצעה</span>
+                    <span className="font-bold text-sm text-black block">השאר פרטים לבריף</span>
+                    <span className="text-xs text-[#666]">מלא טופס קצר ונחזור אליך עם הצעה</span>
                   </div>
                 </button>
               )}
@@ -415,7 +413,7 @@ function ServiceModal({
 }
 
 // ---------------------------------------------------------------------------
-// Main Component — Services Grid (dark theme per Stitch design)
+// Main Component — Services Grid (white bg, black accents)
 // ---------------------------------------------------------------------------
 
 export default function ServicesCatalogTab({ accountId, onAskAbout, sessionId, enableBrief }: ServicesCatalogTabProps) {
@@ -443,14 +441,14 @@ export default function ServicesCatalogTab({ accountId, onAskAbout, sessionId, e
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   if (services.length === 0) {
     return (
-      <div className="text-center py-16 text-[#737373] text-sm">
+      <div className="text-center py-16 text-[#999] text-sm">
         <span className="material-symbols-outlined text-[48px] mb-3 block">info</span>
         אין שירותים להצגה
       </div>
@@ -461,8 +459,8 @@ export default function ServicesCatalogTab({ accountId, onAskAbout, sessionId, e
     <div className="px-4 py-5" style={{ direction: 'rtl' }}>
       {/* Header */}
       <div className="mb-6 text-right">
-        <h2 className="text-[18px] font-bold text-white">השירותים שלנו</h2>
-        <p className="text-[12px] text-[#737373] mt-1">פתרונות דיגיטליים מותאמים לצמיחה שלכם</p>
+        <h2 className="text-[18px] font-bold text-black">השירותים שלנו</h2>
+        <p className="text-[12px] text-[#666] mt-1">פתרונות דיגיטליים מותאמים לצמיחה שלכם</p>
       </div>
 
       {/* Services Grid */}
@@ -473,16 +471,13 @@ export default function ServicesCatalogTab({ accountId, onAskAbout, sessionId, e
             <button
               key={svc.id}
               onClick={() => { setSelectedService(svc); setSelectedIndex(i); }}
-              className="group flex flex-col items-center text-center p-4 rounded-2xl border border-[#262626] bg-[#1A1A1A] hover:border-[#404040] transition-all duration-200 active:scale-[0.98]"
-              style={{ boxShadow: 'none' }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = '0 0 15px rgba(255,255,255,0.05)'; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}
+              className="group flex flex-col items-center text-center p-4 rounded-2xl border border-[#E0E0E0] bg-white hover:border-black transition-all duration-200 active:scale-[0.98]"
             >
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 bg-white/10 transition-transform group-hover:scale-110">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 bg-black transition-transform group-hover:scale-110">
                 <span className="material-symbols-outlined text-[24px] text-white">{icon}</span>
               </div>
-              <span className="text-[13px] font-bold text-white leading-tight">{svc.name}</span>
-              <span className="text-[11px] text-[#737373] mt-1.5 line-clamp-1 w-full">
+              <span className="text-[13px] font-bold text-black leading-tight">{svc.name}</span>
+              <span className="text-[11px] text-[#666] mt-1.5 line-clamp-1 w-full">
                 {svc.description.slice(0, 40)}...
               </span>
             </button>
