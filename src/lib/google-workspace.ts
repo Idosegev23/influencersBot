@@ -28,7 +28,7 @@ export async function uploadBriefToDrive(opts: {
   htmlBody: string;
   folderId?: string;
 }): Promise<{ fileId: string; webViewLink: string }> {
-  const auth = getServiceAccountAuth(['https://www.googleapis.com/auth/drive.file']);
+  const auth = getServiceAccountAuth(['https://www.googleapis.com/auth/drive']);
   const drive = google.drive({ version: 'v3', auth });
 
   const folderId = opts.folderId || process.env.GOOGLE_DRIVE_LEADS_FOLDER_ID;
