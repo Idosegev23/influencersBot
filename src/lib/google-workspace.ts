@@ -49,6 +49,7 @@ export async function uploadBriefToDrive(opts: {
       mimeType: 'text/html',
       body: stream,
     },
+    supportsAllDrives: true,
     fields: 'id, webViewLink',
   });
 
@@ -56,6 +57,7 @@ export async function uploadBriefToDrive(opts: {
   await drive.permissions.create({
     fileId: res.data.id!,
     requestBody: { role: 'reader', type: 'anyone' },
+    supportsAllDrives: true,
   });
 
   return {
