@@ -243,7 +243,8 @@ function DemoWidget({ accountId, config }: { accountId: string; config: WidgetCo
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       const img = (e.target as HTMLElement).closest('img[data-lightbox]') as HTMLImageElement | null;
-      if (img?.dataset.lightbox) window.open(img.dataset.lightbox, '_blank');
+      const url = img?.dataset.lightbox;
+      if (url && /^https?:\/\//i.test(url)) window.open(url, '_blank');
     };
     const handleError = (e: Event) => {
       const img = e.target as HTMLImageElement;

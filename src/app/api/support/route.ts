@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase, getInfluencerByUsername, getProductsByInfluencer } from '@/lib/supabase';
 import { notifyBrandSupport, sendSupportConfirmation } from '@/lib/whatsapp';
 import { sanitizeHtml } from '@/lib/sanitize';
+import { checkInfluencerAuth } from '@/lib/auth/influencer-auth';
+import { requireAdminAuth } from '@/lib/auth/admin-auth';
 
 export async function POST(req: NextRequest) {
   try {
@@ -221,6 +223,13 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Require influencer or admin auth
+    const isInfluencer = await checkInfluencerAuth(username);
+    const isAdmin = (await requireAdminAuth()) === null;
+    if (!isInfluencer && !isAdmin) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     // Get influencer
     const influencer = await getInfluencerByUsername(username);
     if (!influencer) {
@@ -262,8 +271,11 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// PATCH - Update support request status
+// PATCH - Update support request status (admin only)
 export async function PATCH(req: NextRequest) {
+  const denied = await requireAdminAuth();
+  if (denied) return denied;
+
   try {
     const body = await req.json();
     const { requestId, status, notes } = body;

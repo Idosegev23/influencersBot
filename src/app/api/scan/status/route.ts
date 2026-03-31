@@ -5,8 +5,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getScanJobsRepo } from '@/lib/db/repositories/scanJobsRepo';
+import { requireAdminAuth } from '@/lib/auth/admin-auth';
 
 export async function GET(req: NextRequest) {
+  const denied = await requireAdminAuth();
+  if (denied) return denied;
+
   try {
     const { searchParams } = new URL(req.url);
     const jobId = searchParams.get('jobId');

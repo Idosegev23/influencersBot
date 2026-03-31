@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getScanJobsRepo } from '@/lib/db/repositories/scanJobsRepo';
 import { runScanJob } from '@/lib/scraping/runScanJob';
 import { DEFAULT_SCAN_CONFIG } from '@/lib/scraping/newScanOrchestrator';
+import { requireAdminAuth } from '@/lib/auth/admin-auth';
 
 /**
  * Run scan in background (fire and forget)
@@ -23,6 +24,9 @@ async function runScanInBackground(jobId: string) {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = await requireAdminAuth();
+  if (denied) return denied;
+
   try {
     const body = await req.json();
     const { username, accountId, force, priority, config } = body;

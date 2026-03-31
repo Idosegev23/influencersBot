@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     const authHeader = req.headers.get('authorization');
     const expectedToken = process.env.SCAN_WORKER_TOKEN;
 
-    if (expectedToken && authHeader !== `Bearer ${expectedToken}`) {
+    if (!expectedToken || authHeader !== `Bearer ${expectedToken}`) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -100,6 +100,13 @@ export async function POST(req: NextRequest) {
  * Release stale locks
  */
 export async function GET(req: NextRequest) {
+  // Require admin auth for cleanup operations
+  const authHeader = req.headers.get('authorization');
+  const expectedToken = process.env.SCAN_WORKER_TOKEN;
+  if (!expectedToken || authHeader !== `Bearer ${expectedToken}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(req.url);
     const action = searchParams.get('action');

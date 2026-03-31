@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 
     // Require influencer or admin auth
     const isInfluencer = await checkInfluencerAuth(username);
-    const isAdmin = !(await requireAdminAuth());
+    const isAdmin = (await requireAdminAuth()) === null;
     if (!isInfluencer && !isAdmin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

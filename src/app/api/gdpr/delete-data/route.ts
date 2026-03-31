@@ -93,6 +93,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
+  const denied = await requireAdminAuth();
+  if (denied) return denied;
+
   const sessionId = req.nextUrl.searchParams.get('sessionId');
 
   if (!sessionId) {

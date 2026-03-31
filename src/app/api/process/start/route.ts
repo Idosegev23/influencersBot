@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { processAccountContent } from '@/lib/processing/content-processor-orchestrator';
+import { requireAdminAuth } from '@/lib/auth/admin-auth';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 minutes
@@ -14,6 +15,9 @@ export const maxDuration = 300; // 5 minutes
  * Start content processing for an account
  */
 export async function POST(req: NextRequest) {
+  const denied = await requireAdminAuth();
+  if (denied) return denied;
+
   try {
     const body = await req.json();
     const { accountId, transcribeVideos, maxVideos, buildPersona } = body;
