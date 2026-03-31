@@ -5,28 +5,13 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { cookies } from 'next/headers';
-
-const ADMIN_COOKIE_NAME = 'bestieai_admin_session';
-
-async function checkAdminAuth(): Promise<boolean> {
-  const cookieStore = await cookies();
-  const session = cookieStore.get(ADMIN_COOKIE_NAME);
-  return session?.value === 'authenticated';
-}
+import { requireAdminAuth } from '@/lib/auth/admin-auth';
 
 export async function GET(request: Request) {
-  try {
-    // Check admin authentication
-    const isAdmin = await checkAdminAuth();
-    
-    if (!isAdmin) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+  const denied = await requireAdminAuth();
+  if (denied) return denied;
 
+  try {
     const { searchParams } = new URL(request.url);
     const username = searchParams.get('username');
 

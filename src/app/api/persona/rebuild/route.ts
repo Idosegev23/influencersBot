@@ -7,11 +7,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { preprocessInstagramData } from '@/lib/scraping/preprocessing';
 import { buildPersonaWithGemini } from '@/lib/ai/gemini-persona-builder';
+import { requireAdminAuth } from '@/lib/auth/admin-auth';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 minutes
 
 export async function POST(req: NextRequest) {
+  const denied = await requireAdminAuth();
+  if (denied) return denied;
+
   try {
     const body = await req.json();
     const { accountId } = body;

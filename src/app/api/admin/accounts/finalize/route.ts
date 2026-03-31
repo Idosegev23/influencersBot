@@ -1,25 +1,14 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
-
-const COOKIE_NAME = 'bestieai_admin_session';
-
-// Check admin authentication
-async function checkAuth(): Promise<boolean> {
-  const cookieStore = await cookies();
-  const session = cookieStore.get(COOKIE_NAME);
-  return session?.value === 'authenticated';
-}
+import { requireAdminAuth } from '@/lib/auth/admin-auth';
 
 /**
  * POST /api/admin/accounts/finalize
  * Finalize account setup with subdomain, password, phone, etc.
  */
 export async function POST(request: Request) {
-  const isAuth = await checkAuth();
-  if (!isAuth) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const denied = await requireAdminAuth();
+  if (denied) return denied;
 
   try {
     const body = await request.json();

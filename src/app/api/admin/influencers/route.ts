@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { requireAdminAuth } from '@/lib/auth/admin-auth';
 
 export async function GET() {
+  const denied = await requireAdminAuth();
+  if (denied) return denied;
+
   try {
     const supabase = await createClient();
 

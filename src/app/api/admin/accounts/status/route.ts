@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAccountStatus } from '@/lib/scraping/resumeHelper';
+import { requireAdminAuth } from '@/lib/auth/admin-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,8 @@ export const dynamic = 'force-dynamic';
  * Check account status and get resume recommendation
  */
 export async function GET(req: NextRequest) {
+  const denied = await requireAdminAuth();
+  if (denied) return denied;
   try {
     const { searchParams } = new URL(req.url);
     const username = searchParams.get('username');

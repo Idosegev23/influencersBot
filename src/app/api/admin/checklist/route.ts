@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireAdminAuth } from '@/lib/auth/admin-auth';
 
 function getSupabase() {
   return createClient(
@@ -96,6 +97,9 @@ const CHECKLIST_TEMPLATE: { section: string; tasks: { key: string; title: string
 
 // GET — load checklist for account (auto-init if needed)
 export async function GET(req: NextRequest) {
+  const denied = await requireAdminAuth();
+  if (denied) return denied;
+
   const accountId = req.nextUrl.searchParams.get('accountId');
   if (!accountId) {
     return NextResponse.json({ error: 'Missing accountId' }, { status: 400 });
@@ -179,6 +183,9 @@ export async function PATCH(req: NextRequest) {
 
 // POST — reset checklist (re-initialize from template)
 export async function POST(req: NextRequest) {
+  const denied = await requireAdminAuth();
+  if (denied) return denied;
+
   const body = await req.json();
   const { accountId, action } = body;
 

@@ -5,21 +5,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-
-const COOKIE_NAME = 'bestieai_admin_session';
-
-async function checkAuth(): Promise<boolean> {
-  const cookieStore = await cookies();
-  const session = cookieStore.get(COOKIE_NAME);
-  return session?.value === 'authenticated';
-}
+import { requireAdminAuth } from '@/lib/auth/admin-auth';
 
 export async function GET(req: NextRequest) {
-  const isAuth = await checkAuth();
-  if (!isAuth) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const denied = await requireAdminAuth();
+  if (denied) return denied;
 
   const targetUrl = req.nextUrl.searchParams.get('url');
   if (!targetUrl) {

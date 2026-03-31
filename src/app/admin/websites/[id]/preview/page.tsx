@@ -351,6 +351,21 @@ function WidgetPreview({ accountId, config }: { accountId: string; config: Widge
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Delegated handlers for dynamically rendered images (replaces inline onclick/onerror)
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      const img = (e.target as HTMLElement).closest('img[data-lightbox]') as HTMLImageElement | null;
+      if (img?.dataset.lightbox) window.open(img.dataset.lightbox, '_blank');
+    };
+    const handleError = (e: Event) => {
+      const img = e.target as HTMLImageElement;
+      if (img.tagName === 'IMG' && img.dataset.lightbox) img.style.display = 'none';
+    };
+    document.addEventListener('click', handleClick);
+    document.addEventListener('error', handleError, true);
+    return () => { document.removeEventListener('click', handleClick); document.removeEventListener('error', handleError, true); };
+  }, []);
+
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
@@ -619,7 +634,7 @@ function formatWidgetMessage(text: string, isUserMsg: boolean = false, primaryCo
   function formatInline(t: string): string {
     let safe = escapeHtml(t);
     safe = safe.replace(/!\[([^\]]*)\]\(([^)]+)\)/g,
-      '<div style="margin:8px 0;"><img src="$2" alt="$1" style="max-width:100%;max-height:180px;border-radius:10px;object-fit:cover;cursor:pointer;" onerror="this.style.display=\'none\'" onclick="window.open(\'$2\',\'_blank\')" /></div>');
+      '<div style="margin:8px 0;"><img src="$2" alt="$1" data-lightbox="$2" style="max-width:100%;max-height:180px;border-radius:10px;object-fit:cover;cursor:pointer;" loading="lazy" /></div>');
     safe = safe.replace(/\[([^\]]+)\]\(([^)]+)\)/g,
       `<a href="$2" target="_blank" rel="noopener" style="color:${linkColor};text-decoration:underline;text-underline-offset:2px;font-weight:500;">$1</a>`);
     safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong style="font-weight:600;">$1</strong>');

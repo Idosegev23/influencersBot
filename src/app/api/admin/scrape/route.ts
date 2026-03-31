@@ -4,7 +4,7 @@ import { getInfluencerByUsername } from '@/lib/supabase';
 import { runBackgroundScrape } from '@/lib/background-scraper';
 import { getProgress } from '@/lib/scraping-progress';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '123456';
 
 // Increase timeout to 8 minutes (Vercel Pro max: 900s)
 export const maxDuration = 480; // 8 minutes

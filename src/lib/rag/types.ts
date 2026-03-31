@@ -78,6 +78,7 @@ export interface IngestInput {
 export interface IngestResult {
   documentId: string;
   chunksCreated: number;
+  skippedDuplicates?: number;
   totalTokens: number;
   durationMs: number;
 }

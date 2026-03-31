@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { scrapeLinkisProfile } from '@/lib/scraping/linkis-scraper';
+import { requireAdminAuth } from '@/lib/auth/admin-auth';
 
 export async function POST(req: NextRequest) {
+  const denied = await requireAdminAuth();
+  if (denied) return denied;
+
   try {
     const body = await req.json();
     const { accountId, url } = body;

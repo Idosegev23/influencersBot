@@ -5,15 +5,7 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { cookies } from 'next/headers';
-
-const ADMIN_COOKIE_NAME = 'bestieai_admin_session';
-
-async function checkAdminAuth(): Promise<boolean> {
-  const cookieStore = await cookies();
-  const session = cookieStore.get(ADMIN_COOKIE_NAME);
-  return session?.value === 'authenticated';
-}
+import { requireAdminAuth } from '@/lib/auth/admin-auth';
 
 /**
  * PATCH /api/admin/accounts/[accountId]/config
@@ -23,11 +15,10 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ accountId: string }> }
 ) {
+  const denied = await requireAdminAuth();
+  if (denied) return denied;
+
   try {
-    const isAdmin = await checkAdminAuth();
-    if (!isAdmin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
 
     const { accountId } = await params;
     if (!accountId) {
@@ -81,17 +72,10 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ accountId: string }> }
 ) {
+  const denied2 = await requireAdminAuth();
+  if (denied2) return denied2;
+
   try {
-    // Check admin authentication
-    const isAdmin = await checkAdminAuth();
-
-    if (!isAdmin) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
     const { accountId } = await params;
 
     if (!accountId) {

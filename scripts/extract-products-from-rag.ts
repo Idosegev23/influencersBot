@@ -307,9 +307,8 @@ async function main() {
   if (force && !dryRun) {
     const { count } = await supabase
       .from('widget_products')
-      .delete()
-      .eq('account_id', accountId)
-      .select('id', { count: 'exact', head: true });
+      .delete({ count: 'exact' })
+      .eq('account_id', accountId);
 
     if (count) console.log(`🗑️  Deleted ${count} existing products`);
   }

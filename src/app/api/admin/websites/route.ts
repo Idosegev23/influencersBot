@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { requireAdminAuth } from '@/lib/auth/admin-auth';
 import crypto from 'crypto';
 
 /**
  * POST /api/admin/websites - Generate management token for an account
  */
 export async function POST(request: NextRequest) {
+  const denied = await requireAdminAuth();
+  if (denied) return denied;
+
   try {
     const { accountId } = await request.json();
     if (!accountId) {
@@ -52,6 +56,9 @@ export async function POST(request: NextRequest) {
  * Every account with config.widget.enabled = true appears here.
  */
 export async function GET() {
+  const denied = await requireAdminAuth();
+  if (denied) return denied;
+
   try {
     const supabase = await createClient();
 

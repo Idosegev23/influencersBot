@@ -29,6 +29,18 @@ const securityHeaders = [
     key: 'Permissions-Policy',
     value: 'camera=(), microphone=(), geolocation=()',
   },
+  {
+    key: 'Content-Security-Policy',
+    value: [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com",
+      "img-src 'self' data: blob: https://*.cdninstagram.com https://*.fbcdn.net https://images.unsplash.com https://*.supabase.co",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://generativelanguage.googleapis.com https://vercel.live",
+      "frame-ancestors 'none'",
+    ].join('; '),
+  },
 ];
 
 const nextConfig: NextConfig = {
@@ -64,10 +76,14 @@ const nextConfig: NextConfig = {
     ],
   },
   async headers() {
-    // Security headers WITHOUT X-Frame-Options (for embeddable routes)
-    const headersWithoutFrame = securityHeaders.filter(
-      (h) => h.key !== 'X-Frame-Options',
-    );
+    // Security headers WITHOUT X-Frame-Options and with relaxed CSP (for embeddable routes)
+    const headersWithoutFrame = securityHeaders
+      .filter((h) => h.key !== 'X-Frame-Options')
+      .map((h) =>
+        h.key === 'Content-Security-Policy'
+          ? { ...h, value: h.value.replace("frame-ancestors 'none'", "frame-ancestors *") }
+          : h,
+      );
 
     return [
       {

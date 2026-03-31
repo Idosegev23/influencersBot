@@ -92,6 +92,19 @@ const envChecks: EnvCheck[] = [
     description: 'SendGrid API Key (for email notifications)',
     validator: (val) => val.startsWith('SG.'),
   },
+
+  // Security
+  {
+    name: 'ADMIN_PASSWORD',
+    required: false,
+    description: 'Admin dashboard password (defaults to 123456)',
+  },
+  {
+    name: 'CRON_SECRET',
+    required: true,
+    description: 'Cron job authorization secret (min 16 chars)',
+    validator: (val) => val.length >= 16,
+  },
 ];
 
 function checkEnv() {

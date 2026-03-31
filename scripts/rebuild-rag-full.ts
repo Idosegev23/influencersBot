@@ -162,16 +162,14 @@ async function main() {
       // Delete chunks first (foreign key to documents)
       const { count: chunkCount } = await supabase
         .from('document_chunks')
-        .delete()
-        .eq('account_id', account.id)
-        .select('*', { count: 'exact', head: true });
+        .delete({ count: 'exact' })
+        .eq('account_id', account.id);
       deletedChunks = chunkCount || 0;
 
       const { count: docCount } = await supabase
         .from('documents')
-        .delete()
-        .eq('account_id', account.id)
-        .select('*', { count: 'exact', head: true });
+        .delete({ count: 'exact' })
+        .eq('account_id', account.id);
       deletedDocs = docCount || 0;
 
       console.log(`  Deleted: ${deletedChunks} chunks, ${deletedDocs} documents`);

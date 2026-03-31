@@ -5,6 +5,8 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { checkInfluencerAuth } from '@/lib/auth/influencer-auth';
+import { requireAdminAuth } from '@/lib/auth/admin-auth';
 
 export async function GET(request: Request) {
   try {
@@ -16,6 +18,13 @@ export async function GET(request: Request) {
         { error: 'Username is required' },
         { status: 400 }
       );
+    }
+
+    // Require influencer or admin auth
+    const isInfluencer = await checkInfluencerAuth(username);
+    const isAdmin = !(await requireAdminAuth());
+    if (!isInfluencer && !isAdmin) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const supabase = await createClient();

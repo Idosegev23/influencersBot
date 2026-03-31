@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getProgress } from '@/lib/scraping-progress';
+import { requireAdminAuth } from '@/lib/auth/admin-auth';
 
 /**
  * GET /api/admin/scrape-progress/[username]
@@ -9,6 +10,9 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ username: string }> }
 ) {
+  const denied = await requireAdminAuth();
+  if (denied) return denied;
+
   try {
     const { username } = await params;
     

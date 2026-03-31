@@ -217,8 +217,8 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
   };
 
   const handleConnectIG = () => {
-    if (!accountId) return;
-    window.location.href = `/api/auth/instagram/connect?accountId=${accountId}`;
+    if (!accountId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(accountId)) return;
+    window.location.href = `/api/auth/instagram/connect?accountId=${encodeURIComponent(accountId)}`;
   };
 
   if (loading) {

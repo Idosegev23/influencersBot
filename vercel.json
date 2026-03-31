@@ -2,18 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
     {
-      "path": "/api/cron/notifications",
-      "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/cron/daily-digest",
-      "schedule": "0 6 * * *"
-    },
-    {
-      "path": "/api/cron/social-listening",
-      "schedule": "0 */6 * * *"
-    },
-    {
       "path": "/api/cron/poll-stories",
       "schedule": "*/30 * * * *"
     },

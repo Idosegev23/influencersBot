@@ -5,6 +5,7 @@
 
 import { NextRequest } from 'next/server';
 import { processWidgetMessage } from '@/lib/chatbot/widget-chat-handler';
+import { createClient } from '@/lib/supabase/server';
 
 // ============================================
 // CORS Headers
@@ -17,6 +18,24 @@ function getCorsHeaders(origin: string): Record<string, string> {
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Max-Age': '86400',
   };
+}
+
+/**
+ * Validate that the request origin matches the account's registered domain.
+ * Allows: localhost (dev), vercel preview deploys, and the account's own domain.
+ */
+function isOriginAllowed(origin: string, accountDomain?: string): boolean {
+  if (!origin || origin === 'null') return true; // server-side or file:// requests
+  try {
+    const url = new URL(origin);
+    // Always allow localhost / dev
+    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') return true;
+    // Allow our own domain
+    if (url.hostname.endsWith('.vercel.app') || url.hostname.endsWith('bestieai.co.il')) return true;
+    // Allow the account's registered domain
+    if (accountDomain && url.hostname.endsWith(accountDomain.replace(/^www\./, ''))) return true;
+  } catch { /* invalid URL */ }
+  return false;
 }
 
 // ============================================
@@ -57,6 +76,23 @@ export async function POST(req: NextRequest) {
         JSON.stringify({ error: 'message and accountId are required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
+    }
+
+    // CORS origin validation: check if origin matches the account's domain
+    if (origin && origin !== '*') {
+      const supabase = await createClient();
+      const { data: account } = await supabase
+        .from('accounts')
+        .select('config')
+        .eq('id', accountId)
+        .single();
+      const accountDomain = (account?.config as any)?.username; // domain stored in config.username
+      if (!isOriginAllowed(origin, accountDomain)) {
+        return new Response(
+          JSON.stringify({ error: 'Origin not allowed for this account' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
     }
 
     // Stream the response as NDJSON

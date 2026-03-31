@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireAdminAuth } from '@/lib/auth/admin-auth';
 
 function getSupabase() {
   return createClient(
@@ -10,6 +11,9 @@ function getSupabase() {
 
 // GET — returns checklist progress for all accounts (or a specific one)
 export async function GET(req: NextRequest) {
+  const denied = await requireAdminAuth();
+  if (denied) return denied;
+
   const accountId = req.nextUrl.searchParams.get('accountId');
 
   const supabase = getSupabase();
