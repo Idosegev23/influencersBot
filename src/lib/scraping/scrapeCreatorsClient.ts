@@ -668,15 +668,23 @@ export class ScrapeCreatorsClient {
    */
   async getBatchPostComments(
     postUrls: string[],
-    commentsPerPost: number = 3
+    commentsPerPost: number = 3,
+    totalTimeoutMs: number = 240_000 // 4 minutes max for entire batch
   ): Promise<InstagramComment[]> {
     const allComments: InstagramComment[] = [];
+    const batchStart = Date.now();
 
     for (const postUrl of postUrls) {
+      // Check if we've exceeded the total timeout
+      if (Date.now() - batchStart > totalTimeoutMs) {
+        console.warn(`[ScrapeCreators] getBatchPostComments timeout after ${Math.round((Date.now() - batchStart) / 1000)}s — processed ${allComments.length} comments from ${postUrls.indexOf(postUrl)}/${postUrls.length} posts`);
+        break;
+      }
+
       try {
         const comments = await this.getPostComments(postUrl, commentsPerPost);
         allComments.push(...comments);
-        
+
         // Small delay between requests
         await this.sleep(500);
       } catch (error: any) {

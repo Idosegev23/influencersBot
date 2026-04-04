@@ -33,6 +33,25 @@ export async function GET(req: NextRequest) {
     const supabase = await createClient();
     const repo = getScanJobsRepo();
 
+    // ⚡ Cleanup: mark stuck "running" jobs (>30 min) as failed
+    try {
+      const { data: stuckJobs } = await supabase
+        .from('scan_jobs')
+        .select('id, username, started_at')
+        .eq('status', 'running')
+        .lt('started_at', new Date(Date.now() - 30 * 60 * 1000).toISOString());
+
+      if (stuckJobs && stuckJobs.length > 0) {
+        for (const stuck of stuckJobs) {
+          await repo.markFailed(stuck.id, 'TIMEOUT', `Stuck in running state since ${stuck.started_at} — auto-cleaned`);
+          console.log(`[Cron] Cleaned stuck job ${stuck.id} (@${stuck.username})`);
+        }
+        console.log(`[Cron] Cleaned ${stuckJobs.length} stuck scan jobs`);
+      }
+    } catch (cleanupErr: any) {
+      console.error('[Cron] Cleanup failed (non-fatal):', cleanupErr.message);
+    }
+
     // Get ALL active creator accounts
     const { data: activeAccounts, error: accountsError } = await supabase
       .from('accounts')

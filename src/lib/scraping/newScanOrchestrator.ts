@@ -350,7 +350,7 @@ export class NewScanOrchestrator {
       // STEP 9: Fetch Comments (from posts)
       // ==========================================
       report('comments', 'running', 75, 'סורק תגובות...');
-      
+
       // Select posts for comments
       const postUrlsForComments = posts
         .sort((a, b) => (b.likes_count || 0) - (a.likes_count || 0))
@@ -358,44 +358,60 @@ export class NewScanOrchestrator {
         .map(p => p.post_url);
 
       if (postUrlsForComments.length > 0) {
-        const comments = await this.client.getBatchPostComments(
-          postUrlsForComments,
-          fullConfig.commentsPerPost
-        );
+        // ⚡ Timeout: 5 minutes max for entire comments step (fetch + save)
+        // Profile+highlights+posts take ~4min, leaving ~6min for comments+websites
+        const COMMENTS_STEP_TIMEOUT_MS = 300_000;
+        const commentsStepResult = await Promise.race([
+          (async () => {
+            const comments = await this.client.getBatchPostComments(
+              postUrlsForComments,
+              fullConfig.commentsPerPost,
+              240_000 // 4 minutes for API calls
+            );
 
-        // Get post IDs for linking
-        const { data: savedPosts } = await this.supabase
-          .from('instagram_posts')
-          .select('id, shortcode')
-          .eq('account_id', accountId);
+            // Get post IDs for linking
+            const { data: savedPosts } = await this.supabase
+              .from('instagram_posts')
+              .select('id, shortcode')
+              .eq('account_id', accountId);
 
-        const postIdMap = new Map(savedPosts?.map((p: any) => [p.shortcode, p.id]) || []);
+            const postIdMap = new Map(savedPosts?.map((p: any) => [p.shortcode, p.id]) || []);
 
-        // Save comments
-        for (const comment of comments) {
-          const postId = postIdMap.get(comment.post_shortcode);
-          if (!postId) continue;
+            // Save comments
+            for (const comment of comments) {
+              const postId = postIdMap.get(comment.post_shortcode);
+              if (!postId) continue;
 
-          const { error: commentError } = await this.supabase.from('instagram_comments').upsert({
-            post_id: postId,
-            account_id: accountId,
-            comment_id: comment.comment_id,
-            text: comment.text,
-            author_username: comment.author_username,
-            author_profile_pic: comment.author_profile_pic,
-            is_owner_reply: comment.is_owner_reply,
-            likes_count: comment.likes_count,
-            commented_at: comment.commented_at || new Date().toISOString(),
-            scraped_at: new Date().toISOString(),
-          }, {
-            onConflict: 'post_id,comment_id',
-          });
+              const { error: commentError } = await this.supabase.from('instagram_comments').upsert({
+                post_id: postId,
+                account_id: accountId,
+                comment_id: comment.comment_id,
+                text: comment.text,
+                author_username: comment.author_username,
+                author_profile_pic: comment.author_profile_pic,
+                is_owner_reply: comment.is_owner_reply,
+                likes_count: comment.likes_count,
+                commented_at: comment.commented_at || new Date().toISOString(),
+                scraped_at: new Date().toISOString(),
+              }, {
+                onConflict: 'post_id,comment_id',
+              });
 
-          if (commentError) {
-            console.error(`[Scan] Failed to save comment ${comment.comment_id}:`, commentError.message);
-          } else {
-            stats.commentsCount++;
-          }
+              if (commentError) {
+                console.error(`[Scan] Failed to save comment ${comment.comment_id}:`, commentError.message);
+              } else {
+                stats.commentsCount++;
+              }
+            }
+            return 'done' as const;
+          })(),
+          new Promise<'timeout'>((resolve) =>
+            setTimeout(() => resolve('timeout'), COMMENTS_STEP_TIMEOUT_MS)
+          ),
+        ]);
+
+        if (commentsStepResult === 'timeout') {
+          console.warn(`[Scan] Comments step timed out after ${COMMENTS_STEP_TIMEOUT_MS / 1000}s — continuing with ${stats.commentsCount} comments saved so far`);
         }
       }
 
@@ -560,6 +576,36 @@ async function startProcessingInBackground(
       console.log(`   - Errors: ${result.errors.join(', ')}`);
     }
     console.log(`${'='.repeat(60)}\n`);
+
+    // ⚡ Update scan job with transcript count from background processing
+    if (scanJobId && result.stats.videosTranscribed > 0) {
+      try {
+        const { createClient } = await import('@/lib/supabase/server');
+        const supabase = await createClient();
+        const { data: job } = await supabase
+          .from('scan_jobs')
+          .select('result_summary')
+          .eq('id', scanJobId)
+          .single();
+
+        if (job?.result_summary) {
+          const updated = {
+            ...job.result_summary,
+            stats: {
+              ...(job.result_summary as any).stats,
+              transcriptsCount: result.stats.videosTranscribed,
+            },
+          };
+          await supabase
+            .from('scan_jobs')
+            .update({ result_summary: updated })
+            .eq('id', scanJobId);
+          console.log(`[Background] Updated scan job ${scanJobId} with transcriptsCount: ${result.stats.videosTranscribed}`);
+        }
+      } catch (updateErr: any) {
+        console.error(`[Background] Failed to update scan job transcript count:`, updateErr.message);
+      }
+    }
 
   } catch (error: any) {
     console.error(`\n${'='.repeat(60)}`);
