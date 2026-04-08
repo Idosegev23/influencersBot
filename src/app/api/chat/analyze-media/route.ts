@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { analyzeMediaForChat } from '@/lib/chat/vision-analyzer';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { sanitizeUsername } from '@/lib/sanitize';
 
 export async function POST(req: NextRequest) {
   try {
-    const { storagePath, mediaType, username } = await req.json();
+    const body = await req.json();
+    const storagePath = (body.storagePath || '').replace(/[^a-zA-Z0-9_\-./]/g, '').slice(0, 500);
+    const mediaType = body.mediaType;
+    const username = sanitizeUsername(body.username || '');
 
     if (!storagePath || !mediaType || !username) {
       return NextResponse.json(

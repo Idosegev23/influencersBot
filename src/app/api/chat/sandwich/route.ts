@@ -17,11 +17,14 @@ import {
   loadContentIndexCached,
 } from '@/lib/cached-loaders';
 import { getAccountByInfluencerUsername } from '@/engines';
+import { sanitizeChatMessage, sanitizeUsername } from '@/lib/sanitize';
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { message, username, sessionId, responseId } = body;
+    const message = sanitizeChatMessage(body.message || '');
+    const username = sanitizeUsername(body.username || '');
+    const { sessionId, responseId } = body;
 
     if (!message || !username) {
       return NextResponse.json(

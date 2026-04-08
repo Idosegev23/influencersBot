@@ -12,17 +12,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { ingestAllForAccount } from '@/lib/rag/ingest';
+import { requireAdminAuth } from '@/lib/auth/admin-auth';
 
 // Allow up to 10 minutes for full re-embed of all accounts
 export const maxDuration = 600;
 
 export async function POST(req: NextRequest) {
   try {
-    // Auth
+    // Auth: Admin cookie OR CRON_SECRET
     const authHeader = req.headers.get('authorization');
     const expectedToken = process.env.CRON_SECRET;
-    if (expectedToken && authHeader !== `Bearer ${expectedToken}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const hasCronToken = expectedToken && authHeader === `Bearer ${expectedToken}`;
+    if (!hasCronToken) {
+      const denied = await requireAdminAuth();
+      if (denied) return denied;
     }
 
     const body = await req.json().catch(() => ({}));

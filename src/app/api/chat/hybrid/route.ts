@@ -6,10 +6,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processWithHybridAndPersona } from '@/lib/chatbot/sandwich-bot-hybrid';
 import { createClient } from '@/lib/supabase/server';
+import { sanitizeChatMessage, sanitizeUsername } from '@/lib/sanitize';
 
 export async function POST(req: NextRequest) {
   try {
-    const { message, username } = await req.json();
+    const body = await req.json();
+    const message = sanitizeChatMessage(body.message || '');
+    const username = sanitizeUsername(body.username || '');
 
     if (!message || !username) {
       return NextResponse.json(

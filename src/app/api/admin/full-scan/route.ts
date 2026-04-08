@@ -11,16 +11,19 @@ import { runScanJob } from '@/lib/scraping/runScanJob';
 import { processAccountContent } from '@/lib/processing/content-processor-orchestrator';
 import { DEFAULT_SCAN_CONFIG } from '@/lib/scraping/newScanOrchestrator';
 import { hashPassword } from '@/lib/utils';
+import { requireAdminAuth } from '@/lib/auth/admin-auth';
 
 export const maxDuration = 600;
 
 export async function POST(req: NextRequest) {
   try {
-    // Auth: CRON_SECRET
+    // Auth: Admin cookie OR CRON_SECRET
     const authHeader = req.headers.get('authorization');
     const expectedToken = process.env.CRON_SECRET;
-    if (expectedToken && authHeader !== `Bearer ${expectedToken}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const hasCronToken = expectedToken && authHeader === `Bearer ${expectedToken}`;
+    if (!hasCronToken) {
+      const denied = await requireAdminAuth();
+      if (denied) return denied;
     }
 
     const { username, accountId } = await req.json();

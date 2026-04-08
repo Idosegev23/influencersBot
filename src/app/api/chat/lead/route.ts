@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { sanitizeHtml, sanitizeUsername } from '@/lib/sanitize';
 
 function generateSerial(): string {
   const ts = Date.now().toString(36);
@@ -9,7 +10,12 @@ function generateSerial(): string {
 
 export async function POST(req: NextRequest) {
   try {
-    const { firstName, lastName, phone, username, sessionId } = await req.json();
+    const body = await req.json();
+    const firstName = sanitizeHtml(body.firstName || '');
+    const lastName = sanitizeHtml(body.lastName || '');
+    const phone = (body.phone || '').replace(/[^\d+\-() ]/g, '').slice(0, 20);
+    const username = sanitizeUsername(body.username || '');
+    const sessionId = body.sessionId;
 
     if (!firstName?.trim() || !lastName?.trim() || !phone?.trim()) {
       return NextResponse.json({ success: false, error: 'כל השדות חובה' }, { status: 400 });
