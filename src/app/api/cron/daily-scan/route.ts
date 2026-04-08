@@ -154,6 +154,8 @@ export async function GET(req: NextRequest) {
         maxWebsitePages: 0,
         samplesPerHighlight: 999,
         transcribeReels: true,
+        incremental: true,
+        websiteCacheDays: 7,
       },
     });
 

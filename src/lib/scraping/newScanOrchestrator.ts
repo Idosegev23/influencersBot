@@ -20,6 +20,8 @@ export interface NewScanConfig {
   maxWebsitePages: number;
   samplesPerHighlight: number;
   transcribeReels: boolean;
+  incremental: boolean;         // Skip unchanged highlights, comments on old posts, etc.
+  websiteCacheDays: number;     // Skip websites crawled within N days
 }
 
 export interface ScanResult {
@@ -57,8 +59,10 @@ export const DEFAULT_SCAN_CONFIG: NewScanConfig = {
   postsLimit: 50,
   commentsPerPost: 3,
   maxWebsitePages: 10,
-  samplesPerHighlight: 999, // ⚡ Get ALL items from each highlight (not just samples!)
-  transcribeReels: true, // ⚡ CRITICAL: Must transcribe highlights for persona + partnerships detection!
+  samplesPerHighlight: 999,
+  transcribeReels: true,
+  incremental: false,       // Full scan by default (initial onboarding)
+  websiteCacheDays: 7,
 };
 
 // ============================================
@@ -89,12 +93,14 @@ export class NewScanOrchestrator {
     const fullConfig = { ...DEFAULT_SCAN_CONFIG, ...config };
     const sessionId = randomUUID();
     
-    const stats: ScanStats = {
+    const stats: ScanStats & { newPostsCount: number; highlightsSkipped: number } = {
       profileScraped: false,
       postsCount: 0,
+      newPostsCount: 0,
       commentsCount: 0,
       highlightsCount: 0,
       highlightItemsCount: 0,
+      highlightsSkipped: 0,
       websitesCrawled: 0,
       websitePagesCount: 0,
       transcriptsCount: 0,
@@ -245,18 +251,40 @@ export class NewScanOrchestrator {
       await this.rateLimiter.waitRandom('after stories');
 
       // ==========================================
-      // STEP 5: Fetch Highlights (metadata + samples)
+      // STEP 5: Fetch Highlights (incremental — only changed)
       // ==========================================
       report('highlights', 'running', 35, 'סורק הילייטס...');
-      
-      const highlightsData = await this.client.getHighlightSamples(
-        username,
-        fullConfig.samplesPerHighlight,
-        15 // ⚡ Max 15 highlights
-      );
 
-      // Save highlights metadata
-      for (const highlight of highlightsData.highlights) {
+      // Phase A: Get highlight metadata (1 API call, fast)
+      const freshHighlights = await this.client.getHighlights(username);
+      const highlightsToProcess = freshHighlights.slice(0, 15);
+
+      // Phase B: In incremental mode, compare with DB to skip unchanged
+      let highlightsToFetchDetail = highlightsToProcess;
+
+      if (fullConfig.incremental && highlightsToProcess.length > 0) {
+        const { data: existingHighlights } = await this.supabase
+          .from('instagram_highlights')
+          .select('highlight_id, items_count')
+          .eq('account_id', accountId);
+
+        const existingMap = new Map(
+          (existingHighlights || []).map((h: any) => [h.highlight_id, h.items_count])
+        );
+
+        highlightsToFetchDetail = highlightsToProcess.filter(h => {
+          const existingCount = existingMap.get(h.highlight_id);
+          return existingCount === undefined || existingCount !== h.items_count;
+        });
+
+        stats.highlightsSkipped = highlightsToProcess.length - highlightsToFetchDetail.length;
+        if (stats.highlightsSkipped > 0) {
+          console.log(`[Step 5] Incremental: ${stats.highlightsSkipped} highlights unchanged, fetching detail for ${highlightsToFetchDetail.length}`);
+        }
+      }
+
+      // Phase C: Upsert metadata for ALL highlights, fetch items only for changed
+      for (const highlight of highlightsToProcess) {
         const { data: savedHighlight } = await this.supabase
           .from('instagram_highlights')
           .upsert({
@@ -274,33 +302,37 @@ export class NewScanOrchestrator {
 
         stats.highlightsCount++;
 
-        // Save sample items
-        const sample = highlightsData.samples.find(s => s.highlightId === highlight.highlight_id);
-        if (sample && savedHighlight) {
-          for (let i = 0; i < sample.items.length; i++) {
-            const item = sample.items[i];
-            
-            await this.supabase.from('instagram_highlight_items').upsert({
-              highlight_id: savedHighlight.id,
-              account_id: accountId,
-              item_id: item.story_id,
-              item_index: i,
-              media_type: item.media_type === 'video' ? 'video' : 'image',
-              media_url: item.media_url,
-              thumbnail_url: item.thumbnail_url,
-              posted_at: item.timestamp,
-              scraped_at: new Date().toISOString(),
-            }, {
-              onConflict: 'highlight_id,item_id',
-            });
-
-            stats.highlightItemsCount++;
+        // Only fetch items for changed/new highlights
+        const needsDetail = highlightsToFetchDetail.some(h => h.highlight_id === highlight.highlight_id);
+        if (needsDetail && savedHighlight) {
+          try {
+            const detail = await this.client.getHighlightDetail(highlight.highlight_id);
+            for (let i = 0; i < detail.items.length; i++) {
+              const item = detail.items[i];
+              await this.supabase.from('instagram_highlight_items').upsert({
+                highlight_id: savedHighlight.id,
+                account_id: accountId,
+                item_id: item.story_id,
+                item_index: i,
+                media_type: item.media_type === 'video' ? 'video' : 'image',
+                media_url: item.media_url,
+                thumbnail_url: item.thumbnail_url,
+                posted_at: item.timestamp,
+                scraped_at: new Date().toISOString(),
+              }, {
+                onConflict: 'highlight_id,item_id',
+              });
+              stats.highlightItemsCount++;
+            }
+          } catch (err: any) {
+            console.error(`[Step 5] Failed to fetch detail for highlight ${highlight.highlight_id}:`, err.message);
           }
+          await this.rateLimiter.waitFixed(500, 'between highlights');
         }
       }
 
-      report('highlights', 'completed', 45, 
-        `✓ ${stats.highlightsCount} הילייטס (${stats.highlightItemsCount} פריטים לדגימה)`);
+      report('highlights', 'completed', 45,
+        `✓ ${stats.highlightsCount} הילייטס (${stats.highlightItemsCount} פריטים חדשים, ${stats.highlightsSkipped} ללא שינוי)`);
 
       // ==========================================
       // STEP 6: Random Delay
@@ -311,9 +343,26 @@ export class NewScanOrchestrator {
       // STEP 7: Fetch Posts (LAST! Most important is profile, bio, stories, highlights)
       // ==========================================
       report('posts', 'running', 50, `סורק ${fullConfig.postsLimit} פוסטים...`);
-      
+
       const posts = await this.client.getPosts(username, fullConfig.postsLimit);
-      
+
+      // Identify new vs existing posts for incremental comments
+      let newPosts = posts;
+      if (fullConfig.incremental && posts.length > 0) {
+        const postShortcodes = posts.map(p => p.shortcode);
+        const { data: existingPosts } = await this.supabase
+          .from('instagram_posts')
+          .select('shortcode')
+          .eq('account_id', accountId)
+          .in('shortcode', postShortcodes);
+
+        const existingShortcodes = new Set((existingPosts || []).map((p: any) => p.shortcode));
+        newPosts = posts.filter(p => !existingShortcodes.has(p.shortcode));
+        stats.newPostsCount = newPosts.length;
+        console.log(`[Step 7] Incremental: ${newPosts.length} new posts, ${posts.length - newPosts.length} already in DB`);
+      }
+
+      // Upsert ALL posts (updates metrics like likes/comments count)
       for (const post of posts) {
         await this.supabase.from('instagram_posts').upsert({
           account_id: accountId,
@@ -335,11 +384,11 @@ export class NewScanOrchestrator {
         }, {
           onConflict: 'account_id,shortcode',
         });
-        
+
         stats.postsCount++;
       }
 
-      report('posts', 'completed', 70, `✓ ${stats.postsCount} פוסטים`);
+      report('posts', 'completed', 70, `✓ ${stats.postsCount} פוסטים (${stats.newPostsCount} חדשים)`);
 
       // ==========================================
       // STEP 8: Random Delay
@@ -351,11 +400,17 @@ export class NewScanOrchestrator {
       // ==========================================
       report('comments', 'running', 75, 'סורק תגובות...');
 
-      // Select posts for comments
-      const postUrlsForComments = posts
-        .sort((a, b) => (b.likes_count || 0) - (a.likes_count || 0))
-        .slice(0, Math.min(fullConfig.postsLimit, posts.length))
-        .map(p => p.post_url);
+      // In incremental mode: only fetch comments for NEW posts
+      // In full mode: fetch comments for all posts (sorted by likes)
+      const postsForComments = fullConfig.incremental
+        ? newPosts
+        : posts.sort((a, b) => (b.likes_count || 0) - (a.likes_count || 0)).slice(0, Math.min(fullConfig.postsLimit, posts.length));
+
+      const postUrlsForComments = postsForComments.map(p => p.post_url);
+
+      if (fullConfig.incremental && newPosts.length === 0) {
+        console.log(`[Step 9] Incremental: no new posts, skipping comments`);
+      }
 
       if (postUrlsForComments.length > 0) {
         // ⚡ Timeout: 5 minutes max for entire comments step (fetch + save)
