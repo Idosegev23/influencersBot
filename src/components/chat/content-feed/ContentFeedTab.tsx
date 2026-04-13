@@ -209,7 +209,7 @@ function RecipeModal({
         {/* Image */}
         {item.imageUrl && (
           <div className="cf-modal__img">
-            <img src={getProxiedImageUrl(item.imageUrl)} alt={item.title} />
+            <img src={getProxiedImageUrl(item.imageUrl, item.shortcode || undefined)} alt={item.title} />
           </div>
         )}
 
@@ -299,7 +299,7 @@ function RecipeCard({ item, config, onAsk, onOpen, isNew }: { item: ContentCard;
     >
       <div className="cf-recipe-card__img-wrap">
         {item.imageUrl && (
-          <img src={getProxiedImageUrl(item.imageUrl)} alt={item.title} loading="lazy" />
+          <img src={getProxiedImageUrl(item.imageUrl, item.shortcode || undefined)} alt={item.title} loading="lazy" />
         )}
         {isNew && (
           <span className="cf-recipe-card__badge">
@@ -382,7 +382,7 @@ function LookCard({ item, config, onAsk, index }: { item: ContentCard; config: t
     >
       <div className="cf-look-card__img">
         {item.imageUrl ? (
-          <img src={getProxiedImageUrl(item.imageUrl)} alt={brandName || item.title} loading="lazy" />
+          <img src={getProxiedImageUrl(item.imageUrl, item.shortcode || undefined)} alt={brandName || item.title} loading="lazy" />
         ) : (
           <div className="cf-look-card__placeholder">
             <Shirt className="w-8 h-8" style={{ color: '#999' }} />
@@ -432,7 +432,7 @@ function BeautyCard({ item, config, onAsk }: { item: ContentCard; config: typeof
     >
       <div className="cf-beauty-card__img">
         {item.imageUrl ? (
-          <img src={getProxiedImageUrl(item.imageUrl)} alt={item.title} loading="lazy" />
+          <img src={getProxiedImageUrl(item.imageUrl, item.shortcode || undefined)} alt={item.title} loading="lazy" />
         ) : (
           <div className="cf-beauty-card__placeholder">
             <Sparkles className="w-8 h-8" style={{ color: '#805062' }} />
@@ -472,7 +472,7 @@ function ReviewCard({ item, config, onAsk }: { item: ContentCard; config: typeof
     >
       {item.imageUrl && (
         <div className="cf-review-card__img">
-          <img src={getProxiedImageUrl(item.imageUrl)} alt={item.title} loading="lazy" />
+          <img src={getProxiedImageUrl(item.imageUrl, item.shortcode || undefined)} alt={item.title} loading="lazy" />
         </div>
       )}
       <div className="cf-review-card__body">
@@ -510,7 +510,7 @@ function DestinationCard({ item, config, onAsk }: { item: ContentCard; config: t
     >
       <div className="cf-destination-card__img">
         {item.imageUrl ? (
-          <img src={getProxiedImageUrl(item.imageUrl)} alt={item.title} loading="lazy" />
+          <img src={getProxiedImageUrl(item.imageUrl, item.shortcode || undefined)} alt={item.title} loading="lazy" />
         ) : (
           <div className="cf-destination-card__placeholder" style={{ background: config.accentBg }}>
             <Plane className="w-8 h-8" style={{ color: config.accentColor }} />
@@ -537,7 +537,7 @@ function GenericCard({ item, config, onAsk }: { item: ContentCard; config: typeo
     >
       {item.imageUrl && (
         <div className="cf-generic-card__thumb">
-          <img src={getProxiedImageUrl(item.imageUrl)} alt={item.title} loading="lazy" />
+          <img src={getProxiedImageUrl(item.imageUrl, item.shortcode || undefined)} alt={item.title} loading="lazy" />
         </div>
       )}
       <div className="cf-generic-card__info">

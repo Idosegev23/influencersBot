@@ -341,8 +341,12 @@ async function handleFashionFeed(
     });
   }
 
-  // Sort by variety: interleave highlights and posts
-  // First highlights (brand looks), then posts
+  // Sort: posts first (have shortcode fallback for images), then highlights
+  items.sort((a, b) => {
+    if (a.shortcode && !b.shortcode) return -1;
+    if (!a.shortcode && b.shortcode) return 1;
+    return 0;
+  });
   const total = items.length;
   const paginated = items.slice(offset, offset + limit);
 
