@@ -36,7 +36,7 @@ const securityHeaders = [
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: blob: https://*.cdninstagram.com https://*.fbcdn.net https://*.fna.fbcdn.net https://images.unsplash.com https://*.supabase.co https://cdn-icons-png.freepik.com",
+      "img-src 'self' data: blob: https://*.cdninstagram.com https://*.fbcdn.net https://*.fna.fbcdn.net https://images.unsplash.com https://*.supabase.co https://cdn-icons-png.freepik.com https://*.cloudfront.net",
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://generativelanguage.googleapis.com https://vercel.live",
       "frame-ancestors 'none'",
     ].join('; '),
