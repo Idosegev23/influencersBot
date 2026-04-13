@@ -84,7 +84,7 @@ export function NavTabs({ tabs, activeTab, onTabChange }: NavTabsProps) {
               role="tab"
             >
               <Icon className="nav-tab-icon" />
-              <span className="nav-tab-label">{tab.label}</span>
+              {isActive && <span className="nav-tab-label">{tab.label}</span>}
             </button>
           );
         })}
