@@ -8,6 +8,13 @@ import {
   ShoppingBag,
   Ticket,
   AlertCircle,
+  Shirt,
+  ChefHat,
+  Briefcase,
+  Droplets,
+  Star,
+  Tag,
+  Eye,
 } from 'lucide-react';
 
 /* ── Icon mapping by tab id ── */
@@ -19,7 +26,33 @@ const TAB_ICONS: Record<string, LucideIcon> = {
   content_feed: Sparkles,
   coupons: Ticket,
   support: AlertCircle,
+  deals: Tag,
 };
+
+/* ── Icon mapping by label (fallback for topic-specific tabs) ── */
+const LABEL_ICONS: Record<string, LucideIcon> = {
+  'טיפוח': Droplets,
+  'לוקים': Shirt,
+  'מתכונים': ChefHat,
+  'שירותים': Briefcase,
+  'סקירות': Star,
+  'מבצעים': Tag,
+  'מוצרים': ShoppingBag,
+  'קופונים': Ticket,
+  'גלו': Compass,
+  'צ׳אט': MessageCircle,
+  'בעיה במוצר': AlertCircle,
+  'בעיה בהזמנה': AlertCircle,
+};
+
+function getTabIcon(tab: TabItem): LucideIcon {
+  // First try by tab id
+  if (TAB_ICONS[tab.id]) return TAB_ICONS[tab.id];
+  // Then try by label
+  if (LABEL_ICONS[tab.label]) return LABEL_ICONS[tab.label];
+  // Fallback
+  return Eye;
+}
 
 export interface TabItem {
   id: string;
@@ -40,7 +73,7 @@ export function NavTabs({ tabs, activeTab, onTabChange }: NavTabsProps) {
       <div className="nav-tabs-inner">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
-          const Icon = TAB_ICONS[tab.id] || MessageCircle;
+          const Icon = getTabIcon(tab);
 
           return (
             <button
@@ -51,7 +84,7 @@ export function NavTabs({ tabs, activeTab, onTabChange }: NavTabsProps) {
               role="tab"
             >
               <Icon className="nav-tab-icon" />
-              {isActive && <span className="nav-tab-label">{tab.label}</span>}
+              <span className="nav-tab-label">{tab.label}</span>
             </button>
           );
         })}

@@ -2534,11 +2534,10 @@ h1, h2, h3, h4, h5, h6 {
   line-height: 21px;
 }
 
-/* Active tab: purple bg, light text, icon + label */
+/* Active tab: purple bg, light text */
 .nav-tab--active {
   background: #883fe2;
   color: #f1e9fd;
-  padding: 10px 12px;
 }
 
 /* ── Legacy mobile bottom tabs (kept for backwards compat) ── */
