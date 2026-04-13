@@ -128,10 +128,13 @@ export async function GET(req: NextRequest) {
         '@/lib/processing/content-processor-orchestrator'
       );
 
+      // Limit transcriptions per cron run to fit within Vercel's 10-min timeout.
+      // ~10s per transcription → 30 transcriptions ≈ 5 min, leaving 5 min for RAG + persona.
+      // Accounts with more untranscribed videos will be picked up in the next cron run.
       const result = await processAccountContent({
         accountId: account.id,
         transcribeVideos: true,
-        maxVideosToTranscribe: 999,
+        maxVideosToTranscribe: 30,
         buildRagIndex: true,
         buildPersona: true,
         priority: 'normal',
