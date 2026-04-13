@@ -18,7 +18,30 @@ import {
   Eye,
 } from 'lucide-react';
 
-/* ── Icon mapping by tab id ── */
+/* ── Icon mapping by label (primary — checked first) ── */
+const LABEL_ICONS: Record<string, LucideIcon> = {
+  // Topic-specific labels
+  'טיפוח': Droplets,
+  'לוקים': Shirt,
+  'מתכונים': CookingPot,
+  'שירותים': BriefcaseBusiness,
+  'סקירות': BadgeCheck,
+  'המלצות': Stars,
+  'טיפים': Stars,
+  // Coupons/deals variants
+  'קופונים': Ticket,
+  'מבצעים': Tag,
+  'דילים': Tag,
+  'הטבות': Tag,
+  // Standard tabs
+  'מוצרים': ShoppingBag,
+  'גלו': Compass,
+  'צ׳אט': MessageCircle,
+  'בעיה במוצר': AlertCircle,
+  'בעיה בהזמנה': AlertCircle,
+};
+
+/* ── Icon mapping by tab id (fallback) ── */
 const TAB_ICONS: Record<string, LucideIcon> = {
   chat: MessageCircle,
   discover: Compass,
@@ -27,31 +50,13 @@ const TAB_ICONS: Record<string, LucideIcon> = {
   content_feed: Sparkles,
   coupons: Ticket,
   support: AlertCircle,
-  deals: Tag,
-};
-
-/* ── Icon mapping by label (fallback for topic-specific tabs) ── */
-const LABEL_ICONS: Record<string, LucideIcon> = {
-  'טיפוח': Droplets,
-  'לוקים': Shirt,
-  'מתכונים': CookingPot,
-  'שירותים': BriefcaseBusiness,
-  'סקירות': BadgeCheck,
-  'המלצות': Stars,
-  'מבצעים': Tag,
-  'מוצרים': ShoppingBag,
-  'קופונים': Ticket,
-  'גלו': Compass,
-  'צ׳אט': MessageCircle,
-  'בעיה במוצר': AlertCircle,
-  'בעיה בהזמנה': AlertCircle,
 };
 
 function getTabIcon(tab: TabItem): LucideIcon {
-  // First try by tab id
-  if (TAB_ICONS[tab.id]) return TAB_ICONS[tab.id];
-  // Then try by label
+  // Label first — same tab id can have different labels per account
   if (LABEL_ICONS[tab.label]) return LABEL_ICONS[tab.label];
+  // Then by tab id
+  if (TAB_ICONS[tab.id]) return TAB_ICONS[tab.id];
   // Fallback
   return Eye;
 }
