@@ -1970,22 +1970,37 @@ h1, h2, h3, h4, h5, h6 {
   border: 2px solid white;
 }
 
+/* ── Chat Input Wrapper ── */
+.chat-input-wrapper {
+  width: 100%;
+}
+
+.chat-input-disclaimer {
+  color: #676767;
+  font-size: 11px;
+  text-align: center;
+  margin-top: 6px;
+  line-height: 16px;
+}
+
+/* ── Chat Input Pill ── */
 .chat-input-pill {
   position: relative;
   display: flex;
   align-items: center;
   min-height: 60px;
   background: white;
-  border: 1px solid #f9e8f3;
   border-radius: 60px;
-  box-shadow:
-    -30px 4px 60px 0 rgba(201, 60, 118, 0.1),
-     30px 4px 60px 0 rgba(56, 100, 227, 0.1);
-  transition: box-shadow 0.3s ease, border-color 0.3s ease;
-  padding: 8px 16px 8px 10px;
+  box-shadow: 0px 6px 20px rgba(0, 0, 0, 0.10);
+  border: 1px solid transparent;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  padding: 8px 20px 8px 10px;
 }
 
-/* No visual change on focus — same look always */
+/* Active state — purple border */
+.chat-input-pill--active {
+  border-color: #883fe2;
+}
 
 .chat-input-pill textarea {
   background: transparent;
@@ -1994,7 +2009,9 @@ h1, h2, h3, h4, h5, h6 {
   flex: 1;
   padding: 8px 12px;
   font-size: 16px;
-  color: var(--color-text);
+  font-family: 'Heebo', sans-serif;
+  font-weight: 400;
+  color: #0C1013;
   text-align: right;
   resize: none;
   overflow: hidden;
@@ -2005,6 +2022,7 @@ h1, h2, h3, h4, h5, h6 {
   color: #676767;
 }
 
+/* ── Send Button ── */
 .chat-input-pill .send-btn {
   flex-shrink: 0;
   width: 38px;
@@ -2013,11 +2031,16 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #883fe2;
+  background: #0C1013;
   color: white;
   border: none;
   cursor: pointer;
-  transition: transform 0.25s ease, opacity 0.25s ease;
+  transition: transform 0.25s ease, opacity 0.25s ease, background 0.25s ease;
+}
+
+/* Active state — purple send button */
+.chat-input-pill--active .send-btn {
+  background: #883fe2;
 }
 
 .chat-input-pill .send-btn:hover:not(:disabled) {
@@ -2156,6 +2179,45 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: none;
 }
 
+/* ── Starter Pills (suggested questions grid) ── */
+.starter-pills-grid {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 8px;
+  justify-content: center;
+  max-width: 670px;
+  width: 100%;
+  padding: 0 8px;
+}
+
+.starter-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 15px;
+  font-size: 13px;
+  font-family: 'Heebo', sans-serif;
+  font-weight: 400;
+  line-height: 19.5px;
+  background: white;
+  border: none;
+  border-radius: 23px;
+  color: #676767;
+  transition: all 0.25s ease;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.starter-pill:hover {
+  background: #f4f5f7;
+}
+
+.starter-pill:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Legacy suggestion-pill — kept for hot-topic pills and discovery */
 .suggestion-pill {
   display: flex;
   align-items: center;
@@ -2422,20 +2484,14 @@ h1, h2, h3, h4, h5, h6 {
 /* ============================================
    Mobile Chat Redesign (< 768px)
    ============================================ */
-.mobile-bottom-tabs {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 60;
+/* ── Nav Tabs (shared between desktop header & mobile bottom bar) ── */
+.nav-tabs-bar {
   display: flex;
   justify-content: center;
-  padding-bottom: max(10px, env(safe-area-inset-bottom));
-  padding-top: 6px;
   pointer-events: none;
 }
 
-.mobile-bottom-tabs-inner {
+.nav-tabs-inner {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -2443,51 +2499,62 @@ h1, h2, h3, h4, h5, h6 {
   background: white;
   border-radius: 60px;
   pointer-events: auto;
-  position: relative;
 }
 
-/* Mobile tab bar glow removed per design feedback */
-
-.mobile-tab-btn {
+.nav-tab {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 10px;
+  padding: 10px;
   border-radius: 60px;
   font-size: 14px;
+  font-family: 'Heebo', sans-serif;
   font-weight: 400;
   color: #676767;
   background: transparent;
   border: none;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.25s ease;
   white-space: nowrap;
+  line-height: 21px;
 }
 
-.mobile-tab-btn.active-chat {
-  background: #883fe2;
-  color: #f1e9fd;
-  font-weight: 700;
+.nav-tab-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
 }
 
-.mobile-tab-btn.active-coupons {
-  background: #883fe2;
-  color: #f1e9fd;
-  font-weight: 700;
+.nav-tab-label {
+  font-size: 14px;
+  line-height: 21px;
 }
 
-.mobile-tab-btn.active-problem,
-.mobile-tab-btn.active-support {
+/* Active tab: purple bg, light text, icon + label */
+.nav-tab--active {
   background: #883fe2;
   color: #f1e9fd;
-  font-weight: 700;
+  padding: 10px 12px;
 }
 
-.mobile-tab-btn.active-discover,
-.mobile-tab-btn.active-topics {
-  background: #883fe2;
-  color: #f1e9fd;
-  font-weight: 700;
+/* ── Legacy mobile bottom tabs (kept for backwards compat) ── */
+.mobile-bottom-tabs {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 60;
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
+  padding-top: 6px;
+  pointer-events: none;
+}
+
+.mobile-bottom-tabs .nav-tabs-bar {
+  pointer-events: none;
+}
+
+.mobile-bottom-tabs .nav-tabs-inner {
+  pointer-events: auto;
 }
 
 @media (max-width: 767px) {
@@ -2509,16 +2576,38 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .mobile-chat .chat-input-pill {
-    border: none !important;
+    border: 1px solid transparent !important;
     border-radius: 60px !important;
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1) !important;
     background: white !important;
+  }
+
+  .mobile-chat .chat-input-pill--active {
+    border-color: #883fe2 !important;
   }
 
   .mobile-chat .chat-input-pill .send-btn {
     background: #0c1013 !important;
     width: 38px !important;
     height: 38px !important;
+  }
+
+  .mobile-chat .chat-input-pill--active .send-btn {
+    background: #883fe2 !important;
+  }
+
+  .mobile-chat .starter-pill {
+    background: white !important;
+    border: none !important;
+    border-radius: 23px !important;
+    padding: 6px 15px !important;
+    font-size: 13px !important;
+    color: #676767 !important;
+  }
+
+  .mobile-chat .starter-pill:hover {
+    background: #f4f5f7 !important;
+    transform: none !important;
   }
 
   .mobile-chat .suggestion-pill {

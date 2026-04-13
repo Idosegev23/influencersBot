@@ -6,7 +6,6 @@ import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import {
-  Send,
   MessageCircle,
   Copy,
   ChefHat,
@@ -19,18 +18,15 @@ import {
   Plane,
   X,
   Loader2,
-  Ticket,
-  AlertCircle,
   HelpCircle,
   ChevronLeft,
   Plus,
   RotateCcw,
   CheckCircle,
   ArrowRight,
-  Compass,
   Flame,
   Home,
-  ShoppingBag,
+  Compass,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { getInfluencerByUsername, getBrandsByInfluencer, getContentByInfluencer, type Brand } from '@/lib/supabase';
@@ -49,8 +45,9 @@ import { SupportFlowForm } from '@/components/chat/SupportFlowForm';
 import { DirectiveRenderer, type UIDirectives, type BrandCardData } from '@/components/chat';
 import { useStreamChat, type StreamMeta, type StreamCards, type StreamDone } from '@/hooks/useStreamChat';
 import { useChatMedia } from '@/hooks/useChatMedia';
-import { MediaAttachButton } from '@/components/chat/MediaAttachButton';
-import { MediaPreview } from '@/components/chat/MediaPreview';
+import { ChatInput } from '@/components/chat/ChatInput';
+import { NavTabs } from '@/components/chat/NavTabs';
+import { StarterPills } from '@/components/chat/StarterPills';
 import SupportForm from '@/components/SupportForm';
 import { LeadCapturePopup } from '@/components/chat/LeadCapturePopup';
 import type { Influencer, ContentItem, InfluencerType } from '@/types';
@@ -124,22 +121,7 @@ const typeLabels: Record<InfluencerType, string> = {
   other: 'טיפים והמלצות',
 };
 
-// Tab styling per tab id (icon, colors)
 type TabId = string; // Dynamic — tab ids come from account config
-
-const TAB_STYLE: Record<string, { icon: typeof MessageCircle; activeColor: string; activeBg: string }> = {
-  chat: { icon: MessageCircle, activeColor: '#f1e9fd', activeBg: '#883fe2' },
-  discover: { icon: Compass, activeColor: '#f1e9fd', activeBg: '#883fe2' },
-  topics: { icon: Sparkles, activeColor: '#f1e9fd', activeBg: '#883fe2' },
-  products: { icon: ShoppingBag, activeColor: '#f1e9fd', activeBg: '#883fe2' },
-  content_feed: { icon: Sparkles, activeColor: '#f1e9fd', activeBg: '#883fe2' },
-  coupons: { icon: Ticket, activeColor: '#f1e9fd', activeBg: '#883fe2' },
-  support: { icon: AlertCircle, activeColor: '#f1e9fd', activeBg: '#883fe2' },
-};
-
-function getTabStyle(tabId: string) {
-  return TAB_STYLE[tabId] || TAB_STYLE.chat;
-}
 
 // Default tabs if config.tabs is not set (fallback)
 const DEFAULT_TABS: { id: string; label: string; type: string; topic?: string }[] = [
@@ -906,24 +888,11 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
 
               {/* Left side: Tab pills */}
               <div className="flex items-center gap-2 flex-shrink-0">
-              <div className="flex items-center gap-[5px] rounded-full p-[6px]" style={{ background: 'white' }}>
-                {(influencer.tabs || DEFAULT_TABS).map((tab: { id: string; label: string; type?: string }) => {
-                  const isActive = activeTab === tab.id;
-                  const style = getTabStyle(tab.id);
-                  const TabIcon = style.icon;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id as TabId)}
-                      className="flex items-center gap-[6px] px-[11px] py-[6px] rounded-full transition-all"
-                      style={{ color: isActive ? style.activeColor : '#676767', fontSize: '16px', fontWeight: isActive ? 700 : 400, background: isActive ? style.activeBg : 'transparent' }}
-                    >
-                      <span>{tab.label}</span>
-                      <TabIcon className="w-[18px] h-[18px]" />
-                    </button>
-                  );
-                })}
-              </div>
+                <NavTabs
+                  tabs={influencer.tabs || DEFAULT_TABS}
+                  activeTab={activeTab}
+                  onTabChange={(id) => setActiveTab(id as TabId)}
+                />
               </div>
             </div>
           )}
@@ -979,81 +948,28 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         transition={{ duration: 0.4, delay: 0.3 }}
                         className={`${isMobile ? 'w-[363px]' : 'w-[670px]'} max-w-full mb-6`}
                       >
-                        {media.previewUrl && (
-                          <MediaPreview
-                            previewUrl={media.previewUrl}
-                            isProcessing={media.isProcessing}
-                            isReady={!!media.result}
-                            isVideo={media.result?.mediaType === 'video' || media.previewUrl?.includes('video') || false}
-                            error={media.error}
-                            onClear={media.clear}
-                          />
-                        )}
-                        <div className="chat-input-pill">
-                          <MediaAttachButton
-                            onFileSelected={(file) => media.processMedia(file, username)}
-                            disabled={isTyping || media.isProcessing}
-                          />
-                          <textarea
-                            ref={inputRef}
-                            value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                handleSendMessage();
-                              }
-                            }}
-                            placeholder="מה רצית לשאול?"
-                            disabled={isTyping}
-                            rows={1}
-                            onInput={(e) => {
-                              const t = e.currentTarget;
-                              t.style.height = 'auto';
-                              t.style.height = Math.min(t.scrollHeight, 120) + 'px';
-                            }}
-                          />
-                          <button
-                            onClick={handleSendMessage}
-                            disabled={(!inputValue.trim() && !media.result) || isTyping || media.isProcessing}
-                            className="send-btn"
-                          >
-                            <Send className="w-4 h-4" />
-                          </button>
-                        </div>
-                        {hasCommercialContent && (
-                          <p dir="rtl" style={{ color: '#676767', fontSize: isMobile ? '11px' : '10px', textAlign: 'center', marginTop: '6px', lineHeight: '16px' }}>
-                            העמוד עשוי לכלול תוכן שיווקי ושיתופי פעולה מסחריים
-                          </p>
-                        )}
+                        <ChatInput
+                          value={inputValue}
+                          onChange={setInputValue}
+                          onSend={handleSendMessage}
+                          disabled={isTyping}
+                          media={media}
+                          username={username}
+                          showDisclaimer={hasCommercialContent}
+                          inputRef={inputRef}
+                        />
                       </motion.div>
 
                       {/* Quick reply pills — only for non-media_news accounts (media_news uses hot topic pills instead) */}
                       {influencer.influencer_type !== 'media_news' && quickReplies.length > 0 && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 8 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.4, delay: 0.35 }}
-                          className="flex flex-wrap justify-center gap-2 max-w-[670px] w-full px-2"
-                        >
-                          {quickReplies.map((q, i) => (
-                            <motion.button
-                              key={i}
-                              initial={{ opacity: 0, y: 6 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ delay: 0.4 + i * 0.05, duration: 0.3 }}
-                              whileTap={{ scale: 0.96 }}
-                              onClick={() => {
-                                if (isTyping || isStreamActive) return;
-                                maybeShowLeadPopup();
-                                sendQuickMessage(q);
-                              }}
-                              className="suggestion-pill whitespace-nowrap flex-shrink-0"
-                            >
-                              {q}
-                            </motion.button>
-                          ))}
-                        </motion.div>
+                        <StarterPills
+                          items={quickReplies}
+                          onSelect={(q) => {
+                            maybeShowLeadPopup();
+                            sendQuickMessage(q);
+                          }}
+                          disabled={isTyping || isStreamActive}
+                        />
                       )}
 
                       {/* Hot topic pills for media_news accounts */}
@@ -1532,53 +1448,16 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   style={{ background: 'transparent' }}
                 >
                   <div className={`mx-auto ${isMobile ? 'max-w-2xl' : 'max-w-[670px]'}`}>
-                    {media.previewUrl && (
-                      <MediaPreview
-                        previewUrl={media.previewUrl}
-                        isProcessing={media.isProcessing}
-                        isReady={!!media.result}
-                        isVideo={media.result?.mediaType === 'video' || media.previewUrl?.includes('video') || false}
-                        error={media.error}
-                        onClear={media.clear}
-                      />
-                    )}
-                    <div className="chat-input-pill">
-                      <MediaAttachButton
-                        onFileSelected={(file) => media.processMedia(file, username)}
-                        disabled={isTyping || media.isProcessing}
-                      />
-                      <textarea
-                        ref={inputRef}
-                        value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            handleSendMessage();
-                          }
-                        }}
-                        placeholder="מה רצית לשאול?"
-                        disabled={isTyping}
-                        rows={1}
-                        onInput={(e) => {
-                          const t = e.currentTarget;
-                          t.style.height = 'auto';
-                          t.style.height = Math.min(t.scrollHeight, 120) + 'px';
-                        }}
-                      />
-                      <button
-                        onClick={handleSendMessage}
-                        disabled={(!inputValue.trim() && !media.result) || isTyping || media.isProcessing}
-                        className="send-btn"
-                      >
-                        <Send className="w-4 h-4" />
-                      </button>
-                    </div>
-                    {hasCommercialContent && (
-                      <p dir="rtl" style={{ color: '#9ca3af', fontSize: '11px', textAlign: 'center', marginTop: '6px', lineHeight: '16px' }}>
-                        העמוד עשוי לכלול תוכן שיווקי ושיתופי פעולה מסחריים
-                      </p>
-                    )}
+                    <ChatInput
+                      value={inputValue}
+                      onChange={setInputValue}
+                      onSend={handleSendMessage}
+                      disabled={isTyping}
+                      media={media}
+                      username={username}
+                      showDisclaimer={hasCommercialContent}
+                      inputRef={inputRef}
+                    />
                   </div>
                 </div>
               </motion.div>
@@ -2042,22 +1921,11 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
         {/* Mobile Bottom Tab Bar */}
         {isMobile && influencer && (
           <div className="mobile-bottom-tabs">
-            <div className="mobile-bottom-tabs-inner">
-              {(influencer.tabs || DEFAULT_TABS).map((tab: { id: string; label: string; type?: string }) => {
-                const style = getTabStyle(tab.id);
-                const TabIcon = style.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id as TabId)}
-                    className={`mobile-tab-btn ${activeTab === tab.id ? `active-${tab.id}` : ''}`}
-                  >
-                    <span>{tab.label}</span>
-                    <TabIcon className="w-[18px] h-[18px]" />
-                  </button>
-                );
-              })}
-            </div>
+            <NavTabs
+              tabs={influencer.tabs || DEFAULT_TABS}
+              activeTab={activeTab}
+              onTabChange={(id) => setActiveTab(id as TabId)}
+            />
           </div>
         )}
 

@@ -6,6 +6,9 @@ export { InlineProgress, type ProgressData } from './InlineProgress';
 export { InlineForm, type FormType } from './InlineForm';
 export { BrandCards } from './BrandCards';
 export { SupportFlowForm } from './SupportFlowForm';
+export { ChatInput } from './ChatInput';
+export { NavTabs, type TabItem } from './NavTabs';
+export { StarterPills } from './StarterPills';
 
 
 
