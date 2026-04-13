@@ -2181,13 +2181,14 @@ h1, h2, h3, h4, h5, h6 {
 
 /* ── Starter Pills (suggested questions grid) ── */
 .starter-pills-grid {
-  display: grid;
-  grid-template-columns: repeat(2, auto);
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   justify-content: center;
-  max-width: 670px;
+  max-width: 350px;
   width: 100%;
-  padding: 0 8px;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 .starter-pill {
@@ -2206,6 +2207,9 @@ h1, h2, h3, h4, h5, h6 {
   transition: all 0.25s ease;
   cursor: pointer;
   white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .starter-pill:hover {

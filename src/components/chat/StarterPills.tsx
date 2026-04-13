@@ -6,6 +6,11 @@ interface StarterPillsProps {
   items: string[];
   onSelect: (item: string) => void;
   disabled?: boolean;
+  /** Extra pill at the end (e.g. "גלו עוד") */
+  extraPill?: {
+    label: string;
+    onClick: () => void;
+  };
 }
 
 /** Strip emojis from text */
@@ -17,8 +22,8 @@ function stripEmojis(text: string): string {
     .trim();
 }
 
-export function StarterPills({ items, onSelect, disabled }: StarterPillsProps) {
-  if (items.length === 0) return null;
+export function StarterPills({ items, onSelect, disabled, extraPill }: StarterPillsProps) {
+  if (items.length === 0 && !extraPill) return null;
 
   return (
     <motion.div
@@ -41,6 +46,19 @@ export function StarterPills({ items, onSelect, disabled }: StarterPillsProps) {
           {stripEmojis(item)}
         </motion.button>
       ))}
+      {extraPill && (
+        <motion.button
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 + items.length * 0.05, duration: 0.3 }}
+          whileTap={{ scale: 0.96 }}
+          onClick={extraPill.onClick}
+          className="starter-pill"
+          disabled={disabled}
+        >
+          {extraPill.label}
+        </motion.button>
+      )}
     </motion.div>
   );
 }

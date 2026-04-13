@@ -960,8 +960,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         />
                       </motion.div>
 
-                      {/* Quick reply pills — only for non-media_news accounts (media_news uses hot topic pills instead) */}
-                      {influencer.influencer_type !== 'media_news' && quickReplies.length > 0 && (
+                      {/* Starter pills — unified for ALL account types */}
+                      {quickReplies.length > 0 && (
                         <StarterPills
                           items={quickReplies}
                           onSelect={(q) => {
@@ -969,149 +969,12 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             sendQuickMessage(q);
                           }}
                           disabled={isTyping || isStreamActive}
+                          extraPill={
+                            (influencer.tabs || DEFAULT_TABS).some((t: { id: string }) => t.id === 'discover')
+                              ? { label: 'גלו עוד', onClick: () => setActiveTab('discover') }
+                              : undefined
+                          }
                         />
-                      )}
-
-                      {/* Hot topic pills for media_news accounts */}
-                      {influencer.influencer_type === 'media_news' && hotTopicPills.length > 0 && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 8 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.4, delay: 0.4 }}
-                          className="discovery-pills-row"
-                        >
-                          <div className="discovery-pills-scroll">
-                            {hotTopicPills.map((topic, i) => (
-                              <motion.button
-                                key={topic.name}
-                                initial={{ opacity: 0, y: 6 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.45 + i * 0.05, duration: 0.3 }}
-                                whileTap={{ scale: 0.96 }}
-                                onClick={async () => {
-                                  if (isTyping || isStreamActive) return;
-                                  const visibleMsg = `ספרו לי על ${topic.name}`;
-                                  const apiMessage = topic.summary
-                                    ? `${visibleMsg}\n\n[הקשר הלוק:]\n[נושא חם: ${topic.name} (${topic.status})\nתקציר: ${topic.summary}]`
-                                    : visibleMsg;
-                                  const userMsg: Message = { id: Date.now().toString(), role: 'user', content: visibleMsg };
-                                  setMessages(prev => [...prev, userMsg]);
-                                  setIsTyping(true);
-                                  const assistantMessageId = (Date.now() + 1).toString();
-                                  setStreamingMessageId(assistantMessageId);
-                                  setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant', content: '' }]);
-                                  await sendStreamMessage({
-                                    message: apiMessage,
-                                    username,
-                                    sessionId: sessionId || undefined,
-                                    previousResponseId: responseId || undefined,
-                                    clientMessageId: assistantMessageId,
-                                  });
-                                }}
-                                className="suggestion-pill whitespace-nowrap flex-shrink-0"
-                                style={{
-                                  background: topic.status === 'breaking' ? '#FFF0F0' : '#FFF8F0',
-                                  borderColor: topic.status === 'breaking' ? '#FFD0D0' : '#FFE8D0',
-                                }}
-                              >
-                                <span>{topic.name}</span>
-                              </motion.button>
-                            ))}
-                            <motion.button
-                              initial={{ opacity: 0, y: 6 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ delay: 0.75, duration: 0.3 }}
-                              whileTap={{ scale: 0.96 }}
-                              onClick={() => setActiveTab('discover')}
-                              className="suggestion-pill flex items-center gap-1 whitespace-nowrap flex-shrink-0"
-                              style={{ background: '#FFF3E5', borderColor: '#FFE0B2' }}
-                            >
-                              <Flame className="w-3.5 h-3.5" style={{ color: '#FF6B00' }} />
-                              <span>מה עוד חם?</span>
-                            </motion.button>
-                          </div>
-                        </motion.div>
-                      )}
-
-                      {/* Discovery category pills — horizontal scroll with arrow (non-news accounts) */}
-                      {influencer.influencer_type !== 'media_news' && (influencer.tabs || DEFAULT_TABS).some((t: { id: string }) => t.id === 'discover') && discoveryCategories.length > 0 && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 8 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.4, delay: 0.4 }}
-                          className="discovery-pills-row"
-                        >
-                          <button
-                            className="discovery-pills-arrow"
-                            onClick={() => {
-                              const el = document.querySelector('.discovery-pills-scroll');
-                              if (el) el.scrollBy({ left: -200, behavior: 'smooth' });
-                            }}
-                            aria-label="גלול שמאלה"
-                          >
-                            <ChevronLeft className="w-4 h-4" />
-                          </button>
-                          <div className="discovery-pills-scroll">
-                            {discoveryCategories.slice(0, 6).map((cat, i) => (
-                              <motion.button
-                                key={cat.slug}
-                                initial={{ opacity: 0, y: 6 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.45 + i * 0.05, duration: 0.3 }}
-                                whileTap={{ scale: 0.96 }}
-                                onClick={async () => {
-                                  if (isTyping || isStreamActive) return;
-                                  maybeShowLeadPopup();
-                                  const visibleMsg = `ספרי לי על ${cat.title}`;
-                                  const userMsg: Message = { id: Date.now().toString(), role: 'user', content: visibleMsg };
-                                  setMessages(prev => [...prev, userMsg]);
-                                  setIsTyping(true);
-
-                                  let enrichedMsg = visibleMsg;
-                                  try {
-                                    const res = await fetch(`/api/discovery/list?username=${encodeURIComponent(username)}&slug=${encodeURIComponent(cat.slug)}`);
-                                    if (res.ok) {
-                                      const listData = await res.json();
-                                      const items = (listData.items || []).slice(0, 10);
-                                      const contextLines = items.map((item: any, idx: number) => {
-                                        const title = item.aiTitle || item.captionExcerpt || '';
-                                        const summary = item.aiSummary || '';
-                                        const metric = item.metricValue && item.metricLabel ? ` (${item.metricLabel}: ${item.metricValue.toLocaleString()})` : '';
-                                        return `${idx + 1}. ${title}${metric}${summary ? ' — ' + summary : ''}`;
-                                      }).join('\n');
-                                      enrichedMsg = `[הנתונים מתוך הרשימה "${cat.title}":\n${contextLines}]\n\n${visibleMsg}`;
-                                    }
-                                  } catch { /* fallback to plain message */ }
-
-                                  const assistantMessageId = (Date.now() + 1).toString();
-                                  setStreamingMessageId(assistantMessageId);
-                                  setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant', content: '' }]);
-                                  await sendStreamMessage({
-                                    message: enrichedMsg,
-                                    username,
-                                    sessionId: sessionId || undefined,
-                                    previousResponseId: responseId || undefined,
-                                    clientMessageId: assistantMessageId,
-                                  });
-                                }}
-                                className="suggestion-pill whitespace-nowrap flex-shrink-0"
-                              >
-                                {cat.title}
-                              </motion.button>
-                            ))}
-                            <motion.button
-                              initial={{ opacity: 0, y: 6 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ delay: 0.75, duration: 0.3 }}
-                              whileTap={{ scale: 0.96 }}
-                              onClick={() => setActiveTab('discover')}
-                              className="suggestion-pill flex items-center gap-1 whitespace-nowrap flex-shrink-0"
-                            >
-                              <Compass className="w-3.5 h-3.5" />
-                              <span>גלו עוד</span>
-                            </motion.button>
-                          </div>
-                        </motion.div>
                       )}
                     </div>
                   ) : (
