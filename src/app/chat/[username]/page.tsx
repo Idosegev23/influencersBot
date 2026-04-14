@@ -18,7 +18,6 @@ import {
   Plane,
   X,
   Loader2,
-  HelpCircle,
   ChevronLeft,
   Plus,
   RotateCcw,
@@ -853,13 +852,13 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   <div className="status-dot absolute -bottom-0.5 -left-0.5" />
                 </div>
                 <div>
-                  <h1 className="font-semibold text-base whitespace-nowrap overflow-hidden text-ellipsis" style={{ color: '#0c1013' }}>{influencer.display_name}</h1>
-                  <p className="text-xs" style={{ color: '#676767' }}>{influencer.header_label || typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other}</p>
+                  <h1 className="font-semibold text-base leading-6 whitespace-nowrap overflow-hidden text-ellipsis" style={{ color: '#0c1013' }}>{influencer.display_name}</h1>
+                  <p className="text-sm font-light leading-4" style={{ color: '#676767' }}>{influencer.header_label || typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other}</p>
                 </div>
               </div>
               <div className="flex items-center gap-1">
                 <button onClick={() => setShowSupportModal(true)} className="p-2 rounded-lg transition-all hover:bg-black/10" style={{ color: '#676767' }} aria-label="עזרה">
-                  <HelpCircle className="w-[18px] h-[18px]" />
+                  <span className="help-icon" aria-hidden />
                 </button>
               </div>
             </div>
@@ -881,8 +880,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   <div className="status-dot absolute -bottom-0.5 -left-0.5" />
                 </div>
                 <div className="min-w-0">
-                  <h1 className="font-semibold text-[19px] whitespace-nowrap overflow-hidden text-ellipsis" style={{ color: '#0c1013' }}>{influencer.display_name}</h1>
-                  <p className="text-[13px] whitespace-nowrap" style={{ color: '#676767' }}>{influencer.header_label || typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other}</p>
+                  <h1 className="font-semibold text-base leading-6 whitespace-nowrap overflow-hidden text-ellipsis" style={{ color: '#0c1013' }}>{influencer.display_name}</h1>
+                  <p className="text-sm font-light leading-4 whitespace-nowrap" style={{ color: '#676767' }}>{influencer.header_label || typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other}</p>
                 </div>
               </div>
 
@@ -1800,7 +1799,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
             style={{ color: '#676767' }}
             aria-label="עזרה"
           >
-            <HelpCircle className="w-[18px] h-[18px]" />
+            <span className="help-icon" aria-hidden />
           </button>
         )}
 

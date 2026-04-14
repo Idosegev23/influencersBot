@@ -1,7 +1,6 @@
 'use client';
 
 import { useRef, useState, useCallback } from 'react';
-import { Send } from 'lucide-react';
 import { MediaAttachButton } from './MediaAttachButton';
 import { MediaPreview } from './MediaPreview';
 
@@ -89,7 +88,7 @@ export function ChatInput({
           className="send-btn"
           aria-label="שלח הודעה"
         >
-          <Send className="w-4 h-4" />
+          <span className="send-btn-icon" aria-hidden />
         </button>
 
         {/* Textarea */}

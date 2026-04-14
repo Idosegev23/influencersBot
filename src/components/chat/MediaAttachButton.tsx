@@ -1,7 +1,6 @@
 'use client';
 
 import { useRef } from 'react';
-import { ImagePlus } from 'lucide-react';
 
 interface MediaAttachButtonProps {
   onFileSelected: (file: File) => void;
@@ -20,7 +19,7 @@ export function MediaAttachButton({ onFileSelected, disabled }: MediaAttachButto
         disabled={disabled}
         aria-label="צרף תמונה או סרטון"
       >
-        <ImagePlus className="w-5 h-5" />
+        <span className="media-attach-icon" aria-hidden />
       </button>
       <input
         ref={inputRef}

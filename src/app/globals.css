@@ -2008,9 +2008,10 @@ h1, h2, h3, h4, h5, h6 {
   outline: none;
   flex: 1;
   padding: 8px 12px;
-  font-size: 16px;
+  font-size: 18px;
+  line-height: 22.4px;
   font-family: 'Heebo', sans-serif;
-  font-weight: 400;
+  font-weight: 300;
   color: #0C1013;
   text-align: right;
   resize: none;
@@ -2053,12 +2054,40 @@ h1, h2, h3, h4, h5, h6 {
   cursor: not-allowed;
 }
 
+.send-btn-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  background-color: currentColor;
+  -webkit-mask: url('/icons/send.svg') center/contain no-repeat;
+  mask: url('/icons/send.svg') center/contain no-repeat;
+}
+
+.media-attach-icon {
+  display: block;
+  width: 24px;
+  height: 24px;
+  background-color: currentColor;
+  -webkit-mask: url('/icons/media-attach.svg') center/contain no-repeat;
+  mask: url('/icons/media-attach.svg') center/contain no-repeat;
+}
+
+.help-icon {
+  display: block;
+  width: 18px;
+  height: 18px;
+  background-color: currentColor;
+  -webkit-mask: url('/icons/help.svg') center/contain no-repeat;
+  mask: url('/icons/help.svg') center/contain no-repeat;
+}
+
 /* ── Media Attach Button ── */
 .media-attach-btn {
   flex-shrink: 0;
   width: 36px;
   height: 36px;
-  border-radius: 50%;
+  padding: 0 8px;
+  border-radius: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2524,9 +2553,16 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .nav-tab-icon {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   flex-shrink: 0;
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
 }
 
 .nav-tab-label {

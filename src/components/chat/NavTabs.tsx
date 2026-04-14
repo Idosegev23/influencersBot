@@ -1,64 +1,41 @@
 'use client';
 
-import type { LucideIcon } from 'lucide-react';
-import {
-  MessageCircle,
-  Compass,
-  Sparkles,
-  ShoppingBag,
-  Ticket,
-  AlertCircle,
-  Shirt,
-  CookingPot,
-  BriefcaseBusiness,
-  Droplets,
-  BadgeCheck,
-  Stars,
-  Tag,
-  Eye,
-} from 'lucide-react';
-
 /* ── Icon mapping by label (primary — checked first) ── */
-const LABEL_ICONS: Record<string, LucideIcon> = {
-  // Topic-specific labels
-  'טיפוח': Droplets,
-  'לוקים': Shirt,
-  'מתכונים': CookingPot,
-  'שירותים': BriefcaseBusiness,
-  'סקירות': BadgeCheck,
-  'המלצות': Stars,
-  'טיפים': Stars,
-  // Coupons/deals variants
-  'קופונים': Ticket,
-  'מבצעים': Tag,
-  'דילים': Tag,
-  'הטבות': Tag,
-  // Standard tabs
-  'מוצרים': ShoppingBag,
-  'גלו': Compass,
-  'צ׳אט': MessageCircle,
-  'בעיה במוצר': AlertCircle,
-  'בעיה בהזמנה': AlertCircle,
+const LABEL_ICONS: Record<string, string> = {
+  'טיפוח': 'tipuach',
+  'לוקים': 'lookim',
+  'מתכונים': 'matkonim',
+  'שירותים': 'shirutim',
+  'סקירות': 'skirot',
+  'המלצות': 'hamlazot',
+  'טיפים': 'hamlazot',
+  'מה חם': 'ham',
+  'קופונים': 'coupons',
+  'מבצעים': 'mivzaim',
+  'דילים': 'mivzaim',
+  'הטבות': 'mivzaim',
+  'מוצרים': 'mozarim',
+  'גלו': 'galu',
+  'צ׳אט': 'chat',
+  'בעיה במוצר': 'baaya',
+  'בעיה בהזמנה': 'baaya_motzar',
 };
 
 /* ── Icon mapping by tab id (fallback) ── */
-const TAB_ICONS: Record<string, LucideIcon> = {
-  chat: MessageCircle,
-  discover: Compass,
-  topics: Sparkles,
-  products: ShoppingBag,
-  content_feed: Sparkles,
-  coupons: Ticket,
-  support: AlertCircle,
+const TAB_ICONS: Record<string, string> = {
+  chat: 'chat',
+  discover: 'galu',
+  topics: 'ham',
+  products: 'mozarim',
+  content_feed: 'ham',
+  coupons: 'coupons',
+  support: 'baaya',
 };
 
-function getTabIcon(tab: TabItem): LucideIcon {
-  // Label first — same tab id can have different labels per account
+function getTabIconName(tab: TabItem): string {
   if (LABEL_ICONS[tab.label]) return LABEL_ICONS[tab.label];
-  // Then by tab id
   if (TAB_ICONS[tab.id]) return TAB_ICONS[tab.id];
-  // Fallback
-  return Eye;
+  return 'chat';
 }
 
 export interface TabItem {
@@ -80,7 +57,8 @@ export function NavTabs({ tabs, activeTab, onTabChange }: NavTabsProps) {
       <div className="nav-tabs-inner">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
-          const Icon = getTabIcon(tab);
+          const iconName = getTabIconName(tab);
+          const iconUrl = `/icons/${iconName}.svg`;
 
           return (
             <button
@@ -90,7 +68,14 @@ export function NavTabs({ tabs, activeTab, onTabChange }: NavTabsProps) {
               aria-selected={isActive}
               role="tab"
             >
-              <Icon className="nav-tab-icon" />
+              <span
+                className="nav-tab-icon"
+                style={{
+                  WebkitMaskImage: `url(${iconUrl})`,
+                  maskImage: `url(${iconUrl})`,
+                }}
+                aria-hidden
+              />
               {isActive && <span className="nav-tab-label">{tab.label}</span>}
             </button>
           );
