@@ -275,10 +275,6 @@ export default function BrandSupportTab({
                   onClick={() => { setSelectedProduct(null); setStep('type'); }}
                   className="support-card mb-2"
                 >
-                  <div className="support-card-text">
-                    <p className="support-card-title">פנייה כללית</p>
-                    <p className="support-card-subtitle">ללא מוצר ספציפי</p>
-                  </div>
                   <div className="support-card-icon-avatar">
                     <span
                       className="support-icon"
@@ -288,6 +284,10 @@ export default function BrandSupportTab({
                       }}
                       aria-hidden
                     />
+                  </div>
+                  <div className="support-card-text">
+                    <p className="support-card-title">פנייה כללית</p>
+                    <p className="support-card-subtitle">ללא מוצר ספציפי</p>
                   </div>
                 </button>
 
@@ -303,12 +303,6 @@ export default function BrandSupportTab({
                             onClick={() => setExpandedCategory(isOpen ? null : cat)}
                             className={`support-card${isOpen ? ' is-open' : ''}`}
                           >
-                            <div className="support-card-text">
-                              <p className="support-card-title">
-                                {CATEGORY_LABELS[cat] || cat.replace(/_/g, ' ')}
-                              </p>
-                              <p className="support-card-subtitle">{items.length} מוצרים</p>
-                            </div>
                             <div className="support-card-icon-avatar">
                               <span
                                 className="support-icon"
@@ -318,6 +312,12 @@ export default function BrandSupportTab({
                                 }}
                                 aria-hidden
                               />
+                            </div>
+                            <div className="support-card-text">
+                              <p className="support-card-title">
+                                {CATEGORY_LABELS[cat] || cat.replace(/_/g, ' ')}
+                              </p>
+                              <p className="support-card-subtitle">{items.length} מוצרים</p>
                             </div>
                           </button>
                           <AnimatePresence>
@@ -339,12 +339,6 @@ export default function BrandSupportTab({
                                         onClick={() => { setSelectedProduct(product); setStep('type'); }}
                                         className="support-card"
                                       >
-                                        <div className="support-card-text">
-                                          <p className="support-card-title">{rawName}</p>
-                                          {product.product_line && (
-                                            <p className="support-card-subtitle">{product.product_line}</p>
-                                          )}
-                                        </div>
                                         {product.image_url ? (
                                           <img
                                             src={product.image_url}
@@ -354,6 +348,12 @@ export default function BrandSupportTab({
                                         ) : (
                                           <div className="support-letter-avatar">{letter}</div>
                                         )}
+                                        <div className="support-card-text">
+                                          <p className="support-card-title">{rawName}</p>
+                                          {product.product_line && (
+                                            <p className="support-card-subtitle">{product.product_line}</p>
+                                          )}
+                                        </div>
                                       </button>
                                     );
                                   })}
