@@ -1720,6 +1720,33 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                     });
                   }}
                 />
+              ) : ((influencer as any).archetype === 'brand' || (influencer as any).archetype === 'local_business') ? (
+                <ProductsCatalogTab
+                  key="products-from-topics"
+                  accountId={influencer.id}
+                  accountType={influencer.influencer_type}
+                  onAskAbout={(question: string, hiddenContext?: string) => {
+                    setActiveTab('chat');
+                    maybeShowLeadPopup();
+                    const userMsg = { id: Date.now().toString(), role: 'user' as const, content: question };
+                    setMessages(prev => [...prev, userMsg]);
+                    setIsTyping(true);
+                    const assistantMessageId = (Date.now() + 1).toString();
+                    setStreamingMessageId(assistantMessageId);
+                    setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant' as const, content: '' }]);
+                    setIsTyping(false);
+                    const apiMessage = hiddenContext
+                      ? `${question}\n\n[הקשר המוצר:]\n${hiddenContext}`
+                      : question;
+                    sendStreamMessage({
+                      message: apiMessage,
+                      username,
+                      sessionId: sessionId || undefined,
+                      previousResponseId: responseId || undefined,
+                      clientMessageId: assistantMessageId,
+                    });
+                  }}
+                />
               ) : (
                 <TopicQuestionsTab
                   key="topics"
