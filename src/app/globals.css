@@ -2142,12 +2142,13 @@ h1, h2, h3, h4, h5, h6 {
 .support-card {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 12px;
   background: white;
   border-radius: 18px;
   height: 74px;
-  padding: 0 12px 0 18px;
+  padding-inline-start: 18px;
+  padding-inline-end: 12px;
   width: 100%;
   border: none;
   cursor: pointer;

@@ -62,7 +62,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   makeup: 'איפור', fragrance: 'בשמים', skincare: 'טיפוח עור',
   food: 'אוכל', spices: 'תבלינים', paint: 'צבעים',
   tools: 'כלים', service: 'שירותים', general: 'כללי', other: 'אחר',
-  lips: 'טיפוח שפתיים', accessories: 'אקססוריז', sets: 'סטים', men: 'לגבר',
+  lips: 'טיפוח שפתיים', lip_care: 'טיפוח שפתיים',
+  accessories: 'אקססוריז', sets: 'סטים', men: 'לגבר',
   nails: 'ציפורניים', sun: 'הגנה מהשמש', eyes: 'עיניים',
 };
 
@@ -74,6 +75,7 @@ const CATEGORY_ICON: Record<string, string> = {
   skincare: 'cream',
   makeup: 'blush',
   lips: 'lipstick',
+  lip_care: 'lipstick',
   eyes: 'mascara',
   nails: 'manicure',
   sun: 'sunscreen',
@@ -236,7 +238,7 @@ export default function BrandSupportTab({
   }
 
   return (
-    <div className={`h-full overflow-y-auto ${isMobile ? 'pb-32' : 'pb-8'}`}>
+    <div className={`h-full overflow-y-auto ${isMobile ? 'pb-32' : 'pb-8'}`} dir="rtl">
       <div className="px-4 py-6">
         <div className={`mx-auto ${isMobile ? 'max-w-2xl' : 'max-w-[700px]'}`}>
           <AnimatePresence mode="wait">
