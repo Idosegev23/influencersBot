@@ -2081,6 +2081,149 @@ h1, h2, h3, h4, h5, h6 {
   mask: url('/icons/help.svg') center/contain no-repeat;
 }
 
+/* ── Brand Support — Category Picker (Figma 346:4206) ── */
+.support-title {
+  font-family: 'Heebo', sans-serif;
+  font-weight: 600;
+  font-size: 24px;
+  line-height: 28px;
+  color: #0c1013;
+  text-align: right;
+}
+
+.support-subtitle {
+  font-family: 'Heebo', sans-serif;
+  font-weight: 400;
+  font-size: 18px;
+  line-height: 24px;
+  color: #676767;
+  text-align: right;
+}
+
+.support-search {
+  position: relative;
+  background: white;
+  border-radius: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  width: 100%;
+}
+
+.support-search input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: 'Heebo', sans-serif;
+  font-weight: 300;
+  font-size: 18px;
+  line-height: 22.4px;
+  color: #0c1013;
+  text-align: right;
+  padding: 0 12px;
+}
+
+.support-search input::placeholder {
+  color: #676767;
+}
+
+.support-search-icon {
+  width: 20px;
+  height: 20px;
+  color: #676767;
+  background-color: currentColor;
+  -webkit-mask: url('/icons/search.svg') center/contain no-repeat;
+  mask: url('/icons/search.svg') center/contain no-repeat;
+  flex-shrink: 0;
+}
+
+.support-card {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  background: white;
+  border-radius: 18px;
+  height: 74px;
+  padding: 0 12px 0 18px;
+  width: 100%;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.support-card:hover,
+.support-card:active,
+.support-card.is-open {
+  background: rgba(241, 233, 253, 0.5);
+}
+
+.support-card-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding-bottom: 4px;
+  line-height: 22.4px;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.support-card-title {
+  font-family: 'Heebo', sans-serif;
+  font-weight: 400;
+  font-size: 18px;
+  color: #0c1013;
+}
+
+.support-card-subtitle {
+  font-family: 'Heebo', sans-serif;
+  font-weight: 300;
+  font-size: 12px;
+  color: #676767;
+}
+
+.support-card-icon-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #f1e9fd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #883fe2;
+}
+
+.support-card-icon-avatar .support-icon {
+  width: 20px;
+  height: 20px;
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+.support-letter-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #f4f5f7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-family: 'Heebo', sans-serif;
+  font-weight: 300;
+  font-size: 18px;
+  line-height: 22.4px;
+  color: #883fe2;
+}
+
 /* ── Media Attach Button ── */
 .media-attach-btn {
   flex-shrink: 0;

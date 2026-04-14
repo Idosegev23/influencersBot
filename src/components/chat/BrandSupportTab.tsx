@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Loader2, Search, ChevronLeft, ChevronDown, ArrowRight, X, CheckCircle,
-  Package, Truck, RefreshCcw, CreditCard, Tag, MessageCircle,
+  Loader2, ChevronLeft, ArrowRight, X, CheckCircle,
+  Package, Truck, RefreshCcw, CreditCard, Tag,
   ShoppingBag, AlertTriangle, HelpCircle,
 } from 'lucide-react';
 
@@ -62,40 +62,30 @@ const CATEGORY_LABELS: Record<string, string> = {
   makeup: 'איפור', fragrance: 'בשמים', skincare: 'טיפוח עור',
   food: 'אוכל', spices: 'תבלינים', paint: 'צבעים',
   tools: 'כלים', service: 'שירותים', general: 'כללי', other: 'אחר',
+  lips: 'טיפוח שפתיים', accessories: 'אקססוריז', sets: 'סטים', men: 'לגבר',
+  nails: 'ציפורניים', sun: 'הגנה מהשמש', eyes: 'עיניים',
 };
 
-/* ------------------------------------------------------------------ */
-/*  Product Row                                                        */
-/* ------------------------------------------------------------------ */
-
-function ProductRow({ product, onClick }: { product: Product; onClick: () => void }) {
-  return (
-    <button onClick={onClick} className="coupon-card w-full">
-      {product.image_url ? (
-        <img src={product.image_url} alt={product.name_he || product.name}
-          className="w-[40px] h-[40px] rounded-xl object-cover flex-shrink-0" />
-      ) : (
-        <div className="w-[40px] h-[40px] rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: 'linear-gradient(135deg, #f3f4f6, #e5e7eb)' }}>
-          <ShoppingBag className="w-4 h-4" style={{ color: '#9ca3af' }} />
-        </div>
-      )}
-      <div className="flex-1 min-w-0 text-right">
-        <p className="font-semibold truncate" style={{ fontSize: '14px', color: '#1a1a2e' }}>
-          {product.name_he || product.name}
-        </p>
-        {product.product_line && (
-          <p className="text-[11px] truncate" style={{ color: '#999' }}>{product.product_line}</p>
-        )}
-      </div>
-      {product.price != null && (
-        <span className="text-[13px] font-semibold flex-shrink-0" style={{ color: 'var(--color-primary, #7c3aed)' }}>
-          ₪{product.price}
-        </span>
-      )}
-      <ChevronLeft className="w-4 h-4 flex-shrink-0" style={{ color: '#ccc' }} />
-    </button>
-  );
+/* ── Category → Figma icon filename (matches public/icons/categories) ── */
+const CATEGORY_ICON: Record<string, string> = {
+  hair_care: 'hairbrush',
+  face_care: 'cream',
+  body_care: 'sunscreen',
+  skincare: 'cream',
+  makeup: 'blush',
+  lips: 'lipstick',
+  eyes: 'mascara',
+  nails: 'manicure',
+  sun: 'sunscreen',
+  fragrance: 'air-freshener',
+  accessories: 'hat-beach',
+  sets: 'diamond',
+  men: 'hair-clipper',
+  tools: 'hair-clipper',
+  service: 'beacon',
+};
+function iconFor(cat: string): string {
+  return CATEGORY_ICON[cat] || 'product';
 }
 
 /* ------------------------------------------------------------------ */
@@ -251,7 +241,7 @@ export default function BrandSupportTab({
         <div className={`mx-auto ${isMobile ? 'max-w-2xl' : 'max-w-[700px]'}`}>
           <AnimatePresence mode="wait">
 
-            {/* ======== STEP 1: Select Product ======== */}
+            {/* ======== STEP 1: Select Product (Figma 346:4206) ======== */}
             {step === 'product' && (
               <motion.div
                 key="support-product"
@@ -259,68 +249,74 @@ export default function BrandSupportTab({
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
               >
-                <h2 className="problem-header-title mb-1 text-center">שירות לקוחות</h2>
-                <p className="mb-5 text-center" style={{ fontSize: '15px', color: '#888' }}>
-                  על איזה מוצר תרצו לדווח?
-                </p>
+                <div className="mb-4 px-3">
+                  <h2 className="support-title">בעיה במוצר</h2>
+                  <p className="support-subtitle">על איזה מוצר תרצו לדווח?</p>
+                </div>
 
-                {/* Search */}
+                {/* Search pill */}
                 {products.length > 6 && (
-                  <div className="relative mb-3" style={{ maxWidth: isMobile ? '100%' : '400px', margin: '0 auto 12px' }}>
-                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#9ca3af' }} />
+                  <div className="support-search mb-3">
                     <input
                       type="text"
                       value={searchQuery}
                       onChange={e => setSearchQuery(e.target.value)}
-                      placeholder="חיפוש מוצר..."
+                      placeholder="חיפוש מוצר"
                       dir="rtl"
-                      className="problem-input w-full pr-10"
                     />
+                    <span className="support-search-icon" aria-hidden />
                   </div>
                 )}
 
                 {/* "General" option */}
                 <button
                   onClick={() => { setSelectedProduct(null); setStep('type'); }}
-                  className="coupon-card mb-3 w-full"
+                  className="support-card mb-2"
                 >
-                  <div className="w-[44px] h-[44px] rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ background: 'linear-gradient(135deg, #8b5cf620, #6366f120)' }}>
-                    <MessageCircle className="w-5 h-5" style={{ color: '#7c3aed' }} />
+                  <div className="support-card-text">
+                    <p className="support-card-title">פנייה כללית</p>
+                    <p className="support-card-subtitle">ללא מוצר ספציפי</p>
                   </div>
-                  <div className="flex-1 min-w-0 text-right">
-                    <p className="font-semibold" style={{ fontSize: '15px', color: '#1a1a2e' }}>פנייה כללית</p>
-                    <p className="text-[12px]" style={{ color: '#999' }}>ללא מוצר ספציפי</p>
+                  <div className="support-card-icon-avatar">
+                    <span
+                      className="support-icon"
+                      style={{
+                        WebkitMaskImage: "url('/icons/categories/product.svg')",
+                        maskImage: "url('/icons/categories/product.svg')",
+                      }}
+                      aria-hidden
+                    />
                   </div>
-                  <ChevronLeft className="w-5 h-5 flex-shrink-0" style={{ color: '#ccc' }} />
                 </button>
 
-                {/* Product list — flat if few, category accordion if many */}
+                {/* Product list — alphabet sub-list when category open, else categories */}
                 {useCategories ? (
-                  /* ---- Category accordion ---- */
                   <div className="flex flex-col gap-2">
                     {groupedByCategory.map(([cat, items]) => {
                       const isOpen = expandedCategory === cat;
+                      const iconName = iconFor(cat);
                       return (
                         <div key={cat}>
                           <button
                             onClick={() => setExpandedCategory(isOpen ? null : cat)}
-                            className="coupon-card w-full"
+                            className={`support-card${isOpen ? ' is-open' : ''}`}
                           >
-                            <div className="w-[44px] h-[44px] rounded-xl flex items-center justify-center flex-shrink-0"
-                              style={{ background: 'linear-gradient(135deg, #f3f4f6, #e5e7eb)' }}>
-                              <Package className="w-5 h-5" style={{ color: '#7c3aed' }} />
-                            </div>
-                            <div className="flex-1 min-w-0 text-right">
-                              <p className="font-semibold" style={{ fontSize: '15px', color: '#1a1a2e' }}>
+                            <div className="support-card-text">
+                              <p className="support-card-title">
                                 {CATEGORY_LABELS[cat] || cat.replace(/_/g, ' ')}
                               </p>
-                              <p className="text-[12px]" style={{ color: '#999' }}>{items.length} מוצרים</p>
+                              <p className="support-card-subtitle">{items.length} מוצרים</p>
                             </div>
-                            <ChevronDown
-                              className="w-4 h-4 flex-shrink-0 transition-transform"
-                              style={{ color: '#ccc', transform: isOpen ? 'rotate(180deg)' : 'none' }}
-                            />
+                            <div className="support-card-icon-avatar">
+                              <span
+                                className="support-icon"
+                                style={{
+                                  WebkitMaskImage: `url('/icons/categories/${iconName}.svg')`,
+                                  maskImage: `url('/icons/categories/${iconName}.svg')`,
+                                }}
+                                aria-hidden
+                              />
+                            </div>
                           </button>
                           <AnimatePresence>
                             {isOpen && (
@@ -331,11 +327,34 @@ export default function BrandSupportTab({
                                 transition={{ duration: 0.2 }}
                                 className="overflow-hidden"
                               >
-                                <div className="flex flex-col gap-1.5 pr-4 mt-1.5 mb-2">
-                                  {items.map(product => (
-                                    <ProductRow key={product.id} product={product}
-                                      onClick={() => { setSelectedProduct(product); setStep('type'); }} />
-                                  ))}
+                                <div className="flex flex-col gap-2 mt-2 mb-2">
+                                  {items.map(product => {
+                                    const rawName = product.name_he || product.name || '';
+                                    const letter = rawName.trim().charAt(0).toUpperCase();
+                                    return (
+                                      <button
+                                        key={product.id}
+                                        onClick={() => { setSelectedProduct(product); setStep('type'); }}
+                                        className="support-card"
+                                      >
+                                        <div className="support-card-text">
+                                          <p className="support-card-title">{rawName}</p>
+                                          {product.product_line && (
+                                            <p className="support-card-subtitle">{product.product_line}</p>
+                                          )}
+                                        </div>
+                                        {product.image_url ? (
+                                          <img
+                                            src={product.image_url}
+                                            alt=""
+                                            className="w-10 h-10 rounded-xl object-cover flex-shrink-0"
+                                          />
+                                        ) : (
+                                          <div className="support-letter-avatar">{letter}</div>
+                                        )}
+                                      </button>
+                                    );
+                                  })}
                                 </div>
                               </motion.div>
                             )}
@@ -345,12 +364,35 @@ export default function BrandSupportTab({
                     })}
                   </div>
                 ) : (
-                  /* ---- Flat list (few products or searching) ---- */
+                  /* Flat product list when few products or searching */
                   <div className="flex flex-col gap-2">
-                    {filtered.map(product => (
-                      <ProductRow key={product.id} product={product}
-                        onClick={() => { setSelectedProduct(product); setStep('type'); }} />
-                    ))}
+                    {filtered.map(product => {
+                      const rawName = product.name_he || product.name || '';
+                      const letter = rawName.trim().charAt(0).toUpperCase();
+                      return (
+                        <button
+                          key={product.id}
+                          onClick={() => { setSelectedProduct(product); setStep('type'); }}
+                          className="support-card"
+                        >
+                          <div className="support-card-text">
+                            <p className="support-card-title">{rawName}</p>
+                            {product.product_line && (
+                              <p className="support-card-subtitle">{product.product_line}</p>
+                            )}
+                          </div>
+                          {product.image_url ? (
+                            <img
+                              src={product.image_url}
+                              alt=""
+                              className="w-10 h-10 rounded-xl object-cover flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="support-letter-avatar">{letter}</div>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
 
