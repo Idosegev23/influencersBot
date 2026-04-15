@@ -1373,20 +1373,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                 const isCopied = copiedCode === brand.id;
                                 return (
                                   <div key={brand.id} className="coupon-card-v2">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleCopyCode(brand.coupon_code!, brand.id)}
-                                      className={`coupon-code-chip${isCopied ? ' copied' : ''}`}
-                                    >
-                                      {isCopied ? '✓ הועתק!' : brand.coupon_code}
-                                    </button>
-                                    <div className="flex gap-3 items-center min-w-0">
-                                      <div className="flex flex-col items-end min-w-0">
-                                        <p className="coupon-card-title">{brand.brand_name}</p>
-                                        {brand.description && (
-                                          <p className="coupon-card-subtitle">{brand.description}</p>
-                                        )}
-                                      </div>
+                                    <div className="flex gap-3 items-center min-w-0 flex-1">
                                       {brand.image_url ? (
                                         <img
                                           src={getProxiedImageUrl(brand.image_url)}
@@ -1398,7 +1385,20 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                           {letter}
                                         </div>
                                       )}
+                                      <div className="flex flex-col min-w-0 flex-1 overflow-hidden">
+                                        <p className="coupon-card-title">{brand.brand_name}</p>
+                                        {brand.description && (
+                                          <p className="coupon-card-subtitle">{brand.description}</p>
+                                        )}
+                                      </div>
                                     </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopyCode(brand.coupon_code!, brand.id)}
+                                      className={`coupon-code-chip${isCopied ? ' copied' : ''}`}
+                                    >
+                                      {isCopied ? '✓ הועתק!' : brand.coupon_code}
+                                    </button>
                                   </div>
                                 );
                               })}
@@ -1414,15 +1414,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                   const letter = (brand.brand_name || '').trim().charAt(0).toUpperCase();
                                   return (
                                     <div key={brand.id} className="coupon-card-v2 coupon-card-v2--disabled">
-                                      <div className="flex gap-3 items-center min-w-0">
-                                        <div className="flex flex-col items-end min-w-0">
-                                          <p className="coupon-card-title coupon-card-title--muted">{brand.brand_name}</p>
-                                          {(brand.description || brand.category) && (
-                                            <p className="coupon-card-subtitle coupon-card-subtitle--muted">
-                                              {brand.description || brand.category}
-                                            </p>
-                                          )}
-                                        </div>
+                                      <div className="flex gap-3 items-center min-w-0 flex-1">
                                         {brand.image_url ? (
                                           <img
                                             src={getProxiedImageUrl(brand.image_url)}
@@ -1434,6 +1426,14 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                             {letter}
                                           </div>
                                         )}
+                                        <div className="flex flex-col min-w-0 flex-1 overflow-hidden">
+                                          <p className="coupon-card-title coupon-card-title--muted">{brand.brand_name}</p>
+                                          {(brand.description || brand.category) && (
+                                            <p className="coupon-card-subtitle coupon-card-subtitle--muted">
+                                              {brand.description || brand.category}
+                                            </p>
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
                                   );
