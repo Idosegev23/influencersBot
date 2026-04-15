@@ -457,7 +457,7 @@ async function ingestEntityType(
     case 'website': {
       const { data: websites } = await supabase
         .from('instagram_bio_websites')
-        .select('id, url, page_title, page_content, page_description')
+        .select('id, url, page_title, page_content, page_description, image_urls')
         .eq('account_id', accountId)
         .eq('processing_status', 'completed')
         .not('page_content', 'is', null);
@@ -475,13 +475,16 @@ async function ingestEntityType(
             if (w.page_description) text += `Description: ${w.page_description}\n\n`;
             text += w.page_content;
 
+            // First image is og:image (per scraper); use as card thumbnail
+            const firstImage = Array.isArray(w.image_urls) && w.image_urls.length > 0 ? w.image_urls[0] : null;
+
             const docResult = await ingestDocument({
               accountId,
               entityType: 'website',
               sourceId: w.id,
               title: w.page_title || w.url,
               text,
-              metadata: { url: w.url },
+              metadata: { url: w.url, image_url: firstImage },
             });
             totalChunks += docResult.chunksCreated;
             count++;
