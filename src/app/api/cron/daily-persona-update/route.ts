@@ -101,10 +101,20 @@ export async function GET(request: Request) {
         // Quick check for new posts (only last 50)
         const newPosts = await quickCheckNewPosts(username, lastPostDate);
 
-        console.log(`[Daily Update] @${username} - found ${newPosts.length} new posts`);
+        // Also check if fresh transcriptions/highlights arrived since last persona update
+        // (Gemini transcribes stories/highlights on download — this content should feed persona too)
+        const lastPersonaUpdate = persona?.instagram_last_synced || new Date(0).toISOString();
+        const { count: freshTranscriptions } = await supabase
+          .from('instagram_transcriptions')
+          .select('id', { count: 'exact', head: true })
+          .eq('account_id', account.id)
+          .gte('created_at', lastPersonaUpdate);
 
-        if (newPosts.length < 3) {
-          // Not enough new posts, just update timestamp
+        const hasFreshContent = newPosts.length > 0 || (freshTranscriptions ?? 0) > 0;
+        console.log(`[Daily Update] @${username} - ${newPosts.length} new posts, ${freshTranscriptions ?? 0} fresh transcriptions`);
+
+        if (!hasFreshContent) {
+          // Nothing new at all, just bump timestamp
           await supabase
             .from('chatbot_persona')
             .update({ instagram_last_synced: new Date().toISOString() })
@@ -114,15 +124,17 @@ export async function GET(request: Request) {
             accountId: account.id,
             username,
             status: 'skipped',
-            reason: `רק ${newPosts.length} פוסטים חדשים`,
+            reason: 'אין תוכן חדש',
           });
           continue;
         }
 
-        // Save new posts
-        await saveNewPosts(supabase, account.id, newPosts);
+        // Save new posts (only if any)
+        if (newPosts.length > 0) {
+          await saveNewPosts(supabase, account.id, newPosts);
+        }
 
-        // Quick preprocessing on new data
+        // Quick preprocessing on all current data (pulls fresh transcriptions too)
         const preprocessed = await runPreprocessing(account.id);
 
         // Update persona incrementally (light update, not full rebuild)
