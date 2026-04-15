@@ -458,6 +458,62 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // ── 2-hop lookup for transcription chunks ──
+  // originalSourceId → instagram_transcriptions.id → source_type + source_id
+  // → instagram_highlight_items / instagram_posts → thumbnail_url
+  const transSourceIds = chunks
+    .filter(c => c.entity_type === 'transcription' && c.metadata?.originalSourceId)
+    .map(c => c.metadata.originalSourceId as string);
+
+  const transcriptionImages: Record<string, string> = {}; // originalSourceId → imageUrl
+  if (transSourceIds.length > 0) {
+    const { data: transRows } = await supabase
+      .from('instagram_transcriptions')
+      .select('id, source_type, source_id')
+      .eq('account_id', account.id)
+      .in('id', transSourceIds);
+
+    const hlItemIds: string[] = [];
+    const postIds: string[] = [];
+    const transById: Record<string, { source_type: string; source_id: string }> = {};
+    for (const t of transRows || []) {
+      transById[t.id] = { source_type: t.source_type, source_id: t.source_id };
+      if (t.source_type === 'highlight_item') hlItemIds.push(t.source_id);
+      else if (t.source_type === 'post' || t.source_type === 'reel') postIds.push(t.source_id);
+    }
+
+    const hlImages: Record<string, string> = {};
+    if (hlItemIds.length > 0) {
+      const { data: hlRows } = await supabase
+        .from('instagram_highlight_items')
+        .select('id, thumbnail_url, media_url')
+        .in('id', hlItemIds);
+      for (const h of hlRows || []) {
+        const url = h.thumbnail_url || h.media_url || null;
+        if (url) hlImages[h.id] = url;
+      }
+    }
+
+    const postImagesById: Record<string, string> = {};
+    if (postIds.length > 0) {
+      const { data: pRows } = await supabase
+        .from('instagram_posts')
+        .select('id, thumbnail_url, media_urls')
+        .in('id', postIds);
+      for (const p of pRows || []) {
+        const url = p.thumbnail_url || (p.media_urls as string[])?.[0] || null;
+        if (url) postImagesById[p.id] = url;
+      }
+    }
+
+    for (const [origId, t] of Object.entries(transById)) {
+      const img = t.source_type === 'highlight_item'
+        ? hlImages[t.source_id]
+        : postImagesById[t.source_id];
+      if (img) transcriptionImages[origId] = img;
+    }
+  }
+
   // Deduplicate by title
   const seen = new Set<string>();
   const items: ContentCard[] = [];
@@ -478,11 +534,14 @@ export async function GET(request: NextRequest) {
 
     const shortcode = chunk.metadata?.shortcode || null;
 
-    // Image resolution: shortcode→post thumbnail, metadata→image_url
+    // Image resolution: shortcode→post thumbnail, transcription→2-hop, metadata→image_url
     let imageUrl: string | null = null;
     if (shortcode && postImages[shortcode]) {
       imageUrl = postImages[shortcode];
-    } else {
+    } else if (chunk.entity_type === 'transcription' && chunk.metadata?.originalSourceId) {
+      imageUrl = transcriptionImages[chunk.metadata.originalSourceId] || null;
+    }
+    if (!imageUrl) {
       imageUrl = chunk.metadata?.image_url || null;
     }
 
