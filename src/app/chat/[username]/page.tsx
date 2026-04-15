@@ -1428,13 +1428,14 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 />
               </motion.div>
               ) : (
-              /* --- Influencer: Original brand-selection support --- */
+              /* --- Influencer: Brand-selection support (Figma 354:4951 / 372:6094) --- */
               <motion.div
                 key="support"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className={`problem-tab h-full overflow-y-auto ${isMobile ? 'pb-32' : 'pb-8'}`}
+                dir="rtl"
               >
                 <div className="px-4 py-6">
                   <div className={`mx-auto ${isMobile ? 'max-w-2xl' : 'max-w-[700px]'}`}>
@@ -1447,9 +1448,11 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           animate={{ opacity: 1, x: 0 }}
                           exit={{ opacity: 0, x: -20 }}
                         >
-                          <h2 className="problem-header-title mb-1 text-center">פניית תמיכה</h2>
-                          <p className="mb-6 text-center" style={{ fontSize: '15px', color: '#888' }}>בחר את המותג שיש לך בעיה איתו</p>
-                          <div className={`${isMobile ? 'flex flex-col gap-3' : 'grid grid-cols-2 gap-4'}`}>
+                          <div className="mb-4 px-3">
+                            <h2 className="support-title">פתיחת פנייה</h2>
+                            <p className="support-subtitle">בחרו את המותג שיש לכם בעיה איתו</p>
+                          </div>
+                          <div className="flex flex-col gap-2">
                             {uniqueBrands.map((brand) => (
                               <button
                                 key={brand.id}
@@ -1457,21 +1460,22 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                   setProblemBrand(brand);
                                   setProblemStep('form');
                                 }}
-                                className="coupon-card"
+                                className="support-card"
                               >
-                                <div className="brand-logo">
-                                  {brand.image_url ? (
-                                    <img src={getProxiedImageUrl(brand.image_url)} alt={brand.brand_name} />
-                                  ) : (
-                                    <span className="brand-logo-letter">{brand.brand_name.charAt(0).toUpperCase()}</span>
-                                  )}
+                                {brand.image_url ? (
+                                  <img
+                                    src={getProxiedImageUrl(brand.image_url)}
+                                    alt={brand.brand_name}
+                                    className="w-10 h-10 rounded-xl object-cover flex-shrink-0"
+                                  />
+                                ) : (
+                                  <div className="support-letter-avatar">
+                                    {brand.brand_name.charAt(0).toUpperCase()}
+                                  </div>
+                                )}
+                                <div className="support-card-text">
+                                  <p className="support-card-title">{brand.brand_name}</p>
                                 </div>
-                                <div className="flex-1 min-w-0 text-right">
-                                  <p className="font-semibold truncate" style={{ fontSize: '16px', color: '#1a1a2e' }}>
-                                    {brand.brand_name}
-                                  </p>
-                                </div>
-                                <ChevronLeft className="w-5 h-5 flex-shrink-0" style={{ color: '#999' }} />
                               </button>
                             ))}
                           </div>
@@ -1486,139 +1490,152 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           animate={{ opacity: 1, x: 0 }}
                           exit={{ opacity: 0, x: -20 }}
                         >
-                          <h2 className="problem-header-title mb-1 text-center">פניית תמיכה</h2>
-                          <p className="mb-5 text-center" style={{ fontSize: '15px', color: '#888' }}>מלא את הפרטים ונחזור אליך בהקדם</p>
-
-                          {/* Selected brand pill */}
-                          <div className="problem-brand-pill mb-6">
-                            <div className="w-[32px] h-[32px] rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.8)' }}>
-                              {problemBrand.image_url ? (
-                                <img src={getProxiedImageUrl(problemBrand.image_url)} alt={problemBrand.brand_name} className="w-full h-full object-cover rounded-full" />
-                              ) : (
-                                <span className="text-xs font-bold" style={{ color: '#1a1a2e' }}>{problemBrand.brand_name.charAt(0).toUpperCase()}</span>
-                              )}
-                            </div>
-                            <span className="text-[14px] font-semibold flex-1 text-right" style={{ color: '#1a1a2e' }}>{problemBrand.brand_name}</span>
+                          <div className="mb-4 px-3 flex items-start justify-between">
                             <button
+                              type="button"
                               onClick={() => {
-                                setProblemBrand(null);
                                 setProblemStep('brands');
+                                setProblemBrand(null);
+                                setProblemForm({ name: '', phone: '', order: '', details: '' });
+                                setProblemError(null);
                               }}
-                              className="w-[28px] h-[28px] rounded-full flex items-center justify-center hover:bg-white/50 transition-all"
+                              className="support-back-btn"
+                              aria-label="חזרה"
                             >
-                              <X className="w-3.5 h-3.5" style={{ color: '#999' }} />
+                              <span className="support-back-icon" aria-hidden />
                             </button>
+                            <div>
+                              <h2 className="support-title">פתיחת פנייה</h2>
+                              <p className="support-subtitle">מלאו את הפרטים ונחזור אליכם בהקדם</p>
+                            </div>
                           </div>
 
-                          {/* Form fields */}
-                          <div className={`flex flex-col gap-3 ${isMobile ? '' : 'items-center'}`}>
+                          <div className="flex flex-col gap-3">
+                            {/* Selected brand pill — Figma speech-bubble shape */}
+                            <div className="support-brand-pill">
+                              {problemBrand.image_url && (
+                                <img
+                                  src={getProxiedImageUrl(problemBrand.image_url)}
+                                  alt={problemBrand.brand_name}
+                                />
+                              )}
+                              <span className="flex-1 text-right">{problemBrand.brand_name}</span>
+                            </div>
+
+                            {/* Form fields — pill inputs (Figma spec) */}
                             <input
                               type="text"
                               value={problemForm.name}
                               onChange={(e) => setProblemForm({ ...problemForm, name: e.target.value })}
-                              placeholder="שם מלא *"
-                              className="problem-input"
-                              style={{ maxWidth: isMobile ? '100%' : '363px' }}
+                              placeholder="שם מלא"
+                              className="support-form-input"
                             />
                             <input
                               type="tel"
                               value={problemForm.phone}
                               onChange={(e) => setProblemForm({ ...problemForm, phone: e.target.value.replace(/\D/g, '') })}
-                              placeholder="מספר טלפון *"
-                              dir="ltr"
-                              className="problem-input text-right"
-                              style={{ maxWidth: isMobile ? '100%' : '363px' }}
+                              placeholder="מספר טלפון"
+                              className="support-form-input"
                             />
                             <input
                               type="text"
                               value={problemForm.order}
                               onChange={(e) => setProblemForm({ ...problemForm, order: e.target.value })}
                               placeholder="מספר הזמנה (אופציונלי)"
-                              className="problem-input"
-                              style={{ maxWidth: isMobile ? '100%' : '363px' }}
+                              className="support-form-input"
                             />
                             <textarea
                               value={problemForm.details}
                               onChange={(e) => setProblemForm({ ...problemForm, details: e.target.value })}
-                              placeholder="תאר את הבעיה... *"
-                              rows={4}
-                              className="problem-textarea"
-                              style={{ maxWidth: isMobile ? '100%' : '363px' }}
+                              placeholder="תיאור הבעיה"
+                              className="support-form-textarea"
                             />
-
-                            {/* Error message */}
-                            {problemError && (
-                              <div className="text-center text-sm" style={{ color: '#ef4444', maxWidth: isMobile ? '100%' : '363px' }}>
-                                {problemError}
-                              </div>
-                            )}
-
-                            {/* Buttons */}
-                            <div className={`flex gap-3 mt-2 ${isMobile ? 'flex-col-reverse' : 'justify-center'}`} style={{ maxWidth: isMobile ? '100%' : '363px', width: '100%' }}>
-                              <button
-                                onClick={() => {
-                                  setProblemStep('brands');
-                                  setProblemBrand(null);
-                                  setProblemForm({ name: '', phone: '', order: '', details: '' });
-                                  setProblemError(null);
-                                }}
-                                className="problem-btn-back flex items-center justify-center gap-2"
-                                style={{
-                                  flex: isMobile ? undefined : 1,
-                                  width: isMobile ? '100%' : undefined,
-                                }}
-                              >
-                                <ArrowRight className="w-4 h-4" />
-                                חזרה
-                              </button>
-                              <button
-                                onClick={handleProblemSubmit}
-                                disabled={problemLoading}
-                                className="problem-btn-submit flex items-center justify-center gap-2"
-                                style={{
-                                  flex: isMobile ? undefined : 1,
-                                  width: isMobile ? '100%' : undefined,
-                                }}
-                              >
-                                {problemLoading ? (
-                                  <Loader2 className="w-5 h-5 animate-spin" />
-                                ) : (
-                                  'שלח פנייה'
-                                )}
-                              </button>
-                            </div>
                           </div>
-                        </motion.div>
-                      )}
 
-                      {/* ---- STEP 3: Success ---- */}
-                      {problemStep === 'success' && (
-                        <motion.div
-                          key="problem-success"
-                          initial={{ opacity: 0, scale: 0.95 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          className="text-center py-12"
-                        >
-                          <div className="problem-success-icon">
-                            <CheckCircle className="w-8 h-8 text-white" />
-                          </div>
-                          <h3 className="text-[22px] font-bold mb-2" style={{ color: '#1a1a2e' }}>
-                            הפנייה נשלחה בהצלחה!
-                          </h3>
-                          <p className="text-[15px] mb-8" style={{ color: '#888' }}>
-                            נחזור אליך בהקדם האפשרי
-                          </p>
                           <button
-                            onClick={resetProblemTab}
-                            className="problem-btn-submit px-10"
+                            type="button"
+                            onClick={handleProblemSubmit}
+                            disabled={problemLoading || !problemForm.name || !problemForm.phone || !problemForm.details}
+                            className={`support-cta mt-8 ${problemLoading || !problemForm.name || !problemForm.phone || !problemForm.details ? 'support-cta--disabled' : 'support-cta--enabled'}`}
                           >
-                            סגור
+                            {problemLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'שלח פנייה'}
                           </button>
                         </motion.div>
                       )}
+
                     </AnimatePresence>
                   </div>
                 </div>
+
+                {/* ---- Success modal (Figma 372:6200) ---- */}
+                {problemStep === 'success' && (
+                  <motion.div
+                    key="problem-success-modal"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="support-modal-overlay"
+                    onClick={resetProblemTab}
+                  >
+                    <motion.div
+                      initial={{ scale: 0.95, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="support-modal-card"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        onClick={resetProblemTab}
+                        className="support-modal-close"
+                        aria-label="סגור"
+                      >
+                        <span className="support-modal-close-icon" aria-hidden />
+                      </button>
+                      <span className="support-modal-icon support-modal-icon--success" aria-hidden />
+                      <h3 className="support-modal-title">הפנייה נשלחה בהצלחה</h3>
+                      <p className="support-modal-body">
+                        קיבלנו את הפנייה שלך
+                        <br />
+                        וניצור קשר מהר ככל האפשר
+                      </p>
+                    </motion.div>
+                  </motion.div>
+                )}
+
+                {/* ---- Error modal (Figma 377:6223) ---- */}
+                {problemError && problemStep === 'form' && (
+                  <motion.div
+                    key="problem-error-modal"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="support-modal-overlay"
+                    onClick={() => setProblemError(null)}
+                  >
+                    <motion.div
+                      initial={{ scale: 0.95, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="support-modal-card"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setProblemError(null)}
+                        className="support-modal-close"
+                        aria-label="סגור"
+                      >
+                        <span className="support-modal-close-icon" aria-hidden />
+                      </button>
+                      <span className="support-modal-icon support-modal-icon--error" aria-hidden />
+                      <h3 className="support-modal-title">אופס משהו השתבש</h3>
+                      <p className="support-modal-body">
+                        יש בעיה בשליחת הפרטים
+                        <br />
+                        נסו שוב
+                      </p>
+                    </motion.div>
+                  </motion.div>
+                )}
               </motion.div>
               )
             ) : activeTab === 'discover' ? (
