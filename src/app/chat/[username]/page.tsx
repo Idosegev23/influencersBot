@@ -171,6 +171,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [responseId, setResponseId] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [couponSearch, setCouponSearch] = useState('');
   const [tapCount, setTapCount] = useState(0);
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [supportBrand, setSupportBrand] = useState<string>('');
@@ -1324,93 +1325,131 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 </div>
               </motion.div>
             ) : activeTab === 'coupons' ? (
-              /* ============ COUPONS TAB — WOW GLASSMORPHIC ============ */
+              /* ============ COUPONS TAB (Figma 385:9100) ============ */
               <motion.div
                 key="coupons"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className={`coupons-tab h-full overflow-y-auto ${isMobile ? 'pb-32' : 'pb-8'}`}
+                dir="rtl"
               >
                 <div className="px-4 py-6">
                   <div className={`mx-auto ${isMobile ? 'max-w-2xl' : 'max-w-[700px]'}`}>
-                    <h2 className="coupons-header-title mb-1 text-center">קופונים</h2>
-                    <p className="mb-6 text-center" style={{ fontSize: '15px', color: '#888' }}>הנחות בלעדיות בשבילכם</p>
+                    <div className="mb-4 px-3">
+                      <h2 className="support-title">קופונים</h2>
+                      <p className="support-subtitle">הנחות בלעדיות בשבילכם</p>
+                    </div>
 
-                    {/* Active coupons */}
-                    {brands.filter(b => b.coupon_code).length > 0 && (
-                      <div className={`${isMobile ? 'flex flex-col gap-3' : 'grid grid-cols-2 gap-4'}`}>
-                        {brands.filter(b => b.coupon_code).map((brand) => (
-                          <button
-                            key={brand.id}
-                            onClick={() => handleCopyCode(brand.coupon_code!, brand.id)}
-                            className="coupon-card"
-                          >
-                            {/* Brand logo */}
-                            <div className="brand-logo">
-                              {brand.image_url ? (
-                                <img src={getProxiedImageUrl(brand.image_url)} alt={brand.brand_name} />
-                              ) : (
-                                <span className="brand-logo-letter">{brand.brand_name.charAt(0).toUpperCase()}</span>
-                              )}
-                            </div>
-                            {/* Brand name + what the coupon gives */}
-                            <div className="flex-1 min-w-0 text-right">
-                              <p className="font-semibold truncate" style={{ fontSize: '16px', color: '#1a1a2e' }}>
-                                {brand.brand_name}
-                              </p>
-                              {brand.description && (
-                                <p style={{ fontSize: '13px', color: '#888', marginTop: '2px', lineHeight: 1.4 }} className="line-clamp-2">
-                                  {brand.description}
-                                </p>
-                              )}
-                            </div>
-                            {/* Coupon code pill */}
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <span className={`coupon-code-pill ${copiedCode === brand.id ? 'copied' : ''}`}>
-                                {copiedCode === brand.id ? '✓ הועתק!' : brand.coupon_code}
-                              </span>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    {/* Search by brand */}
+                    <div className="support-search mb-3">
+                      <input
+                        type="text"
+                        value={couponSearch}
+                        onChange={e => setCouponSearch(e.target.value)}
+                        placeholder="חיפוש לפי מותג"
+                        dir="rtl"
+                      />
+                      <span className="support-search-icon" aria-hidden />
+                    </div>
 
-                    {/* Partnerships without coupons */}
-                    {brands.filter(b => !b.coupon_code).length > 0 && (
-                      <>
-                        <h3 className="text-[15px] font-semibold mt-8 mb-3 text-right" style={{ color: '#555' }}>
-                          שיתופי פעולה
-                        </h3>
-                        <div className={`${isMobile ? 'flex flex-col gap-2' : 'grid grid-cols-2 gap-3'}`}>
-                          {brands.filter(b => !b.coupon_code).map((brand) => (
-                            <div
-                              key={brand.id}
-                              className="coupon-card"
-                              style={{ opacity: 0.75 }}
-                            >
-                              <div className="brand-logo">
-                                {brand.image_url ? (
-                                  <img src={getProxiedImageUrl(brand.image_url)} alt={brand.brand_name} />
-                                ) : (
-                                  <span className="brand-logo-letter">{brand.brand_name.charAt(0).toUpperCase()}</span>
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0 text-right">
-                                <p className="font-semibold truncate" style={{ fontSize: '15px', color: '#1a1a2e' }}>
-                                  {brand.brand_name}
-                                </p>
-                                {brand.category && (
-                                  <p className="truncate" style={{ fontSize: '12px', color: '#aaa', marginTop: '2px' }}>
-                                    {brand.category}
-                                  </p>
-                                )}
-                              </div>
+                    {(() => {
+                      const q = couponSearch.trim().toLowerCase();
+                      const matches = (b: typeof brands[number]) =>
+                        !q ||
+                        b.brand_name?.toLowerCase().includes(q) ||
+                        (b.description || '').toLowerCase().includes(q) ||
+                        (b.coupon_code || '').toLowerCase().includes(q);
+                      const active = brands.filter(b => b.coupon_code && matches(b));
+                      const partnerships = brands.filter(b => !b.coupon_code && matches(b));
+
+                      return (
+                        <>
+                          {/* Active coupons */}
+                          {active.length > 0 && (
+                            <div className="flex flex-col gap-2">
+                              {active.map((brand) => {
+                                const letter = (brand.brand_name || '').trim().charAt(0).toUpperCase();
+                                const isCopied = copiedCode === brand.id;
+                                return (
+                                  <div key={brand.id} className="coupon-card-v2">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopyCode(brand.coupon_code!, brand.id)}
+                                      className={`coupon-code-chip${isCopied ? ' copied' : ''}`}
+                                    >
+                                      {isCopied ? '✓ הועתק!' : brand.coupon_code}
+                                    </button>
+                                    <div className="flex gap-3 items-center min-w-0">
+                                      <div className="flex flex-col items-end min-w-0">
+                                        <p className="coupon-card-title">{brand.brand_name}</p>
+                                        {brand.description && (
+                                          <p className="coupon-card-subtitle">{brand.description}</p>
+                                        )}
+                                      </div>
+                                      {brand.image_url ? (
+                                        <img
+                                          src={getProxiedImageUrl(brand.image_url)}
+                                          alt={brand.brand_name}
+                                          className="w-10 h-10 rounded-xl object-cover flex-shrink-0"
+                                        />
+                                      ) : (
+                                        <div className="support-letter-avatar" style={{ background: '#f4f5f7', color: '#0c1013' }}>
+                                          {letter}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
+                          )}
+
+                          {/* Partnerships (DISABLE variant) */}
+                          {partnerships.length > 0 && (
+                            <>
+                              <p className="coupon-section-label mt-4">שיתופי פעולה</p>
+                              <div className="flex flex-col gap-2">
+                                {partnerships.map((brand) => {
+                                  const letter = (brand.brand_name || '').trim().charAt(0).toUpperCase();
+                                  return (
+                                    <div key={brand.id} className="coupon-card-v2 coupon-card-v2--disabled">
+                                      <div className="flex gap-3 items-center min-w-0">
+                                        <div className="flex flex-col items-end min-w-0">
+                                          <p className="coupon-card-title coupon-card-title--muted">{brand.brand_name}</p>
+                                          {(brand.description || brand.category) && (
+                                            <p className="coupon-card-subtitle coupon-card-subtitle--muted">
+                                              {brand.description || brand.category}
+                                            </p>
+                                          )}
+                                        </div>
+                                        {brand.image_url ? (
+                                          <img
+                                            src={getProxiedImageUrl(brand.image_url)}
+                                            alt={brand.brand_name}
+                                            className="w-10 h-10 rounded-xl object-cover flex-shrink-0"
+                                          />
+                                        ) : (
+                                          <div className="support-letter-avatar" style={{ background: '#f4f5f7', color: '#0c1013' }}>
+                                            {letter}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          )}
+
+                          {active.length === 0 && partnerships.length === 0 && (
+                            <p className="text-center text-sm mt-8" style={{ color: '#999' }}>
+                              {q ? 'לא נמצאו קופונים התואמים לחיפוש' : 'אין קופונים כרגע'}
+                            </p>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               </motion.div>
