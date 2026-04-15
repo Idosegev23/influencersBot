@@ -2164,11 +2164,17 @@ h1, h2, h3, h4, h5, h6 {
 .support-card-text {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   padding-bottom: 4px;
   line-height: 22.4px;
   white-space: nowrap;
   text-align: right;
+  min-width: 0;
+}
+
+/* Fallback for any LTR context: explicitly push text to the right */
+[dir="rtl"] .support-card-text {
+  align-items: flex-start;
 }
 
 .support-card-title {
