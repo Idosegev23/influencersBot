@@ -144,13 +144,19 @@ export async function saveHighlightsAndStories(
 
   // Save highlights
   for (const highlight of data.highlights) {
+    // Fallback: if the API didn't return a cover, use the first item's image.
+    // ScrapeCreators' cover_media path is often missing — the first item is a safe stand-in.
+    const firstItem = highlight.items[0];
+    const coverFallback = firstItem?.thumbnail_url || firstItem?.media_url || null;
+    const coverUrl = highlight.cover_image_url || coverFallback;
+
     const { data: savedHighlight, error: highlightError } = await supabase
       .from('instagram_highlights')
       .upsert({
         account_id: accountId,
         highlight_id: highlight.highlight_id,
         title: highlight.title,
-        cover_image_url: highlight.cover_image_url,
+        cover_image_url: coverUrl,
         items_count: highlight.items_count,
         scraped_at: new Date().toISOString(),
       }, {
