@@ -2271,7 +2271,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .support-form-input {
   background: white;
-  border-radius: 60px;
+  border-radius: 18px;
   height: 60px;
   width: 100%;
   padding: 0 20px;
@@ -2284,6 +2284,7 @@ h1, h2, h3, h4, h5, h6 {
   color: #0c1013;
   text-align: right;
   direction: rtl;
+  box-sizing: border-box;
 }
 
 .support-form-input::placeholder {
@@ -2292,7 +2293,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .support-form-textarea {
   background: white;
-  border-radius: 24px;
+  border-radius: 18px;
   height: 162px;
   width: 100%;
   padding: 16px 20px;
@@ -2306,6 +2307,7 @@ h1, h2, h3, h4, h5, h6 {
   text-align: right;
   direction: rtl;
   resize: none;
+  box-sizing: border-box;
 }
 
 .support-form-textarea::placeholder {
@@ -2547,18 +2549,19 @@ h1, h2, h3, h4, h5, h6 {
 /* ── Problem Type Grid (Figma 403:1953) ── */
 .selected-product-pill {
   background: rgba(241, 233, 253, 0.8);
-  border-radius: 42px;
-  padding: 12px;
+  border-radius: 18px 18px 0 18px;
+  padding: 14px 18px;
   display: flex;
   align-items: center;
   gap: 12px;
   width: 100%;
+  box-sizing: border-box;
 }
 
 .selected-product-pill img {
-  width: 44px;
-  height: 44px;
-  border-radius: 37px;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
   object-fit: cover;
   flex-shrink: 0;
 }
