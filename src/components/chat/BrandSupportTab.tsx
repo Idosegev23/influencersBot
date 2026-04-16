@@ -3,9 +3,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Loader2, ChevronLeft, ArrowRight, X, CheckCircle,
-  Package, Truck, RefreshCcw, CreditCard, Tag,
-  ShoppingBag, AlertTriangle, HelpCircle,
+  Loader2, ChevronLeft, X, CheckCircle,
+  Tag, ShoppingBag,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -46,13 +45,13 @@ interface BrandSupportTabProps {
 /* ------------------------------------------------------------------ */
 
 const PROBLEM_TYPES = [
-  { id: 'damaged', label: 'מוצר פגום', sublabel: 'הגיע שבור או ניזוק', icon: AlertTriangle, color: '#ef4444' },
-  { id: 'wrong_item', label: 'מוצר שגוי', sublabel: 'קיבלתי מוצר אחר', icon: RefreshCcw, color: '#f59e0b' },
-  { id: 'shipping', label: 'בעיית משלוח', sublabel: 'לא הגיע / איחור', icon: Truck, color: '#3b82f6' },
-  { id: 'coupon', label: 'בעיה בקופון', sublabel: 'קוד לא עובד / לא הופעל', icon: Tag, color: '#8b5cf6' },
-  { id: 'payment', label: 'בעיה בתשלום', sublabel: 'חיוב כפול / שגיאה', icon: CreditCard, color: '#ec4899' },
-  { id: 'quality', label: 'איכות המוצר', sublabel: 'לא מתאים לציפיות', icon: Package, color: '#f97316' },
-  { id: 'other', label: 'אחר', sublabel: 'פנייה כללית', icon: HelpCircle, color: '#6b7280' },
+  { id: 'damaged', label: 'מוצר פגום', sublabel: 'הגיע שבור או ניזוק', icon: 'problem-damaged' },
+  { id: 'wrong_item', label: 'מוצר שגוי', sublabel: 'קיבלתי מוצר אחר', icon: 'problem-wrong' },
+  { id: 'shipping', label: 'בעיית משלוח', sublabel: 'לא הגיע / איחר', icon: 'problem-shipping' },
+  { id: 'coupon', label: 'בעיה בקופון', sublabel: 'קוד לא עובד', icon: 'problem-coupon' },
+  { id: 'payment', label: 'בעיה בתשלום', sublabel: 'חיוב כפול / שגיאה', icon: 'problem-payment' },
+  { id: 'quality', label: 'איכות מוצר', sublabel: 'לא מתאים לציפיות', icon: 'problem-quality' },
+  { id: 'other', label: 'אחר', sublabel: 'פנייה כללית', icon: 'problem-other' },
 ] as const;
 
 type ProblemTypeId = typeof PROBLEM_TYPES[number]['id'];
@@ -444,31 +443,35 @@ export default function BrandSupportTab({
 
                   {/* Problem type grid — 2 columns */}
                   <div className="problem-type-grid">
-                    {visibleTypes.map(type => {
-                      const Icon = type.icon;
-                      return (
-                        <button
-                          key={type.id}
-                          onClick={() => {
-                            if (type.id === 'coupon') {
-                              handleCouponTypeSelect();
-                            } else {
-                              setSelectedType(type.id);
-                              setStep('form');
-                            }
-                          }}
-                          className="problem-type-card"
-                        >
-                          <div className="problem-type-icon">
-                            <Icon />
-                          </div>
-                          <div className="problem-type-text">
-                            <p>{type.label}</p>
-                            <p>{type.sublabel}</p>
-                          </div>
-                        </button>
-                      );
-                    })}
+                    {visibleTypes.map(type => (
+                      <button
+                        key={type.id}
+                        onClick={() => {
+                          if (type.id === 'coupon') {
+                            handleCouponTypeSelect();
+                          } else {
+                            setSelectedType(type.id);
+                            setStep('form');
+                          }
+                        }}
+                        className="problem-type-card"
+                      >
+                        <div className="problem-type-icon">
+                          <span
+                            className="support-icon"
+                            style={{
+                              WebkitMaskImage: `url('/icons/categories/${type.icon}.svg')`,
+                              maskImage: `url('/icons/categories/${type.icon}.svg')`,
+                            }}
+                            aria-hidden
+                          />
+                        </div>
+                        <div className="problem-type-text">
+                          <p>{type.label}</p>
+                          <p>{type.sublabel}</p>
+                        </div>
+                      </button>
+                    ))}
                   </div>
                 </div>
               </motion.div>
