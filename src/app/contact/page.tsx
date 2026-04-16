@@ -19,7 +19,7 @@ export default function ContactPage() {
     setStatus('loading');
 
     try {
-      const mailtoLink = `mailto:support@bestieai.com?subject=${encodeURIComponent(`[${formData.subject}] פנייה מ-${formData.name}`)}&body=${encodeURIComponent(`שם: ${formData.name}\nאימייל: ${formData.email}\n\n${formData.message}`)}`;
+      const mailtoLink = `mailto:bestie@ldrsgroup.com?subject=${encodeURIComponent(`[${formData.subject}] פנייה מ-${formData.name}`)}&body=${encodeURIComponent(`שם: ${formData.name}\nאימייל: ${formData.email}\n\n${formData.message}`)}`;
       window.open(mailtoLink, '_blank');
 
       setStatus('success');
@@ -67,7 +67,7 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900 mb-1">אימייל</h3>
-                  <p className="text-gray-600">support@bestieai.com</p>
+                  <p className="text-gray-600">bestie@ldrsgroup.com</p>
                 </div>
               </div>
 

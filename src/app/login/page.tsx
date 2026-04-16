@@ -181,7 +181,7 @@ function LoginForm() {
               יש בעיה בהתחברות?{' '}
               <button
                 onClick={() => {
-                  alert('צור קשר עם התמיכה בכתובת support@bestieai.com');
+                  alert('צור קשר עם התמיכה בכתובת bestie@ldrsgroup.com');
                 }}
                 className="text-purple-600 underline hover:text-purple-700 transition-colors"
               >
