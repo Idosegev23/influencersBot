@@ -2212,7 +2212,8 @@ h1, h2, h3, h4, h5, h6 {
   color: #883fe2;
 }
 
-.support-card-icon-avatar .support-icon {
+.support-card-icon-avatar .support-icon,
+.problem-type-icon .support-icon {
   width: 20px;
   height: 20px;
   background-color: currentColor;
@@ -2222,6 +2223,7 @@ h1, h2, h3, h4, h5, h6 {
   mask-position: center;
   -webkit-mask-size: contain;
   mask-size: contain;
+  display: block;
 }
 
 .support-letter-avatar {
