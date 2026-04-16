@@ -58,7 +58,7 @@ function buildRawEmail(options: {
   from?: string;
 }): string {
   const to = Array.isArray(options.to) ? options.to.join(', ') : options.to;
-  const from = options.from || `LDRS Bot <${SEND_FROM}>`;
+  const from = options.from || `BestieAI <${SEND_FROM}>`;
 
   const messageParts = [
     `From: ${from}`,
@@ -152,7 +152,7 @@ export async function sendAdminAlert(options: {
         <p style="font-size: 16px; color: #1f2937; line-height: 1.6;">${options.message}</p>
         ${options.details ? `<pre style="background: #f3f4f6; padding: 12px; border-radius: 8px; font-size: 13px; overflow-x: auto; direction: ltr;">${options.details}</pre>` : ''}
         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
-        <p style="font-size: 12px; color: #9ca3af;">נשלח אוטומטית מ-LDRS Bot | ${new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' })}</p>
+        <p style="font-size: 12px; color: #9ca3af;">נשלח אוטומטית מ-BestieAI | ${new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' })}</p>
       </div>
     </div>
   `;
@@ -167,11 +167,11 @@ export async function sendAdminAlert(options: {
 export async function sendTestEmail(): Promise<{ success: boolean; error?: string }> {
   return sendEmail({
     to: SEND_FROM!,
-    subject: 'בדיקת מערכת מיילים — LDRS Bot',
+    subject: 'בדיקת מערכת מיילים — BestieAI',
     html: `
       <div dir="rtl" style="font-family: Arial, sans-serif; padding: 24px;">
         <h2 style="color: #883fe2;">✅ מערכת המיילים עובדת!</h2>
-        <p>המייל הזה נשלח אוטומטית מ-LDRS Bot כדי לוודא שהחיבור ל-Gmail API תקין.</p>
+        <p>המייל הזה נשלח אוטומטית מ-BestieAI כדי לוודא שהחיבור ל-Gmail API תקין.</p>
         <p style="color: #9ca3af; font-size: 12px;">${new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' })}</p>
       </div>
     `,
