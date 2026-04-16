@@ -404,7 +404,7 @@ export default function BrandSupportTab({
               </motion.div>
             )}
 
-            {/* ======== STEP 2: Problem Type ======== */}
+            {/* ======== STEP 2: Problem Type (Figma 403:1953) ======== */}
             {step === 'type' && (
               <motion.div
                 key="support-type"
@@ -412,77 +412,65 @@ export default function BrandSupportTab({
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
               >
-                <h2 className="problem-header-title mb-1 text-center">מה הבעיה?</h2>
-                <p className="mb-5 text-center" style={{ fontSize: '15px', color: '#888' }}>
-                  {selectedProduct
-                    ? `${selectedProduct.name_he || selectedProduct.name}`
-                    : 'פנייה כללית'}
-                </p>
-
-                {/* Selected product pill */}
-                {selectedProduct && (
-                  <div className="problem-brand-pill mb-5">
-                    {selectedProduct.image_url ? (
-                      <img src={selectedProduct.image_url} alt=""
-                        className="w-[32px] h-[32px] rounded-lg object-cover flex-shrink-0" />
-                    ) : (
-                      <div className="w-[32px] h-[32px] rounded-lg flex items-center justify-center flex-shrink-0"
-                        style={{ background: '#f3f4f6' }}>
-                        <ShoppingBag className="w-4 h-4" style={{ color: '#9ca3af' }} />
-                      </div>
-                    )}
-                    <span className="text-[14px] font-semibold flex-1 text-right" style={{ color: '#1a1a2e' }}>
-                      {selectedProduct.name_he || selectedProduct.name}
-                    </span>
-                    <button onClick={() => { setSelectedProduct(null); setStep('product'); }}
-                      className="w-[28px] h-[28px] rounded-full flex items-center justify-center hover:bg-white/50 transition-all">
-                      <X className="w-3.5 h-3.5" style={{ color: '#999' }} />
-                    </button>
+                <div className="mb-4 px-3 flex items-start justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setStep('product')}
+                    className="support-back-btn"
+                    aria-label="חזרה"
+                  >
+                    <span className="support-back-icon" aria-hidden />
+                  </button>
+                  <div>
+                    <h2 className="support-title">מה הבעיה?</h2>
+                    <p className="support-subtitle">בחרי את הבעיה שנתקלת בה</p>
                   </div>
-                )}
-
-                {/* Problem type cards */}
-                <div className={`grid gap-2.5 ${isMobile ? 'grid-cols-2' : 'grid-cols-3'}`}>
-                  {visibleTypes.map(type => {
-                    const Icon = type.icon;
-                    return (
-                      <button
-                        key={type.id}
-                        onClick={() => {
-                          if (type.id === 'coupon') {
-                            handleCouponTypeSelect();
-                          } else {
-                            setSelectedType(type.id);
-                            setStep('form');
-                          }
-                        }}
-                        className="flex flex-col items-center gap-2 p-4 rounded-2xl transition-all active:scale-[0.97]"
-                        style={{
-                          background: 'var(--input-bg, rgba(255,255,255,0.7))',
-                          border: '1px solid var(--border-color, #e5e7eb)',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                        }}
-                      >
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-                          style={{ background: `${type.color}12` }}>
-                          <Icon className="w-5 h-5" style={{ color: type.color }} />
-                        </div>
-                        <div className="text-center">
-                          <p className="text-[13px] font-semibold" style={{ color: '#1a1a2e' }}>{type.label}</p>
-                          <p className="text-[10px] mt-0.5" style={{ color: '#999' }}>{type.sublabel}</p>
-                        </div>
-                      </button>
-                    );
-                  })}
                 </div>
 
-                {/* Back button */}
-                <button
-                  onClick={() => setStep('product')}
-                  className="problem-btn-back flex items-center justify-center gap-2 mt-5 mx-auto"
-                >
-                  <ArrowRight className="w-4 h-4" /> חזרה
-                </button>
+                <div className="flex flex-col gap-3">
+                  {/* Selected product pill */}
+                  {selectedProduct && (
+                    <div className="selected-product-pill">
+                      {selectedProduct.image_url ? (
+                        <img src={selectedProduct.image_url} alt="" />
+                      ) : (
+                        <div className="support-letter-avatar" style={{ width: 44, height: 44, borderRadius: 37 }}>
+                          {(selectedProduct.name_he || selectedProduct.name || '').charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <p>{selectedProduct.name_he || selectedProduct.name}</p>
+                    </div>
+                  )}
+
+                  {/* Problem type grid — 2 columns */}
+                  <div className="problem-type-grid">
+                    {visibleTypes.map(type => {
+                      const Icon = type.icon;
+                      return (
+                        <button
+                          key={type.id}
+                          onClick={() => {
+                            if (type.id === 'coupon') {
+                              handleCouponTypeSelect();
+                            } else {
+                              setSelectedType(type.id);
+                              setStep('form');
+                            }
+                          }}
+                          className="problem-type-card"
+                        >
+                          <div className="problem-type-icon">
+                            <Icon />
+                          </div>
+                          <div className="problem-type-text">
+                            <p>{type.label}</p>
+                            <p>{type.sublabel}</p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </motion.div>
             )}
 
