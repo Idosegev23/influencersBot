@@ -8,8 +8,11 @@ import Link from 'next/link';
 import type { Influencer } from '@/types';
 import { formatNumber, formatDateTime } from '@/lib/utils';
 import { getProxiedImageUrl } from '@/lib/image-utils';
+import dynamic from 'next/dynamic';
 
-type ActiveTab = 'social' | 'websites';
+const MonitoringTab = dynamic(() => import('@/components/admin/MonitoringTab'), { ssr: false });
+
+type ActiveTab = 'social' | 'websites' | 'monitoring';
 type AccountFilter = 'all' | 'creator' | 'brand';
 
 interface WebsiteAccount {
@@ -212,6 +215,15 @@ function DashboardContent() {
         >
           <span className="material-symbols-outlined text-[18px]">language</span>
           אתרים
+        </button>
+        <button
+          onClick={() => setActiveTab('monitoring')}
+          className={`neon-pill flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition-all ${
+            activeTab === 'monitoring' ? 'neon-pill-primary' : 'neon-pill-ghost'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[18px]">monitoring</span>
+          מוניטורינג
         </button>
 
         <div className="w-px h-6 mx-1 bg-[#d1d5db]/20" />
@@ -685,6 +697,9 @@ function DashboardContent() {
           )}
         </>
       )}
+
+      {/* ===== Monitoring Tab ===== */}
+      {activeTab === 'monitoring' && <MonitoringTab />}
     </>
   );
 }
