@@ -110,6 +110,20 @@ const nextConfig: NextConfig = {
         source: '/((?!api/widget|api/admin/proxy|blob-animation|manage|widget-preview).*)',
         headers: securityHeaders,
       },
+      {
+        // Static assets: long-lived cache (icons, SVGs, images in public/)
+        source: '/icons/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+        ],
+      },
+      {
+        // Fonts
+        source: '/fonts/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+        ],
+      },
     ];
   },
 };

@@ -74,8 +74,20 @@ export const L2_TTL = {
 // ============================================
 
 /**
+ * Add ±15% jitter to a TTL value to prevent thundering herd.
+ * When many keys share the same TTL, they all expire at the same instant
+ * causing a burst of DB fetches. Jitter spreads expiry over a window.
+ *
+ * Example: TTL 300s → random between 255s and 345s.
+ */
+function jitterTtl(ttlMs: number): number {
+  const jitterFactor = 0.85 + Math.random() * 0.30; // 0.85 – 1.15
+  return Math.round(ttlMs * jitterFactor);
+}
+
+/**
  * Get from L1 -> L2 -> fetcher (DB)
- * Writes back to both layers
+ * Writes back to both layers with jittered TTLs
  */
 export async function l2CacheWrap<T>(
   key: string,
@@ -83,7 +95,7 @@ export async function l2CacheWrap<T>(
   options: L2CacheOptions = {}
 ): Promise<{ value: T; metrics: L2Metrics }> {
   const start = Date.now();
-  
+
   // Try L1 (in-memory)
   if (!options.skipL1) {
     const l1Result = cacheGet<T>(key);
@@ -94,21 +106,21 @@ export async function l2CacheWrap<T>(
       };
     }
   }
-  
+
   // Try L2 (Redis)
   if (!options.skipL2 && isRedisAvailable()) {
     const l2Entry = await redisGet<L2CacheEntry<T>>(key);
     if (l2Entry && l2Entry.value !== undefined) {
       // Check version if specified
       if (!options.version || l2Entry.version === options.version) {
-        // Write back to L1
+        // Write back to L1 (with jitter so instances don't all expire together)
         if (!options.skipL1) {
           cacheSet(key, l2Entry.value, {
-            ttlMs: l2Entry.ttlMs,
+            ttlMs: jitterTtl(l2Entry.ttlMs),
             tags: options.tags,
           });
         }
-        
+
         return {
           value: l2Entry.value,
           metrics: { l1Hit: false, l2Hit: true, source: 'l2', latencyMs: Date.now() - start },
@@ -116,33 +128,34 @@ export async function l2CacheWrap<T>(
       }
     }
   }
-  
+
   // Fetch from DB
   const value = await fetcher();
-  
-  // Write to both layers
+
+  // Write to both layers with jittered TTL
   if (value !== undefined) {
-    const ttlMs = options.ttlMs || 60000;
-    const ttlSeconds = Math.ceil(ttlMs / 1000);
-    
+    const baseTtlMs = options.ttlMs || 60000;
+    const jitteredTtlMs = jitterTtl(baseTtlMs);
+    const ttlSeconds = Math.ceil(jitteredTtlMs / 1000);
+
     // L1
     if (!options.skipL1) {
-      cacheSet(key, value, { ttlMs, tags: options.tags });
+      cacheSet(key, value, { ttlMs: jitteredTtlMs, tags: options.tags });
     }
-    
+
     // L2
     if (!options.skipL2 && isRedisAvailable()) {
       const entry: L2CacheEntry<T> = {
         value,
         cachedAt: Date.now(),
-        ttlMs,
+        ttlMs: baseTtlMs, // Store base TTL for downstream re-use
         version: options.version,
         source: 'db',
       };
       await redisSet(key, entry, ttlSeconds);
     }
   }
-  
+
   return {
     value,
     metrics: { l1Hit: false, l2Hit: false, source: 'db', latencyMs: Date.now() - start },
