@@ -28,6 +28,10 @@
     {
       "path": "/api/cron/prewarm-cache",
       "schedule": "*/4 * * * *"
+    },
+    {
+      "path": "/api/cron/health-alerts",
+      "schedule": "*/10 * * * *"
     }
   ]
 }
