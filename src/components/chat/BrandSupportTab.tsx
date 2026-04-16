@@ -485,10 +485,20 @@ export default function BrandSupportTab({
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
               >
-                <h2 className="problem-header-title mb-1 text-center">פרטי הפנייה</h2>
-                <p className="mb-5 text-center" style={{ fontSize: '15px', color: '#888' }}>
-                  מלאו את הפרטים ונחזור אליכם בהקדם
-                </p>
+                <div className="mb-4 px-3 flex items-start justify-between">
+                  <button
+                    type="button"
+                    onClick={goBack}
+                    className="support-back-btn"
+                    aria-label="חזרה"
+                  >
+                    <span className="support-back-icon" aria-hidden />
+                  </button>
+                  <div>
+                    <h2 className="support-title">פתיחת פנייה</h2>
+                    <p className="support-subtitle">מלאו את הפרטים ונחזור אליכם בהקדם</p>
+                  </div>
+                </div>
 
                 {/* Context pills */}
                 <div className="flex flex-wrap gap-2 justify-center mb-5">
@@ -502,9 +512,9 @@ export default function BrandSupportTab({
                   {selectedType && (
                     <span className="inline-flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded-full font-medium"
                       style={{
-                        background: `${PROBLEM_TYPES.find(t => t.id === selectedType)?.color || '#6b7280'}12`,
-                        color: PROBLEM_TYPES.find(t => t.id === selectedType)?.color || '#6b7280',
-                        border: `1px solid ${PROBLEM_TYPES.find(t => t.id === selectedType)?.color || '#6b7280'}25`,
+                        background: 'rgba(136,63,226,0.08)',
+                        color: '#883fe2',
+                        border: '1px solid rgba(136,63,226,0.15)',
                       }}>
                       {PROBLEM_TYPES.find(t => t.id === selectedType)?.label}
                     </span>
@@ -550,75 +560,45 @@ export default function BrandSupportTab({
                   </div>
                 )}
 
-                {/* Form fields */}
-                <div className={`flex flex-col gap-3 ${isMobile ? '' : 'items-center'}`}>
+                {/* Form fields — Figma pill inputs */}
+                <div className="flex flex-col gap-[6px]">
                   <input
                     type="text"
                     value={form.name}
                     onChange={e => setForm({ ...form, name: e.target.value })}
-                    placeholder="שם מלא *"
-                    dir="rtl"
-                    className="problem-input"
-                    style={{ maxWidth: isMobile ? '100%' : '363px' }}
+                    placeholder="שם מלא"
+                    className="support-form-input"
                   />
                   <input
                     type="tel"
                     value={form.phone}
                     onChange={e => setForm({ ...form, phone: e.target.value.replace(/\D/g, '') })}
-                    placeholder="מספר טלפון *"
-                    dir="ltr"
-                    className="problem-input text-right"
-                    style={{ maxWidth: isMobile ? '100%' : '363px' }}
+                    placeholder="מספר טלפון"
+                    className="support-form-input"
                   />
                   <input
                     type="text"
                     value={form.order}
                     onChange={e => setForm({ ...form, order: e.target.value })}
                     placeholder="מספר הזמנה (אופציונלי)"
-                    dir="rtl"
-                    className="problem-input"
-                    style={{ maxWidth: isMobile ? '100%' : '363px' }}
+                    className="support-form-input"
                   />
                   <textarea
                     value={form.details}
                     onChange={e => setForm({ ...form, details: e.target.value })}
-                    placeholder={selectedType === 'coupon'
-                      ? 'תארו את הבעיה בקופון... *'
-                      : selectedType === 'shipping'
-                        ? 'תארו את בעיית המשלוח... *'
-                        : 'תארו את הבעיה... *'}
-                    rows={4}
-                    dir="rtl"
-                    className="problem-textarea"
-                    style={{ maxWidth: isMobile ? '100%' : '363px' }}
+                    placeholder="תיאור הבעיה"
+                    className="support-form-textarea"
                   />
-
-                  {error && (
-                    <div className="text-center text-sm" style={{ color: '#ef4444', maxWidth: isMobile ? '100%' : '363px' }}>
-                      {error}
-                    </div>
-                  )}
-
-                  {/* Buttons */}
-                  <div className={`flex gap-3 mt-2 ${isMobile ? 'flex-col-reverse' : 'justify-center'}`}
-                    style={{ maxWidth: isMobile ? '100%' : '363px', width: '100%' }}>
-                    <button
-                      onClick={goBack}
-                      className="problem-btn-back flex items-center justify-center gap-2"
-                      style={{ flex: isMobile ? undefined : 1, width: isMobile ? '100%' : undefined }}
-                    >
-                      <ArrowRight className="w-4 h-4" /> חזרה
-                    </button>
-                    <button
-                      onClick={handleSubmit}
-                      disabled={submitting}
-                      className="problem-btn-submit flex items-center justify-center gap-2"
-                      style={{ flex: isMobile ? undefined : 1, width: isMobile ? '100%' : undefined }}
-                    >
-                      {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'שלח פנייה'}
-                    </button>
-                  </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={submitting || !form.name || !form.phone || !form.details}
+                  className={`support-cta mt-8 ${submitting || !form.name || !form.phone || !form.details ? 'support-cta--disabled' : 'support-cta--enabled'}`}
+                >
+                  {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'שלח פנייה'}
+                </button>
               </motion.div>
             )}
 
