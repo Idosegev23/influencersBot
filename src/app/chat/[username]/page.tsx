@@ -857,11 +857,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   <p className="text-sm font-light leading-4" style={{ color: '#676767' }}>{influencer.header_label || typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-1">
-                <button onClick={() => setShowSupportModal(true)} className="p-2 rounded-lg transition-all hover:bg-black/10" style={{ color: '#676767' }} aria-label="עזרה">
-                  <span className="help-icon" aria-hidden />
-                </button>
-              </div>
+              <div className="flex items-center gap-1" />
             </div>
           ) : (
             /* ---- Desktop Header (Figma pill) ---- */
@@ -1875,16 +1871,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
         )}
 
         {/* Desktop: Help icon bottom-left (Figma) */}
-        {!isMobile && (
-          <button
-            onClick={() => setShowSupportModal(true)}
-            className="fixed bottom-6 left-6 z-50 w-[18px] h-[18px] flex items-center justify-center"
-            style={{ color: '#676767' }}
-            aria-label="עזרה"
-          >
-            <span className="help-icon" aria-hidden />
-          </button>
-        )}
+        {/* Help button removed — support accessible via bottom nav tab */}
 
         {/* Lead Capture Popup */}
         {showLeadPopup && (
