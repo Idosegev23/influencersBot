@@ -2,10 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Loader2, ChevronLeft, X, CheckCircle,
-  Tag, ShoppingBag,
-} from 'lucide-react';
+import { Loader2, X, CheckCircle } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -500,65 +497,72 @@ export default function BrandSupportTab({
                   </div>
                 </div>
 
-                {/* Context pills */}
-                <div className="flex flex-wrap gap-2 justify-center mb-5">
+                <div className="flex flex-col gap-3 mb-3">
+                  {/* Selected product speech-bubble pill */}
                   {selectedProduct && (
-                    <span className="inline-flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded-full font-medium"
-                      style={{ background: 'var(--color-primary, #7c3aed)12', color: 'var(--color-primary, #7c3aed)', border: '1px solid var(--color-primary, #7c3aed)25' }}>
-                      <ShoppingBag className="w-3 h-3" />
-                      {selectedProduct.name_he || selectedProduct.name}
-                    </span>
+                    <div className="selected-product-pill">
+                      {selectedProduct.image_url ? (
+                        <img src={selectedProduct.image_url} alt="" />
+                      ) : (
+                        <div className="support-letter-avatar" style={{ width: 44, height: 44, borderRadius: 37 }}>
+                          {(selectedProduct.name_he || selectedProduct.name || '').charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <p>{selectedProduct.name_he || selectedProduct.name}</p>
+                    </div>
                   )}
-                  {selectedType && (
-                    <span className="inline-flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded-full font-medium"
-                      style={{
-                        background: 'rgba(136,63,226,0.08)',
-                        color: '#883fe2',
-                        border: '1px solid rgba(136,63,226,0.15)',
-                      }}>
-                      {PROBLEM_TYPES.find(t => t.id === selectedType)?.label}
-                    </span>
-                  )}
-                  {selectedCoupon?.coupon_code && (
-                    <span className="inline-flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded-full font-medium"
-                      style={{ background: '#8b5cf612', color: '#8b5cf6', border: '1px solid #8b5cf625' }}>
-                      <Tag className="w-3 h-3" />
-                      {selectedCoupon.coupon_code}
-                    </span>
-                  )}
-                </div>
 
-                {/* Coupon selector (if type is coupon and multiple coupons) */}
-                {selectedType === 'coupon' && coupons.length > 1 && !selectedCoupon && (
-                  <div className="mb-4">
-                    <p className="text-[13px] font-medium mb-2 text-right" style={{ color: '#666' }}>
-                      איזה קופון?
-                    </p>
+                  {/* Selected problem type pill */}
+                  {selectedType && (
+                    <div className="selected-product-pill" style={{ background: 'rgba(241,233,253,0.5)' }}>
+                      <div className="problem-type-icon" style={{ width: 36, height: 36, borderRadius: 8 }}>
+                        <span
+                          className="support-icon"
+                          style={{
+                            WebkitMaskImage: `url('/icons/categories/${PROBLEM_TYPES.find(t => t.id === selectedType)?.icon || 'problem-other'}.svg')`,
+                            maskImage: `url('/icons/categories/${PROBLEM_TYPES.find(t => t.id === selectedType)?.icon || 'problem-other'}.svg')`,
+                          }}
+                          aria-hidden
+                        />
+                      </div>
+                      <p>{PROBLEM_TYPES.find(t => t.id === selectedType)?.label}</p>
+                    </div>
+                  )}
+
+                  {/* Coupon selector (if type is coupon and multiple coupons) */}
+                  {selectedType === 'coupon' && coupons.length > 1 && !selectedCoupon && (
                     <div className="flex flex-col gap-2">
                       {coupons.map((c, i) => (
                         <button
                           key={i}
                           onClick={() => setSelectedCoupon(c)}
-                          className="coupon-card w-full"
+                          className="support-card"
                         >
-                          <div className="w-[36px] h-[36px] rounded-lg flex items-center justify-center flex-shrink-0"
-                            style={{ background: '#8b5cf612' }}>
-                            <Tag className="w-4 h-4" style={{ color: '#8b5cf6' }} />
+                          <div className="support-card-icon-avatar" style={{ background: 'rgba(136,63,226,0.08)' }}>
+                            <span
+                              className="support-icon"
+                              style={{
+                                WebkitMaskImage: "url('/icons/categories/problem-coupon.svg')",
+                                maskImage: "url('/icons/categories/problem-coupon.svg')",
+                              }}
+                              aria-hidden
+                            />
                           </div>
-                          <div className="flex-1 min-w-0 text-right">
-                            <p className="font-semibold text-[14px]" style={{ color: '#1a1a2e' }}>
-                              {c.coupon_code || c.brand_name}
-                            </p>
-                            {c.description && (
-                              <p className="text-[11px] truncate" style={{ color: '#999' }}>{c.description}</p>
-                            )}
+                          <div className="support-card-text">
+                            <p className="support-card-title">{c.coupon_code || c.brand_name}</p>
+                            {c.description && <p className="support-card-subtitle">{c.description}</p>}
                           </div>
-                          <ChevronLeft className="w-4 h-4 flex-shrink-0" style={{ color: '#ccc' }} />
                         </button>
                       ))}
                     </div>
-                  </div>
-                )}
+                  )}
+
+                  {selectedCoupon?.coupon_code && (
+                    <div className="selected-product-pill" style={{ background: 'rgba(241,233,253,0.5)' }}>
+                      <p>🎟️ {selectedCoupon.coupon_code}</p>
+                    </div>
+                  )}
+                </div>
 
                 {/* Form fields — Figma pill inputs */}
                 <div className="flex flex-col gap-[6px]">
