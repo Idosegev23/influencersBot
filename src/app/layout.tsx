@@ -8,6 +8,10 @@ export const metadata: Metadata = {
   description: "Create personalized AI chatbots. Powered by OpenAI.",
   keywords: ["chatbot", "AI", "Instagram", "marketing"],
   manifest: "/manifest.json",
+  icons: {
+    icon: "/faclogo.png",
+    apple: "/faclogo.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -53,7 +57,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap"
           rel="stylesheet"
         />
         <link

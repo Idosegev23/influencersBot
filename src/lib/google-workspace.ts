@@ -144,47 +144,107 @@ export function buildBriefHtml(brief: {
     ? new Date(brief.createdAt).toLocaleDateString('he-IL', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
     : new Date().toLocaleDateString('he-IL', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
+  // Build contact info rows
+  const contactRows: string[] = [];
+  contactRows.push(`<tr><td style="padding:12px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #f3f4f6;width:120px;">שם מלא</td><td style="padding:12px 16px;color:#111827;font-weight:600;font-size:15px;border-bottom:1px solid #f3f4f6;">${brief.fullName}</td></tr>`);
+  if (brief.businessName) contactRows.push(`<tr><td style="padding:12px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #f3f4f6;">סוג עסק</td><td style="padding:12px 16px;color:#111827;font-weight:600;font-size:15px;border-bottom:1px solid #f3f4f6;">${brief.businessName}</td></tr>`);
+  if (brief.email) contactRows.push(`<tr><td style="padding:12px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #f3f4f6;">אימייל</td><td style="padding:12px 16px;font-size:15px;border-bottom:1px solid #f3f4f6;"><a href="mailto:${brief.email}" style="color:#7C3AED;text-decoration:none;font-weight:600;">${brief.email}</a></td></tr>`);
+  if (brief.phone) contactRows.push(`<tr><td style="padding:12px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #f3f4f6;">טלפון</td><td style="padding:12px 16px;font-size:15px;border-bottom:1px solid #f3f4f6;"><a href="tel:${brief.phone}" style="color:#7C3AED;text-decoration:none;font-weight:600;">${brief.phone}</a></td></tr>`);
+
+  // Build brief detail rows
+  const briefRows: string[] = [];
+  briefRows.push(`<tr><td style="padding:12px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #f3f4f6;width:120px;">שירות</td><td style="padding:12px 16px;color:#111827;font-weight:600;font-size:15px;border-bottom:1px solid #f3f4f6;">${brief.serviceName}</td></tr>`);
+  if (brief.productDescription) briefRows.push(`<tr><td style="padding:12px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #f3f4f6;">תיאור</td><td style="padding:12px 16px;color:#111827;font-size:14px;border-bottom:1px solid #f3f4f6;">${brief.productDescription}</td></tr>`);
+  if (brief.goal) briefRows.push(`<tr><td style="padding:12px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #f3f4f6;">מטרה</td><td style="padding:12px 16px;color:#111827;font-size:14px;border-bottom:1px solid #f3f4f6;">${brief.goal}</td></tr>`);
+  if (brief.budgetRange) briefRows.push(`<tr><td style="padding:12px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #f3f4f6;">תקציב</td><td style="padding:12px 16px;color:#111827;font-weight:600;font-size:14px;border-bottom:1px solid #f3f4f6;">${brief.budgetRange}</td></tr>`);
+
   return `<!DOCTYPE html>
 <html dir="rtl" lang="he">
-<head><meta charset="UTF-8"><style>
-  body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; direction: rtl; }
-  .header { background: linear-gradient(135deg, #9334EB, #6B21A8); color: white; padding: 24px; border-radius: 12px; margin-bottom: 24px; }
-  .header h1 { margin: 0 0 4px 0; font-size: 22px; }
-  .header p { margin: 0; opacity: 0.85; font-size: 14px; }
-  .section { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 20px; margin-bottom: 16px; }
-  .section h3 { margin: 0 0 12px 0; color: #6B21A8; font-size: 15px; }
-  .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f3f4f6; }
-  .row:last-child { border-bottom: none; }
-  .label { color: #6b7280; font-size: 13px; }
-  .value { color: #111827; font-weight: 600; font-size: 14px; }
-  .notes { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 16px; margin-top: 16px; }
-  .footer { text-align: center; color: #9ca3af; font-size: 12px; margin-top: 24px; }
-</style></head>
-<body>
-  <div class="header">
-    <h1>📋 ליד חדש — ${brief.serviceName}</h1>
-    <p>${date}</p>
-  </div>
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;font-family:'Segoe UI',Arial,sans-serif;background:#f5f3f0;direction:rtl;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f3f0;padding:32px 16px;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.06);">
 
-  <div class="section">
-    <h3>👤 פרטי הלקוח</h3>
-    <div class="row"><span class="label">שם מלא</span><span class="value">${brief.fullName}</span></div>
-    ${brief.businessName ? `<div class="row"><span class="label">שם העסק</span><span class="value">${brief.businessName}</span></div>` : ''}
-    ${brief.email ? `<div class="row"><span class="label">אימייל</span><span class="value">${brief.email}</span></div>` : ''}
-    ${brief.phone ? `<div class="row"><span class="label">טלפון</span><span class="value">${brief.phone}</span></div>` : ''}
-  </div>
+  <!-- Header -->
+  <tr><td style="background:linear-gradient(135deg,#7C3AED,#5B21B6);padding:32px 32px 28px;">
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td>
+          <div style="font-size:11px;letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,0.6);margin-bottom:8px;">ליד חדש</div>
+          <div style="font-size:26px;font-weight:800;color:#ffffff;line-height:1.2;">${brief.fullName}</div>
+          <div style="font-size:14px;color:rgba(255,255,255,0.7);margin-top:6px;">${brief.serviceName} &middot; ${date}</div>
+        </td>
+        <td width="60" align="left" valign="top">
+          <div style="width:48px;height:48px;background:rgba(255,255,255,0.15);border-radius:12px;display:flex;align-items:center;justify-content:center;">
+            <div style="width:48px;height:48px;border-radius:12px;background:rgba(255,255,255,0.2);text-align:center;line-height:48px;font-size:22px;color:#fff;font-weight:700;">${brief.fullName.charAt(0)}</div>
+          </div>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
 
-  <div class="section">
-    <h3>📌 פרטי הבריף</h3>
-    <div class="row"><span class="label">שירות מבוקש</span><span class="value">${brief.serviceName}</span></div>
-    ${brief.productDescription ? `<div class="row"><span class="label">תיאור המוצר/שירות</span><span class="value">${brief.productDescription}</span></div>` : ''}
-    ${brief.goal ? `<div class="row"><span class="label">מטרה</span><span class="value">${brief.goal}</span></div>` : ''}
-    ${brief.budgetRange ? `<div class="row"><span class="label">תקציב</span><span class="value">${brief.budgetRange}</span></div>` : ''}
-  </div>
+  <!-- Status bar -->
+  <tr><td style="background:#f9f7ff;padding:12px 32px;border-bottom:1px solid #ede9fe;">
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td style="font-size:12px;color:#7C3AED;font-weight:600;">
+          <span style="display:inline-block;width:8px;height:8px;background:#22c55e;border-radius:50%;margin-left:6px;vertical-align:middle;"></span>
+          חדש — ממתין לטיפול
+        </td>
+        <td align="left" style="font-size:12px;color:#9ca3af;">
+          ${new Date().toLocaleDateString('he-IL', { weekday: 'long' })}
+        </td>
+      </tr>
+    </table>
+  </td></tr>
 
-  ${brief.notes ? `<div class="notes"><strong>הערות נוספות:</strong><br/>${brief.notes}</div>` : ''}
+  <!-- Contact section -->
+  <tr><td style="padding:28px 32px 8px;">
+    <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#7C3AED;font-weight:700;margin-bottom:16px;">פרטי קשר</div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#fafaf9;border-radius:12px;overflow:hidden;border:1px solid #f3f4f6;">
+      ${contactRows.join('\n      ')}
+    </table>
+  </td></tr>
 
-  <div class="footer">נוצר אוטומטית על ידי מערכת LDRS Bot</div>
+  <!-- Brief details section -->
+  ${briefRows.length > 1 ? `
+  <tr><td style="padding:24px 32px 8px;">
+    <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#7C3AED;font-weight:700;margin-bottom:16px;">פרטי הבריף</div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#fafaf9;border-radius:12px;overflow:hidden;border:1px solid #f3f4f6;">
+      ${briefRows.join('\n      ')}
+    </table>
+  </td></tr>
+  ` : ''}
+
+  <!-- Notes section -->
+  ${brief.notes ? `
+  <tr><td style="padding:24px 32px 8px;">
+    <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#92400e;font-weight:700;margin-bottom:12px;">הערות</div>
+    <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:20px;font-size:14px;color:#78350f;line-height:1.7;">
+      ${brief.notes}
+    </div>
+  </td></tr>
+  ` : ''}
+
+  <!-- Quick actions hint -->
+  <tr><td style="padding:24px 32px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;border-radius:12px;padding:16px;border:1px solid #f3f4f6;">
+      <tr><td style="padding:16px;text-align:center;">
+        ${brief.email ? `<a href="mailto:${brief.email}" style="display:inline-block;padding:10px 24px;background:#7C3AED;color:#ffffff;text-decoration:none;border-radius:8px;font-size:13px;font-weight:600;margin:0 4px;">שלחו מייל</a>` : ''}
+        ${brief.phone ? `<a href="tel:${brief.phone}" style="display:inline-block;padding:10px 24px;background:#ffffff;color:#7C3AED;text-decoration:none;border-radius:8px;font-size:13px;font-weight:600;border:1px solid #e5e7eb;margin:0 4px;">התקשרו</a>` : ''}
+      </td></tr>
+    </table>
+  </td></tr>
+
+  <!-- Footer -->
+  <tr><td style="padding:20px 32px;border-top:1px solid #f3f4f6;text-align:center;">
+    <span style="font-size:11px;color:#c4b5a3;">BestieAI &middot; LDRS Group &middot; ${new Date().getFullYear()}</span>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
 </body>
 </html>`;
 }
