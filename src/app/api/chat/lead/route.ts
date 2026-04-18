@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { sanitizeHtml, sanitizeUsername } from '@/lib/sanitize';
+import { sendFollowerWelcome, fireAndForget } from '@/lib/whatsapp-notify';
 
 function generateSerial(): string {
   const ts = Date.now().toString(36);
@@ -16,6 +17,9 @@ export async function POST(req: NextRequest) {
     const phone = (body.phone || '').replace(/[^\d+\-() ]/g, '').slice(0, 20);
     const username = sanitizeUsername(body.username || '');
     const sessionId = body.sessionId;
+    // Explicit opt-in for WhatsApp marketing messages (required by Meta
+    // for MARKETING-category templates). Optional — defaults to false.
+    const whatsappOptIn = body.whatsappOptIn === true;
 
     if (!firstName?.trim() || !lastName?.trim() || !phone?.trim()) {
       return NextResponse.json({ success: false, error: 'כל השדות חובה' }, { status: 400 });
@@ -88,6 +92,33 @@ export async function POST(req: NextRequest) {
         .from('chat_sessions')
         .update({ lead_id: lead.id, is_follower: true })
         .eq('id', sessionId);
+    }
+
+    // Fire WhatsApp welcome template (fire-and-forget; opt-in required).
+    // Template: follower_welcome_v2 (MARKETING) — Meta requires explicit opt-in.
+    if (whatsappOptIn) {
+      try {
+        const { data: persona } = await supabase
+          .from('chatbot_persona')
+          .select('name')
+          .eq('account_id', account.id)
+          .maybeSingle();
+        const influencerName =
+          persona?.name ||
+          account.config?.display_name ||
+          account.config?.username ||
+          username;
+        fireAndForget(
+          sendFollowerWelcome({
+            to: phone.trim(),
+            followerFirstName: firstName.trim(),
+            influencerName,
+            influencerUsername: username,
+          })
+        );
+      } catch (err) {
+        console.warn('[Lead API] WhatsApp welcome dispatch failed (non-fatal):', err);
+      }
     }
 
     return NextResponse.json({

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { emitEvent, generateRequestId, claimIdempotencyKey, completeIdempotencyKey } from '@/engines';
 import { trackExperimentConversion, type ExperimentContext } from '@/engines/experiments';
+import { createClient } from '@/lib/supabase';
+import { sendFollowerCouponDelivery, fireAndForget } from '@/lib/whatsapp-notify';
 
 /**
  * Track user interactions for analytics and learning loop
@@ -111,6 +113,21 @@ export async function POST(req: NextRequest) {
       });
 
       // ============================================
+      // WhatsApp coupon delivery (fire-and-forget)
+      // Gated by WHATSAPP_NOTIFY_ENABLED + per-template flag inside notify lib.
+      // Only fires when: event is coupon_copied AND we can resolve the
+      // follower's lead (phone + opt-in) AND the coupon exists.
+      // ============================================
+      if (mappedType === 'coupon_copied' && sessionId) {
+        void dispatchCouponDeliveryWhatsApp({
+          sessionId,
+          accountId,
+          couponCode: payload?.couponCode,
+          brandName: payload?.brandName,
+        });
+      }
+
+      // ============================================
       // Track experiment conversion if applicable
       // ============================================
       if (experimentKey && anonId) {
@@ -146,6 +163,113 @@ export async function POST(req: NextRequest) {
       { error: 'Failed to track event' },
       { status: 500 }
     );
+  }
+}
+
+/**
+ * Resolve follower+coupon context and fire the WhatsApp
+ * `follower_coupon_delivery_v3` template. Non-blocking, failures swallowed.
+ *
+ * Note: UTILITY-category templates don't require explicit marketing opt-in
+ * under Meta policy — the user just actively copied a coupon, so sending
+ * the details to their WhatsApp is a direct response to that action.
+ *
+ * Resolution chain:
+ *   session → lead          (phone, first_name)
+ *   account → config.username (URL slug)
+ *   coupons (code matches)  → brand (via partnerships), discount, end_date
+ */
+async function dispatchCouponDeliveryWhatsApp(args: {
+  sessionId: string;
+  accountId?: string;
+  couponCode?: string;
+  brandName?: string;
+}): Promise<void> {
+  try {
+    if (!args.couponCode) return;
+    const supabase = createClient();
+
+    // 1. Session → lead
+    const { data: session } = await supabase
+      .from('chat_sessions')
+      .select('account_id, lead_id')
+      .eq('id', args.sessionId)
+      .maybeSingle();
+    if (!session?.lead_id) return;
+
+    const { data: lead } = await supabase
+      .from('chat_leads')
+      .select('first_name, phone')
+      .eq('id', session.lead_id)
+      .maybeSingle();
+    if (!lead?.phone || !lead?.first_name) return;
+
+    const accountId = args.accountId || session.account_id;
+    if (!accountId) return;
+
+    // 2. Username (URL slug) lives on accounts.config.username
+    const { data: account } = await supabase
+      .from('accounts')
+      .select('config')
+      .eq('id', accountId)
+      .maybeSingle();
+    const username = (account?.config as any)?.username as string | undefined;
+    if (!username) return;
+
+    // 3. Coupon details (+ partnership for brand name)
+    const { data: coupon } = await supabase
+      .from('coupons')
+      .select(`
+        code,
+        discount_type,
+        discount_value,
+        currency,
+        end_date,
+        description,
+        partnership_id,
+        partnerships:partnership_id ( brand_name )
+      `)
+      .eq('account_id', accountId)
+      .eq('code', args.couponCode)
+      .maybeSingle();
+
+    // Human-readable benefit string from discount_type+value
+    let benefit = coupon?.description || '';
+    if (!benefit && coupon?.discount_type && coupon?.discount_value != null) {
+      if (coupon.discount_type === 'percentage') {
+        benefit = `${coupon.discount_value}% הנחה`;
+      } else if (coupon.discount_type === 'fixed') {
+        benefit = `${coupon.discount_value} ${coupon.currency || 'ILS'} הנחה`;
+      } else if (coupon.discount_type === 'free_shipping') {
+        benefit = 'משלוח חינם';
+      }
+    }
+    if (!benefit) benefit = 'הטבה בלעדית';
+
+    const brand =
+      args.brandName ||
+      (Array.isArray(coupon?.partnerships)
+        ? coupon?.partnerships?.[0]?.brand_name
+        : (coupon?.partnerships as any)?.brand_name) ||
+      '';
+
+    const expiresOn = coupon?.end_date
+      ? new Date(coupon.end_date).toLocaleDateString('he-IL')
+      : 'ללא תוקף';
+
+    fireAndForget(
+      sendFollowerCouponDelivery({
+        to: lead.phone,
+        followerFirstName: lead.first_name,
+        brand,
+        benefit,
+        code: args.couponCode,
+        expiresOn,
+        influencerUsername: username,
+      })
+    );
+  } catch (err) {
+    console.warn('[track] dispatchCouponDeliveryWhatsApp failed (non-fatal):', err);
   }
 }
 

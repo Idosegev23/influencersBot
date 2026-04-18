@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireAdminAuth } from '@/lib/auth/admin-auth';
+import { sendInfluencerWelcome, fireAndForget } from '@/lib/whatsapp-notify';
 
 /**
  * POST /api/admin/accounts/finalize
@@ -85,6 +86,32 @@ export async function POST(request: Request) {
     }
 
     console.log(`[Accounts] Finalized account ${accountId}`);
+
+    // Fire WhatsApp welcome template to the new influencer (UTILITY —
+    // direct response to onboarding action, no marketing opt-in needed).
+    // Gated by WHATSAPP_NOTIFY_ENABLED + WHATSAPP_TEMPLATE_INFLUENCER_WELCOME.
+    if (phoneNumber && whatsappEnabled && username) {
+      try {
+        // Pull the display name for a friendly greeting
+        const { data: persona } = await supabase
+          .from('chatbot_persona')
+          .select('name')
+          .eq('account_id', accountId)
+          .maybeSingle();
+        const firstName =
+          persona?.name?.split(' ')[0] ||
+          username;
+        fireAndForget(
+          sendInfluencerWelcome({
+            to: phoneNumber,
+            influencerFirstName: firstName,
+            influencerUsername: username,
+          })
+        );
+      } catch (err) {
+        console.warn('[Accounts] WhatsApp welcome dispatch failed (non-fatal):', err);
+      }
+    }
 
     return NextResponse.json({
       success: true,

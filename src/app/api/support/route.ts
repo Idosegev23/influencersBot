@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, getInfluencerByUsername, getProductsByInfluencer } from '@/lib/supabase';
 import { notifyBrandSupport, sendSupportConfirmation } from '@/lib/whatsapp';
+import {
+  sendBrandSupportTicket,
+  sendFollowerSupportConfirmation,
+  fireAndForget,
+} from '@/lib/whatsapp-notify';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { checkInfluencerAuth } from '@/lib/auth/influencer-auth';
 import { requireAdminAuth } from '@/lib/auth/admin-auth';
@@ -134,11 +139,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Derive a short "issue type" from the first line of the message;
+    // the full text becomes the description. This matches the Meta
+    // `brand_support_ticket` template's {{5}}=issueType, {{6}}=description.
+    const firstLine = sanitizedMessage.split('\n')[0].trim();
+    const issueType = firstLine.length > 0 ? firstLine.slice(0, 60) : 'פנייה כללית';
+    const description = sanitizedMessage.length > firstLine.length
+      ? sanitizedMessage
+      : firstLine;
+
     // Send WhatsApp notification to BRAND (only if brand has WhatsApp configured)
     let whatsappSent = false;
     if (brandPhone && sanitizedBrand) {
       console.log('[Support] Sending brand notification to:', brandPhone, 'for brand:', sanitizedBrand);
       try {
+        // Legacy GREEN-API — kept in parallel until all templates APPROVED.
         const result = await notifyBrandSupport({
           brandName: sanitizedBrand,
           brandPhone: brandPhone,
@@ -153,6 +168,21 @@ export async function POST(req: NextRequest) {
       } catch (err) {
         console.error('[Support] Brand notification error:', err);
       }
+
+      // Meta Cloud API — brand_support_ticket template (fire-and-forget,
+      // gated by WHATSAPP_NOTIFY_ENABLED + WHATSAPP_TEMPLATE_BRAND_SUPPORT_TICKET).
+      fireAndForget(
+        sendBrandSupportTicket({
+          to: brandPhone,
+          brand: sanitizedBrand,
+          followerName: sanitizedName,
+          followerPhone: sanitizedPhone || '—',
+          orderNumber: sanitizedOrderNumber || '—',
+          issueType,
+          description,
+          influencerName: influencer.display_name,
+        })
+      );
     } else {
       console.log('[Support] Skipping brand notification - no WhatsApp phone configured for brand:', sanitizedBrand);
     }
@@ -182,15 +212,28 @@ export async function POST(req: NextRequest) {
     if (sanitizedPhone) {
       console.log('[Support] Sending customer confirmation to:', sanitizedPhone);
       try {
+        // Legacy GREEN-API confirmation — kept in parallel.
         const result = await sendSupportConfirmation(
           sanitizedPhone,
-          sanitizedBrand || influencer.display_name // Use brand name if available
+          sanitizedBrand || influencer.display_name
         );
         console.log('[Support] Customer confirmation result:', result);
         confirmationSent = result.success;
       } catch (err) {
         console.error('[Support] Customer confirmation error:', err);
       }
+
+      // Meta Cloud API — follower_support_confirmation template (fire-and-forget,
+      // gated by WHATSAPP_NOTIFY_ENABLED + WHATSAPP_TEMPLATE_FOLLOWER_SUPPORT_CONFIRMATION).
+      fireAndForget(
+        sendFollowerSupportConfirmation({
+          to: sanitizedPhone,
+          followerFirstName: sanitizedName.split(' ')[0] || sanitizedName,
+          brand: sanitizedBrand || influencer.display_name,
+          orderNumber: sanitizedOrderNumber || '—',
+          issueType,
+        })
+      );
     } else {
       console.log('[Support] No customer phone provided, skipping customer notification');
     }
