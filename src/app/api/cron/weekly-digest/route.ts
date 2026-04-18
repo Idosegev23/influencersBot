@@ -61,8 +61,10 @@ export async function GET(req: NextRequest) {
       const phone: string | undefined = config.phone;
       const username: string | undefined = config.username;
       const whatsappEnabled: boolean = features.whatsapp === true;
+      // Weekly digest is a MARKETING template — requires explicit opt-in
+      const marketingOptIn: boolean = config.whatsapp_marketing_opt_in === true;
 
-      if (!whatsappEnabled || !phone || !username) {
+      if (!whatsappEnabled || !marketingOptIn || !phone || !username) {
         results.push({
           accountId: account.id,
           username,

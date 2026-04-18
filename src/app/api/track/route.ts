@@ -199,10 +199,13 @@ async function dispatchCouponDeliveryWhatsApp(args: {
 
     const { data: lead } = await supabase
       .from('chat_leads')
-      .select('first_name, phone')
+      .select('first_name, phone, whatsapp_marketing_opt_in')
       .eq('id', session.lead_id)
       .maybeSingle();
     if (!lead?.phone || !lead?.first_name) return;
+
+    // Coupon delivery is MARKETING template — requires explicit opt-in
+    if (!lead.whatsapp_marketing_opt_in) return;
 
     const accountId = args.accountId || session.account_id;
     if (!accountId) return;

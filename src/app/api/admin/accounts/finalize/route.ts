@@ -87,10 +87,12 @@ export async function POST(request: Request) {
 
     console.log(`[Accounts] Finalized account ${accountId}`);
 
-    // Fire WhatsApp welcome template to the new influencer (UTILITY —
-    // direct response to onboarding action, no marketing opt-in needed).
-    // Gated by WHATSAPP_NOTIFY_ENABLED + WHATSAPP_TEMPLATE_INFLUENCER_WELCOME.
-    if (phoneNumber && whatsappEnabled && username) {
+    // Fire WhatsApp welcome template to the new influencer (MARKETING —
+    // Meta classified this as marketing, so requires explicit opt-in).
+    // Gated by WHATSAPP_NOTIFY_ENABLED + WHATSAPP_TEMPLATE_INFLUENCER_WELCOME
+    // + whatsappMarketingOptIn from the finalize body.
+    const whatsappMarketingOptIn = body.whatsappMarketingOptIn === true;
+    if (phoneNumber && whatsappEnabled && whatsappMarketingOptIn && username) {
       try {
         // Pull the display name for a friendly greeting
         const { data: persona } = await supabase

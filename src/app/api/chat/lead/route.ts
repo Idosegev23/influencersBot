@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     // Get account
     const { data: account } = await supabase
       .from('accounts')
-      .select('id')
+      .select('id, config')
       .eq('config->>username', username)
       .eq('status', 'active')
       .maybeSingle();
@@ -77,6 +77,7 @@ export async function POST(req: NextRequest) {
         first_name: firstName.trim(),
         last_name: lastName.trim(),
         phone: phone.trim(),
+        whatsapp_marketing_opt_in: whatsappOptIn,
       })
       .select('id, serial_number, first_name')
       .single();
