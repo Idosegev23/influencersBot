@@ -28,7 +28,8 @@
       "Bash(git diff:*)",
       "Bash(find /Users/idosegev/Downloads/TriRoars/Leaders/influencerbot/public -type f \\\\\\( -name \"*.css\" -o -name \"*.scss\" \\\\\\) 2>/dev/null | head -20)",
       "Bash(identify /Users/idosegev/Downloads/TriRoars/Leaders/influencerbot/public/vidNB.gif 2>/dev/null | head -5 || sips -g all /Users/idosegev/Downloads/TriRoars/Leaders/influencerbot/public/vidNB.gif 2>/dev/null | head -20)",
-      "Bash(which gifsicle:*)"
+      "Bash(which gifsicle:*)",
+      "Bash(npx shadcn@latest *)"
     ]
   }
 }
