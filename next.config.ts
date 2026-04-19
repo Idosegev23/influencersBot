@@ -48,23 +48,10 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    remotePatterns: [
-      // Instagram CDN — use ** for nested subdomains (scontent-lga3-2.cdninstagram.com, instagram.fmia1-1.fbcdn.net)
-      { protocol: 'https', hostname: '**.cdninstagram.com' },
-      { protocol: 'https', hostname: '**.fbcdn.net' },
-      { protocol: 'https', hostname: '**.fna.fbcdn.net' },
-      // Supabase Storage
-      { protocol: 'https', hostname: '**.supabase.co' },
-      // Product images (Argania widget)
-      { protocol: 'https', hostname: 'res.cloudinary.com' },
-      { protocol: 'https', hostname: 'media.my-quickshop.com' },
-      // Recipe / website scraping
-      { protocol: 'https', hostname: '**.cloudfront.net' },
-      // Misc
-      { protocol: 'https', hostname: 'images.unsplash.com' },
-      { protocol: 'https', hostname: 'cdn-icons-png.freepik.com' },
-      { protocol: 'https', hostname: 'avatar.vercel.sh' },
-    ],
+    // Skip Vercel image optimization: our /api/image-proxy already caches
+    // Instagram URLs (max-age=86400), and Vercel's optimizer rejects
+    // internal API routes with query strings (INVALID_IMAGE_OPTIMIZE_REQUEST).
+    unoptimized: true,
   },
   async headers() {
     // Security headers WITHOUT X-Frame-Options and with relaxed CSP (for embeddable routes)
