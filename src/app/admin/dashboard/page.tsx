@@ -1,716 +1,612 @@
 'use client';
 
-import { useState, useEffect, Suspense, useCallback } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Image from 'next/image';
-import { motion } from 'framer-motion';
 import Link from 'next/link';
+import {
+  Users,
+  MessagesSquare,
+  Globe,
+  Activity,
+  UserPlus,
+  ListChecks,
+  ArrowUpRight,
+  Plus,
+  Sparkles,
+  CheckCircle2,
+  CircleDot,
+  ExternalLink,
+  Settings2,
+  ChevronLeft,
+} from 'lucide-react';
 import type { Influencer } from '@/types';
-import { formatNumber, formatDateTime } from '@/lib/utils';
+import { formatNumber } from '@/lib/utils';
 import { getProxiedImageUrl } from '@/lib/image-utils';
-import dynamic from 'next/dynamic';
 
-const MonitoringTab = dynamic(() => import('@/components/admin/MonitoringTab'), { ssr: false });
+import { PageHeader } from '@/components/admin/PageHeader';
+import { KpiCard } from '@/components/admin/KpiCard';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { ButtonLink } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Avatar } from '@/components/ui/avatar';
+import { Sparkline } from '@/components/ui/sparkline';
+import { Skeleton } from '@/components/ui/skeleton';
 
-type ActiveTab = 'social' | 'websites' | 'monitoring';
-type AccountFilter = 'all' | 'creator' | 'brand';
-
-interface WebsiteAccount {
-  id: string;
-  domain: string;
-  displayName: string;
-  url: string;
-  pagesCount: number;
-  chunksCount: number;
-  primaryColor: string;
-  profilePic: string | null;
-  managementToken: string | null;
+interface SystemHealthLite {
+  database?: {
+    counts?: { accounts?: number; chatSessions?: number; chatMessages?: number };
+    activity?: { sessionsLastHour?: number; messagesLastHour?: number };
+  };
+  redis?: { available?: boolean; latencyMs?: number };
+  cache?: { hitRate?: number } | null;
+  growth?: {
+    sessionsPerDay?: Record<string, number>;
+    totalSessionsLast7d?: number;
+    previousWeekSessions?: number;
+    growthPercent?: number | null;
+    topAccounts?: { username: string; sessions: number }[];
+  };
+  alerts?: { level: 'info' | 'warning' | 'critical'; message: string }[];
 }
 
 function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [influencers, setInfluencers] = useState<Influencer[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showCreatedNotification, setShowCreatedNotification] = useState(false);
   const createdSubdomain = searchParams.get('created');
 
-  // Tab & filter state
-  const [activeTab, setActiveTab] = useState<ActiveTab>('social');
-  const [accountFilter, setAccountFilter] = useState<AccountFilter>('all');
+  const [influencers, setInfluencers] = useState<Influencer[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Websites state
-  const [websites, setWebsites] = useState<WebsiteAccount[]>([]);
-  const [websitesLoading, setWebsitesLoading] = useState(false);
-  const [websitesFetched, setWebsitesFetched] = useState(false);
-  const [copiedManageId, setCopiedManageId] = useState<string | null>(null);
-  const [generatingTokenId, setGeneratingTokenId] = useState<string | null>(null);
+  const [health, setHealth] = useState<SystemHealthLite | null>(null);
+  const [healthLoading, setHealthLoading] = useState(true);
 
-  // Checklist progress per account
+  const [websitesCount, setWebsitesCount] = useState<number | null>(null);
+  const [websitesPages, setWebsitesPages] = useState<number>(0);
+
   const [checklistProgress, setChecklistProgress] = useState<Record<string, { total: number; completed: number }>>({});
+
+  const [showCreatedNotification, setShowCreatedNotification] = useState(false);
 
   useEffect(() => {
     if (createdSubdomain) {
       setShowCreatedNotification(true);
-      setTimeout(() => setShowCreatedNotification(false), 5000);
+      const t = setTimeout(() => setShowCreatedNotification(false), 5000);
+      return () => clearTimeout(t);
     }
   }, [createdSubdomain]);
 
   useEffect(() => {
-    fetchInfluencers();
-    fetchChecklistProgress();
-  }, []);
-
-  const fetchChecklistProgress = async () => {
-    try {
-      const res = await fetch('/api/admin/checklist/summary');
-      if (res.ok) {
-        const data = await res.json();
-        setChecklistProgress(data.progress || {});
-      }
-    } catch (err) {
-      console.error('Error fetching checklist progress:', err);
-    }
-  };
-
-  // Fetch websites when tab first activated
-  const fetchWebsites = useCallback(async () => {
-    if (websitesFetched) return;
-    setWebsitesLoading(true);
-    try {
-      const res = await fetch('/api/admin/websites');
-      if (res.ok) {
-        const data = await res.json();
-        setWebsites(data.websites || []);
-      }
-    } catch (err) {
-      console.error('Error fetching websites:', err);
-    } finally {
-      setWebsitesLoading(false);
-      setWebsitesFetched(true);
-    }
-  }, [websitesFetched]);
-
-  useEffect(() => {
-    if (activeTab === 'websites') {
-      fetchWebsites();
-    }
-  }, [activeTab, fetchWebsites]);
-
-  const fetchInfluencers = async () => {
-    try {
-      const authRes = await fetch('/api/admin');
-      const authData = await authRes.json();
-
-      if (!authData.authenticated) {
-        router.push('/admin');
-        return;
-      }
-
-      const res = await fetch('/api/admin/accounts');
-      if (!res.ok) {
-        if (res.status === 401) {
+    (async () => {
+      try {
+        const authRes = await fetch('/api/admin');
+        const authData = await authRes.json();
+        if (!authData.authenticated) {
           router.push('/admin');
           return;
         }
-        throw new Error('Failed to fetch');
+        const [accountsRes, checklistRes, websitesRes, healthRes] = await Promise.allSettled([
+          fetch('/api/admin/accounts'),
+          fetch('/api/admin/checklist/summary'),
+          fetch('/api/admin/websites'),
+          fetch('/api/admin/system-health'),
+        ]);
+
+        if (accountsRes.status === 'fulfilled' && accountsRes.value.ok) {
+          const data = await accountsRes.value.json();
+          setInfluencers(data.influencers || []);
+        }
+        if (checklistRes.status === 'fulfilled' && checklistRes.value.ok) {
+          const data = await checklistRes.value.json();
+          setChecklistProgress(data.progress || {});
+        }
+        if (websitesRes.status === 'fulfilled' && websitesRes.value.ok) {
+          const data = await websitesRes.value.json();
+          setWebsitesCount((data.websites || []).length);
+          setWebsitesPages(
+            (data.websites || []).reduce(
+              (s: number, w: { pagesCount?: number }) => s + (w.pagesCount || 0),
+              0,
+            ),
+          );
+        }
+        if (healthRes.status === 'fulfilled' && healthRes.value.ok) {
+          const data = await healthRes.value.json();
+          setHealth(data as SystemHealthLite);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+        setHealthLoading(false);
       }
+    })();
+  }, [router]);
 
-      const data = await res.json();
-      setInfluencers(data.influencers || []);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Derived
+  const accountCount = influencers.length;
+  const activeCount = influencers.filter((i) => i.is_active).length;
+  const totalFollowers = influencers.reduce((s, i) => s + (i.followers_count || 0), 0);
 
-  const handleLogout = async () => {
-    await fetch('/api/admin', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'logout' }),
-    });
-    router.push('/admin');
-  };
+  const growthSeries = (() => {
+    const spd = health?.growth?.sessionsPerDay;
+    if (!spd) return [] as number[];
+    return Object.keys(spd)
+      .sort()
+      .slice(-14)
+      .map((k) => spd[k] || 0);
+  })();
 
-  const handleDelete = async (influencer: Influencer) => {
-    const confirmed = window.confirm(
-      `האם אתה בטוח שברצונך למחוק את @${influencer.username}?\n\n` +
-      'פעולה זו תמחק:\n' +
-      '• את כל נתוני הסריקה (פוסטים, תגובות, האשטגים)\n' +
-      '• את הפרסונה\n' +
-      '• את כל המוצרים והקופונים\n' +
-      '• את כל השיחות\n\n' +
-      'המחיקה היא לצמיתות ולא ניתן לשחזר!'
-    );
+  const growthPct = health?.growth?.growthPercent ?? null;
+  const totalChats = health?.database?.counts?.chatSessions ?? 0;
+  const sessionsLastHour = health?.database?.activity?.sessionsLastHour ?? 0;
 
-    if (!confirmed) return;
-
-    try {
-      setLoading(true);
-      const res = await fetch(`/api/admin/accounts/${influencer.id}`, {
-        method: 'DELETE',
-      });
-
-      if (res.ok) {
-        await fetchInfluencers();
-      } else {
-        const error = await res.json();
-        alert(`שגיאה במחיקה: ${error.error || 'לא ידוע'}`);
-      }
-    } catch (error) {
-      console.error('Error deleting:', error);
-      alert('שגיאה במחיקה');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Filtered influencers based on account type
-  const filteredInfluencers = influencers.filter((i) => {
-    if (accountFilter === 'all') return true;
-    return i.type === accountFilter;
-  });
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-32">
-        <div className="w-8 h-8 border-2 border-[#9334EB] border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  const recentAccounts = [...influencers]
+    .sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
+    .slice(0, 6);
 
   return (
     <>
-      {/* Success Notification */}
+      {/* Success flash */}
       {showCreatedNotification && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          className="fixed top-28 left-1/2 -translate-x-1/2 z-50 neon-pill neon-pill-primary px-5 py-3 text-sm font-medium shadow-lg"
+        <div
+          className="fixed top-20 start-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-[10px] bg-[color:var(--ink-900)] text-white text-[13px] shadow-xl flex items-center gap-2 animate-[fadein_.3s_ease]"
+          role="status"
         >
-          <span className="material-symbols-outlined text-[18px]">check_circle</span>
-          צ&apos;אטבוט נוצר בהצלחה! - /chat/{createdSubdomain}
-        </motion.div>
+          <CheckCircle2 className="w-4 h-4" />
+          הצ׳אטבוט נוצר בהצלחה · <span className="opacity-70">/chat/{createdSubdomain}</span>
+        </div>
       )}
 
-      {/* Tab Bar */}
-      <div className="flex items-center gap-2 mb-6 flex-wrap">
-        <button
-          onClick={() => setActiveTab('social')}
-          className={`neon-pill flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition-all ${
-            activeTab === 'social' ? 'neon-pill-primary' : 'neon-pill-ghost'
-          }`}
-        >
-          <span className="material-symbols-outlined text-[18px]">group</span>
-          חשבונות סושיאל
-        </button>
-        <button
-          onClick={() => setActiveTab('websites')}
-          className={`neon-pill flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition-all ${
-            activeTab === 'websites' ? 'neon-pill-secondary' : 'neon-pill-ghost'
-          }`}
-        >
-          <span className="material-symbols-outlined text-[18px]">language</span>
-          אתרים
-        </button>
-        <button
-          onClick={() => setActiveTab('monitoring')}
-          className={`neon-pill flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition-all ${
-            activeTab === 'monitoring' ? 'neon-pill-primary' : 'neon-pill-ghost'
-          }`}
-        >
-          <span className="material-symbols-outlined text-[18px]">monitoring</span>
-          מוניטורינג
-        </button>
+      <PageHeader
+        eyebrow="סקירה כללית"
+        title={
+          <span className="inline-flex items-center gap-2.5">
+            שלום, Admin
+            <span className="w-2 h-2 rounded-full bg-[color:var(--success)] animate-pulse" aria-hidden />
+          </span>
+        }
+        description="מבט-על על החשבונות, האתרים והפעילות של המערכת — הכל במסך אחד."
+        actions={
+          <>
+            <ButtonLink href="/admin/accounts" variant="outline" size="sm">
+              <Users className="w-3.5 h-3.5" />
+              כל החשבונות
+            </ButtonLink>
+            <ButtonLink href="/admin/add" variant="primary" size="sm">
+              <Plus className="w-3.5 h-3.5" />
+              חשבון חדש
+            </ButtonLink>
+          </>
+        }
+      />
 
-        <div className="w-px h-6 mx-1 bg-[#d1d5db]/20" />
-
-        <Link
-          href="/admin/onboarding"
-          className="neon-pill neon-pill-ghost flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition-all"
-        >
-          <span className="material-symbols-outlined text-[18px]">assignment_turned_in</span>
-          אונבורדינג
-        </Link>
-
+      {/* KPI row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-6">
+        <KpiCard
+          label="חשבונות"
+          icon={Users}
+          value={loading ? '—' : formatNumber(accountCount)}
+          description={`${activeCount} פעילים`}
+          sheen
+        />
+        <KpiCard
+          label="אתרים"
+          icon={Globe}
+          value={websitesCount == null ? '—' : formatNumber(websitesCount)}
+          description={`${formatNumber(websitesPages)} מסמכים`}
+        />
+        <KpiCard
+          label="סה״כ עוקבים"
+          icon={Sparkles}
+          value={loading ? '—' : formatCompact(totalFollowers)}
+          description="בכל חשבונות סושיאל"
+        />
+        <KpiCard
+          label="שיחות"
+          icon={MessagesSquare}
+          value={healthLoading ? '—' : formatNumber(totalChats)}
+          delta={growthPct == null ? null : growthPct}
+          deltaLabel="לעומת שבוע קודם"
+          spark={growthSeries.length > 1 ? growthSeries : undefined}
+        />
       </div>
 
-      {/* ===== Social Tab ===== */}
-      {activeTab === 'social' && (
-        <>
-          {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="neon-stat-card p-6"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[#9334EB]/10">
-                  <span className="material-symbols-outlined text-[24px] text-[#9334EB]">group</span>
-                </div>
-                <div>
-                  <p className="text-3xl font-bold font-headline text-[#1f2937]">{filteredInfluencers.length}</p>
-                  <p className="text-sm text-[#4b5563]">חשבונות</p>
-                </div>
+      {/* Content grid */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        {/* Left: recent accounts */}
+        <div className="xl:col-span-2 flex flex-col gap-4">
+          <Card>
+            <CardHeader className="flex-row items-center justify-between">
+              <div>
+                <CardTitle>חשבונות אחרונים</CardTitle>
+                <CardDescription>שישה החשבונות שנוספו לאחרונה</CardDescription>
               </div>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="neon-stat-card p-6"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[#2663EB]/10">
-                  <span className="material-symbols-outlined text-[24px] text-[#2663EB]">chat_bubble</span>
-                </div>
-                <div>
-                  <p className="text-3xl font-bold font-headline text-[#1f2937]">
-                    {filteredInfluencers.filter((i) => i.is_active).length}
-                  </p>
-                  <p className="text-sm text-[#4b5563]">פעילים</p>
-                </div>
-              </div>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="neon-stat-card p-6"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[#DC2627]/10">
-                  <span className="material-symbols-outlined text-[24px] text-[#DC2627]">bar_chart</span>
-                </div>
-                <div>
-                  <p className="text-3xl font-bold font-headline text-[#1f2937]">
-                    {formatNumber(filteredInfluencers.reduce((sum, i) => sum + (i.followers_count || 0), 0))}
-                  </p>
-                  <p className="text-sm text-[#4b5563]">עוקבים כולל</p>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-
-          {/* Action bar with sub-filter */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-3">
-            <div className="flex items-center gap-3">
-              <h2 className="text-lg sm:text-xl font-semibold font-headline text-[#1f2937]">חשבונות</h2>
-              {/* Sub-filter pills */}
-              <div className="flex items-center gap-1 rounded-full p-1 bg-[#d1d5db]/10 border border-[#d1d5db]/15">
-                {([
-                  { key: 'all' as AccountFilter, label: 'הכל' },
-                  { key: 'creator' as AccountFilter, label: 'משפיענים' },
-                  { key: 'brand' as AccountFilter, label: 'מותגים' },
-                ]).map(({ key, label }) => (
-                  <button
-                    key={key}
-                    onClick={() => setAccountFilter(key)}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all ${
-                      accountFilter === key
-                        ? 'bg-[#9334EB]/15 text-[#1f2937] border border-[#9334EB]/30'
-                        : 'text-[#4b5563] border border-transparent hover:text-[#474747]'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="flex gap-3">
               <Link
-                href="/admin/influencers"
-                className="neon-pill neon-pill-ghost flex items-center gap-2 text-sm"
+                href="/admin/accounts"
+                className="text-[12.5px] text-[color:var(--ink-600)] hover:text-[color:var(--ink-900)] inline-flex items-center gap-1"
               >
-                <span className="material-symbols-outlined text-[16px]">group</span>
-                תצוגה מפורטת
+                הצג הכל
+                <ChevronLeft className="w-3.5 h-3.5 rtl:rotate-180" />
               </Link>
-              <Link
-                href="/admin/add"
-                className="neon-pill neon-pill-primary flex items-center gap-2 text-sm font-medium"
-              >
-                <span className="material-symbols-outlined text-[16px]">add</span>
-                הוסף חשבון
-              </Link>
-            </div>
-          </div>
-
-          {/* Influencers Grid */}
-          {filteredInfluencers.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredInfluencers.map((influencer, index) => (
-                <motion.div
-                  key={influencer.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="neon-card p-4 transition-all hover:shadow-md"
-                >
-                  <div className="flex items-start gap-3">
-                    {influencer.profile_pic_url ? (
-                      <div className="relative w-14 h-14 rounded-2xl overflow-hidden flex-shrink-0 border-2 border-[#9334EB]/20">
-                        <Image
-                          src={getProxiedImageUrl(influencer.profile_pic_url || '')}
-                          alt={influencer.display_name}
-                          fill
-                          className="object-cover"
-                          sizes="56px"
-                          unoptimized
-                        />
+            </CardHeader>
+            <CardContent className="pt-0">
+              {loading ? (
+                <div className="flex flex-col gap-3 py-2">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <Skeleton className="w-9 h-9 rounded-full" />
+                      <div className="flex-1">
+                        <Skeleton className="h-3.5 w-32 mb-1.5" />
+                        <Skeleton className="h-2.5 w-20" />
                       </div>
-                    ) : (
-                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-bold flex-shrink-0 bg-[#d1d5db]/10 border-2 border-[#d1d5db]/15 text-[#d1d5db]">
-                        ?
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold truncate text-[#1f2937]">
-                        {influencer.display_name}
-                      </h3>
-                      <p className="text-sm text-[#4b5563]">@{influencer.username}</p>
-                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                        <span className="text-xs text-[#d1d5db]">{formatNumber(influencer.followers_count)} עוקבים</span>
-                        <span
-                          className={`inline-flex items-center text-[11px] py-0.5 px-2 rounded-full font-medium ${
-                            influencer.is_active
-                              ? 'bg-[#9334EB]/15 text-[#1f2937] border border-[#9334EB]/30'
-                              : 'bg-[#d1d5db]/10 text-[#4b5563] border border-[#d1d5db]/20'
-                          }`}
-                        >
-                          {influencer.is_active ? 'פעיל' : 'לא פעיל'}
-                        </span>
-                        {influencer.type === 'brand' && (
-                          <span className="inline-flex items-center text-[11px] py-0.5 px-2 rounded-full font-medium bg-[#2663EB]/15 text-[#2663EB] border border-[#2663EB]/30">
-                            מותג
-                          </span>
-                        )}
-                      </div>
+                      <Skeleton className="h-2 w-20" />
                     </div>
-                  </div>
-
-                  {/* Checklist progress */}
-                  {(() => {
-                    const cp = checklistProgress[influencer.id];
-                    if (!cp) return null;
-                    const pct = Math.round((cp.completed / cp.total) * 100);
-                    const isDone = pct === 100;
-                    return (
-                      <Link
-                        href={`/admin/influencers/${influencer.id}/checklist`}
-                        className="mt-3 block group/cl"
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-[11px] font-medium text-[#4b5563] group-hover/cl:text-[#9334EB] transition-colors flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[13px]">checklist</span>
-                            צ׳קליסט
-                          </span>
-                          <span className={`text-[11px] font-bold ${isDone ? 'text-[#059669]' : 'text-[#9334EB]'}`}>
-                            {cp.completed}/{cp.total}
-                          </span>
-                        </div>
-                        <div className="h-1.5 rounded-full bg-[#f3f4f6] overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all duration-500"
-                            style={{
-                              width: `${pct}%`,
-                              background: isDone
-                                ? 'linear-gradient(90deg, #059669, #17a34a)'
-                                : 'linear-gradient(90deg, #9334EB, #2663EB)',
-                            }}
-                          />
-                        </div>
-                      </Link>
-                    );
-                  })()}
-
-                  <div className="flex items-center gap-2 mt-4 pt-4 border-t border-[#d1d5db]/10">
-                    <a
-                      href={`/chat/${influencer.username}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="neon-pill neon-pill-ghost flex-1 flex items-center justify-center gap-1 py-2 text-sm"
-                    >
-                      <span className="material-symbols-outlined text-[14px]">open_in_new</span>
-                      צפייה
-                    </a>
-                    <Link
-                      href={`/admin/influencers/${influencer.id}`}
-                      className="neon-pill neon-pill-ghost flex-1 flex items-center justify-center gap-1 py-2 text-sm"
-                    >
-                      <span className="material-symbols-outlined text-[14px]">settings</span>
-                      ניהול
-                    </Link>
-                    <Link
-                      href={`/admin/influencers/${influencer.id}/checklist`}
-                      className="neon-pill neon-pill-ghost flex items-center justify-center gap-1 px-3 py-2 text-sm"
-                      title="צ׳קליסט"
-                    >
-                      <span className="material-symbols-outlined text-[14px]">checklist</span>
-                    </Link>
-                    <button
-                      onClick={() => handleDelete(influencer)}
-                      className="neon-pill neon-pill-danger flex items-center justify-center gap-1 px-3 py-2 text-sm"
-                      title="מחק"
-                    >
-                      <span className="material-symbols-outlined text-[14px]">delete</span>
-                    </button>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="neon-card p-12 text-center"
-            >
-              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 bg-[#d1d5db]/10 border border-[#d1d5db]/15">
-                <span className="material-symbols-outlined text-[32px] text-[#d1d5db]">group</span>
-              </div>
-              <h3 className="text-lg font-medium font-headline mb-2 text-[#1f2937]">
-                {accountFilter === 'all' ? 'אין עדיין חשבונות' : accountFilter === 'creator' ? 'אין משפיענים' : 'אין מותגים'}
-              </h3>
-              <p className="mb-6 text-[#4b5563]">
-                {accountFilter === 'all' ? 'התחילו על ידי הוספת חשבון ראשון' : 'לא נמצאו חשבונות מסוג זה'}
-              </p>
-              <Link
-                href="/admin/add"
-                className="neon-pill neon-pill-primary inline-flex items-center gap-2 px-6 py-3 font-medium"
-              >
-                <span className="material-symbols-outlined text-[20px]">add</span>
-                הוסף חשבון
-              </Link>
-            </motion.div>
-          )}
-        </>
-      )}
-
-      {/* ===== Websites Tab ===== */}
-      {activeTab === 'websites' && (
-        <>
-          {websitesLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <div className="w-8 h-8 border-2 border-[#2663EB] border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : (
-            <>
-              {/* Website Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="neon-stat-card p-6"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[#2663EB]/10">
-                      <span className="material-symbols-outlined text-[24px] text-[#2663EB]">language</span>
-                    </div>
-                    <div>
-                      <p className="text-3xl font-bold font-headline text-[#1f2937]">{websites.length}</p>
-                      <p className="text-sm text-[#4b5563]">אתרים</p>
-                    </div>
-                  </div>
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 }}
-                  className="neon-stat-card p-6"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[#9334EB]/10">
-                      <span className="material-symbols-outlined text-[24px] text-[#9334EB]">description</span>
-                    </div>
-                    <div>
-                      <p className="text-3xl font-bold font-headline text-[#1f2937]">
-                        {websites.reduce((sum, w) => sum + w.pagesCount, 0)}
-                      </p>
-                      <p className="text-sm text-[#4b5563]">מסמכים</p>
-                    </div>
-                  </div>
-                </motion.div>
-              </div>
-
-              {/* Action bar */}
-              <div className="mb-6">
-                <h2 className="text-xl font-semibold font-headline text-[#1f2937]">אתרים</h2>
-              </div>
-
-              {/* Websites Grid */}
-              {websites.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {websites.map((website, index) => (
-                    <motion.div
-                      key={website.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      className="neon-card p-4 transition-all hover:shadow-md"
-                    >
-                      <div className="flex items-start gap-3">
-                        {website.profilePic ? (
-                          <div className="relative w-14 h-14 rounded-2xl overflow-hidden flex-shrink-0 border-2 border-[#d1d5db]/15">
-                            <Image
-                              src={website.profilePic}
-                              alt={website.displayName}
-                              fill
-                              className="object-cover"
-                              sizes="56px"
-                              unoptimized
-                            />
-                          </div>
-                        ) : (
-                          <div
-                            className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
-                            style={{ backgroundColor: website.primaryColor + '15', border: `2px solid ${website.primaryColor}20` }}
-                          >
-                            <span className="material-symbols-outlined text-[28px]" style={{ color: website.primaryColor }}>language</span>
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold truncate text-[#1f2937]">
-                            {website.displayName}
-                          </h3>
-                          <a
-                            href={website.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm truncate block transition-colors text-[#2663EB] hover:text-[#9334EB]"
-                          >
-                            {website.domain}
-                          </a>
-                          <div className="flex items-center gap-2 mt-1.5 text-xs text-[#d1d5db]">
-                            <span>{website.pagesCount} מסמכים</span>
-                            <span>{website.chunksCount} chunks</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Action buttons row */}
-                      <div className="flex items-center gap-2 mt-4 pt-4 border-t border-[#d1d5db]/10">
-                        <Link
-                          href={`/admin/websites/${website.id}/preview`}
-                          className="neon-pill neon-pill-ghost flex-1 flex items-center justify-center gap-1 py-2 text-sm"
-                        >
-                          <span className="material-symbols-outlined text-[14px]">open_in_new</span>
-                          ווידג׳ט
-                        </Link>
-                        <a
-                          href={website.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="neon-pill neon-pill-ghost flex-1 flex items-center justify-center gap-1 py-2 text-sm"
-                        >
-                          <span className="material-symbols-outlined text-[14px]">language</span>
-                          לאתר
-                        </a>
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(`${window.location.origin}/demo/${website.id}`);
-                          }}
-                          className="neon-pill neon-pill-outline flex items-center justify-center gap-1 px-3 py-2 text-sm"
-                          title="העתק לינק דמו"
-                        >
-                          <span className="material-symbols-outlined text-[14px]">content_copy</span>
-                        </button>
-                      </div>
-
-                      {/* Management panel link button */}
-                      <button
-                        onClick={async () => {
-                          let token = website.managementToken;
-                          if (!token) {
-                            setGeneratingTokenId(website.id);
-                            try {
-                              const res = await fetch('/api/admin/websites', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ accountId: website.id }),
-                              });
-                              const data = await res.json();
-                              if (data.token) {
-                                token = data.token;
-                                setWebsites(prev => prev.map(w =>
-                                  w.id === website.id ? { ...w, managementToken: token } : w
-                                ));
-                              }
-                            } catch {} finally {
-                              setGeneratingTokenId(null);
-                            }
-                          }
-                          if (token) {
-                            navigator.clipboard.writeText(`${window.location.origin}/manage/${token}`);
-                            setCopiedManageId(website.id);
-                            setTimeout(() => setCopiedManageId(null), 2000);
-                          }
-                        }}
-                        disabled={generatingTokenId === website.id}
-                        className={`w-full flex items-center justify-center gap-2 mt-2 py-2.5 text-sm font-medium rounded-full transition-all cursor-pointer ${
-                          website.managementToken
-                            ? 'bg-[#9334EB]/10 text-[#1f2937] border border-[#9334EB]/25 hover:bg-[#9334EB]/20'
-                            : 'bg-[#DC2627]/10 text-[#DC2627] border border-[#DC2627]/25 hover:bg-[#DC2627]/20'
-                        }`}
-                      >
-                        {generatingTokenId === website.id ? (
-                          <>מייצר קישור...</>
-                        ) : copiedManageId === website.id ? (
-                          <>
-                            <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                            הקישור הועתק!
-                          </>
-                        ) : website.managementToken ? (
-                          <>
-                            <span className="material-symbols-outlined text-[16px]">content_copy</span>
-                            העתק לינק פאנל ניהול
-                          </>
-                        ) : (
-                          <>
-                            <span className="material-symbols-outlined text-[16px]">settings</span>
-                            צור לינק פאנל ניהול
-                          </>
-                        )}
-                      </button>
-                    </motion.div>
                   ))}
                 </div>
+              ) : recentAccounts.length === 0 ? (
+                <EmptyAccounts />
               ) : (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="neon-card p-12 text-center"
-                >
-                  <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 bg-[#d1d5db]/10 border border-[#d1d5db]/15">
-                    <span className="material-symbols-outlined text-[32px] text-[#d1d5db]">language</span>
-                  </div>
-                  <h3 className="text-lg font-medium font-headline mb-2 text-[#1f2937]">אין עדיין אתרים</h3>
-                  <p className="text-[#4b5563]">אתרים מתווספים דרך הקוד</p>
-                </motion.div>
+                <div className="-mx-5">
+                  <table className="ui-table">
+                    <thead>
+                      <tr>
+                        <th className="ps-5">חשבון</th>
+                        <th>עוקבים</th>
+                        <th>סוג</th>
+                        <th>צ׳קליסט</th>
+                        <th className="pe-5 text-end">פעולות</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentAccounts.map((i) => {
+                        const cp = checklistProgress[i.id];
+                        const pct = cp ? Math.round((cp.completed / cp.total) * 100) : null;
+                        return (
+                          <tr key={i.id}>
+                            <td className="ps-5">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <Avatar
+                                  src={i.profile_pic_url ? getProxiedImageUrl(i.profile_pic_url) : null}
+                                  alt={i.display_name}
+                                  fallback={i.display_name}
+                                  size={32}
+                                  rounded
+                                />
+                                <div className="min-w-0">
+                                  <div className="text-[13px] font-semibold text-[color:var(--ink-900)] truncate">
+                                    {i.display_name}
+                                  </div>
+                                  <div className="text-[11.5px] text-[color:var(--ink-500)] truncate">
+                                    @{i.username}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="tabular-nums text-[color:var(--ink-700)]">
+                              {formatCompact(i.followers_count || 0)}
+                            </td>
+                            <td>
+                              {i.type === 'brand' ? (
+                                <Badge variant="accent">מותג</Badge>
+                              ) : (
+                                <Badge variant="outline">משפיען</Badge>
+                              )}
+                              {i.is_active ? (
+                                <Badge variant="success" className="ms-1.5" dot>
+                                  פעיל
+                                </Badge>
+                              ) : (
+                                <Badge variant="neutral" className="ms-1.5">לא פעיל</Badge>
+                              )}
+                            </td>
+                            <td>
+                              {pct == null ? (
+                                <span className="text-[11.5px] text-[color:var(--ink-400)]">—</span>
+                              ) : (
+                                <div className="flex items-center gap-2 min-w-[120px]">
+                                  <div className="ui-progress flex-1">
+                                    <span style={{ width: `${pct}%` }} />
+                                  </div>
+                                  <span className="text-[11px] font-semibold tabular-nums text-[color:var(--ink-600)] w-9 text-end">
+                                    {pct}%
+                                  </span>
+                                </div>
+                              )}
+                            </td>
+                            <td className="pe-5">
+                              <div className="flex items-center gap-1 justify-end">
+                                <Link
+                                  href={`/admin/influencers/${i.id}`}
+                                  className="ui-btn ui-btn-icon-sm ui-btn-ghost focus-ring"
+                                  aria-label="ניהול"
+                                  title="ניהול"
+                                >
+                                  <Settings2 className="w-3.5 h-3.5" />
+                                </Link>
+                                <a
+                                  href={`/chat/${i.username}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="ui-btn ui-btn-icon-sm ui-btn-ghost focus-ring"
+                                  aria-label="פתח צ׳אט"
+                                  title="פתח צ׳אט"
+                                >
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                </a>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
-            </>
-          )}
-        </>
-      )}
+            </CardContent>
+          </Card>
 
-      {/* ===== Monitoring Tab ===== */}
-      {activeTab === 'monitoring' && <MonitoringTab />}
+          {/* Activity chart */}
+          <Card>
+            <CardHeader className="flex-row items-end justify-between">
+              <div>
+                <CardTitle>שיחות ב-14 ימים אחרונים</CardTitle>
+                <CardDescription>
+                  סה״כ {formatNumber(health?.growth?.totalSessionsLast7d || 0)} בשבוע האחרון
+                  {growthPct != null && (
+                    <>
+                      {' · '}
+                      <span
+                        className={
+                          growthPct >= 0
+                            ? 'text-[color:var(--success)] font-medium'
+                            : 'text-[color:var(--danger)] font-medium'
+                        }
+                      >
+                        {growthPct >= 0 ? '+' : ''}
+                        {growthPct.toFixed(1)}%
+                      </span>
+                    </>
+                  )}
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {healthLoading ? (
+                <Skeleton className="w-full h-32" />
+              ) : growthSeries.length > 1 ? (
+                <div className="w-full">
+                  <div className="ui-grid-bg rounded-[8px] p-3">
+                    <Sparkline
+                      values={growthSeries}
+                      width={800}
+                      height={120}
+                      className="w-full h-32"
+                      strokeWidth={2}
+                    />
+                  </div>
+                  <div className="grid grid-cols-7 mt-2 text-[10.5px] text-[color:var(--ink-400)]">
+                    {['ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳', 'א׳'].map((d, i) => (
+                      <span key={i} className="text-center">{d}</span>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="py-10 text-center text-[12.5px] text-[color:var(--ink-500)]">
+                  אין מספיק נתונים להצגת גרף.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right column */}
+        <div className="flex flex-col gap-4">
+          {/* System pulse */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>מצב מערכת</CardTitle>
+                <Link
+                  href="/admin/monitoring"
+                  className="text-[12px] text-[color:var(--ink-600)] hover:text-[color:var(--ink-900)] inline-flex items-center gap-1"
+                >
+                  מוניטורינג מלא
+                  <ChevronLeft className="w-3.5 h-3.5 rtl:rotate-180" />
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0 flex flex-col gap-3">
+              <StatusRow
+                label="Database"
+                ok={!!health}
+                meta={`${formatNumber(health?.database?.counts?.accounts || 0)} חשבונות`}
+              />
+              <StatusRow
+                label="Redis"
+                ok={!!health?.redis?.available}
+                meta={`${health?.redis?.latencyMs ?? 0} ms`}
+              />
+              <StatusRow
+                label="Cache hit rate"
+                ok={(health?.cache?.hitRate ?? 0) > 0.5}
+                meta={`${Math.round((health?.cache?.hitRate ?? 0) * 100)}%`}
+              />
+              <StatusRow
+                label="שיחות בשעה"
+                ok={sessionsLastHour >= 0}
+                meta={formatNumber(sessionsLastHour)}
+                hideDot
+              />
+
+              {health?.alerts && health.alerts.length > 0 && (
+                <>
+                  <Separator className="my-1" />
+                  <div className="flex flex-col gap-2">
+                    {health.alerts.slice(0, 3).map((a, i) => {
+                      const color =
+                        a.level === 'critical'
+                          ? 'var(--danger)'
+                          : a.level === 'warning'
+                            ? 'var(--warning)'
+                            : 'var(--accent)';
+                      return (
+                        <div
+                          key={i}
+                          className="flex items-start gap-2 p-2.5 rounded-md bg-[color:var(--surface-2)] text-[12px]"
+                          style={{ borderInlineStart: `2px solid ${color}` }}
+                        >
+                          <CircleDot className="w-3 h-3 mt-0.5 flex-shrink-0" style={{ color }} />
+                          <span className="text-[color:var(--ink-800)] leading-relaxed">{a.message}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Quick actions */}
+          <Card>
+            <CardHeader>
+              <CardTitle>קיצורי דרך</CardTitle>
+              <CardDescription>הפעולות הנפוצות ביותר</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0 grid grid-cols-2 gap-2">
+              <QuickAction href="/admin/add" icon={UserPlus} label="קליטת חשבון" />
+              <QuickAction href="/admin/onboarding" icon={ListChecks} label="אונבורדינג" />
+              <QuickAction href="/admin/websites" icon={Globe} label="ניהול אתרים" />
+              <QuickAction href="/admin/monitoring" icon={Activity} label="מוניטורינג" />
+            </CardContent>
+          </Card>
+
+          {/* Top accounts by sessions */}
+          {health?.growth?.topAccounts && health.growth.topAccounts.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>הכי פעילים השבוע</CardTitle>
+                <CardDescription>מספר שיחות ב-7 ימים</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0 flex flex-col gap-2.5">
+                {health.growth.topAccounts.slice(0, 5).map((a, i) => {
+                  const max = Math.max(...health.growth!.topAccounts!.map((x) => x.sessions)) || 1;
+                  const pct = (a.sessions / max) * 100;
+                  return (
+                    <div key={a.username} className="flex items-center gap-3">
+                      <span className="text-[11px] tabular-nums text-[color:var(--ink-400)] w-4 text-center">
+                        {i + 1}
+                      </span>
+                      <span className="text-[13px] text-[color:var(--ink-800)] min-w-0 flex-1 truncate">
+                        @{a.username}
+                      </span>
+                      <div className="w-24 h-1.5 rounded-full bg-[color:var(--ink-100)] overflow-hidden">
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${pct}%`,
+                            background: 'linear-gradient(90deg, var(--brand), var(--accent))',
+                          }}
+                        />
+                      </div>
+                      <span className="text-[12px] tabular-nums font-semibold text-[color:var(--ink-700)] w-10 text-end">
+                        {formatNumber(a.sessions)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
     </>
   );
 }
 
-export default function AdminDashboard() {
+function StatusRow({
+  label,
+  ok,
+  meta,
+  hideDot,
+}: {
+  label: string;
+  ok: boolean;
+  meta?: React.ReactNode;
+  hideDot?: boolean;
+}) {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center py-32">
-        <div className="w-8 h-8 border-2 border-[#9334EB] border-t-transparent rounded-full animate-spin" />
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2.5">
+        {!hideDot && (
+          <span
+            className="w-1.5 h-1.5 rounded-full"
+            style={{
+              background: ok ? 'var(--success)' : 'var(--danger)',
+              boxShadow: `0 0 0 3px ${ok ? 'rgba(23,163,74,0.18)' : 'rgba(220,38,39,0.18)'}`,
+            }}
+          />
+        )}
+        <span className="text-[12.5px] text-[color:var(--ink-700)]">{label}</span>
       </div>
-    }>
+      <span className="text-[12px] tabular-nums font-medium text-[color:var(--ink-600)]">{meta}</span>
+    </div>
+  );
+}
+
+function QuickAction({ href, icon: Icon, label }: { href: string; icon: React.ElementType; label: string }) {
+  return (
+    <Link
+      href={href}
+      className="group relative flex flex-col items-start gap-2 p-3 rounded-[10px] bg-[color:var(--surface-1)] hover:bg-[color:var(--surface-0)] border border-[color:var(--line)] hover:border-[color:var(--ink-300)] transition-all"
+    >
+      <span className="w-7 h-7 rounded-md bg-[color:var(--surface-0)] ring-1 ring-[color:var(--line)] flex items-center justify-center text-[color:var(--ink-700)] group-hover:text-[color:var(--brand)] transition-colors">
+        <Icon className="w-3.5 h-3.5" strokeWidth={1.75} />
+      </span>
+      <div className="flex items-center justify-between w-full">
+        <span className="text-[12.5px] font-medium text-[color:var(--ink-800)] group-hover:text-[color:var(--ink-900)]">
+          {label}
+        </span>
+        <ArrowUpRight className="w-3 h-3 text-[color:var(--ink-400)] group-hover:text-[color:var(--brand)] transition-colors rtl:-scale-x-100" />
+      </div>
+    </Link>
+  );
+}
+
+function EmptyAccounts() {
+  return (
+    <div className="py-12 text-center">
+      <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-[color:var(--ink-100)] flex items-center justify-center">
+        <Users className="w-4 h-4 text-[color:var(--ink-500)]" />
+      </div>
+      <p className="text-[13px] font-semibold text-[color:var(--ink-800)] mb-1">אין עדיין חשבונות</p>
+      <p className="text-[12px] text-[color:var(--ink-500)] mb-4">התחילו על ידי הוספת חשבון ראשון</p>
+      <ButtonLink href="/admin/add" variant="primary" size="sm">
+        <Plus className="w-3.5 h-3.5" />
+        הוספת חשבון
+      </ButtonLink>
+    </div>
+  );
+}
+
+// ───── Helpers ─────
+function formatCompact(n: number) {
+  try {
+    return new Intl.NumberFormat('he-IL', { notation: 'compact', maximumFractionDigits: 1 }).format(n);
+  } catch {
+    return formatNumber(n);
+  }
+}
+
+export default function AdminOverviewPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center py-24">
+          <div className="w-6 h-6 border-2 border-[color:var(--brand)] border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
       <DashboardContent />
     </Suspense>
   );
