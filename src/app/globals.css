@@ -3542,10 +3542,13 @@ h1, h2, h3, h4, h5, h6 {
   transform: translateY(-2px);
   box-shadow: 0 8px 20px rgba(136,63,226,0.12);
 }
+.cf-recipe-card {
+  direction: rtl;
+}
 .cf-recipe-card__inner {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 8px;
 }
 .cf-recipe-card__badge {
@@ -3560,7 +3563,7 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 12px;
   font-weight: 400;
   line-height: 21px;
-  align-self: flex-end;
+  align-self: flex-start;
 }
 .cf-recipe-card__img-wrap {
   width: 100%;
@@ -3605,7 +3608,7 @@ h1, h2, h3, h4, h5, h6 {
 .cf-recipe-card__pills {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 8px;
 }
 .cf-recipe-card__cta {
@@ -3787,12 +3790,14 @@ h1, h2, h3, h4, h5, h6 {
 .cf-recipe-sheet {
   position: fixed; inset: 0; z-index: 9999;
   background: #ffffff;
+  direction: rtl;
   display: flex; flex-direction: column;
   overflow: hidden;
 }
 .cf-recipe-sheet__header {
   position: sticky; top: 0; z-index: 5;
   background: #ffffff;
+  direction: ltr;
   display: flex; align-items: center; justify-content: space-between;
   height: 76px;
   padding: 0 16px;
@@ -3863,7 +3868,7 @@ h1, h2, h3, h4, h5, h6 {
   padding: 20px 20px 40px;
   display: flex; flex-direction: column;
   gap: 8px;
-  align-items: center;
+  align-items: stretch;
 }
 .cf-recipe-sheet__img {
   width: 100%;
@@ -3879,7 +3884,7 @@ h1, h2, h3, h4, h5, h6 {
 .cf-recipe-sheet__intro {
   width: 100%;
   display: flex; flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 12px;
   margin-bottom: 18px;
 }
@@ -3891,7 +3896,7 @@ h1, h2, h3, h4, h5, h6 {
   margin: 0;
 }
 .cf-recipe-sheet__chips {
-  display: flex; flex-wrap: wrap; justify-content: flex-end;
+  display: flex; flex-wrap: wrap; justify-content: flex-start;
   gap: 8px;
   width: 100%;
 }
@@ -3905,7 +3910,7 @@ h1, h2, h3, h4, h5, h6 {
 .cf-recipe-sheet__section {
   width: 100%;
   display: flex; flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 12px;
   margin-bottom: 18px;
 }
