@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChefHat, Shirt, Sparkles, Dumbbell, Cpu, Plane, Baby, Heart, Home, Newspaper,
   Clock, ChevronLeft, Loader2, Star, UtensilsCrossed, Search,
-  X, ExternalLink, MessageCircle, ShoppingBag, Tag, Flame,
+  X, ExternalLink, MessageCircle, ShoppingBag, Tag, Flame, AlignCenter, ArrowLeft,
 } from 'lucide-react';
 import type { InfluencerType } from '@/types';
 import { getProxiedImageUrl } from '@/lib/image-utils';
@@ -29,6 +29,8 @@ interface ContentFeedTabProps {
   influencerType: InfluencerType;
   tabLabel: string;
   onAskAbout: (question: string, chunkId?: string, hiddenContext?: string) => void;
+  influencerName?: string;
+  influencerAvatar?: string | null;
 }
 
 // ─── Type-specific config ───
@@ -47,9 +49,9 @@ const TYPE_CONFIG: Record<string, {
     icon: ChefHat,
     subtitle: 'המתכונים והטיפים',
     askPrefix: 'ספרי לי על המתכון',
-    askLabel: 'שאלו אותי על המתכון',
-    accentColor: '#6d4ea3',
-    accentBg: '#f3eefc',
+    askLabel: 'על המתכון',
+    accentColor: '#883fe2',
+    accentBg: '#f1e9fd',
     emptyText: 'אין עדיין מתכונים',
     headerStyle: 'warm',
   },
@@ -155,126 +157,173 @@ const TYPE_CONFIG: Record<string, {
   },
 };
 
-// ─── Recipe Detail Modal ───
+// ─── Recipe Detail Sheet — full-screen, sticky header (Figma 431:8662) ───
 
-function RecipeModal({
+function parseRecipeText(fullText: string) {
+  const lines = fullText.split('\n').map(l => l.trim()).filter(Boolean);
+  const ingredientHeaders = ['מרכיבים', 'רכיבים', 'מצרכים'];
+  const stepHeaders = ['אופן הכנה', 'אופן ההכנה', 'הוראות הכנה', 'שלבי הכנה', 'הכנה'];
+  const isIngredientHeader = (l: string) =>
+    ingredientHeaders.some(h => l.startsWith(h) && l.length < h.length + 15);
+  const isStepHeader = (l: string) =>
+    stepHeaders.some(h => l.startsWith(h) && l.length < h.length + 15);
+
+  const ingredients: string[] = [];
+  const steps: string[] = [];
+  let mode: 'none' | 'ingredients' | 'steps' = 'none';
+
+  for (const line of lines) {
+    if (isIngredientHeader(line)) { mode = 'ingredients'; continue; }
+    if (isStepHeader(line)) { mode = 'steps'; continue; }
+    const cleaned = line.replace(/^[-•·]\s*/, '').replace(/^\d+[\.\)]\s*/, '').trim();
+    if (!cleaned) continue;
+    if (mode === 'ingredients') ingredients.push(cleaned);
+    else if (mode === 'steps') steps.push(cleaned);
+  }
+  return { ingredients, steps };
+}
+
+function RecipeSheet({
   item,
   config,
   onClose,
   onAsk,
+  influencerName,
+  influencerAvatar,
 }: {
   item: ContentCard;
   config: typeof TYPE_CONFIG['food'];
   onClose: () => void;
   onAsk: (q: string, chunkId?: string) => void;
+  influencerName?: string;
+  influencerAvatar?: string | null;
 }) {
-  // Split content into sections (ingredients, instructions, etc.)
-  const lines = item.fullText
-    .split('\n')
-    .map(l => l.trim())
-    .filter(l => l.length > 0);
-
-  // Detect section headers for styling
-  const sectionHeaders = ['מרכיבים', 'אופן הכנה', 'הוראות הכנה', 'שלבי הכנה'];
-  const isSectionHeader = (line: string) =>
-    sectionHeaders.some(h => line.startsWith(h) && line.length < h.length + 15);
-  const isIngredient = (line: string) =>
-    line.startsWith('-') || line.startsWith('•') || /^\d+\/?\d*\s*(כוס|כף|כפית|גרם|מ"ל|יח'|ק"ג)/.test(line);
-  const isStep = (line: string) =>
-    /^\d+[\.\)]?\s/.test(line);
-
+  const { ingredients, steps } = parseRecipeText(item.fullText);
   const postUrl = item.sourceUrl || null;
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="cf-modal-backdrop"
-      onClick={onClose}
+      initial={{ opacity: 0, x: '-30%' }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: '-30%' }}
+      transition={{ type: 'spring', damping: 30, stiffness: 320 }}
+      className="cf-recipe-sheet"
+      dir="rtl"
     >
-      <motion.div
-        initial={{ opacity: 0, y: 40, scale: 0.97 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 40, scale: 0.97 }}
-        transition={{ type: 'spring', damping: 28, stiffness: 350 }}
-        className="cf-modal"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Close button */}
-        <button onClick={onClose} className="cf-modal__close">
-          <X className="w-5 h-5" />
+      {/* Sticky header */}
+      <div className="cf-recipe-sheet__header">
+        <button onClick={onClose} className="cf-recipe-sheet__back" aria-label="חזרה">
+          <ArrowLeft className="w-7 h-7" />
         </button>
-
-        {/* Image */}
-        {item.imageUrl && (
-          <div className="cf-modal__img">
-            <img src={getProxiedImageUrl(item.imageUrl, item.shortcode || undefined)} alt={item.title} />
+        <div className="cf-recipe-sheet__user">
+          <div className="cf-recipe-sheet__user-text">
+            <p className="cf-recipe-sheet__user-name">{influencerName || 'מתכונים'}</p>
+            <p className="cf-recipe-sheet__user-subtitle">{config.subtitle}</p>
           </div>
-        )}
+          <div className="cf-recipe-sheet__avatar">
+            {influencerAvatar ? (
+              <img src={getProxiedImageUrl(influencerAvatar)} alt={influencerName || ''} />
+            ) : (
+              <div className="cf-recipe-sheet__avatar-fallback">
+                <ChefHat className="w-5 h-5" />
+              </div>
+            )}
+            <span className="cf-recipe-sheet__avatar-status" />
+          </div>
+        </div>
+      </div>
 
-        {/* Content */}
-        <div className="cf-modal__content">
-          <h2 className="cf-modal__title">{item.title}</h2>
-
-          {/* Meta pills */}
-          {Object.keys(item.meta).length > 0 && (
-            <div className="cf-modal__pills">
-              {item.meta.time && (
-                <span className="cf-pill">
-                  <Clock className="w-3.5 h-3.5" /> {item.meta.time}
-                </span>
-              )}
-              {item.meta.items && (
-                <span className="cf-pill">
-                  <UtensilsCrossed className="w-3.5 h-3.5" /> {item.meta.items}
-                </span>
-              )}
-              {item.meta.servings && (
-                <span className="cf-pill">{item.meta.servings}</span>
-              )}
-              {item.meta.difficulty && (
-                <span className="cf-pill">{item.meta.difficulty}</span>
-              )}
+      {/* Scrollable content */}
+      <div className="cf-recipe-sheet__scroll">
+        <div className="cf-recipe-sheet__content">
+          {item.imageUrl && (
+            <div className="cf-recipe-sheet__img">
+              <img src={getProxiedImageUrl(item.imageUrl, item.shortcode || undefined)} alt={item.title} />
             </div>
           )}
 
-          {/* Full text — formatted with section headers */}
-          <div className="cf-modal__text">
-            {lines.map((line, i) => {
-              if (isSectionHeader(line)) {
-                return <h3 key={i} className="cf-modal__section">{line}</h3>;
-              }
-              if (isIngredient(line)) {
-                return <p key={i} className="cf-modal__ingredient">{line}</p>;
-              }
-              if (isStep(line)) {
-                return <p key={i} className="cf-modal__step">{line}</p>;
-              }
-              return <p key={i}>{line}</p>;
-            })}
+          <div className="cf-recipe-sheet__intro">
+            <h1 className="cf-recipe-sheet__title">{item.title}</h1>
+
+            {(item.meta.items || item.meta.time || item.meta.difficulty || item.meta.servings) && (
+              <div className="cf-recipe-sheet__chips">
+                {item.meta.items && (
+                  <span className="cf-pill cf-pill--purple">
+                    {item.meta.items}
+                    <UtensilsCrossed className="w-3.5 h-3.5" />
+                  </span>
+                )}
+                {item.meta.time && (
+                  <span className="cf-pill cf-pill--purple">
+                    {item.meta.time}
+                    <Clock className="w-3.5 h-3.5" />
+                  </span>
+                )}
+                {item.meta.difficulty && (
+                  <span className="cf-pill cf-pill--purple">{item.meta.difficulty}</span>
+                )}
+                {item.meta.servings && (
+                  <span className="cf-pill cf-pill--purple">{item.meta.servings}</span>
+                )}
+              </div>
+            )}
+
+            {item.description && (
+              <p className="cf-recipe-sheet__desc">{item.description}</p>
+            )}
           </div>
 
-          {/* CTAs */}
-          <div className="cf-modal__actions">
+          {ingredients.length > 0 && (
+            <section className="cf-recipe-sheet__section">
+              <h2 className="cf-recipe-sheet__section-title">מרכיבים</h2>
+              <ul className="cf-recipe-sheet__ingredients">
+                {ingredients.map((line, i) => (
+                  <li key={i}>{line}</li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {steps.length > 0 && (
+            <section className="cf-recipe-sheet__section">
+              <h2 className="cf-recipe-sheet__section-title">אופן ההכנה</h2>
+              <ol className="cf-recipe-sheet__steps">
+                {steps.map((line, i) => (
+                  <li key={i}>{line}</li>
+                ))}
+              </ol>
+            </section>
+          )}
+
+          {/* fallback when parser found nothing */}
+          {ingredients.length === 0 && steps.length === 0 && item.fullText && (
+            <section className="cf-recipe-sheet__section">
+              <p className="cf-recipe-sheet__fulltext">{item.fullText}</p>
+            </section>
+          )}
+
+          <div className="cf-recipe-sheet__appetit">
+            <span>בתאבון....</span>
+            <UtensilsCrossed className="w-3.5 h-3.5" />
+          </div>
+
+          <div className="cf-recipe-sheet__actions">
             <button
               onClick={() => {
                 onAsk(`${config.askPrefix} "${item.title}"`, item.id);
                 onClose();
               }}
-              className="cf-modal__btn cf-modal__btn--primary"
-              style={{ background: config.accentColor }}
+              className="cf-recipe-sheet__btn cf-recipe-sheet__btn--primary"
             >
               <MessageCircle className="w-4 h-4" />
-              שאלו אותי על זה
+              שאלו אותי על המתכון
             </button>
-
             {postUrl && (
               <a
                 href={postUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="cf-modal__btn cf-modal__btn--secondary"
+                className="cf-recipe-sheet__btn cf-recipe-sheet__btn--secondary"
               >
                 <ExternalLink className="w-4 h-4" />
                 {item.shortcode ? 'צפו בפוסט' : 'למתכון המלא'}
@@ -282,14 +331,14 @@ function RecipeModal({
             )}
           </div>
         </div>
-      </motion.div>
+      </div>
     </motion.div>
   );
 }
 
 // ─── Recipe card — masonry grid, purple palette, meta pills, badge ───
 
-function RecipeCard({ item, config, onAsk, onOpen, isNew }: { item: ContentCard; config: typeof TYPE_CONFIG['food']; onAsk: (q: string, chunkId?: string) => void; onOpen: (item: ContentCard) => void; isNew?: boolean }) {
+function RecipeCard({ item, config, onOpen, isNew }: { item: ContentCard; config: typeof TYPE_CONFIG['food']; onOpen: (item: ContentCard) => void; isNew?: boolean }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -297,44 +346,48 @@ function RecipeCard({ item, config, onAsk, onOpen, isNew }: { item: ContentCard;
       className="cf-recipe-card"
       onClick={() => onOpen(item)}
     >
-      <div className="cf-recipe-card__img-wrap">
-        {item.imageUrl && (
-          <img src={getProxiedImageUrl(item.imageUrl, item.shortcode || undefined)} alt={item.title} loading="lazy" />
-        )}
+      <div className="cf-recipe-card__inner">
         {isNew && (
           <span className="cf-recipe-card__badge">
-            <Flame className="w-3 h-3" />
+            <Flame className="w-3.5 h-3.5" />
             חדש
           </span>
         )}
-      </div>
-      <div className="cf-recipe-card__body">
-        <h3 className="cf-recipe-card__title">{item.title}</h3>
+        <div className="cf-recipe-card__img-wrap">
+          {item.imageUrl && (
+            <img src={getProxiedImageUrl(item.imageUrl, item.shortcode || undefined)} alt={item.title} loading="lazy" />
+          )}
+        </div>
+        <div className="cf-recipe-card__text">
+          <h3 className="cf-recipe-card__title">{item.title}</h3>
+          {item.description && (
+            <p className="cf-recipe-card__desc">{item.description}</p>
+          )}
+        </div>
         {(item.meta.time || item.meta.items) && (
           <div className="cf-recipe-card__pills">
             {item.meta.time && (
               <span className="cf-pill cf-pill--purple">
-                <Clock className="w-3 h-3" /> {item.meta.time}
+                {item.meta.time}
+                <Clock className="w-3.5 h-3.5" />
               </span>
             )}
             {item.meta.items && (
               <span className="cf-pill cf-pill--purple">
-                <UtensilsCrossed className="w-3 h-3" /> {item.meta.items}
+                {item.meta.items}
+                <UtensilsCrossed className="w-3.5 h-3.5" />
               </span>
             )}
           </div>
         )}
-        {item.description && (
-          <p className="cf-recipe-card__desc">{item.description}</p>
-        )}
-        <button
-          onClick={(e) => { e.stopPropagation(); onAsk(`${config.askPrefix} "${item.title}"`, item.id); }}
-          className="cf-recipe-card__cta"
-        >
-          <MessageCircle className="w-3.5 h-3.5" />
-          {config.askLabel}
-        </button>
       </div>
+      <button
+        onClick={(e) => { e.stopPropagation(); onOpen(item); }}
+        className="cf-recipe-card__cta"
+      >
+        <AlignCenter className="w-3.5 h-3.5" />
+        {config.askLabel}
+      </button>
     </motion.div>
   );
 }
@@ -551,7 +604,7 @@ function GenericCard({ item, config, onAsk }: { item: ContentCard; config: typeo
 
 // ─── Main Component ───
 
-export default function ContentFeedTab({ username, influencerType, tabLabel, onAskAbout }: ContentFeedTabProps) {
+export default function ContentFeedTab({ username, influencerType, tabLabel, onAskAbout, influencerName, influencerAvatar }: ContentFeedTabProps) {
   const [items, setItems] = useState<ContentCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
@@ -637,7 +690,7 @@ export default function ContentFeedTab({ username, influencerType, tabLabel, onA
   const renderCard = (item: ContentCard, index: number) => {
     switch (influencerType) {
       case 'food':
-        return <RecipeCard key={item.id} item={item} config={config} onAsk={onAskAbout} onOpen={openModal} isNew={newItemIds.has(item.id)} />;
+        return <RecipeCard key={item.id} item={item} config={config} onOpen={openModal} isNew={newItemIds.has(item.id)} />;
       case 'fashion':
         return <LookCard key={item.id} item={item} config={config} onAsk={onAskAbout} index={index} />;
       case 'beauty':
@@ -708,9 +761,6 @@ export default function ContentFeedTab({ username, influencerType, tabLabel, onA
     if (influencerType === 'food') {
       return (
         <div className="cf-header cf-header--recipe">
-          <div className="cf-header__icon" style={{ background: config.accentBg }}>
-            <Icon className="w-6 h-6" style={{ color: config.accentColor }} />
-          </div>
           <h2 className="cf-header__title">{tabLabel}</h2>
           <p className="cf-header__subtitle">{config.subtitle}</p>
         </div>
@@ -789,15 +839,17 @@ export default function ContentFeedTab({ username, influencerType, tabLabel, onA
         </div>
       </div>
 
-      {/* Detail modal — portal to body */}
+      {/* Detail sheet — portal to body */}
       {typeof document !== 'undefined' && createPortal(
         <AnimatePresence>
           {selectedItem && (
-            <RecipeModal
+            <RecipeSheet
               item={selectedItem}
               config={config}
               onClose={closeModal}
               onAsk={onAskAbout}
+              influencerName={influencerName}
+              influencerAvatar={influencerAvatar}
             />
           )}
         </AnimatePresence>,

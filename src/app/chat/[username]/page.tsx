@@ -1830,6 +1830,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 username={username}
                 influencerType={(influencer.influencer_type as InfluencerType) || 'other'}
                 tabLabel={(influencer.tabs || DEFAULT_TABS).find((t: { id: string }) => t.id === 'content_feed')?.label || 'תוכן'}
+                influencerName={influencer.display_name}
+                influencerAvatar={influencer.avatar_url}
                 onAskAbout={(question: string, chunkId?: string, hiddenContext?: string) => {
                   setActiveTab('chat');
                   maybeShowLeadPopup();
