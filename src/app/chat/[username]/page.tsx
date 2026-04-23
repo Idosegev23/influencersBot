@@ -1779,7 +1779,6 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   accountId={influencer.id}
                   sessionId={sessionId}
                   enableBrief={!!(influencer as any).features?.services_tab}
-                  conferenceMode={isConferenceMode}
                   onAskAbout={(question: string, hiddenContext?: string) => {
                     setActiveTab('chat');
                     maybeShowLeadPopup();
