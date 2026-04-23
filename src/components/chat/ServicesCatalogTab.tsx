@@ -9,9 +9,11 @@ import { useState, useEffect } from 'react';
 interface Service {
   id: string;
   name: string;
+  name_he?: string | null;
   description: string;
   category: string;
   product_url?: string;
+  priority?: number | null;
 }
 
 interface ServicesCatalogTabProps {
@@ -35,6 +37,11 @@ const SERVICE_ICONS: Record<string, string> = {
   'Social Media Management': 'group_work',
   'Television Advertising': 'tv',
   'Influencer Marketing': 'campaign',
+  'NewVoices': 'record_voice_over',
+  'Influencer Marketing AI': 'hub',
+  'Leaders Platform': 'dashboard_customize',
+  'AI Implementation': 'settings_suggest',
+  'AI Automations': 'bolt',
 };
 
 // ---------------------------------------------------------------------------
@@ -343,10 +350,11 @@ function ServiceModal({
   const [showBrief, setShowBrief] = useState(false);
   const [briefSubmitted, setBriefSubmitted] = useState(false);
   const icon = SERVICE_ICONS[service.name] || 'handshake';
+  const displayName = service.name_he || service.name;
 
   function handleAsk() {
-    const question = `ספרו לי על שירות ${service.name}`;
-    const context = `[הקשר השירות:]\nשם: ${service.name}\nתיאור: ${service.description}`;
+    const question = `ספרו לי על שירות ${displayName}`;
+    const context = `[הקשר השירות:]\nשם: ${displayName}${service.name_he ? ` (${service.name})` : ''}\nתיאור: ${service.description}`;
     onAskAbout(question, context);
     onClose();
   }
@@ -354,8 +362,8 @@ function ServiceModal({
   function handleBriefSubmitted(form: Record<string, string>) {
     setBriefSubmitted(true);
     setTimeout(() => {
-      const question = `שלחתי בריף לגבי ${service.name}`;
-      const context = `[בריף שנשלח:]\nשירות: ${service.name}\nשם: ${form.fullName}\nעסק: ${form.businessName || 'לא צוין'}\nמטרה: ${form.goal || 'לא צוינה'}\nתקציב: ${form.budgetRange || 'לא צוין'}`;
+      const question = `שלחתי בריף לגבי ${displayName}`;
+      const context = `[בריף שנשלח:]\nשירות: ${displayName}\nשם: ${form.fullName}\nעסק: ${form.businessName || 'לא צוין'}\nמטרה: ${form.goal || 'לא צוינה'}\nתקציב: ${form.budgetRange || 'לא צוין'}`;
       onAskAbout(question, context);
       onClose();
     }, 2000);
@@ -378,7 +386,7 @@ function ServiceModal({
             <span className="material-symbols-outlined text-[24px] text-white">{icon}</span>
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-bold text-black">{service.name}</h3>
+            <h3 className="text-lg font-bold text-black">{displayName}</h3>
             <p className="text-sm text-[#666] mt-1 leading-relaxed">{service.description}</p>
           </div>
           <button onClick={onClose} className="p-1 rounded-full hover:bg-black/5 transition-colors flex-shrink-0">
@@ -456,7 +464,9 @@ export default function ServicesCatalogTab({ accountId, onAskAbout, sessionId, e
       try {
         const res = await fetch(`/api/influencer/content/products?accountId=${accountId}`);
         const data = await res.json();
-        const svc = (data.products || []).filter((p: Service) => p.category === 'service');
+        const svc = (data.products || [])
+          .filter((p: Service) => p.category === 'service')
+          .sort((a: Service, b: Service) => (b.priority ?? 0) - (a.priority ?? 0));
         setServices(svc);
       } catch (err) {
         console.error('Failed to load services:', err);
@@ -496,6 +506,7 @@ export default function ServicesCatalogTab({ accountId, onAskAbout, sessionId, e
       <div className="grid grid-cols-3 gap-3">
         {services.map((svc, i) => {
           const icon = SERVICE_ICONS[svc.name] || 'handshake';
+          const cardName = svc.name_he || svc.name;
           return (
             <button
               key={svc.id}
@@ -505,7 +516,7 @@ export default function ServicesCatalogTab({ accountId, onAskAbout, sessionId, e
               <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 bg-black transition-transform group-hover:scale-110">
                 <span className="material-symbols-outlined text-[24px] text-white">{icon}</span>
               </div>
-              <span className="text-[13px] font-bold text-black leading-tight">{svc.name}</span>
+              <span className="text-[13px] font-bold text-black leading-tight">{cardName}</span>
               <span className="text-[11px] text-[#666] mt-1.5 line-clamp-1 w-full">
                 {svc.description.slice(0, 40)}...
               </span>
