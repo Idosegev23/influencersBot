@@ -149,7 +149,7 @@ export async function GET(req: NextRequest) {
       priority: 50,
       requested_by: 'cron:daily-scan',
       config: {
-        postsLimit: 20,
+        postsLimit: 50,
         commentsPerPost: 3,
         maxWebsitePages: 0,
         samplesPerHighlight: 999,

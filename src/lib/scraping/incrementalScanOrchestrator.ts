@@ -147,17 +147,22 @@ export class IncrementalScanOrchestrator {
       console.log(`[Step 3] Fetching ${fullConfig.maxNewPosts} recent posts...`);
       
       const posts = await this.client.getPosts(username, fullConfig.maxNewPosts);
-      
-      // Filter only NEW posts (after last scanned date)
-      const newPosts = posts.filter(p => {
-        const postedAt = new Date(p.posted_at);
-        return postedAt > lastScannedDate;
-      });
 
-      console.log(`[Step 3] Found ${newPosts.length} NEW posts (out of ${posts.length} fetched)`);
+      const existingShortcodes = new Set<string>();
+      {
+        const { data: existingRows } = await this.supabase
+          .from('instagram_posts')
+          .select('shortcode')
+          .eq('account_id', accountId)
+          .in('shortcode', posts.map(p => p.shortcode));
+        (existingRows || []).forEach((r: { shortcode: string }) => existingShortcodes.add(r.shortcode));
+      }
 
-      // Save only new posts
-      for (const post of newPosts) {
+      // Upsert ALL fetched posts: new ones get fully inserted, existing ones get their
+      // media_urls / thumbnail_url / engagement refreshed (Instagram CDN URLs expire).
+      let refreshedUrls = 0;
+      for (const post of posts) {
+        const isNew = !existingShortcodes.has(post.shortcode);
         const { error } = await this.supabase.from('instagram_posts').upsert({
           account_id: accountId,
           shortcode: post.shortcode,
@@ -180,11 +185,12 @@ export class IncrementalScanOrchestrator {
         });
 
         if (!error) {
-          stats.newPostsFound++;
+          if (isNew) stats.newPostsFound++;
+          else refreshedUrls++;
         }
       }
 
-      console.log(`[Step 3] ✓ Saved ${stats.newPostsFound} new posts`);
+      console.log(`[Step 3] ✓ Saved ${stats.newPostsFound} new posts, refreshed ${refreshedUrls} existing URLs`);
 
       await this.rateLimiter.waitRandom('after posts');
 
