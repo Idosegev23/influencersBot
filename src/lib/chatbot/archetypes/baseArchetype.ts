@@ -267,15 +267,46 @@ export abstract class BaseArchetype {
    * Build persona context block for the system prompt.
    * Uses rich JSONB fields (voice_rules, knowledge_map, boundaries, response_policy)
    * from chatbot_persona, falling back to simple bio/interests/directives.
+   *
+   * Optional `queryContext` enables conditional rendering of grounded_facts:
+   * "always" sections (company, leadership, behavioral_rules, subsidiaries) stay
+   * in every prompt, but heavy conditional sections (conference, products) are
+   * added only when the query/conversation signals relevance. This prevents
+   * biasing the model toward conference content for unrelated conversations.
    */
-  private buildPersonaContextPrompt(config: PersonalityConfig, name: string): string {
+  private buildPersonaContextPrompt(config: PersonalityConfig, name: string, queryContext?: string): string {
     const sections: string[] = [];
 
     // --- Grounded Facts (HIGHEST priority — anchor facts that override retrieved content) ---
     const groundedFacts = (config.voiceRules as any)?.grounded_facts;
     if (groundedFacts && typeof groundedFacts === 'object') {
+      // Signal detection — decides which conditional sections to render
+      const ctxLower = (queryContext || '').toLowerCase();
+      const CONFERENCE_SIGNALS = [
+        'הרצאה', 'מצגת', 'כנס', 'הטמעה', 'להטמיע', 'להיות או לא להיות',
+        'איתמר', 'גונשרוביץ', 'איגוד השיווק',
+        'ai ארגוני', 'ai פרטי', '80/20', 'צווארי בקבוק',
+        '30.4', '30/4',
+      ];
+      const PRODUCT_SIGNALS: Record<string, string[]> = {
+        newvoices: ['newvoices', 'סוכן קולי', 'ניו ווייסס'],
+        imai: ['imai', 'influencer marketing ai', 'פלטפורמת משפיענים'],
+        leaders_platform: ['leaders platform', 'פלטפורמה פנימית', 'מחולל הצעות', 'בריף'],
+        ai_implementation: ['ליווי', 'הטמעה', 'להטמיע'],
+        ai_automations: ['אוטומציות', 'אוטומציה'],
+      };
+      const ANTI_SIGNALS = ['פודקאסט', 'פרק', 'אבי זיתן', 'podcast', 'ראיון'];
+
+      const hasConferenceSignal =
+        CONFERENCE_SIGNALS.some((s) => ctxLower.includes(s)) &&
+        !ANTI_SIGNALS.some((s) => ctxLower.includes(s));
+      const mentionedProducts = Object.keys(PRODUCT_SIGNALS).filter((k) =>
+        PRODUCT_SIGNALS[k].some((s) => ctxLower.includes(s))
+      );
+
       const gfLines: string[] = ['🔒 עובדות מבוססות — מקור האמת. אם תוכן מבסיס הידע סותר את אלה, העובדות כאן תמיד מנצחות:'];
 
+      // ALWAYS — short, universal truth
       if (groundedFacts.company) {
         const c = groundedFacts.company;
         gfLines.push('\n🏢 חברה:');
@@ -291,7 +322,20 @@ export abstract class BaseArchetype {
         }
       }
 
-      if (groundedFacts.conference_2026) {
+      if (groundedFacts.subsidiaries && typeof groundedFacts.subsidiaries === 'object') {
+        gfLines.push('\n🏛 חברות בנות:');
+        for (const [, desc] of Object.entries(groundedFacts.subsidiaries)) {
+          if (typeof desc === 'string') gfLines.push(`• ${desc}`);
+        }
+      }
+
+      if (Array.isArray(groundedFacts.behavioral_rules) && groundedFacts.behavioral_rules.length) {
+        gfLines.push('\n🛡 כללי התנהגות (חובה לציית):');
+        groundedFacts.behavioral_rules.forEach((r: string) => gfLines.push(`• ${r}`));
+      }
+
+      // CONDITIONAL — conference block (only when query has conference signal)
+      if (hasConferenceSignal && groundedFacts.conference_2026) {
         const conf = groundedFacts.conference_2026;
         gfLines.push('\n🎤 ההרצאה בכנס:');
         if (conf.name) gfLines.push(`• כנס: ${conf.name}`);
@@ -308,23 +352,19 @@ export abstract class BaseArchetype {
         if (conf.disambiguation) gfLines.push(`• ⚠️ ${conf.disambiguation}`);
       }
 
+      // CONDITIONAL — products: include ALL when conference signal is on,
+      // or just the specific products mentioned by the user.
       if (groundedFacts.products && typeof groundedFacts.products === 'object') {
-        gfLines.push('\n🛠 מוצרי AI:');
-        for (const [key, desc] of Object.entries(groundedFacts.products)) {
-          if (typeof desc === 'string') gfLines.push(`• ${key}: ${desc}`);
+        const productsToShow: string[] = hasConferenceSignal
+          ? Object.keys(groundedFacts.products)
+          : mentionedProducts.filter((k) => k in groundedFacts.products);
+        if (productsToShow.length > 0) {
+          gfLines.push('\n🛠 מוצרי AI:');
+          for (const key of productsToShow) {
+            const desc = groundedFacts.products[key];
+            if (typeof desc === 'string') gfLines.push(`• ${key}: ${desc}`);
+          }
         }
-      }
-
-      if (groundedFacts.subsidiaries && typeof groundedFacts.subsidiaries === 'object') {
-        gfLines.push('\n🏛 חברות בנות:');
-        for (const [, desc] of Object.entries(groundedFacts.subsidiaries)) {
-          if (typeof desc === 'string') gfLines.push(`• ${desc}`);
-        }
-      }
-
-      if (Array.isArray(groundedFacts.behavioral_rules) && groundedFacts.behavioral_rules.length) {
-        gfLines.push('\n🛡 כללי התנהגות (חובה לציית):');
-        groundedFacts.behavioral_rules.forEach((r: string) => gfLines.push(`• ${r}`));
       }
 
       sections.push(gfLines.join('\n'));
@@ -456,7 +496,14 @@ export abstract class BaseArchetype {
       try {
         personalityConfig = personalityConfig || await buildPersonalityFromDB(input.accountContext.accountId);
         personalityBlock = `\n🎭 סגנון אישיות:\n${this.buildPersonalityPrompt(personalityConfig, influencerName)}`;
-        personaContextBlock = this.buildPersonaContextPrompt(personalityConfig, influencerName);
+        // Pass query context (user message + recent history) so grounded_facts
+        // can conditionally render topic-specific sections (conference, products)
+        // only when the conversation signals they're relevant.
+        const queryCtx = [
+          input.userMessage,
+          ...(input.conversationHistory || []).slice(-3).map((m) => m.content),
+        ].filter(Boolean).join(' ');
+        personaContextBlock = this.buildPersonaContextPrompt(personalityConfig, influencerName, queryCtx);
       } catch (e) {
         console.warn('[BaseArchetype] Failed to load personality, using defaults');
       }

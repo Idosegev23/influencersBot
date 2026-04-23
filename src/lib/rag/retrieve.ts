@@ -38,6 +38,84 @@ import type {
 
 const log = createLogger('retrieve');
 
+// ============================================
+// LDRS Conference Scope — Semantic Prototype
+// ============================================
+// Rather than binary keyword boost, we compute how similar each query is to a
+// "prototype" embedding that represents the conference scope. The boost is
+// scaled by cosine similarity (capped), and anti-signals (podcast, Avi Zitan,
+// interview) dampen it. Prototype is computed once and cached in memory.
+
+const LDRS_ACCOUNT_ID = 'de38eac6-d2fb-46a7-ac09-5ec860147ca0';
+
+const LDRS_CONFERENCE_PROTOTYPES = [
+  'סיכום ההרצאה של איתמר גונשרוביץ בכנס החדשנות 30.4',
+  'איך נראה תהליך הטמעת AI בארגון לפי לידרס',
+  '4 עקרונות להטמעת AI בארגון — AI ארגוני מול AI פרטי',
+  '5 שלבי הטמעת AI',
+  'מה זה NewVoices — סוכן קולי של לידרס',
+  'מה זה IMAI — פלטפורמת AI לשיווק משפיענים',
+  'Leaders Platform — מוצר פנימי שהפך למוצר ללקוחות',
+  '80/20 — AI מייעל ולא מחליף',
+  'איך לזהות צוואר בקבוק ב-AI',
+  'איתמר גונשרוביץ מנכ"ל לידרס',
+];
+
+const LDRS_CONFERENCE_ANTI_SIGNALS = [
+  'פודקאסט', 'פרק', 'אבי זיתן', 'podcast', 'ראיון', 'מצייצים',
+];
+
+let _ldrsConferenceCentroid: number[] | null = null;
+let _ldrsConferenceCentroidPromise: Promise<number[] | null> | null = null;
+
+async function getLdrsConferenceCentroid(): Promise<number[] | null> {
+  if (_ldrsConferenceCentroid) return _ldrsConferenceCentroid;
+  if (_ldrsConferenceCentroidPromise) return _ldrsConferenceCentroidPromise;
+
+  _ldrsConferenceCentroidPromise = (async () => {
+    try {
+      const embeddings: number[][] = [];
+      for (const prototype of LDRS_CONFERENCE_PROTOTYPES) {
+        const emb = await generateEmbedding(prototype);
+        if (emb) embeddings.push(emb);
+      }
+      if (embeddings.length === 0) return null;
+
+      const dim = embeddings[0].length;
+      const centroid = new Array(dim).fill(0);
+      for (const e of embeddings) {
+        for (let i = 0; i < dim; i++) centroid[i] += e[i];
+      }
+      for (let i = 0; i < dim; i++) centroid[i] /= embeddings.length;
+      const norm = Math.sqrt(centroid.reduce((s, v) => s + v * v, 0)) || 1;
+      for (let i = 0; i < dim; i++) centroid[i] /= norm;
+
+      _ldrsConferenceCentroid = centroid;
+      log.info('LDRS conference centroid computed', { prototypes: embeddings.length, dim });
+      return centroid;
+    } catch (err: any) {
+      log.error('Failed to compute LDRS conference centroid', { error: err.message });
+      return null;
+    } finally {
+      _ldrsConferenceCentroidPromise = null;
+    }
+  })();
+
+  return _ldrsConferenceCentroidPromise;
+}
+
+function cosineSimNormalized(a: number[], b: number[]): number {
+  // Assumes both vectors are L2-normalized
+  let s = 0;
+  for (let i = 0; i < a.length; i++) s += a[i] * b[i];
+  return s;
+}
+
+function normalizeVector(v: number[]): number[] {
+  const norm = Math.sqrt(v.reduce((s, x) => s + x * x, 0)) || 1;
+  return v.map((x) => x / norm);
+}
+
 let openaiClient: OpenAI | null = null;
 function getOpenAI(): OpenAI {
   if (!openaiClient) openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -585,6 +663,34 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
   const archetypeConfig = getArchetypeConfig(archetype);
   const now = Date.now();
   const queryLower = query.toLowerCase();
+
+  // LDRS conference: semantic confidence — cosine between query embedding and
+  // conference prototype centroid. Used to scale the scope boost below.
+  // Anti-signals (podcast, Avi Zitan, interview) dampen the confidence so
+  // queries clearly about other Itamar contexts don't force-rank conference.
+  let ldrsConferenceConfidence = 0;
+  if (accountId === LDRS_ACCOUNT_ID && baseEmbedding) {
+    try {
+      const centroid = await getLdrsConferenceCentroid();
+      if (centroid) {
+        const normBase = normalizeVector(baseEmbedding);
+        ldrsConferenceConfidence = cosineSimNormalized(normBase, centroid);
+        const hasAntiSignal = LDRS_CONFERENCE_ANTI_SIGNALS.some((s) => queryLower.includes(s));
+        if (hasAntiSignal) ldrsConferenceConfidence *= 0.2;
+        if (conversationSummary) {
+          const summaryLower = conversationSummary.toLowerCase();
+          const convAntiSignal = LDRS_CONFERENCE_ANTI_SIGNALS.some((s) => summaryLower.includes(s));
+          if (convAntiSignal) ldrsConferenceConfidence *= 0.5;
+        }
+        log.info('LDRS conference confidence', {
+          confidence: Number(ldrsConferenceConfidence.toFixed(3)),
+          antiSignalInQuery: LDRS_CONFERENCE_ANTI_SIGNALS.some((s) => queryLower.includes(s)),
+        }, accountId);
+      }
+    } catch (err) {
+      log.warn('LDRS conference confidence calc failed', { error: (err as Error).message }, accountId);
+    }
+  }
   // Split query into content words (3+ chars) for partial matching
   // Hebrew stop words (יש, לך, את, מה, על, גם, עם, כל, אם, לא) are 2 chars — filter them out
   const STOP_WORDS = new Set(['יש', 'לך', 'את', 'מה', 'על', 'גם', 'עם', 'כל', 'אם', 'לא', 'של', 'הם', 'זה', 'כי', 'או', 'אל']);
@@ -624,21 +730,19 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
     if (typeWeight !== 0) {
       c.similarity += typeWeight;
     }
-    // LDRS conference scope boost: when the query has conference signals,
-    // strongly prefer chunks tagged as canonical conference content.
-    // This keeps the bot grounded on the 30.4 talk + AI products when users ask
-    // about "הרצאה", "כנס", "הטמעה", "NewVoices", "IMAI" etc.
-    if (accountId === 'de38eac6-d2fb-46a7-ac09-5ec860147ca0') {
-      const CONFERENCE_SIGNALS = [
-        'הרצאה', 'מצגת', 'כנס', 'הטמעה', 'להטמיע', 'להיות או לא להיות',
-        'איתמר', 'גונשרוביץ', 'איגוד השיווק',
-        'newvoices', 'imai', 'leaders platform', 'influencer marketing ai',
-        'ai ארגוני', 'ai פרטי', '80/20', 'צווארי בקבוק',
-      ];
-      const querySignalMatch = CONFERENCE_SIGNALS.some(s => queryLower.includes(s));
-      if (querySignalMatch && (c.metadata as any)?.scope === 'ai_conference_2026') {
-        c.similarity += 0.35;
-      }
+    // LDRS conference scope boost — scaled by semantic confidence.
+    // Only applies when the query meaningfully resembles the conference prototype
+    // (above 0.35 cosine threshold) AND chunk is tagged as canonical conference
+    // content. Scales up to a max of +0.25, matching strong-phrase bonus.
+    // Anti-signal queries ("podcast", "Avi Zitan") have their confidence damped
+    // above, so they won't trigger this.
+    if (
+      accountId === LDRS_ACCOUNT_ID &&
+      ldrsConferenceConfidence > 0.35 &&
+      (c.metadata as any)?.scope === 'ai_conference_2026'
+    ) {
+      const scaledBoost = Math.min((ldrsConferenceConfidence - 0.35) * 0.55, 0.25);
+      c.similarity += scaledBoost;
     }
     // Topic scoring: penalize chunks from clearly different domains
     // Only when query has a confident topic
