@@ -223,7 +223,7 @@ async function handleFashionFeed(
   // 2. Fetch highlight items with thumbnails (the actual look images)
   const { data: hlItems } = await supabase
     .from('instagram_highlight_items')
-    .select('id, highlight_id, thumbnail_url, media_type, posted_at')
+    .select('id, highlight_id, thumbnail_url, stored_thumbnail_url, stored_media_url, media_type, posted_at')
     .eq('account_id', accountId)
     .not('thumbnail_url', 'is', null)
     .order('posted_at', { ascending: false })
@@ -232,7 +232,7 @@ async function handleFashionFeed(
   // 3. Fetch Instagram posts with images
   const { data: posts } = await supabase
     .from('instagram_posts')
-    .select('id, shortcode, caption, thumbnail_url, media_urls, mentions, is_sponsored, likes_count, posted_at')
+    .select('id, shortcode, caption, thumbnail_url, media_urls, stored_thumbnail_url, stored_media_urls, mentions, is_sponsored, likes_count, posted_at')
     .eq('account_id', accountId)
     .not('thumbnail_url', 'is', null)
     .order('posted_at', { ascending: false })
@@ -300,7 +300,7 @@ async function handleFashionFeed(
       title,
       description: shortDesc,
       fullText: fullTranscription, // full content for the chatbot
-      imageUrl: hi.thumbnail_url,
+      imageUrl: (hi as any).stored_thumbnail_url || (hi as any).stored_media_url || hi.thumbnail_url,
       meta,
       entityType: 'highlight',
       topic: 'fashion',
@@ -325,7 +325,12 @@ async function handleFashionFeed(
     if (post.is_sponsored) meta.sponsored = 'שיתוף פעולה';
     if (post.likes_count) meta.likes = `${post.likes_count} ❤️`;
 
-    const imageUrl = post.thumbnail_url || ((post.media_urls as string[])?.[0]) || null;
+    const imageUrl =
+      (post as any).stored_thumbnail_url ||
+      (((post as any).stored_media_urls as string[] | null)?.[0]) ||
+      post.thumbnail_url ||
+      ((post.media_urls as string[])?.[0]) ||
+      null;
 
     items.push({
       id: post.id,
@@ -446,13 +451,18 @@ export async function GET(request: NextRequest) {
   if (shortcodes.length > 0) {
     const { data: posts } = await supabase
       .from('instagram_posts')
-      .select('shortcode, media_urls, thumbnail_url')
+      .select('shortcode, media_urls, thumbnail_url, stored_media_urls, stored_thumbnail_url')
       .eq('account_id', account.id)
       .in('shortcode', shortcodes);
 
     if (posts) {
       for (const p of posts) {
-        const url = p.thumbnail_url || (p.media_urls as string[])?.[0] || null;
+        const url =
+          (p as any).stored_thumbnail_url ||
+          (((p as any).stored_media_urls as string[] | null)?.[0]) ||
+          p.thumbnail_url ||
+          (p.media_urls as string[])?.[0] ||
+          null;
         if (url && p.shortcode) postImages[p.shortcode] = url;
       }
     }
@@ -486,10 +496,15 @@ export async function GET(request: NextRequest) {
     if (hlItemIds.length > 0) {
       const { data: hlRows } = await supabase
         .from('instagram_highlight_items')
-        .select('id, thumbnail_url, media_url')
+        .select('id, thumbnail_url, media_url, stored_thumbnail_url, stored_media_url')
         .in('id', hlItemIds);
       for (const h of hlRows || []) {
-        const url = h.thumbnail_url || h.media_url || null;
+        const url =
+          (h as any).stored_thumbnail_url ||
+          (h as any).stored_media_url ||
+          h.thumbnail_url ||
+          h.media_url ||
+          null;
         if (url) hlImages[h.id] = url;
       }
     }
@@ -498,10 +513,15 @@ export async function GET(request: NextRequest) {
     if (postIds.length > 0) {
       const { data: pRows } = await supabase
         .from('instagram_posts')
-        .select('id, thumbnail_url, media_urls')
+        .select('id, thumbnail_url, media_urls, stored_thumbnail_url, stored_media_urls')
         .in('id', postIds);
       for (const p of pRows || []) {
-        const url = p.thumbnail_url || (p.media_urls as string[])?.[0] || null;
+        const url =
+          (p as any).stored_thumbnail_url ||
+          (((p as any).stored_media_urls as string[] | null)?.[0]) ||
+          p.thumbnail_url ||
+          (p.media_urls as string[])?.[0] ||
+          null;
         if (url) postImagesById[p.id] = url;
       }
     }

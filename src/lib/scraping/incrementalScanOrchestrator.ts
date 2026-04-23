@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server';
 import { randomUUID } from 'crypto';
 import { getScrapeCreatorsClient } from './scrapeCreatorsClient';
 import { getGlobalRateLimiter } from './rateLimiter';
+import { persistPostMedia } from './media-storage';
 
 export interface IncrementalScanConfig {
   maxNewPosts: number;
@@ -160,9 +161,21 @@ export class IncrementalScanOrchestrator {
 
       // Upsert ALL fetched posts: new ones get fully inserted, existing ones get their
       // media_urls / thumbnail_url / engagement refreshed (Instagram CDN URLs expire).
+      // Additionally persist each image to Supabase storage so URLs never break.
       let refreshedUrls = 0;
+      let persistedMedia = 0;
       for (const post of posts) {
         const isNew = !existingShortcodes.has(post.shortcode);
+
+        const persisted = await persistPostMedia(
+          this.supabase,
+          accountId,
+          post.shortcode,
+          post.media_urls,
+          post.thumbnail_url,
+        );
+        if (persisted.media_stored_at) persistedMedia++;
+
         const { error } = await this.supabase.from('instagram_posts').upsert({
           account_id: accountId,
           shortcode: post.shortcode,
@@ -173,6 +186,9 @@ export class IncrementalScanOrchestrator {
           mentions: post.mentions || [],
           media_urls: post.media_urls,
           thumbnail_url: post.thumbnail_url,
+          stored_media_urls: persisted.stored_media_urls,
+          stored_thumbnail_url: persisted.stored_thumbnail_url,
+          media_stored_at: persisted.media_stored_at,
           likes_count: post.likes_count,
           comments_count: post.comments_count,
           views_count: post.views_count,
@@ -190,7 +206,7 @@ export class IncrementalScanOrchestrator {
         }
       }
 
-      console.log(`[Step 3] ✓ Saved ${stats.newPostsFound} new posts, refreshed ${refreshedUrls} existing URLs`);
+      console.log(`[Step 3] ✓ Saved ${stats.newPostsFound} new posts, refreshed ${refreshedUrls} existing URLs, persisted ${persistedMedia} to storage`);
 
       await this.rateLimiter.waitRandom('after posts');
 

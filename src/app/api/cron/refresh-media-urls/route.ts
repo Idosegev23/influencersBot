@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getScrapeCreatorsClient } from '@/lib/scraping/scrapeCreatorsClient';
+import { persistPostMedia } from '@/lib/scraping/media-storage';
 
 export const maxDuration = 300;
 
@@ -89,6 +90,14 @@ export async function GET(req: NextRequest) {
       const existing = new Set((existingRows || []).map((r: { shortcode: string }) => r.shortcode));
 
       for (const post of posts) {
+        const persisted = await persistPostMedia(
+          supabase,
+          target.id,
+          post.shortcode,
+          post.media_urls,
+          post.thumbnail_url,
+        );
+
         const { error: upErr } = await supabase.from('instagram_posts').upsert({
           account_id: target.id,
           shortcode: post.shortcode,
@@ -99,6 +108,9 @@ export async function GET(req: NextRequest) {
           mentions: post.mentions || [],
           media_urls: post.media_urls,
           thumbnail_url: post.thumbnail_url,
+          stored_media_urls: persisted.stored_media_urls,
+          stored_thumbnail_url: persisted.stored_thumbnail_url,
+          media_stored_at: persisted.media_stored_at,
           likes_count: post.likes_count,
           comments_count: post.comments_count,
           views_count: post.views_count,
