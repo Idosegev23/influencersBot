@@ -624,6 +624,22 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
     if (typeWeight !== 0) {
       c.similarity += typeWeight;
     }
+    // LDRS conference scope boost: when the query has conference signals,
+    // strongly prefer chunks tagged as canonical conference content.
+    // This keeps the bot grounded on the 30.4 talk + AI products when users ask
+    // about "הרצאה", "כנס", "הטמעה", "NewVoices", "IMAI" etc.
+    if (accountId === 'de38eac6-d2fb-46a7-ac09-5ec860147ca0') {
+      const CONFERENCE_SIGNALS = [
+        'הרצאה', 'מצגת', 'כנס', 'הטמעה', 'להטמיע', 'להיות או לא להיות',
+        'איתמר', 'גונשרוביץ', 'איגוד השיווק',
+        'newvoices', 'imai', 'leaders platform', 'influencer marketing ai',
+        'ai ארגוני', 'ai פרטי', '80/20', 'צווארי בקבוק',
+      ];
+      const querySignalMatch = CONFERENCE_SIGNALS.some(s => queryLower.includes(s));
+      if (querySignalMatch && (c.metadata as any)?.scope === 'ai_conference_2026') {
+        c.similarity += 0.35;
+      }
+    }
     // Topic scoring: penalize chunks from clearly different domains
     // Only when query has a confident topic
     if (inferredTopics.length > 0) {

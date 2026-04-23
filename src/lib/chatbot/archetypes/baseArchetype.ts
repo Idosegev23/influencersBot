@@ -271,6 +271,65 @@ export abstract class BaseArchetype {
   private buildPersonaContextPrompt(config: PersonalityConfig, name: string): string {
     const sections: string[] = [];
 
+    // --- Grounded Facts (HIGHEST priority — anchor facts that override retrieved content) ---
+    const groundedFacts = (config.voiceRules as any)?.grounded_facts;
+    if (groundedFacts && typeof groundedFacts === 'object') {
+      const gfLines: string[] = ['🔒 עובדות מבוססות — מקור האמת. אם תוכן מבסיס הידע סותר את אלה, העובדות כאן תמיד מנצחות:'];
+
+      if (groundedFacts.company) {
+        const c = groundedFacts.company;
+        gfLines.push('\n🏢 חברה:');
+        if (c.legal_name) gfLines.push(`• ${c.legal_name}`);
+        if (c.positioning) gfLines.push(`• ${c.positioning}`);
+        if (c.parent) gfLines.push(`• ${c.parent}`);
+      }
+
+      if (groundedFacts.leadership && typeof groundedFacts.leadership === 'object') {
+        gfLines.push('\n👥 הנהלה נוכחית (אל תציין תפקידים היסטוריים):');
+        for (const [, bio] of Object.entries(groundedFacts.leadership)) {
+          if (typeof bio === 'string') gfLines.push(`• ${bio}`);
+        }
+      }
+
+      if (groundedFacts.conference_2026) {
+        const conf = groundedFacts.conference_2026;
+        gfLines.push('\n🎤 ההרצאה בכנס:');
+        if (conf.name) gfLines.push(`• כנס: ${conf.name}`);
+        if (conf.date) gfLines.push(`• תאריך: ${conf.date}`);
+        if (conf.speaker && conf.title) gfLines.push(`• מרצה: ${conf.speaker} | כותרת: "${conf.title}"`);
+        if (Array.isArray(conf.four_principles) && conf.four_principles.length) {
+          gfLines.push('• 4 עקרונות מהמצגת (השתמש בציטוטים כלשונם):');
+          conf.four_principles.forEach((p: string) => gfLines.push(`  - ${p}`));
+        }
+        if (Array.isArray(conf.five_steps) && conf.five_steps.length) {
+          gfLines.push('• 5 שלבי הטמעת AI בארגון:');
+          conf.five_steps.forEach((s: string) => gfLines.push(`  - ${s}`));
+        }
+        if (conf.disambiguation) gfLines.push(`• ⚠️ ${conf.disambiguation}`);
+      }
+
+      if (groundedFacts.products && typeof groundedFacts.products === 'object') {
+        gfLines.push('\n🛠 מוצרי AI:');
+        for (const [key, desc] of Object.entries(groundedFacts.products)) {
+          if (typeof desc === 'string') gfLines.push(`• ${key}: ${desc}`);
+        }
+      }
+
+      if (groundedFacts.subsidiaries && typeof groundedFacts.subsidiaries === 'object') {
+        gfLines.push('\n🏛 חברות בנות:');
+        for (const [, desc] of Object.entries(groundedFacts.subsidiaries)) {
+          if (typeof desc === 'string') gfLines.push(`• ${desc}`);
+        }
+      }
+
+      if (Array.isArray(groundedFacts.behavioral_rules) && groundedFacts.behavioral_rules.length) {
+        gfLines.push('\n🛡 כללי התנהגות (חובה לציית):');
+        groundedFacts.behavioral_rules.forEach((r: string) => gfLines.push(`• ${r}`));
+      }
+
+      sections.push(gfLines.join('\n'));
+    }
+
     // --- Identity & Voice (from voice_rules) ---
     const vr = config.voiceRules;
     if (vr) {
