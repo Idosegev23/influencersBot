@@ -4193,7 +4193,6 @@ h1, h2, h3, h4, h5, h6 {
 }
 .pcat-rail__header {
   display: flex;
-  flex-direction: row-reverse;
   align-items: center;
   justify-content: flex-start;
   gap: 6px;
@@ -4282,7 +4281,7 @@ h1, h2, h3, h4, h5, h6 {
   padding: 12px;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 4px;
   border-radius: 0 0 16px 16px;
   text-align: right;
@@ -4402,7 +4401,6 @@ h1, h2, h3, h4, h5, h6 {
 }
 .pcat-sheet__category {
   display: inline-flex;
-  flex-direction: row-reverse;
   align-items: center;
   gap: 6px;
   height: 24px;
@@ -4429,7 +4427,6 @@ h1, h2, h3, h4, h5, h6 {
 }
 .pcat-sheet__price-row {
   display: flex;
-  flex-direction: row-reverse;
   align-items: baseline;
   gap: 10px;
   width: 100%;
@@ -4460,7 +4457,6 @@ h1, h2, h3, h4, h5, h6 {
 }
 .pcat-sheet__section-header {
   display: flex;
-  flex-direction: row-reverse;
   align-items: center;
   justify-content: flex-start;
   gap: 6px;
@@ -4472,7 +4468,6 @@ h1, h2, h3, h4, h5, h6 {
 }
 .pcat-sheet__chips {
   display: flex;
-  flex-direction: row-reverse;
   flex-wrap: wrap;
   justify-content: flex-start;
   gap: 6px;
@@ -4494,7 +4489,6 @@ h1, h2, h3, h4, h5, h6 {
 }
 .pcat-sheet__actions {
   display: flex;
-  flex-direction: row-reverse;
   gap: 8px;
   width: 100%;
 }
