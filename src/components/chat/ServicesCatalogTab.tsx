@@ -495,7 +495,7 @@ export default function ServicesCatalogTab({ accountId, onAskAbout, sessionId, e
   }
 
   return (
-    <div className="px-4 py-5" style={{ direction: 'rtl' }}>
+    <div className="h-full overflow-y-auto px-4 py-5 pb-32" style={{ direction: 'rtl' }}>
       {/* Header */}
       <div className="mb-6 text-right">
         <h2 className="text-[18px] font-bold text-black">השירותים שלנו</h2>
