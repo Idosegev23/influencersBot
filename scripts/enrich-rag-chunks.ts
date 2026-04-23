@@ -38,6 +38,8 @@ Options:
   --skip-queries       Skip synthetic query generation
   --skip-cleanup       Skip tiny chunk cleanup
   --skip-partnerships  Skip partnership enrichment
+  --force-queries      Re-generate synthetic queries even for already-enriched chunks
+                       (strips stale "[שאלות קשורות: ...]" suffix and re-embeds)
   --all                Enrich all accounts with RAG chunks
 `);
     process.exit(0);
@@ -48,6 +50,7 @@ Options:
   const skipSyntheticQueries = args.includes('--skip-queries');
   const skipCleanup = args.includes('--skip-cleanup');
   const skipPartnershipEnrich = args.includes('--skip-partnerships');
+  const forceSyntheticQueries = args.includes('--force-queries');
   const enrichAll = args.includes('--all');
 
   // Validate environment
@@ -67,6 +70,7 @@ Options:
       skipSyntheticQueries,
       skipCleanup,
       skipPartnershipEnrich,
+      forceSyntheticQueries,
     });
   } else {
     const accountId = args.find(a => !a.startsWith('--'));
@@ -76,7 +80,9 @@ Options:
     }
 
     console.log(`\n🚀 Enriching RAG chunks for account: ${accountId}`);
-    if (dryRun) console.log('📋 DRY RUN — no changes will be made\n');
+    if (dryRun) console.log('📋 DRY RUN — no changes will be made');
+    if (forceSyntheticQueries) console.log('🔁 FORCE — regenerating synthetic queries for ALL chunks');
+    console.log();
 
     const result = await enrichAccountChunks(accountId, {
       dryRun,
@@ -84,6 +90,7 @@ Options:
       skipSyntheticQueries,
       skipCleanup,
       skipPartnershipEnrich,
+      forceSyntheticQueries,
     });
 
     printResult(accountId, result);

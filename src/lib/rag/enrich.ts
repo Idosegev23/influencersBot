@@ -62,6 +62,7 @@ export async function enrichAccountChunks(
     skipPartnershipEnrich?: boolean;
     skipTopicClassification?: boolean;
     skipEntityExtraction?: boolean;
+    forceSyntheticQueries?: boolean;
     geminiApiKey?: string;
     openaiApiKey?: string;
   }
@@ -109,7 +110,7 @@ export async function enrichAccountChunks(
   // --- Step 3: Generate synthetic queries ---
   if (!options?.skipSyntheticQueries) {
     try {
-      const added = await addSyntheticQueries(supabase, accountId, options?.dryRun);
+      const added = await addSyntheticQueries(supabase, accountId, options?.dryRun, options?.forceSyntheticQueries);
       result.syntheticQueriesAdded = added;
       log.info(`Synthetic queries: ${added} chunks enriched`, {}, accountId);
     } catch (err: any) {
@@ -350,7 +351,8 @@ async function addHebrewSummaries(
 async function addSyntheticQueries(
   supabase: ReturnType<typeof createClient>,
   accountId: string,
-  dryRun?: boolean
+  dryRun?: boolean,
+  force?: boolean
 ): Promise<number> {
   // Paginate through ALL chunks — no single-query limit
   let unenriched: ChunkRow[] = [];
@@ -368,8 +370,10 @@ async function addSyntheticQueries(
 
     if (!chunks || chunks.length === 0) break;
 
-    const batch = chunks.filter(c => !(c.metadata as any)?.synthetic_queries);
-    unenriched = unenriched.concat(batch as ChunkRow[]);
+    const batch = force
+      ? (chunks as ChunkRow[])
+      : chunks.filter(c => !(c.metadata as any)?.synthetic_queries) as ChunkRow[];
+    unenriched = unenriched.concat(batch);
 
     if (chunks.length < PAGE_SIZE) break;
     offset += PAGE_SIZE;
@@ -385,9 +389,12 @@ async function addSyntheticQueries(
   for (let i = 0; i < unenriched.length; i += BATCH) {
     const batch = unenriched.slice(i, i + BATCH);
 
+    // Strip any pre-existing `[שאלות קשורות: ...]` suffix so re-runs don't double up
+    const stripQuerySuffix = (t: string) => t.replace(/\n*\[שאלות קשורות:[\s\S]*$/u, '').trimEnd();
+
     try {
       const querySets = await generateSyntheticQueries(batch.map(c => ({
-        text: c.chunk_text,
+        text: stripQuerySuffix(c.chunk_text),
         entityType: c.entity_type,
       })));
 
@@ -406,8 +413,9 @@ async function addSyntheticQueries(
           synthetic_queries: queries,
         };
 
-        // Enrich the chunk text with queries for better embedding
-        const enrichedText = `${batch[j].chunk_text}\n\n[שאלות קשורות: ${queries.join(' | ')}]`;
+        // Enrich the chunk text with queries for better embedding (on the stripped base)
+        const baseText = stripQuerySuffix(batch[j].chunk_text);
+        const enrichedText = `${baseText}\n\n[שאלות קשורות: ${queries.join(' | ')}]`;
 
         // Re-embed with enriched text
         const [embedding] = await generateEmbeddings([enrichedText]);
@@ -577,14 +585,36 @@ Based ONLY on the text below, write 2-3 short Hebrew questions per chunk.
 Do NOT invent information not in the text.
 Do NOT add related topics — only what's explicitly mentioned.
 
-Rules:
+CRITICAL — every question MUST be UNIQUELY answerable by THIS chunk alone.
+The chunk is one of thousands from the same creator. Generic questions
+that could match many chunks are USELESS for retrieval evaluation.
+
+Each question must contain at least ONE specific anchor from the chunk:
+a brand name, product name, a distinctive phrase, a specific number/date,
+or a unique keyword. If you cannot identify such an anchor, produce fewer
+(or zero) questions rather than a generic one.
+
+BAD (generic — will match many chunks, REJECTED):
+  ❌ "מה שם המותג?"
+  ❌ "כמה אחוז הנחה יש?"
+  ❌ "מה הקוד קופון?"
+  ❌ "איזה מוצר זה?"
+  ❌ "מה המחיר?"
+
+GOOD (specific — uniquely identifies this chunk):
+  ✓ "מה שם המותג שמשתף פעולה עם מירן על מסכת ה-PDRN?"
+  ✓ "כמה אחוז הנחה נותן קוד MIRAN10 אצל Opticana?"
+  ✓ "מה הקוד להנחה ב-Leaves למסכת הפנים?"
+  ✓ "על איזה סרום ויטמין C מדברים ברילס עם ארגניה?"
+  ✓ "עד מתי תקפה ההנחה של 25% ההשקה?"
+
+Other rules:
 - If the text is about a recipe for pasta → questions about pasta, NOT about other dishes
 - If the text is about a hair product → questions about that product, NOT about food
-- If the text mentions a specific brand/person → use their actual name
-- Keep questions specific to the actual content
 - Questions must be answerable from the chunk text alone
+- Prefer 2 specific questions over 3 vague ones. Zero > generic.
 
-Return a JSON array of arrays. Each inner array has 2-3 Hebrew questions.
+Return a JSON array of arrays. Each inner array has 0-3 Hebrew questions.
 
 Chunks:
 ${chunks.map((c, i) => `[${i}] (${c.entityType}) ${c.text.substring(0, 400)}`).join('\n\n')}`;
