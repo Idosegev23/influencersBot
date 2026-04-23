@@ -283,25 +283,47 @@ export abstract class BaseArchetype {
       // Signal detection — decides which conditional sections to render
       const ctxLower = (queryContext || '').toLowerCase();
       const CONFERENCE_SIGNALS = [
-        'הרצאה', 'מצגת', 'כנס', 'הטמעה', 'להטמיע', 'להיות או לא להיות',
+        'הרצאה', 'מצגת', 'כנס', 'להיות או לא להיות',
         'איתמר', 'גונשרוביץ', 'איגוד השיווק',
         'ai ארגוני', 'ai פרטי', '80/20', 'צווארי בקבוק',
         '30.4', '30/4',
       ];
+      // AI context — any mention of AI as a subject triggers the products block,
+      // even without explicit conference/product keywords. Covers questions like
+      // "איך אתם עובדים עם AI" or "מה המוצרים שלכם".
+      const AI_CONTEXT_SIGNALS = [
+        'ai', 'בינה מלאכותית', 'למידת מכונה', 'gpt', 'llm',
+        'הטמעה', 'להטמיע', 'אוטומציה', 'אוטומציות',
+        'מוצרים', 'מוצר', 'הכלים', 'הכלי',
+      ];
       const PRODUCT_SIGNALS: Record<string, string[]> = {
-        newvoices: ['newvoices', 'סוכן קולי', 'ניו ווייסס'],
+        newvoices: ['newvoices', 'new voices', 'סוכן קולי', 'ניו ווייסס', 'voice agent'],
         imai: ['imai', 'influencer marketing ai', 'פלטפורמת משפיענים'],
-        leaders_platform: ['leaders platform', 'פלטפורמה פנימית', 'מחולל הצעות', 'בריף'],
-        ai_implementation: ['ליווי', 'הטמעה', 'להטמיע'],
-        ai_automations: ['אוטומציות', 'אוטומציה'],
+        leaders_platform: [
+          'leaders platform', 'פלטפורמה פנימית',
+          'מחולל', 'בריף', 'התנעה', 'מצגת קריאייטיבית', 'האב מסמכים',
+        ],
+        ai_implementation: ['ליווי ai', 'ליווי הטמעה', 'תהליך הטמעה', '5 שלבים'],
+        ai_automations: ['אוטומציות ai', 'אוטומציות מותאמות'],
+      };
+      // Sub-tools inside leaders_platform
+      const LEADERS_TOOL_SIGNALS: Record<string, string[]> = {
+        client_brief: ['בריף לקוח', 'client brief', 'טופס בריף', 'שליחת בריף', 'בריף'],
+        kickoff: ['התנעה', 'kickoff', 'inner meeting', 'פגישת התנעה'],
+        price_quote: ['הצעת מחיר', 'הצעות מחיר', 'מחולל', 'מחולל הצעה', 'תמחור', 'price quote', 'quote'],
+        creative_deck: ['מצגת קריאייטיבית', 'creative deck', 'creative proposal', 'הצעה קריאייטיבית', 'מצגת'],
+        document_hub: ['האב מסמכים', 'ניהול מסמכים', 'לינקים של מסמכים', 'document hub'],
       };
       const ANTI_SIGNALS = ['פודקאסט', 'פרק', 'אבי זיתן', 'podcast', 'ראיון'];
 
-      const hasConferenceSignal =
-        CONFERENCE_SIGNALS.some((s) => ctxLower.includes(s)) &&
-        !ANTI_SIGNALS.some((s) => ctxLower.includes(s));
+      const hasAnti = ANTI_SIGNALS.some((s) => ctxLower.includes(s));
+      const hasConferenceSignal = !hasAnti && CONFERENCE_SIGNALS.some((s) => ctxLower.includes(s));
+      const hasAIContext = !hasAnti && AI_CONTEXT_SIGNALS.some((s) => ctxLower.includes(s));
       const mentionedProducts = Object.keys(PRODUCT_SIGNALS).filter((k) =>
         PRODUCT_SIGNALS[k].some((s) => ctxLower.includes(s))
+      );
+      const mentionedTools = Object.keys(LEADERS_TOOL_SIGNALS).filter((k) =>
+        LEADERS_TOOL_SIGNALS[k].some((s) => ctxLower.includes(s))
       );
 
       const gfLines: string[] = ['🔒 עובדות מבוססות — מקור האמת. אם תוכן מבסיס הידע סותר את אלה, העובדות כאן תמיד מנצחות:'];
@@ -352,17 +374,46 @@ export abstract class BaseArchetype {
         if (conf.disambiguation) gfLines.push(`• ⚠️ ${conf.disambiguation}`);
       }
 
-      // CONDITIONAL — products: include ALL when conference signal is on,
+      // CONDITIONAL — products: include ALL when conference/AI signal is on,
       // or just the specific products mentioned by the user.
+      // Leaders Platform has nested sub-tools (brief, kickoff, quote, deck, hub)
+      // — show them when conference signal OR specific tool is mentioned.
       if (groundedFacts.products && typeof groundedFacts.products === 'object') {
-        const productsToShow: string[] = hasConferenceSignal
+        const showAllProducts = hasConferenceSignal || hasAIContext;
+        let productsToShow: string[] = showAllProducts
           ? Object.keys(groundedFacts.products)
           : mentionedProducts.filter((k) => k in groundedFacts.products);
+        // If user mentioned a leaders_platform sub-tool (e.g. "מחולל הצעות"),
+        // make sure leaders_platform itself is included.
+        if (mentionedTools.length > 0 && !productsToShow.includes('leaders_platform')) {
+          productsToShow.push('leaders_platform');
+        }
+
         if (productsToShow.length > 0) {
           gfLines.push('\n🛠 מוצרי AI:');
           for (const key of productsToShow) {
             const desc = groundedFacts.products[key];
-            if (typeof desc === 'string') gfLines.push(`• ${key}: ${desc}`);
+            if (typeof desc === 'string') {
+              gfLines.push(`• ${key}: ${desc}`);
+            } else if (typeof desc === 'object' && desc !== null) {
+              // Nested product (e.g. leaders_platform with overview + tools)
+              if (desc.overview) {
+                gfLines.push(`• ${key}: ${desc.overview}`);
+              }
+              if (desc.tools && typeof desc.tools === 'object') {
+                const toolsToShow = showAllProducts
+                  ? Object.keys(desc.tools)
+                  : mentionedTools.filter((t) => t in desc.tools);
+                if (toolsToShow.length > 0) {
+                  for (const toolKey of toolsToShow) {
+                    const toolDesc = desc.tools[toolKey];
+                    if (typeof toolDesc === 'string') {
+                      gfLines.push(`  ◦ ${toolDesc}`);
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
