@@ -455,18 +455,19 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   useEffect(() => {
     if (!isConferenceMode || username !== 'ldrs_group') return;
     const conferenceStarters = [
-      'נהניתם מההרצאה של איתמר?',
-      'איך נראה תהליך הטמעה?',
-      'מה הכי חשוב לפני שמתחילים?',
+      'סיכום ההרצאה של איתמר בכנס',
+      'איך מתחילים להטמיע AI בארגון?',
+      'איפה לחפש את הכאב לפני AI?',
       'מה זה NewVoices?',
     ];
     const conferenceTopics = [
-      'איך אתם עובדים היום עם AI?',
-      'איך אני יודע שהעסק שלי יכול לקבל AI?',
+      '5 שלבי הטמעת AI לפי לידרס',
       'איך לזהות תהליך שאפשר לשפר ב-AI?',
-      'כמה זמן לידרס בתחום ה-AI?',
       'מה זה Leaders Platform?',
       'מה זה IMAI?',
+      'למה AI ארגוני ולא AI פרטי?',
+      'ההבדל בין NewVoices ל-IMAI',
+      'קבעו לי פגישה',
     ];
     setQuickReplies(conferenceStarters);
     setTopicSuggestions(conferenceTopics);
