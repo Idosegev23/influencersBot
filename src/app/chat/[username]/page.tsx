@@ -164,6 +164,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   
   const searchParams = useSearchParams();
   const initialTab = (searchParams.get('tab') as TabId) || 'chat';
+  const sourceParam = searchParams.get('source');
+  const isConferenceMode = sourceParam === 'conf';
   const [activeTab, setActiveTab] = useState<TabId>(initialTab);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -431,11 +433,13 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       .catch(() => {});
 
     // Preload topic suggestions + commercial content flag from init API
+    // In conference mode, quickReplies + topicSuggestions are overridden by a dedicated effect below
+    const confMode = searchParams.get('source') === 'conf';
     fetch(`/api/chat/init?username=${encodeURIComponent(username)}`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
-        if (data?.quickReplies) setQuickReplies(data.quickReplies);
-        if (data?.topicSuggestions) setTopicSuggestions(data.topicSuggestions);
+        if (data?.quickReplies && !confMode) setQuickReplies(data.quickReplies);
+        if (data?.topicSuggestions && !confMode) setTopicSuggestions(data.topicSuggestions);
         if (data?.hasCommercialContent) setHasCommercialContent(true);
       })
       .catch(() => {});
@@ -446,6 +450,30 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       if (stored) setLeadInfo(JSON.parse(stored));
     } catch {}
   }, [username]);
+
+  // Conference mode: override starters to AI-focused questions for LDRS QR scanners
+  useEffect(() => {
+    if (!isConferenceMode || username !== 'ldrs_group') return;
+    const conferenceStarters = [
+      'נהניתם מההרצאה של איתמר?',
+      'איך נראה תהליך הטמעה?',
+      'מה הכי חשוב לפני שמתחילים?',
+      'מה זה NewVoices?',
+    ];
+    const conferenceTopics = [
+      'איך אתם עובדים היום עם AI?',
+      'איך אני יודע שהעסק שלי יכול לקבל AI?',
+      'איך לזהות תהליך שאפשר לשפר ב-AI?',
+      'כמה זמן לידרס בתחום ה-AI?',
+      'מה זה Leaders Platform?',
+      'מה זה IMAI?',
+    ];
+    setQuickReplies(conferenceStarters);
+    setTopicSuggestions(conferenceTopics);
+    try {
+      sessionStorage.setItem(`ldrs_conf_source_${username}`, 'conf');
+    } catch {}
+  }, [isConferenceMode, username]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -1750,6 +1778,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   accountId={influencer.id}
                   sessionId={sessionId}
                   enableBrief={!!(influencer as any).features?.services_tab}
+                  conferenceMode={isConferenceMode}
                   onAskAbout={(question: string, hiddenContext?: string) => {
                     setActiveTab('chat');
                     maybeShowLeadPopup();
