@@ -605,8 +605,13 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
         setStreamingMessageId(assistantMessageId);
         setMessages((prev) => [...prev, { id: assistantMessageId, role: 'assistant', content: '' }]);
         // Keep isTyping=true — thinking message / dots stay visible until first stream token
+        // Inject hidden conference context — drives the bot to push for a meeting throughout
+        const apiMessage =
+          isConferenceMode && username === 'ldrs_group'
+            ? `${fakeInput}\n\n[הקשר פנימי — אל תצטט: המבקר הגיע מ-QR של הכנס של איתמר ב-30.4. כלול בתשובה הזמנה עדינה ל-30 דקות עם הצוות.]`
+            : fakeInput;
         sendStreamMessage({
-          message: fakeInput,
+          message: apiMessage,
           username,
           sessionId: sessionId || undefined,
           previousResponseId: responseId || undefined,
@@ -700,9 +705,15 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
         setMessages((prev) => [...prev, streamingMessage]);
         // Keep isTyping=true — the dots stay visible until first stream token arrives
 
+        // Inject hidden conference context — drives the bot to push for a meeting throughout
+        const apiMessage =
+          isConferenceMode && username === 'ldrs_group'
+            ? `${messageContent}\n\n[הקשר פנימי — אל תצטט: המבקר הגיע מ-QR של הכנס של איתמר ב-30.4. כלול בתשובה הזמנה עדינה ל-30 דקות עם הצוות.]`
+            : messageContent;
+
         // Start streaming
         await sendStreamMessage({
-          message: messageContent,
+          message: apiMessage,
           username,
           sessionId: sessionId || undefined,
           previousResponseId: responseId || undefined,
