@@ -195,28 +195,53 @@ export async function POST(req: NextRequest) {
       createdAt: brief?.created_at,
     });
 
-    // Direct email to Roi via Google service account (same path as /api/briefs)
-    sendBriefEmail({
-      to: ownerEmail,
-      subject: `ליד חדש מהכנס: ${fullName}${preferredProduct ? ` — ${preferredProduct}` : ''}`,
-      htmlBody: briefHtml,
-    }).catch((err) => console.error('[conference-lead] Direct email to owner failed:', err));
-
-    // Mirror to Drive for archive
-    uploadBriefToDrive({
-      title: `ליד מהכנס — ${fullName}${preferredProduct ? ` — ${preferredProduct}` : ''} — ${new Date().toLocaleDateString('he-IL')}`,
-      htmlBody: briefHtml,
-    })
-      .then((res) => {
-        if (brief?.id) {
-          supabase
+    // Direct email to Roi via Google service account.
+    // sendBriefEmail returns boolean (true on success, false on any failure).
+    // We await + log the result so DB email_sent reflects reality and we can
+    // diagnose silent failures (the most common cause is missing
+    // domain-wide delegation for ldrsgroup.com or missing
+    // GOOGLE_SERVICE_ACCOUNT_KEY env var on Vercel).
+    (async () => {
+      const hasServiceAccountKey = !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+      console.log(
+        `[conference-lead] sendBriefEmail starting | to=${ownerEmail} | service_account_key_present=${hasServiceAccountKey}`
+      );
+      try {
+        const ok = await sendBriefEmail({
+          to: ownerEmail,
+          subject: `ליד חדש מהכנס: ${fullName}${preferredProduct ? ` — ${preferredProduct}` : ''}`,
+          htmlBody: briefHtml,
+        });
+        console.log(`[conference-lead] sendBriefEmail result | ok=${ok}`);
+        if (ok && brief?.id) {
+          await supabase
             .from('service_briefs')
-            .update({ drive_file_id: res.fileId, drive_file_url: res.webViewLink })
-            .eq('id', brief.id)
-            .then(() => {});
+            .update({ email_sent: true })
+            .eq('id', brief.id);
         }
-      })
-      .catch((err) => console.error('[conference-lead] Drive upload failed:', err));
+      } catch (err) {
+        console.error('[conference-lead] sendBriefEmail threw:', err);
+      }
+
+      try {
+        const driveRes = await uploadBriefToDrive({
+          title: `ליד מהכנס — ${fullName}${preferredProduct ? ` — ${preferredProduct}` : ''} — ${new Date().toLocaleDateString('he-IL')}`,
+          htmlBody: briefHtml,
+        });
+        console.log(`[conference-lead] uploadBriefToDrive ok | fileId=${driveRes.fileId}`);
+        if (brief?.id) {
+          await supabase
+            .from('service_briefs')
+            .update({
+              drive_file_id: driveRes.fileId,
+              drive_file_url: driveRes.webViewLink,
+            })
+            .eq('id', brief.id);
+        }
+      } catch (err) {
+        console.error('[conference-lead] uploadBriefToDrive threw:', err);
+      }
+    })();
 
     // Make webhook (kept for Sheets / future workflows — direct email is the
     // primary delivery path now, Make is redundancy)
