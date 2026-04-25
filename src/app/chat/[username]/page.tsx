@@ -152,6 +152,28 @@ function parseSuggestions(text: string): { cleanText: string; suggestions: strin
   return { cleanText, suggestions };
 }
 
+/**
+ * Detect meeting-scheduling intent in a user message.
+ * When matched, the lead-capture popup is triggered immediately
+ * (not waiting for the message-count threshold).
+ */
+const MEETING_INTENT_KEYWORDS = [
+  'בואו נקבע', 'בוא נקבע', 'בואי נקבע',
+  'נקבע פגישה', 'נקבע שיחה', 'נקבע',
+  'אני רוצה פגישה', 'רוצה פגישה',
+  'תקבע פגישה', 'תקבעו פגישה', 'תקבעו לי',
+  'מתי אפשר להיפגש', 'מתי תוכלו', 'מתי נוכל',
+  'מעוניין בפגישה', 'מעוניינת בפגישה',
+  'אוקי בוא', 'אוקי תקבע', 'אוקי נקבע',
+  'מתאים לי לדבר', 'בוא נדבר',
+  'book a meeting', 'schedule a call', 'set up a meeting', "let's meet", "let's schedule",
+];
+function detectsMeetingIntent(text: string): boolean {
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  return MEETING_INTENT_KEYWORDS.some((k) => lower.includes(k.toLowerCase()));
+}
+
 export default function ChatbotPage({ params }: { params: Promise<{ username: string }> }) {
   const resolvedParams = use(params);
   const username = resolvedParams.username;
@@ -546,33 +568,45 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     }
   };
 
-  // Lead capture trigger helper — shared by all message-send paths
-  const maybeShowLeadPopup = () => {
+  // Lead capture trigger helper — shared by all message-send paths.
+  // Optional userMessageText enables intent detection: if the user clearly
+  // asks to book a meeting (e.g. "בוא נקבע"), the popup fires immediately
+  // regardless of the message-count threshold.
+  const maybeShowLeadPopup = (userMessageText?: string) => {
     userMsgCountRef.current++;
+    const intentMatch = detectsMeetingIntent(userMessageText || '');
 
-    // Conference popup: trigger after 3 user messages for QR-flow visitors only.
-    // Once dismissed or submitted, suppressed for 24h via localStorage / session.
-    if (
-      isConferenceMode &&
-      username === 'ldrs_group' &&
-      userMsgCountRef.current >= 3 &&
-      !showConferencePopup
-    ) {
-      try {
-        const submitted = sessionStorage.getItem('ldrs_conf_popup_submitted');
-        const dismissed = localStorage.getItem(`ldrs_conf_popup_dismissed_${username}`);
-        const canShow =
-          !submitted &&
-          (!dismissed || Date.now() - parseInt(dismissed) > 86400000);
-        if (canShow) {
-          setTimeout(() => setShowConferencePopup(true), 1500);
-          return;
-        }
-      } catch {}
+    // LDRS — always uses ConferenceLeadPopup (it has services + Make webhook).
+    // Triggers: meeting intent (any time) OR 3+ messages in conference mode
+    //           OR 4+ messages in regular mode.
+    if (username === 'ldrs_group' && !showConferencePopup) {
+      const countTrigger =
+        (isConferenceMode && userMsgCountRef.current >= 3) ||
+        (!isConferenceMode && userMsgCountRef.current >= 4);
+      if (intentMatch || countTrigger) {
+        try {
+          const submitted = sessionStorage.getItem('ldrs_conf_popup_submitted');
+          const dismissed = localStorage.getItem(`ldrs_conf_popup_dismissed_${username}`);
+          const canShow =
+            !submitted &&
+            (!dismissed || Date.now() - parseInt(dismissed) > 86400000);
+          if (canShow) {
+            // Intent → faster, count-based → small delay so the bot starts replying first
+            const delay = intentMatch ? 600 : 1500;
+            setTimeout(() => setShowConferencePopup(true), delay);
+            return;
+          }
+        } catch {}
+      }
     }
 
-    // Regular lead popup: 4+ messages, non-conference visitors
-    if (userMsgCountRef.current >= 4 && !leadInfo && !showLeadPopup) {
+    // Other accounts: regular LeadCapturePopup at 4+ messages
+    if (
+      username !== 'ldrs_group' &&
+      userMsgCountRef.current >= 4 &&
+      !leadInfo &&
+      !showLeadPopup
+    ) {
       try {
         const dismissed = localStorage.getItem(`chat_lead_dismissed_${username}`);
         const canShow = !dismissed || (Date.now() - parseInt(dismissed)) > 86400000;
@@ -597,7 +631,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       setMessages((prev) => [...prev, userMessage]);
       setInputValue('');
       setIsTyping(true);
-      maybeShowLeadPopup();
+      maybeShowLeadPopup(fakeInput);
 
       // Streaming send
       if (useStreaming) {
@@ -645,8 +679,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     setMessages((prev) => [...prev, userMessage]);
     setInputValue('');
 
-    // Lead capture trigger: after 4 user messages
-    maybeShowLeadPopup();
+    // Lead capture trigger: 4+ messages OR meeting intent in the user text
+    maybeShowLeadPopup(rawText);
     setIsTyping(true);
 
     try {
