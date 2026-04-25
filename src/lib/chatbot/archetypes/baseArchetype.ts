@@ -303,8 +303,16 @@ export abstract class BaseArchetype {
           'leaders platform', 'פלטפורמה פנימית',
           'מחולל', 'בריף', 'התנעה', 'מצגת קריאייטיבית', 'האב מסמכים',
         ],
+        bestie: [
+          'בסטי', 'bestie', 'הבוט', 'הצ\'אט הזה', 'הסוכן הזה', 'הפלטפורמה',
+          'agent', 'chatbot', 'widget', 'סוכן ai', 'ai agent',
+        ],
         ai_implementation: ['ליווי ai', 'ליווי הטמעה', 'תהליך הטמעה', '5 שלבים'],
-        ai_automations: ['אוטומציות ai', 'אוטומציות מותאמות'],
+        ai_automations: [
+          'אוטומציות ai', 'אוטומציות מותאמות', 'אוטומציות שלמות',
+          'תהליך אוטומטי', 'workflow', 'צינור עבודה', 'pipeline',
+          'make', 'webhook', 'אוטומציה מקצה לקצה',
+        ],
       };
       // Sub-tools inside leaders_platform
       const LEADERS_TOOL_SIGNALS: Record<string, string[]> = {
