@@ -612,27 +612,48 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       if (intentMatch || countTrigger) {
         try {
           const submitted = sessionStorage.getItem('ldrs_conf_popup_submitted');
-          // If user already submitted details, never show again — they're done
-          if (submitted) return;
-
           const dismissed = localStorage.getItem(`ldrs_conf_popup_dismissed_${username}`);
           const dismissedRecent =
             !!dismissed && Date.now() - parseInt(dismissed) <= 86400000;
 
-          // Count-only trigger respects the 24h dismissal cooldown.
-          // Intent trigger overrides it — user explicitly changed their mind.
+          // eslint-disable-next-line no-console
+          console.log('[ldrs-popup]', {
+            intentMatch,
+            countTrigger,
+            count: userMsgCountRef.current,
+            submitted: !!submitted,
+            dismissedRecent,
+            isConferenceMode,
+          });
+
+          // Submitted: respect for count-only. Intent overrides it too —
+          // visitor changed their mind / wants a different service.
+          if (submitted && !intentMatch) return;
+
+          // Count-only trigger respects 24h dismissal cooldown.
+          // Intent trigger overrides — visitor explicitly asked for a meeting.
           if (!intentMatch && dismissedRecent) return;
 
-          // If intent fired and dismissal exists, clear it so future count-triggers also work
-          if (intentMatch && dismissedRecent) {
-            localStorage.removeItem(`ldrs_conf_popup_dismissed_${username}`);
+          // If intent fired, clear stale flags so future count-triggers also work
+          if (intentMatch) {
+            if (dismissedRecent) {
+              localStorage.removeItem(`ldrs_conf_popup_dismissed_${username}`);
+            }
+            if (submitted) {
+              sessionStorage.removeItem('ldrs_conf_popup_submitted');
+            }
           }
 
           // Intent → faster, count-based → small delay so the bot starts replying first
           const delay = intentMatch ? 600 : 1500;
+          // eslint-disable-next-line no-console
+          console.log(`[ldrs-popup] firing in ${delay}ms`);
           setTimeout(() => setShowConferencePopup(true), delay);
           return;
-        } catch {}
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.warn('[ldrs-popup] storage check failed', err);
+        }
       }
     }
 
