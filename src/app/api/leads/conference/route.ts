@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { uploadBriefToDrive, sendBriefEmail, buildBriefHtml } from '@/lib/google-workspace';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -161,6 +162,56 @@ export async function POST(req: NextRequest) {
       },
     };
 
+    // Build a friendly HTML body that lists everything we know about the lead
+    const ownerEmail = process.env.CONFERENCE_LEAD_OWNER_EMAIL || 'roi@ldrsgroup.com';
+    const briefHtml = buildBriefHtml({
+      fullName,
+      businessName: companyName || (role ? `תפקיד: ${role}` : undefined),
+      email: email || undefined,
+      phone,
+      serviceName: preferredProduct
+        ? `${preferredProduct} (ליד מהכנס — AI להיות או לא להיות, 30.4)`
+        : 'ליד מהכנס — AI להיות או לא להיות, 30.4',
+      productDescription: painPoint || currentAiUsage || undefined,
+      goal: primaryArea || undefined,
+      budgetRange: readiness || undefined,
+      notes: botSummary || lastUserMessage
+        ? [
+            botSummary && `סיכום שיחה: ${botSummary}`,
+            lastUserMessage && `הודעה אחרונה: ${lastUserMessage}`,
+            chatUrl && `שיחה: ${chatUrl}`,
+          ]
+            .filter(Boolean)
+            .join('\n')
+        : chatUrl,
+      createdAt: brief?.created_at,
+    });
+
+    // Direct email to Roi via Google service account (same path as /api/briefs)
+    sendBriefEmail({
+      to: ownerEmail,
+      subject: `ליד חדש מהכנס: ${fullName}${preferredProduct ? ` — ${preferredProduct}` : ''}`,
+      htmlBody: briefHtml,
+    }).catch((err) => console.error('[conference-lead] Direct email to owner failed:', err));
+
+    // Mirror to Drive for archive
+    uploadBriefToDrive({
+      title: `ליד מהכנס — ${fullName}${preferredProduct ? ` — ${preferredProduct}` : ''} — ${new Date().toLocaleDateString('he-IL')}`,
+      htmlBody: briefHtml,
+    })
+      .then((res) => {
+        if (brief?.id) {
+          supabase
+            .from('service_briefs')
+            .update({ drive_file_id: res.fileId, drive_file_url: res.webViewLink })
+            .eq('id', brief.id)
+            .then(() => {});
+        }
+      })
+      .catch((err) => console.error('[conference-lead] Drive upload failed:', err));
+
+    // Make webhook (kept for Sheets / future workflows — direct email is the
+    // primary delivery path now, Make is redundancy)
     fetch(MAKE_WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
