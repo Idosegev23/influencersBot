@@ -31,7 +31,7 @@ export async function uploadBriefToDrive(opts: {
   const auth = getServiceAccountAuth(['https://www.googleapis.com/auth/drive']);
   const drive = google.drive({ version: 'v3', auth });
 
-  const folderId = opts.folderId || process.env.GOOGLE_DRIVE_LEADS_FOLDER_ID;
+  const folderId = (opts.folderId || process.env.GOOGLE_DRIVE_LEADS_FOLDER_ID || '').trim();
   if (!folderId) throw new Error('GOOGLE_DRIVE_LEADS_FOLDER_ID not configured');
 
   const { Readable } = await import('stream');
@@ -82,8 +82,15 @@ export async function sendBriefEmail(opts: {
     const raw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
     if (!raw) return false;
 
-    const credentials = JSON.parse(raw);
-    const fromEmail = opts.fromEmail || process.env.LEADS_EMAIL_TO || 'info@ldrsgroup.com';
+    const credentials = JSON.parse(raw.trim());
+    // Trim env-derived emails — Vercel UI sometimes preserves trailing newlines
+    // which Google Auth rejects with "Invalid impersonation sub field".
+    const fromEmail = (
+      opts.fromEmail ||
+      process.env.GMAIL_SEND_FROM ||
+      process.env.LEADS_EMAIL_TO ||
+      'info@ldrsgroup.com'
+    ).trim();
 
     // Use JWT with subject (impersonation) for Gmail
     const jwtClient = new google.auth.JWT({
@@ -95,10 +102,13 @@ export async function sendBriefEmail(opts: {
 
     const gmail = google.gmail({ version: 'v1', auth: jwtClient });
 
+    // Trim recipient too — defensive against env-supplied recipient values
+    const toEmail = opts.to.trim();
+
     // Build RFC 2822 message
     const messageParts = [
       `From: ${fromEmail}`,
-      `To: ${opts.to}`,
+      `To: ${toEmail}`,
       `Subject: =?UTF-8?B?${Buffer.from(opts.subject).toString('base64')}?=`,
       'MIME-Version: 1.0',
       'Content-Type: text/html; charset=UTF-8',

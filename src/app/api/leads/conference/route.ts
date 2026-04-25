@@ -253,12 +253,18 @@ export async function POST(req: NextRequest) {
         // Step 1: parse credentials
         let creds: any;
         try {
-          creds = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY || '');
+          creds = JSON.parse((process.env.GOOGLE_SERVICE_ACCOUNT_KEY || '').trim());
         } catch (err: any) {
           throw new Error(`step=parse_credentials: ${err?.message || err}`);
         }
 
-        const fromEmail = process.env.GMAIL_SEND_FROM || process.env.LEADS_EMAIL_TO || 'info@ldrsgroup.com';
+        // Trim env values — Vercel sometimes preserves trailing newlines that
+        // Google Auth rejects ("Invalid impersonation sub field").
+        const fromEmail = (
+          process.env.GMAIL_SEND_FROM ||
+          process.env.LEADS_EMAIL_TO ||
+          'info@ldrsgroup.com'
+        ).trim();
 
         // Step 2: build + authorize JWT
         const jwt = new google.auth.JWT({
