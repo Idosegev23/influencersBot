@@ -163,7 +163,15 @@ export async function POST(req: NextRequest) {
     };
 
     // Build a friendly HTML body that lists everything we know about the lead
-    const ownerEmail = process.env.CONFERENCE_LEAD_OWNER_EMAIL || 'roi@ldrsgroup.com';
+    // Internal test override: a request can include _test_to (must be an
+    // @ldrsgroup.com address) to redirect the email — used to preview the
+    // template in arbitrary inboxes without touching env vars.
+    const _test_to = body._test_to as string | undefined;
+    const isValidTestOverride =
+      typeof _test_to === 'string' && /^[\w.+-]+@ldrsgroup\.com$/i.test(_test_to);
+    const ownerEmail = isValidTestOverride
+      ? _test_to
+      : process.env.CONFERENCE_LEAD_OWNER_EMAIL || 'roi@ldrsgroup.com';
     const briefHtml = buildBriefHtml({
       fullName,
       businessName: companyName || (role ? `תפקיד: ${role}` : undefined),
