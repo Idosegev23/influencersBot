@@ -612,16 +612,26 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       if (intentMatch || countTrigger) {
         try {
           const submitted = sessionStorage.getItem('ldrs_conf_popup_submitted');
+          // If user already submitted details, never show again — they're done
+          if (submitted) return;
+
           const dismissed = localStorage.getItem(`ldrs_conf_popup_dismissed_${username}`);
-          const canShow =
-            !submitted &&
-            (!dismissed || Date.now() - parseInt(dismissed) > 86400000);
-          if (canShow) {
-            // Intent → faster, count-based → small delay so the bot starts replying first
-            const delay = intentMatch ? 600 : 1500;
-            setTimeout(() => setShowConferencePopup(true), delay);
-            return;
+          const dismissedRecent =
+            !!dismissed && Date.now() - parseInt(dismissed) <= 86400000;
+
+          // Count-only trigger respects the 24h dismissal cooldown.
+          // Intent trigger overrides it — user explicitly changed their mind.
+          if (!intentMatch && dismissedRecent) return;
+
+          // If intent fired and dismissal exists, clear it so future count-triggers also work
+          if (intentMatch && dismissedRecent) {
+            localStorage.removeItem(`ldrs_conf_popup_dismissed_${username}`);
           }
+
+          // Intent → faster, count-based → small delay so the bot starts replying first
+          const delay = intentMatch ? 600 : 1500;
+          setTimeout(() => setShowConferencePopup(true), delay);
+          return;
         } catch {}
       }
     }
