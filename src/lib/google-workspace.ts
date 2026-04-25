@@ -83,14 +83,20 @@ export async function sendBriefEmail(opts: {
     if (!raw) return false;
 
     const credentials = JSON.parse(raw.trim());
-    // Trim env-derived emails — Vercel UI sometimes preserves trailing newlines
-    // which Google Auth rejects with "Invalid impersonation sub field".
-    const fromEmail = (
+    // Strip ALL whitespace from env-derived emails. Vercel UI sometimes
+    // preserves trailing newlines, and even .trim() can miss embedded CR/LF.
+    // Google Auth rejects "Invalid impersonation sub field" for any whitespace.
+    const cleanEmail = (s: string) => s.replace(/[\s​‎‏﻿]+/g, '');
+    const fromEmail = cleanEmail(
       opts.fromEmail ||
-      process.env.GMAIL_SEND_FROM ||
-      process.env.LEADS_EMAIL_TO ||
-      'info@ldrsgroup.com'
-    ).trim();
+        process.env.GMAIL_SEND_FROM ||
+        process.env.LEADS_EMAIL_TO ||
+        'info@ldrsgroup.com'
+    );
+    if (!fromEmail) {
+      console.error('[google-workspace] fromEmail empty after cleaning');
+      return false;
+    }
 
     // Use JWT with subject (impersonation) for Gmail
     const jwtClient = new google.auth.JWT({
@@ -102,8 +108,8 @@ export async function sendBriefEmail(opts: {
 
     const gmail = google.gmail({ version: 'v1', auth: jwtClient });
 
-    // Trim recipient too — defensive against env-supplied recipient values
-    const toEmail = opts.to.trim();
+    // Strip whitespace from recipient too — defensive
+    const toEmail = cleanEmail(opts.to);
 
     // Build RFC 2822 message
     const messageParts = [

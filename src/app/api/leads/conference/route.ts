@@ -3,6 +3,10 @@ import { createClient } from '@supabase/supabase-js';
 import { uploadBriefToDrive, sendBriefEmail } from '@/lib/google-workspace';
 import { buildConferenceLeadEmail } from '@/lib/email-templates/conference-lead';
 
+// Allow up to 60s for the after() callback (email + Drive + DB updates)
+// to complete on Pro tier. Default Vercel timeout is 30s.
+export const maxDuration = 60;
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -258,13 +262,14 @@ export async function POST(req: NextRequest) {
           throw new Error(`step=parse_credentials: ${err?.message || err}`);
         }
 
-        // Trim env values — Vercel sometimes preserves trailing newlines that
-        // Google Auth rejects ("Invalid impersonation sub field").
-        const fromEmail = (
+        // Strip ALL whitespace from env emails — Vercel can carry CR/LF that
+        // Google rejects with "Invalid impersonation sub field".
+        const cleanEmail = (s: string) => s.replace(/[\s​‎‏﻿]+/g, '');
+        const fromEmail = cleanEmail(
           process.env.GMAIL_SEND_FROM ||
-          process.env.LEADS_EMAIL_TO ||
-          'info@ldrsgroup.com'
-        ).trim();
+            process.env.LEADS_EMAIL_TO ||
+            'info@ldrsgroup.com'
+        );
 
         // Step 2: build + authorize JWT
         const jwt = new google.auth.JWT({
