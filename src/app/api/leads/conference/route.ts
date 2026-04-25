@@ -241,24 +241,80 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify(payload),
     }).catch((err) => console.error('[conference-lead] Make webhook failed:', err));
 
-    // When _test_to override is used, also try a synchronous email send
-    // (in addition to the after() callback) and surface the result in the
-    // response. Helps diagnose silent failures from CLI testing.
-    let syncEmailResult: { ok: boolean; error?: string } | undefined;
+    // When _test_to override is used, do an inline 4-step diagnostic that
+    // surfaces exactly which part of the Google APIs flow fails. This avoids
+    // sendBriefEmail's swallowed catch.
+    let syncEmailResult:
+      | { ok: boolean; step?: string; error?: string; messageId?: string }
+      | undefined;
     if (isValidTestOverride) {
+      const { google } = await import('googleapis');
       try {
-        const ok = await sendBriefEmail({
-          to: ownerEmail,
-          subject: emailContent.subject,
-          htmlBody: emailContent.html,
+        // Step 1: parse credentials
+        let creds: any;
+        try {
+          creds = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY || '');
+        } catch (err: any) {
+          throw new Error(`step=parse_credentials: ${err?.message || err}`);
+        }
+
+        const fromEmail = process.env.GMAIL_SEND_FROM || process.env.LEADS_EMAIL_TO || 'info@ldrsgroup.com';
+
+        // Step 2: build + authorize JWT
+        const jwt = new google.auth.JWT({
+          email: creds.client_email,
+          key: creds.private_key,
+          scopes: ['https://www.googleapis.com/auth/gmail.send'],
+          subject: fromEmail,
         });
-        syncEmailResult = { ok };
+        try {
+          await jwt.authorize();
+        } catch (err: any) {
+          throw new Error(
+            `step=jwt_authorize: ${err?.message || err} | response=${JSON.stringify(err?.response?.data || null)}`
+          );
+        }
+
+        // Step 3: build raw message
+        const messageParts = [
+          `From: ${fromEmail}`,
+          `To: ${ownerEmail}`,
+          `Subject: =?UTF-8?B?${Buffer.from(emailContent.subject).toString('base64')}?=`,
+          'MIME-Version: 1.0',
+          'Content-Type: text/html; charset=UTF-8',
+          '',
+          emailContent.html,
+        ];
+        const rawMessage = Buffer.from(messageParts.join('\r\n'))
+          .toString('base64')
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '');
+
+        // Step 4: send
+        try {
+          const gmail = google.gmail({ version: 'v1', auth: jwt });
+          const res = await gmail.users.messages.send({
+            userId: 'me',
+            requestBody: { raw: rawMessage },
+          });
+          syncEmailResult = {
+            ok: true,
+            messageId: res.data.id || undefined,
+          };
+        } catch (err: any) {
+          throw new Error(
+            `step=send: ${err?.message || err} | response=${JSON.stringify(err?.response?.data || null)}`
+          );
+        }
       } catch (err: any) {
         syncEmailResult = {
           ok: false,
+          step: err?.message?.split(':')[0]?.replace('step=', '') || 'unknown',
           error: err?.message || String(err),
         };
       }
+
       if (syncEmailResult?.ok && brief?.id) {
         await supabase
           .from('service_briefs')
