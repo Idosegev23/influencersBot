@@ -117,6 +117,14 @@ function MiniBriefForm({
     if (!validate()) return;
     setSubmitting(true);
 
+    // Conference detection: visitors arriving with ?source=conf (the QR flow)
+    // get an additional fire-and-forget POST to the conference webhook so the
+    // lead also reaches the Make scenario / Roi. The original /api/briefs
+    // path stays untouched for everyone (Drive + email).
+    const isConferenceVisitor =
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('source') === 'conf';
+
     try {
       const res = await fetch('/api/briefs', {
         method: 'POST',
@@ -139,6 +147,35 @@ function MiniBriefForm({
 
       const data = await res.json();
       if (data.success) {
+        // Mirror to conference webhook (fire-and-forget, non-blocking)
+        if (isConferenceVisitor) {
+          fetch('/api/leads/conference', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              accountId,
+              sessionId: sessionId || undefined,
+              fullName: form.fullName.trim(),
+              phone: form.phone.trim(),
+              email: form.email.trim() || undefined,
+              companyName: form.businessName.trim() || undefined,
+              painPoint: form.productDescription.trim() || undefined,
+              primaryArea: form.goal || undefined,
+              readiness: form.budgetRange || undefined,
+              preferredProduct: service.name,
+              hasDefinedPain: !!form.productDescription.trim(),
+              sourceParam: 'conf',
+              utmSource: 'qr_code',
+              utmMedium: 'conference',
+              utmCampaign: 'innovation_conf_2026',
+              landingUrl: window.location.href,
+              referrer: document.referrer || undefined,
+              userAgent: navigator.userAgent,
+              platform: window.innerWidth < 768 ? 'mobile' : 'desktop',
+              locale: 'he-IL',
+            }),
+          }).catch((err) => console.error('Conference webhook mirror failed:', err));
+        }
         onSubmitted(form);
       }
     } catch (err) {
