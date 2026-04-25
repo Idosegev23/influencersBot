@@ -154,24 +154,50 @@ function parseSuggestions(text: string): { cleanText: string; suggestions: strin
 
 /**
  * Detect meeting-scheduling intent in a user message.
- * When matched, the lead-capture popup is triggered immediately
- * (not waiting for the message-count threshold).
+ * Uses logical combinations of word categories — robust to punctuation,
+ * "ל" prefix on nouns, word order variations.
+ *
+ * Match if ANY of:
+ *  - explicit phrase ("בוא נקבע", "תקבעו לי", "let's meet")
+ *  - schedule-verb + meeting-noun anywhere
+ *  - want-verb + meeting-noun anywhere
+ *  - positive + schedule-verb anywhere
+ *  - "when" + "אפשר להיפגש/לדבר"
  */
-const MEETING_INTENT_KEYWORDS = [
-  'בואו נקבע', 'בוא נקבע', 'בואי נקבע',
-  'נקבע פגישה', 'נקבע שיחה', 'נקבע',
-  'אני רוצה פגישה', 'רוצה פגישה',
-  'תקבע פגישה', 'תקבעו פגישה', 'תקבעו לי',
-  'מתי אפשר להיפגש', 'מתי תוכלו', 'מתי נוכל',
-  'מעוניין בפגישה', 'מעוניינת בפגישה',
-  'אוקי בוא', 'אוקי תקבע', 'אוקי נקבע',
-  'מתאים לי לדבר', 'בוא נדבר',
-  'book a meeting', 'schedule a call', 'set up a meeting', "let's meet", "let's schedule",
+const SCHEDULE_VERB_RE = /(?:נקבע|לקבוע|לתאם|תקבע|תקבעו|לקבע|להזמין|תזמן|book|schedule|set\s?up)/u;
+const MEETING_NOUN_RE = /(?:פגישה|פגישת|שיחה|שיחת|זמן|meeting|call|chat|appointment)/u;
+const WANT_VERB_RE = /(?:רוצה|רוצים|רוצות|מעוניינ|נשמח|נרצה|want|need)/u;
+// Note: \b doesn't work with Hebrew chars in JS regex — use non-Hebrew lookaround for "כן"
+const POSITIVE_RE = /(?:אוקי|בסדר|מעולה|יאללה|אהבתי|נשמע\s*טוב|סבבה|מצוין|(?<![֐-׿])כן(?![֐-׿])|sure|yes|\bok\b|\bokay\b)/u;
+const TIME_Q_RE = /(?:מתי|איך|when)/u;
+const REACH_RE = /(?:להיפגש|אפשר\s*לדבר|נוכל\s*לדבר|תוכלו\s*לדבר|אפשר\s*לקבוע)/u;
+const EXPLICIT_PHRASES = [
+  /(?:בוא|בואי|בואו)\s+(?:נקבע|לקבוע|נדבר|נתאם)/u,
+  /(?:תקבע|תקבעו)\s+לי/u,
+  /\blet'?s\s+(?:meet|schedule|talk|book)\b/i,
 ];
+
 function detectsMeetingIntent(text: string): boolean {
   if (!text) return false;
   const lower = text.toLowerCase();
-  return MEETING_INTENT_KEYWORDS.some((k) => lower.includes(k.toLowerCase()));
+
+  // Explicit short phrases
+  if (EXPLICIT_PHRASES.some((re) => re.test(lower))) return true;
+
+  const hasSchedule = SCHEDULE_VERB_RE.test(lower);
+  const hasNoun = MEETING_NOUN_RE.test(lower);
+  const hasWant = WANT_VERB_RE.test(lower);
+  const hasPos = POSITIVE_RE.test(lower);
+  const hasTimeQ = TIME_Q_RE.test(lower);
+  const hasReach = REACH_RE.test(lower);
+
+  // Combinations
+  if (hasSchedule && hasNoun) return true;
+  if (hasWant && hasNoun) return true;
+  if (hasPos && hasSchedule) return true;
+  if (hasTimeQ && hasReach) return true;
+
+  return false;
 }
 
 export default function ChatbotPage({ params }: { params: Promise<{ username: string }> }) {
