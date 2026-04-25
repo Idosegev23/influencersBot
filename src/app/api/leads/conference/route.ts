@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { uploadBriefToDrive, sendBriefEmail, buildBriefHtml } from '@/lib/google-workspace';
+import { uploadBriefToDrive, sendBriefEmail } from '@/lib/google-workspace';
+import { buildConferenceLeadEmail } from '@/lib/email-templates/conference-lead';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -162,36 +163,28 @@ export async function POST(req: NextRequest) {
       },
     };
 
-    // Build a friendly HTML body that lists everything we know about the lead
-    // Internal test override: a request can include _test_to (must be an
-    // @ldrsgroup.com address) to redirect the email — used to preview the
-    // template in arbitrary inboxes without touching env vars.
+    // Build the branded HTML email body
     const _test_to = body._test_to as string | undefined;
     const isValidTestOverride =
       typeof _test_to === 'string' && /^[\w.+-]+@ldrsgroup\.com$/i.test(_test_to);
     const ownerEmail = isValidTestOverride
       ? _test_to
       : process.env.CONFERENCE_LEAD_OWNER_EMAIL || 'roi@ldrsgroup.com';
-    const briefHtml = buildBriefHtml({
+
+    const emailContent = buildConferenceLeadEmail({
       fullName,
-      businessName: companyName || (role ? `תפקיד: ${role}` : undefined),
-      email: email || undefined,
       phone,
-      serviceName: preferredProduct
-        ? `${preferredProduct} (ליד מהכנס — AI להיות או לא להיות, 30.4)`
-        : 'ליד מהכנס — AI להיות או לא להיות, 30.4',
-      productDescription: painPoint || currentAiUsage || undefined,
-      goal: primaryArea || undefined,
-      budgetRange: readiness || undefined,
-      notes: botSummary || lastUserMessage
-        ? [
-            botSummary && `סיכום שיחה: ${botSummary}`,
-            lastUserMessage && `הודעה אחרונה: ${lastUserMessage}`,
-            chatUrl && `שיחה: ${chatUrl}`,
-          ]
-            .filter(Boolean)
-            .join('\n')
-        : chatUrl,
+      email: email || null,
+      companyName: companyName || null,
+      role: role || null,
+      preferredProduct: preferredProduct || null,
+      primaryArea: primaryArea || null,
+      currentAiUsage: currentAiUsage || null,
+      painPoint: painPoint || null,
+      readiness: readiness || null,
+      lastUserMessage: lastUserMessage || null,
+      botSummary: botSummary || null,
+      chatUrl,
       createdAt: brief?.created_at,
     });
 
@@ -206,8 +199,8 @@ export async function POST(req: NextRequest) {
       try {
         const ok = await sendBriefEmail({
           to: ownerEmail,
-          subject: `ליד חדש מהכנס: ${fullName}${preferredProduct ? ` — ${preferredProduct}` : ''}`,
-          htmlBody: briefHtml,
+          subject: emailContent.subject,
+          htmlBody: emailContent.html,
         });
         console.log(`[conference-lead] sendBriefEmail result | ok=${ok}`);
         if (ok && brief?.id) {
@@ -223,7 +216,7 @@ export async function POST(req: NextRequest) {
       try {
         const driveRes = await uploadBriefToDrive({
           title: `ליד מהכנס — ${fullName}${preferredProduct ? ` — ${preferredProduct}` : ''} — ${new Date().toLocaleDateString('he-IL')}`,
-          htmlBody: briefHtml,
+          htmlBody: emailContent.html,
         });
         console.log(`[conference-lead] uploadBriefToDrive ok | fileId=${driveRes.fileId}`);
         if (brief?.id) {
@@ -248,6 +241,32 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify(payload),
     }).catch((err) => console.error('[conference-lead] Make webhook failed:', err));
 
+    // When _test_to override is used, also try a synchronous email send
+    // (in addition to the after() callback) and surface the result in the
+    // response. Helps diagnose silent failures from CLI testing.
+    let syncEmailResult: { ok: boolean; error?: string } | undefined;
+    if (isValidTestOverride) {
+      try {
+        const ok = await sendBriefEmail({
+          to: ownerEmail,
+          subject: emailContent.subject,
+          htmlBody: emailContent.html,
+        });
+        syncEmailResult = { ok };
+      } catch (err: any) {
+        syncEmailResult = {
+          ok: false,
+          error: err?.message || String(err),
+        };
+      }
+      if (syncEmailResult?.ok && brief?.id) {
+        await supabase
+          .from('service_briefs')
+          .update({ email_sent: true })
+          .eq('id', brief.id);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       leadId,
@@ -260,7 +279,10 @@ export async function POST(req: NextRequest) {
               LEADS_EMAIL_TO: !!process.env.LEADS_EMAIL_TO,
               CONFERENCE_LEAD_OWNER_EMAIL: !!process.env.CONFERENCE_LEAD_OWNER_EMAIL,
               MAKE_CONFERENCE_WEBHOOK_URL: !!process.env.MAKE_CONFERENCE_WEBHOOK_URL,
+              GOOGLE_SERVICE_ACCOUNT_KEY_length: process.env.GOOGLE_SERVICE_ACCOUNT_KEY?.length || 0,
+              GOOGLE_SERVICE_ACCOUNT_KEY_starts: process.env.GOOGLE_SERVICE_ACCOUNT_KEY?.slice(0, 30) || null,
             },
+            syncEmailAttempt: syncEmailResult,
           }
         : undefined,
     });
