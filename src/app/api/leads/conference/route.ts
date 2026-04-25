@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { uploadBriefToDrive, sendBriefEmail, buildBriefHtml } from '@/lib/google-workspace';
 
@@ -195,14 +195,11 @@ export async function POST(req: NextRequest) {
       createdAt: brief?.created_at,
     });
 
-    // Direct email to Roi via Google service account.
-    // sendBriefEmail returns boolean (true on success, false on any failure).
-    // We await + log the result so DB email_sent reflects reality and we can
-    // diagnose silent failures (the most common cause is missing
-    // domain-wide delegation for ldrsgroup.com or missing
-    // GOOGLE_SERVICE_ACCOUNT_KEY env var on Vercel).
-    (async () => {
-      const hasServiceAccountKey = !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+    // Use Next.js `after` hook so the email + drive work is guaranteed to
+    // complete even after the response has been sent (Vercel lambdas may
+    // otherwise terminate fire-and-forget async work before it finishes).
+    const hasServiceAccountKey = !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+    after(async () => {
       console.log(
         `[conference-lead] sendBriefEmail starting | to=${ownerEmail} | service_account_key_present=${hasServiceAccountKey}`
       );
@@ -241,7 +238,7 @@ export async function POST(req: NextRequest) {
       } catch (err) {
         console.error('[conference-lead] uploadBriefToDrive threw:', err);
       }
-    })();
+    });
 
     // Make webhook (kept for Sheets / future workflows — direct email is the
     // primary delivery path now, Make is redundancy)
@@ -254,6 +251,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       leadId,
+      // Diagnostics — visible only when _test_to override is used (internal calls)
+      _diag: isValidTestOverride
+        ? {
+            ownerEmail,
+            envFlags: {
+              GOOGLE_SERVICE_ACCOUNT_KEY: hasServiceAccountKey,
+              LEADS_EMAIL_TO: !!process.env.LEADS_EMAIL_TO,
+              CONFERENCE_LEAD_OWNER_EMAIL: !!process.env.CONFERENCE_LEAD_OWNER_EMAIL,
+              MAKE_CONFERENCE_WEBHOOK_URL: !!process.env.MAKE_CONFERENCE_WEBHOOK_URL,
+            },
+          }
+        : undefined,
     });
   } catch (err) {
     console.error('[conference-lead] Unexpected error:', err);
