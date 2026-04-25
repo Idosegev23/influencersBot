@@ -49,6 +49,7 @@ import { NavTabs } from '@/components/chat/NavTabs';
 import { StarterPills } from '@/components/chat/StarterPills';
 import SupportForm from '@/components/SupportForm';
 import { LeadCapturePopup } from '@/components/chat/LeadCapturePopup';
+import { ConferenceLeadPopup } from '@/components/chat/ConferenceLeadPopup';
 import type { Influencer, ContentItem, InfluencerType } from '@/types';
 
 // Feature flag for streaming
@@ -202,6 +203,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [discoveryCategories, setDiscoveryCategories] = useState<DiscoveryCategoryAvailability[]>([]);
   const [initialDiscoverySlug, setInitialDiscoverySlug] = useState<string | null>(null);
   const [showLeadPopup, setShowLeadPopup] = useState(false);
+  const [showConferencePopup, setShowConferencePopup] = useState(false);
   const [leadInfo, setLeadInfo] = useState<{ firstName: string; serialNumber: string } | null>(null);
   const [topicSuggestions, setTopicSuggestions] = useState<string[]>([]);
   const [quickReplies, setQuickReplies] = useState<string[]>([]);
@@ -547,6 +549,29 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   // Lead capture trigger helper — shared by all message-send paths
   const maybeShowLeadPopup = () => {
     userMsgCountRef.current++;
+
+    // Conference popup: trigger after 3 user messages for QR-flow visitors only.
+    // Once dismissed or submitted, suppressed for 24h via localStorage / session.
+    if (
+      isConferenceMode &&
+      username === 'ldrs_group' &&
+      userMsgCountRef.current >= 3 &&
+      !showConferencePopup
+    ) {
+      try {
+        const submitted = sessionStorage.getItem('ldrs_conf_popup_submitted');
+        const dismissed = localStorage.getItem(`ldrs_conf_popup_dismissed_${username}`);
+        const canShow =
+          !submitted &&
+          (!dismissed || Date.now() - parseInt(dismissed) > 86400000);
+        if (canShow) {
+          setTimeout(() => setShowConferencePopup(true), 1500);
+          return;
+        }
+      } catch {}
+    }
+
+    // Regular lead popup: 4+ messages, non-conference visitors
     if (userMsgCountRef.current >= 4 && !leadInfo && !showLeadPopup) {
       try {
         const dismissed = localStorage.getItem(`chat_lead_dismissed_${username}`);
@@ -1903,6 +1928,26 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
 
         {/* Desktop: Help icon bottom-left (Figma) */}
         {/* Help button removed — support accessible via bottom nav tab */}
+
+        {/* Conference Lead Popup — QR-flow visitors after 3 messages */}
+        {showConferencePopup && influencer?.id && (
+          <ConferenceLeadPopup
+            accountId={influencer.id}
+            sessionId={sessionId}
+            onClose={() => {
+              setShowConferencePopup(false);
+              try {
+                localStorage.setItem(
+                  `ldrs_conf_popup_dismissed_${username}`,
+                  Date.now().toString()
+                );
+              } catch {}
+            }}
+            onSubmitted={() => {
+              setShowConferencePopup(false);
+            }}
+          />
+        )}
 
         {/* Lead Capture Popup */}
         {showLeadPopup && (
