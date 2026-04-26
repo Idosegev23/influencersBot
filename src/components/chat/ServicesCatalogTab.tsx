@@ -1,6 +1,31 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  X,
+  Loader2,
+  CheckCircle2,
+  ChevronLeft,
+  Mic,
+  Network,
+  LayoutDashboard,
+  Workflow,
+  Zap,
+  PenLine,
+  TrendingUp,
+  Megaphone,
+  Video,
+  Radio,
+  BarChart3,
+  Hash,
+  Tv,
+  Star,
+  MessageCircle,
+  FileText,
+  Sparkles,
+  type LucideIcon,
+} from 'lucide-react';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -12,6 +37,8 @@ interface Service {
   name_he?: string | null;
   description: string;
   category: string;
+  subcategory?: string | null;
+  product_line?: string | null;
   product_url?: string;
   priority?: number | null;
 }
@@ -24,45 +51,46 @@ interface ServicesCatalogTabProps {
 }
 
 // ---------------------------------------------------------------------------
-// Service icon mapping
+// Icon mapping — lucide-react (no font dependency)
 // ---------------------------------------------------------------------------
 
-const SERVICE_ICONS: Record<string, string> = {
-  'Content Creation': 'edit_note',
-  'SEO': 'trending_up',
-  'Paid Social Advertising': 'ads_click',
-  'Video Production': 'movie',
-  'Podcast Production': 'mic',
-  'Performance Marketing / PPC': 'search_insights',
-  'Social Media Management': 'group_work',
-  'Television Advertising': 'tv',
-  'Influencer Marketing': 'campaign',
-  'NewVoices': 'record_voice_over',
-  'Influencer Marketing AI': 'hub',
-  'Leaders Platform': 'dashboard_customize',
-  'AI Implementation': 'settings_suggest',
-  'AI Automations': 'bolt',
+const ICON_MAP: Record<string, LucideIcon> = {
+  // AI products
+  NewVoices: Mic,
+  'Influencer Marketing AI': Network,
+  'Leaders Platform': LayoutDashboard,
+  'AI Implementation': Workflow,
+  'AI Automations': Zap,
+  // Classic services
+  'Content Creation': PenLine,
+  SEO: TrendingUp,
+  'Paid Social Advertising': Megaphone,
+  'Video Production': Video,
+  'Podcast Production': Radio,
+  'Performance Marketing / PPC': BarChart3,
+  'Social Media Management': Hash,
+  'Television Advertising': Tv,
+  'Influencer Marketing': Star,
 };
 
+function resolveIcon(name: string): LucideIcon {
+  return ICON_MAP[name] || Sparkles;
+}
+
+function isAIService(svc: Service): boolean {
+  return (
+    svc.subcategory === 'ai' ||
+    svc.product_line === 'ai' ||
+    !!svc.name.match(/\b(AI|NewVoices|IMAI|Leaders Platform)\b/i)
+  );
+}
+
 // ---------------------------------------------------------------------------
-// Mini-Brief Form (white bg, black accents)
+// MiniBriefForm — keeps existing /api/briefs flow + conference mirror
 // ---------------------------------------------------------------------------
 
-const GOALS = [
-  'מודעות למותג',
-  'הגדלת מכירות',
-  'חדירה לשוק חדש',
-  'בניית קהילה',
-  'אחר',
-];
-
-const BUDGETS = [
-  'עד ₪5,000',
-  '₪5,000 – ₪15,000',
-  '₪15,000 – ₪50,000',
-  '₪50,000+',
-  'לא בטוח/ה',
-];
+const GOALS = ['מודעות למותג', 'הגדלת מכירות', 'חדירה לשוק חדש', 'בניית קהילה', 'אחר'];
+const BUDGETS = ['עד ₪5,000', '₪5,000 – ₪15,000', '₪15,000 – ₪50,000', '₪50,000+', 'לא בטוח/ה'];
 
 function MiniBriefForm({
   service,
@@ -89,22 +117,25 @@ function MiniBriefForm({
     budgetRange: '',
     notes: '',
   });
-
   const [errors, setErrors] = useState<Record<string, string>>({});
+
   const set = (key: string, val: string) => {
     setForm((p) => ({ ...p, [key]: val }));
-    if (errors[key]) setErrors((p) => { const n = { ...p }; delete n[key]; return n; });
+    if (errors[key]) {
+      setErrors((p) => {
+        const n = { ...p };
+        delete n[key];
+        return n;
+      });
+    }
   };
 
   function validate(): boolean {
     const e: Record<string, string> = {};
     if (!form.fullName.trim()) e.fullName = 'שדה חובה';
-    if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+    if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()))
       e.email = 'אימייל לא תקין';
-    }
-    if (form.phone.trim() && !/^[\d\-+() ]{7,15}$/.test(form.phone.trim())) {
-      e.phone = 'מספר לא תקין';
-    }
+    if (form.phone.trim() && !/^[\d\-+() ]{7,15}$/.test(form.phone.trim())) e.phone = 'מספר לא תקין';
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -117,10 +148,6 @@ function MiniBriefForm({
     if (!validate()) return;
     setSubmitting(true);
 
-    // Conference detection: visitors arriving with ?source=conf (the QR flow)
-    // get an additional fire-and-forget POST to the conference webhook so the
-    // lead also reaches the Make scenario / Roi. The original /api/briefs
-    // path stays untouched for everyone (Drive + email).
     const isConferenceVisitor =
       typeof window !== 'undefined' &&
       new URLSearchParams(window.location.search).get('source') === 'conf';
@@ -144,10 +171,8 @@ function MiniBriefForm({
           sessionId: sessionId || undefined,
         }),
       });
-
       const data = await res.json();
       if (data.success) {
-        // Mirror to conference webhook (fire-and-forget, non-blocking)
         if (isConferenceVisitor) {
           fetch('/api/leads/conference', {
             method: 'POST',
@@ -186,10 +211,15 @@ function MiniBriefForm({
   }
 
   const inputClasses =
-    'w-full px-4 py-3 rounded-xl text-sm bg-white border border-[#E0E0E0] text-black placeholder-[#999] focus:border-black focus:ring-1 focus:ring-black outline-none transition-colors';
+    'w-full h-[50px] px-5 rounded-full text-[15px] outline-none transition-all focus:ring-2 focus:ring-pink-500/20';
+  const inputStyle = {
+    backgroundColor: '#f4f5f7',
+    color: '#0c1013',
+    border: '1px solid #e5e5ea',
+  };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" style={{ direction: 'rtl' }}>
       {/* Step indicator */}
       <div className="flex items-center gap-2 mb-5 px-1">
         {[1, 2].map((s) => (
@@ -197,16 +227,24 @@ function MiniBriefForm({
             <div
               className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors"
               style={{
-                background: step >= s ? '#000' : '#E0E0E0',
-                color: step >= s ? '#fff' : '#999',
+                background: step >= s ? '#db2777' : '#f4f5f7',
+                color: step >= s ? '#fff' : '#9aa3b0',
               }}
             >
               {step > s ? '✓' : s}
             </div>
-            <span className="text-xs font-medium" style={{ color: step >= s ? '#000' : '#999' }}>
+            <span
+              className="text-xs font-medium"
+              style={{ color: step >= s ? '#0c1013' : '#9aa3b0' }}
+            >
               {s === 1 ? 'פרטים' : 'על הפרויקט'}
             </span>
-            {s < 2 && <div className="flex-1 h-0.5 rounded" style={{ background: step > s ? '#000' : '#E0E0E0' }} />}
+            {s < 2 && (
+              <div
+                className="flex-1 h-0.5 rounded transition-colors"
+                style={{ background: step > s ? '#db2777' : '#f4f5f7' }}
+              />
+            )}
           </div>
         ))}
       </div>
@@ -220,9 +258,12 @@ function MiniBriefForm({
               value={form.fullName}
               onChange={(e) => set('fullName', e.target.value)}
               className={`${inputClasses} ${errors.fullName ? '!border-red-500' : ''}`}
+              style={inputStyle}
               autoFocus
             />
-            {errors.fullName && <p className="text-red-500 text-[11px] mt-1 px-1">{errors.fullName}</p>}
+            {errors.fullName && (
+              <p className="text-red-500 text-[11px] mt-1 px-3">{errors.fullName}</p>
+            )}
           </div>
           <input
             type="text"
@@ -230,6 +271,7 @@ function MiniBriefForm({
             value={form.businessName}
             onChange={(e) => set('businessName', e.target.value)}
             className={inputClasses}
+            style={inputStyle}
           />
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -239,9 +281,11 @@ function MiniBriefForm({
                 value={form.email}
                 onChange={(e) => set('email', e.target.value)}
                 className={`${inputClasses} ${errors.email ? '!border-red-500' : ''}`}
-                style={{ direction: 'ltr' }}
+                style={{ ...inputStyle, direction: 'ltr', textAlign: 'right' }}
               />
-              {errors.email && <p className="text-red-500 text-[11px] mt-1 px-1">{errors.email}</p>}
+              {errors.email && (
+                <p className="text-red-500 text-[11px] mt-1 px-3">{errors.email}</p>
+              )}
             </div>
             <div>
               <input
@@ -250,9 +294,11 @@ function MiniBriefForm({
                 value={form.phone}
                 onChange={(e) => set('phone', e.target.value)}
                 className={`${inputClasses} ${errors.phone ? '!border-red-500' : ''}`}
-                style={{ direction: 'ltr' }}
+                style={{ ...inputStyle, direction: 'ltr', textAlign: 'right' }}
               />
-              {errors.phone && <p className="text-red-500 text-[11px] mt-1 px-1">{errors.phone}</p>}
+              {errors.phone && (
+                <p className="text-red-500 text-[11px] mt-1 px-3">{errors.phone}</p>
+              )}
             </div>
           </div>
         </div>
@@ -263,22 +309,27 @@ function MiniBriefForm({
             value={form.productDescription}
             onChange={(e) => set('productDescription', e.target.value)}
             rows={2}
-            className={`${inputClasses} resize-none`}
+            className="w-full px-5 py-3 rounded-2xl text-[15px] outline-none transition-all focus:ring-2 focus:ring-pink-500/20 resize-none"
+            style={inputStyle}
           />
-
           <div>
-            <label className="block text-xs font-semibold mb-2 text-[#666]">מה המטרה העיקרית?</label>
+            <label
+              className="block text-xs font-semibold mb-2 px-1"
+              style={{ color: '#676767' }}
+            >
+              מה המטרה העיקרית?
+            </label>
             <div className="flex flex-wrap gap-2">
               {GOALS.map((g) => (
                 <button
                   key={g}
                   type="button"
                   onClick={() => set('goal', form.goal === g ? '' : g)}
-                  className="px-3 py-1.5 rounded-full text-xs font-medium border transition-colors"
+                  className="px-4 py-2 rounded-full text-xs font-medium border transition-all active:scale-[0.98]"
                   style={{
-                    borderColor: form.goal === g ? '#000' : '#E0E0E0',
-                    background: form.goal === g ? '#000' : '#fff',
-                    color: form.goal === g ? '#fff' : '#000',
+                    borderColor: form.goal === g ? '#db2777' : '#e5e5ea',
+                    background: form.goal === g ? '#db2777' : '#fff',
+                    color: form.goal === g ? '#fff' : '#0c1013',
                   }}
                 >
                   {g}
@@ -286,20 +337,24 @@ function MiniBriefForm({
               ))}
             </div>
           </div>
-
           <div>
-            <label className="block text-xs font-semibold mb-2 text-[#666]">תקציב משוער</label>
+            <label
+              className="block text-xs font-semibold mb-2 px-1"
+              style={{ color: '#676767' }}
+            >
+              תקציב משוער
+            </label>
             <div className="flex flex-wrap gap-2">
               {BUDGETS.map((b) => (
                 <button
                   key={b}
                   type="button"
                   onClick={() => set('budgetRange', form.budgetRange === b ? '' : b)}
-                  className="px-3 py-1.5 rounded-full text-xs font-medium border transition-colors"
+                  className="px-4 py-2 rounded-full text-xs font-medium border transition-all active:scale-[0.98]"
                   style={{
-                    borderColor: form.budgetRange === b ? '#000' : '#E0E0E0',
-                    background: form.budgetRange === b ? '#000' : '#fff',
-                    color: form.budgetRange === b ? '#fff' : '#000',
+                    borderColor: form.budgetRange === b ? '#db2777' : '#e5e5ea',
+                    background: form.budgetRange === b ? '#db2777' : '#fff',
+                    color: form.budgetRange === b ? '#fff' : '#0c1013',
                   }}
                 >
                   {b}
@@ -307,30 +362,31 @@ function MiniBriefForm({
               ))}
             </div>
           </div>
-
           <textarea
-            placeholder="עוד משהו חשוב שנדע? (אופציונלי)"
+            placeholder="עוד משהו חשוב? (אופציונלי)"
             value={form.notes}
             onChange={(e) => set('notes', e.target.value)}
             rows={2}
-            className={`${inputClasses} resize-none`}
+            className="w-full px-5 py-3 rounded-2xl text-[15px] outline-none transition-all focus:ring-2 focus:ring-pink-500/20 resize-none"
+            style={inputStyle}
           />
         </div>
       )}
 
-      {/* Navigation buttons */}
-      <div className="flex gap-3 mt-4 pt-3 border-t border-[#E0E0E0]">
+      <div className="flex gap-2 mt-4 pt-3" style={{ borderTop: '1px solid #f0f3f7' }}>
         {step === 1 ? (
           <>
             <button
               onClick={onCancel}
-              className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-[#E0E0E0] text-[#666] hover:bg-[#F5F5F5] transition-colors"
+              className="px-5 py-3 rounded-full text-sm font-medium transition-colors hover:bg-zinc-50"
+              style={{ border: '1px solid #e5e5ea', color: '#676767' }}
             >
               ביטול
             </button>
             <button
               onClick={handleNext}
-              className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-black text-white hover:bg-[#222] transition-colors"
+              className="flex-1 h-[50px] rounded-full text-[15px] font-semibold text-white transition-all hover:opacity-90"
+              style={{ background: '#0c1013' }}
             >
               המשך →
             </button>
@@ -339,23 +395,18 @@ function MiniBriefForm({
           <>
             <button
               onClick={() => setStep(1)}
-              className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-[#E0E0E0] text-[#666] hover:bg-[#F5F5F5] transition-colors"
+              className="px-5 py-3 rounded-full text-sm font-medium transition-colors hover:bg-zinc-50"
+              style={{ border: '1px solid #e5e5ea', color: '#676767' }}
             >
               ← חזרה
             </button>
             <button
               onClick={handleSubmit}
               disabled={submitting}
-              className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-black text-white hover:bg-[#222] transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+              className="flex-1 h-[50px] rounded-full text-[15px] font-semibold text-white disabled:opacity-60 flex items-center justify-center gap-2 transition-all hover:opacity-90"
+              style={{ background: '#0c1013' }}
             >
-              {submitting ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>שולח...</span>
-                </>
-              ) : (
-                'שלח בריף'
-              )}
+              {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'שלח בריף'}
             </button>
           </>
         )}
@@ -365,7 +416,7 @@ function MiniBriefForm({
 }
 
 // ---------------------------------------------------------------------------
-// Service Detail Modal (white bg, black accents)
+// Service Modal
 // ---------------------------------------------------------------------------
 
 function ServiceModal({
@@ -377,7 +428,6 @@ function ServiceModal({
   onAskAbout,
 }: {
   service: Service;
-  colorIndex: number;
   accountId: string;
   sessionId?: string | null;
   enableBrief?: boolean;
@@ -386,115 +436,319 @@ function ServiceModal({
 }) {
   const [showBrief, setShowBrief] = useState(false);
   const [briefSubmitted, setBriefSubmitted] = useState(false);
-  const icon = SERVICE_ICONS[service.name] || 'handshake';
+  const Icon = resolveIcon(service.name);
+  const ai = isAIService(service);
   const displayName = service.name_he || service.name;
 
   function handleAsk() {
-    const question = `ספרו לי על שירות ${displayName}`;
-    const context = `[הקשר השירות:]\nשם: ${displayName}${service.name_he ? ` (${service.name})` : ''}\nתיאור: ${service.description}`;
+    const question = `ספרו לי על ${displayName}`;
+    const context = `[הקשר השירות:]\nשם: ${service.name}${
+      service.name_he ? ` (${service.name_he})` : ''
+    }\nתיאור: ${service.description}`;
     onAskAbout(question, context);
     onClose();
   }
 
-  function handleBriefSubmitted(form: Record<string, string>) {
+  function handleSubmitted(form: Record<string, string>) {
     setBriefSubmitted(true);
     setTimeout(() => {
       const question = `שלחתי בריף לגבי ${displayName}`;
-      const context = `[בריף שנשלח:]\nשירות: ${displayName}\nשם: ${form.fullName}\nעסק: ${form.businessName || 'לא צוין'}\nמטרה: ${form.goal || 'לא צוינה'}\nתקציב: ${form.budgetRange || 'לא צוין'}`;
+      const context = `[בריף שנשלח:]\nשירות: ${displayName}\nשם: ${form.fullName}${
+        form.businessName ? `\nעסק: ${form.businessName}` : ''
+      }${form.goal ? `\nמטרה: ${form.goal}` : ''}${
+        form.budgetRange ? `\nתקציב: ${form.budgetRange}` : ''
+      }`;
       onAskAbout(question, context);
       onClose();
     }, 2000);
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
+      >
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+
+        <motion.div
+          initial={{ y: 60, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 60, opacity: 0 }}
+          transition={{ type: 'spring', damping: 26, stiffness: 320 }}
+          className="relative w-full sm:max-w-md max-h-[90vh] bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden flex flex-col shadow-2xl"
+          style={{ direction: 'rtl' }}
+        >
+          {/* Header with gradient hero */}
+          <div
+            className="relative px-6 pt-6 pb-5"
+            style={{
+              background: ai
+                ? 'linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%)'
+                : '#fafbfc',
+            }}
+          >
+            {ai && (
+              <span
+                className="inline-block text-[10px] font-bold tracking-widest uppercase px-2 py-1 rounded-full mb-3"
+                style={{ background: '#db2777', color: '#fff' }}
+              >
+                AI · LDRS
+              </span>
+            )}
+            <div className="flex items-start gap-4">
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm"
+                style={{
+                  background: ai ? '#fff' : '#fff',
+                  border: ai ? '1px solid #fbcfe8' : '1px solid #eef1f5',
+                }}
+              >
+                <Icon
+                  className="w-6 h-6"
+                  style={{ color: ai ? '#db2777' : '#0c1013' }}
+                  strokeWidth={1.75}
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-[19px] font-bold leading-tight" style={{ color: '#0c1013' }}>
+                  {displayName}
+                </h3>
+                <p className="text-[13px] mt-1.5 leading-relaxed" style={{ color: '#676767' }}>
+                  {service.description}
+                </p>
+              </div>
+              <button
+                onClick={onClose}
+                className="w-8 h-8 rounded-full flex items-center justify-center transition-colors hover:bg-black/5 flex-shrink-0"
+                aria-label="סגור"
+              >
+                <X className="w-4 h-4" style={{ color: '#676767' }} />
+              </button>
+            </div>
+          </div>
+
+          {/* Body */}
+          <div className="px-6 py-5 flex-1 overflow-y-auto">
+            {briefSubmitted ? (
+              <div className="text-center py-6">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', damping: 15 }}
+                >
+                  <CheckCircle2
+                    className="w-14 h-14 mx-auto mb-4"
+                    style={{ color: '#34c759' }}
+                    strokeWidth={1.5}
+                  />
+                </motion.div>
+                <h4 className="text-[18px] font-bold mb-1" style={{ color: '#0c1013' }}>
+                  הבריף נשלח!
+                </h4>
+                <p className="text-[14px]" style={{ color: '#676767' }}>
+                  נחזור אליך בהקדם
+                </p>
+              </div>
+            ) : showBrief ? (
+              <MiniBriefForm
+                service={service}
+                accountId={accountId}
+                sessionId={sessionId}
+                onSubmitted={handleSubmitted}
+                onCancel={() => setShowBrief(false)}
+              />
+            ) : (
+              <div className="space-y-3">
+                <button
+                  onClick={handleAsk}
+                  className="w-full flex items-center gap-3 p-4 rounded-2xl transition-all text-right active:scale-[0.99]"
+                  style={{
+                    background: '#fafbfc',
+                    border: '1px solid #eef1f5',
+                  }}
+                >
+                  <div
+                    className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{ background: '#fdf2f8' }}
+                  >
+                    <MessageCircle
+                      className="w-5 h-5"
+                      style={{ color: '#db2777' }}
+                      strokeWidth={1.75}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-[14px]" style={{ color: '#0c1013' }}>
+                      שאל אותי על השירות
+                    </div>
+                    <div className="text-[12px] mt-0.5" style={{ color: '#676767' }}>
+                      תשובות מדויקות מתוך מאות פרויקטים
+                    </div>
+                  </div>
+                  <ChevronLeft
+                    className="w-4 h-4 flex-shrink-0"
+                    style={{ color: '#9aa3b0' }}
+                  />
+                </button>
+
+                {enableBrief && (
+                  <button
+                    onClick={() => setShowBrief(true)}
+                    className="w-full flex items-center gap-3 p-4 rounded-2xl text-right active:scale-[0.99] transition-all hover:opacity-90"
+                    style={{
+                      background: '#0c1013',
+                      color: '#fff',
+                    }}
+                  >
+                    <div
+                      className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ background: 'rgba(255,255,255,0.1)' }}
+                    >
+                      <FileText className="w-5 h-5" strokeWidth={1.75} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-[14px]">השאר פרטים לבריף</div>
+                      <div className="text-[12px] mt-0.5" style={{ opacity: 0.7 }}>
+                        טופס קצר ונחזור אליך עם הצעה
+                      </div>
+                    </div>
+                    <ChevronLeft
+                      className="w-4 h-4 flex-shrink-0"
+                      style={{ opacity: 0.7 }}
+                    />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Service Card
+// ---------------------------------------------------------------------------
+
+function ServiceCard({
+  svc,
+  onClick,
+  index,
+}: {
+  svc: Service;
+  onClick: () => void;
+  index: number;
+}) {
+  const Icon = resolveIcon(svc.name);
+  const ai = isAIService(svc);
+  const cardName = svc.name_he || svc.name;
+
+  return (
+    <motion.button
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.03, duration: 0.25 }}
+      onClick={onClick}
+      className="group relative flex flex-col items-start text-right p-4 rounded-2xl transition-all active:scale-[0.98] overflow-hidden"
+      style={{
+        background: ai
+          ? 'linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%)'
+          : '#ffffff',
+        border: ai ? '1px solid #fbcfe8' : '1px solid #eef1f5',
+        minHeight: 140,
+      }}
     >
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      {ai && (
+        <span
+          className="absolute top-3 left-3 text-[9px] font-bold tracking-widest uppercase px-1.5 py-0.5 rounded"
+          style={{ background: '#db2777', color: '#fff' }}
+        >
+          AI
+        </span>
+      )}
 
       <div
-        className="relative w-full sm:max-w-md max-h-[90vh] bg-white rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom duration-300"
-        style={{ direction: 'rtl' }}
+        className="w-11 h-11 rounded-xl flex items-center justify-center mb-3 transition-transform group-hover:scale-105"
+        style={{
+          background: ai ? '#ffffff' : '#fafbfc',
+          border: ai ? '1px solid #fbcfe8' : '1px solid #eef1f5',
+        }}
       >
-        {/* Header */}
-        <div className="p-5 pb-4 flex items-start gap-4 bg-[#F5F5F5]">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-black">
-            <span className="material-symbols-outlined text-[24px] text-white">{icon}</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-bold text-black">{displayName}</h3>
-            <p className="text-sm text-[#666] mt-1 leading-relaxed">{service.description}</p>
-          </div>
-          <button onClick={onClose} className="p-1 rounded-full hover:bg-black/5 transition-colors flex-shrink-0">
-            <span className="material-symbols-outlined text-[20px] text-[#999]">close</span>
-          </button>
-        </div>
+        <Icon
+          className="w-[22px] h-[22px]"
+          style={{ color: ai ? '#db2777' : '#0c1013' }}
+          strokeWidth={1.75}
+        />
+      </div>
 
-        {/* Body */}
-        <div className="p-5 flex-1 overflow-y-auto">
-          {briefSubmitted ? (
-            <div className="text-center py-8">
-              <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-black">
-                <span className="material-symbols-outlined text-[32px] text-white" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-              </div>
-              <h4 className="text-lg font-bold text-black mb-1">הבריף נשלח בהצלחה!</h4>
-              <p className="text-sm text-[#666]">נחזור אליך בהקדם</p>
-            </div>
-          ) : showBrief ? (
-            <MiniBriefForm
-              service={service}
-              accountId={accountId}
-              sessionId={sessionId}
-              onSubmitted={handleBriefSubmitted}
-              onCancel={() => setShowBrief(false)}
-            />
-          ) : (
-            <div className="space-y-3">
-              <button
-                onClick={handleAsk}
-                className="w-full flex items-center gap-3 p-4 rounded-xl border border-[#E0E0E0] hover:border-black transition-all text-right"
-              >
-                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-black">
-                  <span className="material-symbols-outlined text-[20px] text-white">chat</span>
-                </div>
-                <div>
-                  <span className="font-bold text-sm text-black block">שאל אותי על השירות</span>
-                  <span className="text-xs text-[#666]">דברו איתנו בצ׳אט ונסביר הכל</span>
-                </div>
-              </button>
+      <div className="text-[14px] font-bold leading-tight mb-1" style={{ color: '#0c1013' }}>
+        {cardName}
+      </div>
+      <div
+        className="text-[11.5px] leading-relaxed line-clamp-2"
+        style={{ color: '#676767' }}
+      >
+        {svc.description}
+      </div>
+    </motion.button>
+  );
+}
 
-              {enableBrief && (
-                <button
-                  onClick={() => setShowBrief(true)}
-                  className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-black hover:bg-[#F5F5F5] transition-all text-right"
-                >
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-black">
-                    <span className="material-symbols-outlined text-[20px] text-white">description</span>
-                  </div>
-                  <div>
-                    <span className="font-bold text-sm text-black block">השאר פרטים לבריף</span>
-                    <span className="text-xs text-[#666]">מלא טופס קצר ונחזור אליך עם הצעה</span>
-                  </div>
-                </button>
-              )}
-            </div>
-          )}
+// ---------------------------------------------------------------------------
+// Section Header
+// ---------------------------------------------------------------------------
+
+function SectionHeader({
+  eyebrow,
+  title,
+  subtitle,
+  accent,
+}: {
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  accent?: 'ai' | 'classic';
+}) {
+  return (
+    <div className="mb-4 flex items-baseline justify-between gap-3">
+      <div>
+        <div
+          className="text-[10px] font-bold tracking-widest uppercase mb-1"
+          style={{ color: accent === 'ai' ? '#db2777' : '#9aa3b0' }}
+        >
+          {eyebrow}
         </div>
+        <h2 className="text-[19px] font-bold" style={{ color: '#0c1013' }}>
+          {title}
+        </h2>
+        <p className="text-[12.5px] mt-1" style={{ color: '#676767' }}>
+          {subtitle}
+        </p>
       </div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Main Component — Services Grid (white bg, black accents)
+// Main Component
 // ---------------------------------------------------------------------------
 
-export default function ServicesCatalogTab({ accountId, onAskAbout, sessionId, enableBrief }: ServicesCatalogTabProps) {
+export default function ServicesCatalogTab({
+  accountId,
+  onAskAbout,
+  sessionId,
+  enableBrief,
+}: ServicesCatalogTabProps) {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
-  const [selectedIndex, setSelectedIndex] = useState(0);
 
   useEffect(() => {
     async function load() {
@@ -514,59 +768,155 @@ export default function ServicesCatalogTab({ accountId, onAskAbout, sessionId, e
     load();
   }, [accountId]);
 
+  const { aiServices, classicServices } = useMemo(() => {
+    const ai: Service[] = [];
+    const classic: Service[] = [];
+    for (const s of services) {
+      if (isAIService(s)) ai.push(s);
+      else classic.push(s);
+    }
+    return { aiServices: ai, classicServices: classic };
+  }, [services]);
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin" />
+      <div
+        className="h-full overflow-y-auto px-4 py-5 pb-32"
+        style={{ direction: 'rtl', backgroundColor: '#ffffff' }}
+      >
+        <div className="space-y-6">
+          {/* Skeleton hero */}
+          <div className="h-7 w-2/3 rounded-full bg-zinc-100 animate-pulse" />
+          {/* Skeleton cards */}
+          {[0, 1].map((row) => (
+            <div key={row} className="grid grid-cols-2 gap-3">
+              {[0, 1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="h-[140px] rounded-2xl bg-zinc-50 animate-pulse"
+                />
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
 
   if (services.length === 0) {
     return (
-      <div className="text-center py-16 text-[#999] text-sm">
-        <span className="material-symbols-outlined text-[48px] mb-3 block">info</span>
-        אין שירותים להצגה
+      <div
+        className="h-full flex items-center justify-center px-6 py-10"
+        style={{ direction: 'rtl', backgroundColor: '#ffffff' }}
+      >
+        <div className="text-center">
+          <div
+            className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center"
+            style={{ background: '#fafbfc', border: '1px solid #eef1f5' }}
+          >
+            <Sparkles className="w-7 h-7" style={{ color: '#9aa3b0' }} strokeWidth={1.5} />
+          </div>
+          <h3 className="text-[16px] font-bold mb-1" style={{ color: '#0c1013' }}>
+            אין שירותים להצגה
+          </h3>
+          <p className="text-[13px]" style={{ color: '#676767' }}>
+            נסו שוב בעוד רגע
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full overflow-y-auto px-4 py-5 pb-32" style={{ direction: 'rtl' }}>
-      {/* Header */}
-      <div className="mb-6 text-right">
-        <h2 className="text-[18px] font-bold text-black">השירותים שלנו</h2>
-        <p className="text-[12px] text-[#666] mt-1">פתרונות דיגיטליים מותאמים לצמיחה שלכם</p>
+    <div
+      className="h-full overflow-y-auto px-4 py-6 pb-32"
+      style={{
+        direction: 'rtl',
+        backgroundColor: '#ffffff',
+        backgroundImage:
+          'radial-gradient(circle at 100% 0%, rgba(252, 231, 243, 0.4) 0%, transparent 50%)',
+      }}
+    >
+      {/* Hero */}
+      <div className="mb-7 px-1">
+        <div className="flex items-center gap-2 mb-2">
+          <div
+            className="w-2 h-2 rounded-full"
+            style={{ background: '#db2777' }}
+          />
+          <span
+            className="text-[10px] font-bold tracking-widest uppercase"
+            style={{ color: '#db2777' }}
+          >
+            LDRS · השירותים שלנו
+          </span>
+        </div>
+        <h1 className="text-[24px] font-bold leading-tight" style={{ color: '#0c1013' }}>
+          מ-AI ארגוני ועד קמפיין 360°
+        </h1>
+        <p className="text-[13.5px] mt-2 leading-relaxed" style={{ color: '#676767' }}>
+          לחץ על שירות לפרטים, שאלה לבוט או טופס בריף.
+        </p>
       </div>
 
-      {/* Services Grid */}
-      <div className="grid grid-cols-3 gap-3">
-        {services.map((svc, i) => {
-          const icon = SERVICE_ICONS[svc.name] || 'handshake';
-          const cardName = svc.name_he || svc.name;
-          return (
-            <button
-              key={svc.id}
-              onClick={() => { setSelectedService(svc); setSelectedIndex(i); }}
-              className="group flex flex-col items-center text-center p-4 rounded-2xl border border-[#E0E0E0] bg-white hover:border-black transition-all duration-200 active:scale-[0.98]"
-            >
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 bg-black transition-transform group-hover:scale-110">
-                <span className="material-symbols-outlined text-[24px] text-white">{icon}</span>
-              </div>
-              <span className="text-[13px] font-bold text-black leading-tight">{cardName}</span>
-              <span className="text-[11px] text-[#666] mt-1.5 line-clamp-1 w-full">
-                {svc.description.slice(0, 40)}...
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      {/* AI Section */}
+      {aiServices.length > 0 && (
+        <section className="mb-8">
+          <SectionHeader
+            eyebrow="AI · מוצרים שלנו"
+            title="פלטפורמות AI שלידרס בונה"
+            subtitle="מוצרים פנימיים שהפכו לפתרונות לקוחות"
+            accent="ai"
+          />
+          <div className="grid grid-cols-2 gap-3">
+            {aiServices.map((svc, i) => (
+              <ServiceCard
+                key={svc.id}
+                svc={svc}
+                index={i}
+                onClick={() => setSelectedService(svc)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
-      {/* Service Modal */}
+      {/* Divider */}
+      {aiServices.length > 0 && classicServices.length > 0 && (
+        <div className="my-8 flex items-center gap-3">
+          <div className="flex-1 h-px" style={{ background: '#eef1f5' }} />
+          <span className="text-[10px] font-medium tracking-widest uppercase" style={{ color: '#9aa3b0' }}>
+            ◆
+          </span>
+          <div className="flex-1 h-px" style={{ background: '#eef1f5' }} />
+        </div>
+      )}
+
+      {/* Classic services */}
+      {classicServices.length > 0 && (
+        <section className="mb-6">
+          <SectionHeader
+            eyebrow="שיווק · קריאייטיב · מדיה"
+            title="הליבה של LDRS"
+            subtitle="פרפורמנס 360°, משפיענים, תוכן והפקות"
+            accent="classic"
+          />
+          <div className="grid grid-cols-2 gap-3">
+            {classicServices.map((svc, i) => (
+              <ServiceCard
+                key={svc.id}
+                svc={svc}
+                index={i}
+                onClick={() => setSelectedService(svc)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
       {selectedService && (
         <ServiceModal
           service={selectedService}
-          colorIndex={selectedIndex}
           accountId={accountId}
           sessionId={sessionId}
           enableBrief={enableBrief}
