@@ -51,7 +51,6 @@ import SupportForm from '@/components/SupportForm';
 import { LeadCapturePopup } from '@/components/chat/LeadCapturePopup';
 import { ConferenceLeadPopup } from '@/components/chat/ConferenceLeadPopup';
 import { ConferenceForYouTab } from '@/components/chat/ConferenceForYouTab';
-import { ConferenceBackdrop } from '@/components/chat/ConferenceBackdrop';
 import type { Influencer, ContentItem, InfluencerType } from '@/types';
 
 // Feature flag for streaming
@@ -986,18 +985,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       <link href={getGoogleFontsUrl(influencer.theme)} rel="stylesheet" />
       <meta name="theme-color" content="#f4f5f7" />
       
-      {/* Conference visitors (?source=conf): 3D Lanyard backdrop with LDRS + Marketing Association card */}
-      {isConferenceMode && username === 'ldrs_group' && <ConferenceBackdrop />}
-
-      <main
-        className={`chat-page flex flex-col overflow-hidden ${
-          isConferenceMode && username === 'ldrs_group' ? 'chat-page--conference' : ''
-        }`}
-        style={{
-          position: 'relative',
-          zIndex: isConferenceMode && username === 'ldrs_group' ? 1 : undefined,
-        }}
-      >
+      <main className="chat-page flex flex-col overflow-hidden" style={{ position: 'relative' }}>
         {/* Header */}
         <header className={`sticky top-0 z-50 ${isMobile ? 'glass px-4 h-[76px] flex items-center' : 'px-4 py-[10px]'}`} style={{ position: 'sticky', zIndex: 50, isolation: 'isolate' }}>
           {isMobile ? (
@@ -1078,15 +1066,6 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 {/* Chat Messages */}
                 <div
                   className={`flex-1 overflow-y-auto px-4 chat-bg chat-messages-scroll ${messages.length === 0 ? (isMobile ? 'pb-[80px]' : 'pb-8') : (isMobile ? 'pb-2 pt-3' : 'py-6 pb-8')} space-y-4`}
-                  style={
-                    isConferenceMode && username === 'ldrs_group'
-                      ? {
-                          backgroundColor: 'rgba(255,255,255,0.78)',
-                          backdropFilter: 'blur(2px)',
-                          WebkitBackdropFilter: 'blur(2px)',
-                        }
-                      : undefined
-                  }
                 >
                   {messages.length === 0 ? (
                     <div className={`flex flex-col items-center text-center px-4 ${isMobile ? 'pt-[32px]' : 'justify-center min-h-full'}`}>
