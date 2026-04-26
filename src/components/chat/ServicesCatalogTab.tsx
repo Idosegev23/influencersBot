@@ -449,6 +449,15 @@ function ServiceModal({
     }, 2000);
   };
 
+  // Hide the mobile bottom-tab bar while the sheet is open so it never
+  // covers the action buttons on small screens.
+  useEffect(() => {
+    document.body.dataset.serviceSheetOpen = '1';
+    return () => {
+      delete document.body.dataset.serviceSheetOpen;
+    };
+  }, []);
+
   return (
     <AnimatePresence>
       <motion.div
@@ -456,6 +465,7 @@ function ServiceModal({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4"
+        style={{ zIndex: 80 }}
         onClick={(e) => e.target === e.currentTarget && onClose()}
       >
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />

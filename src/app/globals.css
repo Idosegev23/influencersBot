@@ -3171,6 +3171,12 @@ h1, h2, h3, h4, h5, h6 {
   pointer-events: none;
 }
 
+/* When a service-detail sheet is open, hide the bottom tab bar so it
+   never overlaps the sheet's action buttons on mobile. */
+body[data-service-sheet-open] .mobile-bottom-tabs {
+  display: none !important;
+}
+
 .mobile-bottom-tabs .nav-tabs-bar {
   pointer-events: none;
 }
