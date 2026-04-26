@@ -96,15 +96,6 @@ const CASE_STUDIES: CaseStudy[] = [
     hiddenContext: '[קייס:]\nמותג: MAC × H&M\nשירות: חיבור fashion+beauty דרך משפיעניות',
   },
   {
-    brand: 'Leaders (פנימי)',
-    category: 'AI ארגוני',
-    what: 'מבריף לקוח עד מצגת קריאייטיבית — Leaders Platform end-to-end',
-    result: 'מיום עבודה לשעה ביום · 80% AI / 20% אנושי',
-    product: 'Leaders Platform',
-    question: 'איך לידרס משתמשים ב-AI בעצמם?',
-    hiddenContext: '[קייס:]\nמותג: Leaders (שימוש פנימי)\nמוצר: Leaders Platform\nתוצאות: יום עבודה → שעה, 80/20',
-  },
-  {
     brand: 'Argania',
     category: 'eCommerce ביופי',
     what: 'Bestie widget באתר עם 109 מוצרים, המלצות AI שיחתיות',
