@@ -55,7 +55,7 @@ interface ServicesCatalogTabProps {
 }
 
 // ---------------------------------------------------------------------------
-// Icon mapping — lucide-react
+// Icon mapping — lucide-react (desktop modal + train-track fallback)
 // ---------------------------------------------------------------------------
 
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -76,6 +76,26 @@ const ICON_MAP: Record<string, LucideIcon> = {
 };
 
 const resolveIcon = (name: string): LucideIcon => ICON_MAP[name] || Sparkles;
+
+// Figma SVG icons (white-stroke, sit inside dark tile) — mobile grid
+const FIGMA_ICON_MAP: Record<string, string> = {
+  NewVoices: '/icons/services/bonus-alt.svg',
+  'Influencer Marketing AI': '/icons/services/status-up.svg',
+  'AI Implementation': '/icons/services/lamp-on.svg',
+  'AI Automations': '/icons/services/refresh-circle.svg',
+  'Content Creation': '/icons/services/note.svg',
+  'Influencer Marketing': '/icons/services/instagram.svg',
+  'Paid Social Advertising': '/icons/services/instagram.svg',
+  'Performance Marketing / PPC': '/icons/services/status-up.svg',
+  'Podcast Production': '/icons/services/microphone.svg',
+  SEO: '/icons/services/status-up.svg',
+  'Social Media Management': '/icons/services/instagram.svg',
+  'Television Advertising': '/icons/services/monitor.svg',
+  'Video Production': '/icons/services/video.svg',
+};
+
+const resolveFigmaIcon = (name: string): string =>
+  FIGMA_ICON_MAP[name] || '/icons/services/lamp-on.svg';
 
 const isAIService = (svc: Service): boolean =>
   svc.subcategory === 'ai' ||
@@ -655,6 +675,74 @@ function ServiceCard({
 }
 
 // ---------------------------------------------------------------------------
+// Figma mobile card — white card, dark icon tile, Hebrew title + description
+// ---------------------------------------------------------------------------
+
+function FigmaServiceCard({
+  svc,
+  index,
+  onClick,
+}: {
+  svc: Service;
+  index: number;
+  onClick: () => void;
+}) {
+  const cardName = svc.name_he || svc.name;
+  const iconSrc = resolveFigmaIcon(svc.name);
+
+  return (
+    <motion.button
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.025, duration: 0.22 }}
+      onClick={onClick}
+      className="group flex flex-col text-right rounded-2xl transition-all active:scale-[0.98]"
+      style={{
+        background: '#ffffff',
+        border: '1px solid #eef1f5',
+        boxShadow: '0 1px 3px rgba(12,16,19,0.04)',
+        padding: '14px 12px 12px',
+        minHeight: 154,
+      }}
+    >
+      {/* Dark icon tile */}
+      <div
+        className="rounded-2xl flex items-center justify-center mb-2.5"
+        style={{
+          width: 52,
+          height: 52,
+          background: '#0c1013',
+        }}
+      >
+        <img
+          src={iconSrc}
+          alt=""
+          width={20}
+          height={20}
+          style={{ width: 20, height: 20, display: 'block' }}
+        />
+      </div>
+
+      {/* Title */}
+      <div
+        className="text-[13.5px] font-bold leading-[1.25] mb-1 line-clamp-2"
+        style={{ color: '#0c1013' }}
+      >
+        {cardName}
+      </div>
+
+      {/* Description */}
+      <div
+        className="text-[10.5px] leading-[1.35] line-clamp-3"
+        style={{ color: '#9aa3b0' }}
+      >
+        {svc.description}
+      </div>
+    </motion.button>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Section Header
 // ---------------------------------------------------------------------------
 
@@ -698,6 +786,14 @@ export default function ServicesCatalogTab({
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -772,6 +868,47 @@ export default function ServicesCatalogTab({
             אין שירותים להצגה
           </h3>
         </div>
+      </div>
+    );
+  }
+
+  // Mobile (<768): Figma 3-col grid — same on conference and non-conference
+  if (isMobile) {
+    return (
+      <div
+        className="h-full overflow-y-auto pb-32"
+        style={{ direction: 'rtl', backgroundColor: '#ffffff' }}
+      >
+        <header className="px-4 pt-5 pb-4 text-right">
+          <h1 className="text-[22px] font-bold tracking-tight leading-[1.2]" style={{ color: '#0c1013' }}>
+            השירותים שלנו
+          </h1>
+          <p className="text-[13px] mt-1" style={{ color: '#676767' }}>
+            פתרונות דיגיטלים מותאמים לצמיחה שלכם
+          </p>
+        </header>
+
+        <div className="px-4 grid grid-cols-3 gap-2.5">
+          {services.map((svc, i) => (
+            <FigmaServiceCard
+              key={svc.id}
+              svc={svc}
+              index={i}
+              onClick={() => setSelectedService(svc)}
+            />
+          ))}
+        </div>
+
+        {selectedService && (
+          <ServiceModal
+            service={selectedService}
+            accountId={accountId}
+            sessionId={sessionId}
+            enableBrief={enableBrief}
+            onClose={() => setSelectedService(null)}
+            onAskAbout={onAskAbout}
+          />
+        )}
       </div>
     );
   }

@@ -26,7 +26,7 @@ const CASE_STUDIES: CaseStudy[] = [
     what: 'רענון סדרת הקיק — מהלך 360° עם פרזנטוריות שנבחרו דרך IMAI, פרסומת TV "מאז ועד היום", סושיאל אותנטי',
     result: 'מורשת מרוקאית/מצרית פגשה את העכשיו · נרטיב חי בקהילה',
     product: '360° + IMAI',
-    logo: '/foryou-logos/argania.svg',
+    logo: '/foryou-logos/argania.png',
     question: 'מה עשיתם עם Argania?',
     hiddenContext:
       '[קייס:]\nמותג: Argania (סדרת הקיק)\nאתגר: לרענן סדרה ותיקה ואהובה תוך פחות מחודש\nפתרון: IMAI לבחירת פרזנטוריות מדויקת (מירן בוזגלו ועינב בובליל), פרסומת TV "הקיק מאז ועד היום" שמספרת על רכיב טבעי שעובר מדורי דורות, סושיאל אותנטי, וקודי קבוצות סודיות\nתוצאה: זהות תוכן חדשה לסדרה, חיבור בין מורשת לעכשווי, פיד עשיר ועניין מחודש',
@@ -37,7 +37,7 @@ const CASE_STUDIES: CaseStudy[] = [
     what: 'השקת מסקרה בטכנולוגיית טיובינג — מהלך 360° מבוסס דאטה: פילוח, קריאייטיב, משפיעניות, סושיאל ופרפורמנס',
     result: '+700% מחזור חודשי · סל קנייה ממוצע ×2 · התרחבות לקטגוריות נוספות',
     product: 'Performance 360°',
-    logo: '/foryou-logos/seacret.svg',
+    logo: '/foryou-logos/seacret.png',
     question: 'מה עשיתם עם Seacret?',
     hiddenContext:
       '[קייס:]\nמותג: Seacret\nאתגר: מותג בינלאומי שהגיע לישראל עם תדמית מיושנת (ים המלח) ורצה לחדש מול קהל צעיר\nפתרון: 360° עם פילוח דאטה, קריאייטיב מחדש, משפיעניות (מעיין אדם, מאיה ורטהיימר), סרטוני הדגמה אותנטיים, מהלך מדורג ממוצר אחד עד הרחבת סל\nתוצאה: 700% צמיחה חודשית, סל ×2, התרחבות לקרם הגנה/סבון פנים, שינוי תפיסתי מ"מיושן" ל"מותג ביוטי עכשווי"',
@@ -48,7 +48,7 @@ const CASE_STUDIES: CaseStudy[] = [
     what: 'השקת משחת רגישות חדשה דרך הומור — תמהיל מאקרו+מיקרו משפיעניות + רועי הראל בסרטון מרכזי',
     result: '4M חשיפות · 10K אינטראקציות · +0.7% Share of Market',
     product: 'Influencer Marketing',
-    logo: '/foryou-logos/colgate.svg',
+    logo: '/foryou-logos/colgate.png',
     question: 'מה עשיתם עם Colgate?',
     hiddenContext:
       '[קייס:]\nמותג: Colgate\nאתגר: השקת משחה למניעת רגישות בשיניים — מודעות גבוהה והסבר ערך פשוט\nפתרון: 4 משפיעניות (2 גדולות + 2 מיקרו) שנבחרו דרך פלטפורמת ניתוח ביצועים, סרטון מרכזי הומוריסטי בהובלת הקומיקאי רועי הראל, פעימות סטורי לאורך רבעון\nתוצאה: 4 מיליון חשיפות, 1,516 קליקים, 10,000+ אינטראקציות, עלייה של 0.7% ב-Share of Market בקטגוריה תחרותית',
@@ -59,7 +59,7 @@ const CASE_STUDIES: CaseStudy[] = [
     what: 'בתקופת המלחמה — מעבר לשפה חיובית של "ארץ ישראל היפה", 20 סרטונים בחודש, יציאה מ-shadow ban',
     result: 'סרטון בולט: 923K צפיות · 59K לייקים · 8.8K שיתופים · +3K עוקבים',
     product: 'Content & Community',
-    logo: '/foryou-logos/tourism.svg',
+    logo: '/foryou-logos/tourism.png',
     question: 'מה עשיתם עם משרד התיירות?',
     hiddenContext:
       '[קייס:]\nמותג: משרד התיירות\nאתגר: פעילות דיגיטלית בינלאומית בתקופת המלחמה — עוינות בפלטפורמות, shadow ban ממתקפת בוטים\nפתרון: שינוי אסטרטגי לתכנים חיוביים על "ארץ ישראל היפה", התמדה (20 סרטונים בחודש), תכנים ייעודיים לתיירות נוצרית\nתוצאה: יציאה הדרגתית מה-shadow ban; סרטון מוביל עם 923K צפיות, 59K לייקים, 5K שמירות, 442 תגובות, 8,845 העברות, +3,000 עוקבים חדשים',
@@ -169,17 +169,20 @@ function CaseCard({
       <div className="flex items-center gap-3 sm:gap-4 p-4 sm:p-5 h-full">
         {/* Logo tile */}
         <div
-          className={`flex-shrink-0 rounded-2xl overflow-hidden ${
+          className={`flex-shrink-0 flex items-center justify-center rounded-2xl overflow-hidden ${
             isHero ? 'w-[88px] h-[88px] sm:w-[112px] sm:h-[112px]' : 'w-[64px] h-[64px] sm:w-[72px] sm:h-[72px]'
           }`}
-          style={{ background: '#0c1013' }}
+          style={{
+            background: '#ffffff',
+            border: '1px solid #eef1f5',
+          }}
         >
           <Image
             src={cs.logo}
             alt={cs.brand}
             width={isHero ? 112 : 72}
             height={isHero ? 112 : 72}
-            className="w-full h-full object-contain"
+            className="max-w-[80%] max-h-[80%] object-contain"
             unoptimized
           />
         </div>
