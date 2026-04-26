@@ -704,9 +704,9 @@ function FigmaServiceCard({
         minHeight: 154,
       }}
     >
-      {/* Dark icon tile */}
+      {/* Dark icon tile (centered horizontally) */}
       <div
-        className="rounded-2xl flex items-center justify-center mb-2.5"
+        className="rounded-2xl flex items-center justify-center mb-2.5 mx-auto"
         style={{
           width: 52,
           height: 52,
