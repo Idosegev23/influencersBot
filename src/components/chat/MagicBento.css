@@ -115,27 +115,47 @@
 @media (min-width: 600px) {
   .card-grid {
     grid-template-columns: repeat(2, 1fr);
+    grid-auto-flow: dense;
+  }
+
+  /* Tablet: every 4th card is taller (1 col × 2 rows) for variety */
+  .magic-bento-card:nth-child(4n+1) {
+    grid-row: span 2;
   }
 }
 
 @media (min-width: 1024px) {
   .card-grid {
     grid-template-columns: repeat(4, 1fr);
+    grid-auto-flow: dense;
+    grid-auto-rows: minmax(180px, 1fr);
   }
 
-  .magic-bento-card:nth-child(3) {
-    grid-column: span 2;
+  /* Cards stretch to fill their grid area instead of locked 4/3 */
+  .magic-bento-card {
+    aspect-ratio: auto;
+    min-height: 0;
+    height: 100%;
+  }
+
+  /* Mirrored 6-card pattern — keeps the bento symmetric for any
+     number of services. Group N: large left + 2 wides right; group N+1
+     mirrors with large right + 2 wides left. */
+  .magic-bento-card:nth-child(6n+1) {
+    grid-column: 1 / span 2;
     grid-row: span 2;
   }
-
-  .magic-bento-card:nth-child(4) {
-    grid-column: 1 / span 2;
-    grid-row: 2 / span 2;
+  .magic-bento-card:nth-child(6n+2),
+  .magic-bento-card:nth-child(6n+3) {
+    grid-column: 3 / span 2;
   }
-
-  .magic-bento-card:nth-child(6) {
-    grid-column: 4;
-    grid-row: 3;
+  .magic-bento-card:nth-child(6n+4) {
+    grid-column: 3 / span 2;
+    grid-row: span 2;
+  }
+  .magic-bento-card:nth-child(6n+5),
+  .magic-bento-card:nth-child(6n+6) {
+    grid-column: 1 / span 2;
   }
 }
 
