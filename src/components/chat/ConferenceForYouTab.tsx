@@ -17,20 +17,64 @@ interface CaseStudy {
 }
 
 const CASE_STUDIES: CaseStudy[] = [
+  // ============ Israeli flagship cases ============
+  {
+    brand: 'Argania',
+    category: 'טיפוח שיער',
+    what: 'רענון סדרת הקיק — מהלך 360° עם פרזנטוריות שנבחרו דרך IMAI, פרסומת TV "מאז ועד היום", סושיאל אותנטי',
+    result: 'מורשת מרוקאית/מצרית פגשה את העכשיו · נרטיב חי בקהילה',
+    product: '360° + IMAI',
+    question: 'מה עשיתם עם Argania?',
+    hiddenContext:
+      '[קייס:]\nמותג: Argania (סדרת הקיק)\nאתגר: לרענן סדרה ותיקה ואהובה תוך פחות מחודש\nפתרון: IMAI לבחירת פרזנטוריות מדויקת (מירן בוזגלו ועינב בובליל), פרסומת TV "הקיק מאז ועד היום" שמספרת על רכיב טבעי שעובר מדורי דורות, סושיאל אותנטי, וקודי קבוצות סודיות\nתוצאה: זהות תוכן חדשה לסדרה, חיבור בין מורשת לעכשווי, פיד עשיר ועניין מחודש',
+  },
+  {
+    brand: 'Seacret',
+    category: 'יופי וטיפוח',
+    what: 'השקת מסקרה בטכנולוגיית טיובינג — מהלך 360° מבוסס דאטה: פילוח, קריאייטיב, משפיעניות, סושיאל ופרפורמנס',
+    result: '+700% מחזור חודשי · סל קנייה ממוצע ×2 · התרחבות לקטגוריות נוספות',
+    product: 'Performance 360°',
+    question: 'מה עשיתם עם Seacret?',
+    hiddenContext:
+      '[קייס:]\nמותג: Seacret\nאתגר: מותג בינלאומי שהגיע לישראל עם תדמית מיושנת (ים המלח) ורצה לחדש מול קהל צעיר\nפתרון: 360° עם פילוח דאטה, קריאייטיב מחדש, משפיעניות (מעיין אדם, מאיה ורטהיימר), סרטוני הדגמה אותנטיים, מהלך מדורג ממוצר אחד עד הרחבת סל\nתוצאה: 700% צמיחה חודשית, סל ×2, התרחבות לקרם הגנה/סבון פנים, שינוי תפיסתי מ"מיושן" ל"מותג ביוטי עכשווי"',
+  },
+  {
+    brand: 'Colgate',
+    category: 'היגיינת הפה',
+    what: 'השקת משחת רגישות חדשה דרך הומור — תמהיל מאקרו+מיקרו משפיעניות + רועי הראל בסרטון מרכזי',
+    result: '4M חשיפות · 10K אינטראקציות · +0.7% Share of Market',
+    product: 'Influencer Marketing',
+    question: 'מה עשיתם עם Colgate?',
+    hiddenContext:
+      '[קייס:]\nמותג: Colgate\nאתגר: השקת משחה למניעת רגישות בשיניים — מודעות גבוהה והסבר ערך פשוט\nפתרון: 4 משפיעניות (2 גדולות + 2 מיקרו) שנבחרו דרך פלטפורמת ניתוח ביצועים, סרטון מרכזי הומוריסטי בהובלת הקומיקאי רועי הראל, פעימות סטורי לאורך רבעון\nתוצאה: 4 מיליון חשיפות, 1,516 קליקים, 10,000+ אינטראקציות, עלייה של 0.7% ב-Share of Market בקטגוריה תחרותית',
+  },
+  {
+    brand: 'משרד התיירות',
+    category: 'תיירות ושיווק מדינה',
+    what: 'בתקופת המלחמה — מעבר לשפה חיובית של "ארץ ישראל היפה", 20 סרטונים בחודש, יציאה מ-shadow ban',
+    result: 'סרטון בולט: 923K צפיות · 59K לייקים · 8.8K שיתופים · +3K עוקבים',
+    product: 'Content & Community',
+    question: 'מה עשיתם עם משרד התיירות?',
+    hiddenContext:
+      '[קייס:]\nמותג: משרד התיירות\nאתגר: פעילות דיגיטלית בינלאומית בתקופת המלחמה — עוינות בפלטפורמות, shadow ban ממתקפת בוטים\nפתרון: שינוי אסטרטגי לתכנים חיוביים על "ארץ ישראל היפה", התמדה (20 סרטונים בחודש), תכנים ייעודיים לתיירות נוצרית\nתוצאה: יציאה הדרגתית מה-shadow ban; סרטון מוביל עם 923K צפיות, 59K לייקים, 5K שמירות, 442 תגובות, 8,845 העברות, +3,000 עוקבים חדשים',
+  },
+
+  // ============ International proof points (IMAI / NewVoices) ============
   {
     brand: 'Estée Lauder',
     category: 'יופי גלובלי',
     what: 'גילוי משפיענים מבוסס AI ב-12 שווקים, מעקב ביצועים מלא',
-    result: 'ROI x4 בקמפיין נובמבר · -70% זמן sourcing',
+    result: 'ROI ×4 בקמפיין נובמבר · -70% זמן sourcing',
     product: 'IMAI',
     question: 'מה עשיתם עם Estée Lauder?',
-    hiddenContext: '[קייס:]\nמותג: Estée Lauder\nמוצר: IMAI\nתוצאות: 4x ROI, 12 שווקים, -70% sourcing',
+    hiddenContext:
+      '[קייס:]\nמותג: Estée Lauder\nמוצר: IMAI\nתוצאות: 4x ROI, 12 שווקים, -70% sourcing',
   },
   {
     brand: 'Playtika',
     category: 'גיימינג',
-    what: 'מיקוד גיימרים על YouTube ו-TikTok, ניהול קמפיין יחיד למאגר ענק',
-    result: '15M+ גיימרים מוכשרים זוהו, נכתבו והופעלו',
+    what: 'מיקוד גיימרים ב-YouTube ו-TikTok דרך IMAI, ניהול קמפיין יחיד',
+    result: '15M+ גיימרים מוכשרים זוהו והופעלו',
     product: 'IMAI',
     question: 'מה עשיתם עם Playtika?',
     hiddenContext: '[קייס:]\nמותג: Playtika\nמוצר: IMAI\nתוצאות: 15M+ qualified gamers in single campaign',
@@ -38,8 +82,8 @@ const CASE_STUDIES: CaseStudy[] = [
   {
     brand: 'Lumenis',
     category: 'בריאות גלובלי',
-    what: 'קמפיין משפיענים מבוסס Olympic-driven, ניהול end-to-end ב-8 שווקים',
-    result: '40M+ impressions גלובלי, attribution מלא',
+    what: 'קמפיין Olympic-driven, ניהול end-to-end ב-8 שווקים',
+    result: '40M+ impressions גלובלי · attribution מלא',
     product: 'IMAI',
     question: 'מה עשיתם עם Lumenis?',
     hiddenContext: '[קייס:]\nמותג: Lumenis\nמוצר: IMAI\nתוצאות: 40M+ impressions, 8 markets',
@@ -61,56 +105,6 @@ const CASE_STUDIES: CaseStudy[] = [
     product: 'NewVoices',
     question: 'מה עשיתם עם DoReel?',
     hiddenContext: '[קייס:]\nמותג: DoReel\nמוצר: NewVoices\nתוצאות: +70% renewal, -80% churn, +45% LTV',
-  },
-  {
-    brand: 'Beluga Gold Line',
-    category: 'אלכוהול יוקרה',
-    what: 'נראות מותג גלובלית בשוק היוקרה',
-    product: 'IMAI',
-    question: 'מה עשיתם עם Beluga?',
-    hiddenContext: '[קייס:]\nמותג: Beluga Gold Line\nמוצר: IMAI\nסקטור: יוקרה',
-  },
-  {
-    brand: 'Samsung',
-    category: 'טכנולוגיה',
-    what: 'שגרירי מותג גלובליים, סדרת רילסים על מוצרים חדשים',
-    product: 'Influencer Marketing',
-    question: 'מה עשיתם עם Samsung?',
-    hiddenContext: '[קייס:]\nמותג: Samsung\nשירות: שיווק משפיענים גלובלי + שגרירים',
-  },
-  {
-    brand: 'Nespresso',
-    category: 'מזון ומשקאות',
-    what: 'שותפות ארוכת טווח עם משפיענים בישראל',
-    product: 'Influencer Marketing',
-    question: 'מה עשיתם עם Nespresso?',
-    hiddenContext: '[קייס:]\nמותג: Nespresso\nשירות: שיווק משפיענים\nאופי: שותפות long-term',
-  },
-  {
-    brand: 'MAC × H&M',
-    category: 'אופנה ויופי',
-    what: 'חיבור בין שתי קטגוריות דרך משפיעניות, רילסים משותפים, אימייל מרקטינג',
-    result: 'חוויה אחת שלמה — מעורבות עמוקה והנעת רכישה',
-    product: 'Performance 360°',
-    question: 'מה עשיתם עם MAC ו-H&M?',
-    hiddenContext: '[קייס:]\nמותג: MAC × H&M\nשירות: חיבור fashion+beauty דרך משפיעניות',
-  },
-  {
-    brand: 'Argania',
-    category: 'eCommerce ביופי',
-    what: 'Bestie widget באתר עם 109 מוצרים, המלצות AI שיחתיות',
-    product: 'Bestie',
-    question: 'מה עשיתם עם Argania?',
-    hiddenContext: '[קייס:]\nמותג: Argania\nמוצר: Bestie widget\nשירות: AI agent לקטלוג מוצרים',
-  },
-  {
-    brand: 'IMAI (פנימי)',
-    category: 'B2B SaaS',
-    what: 'NewVoices לסינון לידים אוטומטי + ניהול שיחות',
-    result: '+230% פגישות · -95% response delay',
-    product: 'NewVoices',
-    question: 'איך IMAI משתמשים ב-NewVoices בעצמם?',
-    hiddenContext: '[קייס:]\nמותג: IMAI (שימוש פנימי)\nמוצר: NewVoices\nתוצאות: +230% פגישות, -95% response delay',
   },
 ];
 
