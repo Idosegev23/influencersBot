@@ -570,7 +570,7 @@ function ServiceModal({
 }
 
 // ---------------------------------------------------------------------------
-// Service Card — minimal, agency
+// Service Card — portrait 9:16, train-track horizontal scroll
 // ---------------------------------------------------------------------------
 
 function ServiceCard({
@@ -586,46 +586,66 @@ function ServiceCard({
   const ai = isAIService(svc);
   const cardName = svc.name_he || svc.name;
 
+  // 9:16 portrait — width 180px, height 320px (close to true 9:16)
   return (
     <motion.button
-      initial={{ opacity: 0, y: 4 }}
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.025, duration: 0.2 }}
+      transition={{ delay: index * 0.025, duration: 0.25 }}
       onClick={onClick}
-      className="group relative flex flex-col items-start text-right p-4 rounded-xl transition-all active:scale-[0.99] hover:border-zinc-300"
+      className="group relative flex-shrink-0 flex flex-col text-right rounded-2xl overflow-hidden transition-all active:scale-[0.98] snap-start"
       style={{
-        background: '#ffffff',
-        border: '1px solid #e4e4e7',
-        minHeight: 132,
+        width: 200,
+        aspectRatio: '9 / 16',
+        background: ai
+          ? 'linear-gradient(180deg, #fdf2f8 0%, #fce7f3 60%, #f9a8d4 100%)'
+          : 'linear-gradient(180deg, #fafafa 0%, #f4f4f5 100%)',
+        border: ai ? '1px solid #fbcfe8' : '1px solid #e4e4e7',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
       }}
     >
-      <div className="flex items-start justify-between w-full mb-3">
+      {/* index */}
+      <div
+        className="absolute top-3 left-3 text-[10px] font-bold tracking-widest tabular-nums"
+        style={{ color: ai ? 'rgba(219,39,119,0.6)' : 'rgba(9,9,11,0.35)' }}
+      >
+        {String(index + 1).padStart(2, '0')}
+      </div>
+
+      {/* Top — icon area */}
+      <div className="flex-1 flex items-center justify-center px-5 pt-8">
         <div
-          className="w-10 h-10 rounded-lg flex items-center justify-center transition-transform group-hover:scale-105"
+          className="w-16 h-16 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-105"
           style={{
-            background: ai ? '#fdf2f8' : '#fafafa',
-            border: ai ? '1px solid #fbcfe8' : '1px solid #e4e4e7',
+            background: ai ? 'rgba(255,255,255,0.7)' : '#ffffff',
+            border: ai ? '1px solid rgba(251,207,232,0.7)' : '1px solid #e4e4e7',
+            boxShadow: ai
+              ? '0 4px 12px rgba(219,39,119,0.12)'
+              : '0 1px 3px rgba(0,0,0,0.06)',
           }}
         >
           <Icon
-            className="w-[18px] h-[18px]"
+            className="w-7 h-7"
             style={{ color: ai ? '#db2777' : '#09090b' }}
-            strokeWidth={1.75}
+            strokeWidth={1.5}
           />
         </div>
       </div>
 
-      <div
-        className="text-[14.5px] font-bold leading-tight mb-1.5"
-        style={{ color: '#09090b' }}
-      >
-        {cardName}
-      </div>
-      <div
-        className="text-[11.5px] leading-relaxed line-clamp-2"
-        style={{ color: '#71717a' }}
-      >
-        {svc.description}
+      {/* Bottom — text */}
+      <div className="px-4 pb-4 text-right">
+        <div
+          className="text-[14.5px] font-bold leading-[1.25] mb-1.5 line-clamp-2"
+          style={{ color: ai ? '#831843' : '#09090b' }}
+        >
+          {cardName}
+        </div>
+        <div
+          className="text-[10.5px] leading-snug line-clamp-3"
+          style={{ color: ai ? 'rgba(131,24,67,0.7)' : '#71717a' }}
+        >
+          {svc.description}
+        </div>
       </div>
     </motion.button>
   );
@@ -714,11 +734,15 @@ export default function ServicesCatalogTab({
             <div className="h-8 w-48 rounded bg-zinc-100 animate-pulse mb-2" />
             <div className="h-4 w-72 rounded bg-zinc-100 animate-pulse" />
           </div>
-          <div className="space-y-6">
+          <div className="space-y-3">
             <div className="h-5 w-24 rounded bg-zinc-100 animate-pulse" />
-            <div className="grid grid-cols-2 gap-3">
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="h-[132px] rounded-xl bg-zinc-50 animate-pulse" />
+            <div className="flex gap-3 overflow-hidden">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="rounded-2xl bg-zinc-100 animate-pulse flex-shrink-0"
+                  style={{ width: 200, aspectRatio: '9/16' }}
+                />
               ))}
             </div>
           </div>
@@ -770,7 +794,14 @@ export default function ServicesCatalogTab({
       {aiServices.length > 0 && (
         <section className="mb-10">
           <SectionHeader title="AI" count={aiServices.length} isAI />
-          <div className="grid grid-cols-2 gap-3">
+          <div
+            className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-4 -mx-5 px-5"
+            style={{
+              scrollPaddingInline: '20px',
+              WebkitOverflowScrolling: 'touch',
+              scrollbarWidth: 'none',
+            }}
+          >
             {aiServices.map((svc, i) => (
               <ServiceCard
                 key={svc.id}
@@ -779,6 +810,8 @@ export default function ServicesCatalogTab({
                 onClick={() => setSelectedService(svc)}
               />
             ))}
+            {/* End spacer for last card breathing room */}
+            <div className="flex-shrink-0 w-1" />
           </div>
         </section>
       )}
@@ -787,7 +820,14 @@ export default function ServicesCatalogTab({
       {classicServices.length > 0 && (
         <section>
           <SectionHeader title="שיווק וקריאייטיב" count={classicServices.length} />
-          <div className="grid grid-cols-2 gap-3">
+          <div
+            className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-4 -mx-5 px-5"
+            style={{
+              scrollPaddingInline: '20px',
+              WebkitOverflowScrolling: 'touch',
+              scrollbarWidth: 'none',
+            }}
+          >
             {classicServices.map((svc, i) => (
               <ServiceCard
                 key={svc.id}
@@ -796,6 +836,7 @@ export default function ServicesCatalogTab({
                 onClick={() => setSelectedService(svc)}
               />
             ))}
+            <div className="flex-shrink-0 w-1" />
           </div>
         </section>
       )}
