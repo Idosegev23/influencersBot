@@ -695,7 +695,7 @@ function FigmaServiceCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.025, duration: 0.22 }}
       onClick={onClick}
-      className="group flex flex-col text-right rounded-2xl transition-all active:scale-[0.98]"
+      className="group flex flex-col text-center rounded-2xl transition-all active:scale-[0.98]"
       style={{
         background: '#ffffff',
         border: '1px solid #eef1f5',
