@@ -62,6 +62,8 @@ export async function POST(req: NextRequest) {
       platform,
       locale,
       accountId,
+      consentGiven,
+      consentTimestamp,
     } = body;
 
     if (!fullName || !phone) {
@@ -90,6 +92,8 @@ export async function POST(req: NextRequest) {
           industry: industry || null,
           botSummary: botSummary || null,
           topics: topics || [],
+          consent_given: !!consentGiven,
+          consent_timestamp: consentTimestamp || null,
         }),
         session_id: sessionId || null,
         status: 'new',
@@ -161,9 +165,14 @@ export async function POST(req: NextRequest) {
         email: process.env.CONFERENCE_LEAD_OWNER_EMAIL || 'roi@ldrsgroup.com',
         name: process.env.CONFERENCE_LEAD_OWNER_NAME || 'רועי',
       },
+      consent: {
+        given: !!consentGiven,
+        timestamp: consentTimestamp || null,
+        text: 'אני מאשר/ת שצוות לידרס יצור איתי קשר במייל, וואטסאפ או טלפון בעקבות הפרטים שמסרתי',
+      },
       _meta: {
         is_test: false,
-        schema_version: 'v1',
+        schema_version: 'v2',
       },
     };
 
@@ -190,6 +199,8 @@ export async function POST(req: NextRequest) {
       botSummary: botSummary || null,
       chatUrl,
       createdAt: brief?.created_at,
+      consentGiven: !!consentGiven,
+      consentTimestamp: consentTimestamp || null,
     });
 
     // Use Next.js `after` hook so the email + drive work is guaranteed to

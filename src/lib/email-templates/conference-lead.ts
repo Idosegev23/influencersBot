@@ -23,6 +23,8 @@ interface ConferenceLeadEmailInput {
   botSummary?: string | null;
   chatUrl?: string | null;
   createdAt?: string;
+  consentGiven?: boolean;
+  consentTimestamp?: string | null;
 }
 
 const PRIMARY_AREA_LABELS: Record<string, string> = {
@@ -206,6 +208,29 @@ export function buildConferenceLeadEmail(lead: ConferenceLeadEmailInput): {
             ${section('הקשר השיחה', convoBody)}
           </td>
         </tr>
+
+        <!-- Consent badge -->
+        ${
+          lead.consentGiven
+            ? `<tr>
+          <td style="padding:0 32px 16px 32px;background-color:#ffffff;">
+            <div style="background-color:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;padding:12px 16px;font-size:12px;color:#065f46;text-align:right;">
+              ✓ הליד אישר/ה יצירת קשר במייל / וואטסאפ / טלפון${
+                lead.consentTimestamp
+                  ? ` · ${escape(formatDate(lead.consentTimestamp))}`
+                  : ''
+              }
+            </div>
+          </td>
+        </tr>`
+            : `<tr>
+          <td style="padding:0 32px 16px 32px;background-color:#ffffff;">
+            <div style="background-color:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:12px 16px;font-size:12px;color:#991b1b;text-align:right;">
+              ⚠️ הליד <strong>לא אישר</strong> יצירת קשר — ליצור קשר בזהירות
+            </div>
+          </td>
+        </tr>`
+        }
 
         <!-- Footer -->
         <tr>

@@ -50,6 +50,7 @@ import { StarterPills } from '@/components/chat/StarterPills';
 import SupportForm from '@/components/SupportForm';
 import { LeadCapturePopup } from '@/components/chat/LeadCapturePopup';
 import { ConferenceLeadPopup } from '@/components/chat/ConferenceLeadPopup';
+import { ConferenceForYouTab } from '@/components/chat/ConferenceForYouTab';
 import type { Influencer, ContentItem, InfluencerType } from '@/types';
 
 // Feature flag for streaming
@@ -626,22 +627,17 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
             isConferenceMode,
           });
 
-          // Submitted: respect for count-only. Intent overrides it too —
-          // visitor changed their mind / wants a different service.
-          if (submitted && !intentMatch) return;
+          // Submitted: visitor already gave details. Don't show again —
+          // chat should continue normally with a thank-you, not popup spam.
+          if (submitted) return;
 
           // Count-only trigger respects 24h dismissal cooldown.
-          // Intent trigger overrides — visitor explicitly asked for a meeting.
+          // Intent trigger overrides dismissal — visitor changed their mind.
           if (!intentMatch && dismissedRecent) return;
 
-          // If intent fired, clear stale flags so future count-triggers also work
-          if (intentMatch) {
-            if (dismissedRecent) {
-              localStorage.removeItem(`ldrs_conf_popup_dismissed_${username}`);
-            }
-            if (submitted) {
-              sessionStorage.removeItem('ldrs_conf_popup_submitted');
-            }
+          // If intent fired, clear dismissal so future triggers also work
+          if (intentMatch && dismissedRecent) {
+            localStorage.removeItem(`ldrs_conf_popup_dismissed_${username}`);
           }
 
           // Intent → faster, count-based → small delay so the bot starts replying first
@@ -1041,7 +1037,13 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
               {/* Left side: Tab pills */}
               <div className="flex items-center gap-2 flex-shrink-0">
                 <NavTabs
-                  tabs={influencer.tabs || DEFAULT_TABS}
+                  tabs={
+                    isConferenceMode && username === 'ldrs_group'
+                      ? (influencer.tabs || DEFAULT_TABS).map((t: any) =>
+                          t.id === 'discover' ? { ...t, label: 'ForYou' } : t
+                        )
+                      : influencer.tabs || DEFAULT_TABS
+                  }
                   activeTab={activeTab}
                   onTabChange={(id) => setActiveTab(id as TabId)}
                 />
@@ -1837,6 +1839,38 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 exit={{ opacity: 0 }}
                 className="h-full"
               >
+                {isConferenceMode && username === 'ldrs_group' ? (
+                  <ConferenceForYouTab
+                    onAskAbout={(question, hiddenContext) => {
+                      setActiveTab('chat');
+                      maybeShowLeadPopup(question);
+                      const userMsg = {
+                        id: Date.now().toString(),
+                        role: 'user' as const,
+                        content: question,
+                      };
+                      setMessages((prev) => [...prev, userMsg]);
+                      setIsTyping(true);
+                      const assistantMessageId = (Date.now() + 1).toString();
+                      setStreamingMessageId(assistantMessageId);
+                      setMessages((prev) => [
+                        ...prev,
+                        { id: assistantMessageId, role: 'assistant' as const, content: '' },
+                      ]);
+                      setIsTyping(false);
+                      const apiMessage = hiddenContext
+                        ? `${question}\n\n${hiddenContext}`
+                        : question;
+                      sendStreamMessage({
+                        message: apiMessage,
+                        username,
+                        sessionId: sessionId || undefined,
+                        previousResponseId: responseId || undefined,
+                        clientMessageId: assistantMessageId,
+                      });
+                    }}
+                  />
+                ) : (
                 <DiscoveryTab
                   username={username}
                   influencerName={influencer.display_name || ''}
@@ -1869,6 +1903,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   }}
                   onCategoryOpened={() => setInitialDiscoverySlug(null)}
                 />
+                )}
               </motion.div>
             ) : activeTab === 'products' ? (
               <ProductsCatalogTab
@@ -2021,7 +2056,13 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
         {isMobile && influencer && (
           <div className="mobile-bottom-tabs">
             <NavTabs
-              tabs={influencer.tabs || DEFAULT_TABS}
+              tabs={
+                isConferenceMode && username === 'ldrs_group'
+                  ? (influencer.tabs || DEFAULT_TABS).map((t: any) =>
+                      t.id === 'discover' ? { ...t, label: 'ForYou' } : t
+                    )
+                  : influencer.tabs || DEFAULT_TABS
+              }
               activeTab={activeTab}
               onTabChange={(id) => setActiveTab(id as TabId)}
             />
@@ -2047,6 +2088,14 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
             }}
             onSubmitted={() => {
               setShowConferencePopup(false);
+              // Inject acknowledgment so the bot doesn't keep asking for details
+              const ackMessage: Message = {
+                id: `lead-ack-${Date.now()}`,
+                role: 'assistant',
+                content:
+                  'מעולה — קיבלנו את הפרטים 🤍 צוות לידרס יחזור אליך/ך תוך 48 שעות.\n\nבינתיים, אם יש שאלות נוספות על ההרצאה, על הטמעת AI בארגון, או על המוצרים שלנו — תרגישו חופשי.',
+              };
+              setMessages((prev) => [...prev, ackMessage]);
             }}
           />
         )}

@@ -34,12 +34,14 @@ export function ConferenceLeadPopup({
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [companyName, setCompanyName] = useState('');
+  const [consent, setConsent] = useState(false);
 
   function validate(): string {
     if (!fullName.trim()) return 'שם מלא נדרש';
     if (!phone.trim()) return 'מספר טלפון נדרש';
     if (!/^[\d\-+() ]{7,15}$/.test(phone.trim())) return 'מספר לא תקין';
     if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return 'אימייל לא תקין';
+    if (!consent) return 'נא לאשר את התקנון לקבלת יצירת קשר';
     return '';
   }
 
@@ -63,6 +65,8 @@ export function ConferenceLeadPopup({
           phone: phone.trim(),
           email: email.trim() || undefined,
           companyName: companyName.trim() || undefined,
+          consentGiven: consent,
+          consentTimestamp: new Date().toISOString(),
           preferredProduct: selectedService === 'not_sure' ? null : selectedService,
           primaryArea:
             selectedService === 'AI Implementation'
@@ -261,6 +265,25 @@ export function ConferenceLeadPopup({
                   className={inputClasses}
                   style={inputStyle}
                 />
+
+                <label
+                  className="flex items-start gap-3 mt-2 cursor-pointer select-none"
+                  style={{ direction: 'rtl' }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={consent}
+                    onChange={(e) => setConsent(e.target.checked)}
+                    className="mt-[3px] w-[18px] h-[18px] cursor-pointer flex-shrink-0"
+                    style={{ accentColor: '#0c1013' }}
+                  />
+                  <span
+                    className="text-[12px] leading-relaxed"
+                    style={{ color: '#676767' }}
+                  >
+                    אני מאשר/ת שצוות לידרס יצור איתי קשר במייל, וואטסאפ או טלפון בעקבות הפרטים שמסרתי
+                  </span>
+                </label>
               </div>
 
               {error && (
