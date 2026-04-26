@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <rect width="120" height="120" rx="24" fill="#0c1013"/>
+  <path d="M60 28 L70 50 L92 50 L74 64 L80 86 L60 72 L40 86 L46 64 L28 50 L50 50 Z" fill="#2563eb" opacity="0.15"/>
+  <path d="M60 36 L66 52 L82 52 L70 62 L74 78 L60 68 L46 78 L50 62 L38 52 L54 52 Z" stroke="#2563eb" stroke-width="2" fill="none"/>
+  <text x="60" y="106" font-family="Heebo, system-ui, sans-serif" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">משרד התיירות</text>
+</svg>

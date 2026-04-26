@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <rect width="120" height="120" rx="24" fill="#0a3d3a"/>
+  <circle cx="60" cy="52" r="18" fill="none" stroke="#10b981" stroke-width="2.5"/>
+  <circle cx="60" cy="52" r="6" fill="#10b981"/>
+  <text x="60" y="98" font-family="Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#ffffff" text-anchor="middle" letter-spacing="1">Lumenis</text>
+</svg>

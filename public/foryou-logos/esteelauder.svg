@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <rect width="120" height="120" rx="24" fill="#0c1013"/>
+  <text x="60" y="56" font-family="Times, 'Times New Roman', serif" font-size="20" font-weight="400" fill="#ffffff" text-anchor="middle" letter-spacing="2">ESTÉE</text>
+  <text x="60" y="80" font-family="Times, 'Times New Roman', serif" font-size="16" font-weight="400" fill="#c9a86a" text-anchor="middle" letter-spacing="2">LAUDER</text>
+  <line x1="40" y1="92" x2="80" y2="92" stroke="#c9a86a" stroke-width="1"/>
+</svg>
