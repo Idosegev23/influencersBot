@@ -29,6 +29,8 @@ interface LanyardProps {
   gravity?: [number, number, number];
   fov?: number;
   transparent?: boolean;
+  /** Optional override for the card front texture (URL or data: URL). */
+  customCardTexture?: string;
 }
 
 export default function Lanyard({
@@ -36,6 +38,7 @@ export default function Lanyard({
   gravity = [0, -40, 0],
   fov = 20,
   transparent = true,
+  customCardTexture,
 }: LanyardProps) {
   const [isMobile, setIsMobile] = useState<boolean>(
     () => typeof window !== 'undefined' && window.innerWidth < 768
@@ -59,7 +62,7 @@ export default function Lanyard({
       >
         <ambientLight intensity={Math.PI} />
         <Physics gravity={gravity} timeStep={isMobile ? 1 / 30 : 1 / 60}>
-          <Band isMobile={isMobile} />
+          <Band isMobile={isMobile} customCardTexture={customCardTexture} />
         </Physics>
         <Environment blur={0.75}>
           <Lightformer
@@ -100,9 +103,10 @@ interface BandProps {
   maxSpeed?: number;
   minSpeed?: number;
   isMobile?: boolean;
+  customCardTexture?: string;
 }
 
-function Band({ maxSpeed = 50, minSpeed = 0, isMobile = false }: BandProps) {
+function Band({ maxSpeed = 50, minSpeed = 0, isMobile = false, customCardTexture }: BandProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const band = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -133,6 +137,16 @@ function Band({ maxSpeed = 50, minSpeed = 0, isMobile = false }: BandProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { nodes, materials } = useGLTF(cardGLB) as any;
   const texture = useTexture(lanyardPNG);
+
+  // Optional custom texture for the card face
+  const cardOverlay = useTexture(customCardTexture || lanyardPNG);
+  useEffect(() => {
+    if (!customCardTexture || !materials?.base) return;
+    cardOverlay.flipY = false;
+    cardOverlay.colorSpace = THREE.SRGBColorSpace;
+    materials.base.map = cardOverlay;
+    materials.base.needsUpdate = true;
+  }, [customCardTexture, cardOverlay, materials]);
   const [curve] = useState(
     () =>
       new THREE.CatmullRomCurve3([

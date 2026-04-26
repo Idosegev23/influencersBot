@@ -25,6 +25,10 @@ export interface BentoProps {
   glowColor?: string;
   clickEffect?: boolean;
   enableMagnetism?: boolean;
+  /** Override the default card data. */
+  cards?: BentoCardProps[];
+  /** Optional handler — fires when a card is clicked. */
+  onCardClick?: (index: number, card: BentoCardProps) => void;
 }
 
 const DEFAULT_PARTICLE_COUNT = 12;
@@ -91,6 +95,7 @@ const ParticleCard: React.FC<{
   enableTilt?: boolean;
   clickEffect?: boolean;
   enableMagnetism?: boolean;
+  onClick?: () => void;
 }> = ({
   children,
   className = '',
@@ -101,6 +106,7 @@ const ParticleCard: React.FC<{
   enableTilt = true,
   clickEffect = false,
   enableMagnetism = false,
+  onClick,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const particlesRef = useRef<HTMLDivElement[]>([]);
@@ -318,7 +324,20 @@ const ParticleCard: React.FC<{
     <div
       ref={cardRef}
       className={`${className} particle-container`}
-      style={{ ...style, position: 'relative', overflow: 'hidden' }}
+      style={{ ...style, position: 'relative', overflow: 'hidden', cursor: onClick ? 'pointer' : undefined }}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
     >
       {children}
     </div>
@@ -491,10 +510,13 @@ const MagicBento: React.FC<BentoProps> = ({
   glowColor = DEFAULT_GLOW_COLOR,
   clickEffect = true,
   enableMagnetism = true,
+  cards,
+  onCardClick,
 }) => {
   const gridRef = useRef<HTMLDivElement>(null);
   const isMobile = useMobileDetection();
   const shouldDisableAnimations = disableAnimations || isMobile;
+  const data = cards && cards.length > 0 ? cards : cardData;
 
   return (
     <>
@@ -509,7 +531,7 @@ const MagicBento: React.FC<BentoProps> = ({
       )}
 
       <BentoCardGrid gridRef={gridRef}>
-        {cardData.map((card, index) => {
+        {data.map((card, index) => {
           const baseClassName = `magic-bento-card ${textAutoHide ? 'magic-bento-card--text-autohide' : ''} ${enableBorderGlow ? 'magic-bento-card--border-glow' : ''}`;
           const cardProps = {
             className: baseClassName,
@@ -530,6 +552,7 @@ const MagicBento: React.FC<BentoProps> = ({
                 enableTilt={enableTilt}
                 clickEffect={clickEffect}
                 enableMagnetism={enableMagnetism}
+                onClick={onCardClick ? () => onCardClick(index, card) : undefined}
               >
                 <div className="magic-bento-card__header">
                   <div className="magic-bento-card__label">{card.label}</div>
@@ -546,6 +569,20 @@ const MagicBento: React.FC<BentoProps> = ({
             <div
               key={index}
               {...cardProps}
+              style={{ ...cardProps.style, cursor: onCardClick ? 'pointer' : undefined }}
+              role={onCardClick ? 'button' : undefined}
+              tabIndex={onCardClick ? 0 : undefined}
+              onClick={onCardClick ? () => onCardClick(index, card) : undefined}
+              onKeyDown={
+                onCardClick
+                  ? (e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onCardClick(index, card);
+                      }
+                    }
+                  : undefined
+              }
               ref={(el) => {
                 if (!el) return;
 

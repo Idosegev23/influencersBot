@@ -26,6 +26,7 @@ import {
   Sparkles,
   type LucideIcon,
 } from 'lucide-react';
+import MagicBento, { type BentoCardProps } from '@/components/chat/MagicBento';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -49,6 +50,8 @@ interface ServicesCatalogTabProps {
   onAskAbout: (question: string, hiddenContext?: string) => void;
   sessionId?: string | null;
   enableBrief?: boolean;
+  /** When true, renders the MagicBento layout (conference visitors). */
+  bentoMode?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -690,6 +693,7 @@ export default function ServicesCatalogTab({
   onAskAbout,
   sessionId,
   enableBrief,
+  bentoMode,
 }: ServicesCatalogTabProps) {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
@@ -768,6 +772,66 @@ export default function ServicesCatalogTab({
             אין שירותים להצגה
           </h3>
         </div>
+      </div>
+    );
+  }
+
+  if (bentoMode) {
+    const bentoCards: BentoCardProps[] = services.map((svc) => ({
+      title: svc.name_he || svc.name,
+      description: svc.description,
+      label: isAIService(svc) ? 'AI · LDRS' : 'LDRS',
+      color: '#0a0a0f',
+    }));
+
+    return (
+      <div
+        className="h-full overflow-y-auto pb-32"
+        style={{
+          direction: 'rtl',
+          background: 'transparent',
+        }}
+      >
+        <header className="mb-6 px-6 pt-6">
+          <h1
+            className="text-[26px] font-bold tracking-tight leading-[1.15] mb-2"
+            style={{ color: '#09090b' }}
+          >
+            השירותים שלנו
+          </h1>
+          <p className="text-[14px] leading-relaxed" style={{ color: '#52525b' }}>
+            {services.length} פתרונות — לחצו על אחד כדי לשאול את הבוט או להשאיר פרטים.
+          </p>
+        </header>
+
+        <MagicBento
+          cards={bentoCards}
+          glowColor="219, 39, 119"
+          spotlightRadius={320}
+          particleCount={10}
+          enableTilt={false}
+          enableMagnetism={false}
+          clickEffect={true}
+          enableSpotlight={true}
+          enableBorderGlow={true}
+          enableStars={true}
+          textAutoHide={true}
+          onCardClick={(index) => {
+            const svc = services[index];
+            if (svc) setSelectedService(svc);
+          }}
+        />
+
+        {selectedService && (
+          <ServiceModal
+            service={selectedService}
+            accountId={accountId}
+            sessionId={sessionId}
+            enableBrief={enableBrief}
+            onClose={() => setSelectedService(null)}
+            onAskAbout={onAskAbout}
+          />
+        )}
       </div>
     );
   }

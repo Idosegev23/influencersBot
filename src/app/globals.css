@@ -299,6 +299,18 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+/* Conference mode (?source=conf on /chat/ldrs_group): see-through chat
+   so the 3D Lanyard backdrop is visible behind the chat surface. */
+.chat-page--conference,
+.chat-page--conference::before,
+.chat-page--conference::after {
+  background: transparent !important;
+}
+.chat-page--conference::before,
+.chat-page--conference::after {
+  display: none !important;
+}
+
 /* ============================================
    GLASSMORPHIC FOUNDATION
    ============================================ */
