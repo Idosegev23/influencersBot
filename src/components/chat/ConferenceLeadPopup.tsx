@@ -14,8 +14,7 @@ interface ConferenceLeadPopupProps {
 const SERVICES: { value: string; label: string; tagline: string }[] = [
   { value: 'NewVoices', label: 'סוכן קולי AI', tagline: 'NewVoices' },
   { value: 'Influencer Marketing AI', label: 'IMAI', tagline: 'פלטפורמת AI לשיווק משפיענים' },
-  { value: 'Leaders Platform', label: 'Leaders Platform', tagline: 'בריף → הצעה → מצגת אוטומטית' },
-  { value: 'AI Implementation', label: 'ליווי הטמעת AI', tagline: '5 שלבים מקצה לקצה' },
+  { value: 'AI Implementation', label: 'ליווי הטמעת AI', tagline: 'מקצה לקצה' },
   { value: 'AI Automations', label: 'אוטומציות מותאמות', tagline: 'תהליכים שלמים' },
   { value: 'not_sure', label: 'עוד לא בטוח/ה', tagline: 'בואו נדבר ונבין יחד' },
 ];

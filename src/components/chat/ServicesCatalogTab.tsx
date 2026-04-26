@@ -6,7 +6,7 @@ import {
   X,
   Loader2,
   CheckCircle2,
-  ChevronLeft,
+  ArrowLeft,
   Mic,
   Network,
   LayoutDashboard,
@@ -41,6 +41,7 @@ interface Service {
   product_line?: string | null;
   product_url?: string;
   priority?: number | null;
+  is_available?: boolean;
 }
 
 interface ServicesCatalogTabProps {
@@ -51,17 +52,15 @@ interface ServicesCatalogTabProps {
 }
 
 // ---------------------------------------------------------------------------
-// Icon mapping — lucide-react (no font dependency)
+// Icon mapping — lucide-react
 // ---------------------------------------------------------------------------
 
 const ICON_MAP: Record<string, LucideIcon> = {
-  // AI products
   NewVoices: Mic,
   'Influencer Marketing AI': Network,
   'Leaders Platform': LayoutDashboard,
   'AI Implementation': Workflow,
   'AI Automations': Zap,
-  // Classic services
   'Content Creation': PenLine,
   SEO: TrendingUp,
   'Paid Social Advertising': Megaphone,
@@ -73,20 +72,15 @@ const ICON_MAP: Record<string, LucideIcon> = {
   'Influencer Marketing': Star,
 };
 
-function resolveIcon(name: string): LucideIcon {
-  return ICON_MAP[name] || Sparkles;
-}
+const resolveIcon = (name: string): LucideIcon => ICON_MAP[name] || Sparkles;
 
-function isAIService(svc: Service): boolean {
-  return (
-    svc.subcategory === 'ai' ||
-    svc.product_line === 'ai' ||
-    !!svc.name.match(/\b(AI|NewVoices|IMAI|Leaders Platform)\b/i)
-  );
-}
+const isAIService = (svc: Service): boolean =>
+  svc.subcategory === 'ai' ||
+  svc.product_line === 'ai' ||
+  !!svc.name.match(/\b(AI|NewVoices|IMAI|Leaders Platform)\b/i);
 
 // ---------------------------------------------------------------------------
-// MiniBriefForm — keeps existing /api/briefs flow + conference mirror
+// MiniBriefForm
 // ---------------------------------------------------------------------------
 
 const GOALS = ['מודעות למותג', 'הגדלת מכירות', 'חדירה לשוק חדש', 'בניית קהילה', 'אחר'];
@@ -130,7 +124,7 @@ function MiniBriefForm({
     }
   };
 
-  function validate(): boolean {
+  const validate = (): boolean => {
     const e: Record<string, string> = {};
     if (!form.fullName.trim()) e.fullName = 'שדה חובה';
     if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()))
@@ -138,16 +132,11 @@ function MiniBriefForm({
     if (form.phone.trim() && !/^[\d\-+() ]{7,15}$/.test(form.phone.trim())) e.phone = 'מספר לא תקין';
     setErrors(e);
     return Object.keys(e).length === 0;
-  }
-
-  function handleNext() {
-    if (validate()) setStep(2);
-  }
+  };
 
   async function handleSubmit() {
     if (!validate()) return;
     setSubmitting(true);
-
     const isConferenceVisitor =
       typeof window !== 'undefined' &&
       new URLSearchParams(window.location.search).get('source') === 'conf';
@@ -211,38 +200,37 @@ function MiniBriefForm({
   }
 
   const inputClasses =
-    'w-full h-[50px] px-5 rounded-full text-[15px] outline-none transition-all focus:ring-2 focus:ring-pink-500/20';
+    'w-full h-[48px] px-4 rounded-xl text-[15px] outline-none transition-all focus:ring-2 focus:ring-zinc-900/10';
   const inputStyle = {
-    backgroundColor: '#f4f5f7',
-    color: '#0c1013',
-    border: '1px solid #e5e5ea',
+    backgroundColor: '#fafafa',
+    color: '#09090b',
+    border: '1px solid #e4e4e7',
   };
 
   return (
     <div className="flex flex-col h-full" style={{ direction: 'rtl' }}>
-      {/* Step indicator */}
       <div className="flex items-center gap-2 mb-5 px-1">
         {[1, 2].map((s) => (
           <div key={s} className="flex items-center gap-2 flex-1">
             <div
-              className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors"
+              className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold transition-colors"
               style={{
-                background: step >= s ? '#db2777' : '#f4f5f7',
-                color: step >= s ? '#fff' : '#9aa3b0',
+                background: step >= s ? '#09090b' : '#e4e4e7',
+                color: step >= s ? '#fff' : '#71717a',
               }}
             >
               {step > s ? '✓' : s}
             </div>
             <span
-              className="text-xs font-medium"
-              style={{ color: step >= s ? '#0c1013' : '#9aa3b0' }}
+              className="text-[12px] font-medium"
+              style={{ color: step >= s ? '#09090b' : '#a1a1aa' }}
             >
               {s === 1 ? 'פרטים' : 'על הפרויקט'}
             </span>
             {s < 2 && (
               <div
-                className="flex-1 h-0.5 rounded transition-colors"
-                style={{ background: step > s ? '#db2777' : '#f4f5f7' }}
+                className="flex-1 h-px transition-colors"
+                style={{ background: step > s ? '#09090b' : '#e4e4e7' }}
               />
             )}
           </div>
@@ -250,7 +238,7 @@ function MiniBriefForm({
       </div>
 
       {step === 1 ? (
-        <div className="space-y-3 flex-1">
+        <div className="space-y-2.5 flex-1">
           <div>
             <input
               type="text"
@@ -273,63 +261,50 @@ function MiniBriefForm({
             className={inputClasses}
             style={inputStyle}
           />
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <input
-                type="email"
-                placeholder="אימייל"
-                value={form.email}
-                onChange={(e) => set('email', e.target.value)}
-                className={`${inputClasses} ${errors.email ? '!border-red-500' : ''}`}
-                style={{ ...inputStyle, direction: 'ltr', textAlign: 'right' }}
-              />
-              {errors.email && (
-                <p className="text-red-500 text-[11px] mt-1 px-3">{errors.email}</p>
-              )}
-            </div>
-            <div>
-              <input
-                type="tel"
-                placeholder="טלפון"
-                value={form.phone}
-                onChange={(e) => set('phone', e.target.value)}
-                className={`${inputClasses} ${errors.phone ? '!border-red-500' : ''}`}
-                style={{ ...inputStyle, direction: 'ltr', textAlign: 'right' }}
-              />
-              {errors.phone && (
-                <p className="text-red-500 text-[11px] mt-1 px-3">{errors.phone}</p>
-              )}
-            </div>
+          <div className="grid grid-cols-2 gap-2.5">
+            <input
+              type="email"
+              placeholder="אימייל"
+              value={form.email}
+              onChange={(e) => set('email', e.target.value)}
+              className={`${inputClasses} ${errors.email ? '!border-red-500' : ''}`}
+              style={{ ...inputStyle, direction: 'ltr', textAlign: 'right' }}
+            />
+            <input
+              type="tel"
+              placeholder="טלפון"
+              value={form.phone}
+              onChange={(e) => set('phone', e.target.value)}
+              className={`${inputClasses} ${errors.phone ? '!border-red-500' : ''}`}
+              style={{ ...inputStyle, direction: 'ltr', textAlign: 'right' }}
+            />
           </div>
         </div>
       ) : (
         <div className="space-y-3 flex-1 overflow-y-auto" style={{ maxHeight: '55vh' }}>
           <textarea
-            placeholder="ספר/י בקצרה על המוצר או השירות שלך"
+            placeholder="ספר/י בקצרה על המוצר או השירות"
             value={form.productDescription}
             onChange={(e) => set('productDescription', e.target.value)}
             rows={2}
-            className="w-full px-5 py-3 rounded-2xl text-[15px] outline-none transition-all focus:ring-2 focus:ring-pink-500/20 resize-none"
+            className="w-full px-4 py-3 rounded-xl text-[15px] outline-none transition-all focus:ring-2 focus:ring-zinc-900/10 resize-none"
             style={inputStyle}
           />
           <div>
-            <label
-              className="block text-xs font-semibold mb-2 px-1"
-              style={{ color: '#676767' }}
-            >
-              מה המטרה העיקרית?
+            <label className="block text-[12px] font-medium mb-2 px-1" style={{ color: '#52525b' }}>
+              מטרה
             </label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {GOALS.map((g) => (
                 <button
                   key={g}
                   type="button"
                   onClick={() => set('goal', form.goal === g ? '' : g)}
-                  className="px-4 py-2 rounded-full text-xs font-medium border transition-all active:scale-[0.98]"
+                  className="px-3.5 py-1.5 rounded-full text-[12px] font-medium border transition-all"
                   style={{
-                    borderColor: form.goal === g ? '#db2777' : '#e5e5ea',
-                    background: form.goal === g ? '#db2777' : '#fff',
-                    color: form.goal === g ? '#fff' : '#0c1013',
+                    borderColor: form.goal === g ? '#09090b' : '#e4e4e7',
+                    background: form.goal === g ? '#09090b' : '#fff',
+                    color: form.goal === g ? '#fff' : '#52525b',
                   }}
                 >
                   {g}
@@ -338,23 +313,20 @@ function MiniBriefForm({
             </div>
           </div>
           <div>
-            <label
-              className="block text-xs font-semibold mb-2 px-1"
-              style={{ color: '#676767' }}
-            >
-              תקציב משוער
+            <label className="block text-[12px] font-medium mb-2 px-1" style={{ color: '#52525b' }}>
+              תקציב
             </label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {BUDGETS.map((b) => (
                 <button
                   key={b}
                   type="button"
                   onClick={() => set('budgetRange', form.budgetRange === b ? '' : b)}
-                  className="px-4 py-2 rounded-full text-xs font-medium border transition-all active:scale-[0.98]"
+                  className="px-3.5 py-1.5 rounded-full text-[12px] font-medium border transition-all"
                   style={{
-                    borderColor: form.budgetRange === b ? '#db2777' : '#e5e5ea',
-                    background: form.budgetRange === b ? '#db2777' : '#fff',
-                    color: form.budgetRange === b ? '#fff' : '#0c1013',
+                    borderColor: form.budgetRange === b ? '#09090b' : '#e4e4e7',
+                    background: form.budgetRange === b ? '#09090b' : '#fff',
+                    color: form.budgetRange === b ? '#fff' : '#52525b',
                   }}
                 >
                   {b}
@@ -362,51 +334,43 @@ function MiniBriefForm({
               ))}
             </div>
           </div>
-          <textarea
-            placeholder="עוד משהו חשוב? (אופציונלי)"
-            value={form.notes}
-            onChange={(e) => set('notes', e.target.value)}
-            rows={2}
-            className="w-full px-5 py-3 rounded-2xl text-[15px] outline-none transition-all focus:ring-2 focus:ring-pink-500/20 resize-none"
-            style={inputStyle}
-          />
         </div>
       )}
 
-      <div className="flex gap-2 mt-4 pt-3" style={{ borderTop: '1px solid #f0f3f7' }}>
+      <div className="flex gap-2 mt-5 pt-3" style={{ borderTop: '1px solid #f4f4f5' }}>
         {step === 1 ? (
           <>
             <button
               onClick={onCancel}
-              className="px-5 py-3 rounded-full text-sm font-medium transition-colors hover:bg-zinc-50"
-              style={{ border: '1px solid #e5e5ea', color: '#676767' }}
+              className="px-5 h-[44px] rounded-xl text-[14px] font-medium transition-colors hover:bg-zinc-50"
+              style={{ border: '1px solid #e4e4e7', color: '#52525b' }}
             >
               ביטול
             </button>
             <button
-              onClick={handleNext}
-              className="flex-1 h-[50px] rounded-full text-[15px] font-semibold text-white transition-all hover:opacity-90"
-              style={{ background: '#0c1013' }}
+              onClick={() => validate() && setStep(2)}
+              className="flex-1 h-[44px] rounded-xl text-[14px] font-semibold text-white transition-all hover:opacity-90"
+              style={{ background: '#09090b' }}
             >
-              המשך →
+              המשך
             </button>
           </>
         ) : (
           <>
             <button
               onClick={() => setStep(1)}
-              className="px-5 py-3 rounded-full text-sm font-medium transition-colors hover:bg-zinc-50"
-              style={{ border: '1px solid #e5e5ea', color: '#676767' }}
+              className="px-5 h-[44px] rounded-xl text-[14px] font-medium transition-colors hover:bg-zinc-50"
+              style={{ border: '1px solid #e4e4e7', color: '#52525b' }}
             >
-              ← חזרה
+              חזרה
             </button>
             <button
               onClick={handleSubmit}
               disabled={submitting}
-              className="flex-1 h-[50px] rounded-full text-[15px] font-semibold text-white disabled:opacity-60 flex items-center justify-center gap-2 transition-all hover:opacity-90"
-              style={{ background: '#0c1013' }}
+              className="flex-1 h-[44px] rounded-xl text-[14px] font-semibold text-white disabled:opacity-60 flex items-center justify-center gap-2 transition-all hover:opacity-90"
+              style={{ background: '#09090b' }}
             >
-              {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'שלח בריף'}
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'שליחה'}
             </button>
           </>
         )}
@@ -416,7 +380,7 @@ function MiniBriefForm({
 }
 
 // ---------------------------------------------------------------------------
-// Service Modal
+// Service Modal — agency clean
 // ---------------------------------------------------------------------------
 
 function ServiceModal({
@@ -440,28 +404,28 @@ function ServiceModal({
   const ai = isAIService(service);
   const displayName = service.name_he || service.name;
 
-  function handleAsk() {
-    const question = `ספרו לי על ${displayName}`;
-    const context = `[הקשר השירות:]\nשם: ${service.name}${
-      service.name_he ? ` (${service.name_he})` : ''
-    }\nתיאור: ${service.description}`;
-    onAskAbout(question, context);
+  const handleAsk = () => {
+    onAskAbout(
+      `ספרו לי על ${displayName}`,
+      `[הקשר השירות:]\nשם: ${service.name}${service.name_he ? ` (${service.name_he})` : ''}\nתיאור: ${service.description}`
+    );
     onClose();
-  }
+  };
 
-  function handleSubmitted(form: Record<string, string>) {
+  const handleSubmitted = (form: Record<string, string>) => {
     setBriefSubmitted(true);
     setTimeout(() => {
-      const question = `שלחתי בריף לגבי ${displayName}`;
-      const context = `[בריף שנשלח:]\nשירות: ${displayName}\nשם: ${form.fullName}${
-        form.businessName ? `\nעסק: ${form.businessName}` : ''
-      }${form.goal ? `\nמטרה: ${form.goal}` : ''}${
-        form.budgetRange ? `\nתקציב: ${form.budgetRange}` : ''
-      }`;
-      onAskAbout(question, context);
+      onAskAbout(
+        `שלחתי בריף לגבי ${displayName}`,
+        `[בריף שנשלח:]\nשירות: ${displayName}\nשם: ${form.fullName}${
+          form.businessName ? `\nעסק: ${form.businessName}` : ''
+        }${form.goal ? `\nמטרה: ${form.goal}` : ''}${
+          form.budgetRange ? `\nתקציב: ${form.budgetRange}` : ''
+        }`
+      );
       onClose();
     }, 2000);
-  }
+  };
 
   return (
     <AnimatePresence>
@@ -470,88 +434,82 @@ function ServiceModal({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-        onClick={(e) => {
-          if (e.target === e.currentTarget) onClose();
-        }}
+        onClick={(e) => e.target === e.currentTarget && onClose()}
       >
-        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
         <motion.div
           initial={{ y: 60, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 60, opacity: 0 }}
-          transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-          className="relative w-full sm:max-w-md max-h-[90vh] bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden flex flex-col shadow-2xl"
-          style={{ direction: 'rtl' }}
+          transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+          className="relative w-full sm:max-w-md max-h-[88vh] bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden flex flex-col"
+          style={{ direction: 'rtl', boxShadow: '0 20px 60px -10px rgba(0,0,0,0.18)' }}
         >
-          {/* Header with gradient hero */}
-          <div
-            className="relative px-6 pt-6 pb-5"
-            style={{
-              background: ai
-                ? 'linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%)'
-                : '#fafbfc',
-            }}
-          >
+          {/* Top bar with close */}
+          <div className="flex items-center justify-end px-5 pt-4 pb-1">
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-full flex items-center justify-center transition-colors hover:bg-zinc-100"
+              aria-label="סגור"
+            >
+              <X className="w-4 h-4" style={{ color: '#71717a' }} />
+            </button>
+          </div>
+
+          {/* Hero */}
+          <div className="px-6 pb-5">
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center mb-4"
+              style={{
+                background: ai ? '#fdf2f8' : '#fafafa',
+                border: ai ? '1px solid #fbcfe8' : '1px solid #e4e4e7',
+              }}
+            >
+              <Icon
+                className="w-5 h-5"
+                style={{ color: ai ? '#db2777' : '#09090b' }}
+                strokeWidth={1.75}
+              />
+            </div>
             {ai && (
               <span
-                className="inline-block text-[10px] font-bold tracking-widest uppercase px-2 py-1 rounded-full mb-3"
-                style={{ background: '#db2777', color: '#fff' }}
+                className="inline-block text-[10px] font-semibold tracking-wider uppercase mb-2"
+                style={{ color: '#db2777' }}
               >
                 AI · LDRS
               </span>
             )}
-            <div className="flex items-start gap-4">
-              <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm"
-                style={{
-                  background: ai ? '#fff' : '#fff',
-                  border: ai ? '1px solid #fbcfe8' : '1px solid #eef1f5',
-                }}
-              >
-                <Icon
-                  className="w-6 h-6"
-                  style={{ color: ai ? '#db2777' : '#0c1013' }}
-                  strokeWidth={1.75}
-                />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="text-[19px] font-bold leading-tight" style={{ color: '#0c1013' }}>
-                  {displayName}
-                </h3>
-                <p className="text-[13px] mt-1.5 leading-relaxed" style={{ color: '#676767' }}>
-                  {service.description}
-                </p>
-              </div>
-              <button
-                onClick={onClose}
-                className="w-8 h-8 rounded-full flex items-center justify-center transition-colors hover:bg-black/5 flex-shrink-0"
-                aria-label="סגור"
-              >
-                <X className="w-4 h-4" style={{ color: '#676767' }} />
-              </button>
-            </div>
+            <h3 className="text-[20px] font-bold leading-tight" style={{ color: '#09090b' }}>
+              {displayName}
+            </h3>
+            <p
+              className="text-[14px] mt-2 leading-relaxed"
+              style={{ color: '#52525b' }}
+            >
+              {service.description}
+            </p>
           </div>
 
           {/* Body */}
-          <div className="px-6 py-5 flex-1 overflow-y-auto">
+          <div className="px-6 pb-6 flex-1 overflow-y-auto">
             {briefSubmitted ? (
-              <div className="text-center py-6">
+              <div className="text-center py-8">
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ type: 'spring', damping: 15 }}
                 >
                   <CheckCircle2
-                    className="w-14 h-14 mx-auto mb-4"
-                    style={{ color: '#34c759' }}
+                    className="w-12 h-12 mx-auto mb-3"
+                    style={{ color: '#16a34a' }}
                     strokeWidth={1.5}
                   />
                 </motion.div>
-                <h4 className="text-[18px] font-bold mb-1" style={{ color: '#0c1013' }}>
-                  הבריף נשלח!
+                <h4 className="text-[16px] font-bold mb-1" style={{ color: '#09090b' }}>
+                  הבריף נשלח
                 </h4>
-                <p className="text-[14px]" style={{ color: '#676767' }}>
+                <p className="text-[13px]" style={{ color: '#71717a' }}>
                   נחזור אליך בהקדם
                 </p>
               </div>
@@ -564,64 +522,42 @@ function ServiceModal({
                 onCancel={() => setShowBrief(false)}
               />
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <button
                   onClick={handleAsk}
-                  className="w-full flex items-center gap-3 p-4 rounded-2xl transition-all text-right active:scale-[0.99]"
-                  style={{
-                    background: '#fafbfc',
-                    border: '1px solid #eef1f5',
-                  }}
+                  className="w-full flex items-center gap-3 p-3.5 rounded-xl transition-all text-right active:scale-[0.99] hover:bg-zinc-50"
+                  style={{ border: '1px solid #e4e4e7' }}
                 >
-                  <div
-                    className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
-                    style={{ background: '#fdf2f8' }}
-                  >
-                    <MessageCircle
-                      className="w-5 h-5"
-                      style={{ color: '#db2777' }}
-                      strokeWidth={1.75}
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-bold text-[14px]" style={{ color: '#0c1013' }}>
+                  <MessageCircle
+                    className="w-[18px] h-[18px] flex-shrink-0"
+                    style={{ color: '#09090b' }}
+                    strokeWidth={1.75}
+                  />
+                  <div className="flex-1 min-w-0 text-right">
+                    <div className="font-semibold text-[14px]" style={{ color: '#09090b' }}>
                       שאל אותי על השירות
                     </div>
-                    <div className="text-[12px] mt-0.5" style={{ color: '#676767' }}>
-                      תשובות מדויקות מתוך מאות פרויקטים
-                    </div>
                   </div>
-                  <ChevronLeft
+                  <ArrowLeft
                     className="w-4 h-4 flex-shrink-0"
-                    style={{ color: '#9aa3b0' }}
+                    style={{ color: '#a1a1aa' }}
                   />
                 </button>
 
                 {enableBrief && (
                   <button
                     onClick={() => setShowBrief(true)}
-                    className="w-full flex items-center gap-3 p-4 rounded-2xl text-right active:scale-[0.99] transition-all hover:opacity-90"
-                    style={{
-                      background: '#0c1013',
-                      color: '#fff',
-                    }}
+                    className="w-full flex items-center gap-3 p-3.5 rounded-xl text-right active:scale-[0.99] transition-all hover:opacity-90"
+                    style={{ background: '#09090b', color: '#fff' }}
                   >
-                    <div
-                      className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
-                      style={{ background: 'rgba(255,255,255,0.1)' }}
-                    >
-                      <FileText className="w-5 h-5" strokeWidth={1.75} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-bold text-[14px]">השאר פרטים לבריף</div>
-                      <div className="text-[12px] mt-0.5" style={{ opacity: 0.7 }}>
-                        טופס קצר ונחזור אליך עם הצעה
-                      </div>
-                    </div>
-                    <ChevronLeft
-                      className="w-4 h-4 flex-shrink-0"
-                      style={{ opacity: 0.7 }}
+                    <FileText
+                      className="w-[18px] h-[18px] flex-shrink-0"
+                      strokeWidth={1.75}
                     />
+                    <div className="flex-1 min-w-0 text-right">
+                      <div className="font-semibold text-[14px]">השאר פרטים לבריף</div>
+                    </div>
+                    <ArrowLeft className="w-4 h-4 flex-shrink-0" style={{ opacity: 0.7 }} />
                   </button>
                 )}
               </div>
@@ -634,7 +570,7 @@ function ServiceModal({
 }
 
 // ---------------------------------------------------------------------------
-// Service Card
+// Service Card — minimal, agency
 // ---------------------------------------------------------------------------
 
 function ServiceCard({
@@ -652,48 +588,42 @@ function ServiceCard({
 
   return (
     <motion.button
-      initial={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.03, duration: 0.25 }}
+      transition={{ delay: index * 0.025, duration: 0.2 }}
       onClick={onClick}
-      className="group relative flex flex-col items-start text-right p-4 rounded-2xl transition-all active:scale-[0.98] overflow-hidden"
+      className="group relative flex flex-col items-start text-right p-4 rounded-xl transition-all active:scale-[0.99] hover:border-zinc-300"
       style={{
-        background: ai
-          ? 'linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%)'
-          : '#ffffff',
-        border: ai ? '1px solid #fbcfe8' : '1px solid #eef1f5',
-        minHeight: 140,
+        background: '#ffffff',
+        border: '1px solid #e4e4e7',
+        minHeight: 132,
       }}
     >
-      {ai && (
-        <span
-          className="absolute top-3 left-3 text-[9px] font-bold tracking-widest uppercase px-1.5 py-0.5 rounded"
-          style={{ background: '#db2777', color: '#fff' }}
+      <div className="flex items-start justify-between w-full mb-3">
+        <div
+          className="w-10 h-10 rounded-lg flex items-center justify-center transition-transform group-hover:scale-105"
+          style={{
+            background: ai ? '#fdf2f8' : '#fafafa',
+            border: ai ? '1px solid #fbcfe8' : '1px solid #e4e4e7',
+          }}
         >
-          AI
-        </span>
-      )}
-
-      <div
-        className="w-11 h-11 rounded-xl flex items-center justify-center mb-3 transition-transform group-hover:scale-105"
-        style={{
-          background: ai ? '#ffffff' : '#fafbfc',
-          border: ai ? '1px solid #fbcfe8' : '1px solid #eef1f5',
-        }}
-      >
-        <Icon
-          className="w-[22px] h-[22px]"
-          style={{ color: ai ? '#db2777' : '#0c1013' }}
-          strokeWidth={1.75}
-        />
+          <Icon
+            className="w-[18px] h-[18px]"
+            style={{ color: ai ? '#db2777' : '#09090b' }}
+            strokeWidth={1.75}
+          />
+        </div>
       </div>
 
-      <div className="text-[14px] font-bold leading-tight mb-1" style={{ color: '#0c1013' }}>
+      <div
+        className="text-[14.5px] font-bold leading-tight mb-1.5"
+        style={{ color: '#09090b' }}
+      >
         {cardName}
       </div>
       <div
         className="text-[11.5px] leading-relaxed line-clamp-2"
-        style={{ color: '#676767' }}
+        style={{ color: '#71717a' }}
       >
         {svc.description}
       </div>
@@ -706,38 +636,33 @@ function ServiceCard({
 // ---------------------------------------------------------------------------
 
 function SectionHeader({
-  eyebrow,
   title,
-  subtitle,
-  accent,
+  count,
+  isAI,
 }: {
-  eyebrow: string;
   title: string;
-  subtitle: string;
-  accent?: 'ai' | 'classic';
+  count: number;
+  isAI?: boolean;
 }) {
   return (
-    <div className="mb-4 flex items-baseline justify-between gap-3">
-      <div>
-        <div
-          className="text-[10px] font-bold tracking-widest uppercase mb-1"
-          style={{ color: accent === 'ai' ? '#db2777' : '#9aa3b0' }}
-        >
-          {eyebrow}
-        </div>
-        <h2 className="text-[19px] font-bold" style={{ color: '#0c1013' }}>
+    <div className="flex items-baseline justify-between mb-4 px-0.5">
+      <div className="flex items-baseline gap-2.5">
+        <h2 className="text-[18px] font-bold tracking-tight" style={{ color: '#09090b' }}>
           {title}
         </h2>
-        <p className="text-[12.5px] mt-1" style={{ color: '#676767' }}>
-          {subtitle}
-        </p>
+        <span
+          className="text-[12px] font-medium tabular-nums"
+          style={{ color: isAI ? '#db2777' : '#a1a1aa' }}
+        >
+          {String(count).padStart(2, '0')}
+        </span>
       </div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Main Component
+// Main
 // ---------------------------------------------------------------------------
 
 export default function ServicesCatalogTab({
@@ -756,7 +681,7 @@ export default function ServicesCatalogTab({
         const res = await fetch(`/api/influencer/content/products?accountId=${accountId}`);
         const data = await res.json();
         const svc = (data.products || [])
-          .filter((p: Service) => p.category === 'service')
+          .filter((p: Service) => p.category === 'service' && p.is_available !== false)
           .sort((a: Service, b: Service) => (b.priority ?? 0) - (a.priority ?? 0));
         setServices(svc);
       } catch (err) {
@@ -781,23 +706,22 @@ export default function ServicesCatalogTab({
   if (loading) {
     return (
       <div
-        className="h-full overflow-y-auto px-4 py-5 pb-32"
+        className="h-full overflow-y-auto px-5 py-8 pb-32"
         style={{ direction: 'rtl', backgroundColor: '#ffffff' }}
       >
-        <div className="space-y-6">
-          {/* Skeleton hero */}
-          <div className="h-7 w-2/3 rounded-full bg-zinc-100 animate-pulse" />
-          {/* Skeleton cards */}
-          {[0, 1].map((row) => (
-            <div key={row} className="grid grid-cols-2 gap-3">
+        <div className="space-y-8">
+          <div>
+            <div className="h-8 w-48 rounded bg-zinc-100 animate-pulse mb-2" />
+            <div className="h-4 w-72 rounded bg-zinc-100 animate-pulse" />
+          </div>
+          <div className="space-y-6">
+            <div className="h-5 w-24 rounded bg-zinc-100 animate-pulse" />
+            <div className="grid grid-cols-2 gap-3">
               {[0, 1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="h-[140px] rounded-2xl bg-zinc-50 animate-pulse"
-                />
+                <div key={i} className="h-[132px] rounded-xl bg-zinc-50 animate-pulse" />
               ))}
             </div>
-          ))}
+          </div>
         </div>
       </div>
     );
@@ -811,17 +735,14 @@ export default function ServicesCatalogTab({
       >
         <div className="text-center">
           <div
-            className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center"
-            style={{ background: '#fafbfc', border: '1px solid #eef1f5' }}
+            className="w-14 h-14 rounded-full mx-auto mb-4 flex items-center justify-center"
+            style={{ background: '#fafafa', border: '1px solid #e4e4e7' }}
           >
-            <Sparkles className="w-7 h-7" style={{ color: '#9aa3b0' }} strokeWidth={1.5} />
+            <Sparkles className="w-6 h-6" style={{ color: '#a1a1aa' }} strokeWidth={1.5} />
           </div>
-          <h3 className="text-[16px] font-bold mb-1" style={{ color: '#0c1013' }}>
+          <h3 className="text-[15px] font-bold mb-1" style={{ color: '#09090b' }}>
             אין שירותים להצגה
           </h3>
-          <p className="text-[13px]" style={{ color: '#676767' }}>
-            נסו שוב בעוד רגע
-          </p>
         </div>
       </div>
     );
@@ -829,45 +750,26 @@ export default function ServicesCatalogTab({
 
   return (
     <div
-      className="h-full overflow-y-auto px-4 py-6 pb-32"
-      style={{
-        direction: 'rtl',
-        backgroundColor: '#ffffff',
-        backgroundImage:
-          'radial-gradient(circle at 100% 0%, rgba(252, 231, 243, 0.4) 0%, transparent 50%)',
-      }}
+      className="h-full overflow-y-auto px-5 py-8 pb-32"
+      style={{ direction: 'rtl', backgroundColor: '#ffffff' }}
     >
-      {/* Hero */}
-      <div className="mb-7 px-1">
-        <div className="flex items-center gap-2 mb-2">
-          <div
-            className="w-2 h-2 rounded-full"
-            style={{ background: '#db2777' }}
-          />
-          <span
-            className="text-[10px] font-bold tracking-widest uppercase"
-            style={{ color: '#db2777' }}
-          >
-            LDRS · השירותים שלנו
-          </span>
-        </div>
-        <h1 className="text-[24px] font-bold leading-tight" style={{ color: '#0c1013' }}>
-          מ-AI ארגוני ועד קמפיין 360°
+      {/* Header */}
+      <header className="mb-9">
+        <h1
+          className="text-[26px] font-bold tracking-tight leading-[1.15] mb-2"
+          style={{ color: '#09090b' }}
+        >
+          השירותים שלנו
         </h1>
-        <p className="text-[13.5px] mt-2 leading-relaxed" style={{ color: '#676767' }}>
-          לחץ על שירות לפרטים, שאלה לבוט או טופס בריף.
+        <p className="text-[14px] leading-relaxed" style={{ color: '#52525b' }}>
+          {services.length} פתרונות פעילים — לחצו על אחד לפרטים, שאלה לבוט, או טופס בריף.
         </p>
-      </div>
+      </header>
 
       {/* AI Section */}
       {aiServices.length > 0 && (
-        <section className="mb-8">
-          <SectionHeader
-            eyebrow="AI · מוצרים שלנו"
-            title="פלטפורמות AI שלידרס בונה"
-            subtitle="מוצרים פנימיים שהפכו לפתרונות לקוחות"
-            accent="ai"
-          />
+        <section className="mb-10">
+          <SectionHeader title="AI" count={aiServices.length} isAI />
           <div className="grid grid-cols-2 gap-3">
             {aiServices.map((svc, i) => (
               <ServiceCard
@@ -881,26 +783,10 @@ export default function ServicesCatalogTab({
         </section>
       )}
 
-      {/* Divider */}
-      {aiServices.length > 0 && classicServices.length > 0 && (
-        <div className="my-8 flex items-center gap-3">
-          <div className="flex-1 h-px" style={{ background: '#eef1f5' }} />
-          <span className="text-[10px] font-medium tracking-widest uppercase" style={{ color: '#9aa3b0' }}>
-            ◆
-          </span>
-          <div className="flex-1 h-px" style={{ background: '#eef1f5' }} />
-        </div>
-      )}
-
-      {/* Classic services */}
+      {/* Classic Section */}
       {classicServices.length > 0 && (
-        <section className="mb-6">
-          <SectionHeader
-            eyebrow="שיווק · קריאייטיב · מדיה"
-            title="הליבה של LDRS"
-            subtitle="פרפורמנס 360°, משפיענים, תוכן והפקות"
-            accent="classic"
-          />
+        <section>
+          <SectionHeader title="שיווק וקריאייטיב" count={classicServices.length} />
           <div className="grid grid-cols-2 gap-3">
             {classicServices.map((svc, i) => (
               <ServiceCard
