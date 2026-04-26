@@ -26,7 +26,6 @@ import {
   Sparkles,
   type LucideIcon,
 } from 'lucide-react';
-import MagicBento, { type BentoCardProps } from '@/components/chat/MagicBento';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -50,7 +49,7 @@ interface ServicesCatalogTabProps {
   onAskAbout: (question: string, hiddenContext?: string) => void;
   sessionId?: string | null;
   enableBrief?: boolean;
-  /** When true, renders the MagicBento layout (conference visitors). */
+  /** When true, forces the Figma card grid (used by conference visitors). */
   bentoMode?: boolean;
 }
 
@@ -872,23 +871,27 @@ export default function ServicesCatalogTab({
     );
   }
 
-  // Mobile (<768): Figma 3-col grid — same on conference and non-conference
-  if (isMobile) {
+  // Unified Figma card grid — applies on every viewport, replaces the bento
+  // and the train-track layouts. 3 cols on mobile, scales up on wider screens.
+  if (isMobile || bentoMode) {
     return (
       <div
         className="h-full overflow-y-auto pb-32"
         style={{ direction: 'rtl', backgroundColor: '#ffffff' }}
       >
-        <header className="px-4 pt-5 pb-4 text-right">
-          <h1 className="text-[22px] font-bold tracking-tight leading-[1.2]" style={{ color: '#0c1013' }}>
+        <header className="px-4 sm:px-6 pt-5 sm:pt-6 pb-4 text-right">
+          <h1
+            className="text-[22px] sm:text-[26px] font-bold tracking-tight leading-[1.2]"
+            style={{ color: '#0c1013' }}
+          >
             השירותים שלנו
           </h1>
-          <p className="text-[13px] mt-1" style={{ color: '#676767' }}>
+          <p className="text-[13px] sm:text-[14px] mt-1" style={{ color: '#676767' }}>
             פתרונות דיגיטלים מותאמים לצמיחה שלכם
           </p>
         </header>
 
-        <div className="px-4 grid grid-cols-3 gap-2.5">
+        <div className="px-4 sm:px-6 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-3">
           {services.map((svc, i) => (
             <FigmaServiceCard
               key={svc.id}
@@ -898,66 +901,6 @@ export default function ServicesCatalogTab({
             />
           ))}
         </div>
-
-        {selectedService && (
-          <ServiceModal
-            service={selectedService}
-            accountId={accountId}
-            sessionId={sessionId}
-            enableBrief={enableBrief}
-            onClose={() => setSelectedService(null)}
-            onAskAbout={onAskAbout}
-          />
-        )}
-      </div>
-    );
-  }
-
-  if (bentoMode) {
-    const bentoCards: BentoCardProps[] = services.map((svc) => ({
-      title: svc.name_he || svc.name,
-      description: svc.description,
-      label: isAIService(svc) ? 'AI · LDRS' : 'LDRS',
-      color: '#0a0a0f',
-    }));
-
-    return (
-      <div
-        className="h-full overflow-y-auto pb-32"
-        style={{
-          direction: 'rtl',
-          background: 'transparent',
-        }}
-      >
-        <header className="mb-6 px-6 pt-6">
-          <h1
-            className="text-[26px] font-bold tracking-tight leading-[1.15] mb-2"
-            style={{ color: '#09090b' }}
-          >
-            השירותים שלנו
-          </h1>
-          <p className="text-[14px] leading-relaxed" style={{ color: '#52525b' }}>
-            {services.length} פתרונות — לחצו על אחד כדי לשאול את הבוט או להשאיר פרטים.
-          </p>
-        </header>
-
-        <MagicBento
-          cards={bentoCards}
-          glowColor="219, 39, 119"
-          spotlightRadius={320}
-          particleCount={10}
-          enableTilt={false}
-          enableMagnetism={false}
-          clickEffect={true}
-          enableSpotlight={true}
-          enableBorderGlow={true}
-          enableStars={true}
-          textAutoHide={true}
-          onCardClick={(index) => {
-            const svc = services[index];
-            if (svc) setSelectedService(svc);
-          }}
-        />
 
         {selectedService && (
           <ServiceModal
