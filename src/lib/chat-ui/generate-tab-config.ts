@@ -99,7 +99,7 @@ const HEADER_LABELS: Record<string, Record<string, string>> = {
   },
   brand: { home: 'בית ועיצוב', _default: 'מותג' },
   media_news: { _default: 'חדשות ומדיה' },
-  service_provider: { _default: 'Assistent' },
+  service_provider: { _default: 'Assistant' },
   local_business: { food: 'אוכל ומעדנייה', _default: 'עסק מקומי' },
   tech_creator: { _default: 'טכנולוגיה וסקירות' },
 };
