@@ -31,7 +31,7 @@ export function ChatInput({
   onChange,
   onSend,
   disabled = false,
-  placeholder = 'מה רצית לשאול?',
+  placeholder = 'משהו שבא לך לשאול?',
   media,
   username,
   showDisclaimer = false,

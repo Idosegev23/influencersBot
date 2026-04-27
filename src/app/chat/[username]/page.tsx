@@ -52,6 +52,12 @@ import { LeadCapturePopup } from '@/components/chat/LeadCapturePopup';
 import { ConferenceLeadPopup } from '@/components/chat/ConferenceLeadPopup';
 import { ConferenceForYouTab } from '@/components/chat/ConferenceForYouTab';
 import { AskItamarButton } from '@/components/chat/AskItamarButton';
+
+// Itamar handoff button kill-switch. Flip back to true when the LDRS
+// WhatsApp Cloud API number (+972 54-390-2030) finishes /register with
+// its 2FA PIN — until then the bridge can't fire and we hide the button
+// so visitors don't tap a CTA that errors.
+const HANDOFF_BUTTON_ENABLED = false;
 import type { Influencer, ContentItem, InfluencerType } from '@/types';
 
 // Feature flag for streaming
@@ -518,10 +524,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   useEffect(() => {
     if (!isConferenceMode || username !== 'ldrs_group') return;
     const conferenceStarters = [
-      'סיכום ההרצאה של איתמר בכנס',
-      'איך מתחילים להטמיע AI בארגון?',
-      'איפה לחפש את הכאב לפני AI?',
-      'מה זה NewVoices?',
+      'סיכום ההרצאה של איתמר בכנס החדשנות',
+      'איך למצוא את נקודות הכאב בארגון לפני שפונים ל-AI?',
     ];
     const conferenceTopics = [
       '5 שלבי הטמעת AI לפי לידרס',
@@ -1581,21 +1585,24 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   style={{ background: 'transparent' }}
                 >
                   <div className={`mx-auto ${isMobile ? 'max-w-2xl' : 'max-w-[670px]'}`}>
-                    {/* Personal handoff CTA — conference visitors only
-                        (?source=conf on /chat/ldrs_group). General LDRS
-                        traffic does NOT see this button, and the API
-                        rejects any request with source !== 'conf'. */}
-                    {isConferenceMode && username === 'ldrs_group' && messages.length > 0 && (
-                      <div className="flex justify-end mb-2">
-                        <AskItamarButton
-                          sessionId={sessionId}
-                          source="conf"
-                          visitorName={null}
-                          visitorMeta="מהכנס · 30.4.2026"
-                          onSubmitted={() => setHandoffActive(true)}
-                        />
-                      </div>
-                    )}
+                    {/* Personal handoff CTA — conference visitors only.
+                        TEMPORARILY DISABLED: Cloud API number pending
+                        2FA registration. Flip HANDOFF_BUTTON_ENABLED to
+                        true once the WhatsApp number is registered. */}
+                    {HANDOFF_BUTTON_ENABLED &&
+                      isConferenceMode &&
+                      username === 'ldrs_group' &&
+                      messages.length > 0 && (
+                        <div className="flex justify-end mb-2">
+                          <AskItamarButton
+                            sessionId={sessionId}
+                            source="conf"
+                            visitorName={null}
+                            visitorMeta="מהכנס · 30.4.2026"
+                            onSubmitted={() => setHandoffActive(true)}
+                          />
+                        </div>
+                      )}
                     <ChatInput
                       value={inputValue}
                       onChange={setInputValue}
