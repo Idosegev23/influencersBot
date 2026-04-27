@@ -526,6 +526,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     const conferenceStarters = [
       'סיכום ההרצאה של איתמר בכנס החדשנות',
       'איך למצוא את נקודות הכאב בארגון לפני שפונים ל-AI?',
+      'איך מתחילים להטמיע AI בארגון?',
+      'מה זה NewVoices?',
     ];
     const conferenceTopics = [
       '5 שלבי הטמעת AI לפי לידרס',

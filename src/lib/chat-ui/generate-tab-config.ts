@@ -76,7 +76,7 @@ const SUBTITLE_TEMPLATES: Record<string, Record<string, string>> = {
     other: 'אני כאן לעזור עם מוצרים, המלצות ומבצעים',
   },
   media_news: { _default: 'אני כאן לעזור עם חדשות, עדכונים ובידור' },
-  service_provider: { _default: 'אני כאן לעזור עם שירותים, פרויקטים ומידע' },
+  service_provider: { _default: 'אני כאן לעזור בכל עניין ונושא מקצועי' },
   local_business: {
     food: 'אני כאן לעזור עם מוצרים, הזמנות ומידע',
     other: 'אני כאן לעזור עם מידע, מוצרים ושירותים',
@@ -99,7 +99,7 @@ const HEADER_LABELS: Record<string, Record<string, string>> = {
   },
   brand: { home: 'בית ועיצוב', _default: 'מותג' },
   media_news: { _default: 'חדשות ומדיה' },
-  service_provider: { _default: 'נותן שירות' },
+  service_provider: { _default: 'Assistent' },
   local_business: { food: 'אוכל ומעדנייה', _default: 'עסק מקומי' },
   tech_creator: { _default: 'טכנולוגיה וסקירות' },
 };
