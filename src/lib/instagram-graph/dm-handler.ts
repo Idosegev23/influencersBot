@@ -90,36 +90,36 @@ export async function processInstagramGraphDM(
       return { success: false, error: `No account mapped for IG ${igAccountId}` };
     }
 
-    // 2. Get or create DM session (keyed by sender + account via thread_id)
-    const threadId = `dm_ig_graph_${senderId}_${accountId}`;
-    const session = await getOrCreateSession(supabase, threadId, accountId, senderId);
-    const sessionUUID = session.id; // actual UUID from DB
-
-    // 3. Load account info + conversation history + personality
-    // DM prioritizes quality over speed — load more history for better understanding
-    const [accountData, historyData] = await Promise.all([
-      supabase
-        .from('accounts')
-        .select('config')
-        .eq('id', accountId)
-        .single()
-        .then(r => r.data),
-      supabase
-        .from('chat_messages')
-        .select('role, content')
-        .eq('session_id', sessionUUID)
-        .order('created_at', { ascending: false })
-        .limit(20)
-        .then(r => r.data),
-    ]);
+    // 2. Kill-switch: load account config FIRST and bail before any session
+    //    creation if dm_bot_enabled is not explicitly true. This guarantees
+    //    we never write rows or generate replies when the bot is disabled.
+    const accountData = await supabase
+      .from('accounts')
+      .select('config')
+      .eq('id', accountId)
+      .single()
+      .then(r => r.data);
 
     const config = accountData?.config || {};
 
-    // Check if DM bot is enabled for this account (default: disabled)
     if (config.dm_bot_enabled !== true) {
       console.log(`[IG Graph DM] Bot not enabled for account ${accountId}, skipping`);
       return { success: true };
     }
+
+    // 3. Get or create DM session (keyed by sender + account via thread_id)
+    const threadId = `dm_ig_graph_${senderId}_${accountId}`;
+    const session = await getOrCreateSession(supabase, threadId, accountId, senderId);
+    const sessionUUID = session.id; // actual UUID from DB
+
+    // 4. Load conversation history (account already loaded above)
+    const historyData = await supabase
+      .from('chat_messages')
+      .select('role, content')
+      .eq('session_id', sessionUUID)
+      .order('created_at', { ascending: false })
+      .limit(20)
+      .then(r => r.data);
 
     const username = config.username || 'influencer';
     const influencerName = config.display_name || config.username || 'Influencer';

@@ -59,11 +59,24 @@ export async function processInstagramDM(payload: WebhookPayload): Promise<DMPro
       return { success: false, error: `No account mapped for channel ${channelId}` };
     }
 
-    // 2. Get or create DM session
+    // 2. Kill-switch: bail BEFORE any session creation if dm_bot_enabled is
+    //    not explicitly true. Mirrors the Instagram Graph handler so any
+    //    DM channel can be paused by flipping a single account.config flag.
+    const { data: gateAccount } = await supabase
+      .from('accounts')
+      .select('config')
+      .eq('id', accountId)
+      .single();
+    if ((gateAccount?.config || {}).dm_bot_enabled !== true) {
+      console.log(`[DM Handler] Bot not enabled for account ${accountId}, skipping`);
+      return { success: true };
+    }
+
+    // 3. Get or create DM session
     const sessionKey = `dm_respondio_${contactId}_${accountId}`;
     let session = await getOrCreateSession(supabase, sessionKey, accountId);
 
-    // 3. Load account info + conversation history + personality
+    // 4. Load account info + conversation history + personality
     const [accountData, historyData] = await Promise.all([
       supabase
         .from('accounts')
