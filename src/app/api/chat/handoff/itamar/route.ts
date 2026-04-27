@@ -21,6 +21,12 @@ function getSupabase() {
   );
 }
 
+// Personal handoff is restricted to conference visitors on the LDRS account.
+// Both gates are required:
+//   1. session.account_id === LDRS_ACCOUNT_ID
+//   2. body.source === 'conf'
+const LDRS_ACCOUNT_ID = 'de38eac6-d2fb-46a7-ac09-5ec860147ca0';
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -28,12 +34,19 @@ export async function POST(req: NextRequest) {
     const question: string | undefined = body.question;
     const visitorName: string | undefined = body.visitorName;
     const visitorMeta: string | undefined = body.visitorMeta;
+    const source: string | undefined = body.source;
 
     if (!sessionId || !question) {
       return NextResponse.json({ error: 'sessionId and question required' }, { status: 400 });
     }
     if (question.length > 2000) {
       return NextResponse.json({ error: 'question too long' }, { status: 400 });
+    }
+    if (source !== 'conf') {
+      return NextResponse.json(
+        { error: 'Personal handoff is enabled only for conference visitors.' },
+        { status: 403 },
+      );
     }
 
     const supabase = getSupabase();
@@ -46,6 +59,12 @@ export async function POST(req: NextRequest) {
       .single();
     if (sErr || !session) {
       return NextResponse.json({ error: 'session not found' }, { status: 404 });
+    }
+    if (session.account_id !== LDRS_ACCOUNT_ID) {
+      return NextResponse.json(
+        { error: 'Personal handoff is not enabled for this account.' },
+        { status: 403 },
+      );
     }
 
     const labelParts = [visitorName, visitorMeta].filter(Boolean);

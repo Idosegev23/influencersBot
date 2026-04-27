@@ -1581,13 +1581,17 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   style={{ background: 'transparent' }}
                 >
                   <div className={`mx-auto ${isMobile ? 'max-w-2xl' : 'max-w-[670px]'}`}>
-                    {/* Personal handoff CTA — LDRS only. Always visible above input. */}
-                    {username === 'ldrs_group' && messages.length > 0 && (
+                    {/* Personal handoff CTA — conference visitors only
+                        (?source=conf on /chat/ldrs_group). General LDRS
+                        traffic does NOT see this button, and the API
+                        rejects any request with source !== 'conf'. */}
+                    {isConferenceMode && username === 'ldrs_group' && messages.length > 0 && (
                       <div className="flex justify-end mb-2">
                         <AskItamarButton
                           sessionId={sessionId}
+                          source="conf"
                           visitorName={null}
-                          visitorMeta={isConferenceMode ? 'מהכנס · 30.4.2026' : null}
+                          visitorMeta="מהכנס · 30.4.2026"
                           onSubmitted={() => setHandoffActive(true)}
                         />
                       </div>

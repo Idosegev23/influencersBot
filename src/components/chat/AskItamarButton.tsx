@@ -9,6 +9,8 @@ interface AskItamarButtonProps {
   /** Optional context shown to Itamar in the WhatsApp template body. */
   visitorName?: string | null;
   visitorMeta?: string | null;
+  /** Pass-through tag identifying the visitor's source (must be 'conf'). */
+  source?: 'conf';
   /** Called after a successful submit so the parent can refresh messages. */
   onSubmitted?: () => void;
 }
@@ -23,6 +25,7 @@ export function AskItamarButton({
   sessionId,
   visitorName,
   visitorMeta,
+  source,
   onSubmitted,
 }: AskItamarButtonProps) {
   const [open, setOpen] = useState(false);
@@ -54,6 +57,7 @@ export function AskItamarButton({
         body: JSON.stringify({
           sessionId,
           question: text.trim(),
+          source,
           visitorName: visitorName || undefined,
           visitorMeta: visitorMeta || undefined,
         }),
