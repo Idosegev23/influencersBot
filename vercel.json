@@ -40,6 +40,10 @@
     {
       "path": "/api/cron/refresh-media-urls",
       "schedule": "0 * * * 0"
+    },
+    {
+      "path": "/api/cron/handoff-fallback",
+      "schedule": "*/30 * * * *"
     }
   ]
 }

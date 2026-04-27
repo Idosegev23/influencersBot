@@ -24,6 +24,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyWhatsAppSignature } from '@/lib/whatsapp-cloud/signature';
 import { createClient } from '@/lib/supabase';
+import { isItamarSender, processItamarReply } from '@/lib/handoff/process-itamar-reply';
 
 export const runtime = 'nodejs';          // need crypto + Buffer
 export const dynamic = 'force-dynamic';   // never cache
@@ -146,6 +147,33 @@ async function processWebhook(payload: any): Promise<void> {
         const waId: string = msg.from;                 // remote user
         const profileName: string | undefined =
           value.contacts?.find((c: any) => c.wa_id === waId)?.profile?.name;
+
+        // Personal handoff (Itamar via WhatsApp): if the sender is on the
+        // allow-list, attempt to route this reply back into a Bestie chat
+        // session. We still proceed with the standard whatsapp_messages
+        // upsert below for audit, but skip incrementing unread_count for
+        // this conversation since it's not a customer-facing thread.
+        const inboundText: string | null =
+          msg.text?.body ??
+          msg.button?.text ??
+          msg.interactive?.button_reply?.title ??
+          msg.interactive?.list_reply?.title ??
+          null;
+        if (isItamarSender(waId) && inboundText) {
+          try {
+            await processItamarReply({
+              fromWaId: waId,
+              text: inboundText,
+              contextWaMessageId: msg.context?.id,
+              waMessageId: msg.id,
+              sentAt: msg.timestamp
+                ? new Date(Number(msg.timestamp) * 1000).toISOString()
+                : undefined,
+            });
+          } catch (err) {
+            console.error('[whatsapp webhook] handoff routing failed', err);
+          }
+        }
 
         // upsert contact
         const { data: contact } = await supabase
