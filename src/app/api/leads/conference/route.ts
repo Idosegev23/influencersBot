@@ -2,6 +2,7 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { uploadBriefToDrive, sendBriefEmail } from '@/lib/google-workspace';
 import { buildConferenceLeadEmail } from '@/lib/email-templates/conference-lead';
+import { buildConferenceLeadConfirmationEmail } from '@/lib/email-templates/conference-lead-confirmation';
 
 // Allow up to 60s for the after() callback (email + Drive + DB updates)
 // to complete on Pro tier. Default Vercel timeout is 30s.
@@ -245,6 +246,32 @@ export async function POST(req: NextRequest) {
         }
       } catch (err) {
         console.error('[conference-lead] uploadBriefToDrive threw:', err);
+      }
+
+      // Confirmation email back to the lead — only when they provided
+      // an email AND consented to be contacted.
+      if (email && consentGiven) {
+        try {
+          const confirmation = buildConferenceLeadConfirmationEmail({
+            fullName,
+            preferredProduct: preferredProduct || null,
+            phone: phone || null,
+            ownerName: process.env.CONFERENCE_LEAD_OWNER_NAME || 'רועי',
+            ownerEmail: ownerEmail,
+          });
+          const ok = await sendBriefEmail({
+            to: email,
+            subject: confirmation.subject,
+            htmlBody: confirmation.html,
+          });
+          console.log(`[conference-lead] confirmation email sent | to=${email} | ok=${ok}`);
+        } catch (err) {
+          console.error('[conference-lead] confirmation email threw:', err);
+        }
+      } else {
+        console.log(
+          `[conference-lead] skipping confirmation | email=${!!email} | consent=${!!consentGiven}`
+        );
       }
     });
 
