@@ -334,6 +334,112 @@ export async function POST(req: NextRequest) {
 
         let session = sessionData;
 
+        // === PERSONAL HANDOFF GUARD ===
+        // If this session has an active "talk to Itamar" handoff, mute the
+        // bot and forward the visitor's message into the WhatsApp thread
+        // with Itamar instead of running the LLM. The visitor sees a
+        // system note; Itamar's reply still flows back through the
+        // /api/webhooks/whatsapp route and gets routed via metadata.source
+        // = 'whatsapp_personal'.
+        if (currentSessionId) {
+          const { data: activeHandoff } = await supabase
+            .from('chat_handoffs')
+            .select('id, ref_code, status, target_phone, target_name, last_outbound_wa_message_id, replied_at')
+            .eq('session_id', currentSessionId)
+            .in('status', ['forwarded', 'replied'])
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (activeHandoff) {
+            const targetName = activeHandoff.target_name || 'איתמר';
+
+            // 1) Persist the visitor message so the transcript stays whole
+            await saveChatMessage(currentSessionId, 'user', displayMessage);
+
+            // 2) Try to relay to Itamar's WhatsApp.
+            //    sendText only works if a 24h customer window is open
+            //    (i.e. Itamar replied at least once in the past 23h).
+            //    If not, we fall back to "queued" UX — visitor's message
+            //    is in our DB; we'll re-attempt automatically next time
+            //    Itamar replies and re-opens the window.
+            let routed = false;
+            let waError: string | null = null;
+            const windowOpen =
+              activeHandoff.status === 'replied' &&
+              activeHandoff.replied_at &&
+              Date.now() - new Date(activeHandoff.replied_at as any).getTime() <
+                23 * 60 * 60 * 1000;
+
+            if (windowOpen) {
+              try {
+                const { sendText } = await import('@/lib/whatsapp-cloud/client');
+                const phone = (activeHandoff.target_phone || '').trim();
+                const r = await sendText({
+                  to: phone,
+                  body: `[#${activeHandoff.ref_code}] ${displayMessage}`,
+                  contextMessageId: activeHandoff.last_outbound_wa_message_id || undefined,
+                });
+                if (r.success) {
+                  routed = true;
+                  await supabase
+                    .from('chat_handoffs')
+                    .update({ last_outbound_wa_message_id: r.wa_message_id })
+                    .eq('id', activeHandoff.id);
+                } else {
+                  waError = r.error?.message || 'send failed';
+                }
+              } catch (e: any) {
+                waError = e?.message || 'unknown';
+              }
+            }
+
+            const note = routed
+              ? `✉️ ההודעה שלך הועברה ל${targetName} בוואטסאפ. נמשיך כאן ברגע שהוא יענה.`
+              : `✉️ ההודעה נשמרה. ${targetName} ${
+                  activeHandoff.status === 'forwarded' ? 'עדיין לא ענה' : 'לא זמין כרגע'
+                } — ברגע שייכנס היא תועבר אליו אוטומטית, ותראו את התשובה שלו כאן בצ׳אט.`;
+
+            // 3) Persist the system note WITH metadata so the UI keeps
+            //    showing the personal-handoff styling.
+            await supabase.from('chat_messages').insert({
+              session_id: currentSessionId,
+              role: 'assistant',
+              content: note,
+              metadata: {
+                source: 'handoff_relay_note',
+                ref_code: activeHandoff.ref_code,
+                routed,
+                wa_error: waError,
+              },
+            });
+
+            // 4) Stream the note to the client and close
+            controller.enqueue(
+              encodeEvent({
+                type: 'meta',
+                traceId,
+                requestId,
+                decisionId: 'handoff',
+                sessionId: currentSessionId,
+                anonId: `anon_${currentSessionId.slice(0, 8)}`,
+                uiDirectives: {},
+              }),
+            );
+            controller.enqueue(encodeEvent({ type: 'delta', text: note }));
+            controller.enqueue(
+              encodeEvent({
+                type: 'done',
+                responseId: null,
+                latencyMs: Date.now() - startedAt,
+                fullText: note,
+              }),
+            );
+            controller.close();
+            return;
+          }
+        }
+
         // === LEAD NAME (runs in parallel with decision engine below) ===
         const leadNamePromise = session?.lead_id
           ? Promise.resolve(

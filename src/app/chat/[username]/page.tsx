@@ -100,11 +100,14 @@ interface Message {
   decisionId?: string; // For linking UI actions to decisions
   suggestions?: string[]; // AI-generated follow-up suggestions
   metadata?: {
-    source?: 'whatsapp_personal' | 'handoff_system_note' | string;
+    source?: 'whatsapp_personal' | 'handoff_system_note' | 'handoff_fallback_note' | string;
     author_label?: string;
     ref_code?: string;
+    sent_at?: string;
     [k: string]: any;
   };
+  /** ISO timestamp from the DB for messages we receive via polling. */
+  createdAt?: string;
 }
 
 const typeIcons: Record<InfluencerType, typeof ChefHat> = {
@@ -600,6 +603,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 role: m.role,
                 content: m.content,
                 metadata: m.metadata,
+                createdAt: m.created_at,
               });
             }
             return additions.length ? [...prev, ...additions] : prev;
@@ -1358,10 +1362,25 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                   </div>
                                 )}
                               </div>
-                              {/* Timestamp */}
-                              <div className={`msg-time ${msg.role === 'user' ? 'text-right' : 'text-left'}`} style={{ color: 'var(--color-text)' }}>
-                                {new Date(parseInt(msg.id)).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}
-                              </div>
+                              {/* Timestamp — fall back from id-as-epoch (bot path)
+                                  to metadata.sent_at / createdAt (handoff poll path) */}
+                              {(() => {
+                                const epoch = Number(msg.id);
+                                const t =
+                                  Number.isFinite(epoch) && epoch > 1_000_000_000_000
+                                    ? new Date(epoch)
+                                    : msg.metadata?.sent_at
+                                      ? new Date(msg.metadata.sent_at)
+                                      : msg.createdAt
+                                        ? new Date(msg.createdAt)
+                                        : null;
+                                if (!t || isNaN(t.getTime())) return null;
+                                return (
+                                  <div className={`msg-time ${msg.role === 'user' ? 'text-right' : 'text-left'}`} style={{ color: 'var(--color-text)' }}>
+                                    {t.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}
+                                  </div>
+                                );
+                              })()}
                             </div>
                           </div>
                           
