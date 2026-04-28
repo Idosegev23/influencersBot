@@ -327,10 +327,22 @@ function ReelCard({ reel, index }: { reel: Reel; index: number }) {
   );
 }
 
-function HighlightCard({ h, index }: { h: Highlight; index: number }) {
+function HighlightCard({
+  h,
+  index,
+  brandLogo,
+}: {
+  h: Highlight;
+  index: number;
+  brandLogo: string | null;
+}) {
   const igUrl = h.highlight_id
     ? `https://www.instagram.com/stories/highlights/${h.highlight_id}/`
     : 'https://www.instagram.com/ldrs_group/';
+  // Per Instagram convention, every highlight uses the brand's own logo
+  // as its cover. Fall back to the latest-item thumbnail only if the
+  // brand logo isn't available.
+  const cover = brandLogo || h.cover;
   return (
     <motion.a
       href={igUrl}
@@ -343,18 +355,18 @@ function HighlightCard({ h, index }: { h: Highlight; index: number }) {
       style={{ width: 84 }}
     >
       <div
-        className="relative rounded-full overflow-hidden mb-1.5"
+        className="relative rounded-full overflow-hidden mb-1.5 flex items-center justify-center"
         style={{
           width: 76,
           height: 76,
-          background: '#0c1013',
+          background: '#ffffff',
           padding: 2.5,
           boxShadow: '0 0 0 2px #5FD4F5, 0 4px 12px rgba(12,16,19,0.15)',
         }}
       >
-        {h.cover ? (
+        {cover ? (
           <img
-            src={getProxiedImageUrl(h.cover)}
+            src={getProxiedImageUrl(cover)}
             alt={h.title}
             className="w-full h-full object-cover rounded-full"
             loading="lazy"
@@ -378,6 +390,7 @@ function HighlightCard({ h, index }: { h: Highlight; index: number }) {
 export function ConferenceForYouTab({ onAskAbout }: ConferenceForYouTabProps) {
   const [reels, setReels] = useState<Reel[]>([]);
   const [highlights, setHighlights] = useState<Highlight[]>([]);
+  const [brandLogo, setBrandLogo] = useState<string | null>(null);
   const [contentLoaded, setContentLoaded] = useState(false);
 
   useEffect(() => {
@@ -387,6 +400,7 @@ export function ConferenceForYouTab({ onAskAbout }: ConferenceForYouTabProps) {
         if (!data) return;
         setReels(data.reels || []);
         setHighlights(data.highlights || []);
+        setBrandLogo(data.brandLogo || null);
       })
       .catch(() => undefined)
       .finally(() => setContentLoaded(true));
@@ -422,7 +436,7 @@ export function ConferenceForYouTab({ onAskAbout }: ConferenceForYouTabProps) {
             style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
           >
             {highlights.map((h, i) => (
-              <HighlightCard key={h.id} h={h} index={i} />
+              <HighlightCard key={h.id} h={h} index={i} brandLogo={brandLogo} />
             ))}
           </div>
         </section>

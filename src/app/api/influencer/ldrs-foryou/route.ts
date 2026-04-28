@@ -105,9 +105,19 @@ export async function GET() {
       .filter((h) => h.items_count > 0 && h.cover)
       .sort((a, b) => b.items_count - a.items_count);
 
+    // Brand logo to overlay on every highlight (Instagram-style: the
+    // brand's profile picture as the highlight cover).
+    const { data: account } = await supabase
+      .from('accounts')
+      .select('config')
+      .eq('id', LDRS_ACCOUNT_ID)
+      .single();
+    const brandLogo = (account?.config as any)?.avatar_url || null;
+
     return NextResponse.json({
       reels,
       highlights,
+      brandLogo,
       generated_at: new Date().toISOString(),
     });
   } catch (e: any) {
