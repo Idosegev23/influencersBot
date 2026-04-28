@@ -1,10 +1,33 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
+import { Play, Eye, Heart } from 'lucide-react';
+import { getProxiedImageUrl } from '@/lib/image-utils';
 
 interface ConferenceForYouTabProps {
   onAskAbout: (question: string, hiddenContext?: string) => void;
+}
+
+interface Reel {
+  shortcode: string;
+  url: string;
+  caption: string;
+  thumbnail: string | null;
+  duration: number | null;
+  views: number | null;
+  likes: number | null;
+  comments: number | null;
+  posted_at: string | null;
+}
+
+interface Highlight {
+  id: string;
+  highlight_id: string;
+  title: string;
+  cover: string | null;
+  items_count: number;
 }
 
 interface CaseStudy {
@@ -238,7 +261,137 @@ function CaseCard({
   );
 }
 
+// ---------------------------------------------------------------------------
+// Reel + Highlight cards
+// ---------------------------------------------------------------------------
+
+function formatCount(n: number | null): string {
+  if (!n || n < 1000) return String(n ?? 0);
+  if (n < 1_000_000) return `${(n / 1000).toFixed(n < 10000 ? 1 : 0)}K`;
+  return `${(n / 1_000_000).toFixed(1)}M`;
+}
+
+function ReelCard({ reel, index }: { reel: Reel; index: number }) {
+  return (
+    <motion.a
+      href={reel.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.025, duration: 0.2 }}
+      className="group relative flex-shrink-0 rounded-2xl overflow-hidden snap-start"
+      style={{
+        width: 156,
+        aspectRatio: '9 / 16',
+        background: '#0c1013',
+        boxShadow: '0 1px 4px rgba(12,16,19,0.08)',
+      }}
+    >
+      {reel.thumbnail ? (
+        <img
+          src={getProxiedImageUrl(reel.thumbnail, reel.shortcode)}
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover"
+          loading="lazy"
+        />
+      ) : null}
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            'linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,0.55) 100%)',
+        }}
+      />
+      <div className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}>
+        <Play className="w-3.5 h-3.5 text-white fill-white" />
+      </div>
+      <div className="absolute bottom-0 right-0 left-0 p-2.5 text-white text-right">
+        <div className="flex items-center justify-end gap-3 mb-1.5 text-[10.5px] tabular-nums" style={{ direction: 'ltr' }}>
+          {reel.views !== null && (
+            <span className="flex items-center gap-1 opacity-90">
+              <Eye className="w-3 h-3" /> {formatCount(reel.views)}
+            </span>
+          )}
+          {reel.likes !== null && (
+            <span className="flex items-center gap-1 opacity-90">
+              <Heart className="w-3 h-3" /> {formatCount(reel.likes)}
+            </span>
+          )}
+        </div>
+        <div className="text-[11px] leading-tight line-clamp-2 opacity-95">
+          {reel.caption || ''}
+        </div>
+      </div>
+    </motion.a>
+  );
+}
+
+function HighlightCard({ h, index }: { h: Highlight; index: number }) {
+  const igUrl = h.highlight_id
+    ? `https://www.instagram.com/stories/highlights/${h.highlight_id}/`
+    : 'https://www.instagram.com/ldrs_group/';
+  return (
+    <motion.a
+      href={igUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.025, duration: 0.2 }}
+      className="group flex-shrink-0 flex flex-col items-center snap-start"
+      style={{ width: 84 }}
+    >
+      <div
+        className="relative rounded-full overflow-hidden mb-1.5"
+        style={{
+          width: 76,
+          height: 76,
+          background: '#0c1013',
+          padding: 2.5,
+          boxShadow: '0 0 0 2px #5FD4F5, 0 4px 12px rgba(12,16,19,0.15)',
+        }}
+      >
+        {h.cover ? (
+          <img
+            src={getProxiedImageUrl(h.cover)}
+            alt={h.title}
+            className="w-full h-full object-cover rounded-full"
+            loading="lazy"
+          />
+        ) : null}
+      </div>
+      <div className="text-[11px] font-medium leading-tight text-center line-clamp-1" style={{ color: '#0c1013', maxWidth: 78 }}>
+        {h.title}
+      </div>
+      <div className="text-[10px] tabular-nums" style={{ color: '#9aa3b0' }}>
+        {h.items_count}
+      </div>
+    </motion.a>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
+
 export function ConferenceForYouTab({ onAskAbout }: ConferenceForYouTabProps) {
+  const [reels, setReels] = useState<Reel[]>([]);
+  const [highlights, setHighlights] = useState<Highlight[]>([]);
+  const [contentLoaded, setContentLoaded] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/influencer/ldrs-foryou')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data) return;
+        setReels(data.reels || []);
+        setHighlights(data.highlights || []);
+      })
+      .catch(() => undefined)
+      .finally(() => setContentLoaded(true));
+  }, []);
+
   return (
     <div
       className="h-full overflow-y-auto px-4 py-5 pb-32"
@@ -249,10 +402,69 @@ export function ConferenceForYouTab({ onAskAbout }: ConferenceForYouTabProps) {
           ForYou — מה עשינו עם
         </h2>
         <p className="text-[13px]" style={{ color: '#676767' }}>
-          קייסים אמיתיים של מותגים שעבדנו איתם. לחצו על קייס לסיכום מהיר בצ׳אט.
+          תוכן עכשווי וקייסים של מותגים שעבדנו איתם. גלילה ימינה לעוד.
         </p>
       </div>
 
+      {/* ─────────── Highlights ─────────── */}
+      {contentLoaded && highlights.length > 0 && (
+        <section className="mb-7">
+          <div className="flex items-baseline justify-between mb-3 px-0.5">
+            <h3 className="text-[15px] font-bold" style={{ color: '#0c1013' }}>
+              הדגשות מאינסטגרם
+            </h3>
+            <span className="text-[11px]" style={{ color: '#9aa3b0' }}>
+              @ldrs_group · {highlights.length}
+            </span>
+          </div>
+          <div
+            className="flex gap-3 overflow-x-auto snap-x pb-1.5 -mx-4 px-4"
+            style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
+          >
+            {highlights.map((h, i) => (
+              <HighlightCard key={h.id} h={h} index={i} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ─────────── Reels ─────────── */}
+      {contentLoaded && reels.length > 0 && (
+        <section className="mb-7">
+          <div className="flex items-baseline justify-between mb-3 px-0.5">
+            <h3 className="text-[15px] font-bold" style={{ color: '#0c1013' }}>
+              הרילסים האחרונים
+            </h3>
+            <a
+              href="https://instagram.com/ldrs_group"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] font-semibold"
+              style={{ color: '#0c1013' }}
+            >
+              לכל הרילסים ↗
+            </a>
+          </div>
+          <div
+            className="flex gap-2.5 overflow-x-auto snap-x pb-1.5 -mx-4 px-4"
+            style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
+          >
+            {reels.map((r, i) => (
+              <ReelCard key={r.shortcode} reel={r} index={i} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ─────────── Case studies bento ─────────── */}
+      <div className="flex items-baseline justify-between mb-3 px-0.5">
+        <h3 className="text-[15px] font-bold" style={{ color: '#0c1013' }}>
+          קייסים נבחרים
+        </h3>
+        <span className="text-[11px]" style={{ color: '#9aa3b0' }}>
+          {CASE_STUDIES.length}
+        </span>
+      </div>
       <div className="foryou-bento">
         {CASE_STUDIES.map((cs, i) => (
           <CaseCard
