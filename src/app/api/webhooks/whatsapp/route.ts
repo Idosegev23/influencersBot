@@ -35,10 +35,13 @@ export const dynamic = 'force-dynamic';   // never cache
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const mode      = url.searchParams.get('hub.mode');
-  const token     = url.searchParams.get('hub.verify_token');
+  const token     = (url.searchParams.get('hub.verify_token') || '').trim();
   const challenge = url.searchParams.get('hub.challenge');
 
-  const expected = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
+  // Trim defensively — Vercel env values occasionally pick up trailing
+  // whitespace (CR/LF) from the CLI, which would otherwise break a
+  // strict equality check against Meta's clean token.
+  const expected = (process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || '').trim();
 
   if (mode === 'subscribe' && token && expected && token === expected) {
     // Meta expects the raw challenge back as plain text
