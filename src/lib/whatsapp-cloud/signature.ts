@@ -24,6 +24,10 @@ export function verifyWhatsAppSignature(
   signatureHeader: string | null | undefined,
   appSecret = process.env.WHATSAPP_APP_SECRET
 ): VerifySignatureResult {
+  // Trim defensively — Vercel CLI sometimes persists env values with a
+  // trailing newline, which would silently break HMAC parity (every
+  // signature would be 'mismatch') without any obvious clue.
+  appSecret = (appSecret || '').trim();
   if (!appSecret) {
     return { valid: false, reason: 'WHATSAPP_APP_SECRET not configured' };
   }
