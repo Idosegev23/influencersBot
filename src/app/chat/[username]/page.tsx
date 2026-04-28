@@ -53,11 +53,11 @@ import { ConferenceLeadPopup } from '@/components/chat/ConferenceLeadPopup';
 import { ConferenceForYouTab } from '@/components/chat/ConferenceForYouTab';
 import { AskItamarButton } from '@/components/chat/AskItamarButton';
 
-// Itamar handoff button kill-switch. Flip back to true when the LDRS
-// WhatsApp Cloud API number (+972 54-390-2030) finishes /register with
-// its 2FA PIN — until then the bridge can't fire and we hide the button
-// so visitors don't tap a CTA that errors.
-const HANDOFF_BUTTON_ENABLED = false;
+// Itamar handoff button kill-switch.
+// LIVE since 2026-04-28: LDRS WhatsApp Cloud API number registered (PIN
+// stored in 1Password / shared secret), App webhook subscribed,
+// signature + verify-token + target-phone all trimmed defensively.
+const HANDOFF_BUTTON_ENABLED = true;
 import type { Influencer, ContentItem, InfluencerType } from '@/types';
 
 // Feature flag for streaming
