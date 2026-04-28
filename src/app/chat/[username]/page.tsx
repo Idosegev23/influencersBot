@@ -1585,15 +1585,30 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             transition={{ duration: 0.3, delay: 0.2 }}
                             className="flex gap-2 mt-3"
                           >
-                            {lastMsg.suggestions.map((s, i) => (
-                              <button
-                                key={i}
-                                onClick={() => sendQuickMessage(s)}
-                                className="suggestion-pill text-xs flex-1 justify-center"
-                              >
-                                {s}
-                              </button>
-                            ))}
+                            {lastMsg.suggestions.map((s, i) => {
+                              // Conference visitors: tapping the meeting CTA
+                              // should open the popup directly, not echo a
+                              // message to the bot.
+                              const isMeetingPill =
+                                isConferenceMode &&
+                                username === 'ldrs_group' &&
+                                /פגישה|נקבע|לקבוע/.test(s);
+                              return (
+                                <button
+                                  key={i}
+                                  onClick={() => {
+                                    if (isMeetingPill) {
+                                      setShowConferencePopup(true);
+                                    } else {
+                                      sendQuickMessage(s);
+                                    }
+                                  }}
+                                  className="suggestion-pill text-xs flex-1 justify-center"
+                                >
+                                  {s}
+                                </button>
+                              );
+                            })}
                           </motion.div>
                         );
                       })()}
