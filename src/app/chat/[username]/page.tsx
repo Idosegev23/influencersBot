@@ -53,11 +53,9 @@ import { ConferenceLeadPopup } from '@/components/chat/ConferenceLeadPopup';
 import { ConferenceForYouTab } from '@/components/chat/ConferenceForYouTab';
 import { AskItamarButton } from '@/components/chat/AskItamarButton';
 
-// Itamar handoff button kill-switch.
-// Bridge plumbing is fully wired (Cloud API registered, App webhook
-// subscribed, env trimmed, two-way relay tested). The button stays
-// hidden until the conference morning — flip to true on 2026-04-30.
-const HANDOFF_BUTTON_ENABLED = false;
+// Itamar handoff button kill-switch is now DB-driven:
+// accounts.config.features.handoff_button_enabled (boolean).
+// Toggle live from /admin/handoff without deploying.
 import type { Influencer, ContentItem, InfluencerType } from '@/types';
 
 // Feature flag for streaming
@@ -1221,7 +1219,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         {/* Conference handoff button — also rendered in
                             empty state so visitors can go straight to
                             Itamar without chatting with the bot first. */}
-                        {HANDOFF_BUTTON_ENABLED &&
+                        {(influencer as any).features?.handoff_button_enabled === true &&
                           isConferenceMode &&
                           username === 'ldrs_group' && (
                             <div className="flex justify-center mt-3">
@@ -1635,7 +1633,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         TEMPORARILY DISABLED: Cloud API number pending
                         2FA registration. Flip HANDOFF_BUTTON_ENABLED to
                         true once the WhatsApp number is registered. */}
-                    {HANDOFF_BUTTON_ENABLED &&
+                    {(influencer as any).features?.handoff_button_enabled === true &&
                       isConferenceMode &&
                       username === 'ldrs_group' &&
                       messages.length > 0 && (
