@@ -54,10 +54,10 @@ import { ConferenceForYouTab } from '@/components/chat/ConferenceForYouTab';
 import { AskItamarButton } from '@/components/chat/AskItamarButton';
 
 // Itamar handoff button kill-switch.
-// LIVE since 2026-04-28: LDRS WhatsApp Cloud API number registered (PIN
-// stored in 1Password / shared secret), App webhook subscribed,
-// signature + verify-token + target-phone all trimmed defensively.
-const HANDOFF_BUTTON_ENABLED = true;
+// Bridge plumbing is fully wired (Cloud API registered, App webhook
+// subscribed, env trimmed, two-way relay tested). The button stays
+// hidden until the conference morning — flip to true on 2026-04-30.
+const HANDOFF_BUTTON_ENABLED = false;
 import type { Influencer, ContentItem, InfluencerType } from '@/types';
 
 // Feature flag for streaming
