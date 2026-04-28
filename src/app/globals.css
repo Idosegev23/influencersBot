@@ -3106,14 +3106,20 @@ h1, h2, h3, h4, h5, h6 {
   pointer-events: none;
 }
 
+/* Mobile bottom nav — Figma 323:890.
+   White capsule pill, 6px gap between tabs, 10px horizontal pad inside
+   each tab, neutral grey text by default. Active state: same pill, just
+   bold weight + dark text/icon (no purple background — Figma intent). */
 .nav-tabs-inner {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   padding: 6px;
-  background: white;
+  height: 52px;
+  background: #ffffff;
   border-radius: 60px;
   pointer-events: auto;
+  box-shadow: 0 4px 16px rgba(12, 16, 19, 0.08);
 }
 
 .nav-tab {
@@ -3121,6 +3127,7 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   gap: 4px;
   padding: 10px;
+  height: 40px;
   border-radius: 60px;
   font-size: 14px;
   font-family: 'Heebo', sans-serif;
@@ -3129,7 +3136,7 @@ h1, h2, h3, h4, h5, h6 {
   background: transparent;
   border: none;
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: color 0.18s ease, font-weight 0.18s ease;
   white-space: nowrap;
   line-height: 21px;
 }
@@ -3152,11 +3159,10 @@ h1, h2, h3, h4, h5, h6 {
   line-height: 21px;
 }
 
-/* Active tab: purple bg, light text, icon + label */
+/* Active tab: bold + dark text. Same pill, no fill change. */
 .nav-tab--active {
-  background: #883fe2;
-  color: #f1e9fd;
-  padding: 10px 12px;
+  color: #0c1013;
+  font-weight: 600;
 }
 
 /* ── Legacy mobile bottom tabs (kept for backwards compat) ── */
@@ -3381,7 +3387,7 @@ body[data-service-sheet-open] .mobile-bottom-tabs {
 .cf-tab { background: #f8f9fb; }
 .cf-tab--food { background: #faf6f1; }
 .cf-tab--fashion { background: #fafafa; }
-.cf-tab--beauty { background: #fdf2f8; }
+.cf-tab--beauty { background: #f4f5f7; }
 .cf-tab--tech { background: #f0f4ff; }
 .cf-tab--travel { background: #f0fafb; }
 .cf-tab--fitness { background: #f0f9f0; }
@@ -3408,36 +3414,56 @@ body[data-service-sheet-open] .mobile-bottom-tabs {
   margin: 10px auto;
 }
 
-/* Beauty header — glass-morphism */
-.cf-header--beauty { margin-bottom: 8px; }
-.cf-header__glass {
-  background: rgba(255,255,255,0.7);
-  backdrop-filter: blur(12px);
-  border-radius: 16px; padding: 16px;
-  border: 1px solid rgba(128,80,98,0.1);
-  text-align: center; margin-bottom: 12px;
+/* Beauty header — figma node 437:2607 (right-aligned, simple) */
+.cf-header--beauty {
+  text-align: right;
+  margin-bottom: 16px;
+  padding: 0 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
 }
-.cf-header--beauty .cf-header__title { color: #805062; }
-.cf-header--beauty .cf-header__subtitle { color: #a06878; }
+.cf-header--beauty .cf-header__title {
+  font-size: 24px; font-weight: 600;
+  color: #0c1013; line-height: 28px;
+  text-align: right;
+}
+.cf-header--beauty .cf-header__subtitle {
+  font-size: 18px; font-weight: 400;
+  color: #676767; line-height: 24px;
+  margin-top: 0; text-align: right;
+}
 
-/* Beauty sub-tabs */
+/* Beauty sub-tabs — figma node 437:2744 */
 .cf-beauty-tabs {
-  display: flex; gap: 6px; overflow-x: auto;
-  padding: 0 4px 12px; -webkit-overflow-scrolling: touch;
+  display: flex; gap: 8px; overflow-x: auto;
+  padding: 16px 0 0; -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  align-self: stretch;
+  justify-content: flex-start;
 }
 .cf-beauty-tabs::-webkit-scrollbar { display: none; }
 .cf-beauty-tabs__btn {
-  flex-shrink: 0; padding: 7px 16px; border-radius: 100px;
-  font-size: 13px; font-weight: 600;
-  border: 1.5px solid #e8d0d8; background: white; color: #805062;
-  cursor: pointer; transition: all 0.2s; white-space: nowrap;
+  flex-shrink: 0;
+  height: 40px;
+  padding: 6px 16px;
+  border-radius: 23px;
+  font-family: 'Heebo', sans-serif;
+  font-size: 18px; font-weight: 400;
+  line-height: 19.5px;
+  border: none;
+  background: #eeeeee;
+  color: #676767;
+  cursor: pointer; transition: all 0.2s;
+  white-space: nowrap;
+  display: inline-flex; align-items: center; justify-content: center;
 }
 .cf-beauty-tabs__btn--active {
-  background: #805062; color: white; border-color: #805062;
+  background: #883fe2;
+  color: #f1e9fd;
 }
 .cf-beauty-tabs__btn:not(.cf-beauty-tabs__btn--active):hover {
-  background: #fce4f0;
+  background: #e1e1e1;
 }
 
 /* Recipe header — right-aligned, Figma spec */
@@ -3485,12 +3511,29 @@ body[data-service-sheet-open] .mobile-bottom-tabs {
   right: auto; left: 20px; color: #676767;
   width: 20px; height: 20px;
 }
+/* Beauty search — figma node 437:2612 */
+.cf-search--beauty .cf-search__input {
+  border-radius: 60px;
+  border: none;
+  background: #ffffff;
+  height: 60px;
+  padding: 0 20px 0 56px;
+  font-size: 18px;
+  font-weight: 300;
+  color: #676767;
+}
+.cf-search--beauty .cf-search__input::placeholder { color: #676767; }
+.cf-search--beauty .cf-search__input:focus { box-shadow: 0 0 0 1px #883fe2; }
+.cf-search--beauty .cf-search__icon {
+  right: auto; left: 20px; color: #676767;
+  width: 20px; height: 20px;
+}
 
 /* ── Grid layouts ── */
 .cf-grid { display: flex; flex-direction: column; gap: 12px; }
 .cf-grid--masonry { column-count: 2; column-gap: 10px; display: block; }
 .cf-grid--masonry > * { break-inside: avoid; margin-bottom: 10px; }
-.cf-grid--beauty { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.cf-grid--beauty { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .cf-grid--list { display: flex; flex-direction: column; gap: 10px; }
 .cf-grid--wide { display: flex; flex-direction: column; gap: 14px; }
 
@@ -3704,36 +3747,64 @@ body[data-service-sheet-open] .mobile-bottom-tabs {
 .cf-look-card__cta:hover { background: rgba(255,255,255,0.3); }
 
 /* ═══════════════════════════════════════════
-   BEAUTY CARD — square grid, pink/mauve, metadata
+   BEAUTY CARD — figma node 437:2799 (Frame101)
+   White card, lavender image area, right-aligned text
    ═══════════════════════════════════════════ */
 .cf-beauty-card {
-  background: white; border-radius: 14px; overflow: hidden;
-  box-shadow: 0 2px 8px rgba(128,80,98,0.06);
-  cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 12px 12px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  direction: rtl;
 }
-.cf-beauty-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(128,80,98,0.12); }
+.cf-beauty-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(136,63,226,0.10);
+}
 .cf-beauty-card__img {
-  width: 100%; aspect-ratio: 1; overflow: hidden; position: relative;
+  width: 100%;
+  height: 151px;
+  background: #f1e9fd;
+  border-radius: 12px 12px 0 0;
+  overflow: hidden;
+  position: relative;
 }
-.cf-beauty-card__img img { width: 100%; height: 100%; object-fit: cover; }
+.cf-beauty-card__img img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .cf-beauty-card__placeholder {
   width: 100%; height: 100%;
   display: flex; align-items: center; justify-content: center;
-  background: #fce4f0;
+  background: #f1e9fd;
 }
-.cf-beauty-card__body { padding: 12px 14px 14px; }
+.cf-beauty-card__body {
+  padding: 0;
+  display: flex; flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  text-align: right;
+  width: 100%;
+}
 .cf-beauty-card__title {
-  font-size: 14px; font-weight: 700; color: #3d2030;
-  line-height: 1.3; margin-bottom: 4px;
+  font-family: 'Heebo', sans-serif;
+  font-size: 18px; font-weight: 400;
+  color: #0c1013;
+  line-height: 20px;
+  text-align: right;
+  width: 100%;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.cf-beauty-card__meta {
-  font-size: 11px; color: #a06878; font-weight: 500;
-  margin-bottom: 4px;
-}
 .cf-beauty-card__desc {
-  font-size: 12px; color: #888; line-height: 1.4;
+  font-family: 'Heebo', sans-serif;
+  font-size: 14px; font-weight: 300;
+  color: #676767;
+  line-height: 20px;
+  text-align: right;
+  width: 100%;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
   overflow: hidden;
 }

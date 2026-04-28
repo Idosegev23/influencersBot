@@ -1,11 +1,21 @@
 'use client';
 
-/* ── Icon mapping by label (primary — checked first) ── */
+/**
+ * Nav-tab icons — Figma node 323:890 spec:
+ *   chat       → /icons/nav/comment.svg
+ *   discover   → /icons/nav/screen-play.svg
+ *   topics(שירותים)/services_provider → /icons/nav/bonus-alt.svg
+ * Other tab types fall back to the legacy /icons/<name>.svg set.
+ */
 const LABEL_ICONS: Record<string, string> = {
+  'צ׳אט': 'nav/comment',
+  'גלו': 'nav/screen-play',
+  'ForYou': 'nav/screen-play',
+  'שירותים': 'nav/bonus-alt',
+  // legacy fallbacks
   'טיפוח': 'tipuach',
   'לוקים': 'lookim',
   'מתכונים': 'matkonim',
-  'שירותים': 'shirutim',
   'סקירות': 'skirot',
   'המלצות': 'hamlazot',
   'טיפים': 'hamlazot',
@@ -15,17 +25,15 @@ const LABEL_ICONS: Record<string, string> = {
   'דילים': 'mivzaim',
   'הטבות': 'mivzaim',
   'מוצרים': 'mozarim',
-  'גלו': 'galu',
-  'צ׳אט': 'chat',
   'בעיה במוצר': 'baaya',
   'בעיה בהזמנה': 'baaya_motzar',
 };
 
 /* ── Icon mapping by tab id (fallback) ── */
 const TAB_ICONS: Record<string, string> = {
-  chat: 'chat',
-  discover: 'galu',
-  topics: 'ham',
+  chat: 'nav/comment',
+  discover: 'nav/screen-play',
+  topics: 'nav/bonus-alt',
   products: 'mozarim',
   content_feed: 'ham',
   coupons: 'coupons',
@@ -76,7 +84,7 @@ export function NavTabs({ tabs, activeTab, onTabChange }: NavTabsProps) {
                 }}
                 aria-hidden
               />
-              {isActive && <span className="nav-tab-label">{tab.label}</span>}
+              <span className="nav-tab-label">{tab.label}</span>
             </button>
           );
         })}
