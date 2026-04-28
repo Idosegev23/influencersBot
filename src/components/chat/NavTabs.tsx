@@ -84,7 +84,7 @@ export function NavTabs({ tabs, activeTab, onTabChange }: NavTabsProps) {
                 }}
                 aria-hidden
               />
-              <span className="nav-tab-label">{tab.label}</span>
+              {isActive && <span className="nav-tab-label">{tab.label}</span>}
             </button>
           );
         })}

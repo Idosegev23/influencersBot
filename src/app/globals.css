@@ -3159,10 +3159,13 @@ h1, h2, h3, h4, h5, h6 {
   line-height: 21px;
 }
 
-/* Active tab: bold + dark text. Same pill, no fill change. */
+/* Active tab: purple pill with icon + label, white-ish text.
+   Inactive tabs render icon-only (label hidden in the JSX). */
 .nav-tab--active {
-  color: #0c1013;
-  font-weight: 600;
+  background: #883fe2;
+  color: #f1e9fd;
+  padding: 10px 14px;
+  font-weight: 500;
 }
 
 /* ── Legacy mobile bottom tabs (kept for backwards compat) ── */
