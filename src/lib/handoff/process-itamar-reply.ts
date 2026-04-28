@@ -36,11 +36,12 @@ function digitsOnly(phone: string): string {
 
 function getItamarPhones(): Set<string> {
   const phones: string[] = [];
-  if (process.env.ITAMAR_WHATSAPP_NUMBER) phones.push(process.env.ITAMAR_WHATSAPP_NUMBER);
-  if (process.env.HANDOFF_ALLOWED_NUMBERS) {
-    phones.push(
-      ...process.env.HANDOFF_ALLOWED_NUMBERS.split(',').map((s) => s.trim()).filter(Boolean),
-    );
+  // Trim — Vercel CLI sometimes persists env values with a trailing newline.
+  const itamar = (process.env.ITAMAR_WHATSAPP_NUMBER || '').trim();
+  if (itamar) phones.push(itamar);
+  const allowList = (process.env.HANDOFF_ALLOWED_NUMBERS || '').trim();
+  if (allowList) {
+    phones.push(...allowList.split(',').map((s) => s.trim()).filter(Boolean));
   }
   return new Set(phones.map(digitsOnly).filter(Boolean));
 }

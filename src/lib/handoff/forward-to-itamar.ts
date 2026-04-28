@@ -57,10 +57,12 @@ interface ForwardResult {
 export async function forwardToItamar(input: ForwardInput): Promise<ForwardResult> {
   const supabase = getSupabase();
 
-  const targetPhone =
+  // Trim — Vercel CLI sometimes persists env values with a trailing newline.
+  const targetPhone = (
     input.targetPhoneOverride ||
     process.env.ITAMAR_WHATSAPP_NUMBER ||
-    '';
+    ''
+  ).trim();
   if (!targetPhone) {
     return { success: false, error: 'ITAMAR_WHATSAPP_NUMBER not configured' };
   }
