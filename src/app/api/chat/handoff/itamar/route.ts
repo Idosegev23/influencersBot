@@ -36,8 +36,8 @@ export async function POST(req: NextRequest) {
     const visitorMeta: string | undefined = body.visitorMeta;
     const source: string | undefined = body.source;
 
-    if (!sessionId || !question) {
-      return NextResponse.json({ error: 'sessionId and question required' }, { status: 400 });
+    if (!question) {
+      return NextResponse.json({ error: 'question required' }, { status: 400 });
     }
     if (question.length > 2000) {
       return NextResponse.json({ error: 'question too long' }, { status: 400 });
@@ -51,27 +51,46 @@ export async function POST(req: NextRequest) {
 
     const supabase = getSupabase();
 
-    // Resolve account_id + sanity check the session exists
-    const { data: session, error: sErr } = await supabase
-      .from('chat_sessions')
-      .select('id, account_id')
-      .eq('id', sessionId)
-      .single();
-    if (sErr || !session) {
-      return NextResponse.json({ error: 'session not found' }, { status: 404 });
+    // Resolve or create the chat session. Conference visitors who tap
+    // "send to Itamar" before chatting with the bot don't yet have a
+    // sessionId — we mint one for them so the reply has a target.
+    let resolvedSessionId: string | null = null;
+    if (sessionId) {
+      const { data: existing } = await supabase
+        .from('chat_sessions')
+        .select('id, account_id')
+        .eq('id', sessionId)
+        .maybeSingle();
+      if (existing) {
+        if (existing.account_id !== LDRS_ACCOUNT_ID) {
+          return NextResponse.json(
+            { error: 'Personal handoff is not enabled for this account.' },
+            { status: 403 },
+          );
+        }
+        resolvedSessionId = existing.id;
+      }
     }
-    if (session.account_id !== LDRS_ACCOUNT_ID) {
-      return NextResponse.json(
-        { error: 'Personal handoff is not enabled for this account.' },
-        { status: 403 },
-      );
+    if (!resolvedSessionId) {
+      const threadId = `handoff_conf_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const { data: created, error: createErr } = await supabase
+        .from('chat_sessions')
+        .insert({ thread_id: threadId, account_id: LDRS_ACCOUNT_ID })
+        .select('id')
+        .single();
+      if (createErr || !created) {
+        console.error('[/api/chat/handoff/itamar] session create failed:', createErr);
+        return NextResponse.json({ error: 'could not create session' }, { status: 500 });
+      }
+      resolvedSessionId = created.id;
     }
+    const session = { id: resolvedSessionId, account_id: LDRS_ACCOUNT_ID };
 
     const labelParts = [visitorName, visitorMeta].filter(Boolean);
     const visitorLabel = labelParts.length ? labelParts.join(' · ') : 'אורח/ת ב-Bestie';
 
     const result = await forwardToItamar({
-      sessionId,
+      sessionId: resolvedSessionId,
       accountId: session.account_id,
       visitorLabel,
       visitorQuestion: question,
@@ -86,7 +105,7 @@ export async function POST(req: NextRequest) {
 
     // Drop a system note into the visitor's chat so they see what happened
     await supabase.from('chat_messages').insert({
-      session_id: sessionId,
+      session_id: resolvedSessionId,
       role: 'assistant',
       content:
         '✉️ ההודעה שלך הועברה לאיתמר אישית.\n' +
@@ -101,6 +120,7 @@ export async function POST(req: NextRequest) {
       success: true,
       refCode: result.refCode,
       handoffId: result.handoffId,
+      sessionId: resolvedSessionId,
     });
   } catch (err: any) {
     console.error('[/api/chat/handoff/itamar] error:', err);

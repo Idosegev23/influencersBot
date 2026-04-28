@@ -11,8 +11,10 @@ interface AskItamarButtonProps {
   visitorMeta?: string | null;
   /** Pass-through tag identifying the visitor's source (must be 'conf'). */
   source?: 'conf';
-  /** Called after a successful submit so the parent can refresh messages. */
-  onSubmitted?: () => void;
+  /** Called after a successful submit so the parent can refresh messages.
+   *  The API may have minted a fresh session — that id is passed through
+   *  so the parent can store it and start polling. */
+  onSubmitted?: (info: { sessionId: string | null; refCode?: string }) => void;
 }
 
 /**
@@ -47,7 +49,7 @@ export function AskItamarButton({
   };
 
   async function submit() {
-    if (!sessionId || text.trim().length < 4) return;
+    if (text.trim().length < 4) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -55,7 +57,7 @@ export function AskItamarButton({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sessionId,
+          sessionId: sessionId || undefined,
           question: text.trim(),
           source,
           visitorName: visitorName || undefined,
@@ -67,7 +69,10 @@ export function AskItamarButton({
         throw new Error(data?.error || `HTTP ${res.status}`);
       }
       setDone(true);
-      onSubmitted?.();
+      onSubmitted?.({
+        sessionId: data.sessionId || sessionId,
+        refCode: data.refCode,
+      });
       // Auto-close after a short success state
       setTimeout(() => close(), 1800);
     } catch (e: any) {

@@ -1208,6 +1208,25 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           showDisclaimer={hasCommercialContent}
                           inputRef={inputRef}
                         />
+                        {/* Conference handoff button — also rendered in
+                            empty state so visitors can go straight to
+                            Itamar without chatting with the bot first. */}
+                        {HANDOFF_BUTTON_ENABLED &&
+                          isConferenceMode &&
+                          username === 'ldrs_group' && (
+                            <div className="flex justify-center mt-3">
+                              <AskItamarButton
+                                sessionId={sessionId}
+                                source="conf"
+                                visitorName={null}
+                                visitorMeta="מהכנס · 30.4.2026"
+                                onSubmitted={({ sessionId: returnedSid }) => {
+                                  if (returnedSid) setSessionId(returnedSid);
+                                  setHandoffActive(true);
+                                }}
+                              />
+                            </div>
+                          )}
                       </motion.div>
 
                       {/* Starter pills — unified for ALL account types */}
@@ -1601,7 +1620,10 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             source="conf"
                             visitorName={null}
                             visitorMeta="מהכנס · 30.4.2026"
-                            onSubmitted={() => setHandoffActive(true)}
+                            onSubmitted={({ sessionId: returnedSid }) => {
+                              if (returnedSid) setSessionId(returnedSid);
+                              setHandoffActive(true);
+                            }}
                           />
                         </div>
                       )}
