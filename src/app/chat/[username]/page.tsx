@@ -610,11 +610,17 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
           });
         }
 
-        // Stop polling once any handoff has reached a terminal state and
-        // there are no still-pending ones for this session.
+        // Keep polling as long as the handoff isn't TRULY closed.
+        // 'replied' means Itamar answered once but the conversation can
+        // continue — visitors send follow-ups and Itamar replies again.
+        // We only stop when every handoff for this session is in a
+        // terminal state (fallback_sent / failed) AND there are no
+        // open ones still expecting replies.
         const handoffs: Array<{ status: string }> = data?.handoffs || [];
-        const stillOpen = handoffs.some((h) => h.status === 'forwarded' || h.status === 'pending');
-        if (!stillOpen && handoffs.length > 0) {
+        const stillLive = handoffs.some(
+          (h) => h.status === 'forwarded' || h.status === 'pending' || h.status === 'replied',
+        );
+        if (!stillLive && handoffs.length > 0) {
           if (!cancelled) setHandoffActive(false);
           return;
         }

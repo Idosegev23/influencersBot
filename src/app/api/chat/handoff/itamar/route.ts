@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
     const sessionId: string | undefined = body.sessionId;
     const question: string | undefined = body.question;
     const visitorName: string | undefined = body.visitorName;
+    const visitorPhone: string | undefined = body.visitorPhone;
     const visitorMeta: string | undefined = body.visitorMeta;
     const source: string | undefined = body.source;
 
@@ -86,7 +87,11 @@ export async function POST(req: NextRequest) {
     }
     const session = { id: resolvedSessionId, account_id: LDRS_ACCOUNT_ID };
 
-    const labelParts = [visitorName, visitorMeta].filter(Boolean);
+    const labelParts = [
+      visitorName,
+      visitorPhone ? `📞 ${visitorPhone}` : null,
+      visitorMeta,
+    ].filter(Boolean) as string[];
     const visitorLabel = labelParts.length ? labelParts.join(' · ') : 'אורח/ת ב-Bestie';
 
     const result = await forwardToItamar({
@@ -94,6 +99,8 @@ export async function POST(req: NextRequest) {
       accountId: session.account_id,
       visitorLabel,
       visitorQuestion: question,
+      visitorName,
+      visitorPhone,
     });
 
     if (!result.success) {

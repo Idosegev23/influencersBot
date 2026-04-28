@@ -166,8 +166,12 @@ export async function POST(req: NextRequest) {
         // Validate & sanitize
         const message = sanitizeChatMessage(rawMessage);
         const username = sanitizeUsername(rawUsername);
-        // Extract clean display message (strip hidden context) for DB storage
-        const displayMessage = message.split(/\n\n\[הקשר ה(לוק|מוצר):\]/)[0].trim();
+        // Extract clean display message — strip ALL forms of hidden context
+        // (לוק / מוצר / פנימי) so neither the DB nor outbound relays
+        // (e.g. WhatsApp handoff to Itamar) leak prompt-shaping notes.
+        const displayMessage = message
+          .split(/\n\n\[הקשר (הלוק|המוצר|פנימי)/)[0]
+          .trim();
 
         if (!message || message.length < 1) {
           controller.enqueue(encodeEvent({

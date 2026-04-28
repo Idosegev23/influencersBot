@@ -39,8 +39,12 @@ function generateRefCode(): string {
 interface ForwardInput {
   sessionId: string;
   accountId: string;
-  visitorLabel: string; // e.g. "Noa Lavi · @noki_coffe · 9.1K"
+  visitorLabel: string; // e.g. "Noa Lavi · 📞 050-1234567 · מהכנס · 30.4.2026"
   visitorQuestion: string;
+  /** Visitor's name — stored on chat_handoffs for Roi follow-up. */
+  visitorName?: string;
+  /** Visitor's phone — stored on chat_handoffs for Roi follow-up. */
+  visitorPhone?: string;
   /** Override the default ITAMAR_WHATSAPP_NUMBER env (used for testing). */
   targetPhoneOverride?: string;
   targetName?: string; // for the row, defaults to "Itamar"
@@ -87,6 +91,8 @@ export async function forwardToItamar(input: ForwardInput): Promise<ForwardResul
         ref_code: candidate,
         visitor_label: input.visitorLabel,
         visitor_question: input.visitorQuestion,
+        visitor_name: input.visitorName || null,
+        visitor_phone: input.visitorPhone || null,
         target_phone: targetPhone,
         target_name: input.targetName || 'Itamar',
         status: 'pending',

@@ -32,12 +32,20 @@ export function AskItamarButton({
 }: AskItamarButtonProps) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const phoneOk = phone.trim().length === 0 || /^[\d\-+() ]{7,15}$/.test(phone.trim());
+  const formValid =
+    text.trim().length >= 4 && name.trim().length >= 2 && phone.trim().length >= 7 && phoneOk;
+
   const reset = () => {
     setText('');
+    setName('');
+    setPhone('');
     setSubmitting(false);
     setDone(false);
     setError(null);
@@ -49,7 +57,7 @@ export function AskItamarButton({
   };
 
   async function submit() {
-    if (text.trim().length < 4) return;
+    if (!formValid) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -60,7 +68,8 @@ export function AskItamarButton({
           sessionId: sessionId || undefined,
           question: text.trim(),
           source,
-          visitorName: visitorName || undefined,
+          visitorName: name.trim() || visitorName || undefined,
+          visitorPhone: phone.trim() || undefined,
           visitorMeta: visitorMeta || undefined,
         }),
       });
@@ -176,6 +185,38 @@ export function AskItamarButton({
                   </div>
                 ) : (
                   <>
+                    {/* Name + phone — required so Itamar can follow up
+                        outside Bestie if the chat goes idle. */}
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <input
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="שם מלא *"
+                        autoFocus
+                        className="w-full h-[44px] px-3.5 rounded-xl text-[14px] outline-none transition-all focus:ring-2 focus:ring-zinc-900/10"
+                        style={{
+                          backgroundColor: '#fafafa',
+                          color: '#09090b',
+                          border: '1px solid #e4e4e7',
+                        }}
+                      />
+                      <input
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="טלפון *"
+                        className="w-full h-[44px] px-3.5 rounded-xl text-[14px] outline-none transition-all focus:ring-2 focus:ring-zinc-900/10"
+                        style={{
+                          backgroundColor: '#fafafa',
+                          color: '#09090b',
+                          border: phone.trim() && !phoneOk ? '1px solid #ef4444' : '1px solid #e4e4e7',
+                          direction: 'ltr',
+                          textAlign: 'right',
+                        }}
+                      />
+                    </div>
+
                     <label
                       className="block text-[12px] font-semibold mb-2"
                       style={{ color: '#52525b' }}
@@ -186,9 +227,8 @@ export function AskItamarButton({
                       value={text}
                       onChange={(e) => setText(e.target.value)}
                       placeholder="היי איתמר, אני רוצה לשאול אותך על..."
-                      rows={5}
+                      rows={4}
                       maxLength={500}
-                      autoFocus
                       className="w-full px-4 py-3 rounded-xl text-[14px] outline-none transition-all focus:ring-2 focus:ring-zinc-900/10 resize-none"
                       style={{
                         backgroundColor: '#fafafa',
@@ -235,7 +275,7 @@ export function AskItamarButton({
                   </button>
                   <button
                     onClick={submit}
-                    disabled={submitting || text.trim().length < 4}
+                    disabled={submitting || !formValid}
                     className="flex-1 h-[44px] rounded-xl text-[14px] font-semibold text-white transition-all active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2"
                     style={{
                       background:
