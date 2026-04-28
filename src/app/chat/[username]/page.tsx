@@ -150,20 +150,37 @@ const DEFAULT_TABS: { id: string; label: string; type: string; topic?: string }[
  * Parse AI-generated suggestions from bot response.
  * Format: <<SUGGESTIONS>>suggestion1|suggestion2|suggestion3<</SUGGESTIONS>>
  * Returns clean text (without the tag) and parsed suggestions array.
+ *
+ * For conference visitors we *always* inject "נקבע פגישה?" as the first
+ * suggestion (and drop the last LLM-generated one if needed) so the
+ * meeting CTA is one tap away after every bot message.
  */
-function parseSuggestions(text: string): { cleanText: string; suggestions: string[] } {
+function parseSuggestions(
+  text: string,
+  opts: { conferenceMode?: boolean } = {},
+): { cleanText: string; suggestions: string[] } {
   const match = text.match(/<<SUGGESTIONS>>([\s\S]*?)<\/SUGGESTIONS>>/);
+  let cleanText: string;
+  let suggestions: string[];
   if (!match) {
-    // Also strip partial tag at end (during streaming)
-    const partialClean = text.replace(/<<SUGGESTIONS>>[\s\S]*$/, '').trim();
-    return { cleanText: partialClean, suggestions: [] };
+    cleanText = text.replace(/<<SUGGESTIONS>>[\s\S]*$/, '').trim();
+    suggestions = [];
+  } else {
+    cleanText = text.replace(/<<SUGGESTIONS>>[\s\S]*?<\/SUGGESTIONS>>/, '').trim();
+    suggestions = match[1]
+      .split('|')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0 && s.length < 40)
+      .slice(0, 3);
   }
-  const cleanText = text.replace(/<<SUGGESTIONS>>[\s\S]*?<\/SUGGESTIONS>>/, '').trim();
-  const suggestions = match[1]
-    .split('|')
-    .map(s => s.trim())
-    .filter(s => s.length > 0 && s.length < 40)
-    .slice(0, 3);
+
+  if (opts.conferenceMode) {
+    const hasMeeting = suggestions.some((s) => /פגישה|נקבע|לקבוע/.test(s));
+    if (!hasMeeting) {
+      // prepend the meeting CTA, cap total at 3
+      suggestions = ['נקבע פגישה?', ...suggestions].slice(0, 3);
+    }
+  }
   return { cleanText, suggestions };
 }
 
@@ -357,7 +374,9 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       const cards = streamCardsRef.current;
       
       if (msgId && done.fullText) {
-        const { cleanText, suggestions } = parseSuggestions(done.fullText);
+        const { cleanText, suggestions } = parseSuggestions(done.fullText, {
+          conferenceMode: isConferenceMode && username === 'ldrs_group',
+        });
         // Fall back to random topic suggestions if AI didn't generate any
         const fallbackSuggestions = suggestions.length > 0
           ? suggestions
@@ -931,7 +950,9 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       if (data.sessionId) setSessionId(data.sessionId);
 
       const rawResponse = data.response || 'מצטער, משהו השתבש. נסה שוב!';
-      const { cleanText: cleanResponse, suggestions: parsedSuggestions } = parseSuggestions(rawResponse);
+      const { cleanText: cleanResponse, suggestions: parsedSuggestions } = parseSuggestions(rawResponse, {
+        conferenceMode: isConferenceMode && username === 'ldrs_group',
+      });
       const nonStreamFallback = parsedSuggestions.length > 0
         ? parsedSuggestions
         : topicSuggestions.length > 0
