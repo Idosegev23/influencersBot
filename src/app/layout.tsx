@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import CookieConsent from "@/components/CookieConsent";
 import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
+import { AnalyticsClient } from "@/components/AnalyticsClient";
 
 export const metadata: Metadata = {
   title: "bestieAI - AI Chatbot Platform",
@@ -71,6 +72,7 @@ export default function RootLayout({
         <script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
       </head>
       <body className="antialiased">
+        <AnalyticsClient />
         {children}
         <CookieConsent />
         <ServiceWorkerRegistration />

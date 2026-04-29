@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import Image from 'next/image';
 import { Play, Eye, Heart } from 'lucide-react';
 import { getProxiedImageUrl } from '@/lib/image-utils';
+import { track } from '@/lib/analytics/track';
 
 interface ConferenceForYouTabProps {
   onAskAbout: (question: string, hiddenContext?: string) => void;
@@ -181,7 +182,15 @@ function CaseCard({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.04, duration: 0.25 }}
-      onClick={() => onAskAbout(cs.question, cs.hiddenContext)}
+      onClick={() => {
+        track('case_study_clicked', {
+          brand_slug: cs.brand,
+          position: index,
+          product: cs.product || null,
+          variant,
+        });
+        onAskAbout(cs.question, cs.hiddenContext);
+      }}
       className={`${variantClasses[variant]} group relative overflow-hidden rounded-2xl text-right transition-all active:scale-[0.99] hover:shadow-lg`}
       style={{
         background: '#ffffff',
@@ -277,6 +286,14 @@ function ReelCard({ reel, index }: { reel: Reel; index: number }) {
       href={reel.url}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={() =>
+        track('reel_clicked', {
+          shortcode: reel.shortcode,
+          position: index,
+          views: reel.views,
+          likes: reel.likes,
+        })
+      }
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.025, duration: 0.2 }}
@@ -348,6 +365,14 @@ function HighlightCard({
       href={igUrl}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={() =>
+        track('highlight_clicked', {
+          highlight_id: h.highlight_id,
+          title: h.title,
+          items_count: h.items_count,
+          position: index,
+        })
+      }
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.025, duration: 0.2 }}
@@ -401,6 +426,11 @@ export function ConferenceForYouTab({ onAskAbout }: ConferenceForYouTabProps) {
         setReels(data.reels || []);
         setHighlights(data.highlights || []);
         setBrandLogo(data.brandLogo || null);
+        track('foryou_loaded', {
+          case_studies_count: CASE_STUDIES.length,
+          reels_count: (data.reels || []).length,
+          highlights_count: (data.highlights || []).length,
+        });
       })
       .catch(() => undefined)
       .finally(() => setContentLoaded(true));

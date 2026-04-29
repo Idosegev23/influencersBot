@@ -52,6 +52,7 @@ import { LeadCapturePopup } from '@/components/chat/LeadCapturePopup';
 import { ConferenceLeadPopup } from '@/components/chat/ConferenceLeadPopup';
 import { ConferenceForYouTab } from '@/components/chat/ConferenceForYouTab';
 import { AskItamarButton } from '@/components/chat/AskItamarButton';
+import { track, setAnalyticsContext, identify } from '@/lib/analytics/track';
 
 // Itamar handoff button kill-switch is now DB-driven:
 // accounts.config.features.handoff_button_enabled (boolean).
@@ -377,6 +378,13 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
         const { cleanText, suggestions } = parseSuggestions(done.fullText, {
           conferenceMode: isConferenceMode && username === 'ldrs_group',
         });
+        track('chat_message_received', {
+          length: cleanText.length,
+          has_suggestions: suggestions.length > 0,
+          suggestion_count: suggestions.length,
+          response_id: done.responseId || null,
+          latency_ms: done.latencyMs || null,
+        });
         // Fall back to random topic suggestions if AI didn't generate any
         const fallbackSuggestions = suggestions.length > 0
           ? suggestions
@@ -503,6 +511,12 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     
     loadData();
 
+    // ── analytics: track entering the chat page for this account
+    track('session_start', {
+      username,
+      is_conference: isConferenceMode,
+    });
+
     // Preload discovery categories for the empty state (skip for media_news — uses hot topics instead)
     fetch(`/api/discovery/categories?username=${encodeURIComponent(username)}`)
       .then(res => res.ok ? res.json() : null)
@@ -539,6 +553,15 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       if (stored) setLeadInfo(JSON.parse(stored));
     } catch {}
   }, [username]);
+
+  // ── analytics: keep context current for every track() call ──
+  useEffect(() => {
+    setAnalyticsContext({
+      accountId: influencer?.id,
+      sessionId,
+      currentTab: activeTab,
+    });
+  }, [influencer?.id, sessionId, activeTab]);
 
   // Conference mode: override starters to AI-focused questions for LDRS QR scanners
   useEffect(() => {
@@ -765,6 +788,13 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
           const delay = intentMatch ? 600 : 1500;
           // eslint-disable-next-line no-console
           console.log(`[ldrs-popup] firing in ${delay}ms`);
+          track('lead_popup_triggered', {
+            trigger: intentMatch ? 'meeting_intent' : 'msg_count',
+            msg_count: messages.length,
+          });
+          if (intentMatch) {
+            track('meeting_intent_detected', { source: 'user_message' });
+          }
           setTimeout(() => setShowConferencePopup(true), delay);
           return;
         } catch (err) {
@@ -852,6 +882,12 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
 
     setMessages((prev) => [...prev, userMessage]);
     setInputValue('');
+
+    track('chat_message_sent', {
+      length: rawText.length,
+      has_question: /\?$/.test(rawText.trim()),
+      msg_index: messages.length,
+    });
 
     // Lead capture trigger: 4+ messages OR meeting intent in the user text
     maybeShowLeadPopup(rawText);
@@ -1168,7 +1204,10 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                       : influencer.tabs || DEFAULT_TABS
                   }
                   activeTab={activeTab}
-                  onTabChange={(id) => setActiveTab(id as TabId)}
+                  onTabChange={(id) => {
+                    track('tab_changed', { from_tab: activeTab, to_tab: id });
+                    setActiveTab(id as TabId);
+                  }}
                 />
               </div>
             </div>
@@ -1263,6 +1302,11 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         <StarterPills
                           items={quickReplies}
                           onSelect={(q) => {
+                            track('starter_pill_clicked', {
+                              pill_label: q,
+                              pill_index: quickReplies.indexOf(q),
+                              total_pills: quickReplies.length,
+                            });
                             maybeShowLeadPopup();
                             sendQuickMessage(q);
                           }}
@@ -1597,7 +1641,14 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                 <button
                                   key={i}
                                   onClick={() => {
+                                    track('suggestion_pill_clicked', {
+                                      pill_label: s,
+                                      pill_index: i,
+                                      is_meeting_cta: isMeetingPill,
+                                    });
                                     if (isMeetingPill) {
+                                      track('meeting_pill_clicked', { pill_text: s });
+                                      track('meeting_request_initiated', { entry_point: 'suggestion_pill' });
                                       setShowConferencePopup(true);
                                     } else {
                                       sendQuickMessage(s);
@@ -2300,6 +2351,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
             accountId={influencer.id}
             sessionId={sessionId}
             onClose={() => {
+              track('lead_popup_closed_no_submit', { msg_count: messages.length });
               setShowConferencePopup(false);
               try {
                 localStorage.setItem(
@@ -2309,6 +2361,11 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
               } catch {}
             }}
             onSubmitted={() => {
+              track('lead_form_submitted', {
+                source: 'conference_popup',
+                msg_count: messages.length,
+              });
+              track('meeting_request_submitted', { source: 'conference_popup' });
               setShowConferencePopup(false);
               // Inject acknowledgment so the bot doesn't keep asking for details
               const ackMessage: Message = {

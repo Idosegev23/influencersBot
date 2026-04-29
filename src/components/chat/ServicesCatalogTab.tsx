@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { track } from '@/lib/analytics/track';
 import {
   X,
   Loader2,
@@ -184,6 +185,12 @@ function MiniBriefForm({
       });
       const data = await res.json();
       if (data.success) {
+        track('service_brief_submitted', {
+          service_id: service.id,
+          service_name: service.name,
+          goal: form.goal || null,
+          budget_range: form.budgetRange || null,
+        });
         if (isConferenceVisitor) {
           fetch('/api/leads/conference', {
             method: 'POST',
@@ -813,6 +820,11 @@ export default function ServicesCatalogTab({
           .filter((p: Service) => p.category === 'service' && p.is_available !== false)
           .sort((a: Service, b: Service) => (b.priority ?? 0) - (a.priority ?? 0));
         setServices(svc);
+        track('services_loaded', {
+          count: svc.length,
+          ai_count: svc.filter(isAIService).length,
+          classic_count: svc.filter((s: Service) => !isAIService(s)).length,
+        });
       } catch (err) {
         console.error('Failed to load services:', err);
       } finally {
@@ -907,7 +919,14 @@ export default function ServicesCatalogTab({
               key={svc.id}
               svc={svc}
               index={i}
-              onClick={() => setSelectedService(svc)}
+              onClick={() => {
+                track('service_card_opened', {
+                  service_id: svc.id,
+                  service_name: svc.name,
+                  is_ai: isAIService(svc),
+                });
+                setSelectedService(svc);
+              }}
             />
           ))}
         </div>
@@ -961,7 +980,14 @@ export default function ServicesCatalogTab({
                 key={svc.id}
                 svc={svc}
                 index={i}
-                onClick={() => setSelectedService(svc)}
+                onClick={() => {
+                track('service_card_opened', {
+                  service_id: svc.id,
+                  service_name: svc.name,
+                  is_ai: isAIService(svc),
+                });
+                setSelectedService(svc);
+              }}
               />
             ))}
             {/* End spacer for last card breathing room */}
@@ -987,7 +1013,14 @@ export default function ServicesCatalogTab({
                 key={svc.id}
                 svc={svc}
                 index={i}
-                onClick={() => setSelectedService(svc)}
+                onClick={() => {
+                track('service_card_opened', {
+                  service_id: svc.id,
+                  service_name: svc.name,
+                  is_ai: isAIService(svc),
+                });
+                setSelectedService(svc);
+              }}
               />
             ))}
             <div className="flex-shrink-0 w-1" />

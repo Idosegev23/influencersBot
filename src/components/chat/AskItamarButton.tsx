@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, X, Loader2, CheckCircle2 } from 'lucide-react';
+import { track } from '@/lib/analytics/track';
 
 interface AskItamarButtonProps {
   sessionId: string | null;
@@ -77,6 +78,11 @@ export function AskItamarButton({
       if (!res.ok || !data?.success) {
         throw new Error(data?.error || `HTTP ${res.status}`);
       }
+      track('handoff_form_submitted', {
+        ref_code: data.refCode,
+        has_phone: !!phone.trim(),
+        question_length: text.trim().length,
+      });
       setDone(true);
       onSubmitted?.({
         sessionId: data.sessionId || sessionId,
@@ -91,11 +97,20 @@ export function AskItamarButton({
     }
   }
 
+  // Track button visibility (when modal isn't open)
+  useEffect(() => {
+    if (!open) track('handoff_button_shown', {});
+  }, [open]);
+
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          track('handoff_button_clicked', {});
+          track('handoff_form_opened', {});
+          setOpen(true);
+        }}
         className="ask-itamar-btn flex items-center gap-2 px-3.5 py-2 rounded-full text-[13px] font-semibold transition-all active:scale-[0.97] hover:shadow-md"
         style={{
           background: 'linear-gradient(135deg,#0c1013 0%,#1a2030 100%)',

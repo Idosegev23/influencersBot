@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { uploadBriefToDrive, sendBriefEmail } from '@/lib/google-workspace';
 import { buildConferenceLeadEmail } from '@/lib/email-templates/conference-lead';
 import { buildConferenceLeadConfirmationEmail } from '@/lib/email-templates/conference-lead-confirmation';
+import { emitServerConversion } from '@/lib/analytics/server-track';
 
 // Allow up to 60s for the after() callback (email + Drive + DB updates)
 // to complete on Pro tier. Default Vercel timeout is 30s.
@@ -272,6 +273,55 @@ export async function POST(req: NextRequest) {
         console.log(
           `[conference-lead] skipping confirmation | email=${!!email} | consent=${!!consentGiven}`
         );
+      }
+
+      // Server-side conversion APIs (Meta CAPI + TikTok Events API) —
+      // dedupes against client pixels via shared event_id. No-ops if
+      // META_CAPI_TOKEN / TIKTOK_EVENTS_TOKEN aren't set.
+      try {
+        const ua = req.headers.get('user-agent') || undefined;
+        const fwd = req.headers.get('x-forwarded-for') || '';
+        const ip = fwd.split(',')[0]?.trim() || undefined;
+        const eventSourceUrl = body.landingUrl || 'https://bestie.ldrsgroup.com/chat/ldrs_group?source=conf';
+        const externalId = sessionId || leadId;
+
+        await emitServerConversion({
+          eventName: 'lead_form_submitted',
+          email: email || null,
+          phone: phone || null,
+          firstName: fullName?.split(/\s+/)[0] || null,
+          lastName: fullName?.split(/\s+/).slice(1).join(' ') || null,
+          externalId,
+          clientIpAddress: ip,
+          clientUserAgent: ua,
+          eventSourceUrl,
+          customData: {
+            lead_id: leadId,
+            preferred_product: preferredProduct || null,
+            primary_area: primaryArea || null,
+            source: sourceParam || 'conf',
+            consent_given: !!consentGiven,
+          },
+        });
+
+        // Conference popup form acts as both a lead AND a meeting request
+        await emitServerConversion({
+          eventName: 'meeting_request_submitted',
+          email: email || null,
+          phone: phone || null,
+          firstName: fullName?.split(/\s+/)[0] || null,
+          lastName: fullName?.split(/\s+/).slice(1).join(' ') || null,
+          externalId,
+          clientIpAddress: ip,
+          clientUserAgent: ua,
+          eventSourceUrl,
+          customData: {
+            lead_id: leadId,
+            source: sourceParam || 'conf',
+          },
+        });
+      } catch (capiErr) {
+        console.error('[conference-lead] server-side conversion fire failed:', capiErr);
       }
     });
 
