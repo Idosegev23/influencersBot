@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send, Loader2, CheckCircle, Phone, User, Package, MessageSquare, Tag } from 'lucide-react';
+import { track, identify } from '@/lib/analytics/track';
 interface SupportFormProduct {
   id: string;
   name: string;
@@ -31,6 +32,17 @@ export default function SupportForm({ username, influencerName, products, onClos
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    track('support_form_opened', { username, initial_brand: initialBrand || null });
+    return () => {
+      // unmounted without success → closed-no-submit
+      if (step !== 'success') {
+        track('support_form_closed_no_submit', { username, last_step: step });
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Extract unique brands from products
   const brands = Array.from(new Set(
@@ -68,6 +80,15 @@ export default function SupportForm({ username, influencerName, products, onClos
         throw new Error(data.error || 'שגיאה בשליחת הפנייה');
       }
 
+      track('support_form_submitted', {
+        username,
+        brand: selectedBrand,
+      });
+      void identify({
+        firstName: formData.customerName.split(/\s+/)[0],
+        lastName: formData.customerName.split(/\s+/).slice(1).join(' ') || null,
+        phone: formData.customerPhone,
+      });
       setStep('success');
       onSuccess?.();
     } catch (err) {

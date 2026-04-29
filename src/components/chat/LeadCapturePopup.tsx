@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Loader2, CheckCircle } from 'lucide-react';
+import { track, identify } from '@/lib/analytics/track';
 
 interface LeadCapturePopupProps {
   username: string;
@@ -18,6 +19,18 @@ export function LeadCapturePopup({ username, sessionId, onClose, onSubmit }: Lea
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState<{ serialNumber: string; firstName: string } | null>(null);
+
+  // Track popup opened (mount = trigger)
+  useEffect(() => {
+    track('lead_popup_triggered', { trigger: 'generic_popup', username });
+    return () => {
+      // If unmounted without success, count as closed-no-submit
+      if (!success) {
+        track('lead_popup_closed_no_submit', { username });
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = async () => {
     if (!firstName.trim() || !lastName.trim() || !phone.trim()) {
@@ -44,6 +57,18 @@ export function LeadCapturePopup({ username, sessionId, onClose, onSubmit }: Lea
       }
 
       setSuccess({ serialNumber: data.serialNumber, firstName: data.firstName });
+
+      // Analytics — fire conversion + advanced matching
+      track('lead_form_submitted', {
+        username,
+        lead_id: data.leadId,
+        source: 'generic_popup',
+      });
+      void identify({
+        firstName: data.firstName,
+        lastName,
+        phone,
+      });
 
       // Auto-submit after showing success briefly
       setTimeout(() => {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { uploadBriefToDrive, sendBriefEmail, buildBriefHtml } from '@/lib/google-workspace';
+import { emitServerConversion } from '@/lib/analytics/server-track';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -100,6 +101,32 @@ export async function POST(req: NextRequest) {
       }
     } catch (err) {
       console.error('[briefs] Email send failed:', err);
+    }
+
+    // Server-side conversion APIs (Meta CAPI + TikTok Events API).
+    try {
+      const ua = req.headers.get('user-agent') || undefined;
+      const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0]?.trim() || undefined;
+      await emitServerConversion({
+        eventName: 'service_brief_submitted',
+        email: email || null,
+        phone: phone || null,
+        firstName: (fullName || '').split(/\s+/)[0] || null,
+        lastName: (fullName || '').split(/\s+/).slice(1).join(' ') || null,
+        externalId: sessionId || brief.id,
+        clientIpAddress: ip,
+        clientUserAgent: ua,
+        eventSourceUrl: 'https://bestie.ldrsgroup.com',
+        customData: {
+          brief_id: brief.id,
+          service_id: serviceId || null,
+          service_name: serviceName,
+          goal: goal || null,
+          budget_range: budgetRange || null,
+        },
+      });
+    } catch (err) {
+      console.error('[briefs] CAPI dispatch failed:', err);
     }
 
     return NextResponse.json({

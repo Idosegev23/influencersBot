@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { track } from '@/lib/analytics/track';
 import {
   Loader2, Search, ExternalLink, ShoppingBag,
   X, Sparkles, AlignCenter,
@@ -483,7 +484,10 @@ export default function ProductsCatalogTab({ accountId, onAskAbout }: ProductsCa
           ) : (
             <div className="pcat-body">
               {featured && (
-                <FeaturedProductCard product={featured} onOpen={setSelectedProduct} />
+                <FeaturedProductCard product={featured} onOpen={(p) => {
+                  track('product_card_clicked', { product_id: p.id, product_name: p.name, placement: 'featured' });
+                  setSelectedProduct(p);
+                }} />
               )}
 
               {rails.map(rail => (
@@ -491,7 +495,10 @@ export default function ProductsCatalogTab({ accountId, onAskAbout }: ProductsCa
                   key={rail.title}
                   title={rail.title}
                   products={rail.products}
-                  onOpen={setSelectedProduct}
+                  onOpen={(p) => {
+                    track('product_card_clicked', { product_id: p.id, product_name: p.name, placement: 'rail', rail_title: rail.title });
+                    setSelectedProduct(p);
+                  }}
                 />
               ))}
             </div>

@@ -54,6 +54,8 @@ export interface ServerEventInput {
 const META_EVENT_DEFAULT: Record<string, string> = {
   lead_form_submitted: 'Lead',
   service_brief_submitted: 'Lead',
+  support_form_submitted: 'Lead',
+  widget_lead_submitted: 'Lead',
   meeting_request_submitted: 'Schedule',
   handoff_form_submitted: 'Contact',
   itamar_replied: 'Contact',
@@ -61,6 +63,8 @@ const META_EVENT_DEFAULT: Record<string, string> = {
 const TIKTOK_EVENT_DEFAULT: Record<string, string> = {
   lead_form_submitted: 'SubmitForm',
   service_brief_submitted: 'CompleteRegistration',
+  support_form_submitted: 'SubmitForm',
+  widget_lead_submitted: 'SubmitForm',
   meeting_request_submitted: 'Contact',
   handoff_form_submitted: 'Contact',
   itamar_replied: 'Contact',

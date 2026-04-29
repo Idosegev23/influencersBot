@@ -8,6 +8,7 @@ import {
 } from '@/lib/whatsapp-notify';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { checkInfluencerAuth } from '@/lib/auth/influencer-auth';
+import { emitServerConversion } from '@/lib/analytics/server-track';
 import { requireAdminAuth } from '@/lib/auth/admin-auth';
 
 export async function POST(req: NextRequest) {
@@ -236,6 +237,29 @@ export async function POST(req: NextRequest) {
       );
     } else {
       console.log('[Support] No customer phone provided, skipping customer notification');
+    }
+
+    // Server-side conversion APIs (Meta CAPI + TikTok Events API).
+    try {
+      const ua = req.headers.get('user-agent') || undefined;
+      const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0]?.trim() || undefined;
+      await emitServerConversion({
+        eventName: 'support_form_submitted',
+        email: null,
+        phone: sanitizedPhone || null,
+        firstName: sanitizedName.split(/\s+/)[0] || null,
+        lastName: sanitizedName.split(/\s+/).slice(1).join(' ') || null,
+        externalId: supportRequest.id,
+        clientIpAddress: ip,
+        clientUserAgent: ua,
+        eventSourceUrl: `https://bestie.ldrsgroup.com/chat/${username}`,
+        customData: {
+          request_id: supportRequest.id,
+          username,
+        },
+      });
+    } catch (err) {
+      console.error('[Support] CAPI dispatch failed:', err);
     }
 
     return NextResponse.json({

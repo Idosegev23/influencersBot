@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, Search, ChevronLeft, FileText, Video, ImageIcon, Handshake } from 'lucide-react';
+import { track } from '@/lib/analytics/track';
 
 interface QuestionItem {
   title: string;
@@ -180,7 +181,14 @@ export default function TopicQuestionsTab({
                               initial={{ opacity: 0, x: -8 }}
                               animate={{ opacity: 1, x: 0 }}
                               transition={{ delay: Math.min(i * 0.02, 0.2) }}
-                              onClick={() => onAskAbout(item.question)}
+                              onClick={() => {
+                                track('topic_question_clicked', {
+                                  question: item.question,
+                                  group_label: group.label,
+                                  position: i,
+                                });
+                                onAskAbout(item.question);
+                              }}
                               className="w-full text-right px-4 py-3 hover:bg-purple-50 transition-colors border-b border-gray-50 last:border-b-0 group"
                             >
                               <div className="flex items-start gap-2">

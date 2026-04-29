@@ -80,6 +80,36 @@ export type AnalyticsEventName =
   | 'phone_clicked'
   | 'email_clicked'
   | 'external_link_clicked'
+  // Support
+  | 'support_form_opened'
+  | 'support_form_step'
+  | 'support_form_submitted'
+  | 'support_form_closed_no_submit'
+  // Coupons / Brands / Products
+  | 'brand_card_opened'
+  | 'brand_card_closed'
+  | 'coupon_revealed'
+  | 'coupon_copied'
+  | 'coupon_redeemed_clicked'
+  | 'product_card_clicked'
+  | 'product_buy_clicked'
+  // Content / Discover / Topics
+  | 'content_browse_loaded'
+  | 'content_filter_changed'
+  | 'content_card_clicked'
+  | 'topic_card_clicked'
+  | 'topic_question_clicked'
+  | 'discovery_category_opened'
+  // Share / link
+  | 'share_clicked'
+  | 'copy_link_clicked'
+  // Widget (third-party embed)
+  | 'widget_loaded'
+  | 'widget_opened'
+  | 'widget_closed'
+  | 'widget_message_sent'
+  | 'widget_message_received'
+  | 'widget_lead_submitted'
   // Errors & perf
   | 'js_error'
   | 'unhandled_promise_rejection'

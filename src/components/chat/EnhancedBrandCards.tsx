@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, Gift, Sparkles } from 'lucide-react';
+import { track } from '@/lib/analytics/track';
 
 export interface BrandCardData {
   id: string;
@@ -48,12 +49,29 @@ export function EnhancedBrandCards({
   const hasMore = brands.length > maxDisplay;
 
   const handleCardTap = (brand: BrandCardData) => {
+    track('brand_card_opened', {
+      brand_id: brand.id,
+      brand_name: brand.brand_name,
+      has_coupon: !!brand.coupon_code,
+      category: brand.category || null,
+    });
     if (brand.coupon_code) {
       navigator.clipboard.writeText(brand.coupon_code);
       setCopiedId(brand.id);
       setTimeout(() => setCopiedId(null), 2000);
+      track('coupon_copied', {
+        brand_id: brand.id,
+        brand_name: brand.brand_name,
+        coupon_code: brand.coupon_code,
+        discount_percent: brand.discount_percent || null,
+      });
       onCopy(brand);
     } else if (brand.link) {
+      track('coupon_redeemed_clicked', {
+        brand_id: brand.id,
+        brand_name: brand.brand_name,
+        target_url: brand.link,
+      });
       onOpen(brand);
     }
   };

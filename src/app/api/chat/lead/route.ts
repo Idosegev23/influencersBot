@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { sanitizeHtml, sanitizeUsername } from '@/lib/sanitize';
 import { sendFollowerWelcome, fireAndForget } from '@/lib/whatsapp-notify';
+import { emitServerConversion } from '@/lib/analytics/server-track';
 
 function generateSerial(): string {
   const ts = Date.now().toString(36);
@@ -120,6 +121,32 @@ export async function POST(req: NextRequest) {
       } catch (err) {
         console.warn('[Lead API] WhatsApp welcome dispatch failed (non-fatal):', err);
       }
+    }
+
+    // Server-side conversion APIs (Meta CAPI + TikTok Events API).
+    // No-ops if META_CAPI_TOKEN / TIKTOK_EVENTS_TOKEN aren't configured.
+    try {
+      const ua = req.headers.get('user-agent') || undefined;
+      const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0]?.trim() || undefined;
+      await emitServerConversion({
+        eventName: 'lead_form_submitted',
+        email: null,
+        phone: body.phone || null,
+        firstName: lead.first_name,
+        lastName: body.lastName || null,
+        externalId: body.sessionId || lead.id,
+        clientIpAddress: ip,
+        clientUserAgent: ua,
+        eventSourceUrl: `https://bestie.ldrsgroup.com/chat/${username}`,
+        customData: {
+          lead_id: lead.id,
+          serial_number: lead.serial_number,
+          username,
+          source: 'generic_popup',
+        },
+      });
+    } catch (err) {
+      console.error('[Lead API] CAPI dispatch failed:', err);
     }
 
     return NextResponse.json({

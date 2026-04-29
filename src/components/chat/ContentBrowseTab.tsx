@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Loader2, Search, ChevronLeft } from 'lucide-react';
+import { track } from '@/lib/analytics/track';
 import Image from 'next/image';
 import { getProxiedImageUrl } from '@/lib/image-utils';
 
@@ -78,6 +79,10 @@ export default function ContentBrowseTab({
     : items;
 
   const handleCardClick = (item: ContentItem) => {
+    track('content_card_clicked', {
+      content_id: item.id,
+      title: item.title,
+    });
     const question = `ספר/י לי על: ${item.title}`;
     onAskAbout(question);
   };

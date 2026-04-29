@@ -40,6 +40,52 @@
   };
 
   // ============================================
+  // Analytics shim — piggybacks on the host site's gtag / fbq / ttq pixels
+  // ============================================
+
+  var META_EVENT_MAP = {
+    widget_lead_submitted: 'Lead',
+    widget_message_sent: 'ViewContent',
+  };
+  var TIKTOK_EVENT_MAP = {
+    widget_lead_submitted: 'SubmitForm',
+    widget_message_sent: 'ClickButton',
+  };
+  var GA4_EVENT_MAP = {
+    widget_lead_submitted: 'generate_lead',
+  };
+
+  function widgetTrack(eventName, params) {
+    params = params || {};
+    var enriched = {
+      account_id: ACCOUNT_ID,
+      session_id: sessionId,
+      widget_version: '3.0',
+    };
+    for (var k in params) enriched[k] = params[k];
+
+    try {
+      if (window.gtag) {
+        window.gtag('event', GA4_EVENT_MAP[eventName] || eventName, enriched);
+      }
+    } catch (e) { /* host gtag missing */ }
+
+    try {
+      if (window.fbq) {
+        var meta = META_EVENT_MAP[eventName];
+        if (meta) window.fbq('track', meta, enriched);
+        else window.fbq('trackCustom', eventName, enriched);
+      }
+    } catch (e) { /* host fbq missing */ }
+
+    try {
+      if (window.ttq && window.ttq.track) {
+        window.ttq.track(TIKTOK_EVENT_MAP[eventName] || eventName, enriched);
+      }
+    } catch (e) { /* host ttq missing */ }
+  }
+
+  // ============================================
   // Load Heebo Font
   // ============================================
 
@@ -140,7 +186,11 @@
       '</div>';
 
     var trigger = document.getElementById('ibot-trigger');
-    trigger.onclick = function () { isOpen = true; render(); };
+    trigger.onclick = function () {
+      isOpen = true;
+      widgetTrack('widget_opened', {});
+      render();
+    };
     trigger.onmouseover = function () { this.style.transform = 'scale(1.03)'; };
     trigger.onmouseout = function () { this.style.transform = 'scale(1)'; };
   }
@@ -278,14 +328,22 @@
     // Event listeners
     var closeEl = document.getElementById('ibot-close');
     if (closeEl) {
-      closeEl.onclick = function () { isOpen = false; render(); };
+      closeEl.onclick = function () {
+        isOpen = false;
+        widgetTrack('widget_closed', { msg_count: messages.length });
+        render();
+      };
       closeEl.onmouseover = function () { this.style.transform = 'scale(1.08)'; };
       closeEl.onmouseout = function () { this.style.transform = 'scale(1)'; };
     }
 
     var closeMobileEl = document.getElementById('ibot-close-mobile');
     if (closeMobileEl) {
-      closeMobileEl.onclick = function () { isOpen = false; render(); };
+      closeMobileEl.onclick = function () {
+        isOpen = false;
+        widgetTrack('widget_closed', { msg_count: messages.length });
+        render();
+      };
       closeMobileEl.onmouseover = function () { this.style.background = 'rgba(255,255,255,0.25)'; };
       closeMobileEl.onmouseout = function () { this.style.background = 'rgba(255,255,255,0.15)'; };
     }
@@ -315,6 +373,7 @@
     messages.push({ role: 'user', content: text });
     messages.push({ role: 'assistant', content: '' });
     isLoading = true;
+    widgetTrack('widget_message_sent', { length: text.length, msg_index: messages.length - 2 });
     render();
 
     fetch(BASE_URL + '/api/widget/chat', {
@@ -337,7 +396,9 @@
             if (result.done) {
               isLoading = false;
               thinkingText = null;
-              messages[messages.length - 1].content = fullText.replace(/<<SUGGESTIONS>>[\s\S]*?<<\/SUGGESTIONS>>/g, '').trim();
+              var clean = fullText.replace(/<<SUGGESTIONS>>[\s\S]*?<<\/SUGGESTIONS>>/g, '').trim();
+              messages[messages.length - 1].content = clean;
+              widgetTrack('widget_message_received', { length: clean.length });
               render();
               return;
             }
@@ -471,6 +532,7 @@
     }
   }
 
-  // Initial render
+  // Initial render + analytics: announce widget is on the page
+  widgetTrack('widget_loaded', {});
   render();
 })();
