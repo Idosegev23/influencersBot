@@ -1,5 +1,5 @@
 // bestieAI Service Worker
-const CACHE_NAME = 'bestieai-v1';
+const CACHE_NAME = 'bestieai-v2-cross-origin-passthrough';
 const STATIC_ASSETS = [
   '/',
   '/offline.html',
@@ -38,6 +38,12 @@ self.addEventListener('fetch', (event) => {
   // Skip API requests and auth endpoints
   const url = new URL(event.request.url);
   if (url.pathname.startsWith('/api/')) return;
+
+  // Skip cross-origin requests entirely — let the browser handle them with
+  // its native CSP (img-src/font-src/etc.). Otherwise our fetch() call here
+  // gets evaluated against connect-src, which is much narrower than img-src
+  // and blocks Shopify CDN, Google Fonts, FB pixel, TikTok pixel, etc.
+  if (url.origin !== self.location.origin) return;
 
   event.respondWith(
     fetch(event.request)
