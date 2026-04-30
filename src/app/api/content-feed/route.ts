@@ -133,9 +133,16 @@ function extractTitle(text: string, entityType: string): string {
   if (productMatch) return productMatch[1].trim();
 
   // For posts/transcriptions, take the first meaningful line
-  const lines = text.split('\n').filter(l => l.trim().length > 5);
+  // Strip leading tag prefix [post]/[transcription] + invisible Unicode markers + "י " RTL leak
+  const cleanedText = text
+    .replace(/^\[\w+\]\s*/, '')
+    .replace(/^[​-‏﻿]*י\s*(?=[A-Za-z#])/gm, '') // strip "י" only when followed by Latin/hashtag (RTL artifact)
+    .replace(/^[​-‏﻿]+/gm, '');
+  const lines = cleanedText.split('\n').filter(l => l.trim().length > 5);
   if (lines.length > 0) {
-    const first = lines[0].trim();
+    let first = lines[0].trim()
+      .replace(/^[​-‏﻿]+/, '')      // strip any remaining invisible chars
+      .replace(/^[#@]\S+\s*/, '');                  // drop leading hashtag/mention
     return first.length > 60 ? first.slice(0, 57) + '...' : first;
   }
 
@@ -154,10 +161,14 @@ function extractDescription(text: string): string {
   }
 
   // Try he_summary from metadata (handled at caller level)
-  // Fallback: second meaningful line
-  const lines = text.split('\n').filter(l => l.trim().length > 10);
+  // Fallback: second meaningful line (strip chunker tag prefix + invisible Unicode + "י " leak)
+  const cleaned = text
+    .replace(/^\[\w+\]\s*/, '')
+    .replace(/^[​-‏﻿]*י\s*(?=[A-Za-z#])/gm, '') // strip "י" only when followed by Latin/hashtag (RTL artifact)
+    .replace(/^[​-‏﻿]+/gm, '');
+  const lines = cleaned.split('\n').filter(l => l.trim().length > 10);
   if (lines.length > 1) {
-    const second = lines[1].trim();
+    const second = lines[1].trim().replace(/^[​-‏﻿]+/, '');
     return second.length > 120 ? second.slice(0, 117) + '...' : second;
   }
 
@@ -571,6 +582,9 @@ export async function GET(request: NextRequest) {
 
     // Clean full text: strip metadata prefixes + meta fields already in pills + HTML/CSS/JS junk
     const rawText = text
+      .replace(/^\[\w+\]\s*/, '')           // chunker tag like [post] / [transcription]
+      .replace(/^[​-‏﻿]*י\s*(?=[A-Za-z#])/gm, '') // strip "י" only when followed by Latin/hashtag (RTL artifact)
+    .replace(/^[​-‏﻿]+/gm, '') // RTL/LRM marker + "י " leak at line start
       .replace(/^Title:\s*.+?\n/m, '')
       .replace(/^Description:\s*.+?\n/m, '')
       .replace(/^\[סיכום:.*?\]\n?/m, '')

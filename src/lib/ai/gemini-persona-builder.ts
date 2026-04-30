@@ -734,8 +734,17 @@ export async function savePersonaToDatabase(
       evolution: persona.evolution,
       response_policy: persona.responsePolicy,
 
-      // Emoji settings from analysis
-      emoji_usage: persona.voice.emojiAnalysis?.usage || 'minimal',
+      // Emoji settings from analysis (DB CHECK: none|minimal|moderate|heavy)
+      emoji_usage: (() => {
+        const allowed = new Set(['none', 'minimal', 'moderate', 'heavy']);
+        const raw = persona.voice.emojiAnalysis?.usage;
+        if (typeof raw === 'string' && allowed.has(raw)) return raw;
+        const commonCount = persona.voice.emojiAnalysis?.common?.length ?? 0;
+        if (commonCount === 0) return 'none';
+        if (commonCount > 5) return 'heavy';
+        if (commonCount > 2) return 'moderate';
+        return 'minimal';
+      })(),
       emoji_types: persona.voice.emojiAnalysis?.common || [],
 
       // Common phrases from analysis

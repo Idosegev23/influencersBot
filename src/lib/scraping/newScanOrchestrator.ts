@@ -363,13 +363,21 @@ export class NewScanOrchestrator {
       }
 
       // Upsert ALL posts (updates metrics like likes/comments count)
+      // DB CHECK constraint allows: post | reel | carousel | video
+      // ScrapeCreators normalizeMediaType returns: photo | video | carousel
+      const POST_TYPE_MAP: Record<string, string> = {
+        photo: 'post',
+        video: 'reel',
+        carousel: 'carousel',
+      };
       for (const post of posts) {
-        await this.supabase.from('instagram_posts').upsert({
+        const dbType = POST_TYPE_MAP[post.media_type] || 'post';
+        const { error: postUpsertError } = await this.supabase.from('instagram_posts').upsert({
           account_id: accountId,
           shortcode: post.shortcode,
           post_id: post.post_id,
           post_url: post.post_url,
-          type: post.media_type === 'video' ? 'reel' : post.media_type,
+          type: dbType,
           caption: post.caption,
           mentions: post.mentions || [],
           media_urls: post.media_urls,
@@ -385,7 +393,11 @@ export class NewScanOrchestrator {
           onConflict: 'account_id,shortcode',
         });
 
-        stats.postsCount++;
+        if (postUpsertError) {
+          console.error(`[Scan] Failed to upsert post ${post.shortcode} (type=${dbType}, mediaType=${post.media_type}):`, postUpsertError.message);
+        } else {
+          stats.postsCount++;
+        }
       }
 
       report('posts', 'completed', 70, `✓ ${stats.postsCount} פוסטים (${stats.newPostsCount} חדשים)`);
