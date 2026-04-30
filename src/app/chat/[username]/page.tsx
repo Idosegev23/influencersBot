@@ -563,6 +563,34 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     });
   }, [influencer?.id, sessionId, activeTab]);
 
+  // ── SEO: per-tab document title + description for Google Ads sitelinks.
+  // Each tab needs distinct meta so Google won't merge them under one canonical.
+  useEffect(() => {
+    if (!influencer?.display_name) return;
+    const tabs = (influencer as any).tabs || DEFAULT_TABS;
+    const tabLabel = tabs.find((t: { id: string }) => t.id === activeTab)?.label || 'צ׳אט';
+    const accountName = influencer.display_name;
+    document.title = `${tabLabel} · ${accountName}`;
+
+    const descMap: Record<string, string> = {
+      chat: `שיחה ישירה עם העוזרת החכמה של ${accountName}. שאלו כל דבר על השירותים והתוכן.`,
+      discover: `גלו את התכנים, ההרצאות והפרויקטים האחרונים של ${accountName}.`,
+      topics: `כל השירותים שמציעה ${accountName} במקום אחד — בקשו פירוט או צרו קשר.`,
+      coupons: `הקופונים והמבצעים העדכניים של ${accountName}.`,
+      content_feed: `התוכן החדש ביותר של ${accountName} בפיד אחד.`,
+      products: `המוצרים של ${accountName} — חיפוש וייעוץ ב-AI.`,
+      support: `יצירת קשר עם הצוות של ${accountName}.`,
+    };
+    const description = descMap[activeTab] || `${tabLabel} של ${accountName}`;
+    let metaDesc = document.querySelector('meta[name="description"]');
+    if (!metaDesc) {
+      metaDesc = document.createElement('meta');
+      metaDesc.setAttribute('name', 'description');
+      document.head.appendChild(metaDesc);
+    }
+    metaDesc.setAttribute('content', description);
+  }, [activeTab, influencer]);
+
   // Conference mode: override starters to AI-focused questions for LDRS QR scanners
   useEffect(() => {
     if (!isConferenceMode || username !== 'ldrs_group') return;

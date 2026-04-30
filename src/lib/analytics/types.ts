@@ -132,6 +132,9 @@ export interface GlobalParams {
   utm_campaign?: string;
   utm_term?: string;
   utm_content?: string;
+  gclid?: string;
+  fbclid?: string;
+  ttclid?: string;
   current_path?: string;
   current_tab?: string;
   viewport_w?: number;

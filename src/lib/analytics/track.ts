@@ -172,6 +172,9 @@ export interface Attribution {
   utm_campaign?: string;
   utm_term?: string;
   utm_content?: string;
+  gclid?: string;   // Google Ads click ID — required for Google Ads conversion attribution
+  fbclid?: string;  // Meta (Facebook/Instagram) click ID
+  ttclid?: string;  // TikTok click ID
   referrer_host?: string;
   referrer?: string;
   landing_path?: string;
@@ -198,6 +201,9 @@ export function captureAttribution(): Attribution {
     utm_campaign: params.get('utm_campaign') || undefined,
     utm_term: params.get('utm_term') || undefined,
     utm_content: params.get('utm_content') || undefined,
+    gclid: params.get('gclid') || undefined,
+    fbclid: params.get('fbclid') || undefined,
+    ttclid: params.get('ttclid') || undefined,
     referrer: ref || undefined,
     referrer_host: referrerHost || undefined,
     landing_path: url.pathname,
@@ -275,6 +281,9 @@ function buildGlobals(): GlobalParams {
     utm_campaign: attribution.utm_campaign,
     utm_term: attribution.utm_term,
     utm_content: attribution.utm_content,
+    gclid: attribution.gclid,
+    fbclid: attribution.fbclid,
+    ttclid: attribution.ttclid,
     viewport_w: window.innerWidth,
     viewport_h: window.innerHeight,
     is_mobile: window.innerWidth < 768,
