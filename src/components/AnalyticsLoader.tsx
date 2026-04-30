@@ -31,7 +31,7 @@ export function AnalyticsLoader() {
               function gtag(){dataLayer.push(arguments);}
               window.gtag = gtag;
               gtag('js', new Date());
-              gtag('config', '${GA4_ID}', { send_page_view: false });
+              gtag('config', '${GA4_ID}');
             `}
           </Script>
         </>
@@ -49,6 +49,7 @@ export function AnalyticsLoader() {
             s.parentNode.insertBefore(t,s)}(window, document,'script',
             'https://connect.facebook.net/en_US/fbevents.js');
             fbq('init', '${META_PIXEL_ID}');
+            fbq('track', 'PageView');
           `}
         </Script>
       )}
