@@ -605,7 +605,11 @@ async function ingestToRAG(accountId, page) {
     }));
 
     const { error } = await supabase.from('document_chunks').insert(rows);
-    if (!error) created += rows.length;
+    if (error) {
+      console.error(`   chunk insert error: ${error.message}`);
+    } else {
+      created += rows.length;
+    }
   }
 
   await supabase
@@ -642,10 +646,13 @@ async function getEmbeddingBatch(texts) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'text-embedding-3-small',
+        // Must match src/lib/rag/embeddings.ts — pgvector column is 2000-dim
+        // Mismatched dimensions cause silent insert failures.
+        model: 'text-embedding-3-large',
+        dimensions: 2000,
         input: texts.map((t) => t.slice(0, 8000)),
       }),
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(300000), // 5 min — local script, no need to time out aggressively
     });
 
     if (!res.ok) {
