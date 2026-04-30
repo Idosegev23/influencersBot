@@ -3,6 +3,7 @@ import "./globals.css";
 import CookieConsent from "@/components/CookieConsent";
 import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
 import { AnalyticsClient } from "@/components/AnalyticsClient";
+import { Analytics } from "@vercel/analytics/next";
 
 export const metadata: Metadata = {
   title: "bestieAI - AI Chatbot Platform",
@@ -76,6 +77,7 @@ export default function RootLayout({
         {children}
         <CookieConsent />
         <ServiceWorkerRegistration />
+        <Analytics />
       </body>
     </html>
   );
