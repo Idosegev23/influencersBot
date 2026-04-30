@@ -114,6 +114,7 @@ function Navbar() {
     { href: '#demo', label: 'דמו חי' },
     { href: '#capabilities', label: 'יכולות' },
     { href: '#how', label: 'איך זה עובד' },
+    { href: '/onboarding-guide', label: 'אונבורדינג' },
     { href: '#faq', label: 'שאלות' },
   ];
 
@@ -128,12 +129,19 @@ function Navbar() {
         </Link>
 
         <div className="hidden md:flex items-center gap-9 text-sm text-stone-600">
-          {links.map((l) => (
-            <a key={l.href} href={l.href} className="hover:text-stone-900 transition-colors relative group">
-              {l.label}
-              <span className="absolute -bottom-1 right-0 left-0 h-px bg-stone-900 scale-x-0 group-hover:scale-x-100 transition-transform origin-right" />
-            </a>
-          ))}
+          {links.map((l) =>
+            l.href.startsWith('/') ? (
+              <Link key={l.href} href={l.href} className="hover:text-stone-900 transition-colors relative group">
+                {l.label}
+                <span className="absolute -bottom-1 right-0 left-0 h-px bg-stone-900 scale-x-0 group-hover:scale-x-100 transition-transform origin-right" />
+              </Link>
+            ) : (
+              <a key={l.href} href={l.href} className="hover:text-stone-900 transition-colors relative group">
+                {l.label}
+                <span className="absolute -bottom-1 right-0 left-0 h-px bg-stone-900 scale-x-0 group-hover:scale-x-100 transition-transform origin-right" />
+              </a>
+            ),
+          )}
         </div>
 
         <div className="hidden md:flex items-center gap-2">
@@ -174,16 +182,17 @@ function Navbar() {
             className="md:hidden overflow-hidden bg-[#faf7f2] border-t border-stone-200"
           >
             <div className="px-5 py-5 space-y-4" dir="rtl">
-              {links.map((l) => (
-                <a
-                  key={l.href}
-                  href={l.href}
-                  onClick={() => setOpen(false)}
-                  className="block text-base text-stone-700"
-                >
-                  {l.label}
-                </a>
-              ))}
+              {links.map((l) =>
+                l.href.startsWith('/') ? (
+                  <Link key={l.href} href={l.href} onClick={() => setOpen(false)} className="block text-base text-stone-700">
+                    {l.label}
+                  </Link>
+                ) : (
+                  <a key={l.href} href={l.href} onClick={() => setOpen(false)} className="block text-base text-stone-700">
+                    {l.label}
+                  </a>
+                ),
+              )}
               <div className="pt-3 border-t border-stone-200 flex items-center justify-between">
                 <Link href="/admin" className="text-sm text-stone-600" onClick={() => setOpen(false)}>
                   כניסה למערכת
@@ -1350,6 +1359,9 @@ function Footer() {
           <div className="flex flex-wrap items-center gap-6 text-sm text-stone-600">
             <Link href="/admin" className="hover:text-stone-900 transition-colors">
               כניסה למערכת
+            </Link>
+            <Link href="/onboarding-guide" className="hover:text-stone-900 transition-colors">
+              אונבורדינג
             </Link>
             <a href="#contact" className="hover:text-stone-900 transition-colors">
               צרו קשר
