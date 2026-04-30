@@ -2,7 +2,7 @@
 
 /* ==========================================================================
    BestieAI — Public Landing Page (root "/")
-   Brand-aligned: 99 mark (indigo + peach), warm, friendly, confident.
+   Brand-aligned: Bestie purple gradient (#883FE2 → #B497EF → #E6F7FF).
    Real capabilities only. Form posts to /api/briefs.
    ========================================================================== */
 
@@ -47,8 +47,10 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 /*  Brand tokens                                                       */
 /* ------------------------------------------------------------------ */
 
-const INDIGO = '#6366f1';
-const PEACH = '#f9b65f';
+// Bestie brand tokens — sourced from Figma (Primary-purple) + logo gradient.
+const INDIGO = '#883fe2'; // brand-primary (deep purple)
+const PEACH = '#b497ef';  // brand-soft (lavender highlight from gradient)
+const BRAND_RGB = '136, 63, 226'; // #883fe2 in r,g,b — for rgba()/glow stops
 
 /* ------------------------------------------------------------------ */
 /*  Grain texture overlay — subtle warmth                              */
@@ -73,7 +75,7 @@ function Grain() {
 function MiniMark({ size = 24, className = '' }: { size?: number; className?: string }) {
   return (
     <Image
-      src="/faclogo.png"
+      src="/brand/bestie-icon.svg"
       alt=""
       width={size}
       height={size}
@@ -122,7 +124,7 @@ function Navbar() {
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between px-5 md:px-8 h-16" dir="rtl">
         <Link href="#hero" className="flex items-center shrink-0">
-          <Image src="/logo.png" alt="BestieAI" width={180} height={40} priority className="h-7 md:h-8 w-auto" />
+          <Image src="/brand/bestie-wordmark.svg" alt="BestieAI" width={180} height={45} priority className="h-7 md:h-8 w-auto" />
         </Link>
 
         <div className="hidden md:flex items-center gap-9 text-sm text-stone-600">
@@ -235,12 +237,12 @@ function MouseParallaxMark() {
       className="relative"
     >
       <Image
-        src="/faclogo.png"
+        src="/brand/bestie-icon.svg"
         alt=""
         width={820}
         height={820}
         priority
-        className="w-[260px] sm:w-[340px] md:w-[440px] lg:w-[560px] h-auto drop-shadow-[0_30px_60px_rgba(99,102,241,0.25)]"
+        className="w-[260px] sm:w-[340px] md:w-[440px] lg:w-[560px] h-auto drop-shadow-[0_30px_60px_rgba(136,63,226,0.25)]"
       />
     </motion.div>
   );
@@ -253,8 +255,8 @@ function Hero() {
       className="relative min-h-[100svh] pt-28 md:pt-32 pb-16 overflow-hidden bg-[#faf7f2] text-stone-900"
     >
       {/* atmospheric color */}
-      <div className="pointer-events-none absolute top-10 right-[-20%] w-[700px] h-[700px] rounded-full bg-[#f9b65f]/30 blur-[150px]" />
-      <div className="pointer-events-none absolute bottom-0 left-[-15%] w-[600px] h-[600px] rounded-full bg-[#6366f1]/25 blur-[140px]" />
+      <div className="pointer-events-none absolute top-10 right-[-20%] w-[700px] h-[700px] rounded-full bg-[#b497ef]/40 blur-[150px]" />
+      <div className="pointer-events-none absolute bottom-0 left-[-15%] w-[600px] h-[600px] rounded-full bg-[#883fe2]/25 blur-[140px]" />
 
       <div className="relative max-w-7xl w-full mx-auto px-5 md:px-8 h-full">
         {/* Top row: headline left / mark right (RTL: headline right / mark left) */}
@@ -330,7 +332,7 @@ function Hero() {
               <a
                 href="#contact"
                 className="group relative inline-flex items-center gap-2 px-8 py-4 rounded-full font-semibold text-sm text-stone-900 overflow-hidden
-                           shadow-[0_10px_30px_-8px_rgba(99,102,241,0.5)] hover:shadow-[0_16px_40px_-8px_rgba(99,102,241,0.6)] transition-shadow"
+                           shadow-[0_10px_30px_-8px_rgba(136,63,226,0.5)] hover:shadow-[0_16px_40px_-8px_rgba(136,63,226,0.6)] transition-shadow"
               >
                 <span
                   className="absolute inset-0 rounded-full"
@@ -786,7 +788,7 @@ function MomentOfRecognition() {
             className="font-black tracking-[-0.03em] leading-[0.9] bg-clip-text text-transparent"
             style={{
               fontSize: 'clamp(2.5rem, 8vw, 6.5rem)',
-              backgroundImage: `linear-gradient(100deg, #ffd6a5, ${PEACH}, #c7d2fe, ${INDIGO})`,
+              backgroundImage: `linear-gradient(100deg, #e6f7ff, ${PEACH}, #c8bef6, ${INDIGO})`,
             }}
           >
             עכשיו יש לכם אחת.
@@ -889,7 +891,7 @@ function Capabilities() {
           clickEffect={true}
           spotlightRadius={300}
           particleCount={10}
-          glowColor="99, 102, 241"
+          glowColor={BRAND_RGB}
         />
       </div>
     </section>
@@ -1170,7 +1172,7 @@ function CtaForm() {
             <br />
             <span
               className="bg-clip-text text-transparent"
-              style={{ backgroundImage: `linear-gradient(100deg, #ffd6a5, ${PEACH}, #c7d2fe, ${INDIGO})` }}
+              style={{ backgroundImage: `linear-gradient(100deg, #e6f7ff, ${PEACH}, #c8bef6, ${INDIGO})` }}
             >
               לשמוע עוד?
             </span>
@@ -1361,7 +1363,7 @@ function Footer() {
         {/* Giant logo */}
         <div className="py-14 md:py-20 flex items-center justify-center">
           <Image
-            src="/logo.png"
+            src="/brand/bestie-wordmark.svg"
             alt="BestieAI"
             width={2400}
             height={600}

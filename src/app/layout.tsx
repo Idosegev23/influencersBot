@@ -11,8 +11,8 @@ export const metadata: Metadata = {
   keywords: ["chatbot", "AI", "Instagram", "marketing"],
   manifest: "/manifest.json",
   icons: {
-    icon: "/faclogo.png",
-    apple: "/faclogo.png",
+    icon: "/brand/bestie-icon.svg",
+    apple: "/brand/bestie-icon.svg",
   },
   appleWebApp: {
     capable: true,
