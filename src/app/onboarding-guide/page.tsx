@@ -401,16 +401,20 @@ function Required() {
 /* ------------------------------------------------------------------ */
 
 function AutoExtracted() {
-  // What we EXTRACT AUTOMATICALLY — owners don't need to send this.
+  // Sourced from: setup-account.ts → newScanOrchestrator + content-processor + deep-scrape + extract-products + extract-coupons
   const items = [
-    'אתר, מבנה, פלטפורמה ו-sitemap',
-    'לוגו ופרופיל מהאינסטגרם',
-    'מוצרים ותמונות מ-Shopify / כל חנות סטנדרטית',
-    'טון דיבור וסגנון — מנותחים מהפוסטים',
-    'נושאים מרכזיים — מהקאפשנים והתגובות',
-    'שאלות נפוצות — מהתגובות ומה-DMs הציבוריים',
-    'תמלולי וידאו ב-Reels וב-highlights',
-    'שותפויות — מאזכורי מותגים בפוסטים',
+    { k: 'פרופיל אינסטגרם', v: 'ביו, עוקבים, סוג חשבון, פרופיל פיקצ׳ר ⇽ לוגו ראשוני' },
+    { k: 'אתר מהביו', v: 'אם יש URL בביו — סריקה אוטומטית של כל הדפים' },
+    { k: 'פוסטים ותגובות', v: '50 פוסטים אחרונים + 3 תגובות לכל פוסט' },
+    { k: 'תמלולי וידאו', v: 'כל Reel וכל סטורי בהיילייטים — Gemini 3 Flash' },
+    { k: 'מוצרים מהאתר', v: 'Shopify/כל חנות — שם, מחיר, תיאור, תמונות מה-CDN' },
+    { k: 'קופונים', v: 'regex על תמלולים: "X% הנחה עם הקוד CODE", "₪X הנחה"' },
+    { k: 'שותפויות', v: 'מאזכורי "בשיתוף @brand" בתמלולים ובפוסטים' },
+    { k: 'טון ופרסונה', v: 'GPT-5.4 מנתח את כל התוכן ובונה זהות, סגנון, גבולות' },
+    { k: 'נושאים מרכזיים', v: 'נושאים שחוזרים על עצמם בפוסטים — מסווגים אוטומטית' },
+    { k: 'שאלות נפוצות', v: 'מתוך תגובות לקוחות חוזרות + ניתוח של פוסטים' },
+    { k: 'AI profile למוצר', v: 'whatItDoes, sellingPoints, conversationTriggers, pairsWith' },
+    { k: 'Tab config', v: 'בחירת טאבים, שאלות מוצעות, קטגוריות — אוטומטי לפי הסוג' },
   ];
 
   return (
@@ -438,17 +442,20 @@ function AutoExtracted() {
           </p>
         </div>
 
-        <div className="mt-12 bg-[#faf7f2] border border-stone-200 rounded-3xl p-8 md:p-10">
-          <ul className="grid md:grid-cols-2 gap-x-8 gap-y-4">
+        <div className="mt-12 bg-[#faf7f2] border border-stone-200 rounded-3xl p-6 md:p-8">
+          <dl className="grid md:grid-cols-2 gap-x-8 gap-y-5">
             {items.map((item) => (
-              <li key={item} className="flex items-start gap-3">
+              <div key={item.k} className="flex items-start gap-3">
                 <span className="mt-1 w-5 h-5 rounded-full flex items-center justify-center shrink-0" style={{ background: 'rgba(136, 63, 226, 0.1)' }}>
                   <Check className="w-3 h-3" style={{ color: INDIGO }} strokeWidth={3} />
                 </span>
-                <span className="text-sm md:text-base text-stone-700">{item}</span>
-              </li>
+                <div className="flex-1">
+                  <dt className="text-sm md:text-base font-semibold text-stone-800">{item.k}</dt>
+                  <dd className="text-xs md:text-sm text-stone-500 mt-0.5 leading-relaxed">{item.v}</dd>
+                </div>
+              </div>
             ))}
-          </ul>
+          </dl>
         </div>
       </div>
     </section>
@@ -456,42 +463,42 @@ function AutoExtracted() {
 }
 
 function Recommended() {
-  // Only things we genuinely CANNOT extract from public scans.
+  // Things that genuinely require owner input — not in any public scan.
   const blocks = [
-    {
-      title: 'קופונים פעילים',
-      subtitle: 'קודים שאתם רוצים שהבוט ידחוף',
-      points: [
-        { k: 'הקוד', v: 'לדוגמה SUMMER25 — בדיוק כמו שהלקוח יקליד.' },
-        { k: 'ההטבה', v: '10% הנחה / משלוח חינם / מתנה — מה הקוד עושה.' },
-        { k: 'תוקף', v: 'תאריך סיום אם יש, או "פעיל קבוע".' },
-      ],
-    },
     {
       title: 'גבולות וכללים',
       subtitle: 'מה הבוט אסור עליו',
       points: [
-        { k: 'מתחרים בשם', v: 'אם יש מתחרים שאסור להזכיר — צריך שמות.' },
-        { k: 'נושאים רגישים', v: 'פוליטיקה, דת, נושאי בריאות שדורשים זהירות.' },
-        { k: 'הצהרת אחריות', v: 'אם נדרשת הצהרה משפטית (בריאות, פיננסים, יעוץ).' },
+        { k: 'מתחרים בשם', v: 'מתחרים שלא מוזכרים בפוסטים שלכם — צריך לציין שמות.' },
+        { k: 'נושאים רגישים', v: 'פוליטיקה, דת, או נושאים פרסונליים שצריך לעקוף.' },
+        { k: 'הצהרת אחריות', v: 'אם נדרשת חוקית: בריאות, פיננסים, יעוץ משפטי.' },
       ],
     },
     {
       title: 'יעד הלידים',
       subtitle: 'מה קורה כשמישהו רוצה לדבר',
       points: [
-        { k: 'המטרה', v: 'טלפון, אימייל, תיאום פגישה או קישור לרכישה.' },
+        { k: 'מטרת השיחה', v: 'טלפון? תיאום פגישה? קישור לרכישה?' },
         { k: 'יעד CRM', v: 'Make.com / Zapier / Webhook ישיר / Gmail / רק מייל.' },
         { k: 'שדות חובה', v: 'שם בלבד? טלפון? אימייל? פרטי הצורך?' },
       ],
     },
     {
-      title: 'תיקונים והעדפות',
-      subtitle: 'דברים שצריך לתקן או להוסיף',
+      title: 'מוצרים פנימיים',
+      subtitle: 'מה שלא מופיע באתר',
       points: [
-        { k: 'תיקוני טון', v: 'אם הסריקה אוטומטית ייצאה לא בדיוק "אתם" — נכוון יחד.' },
-        { k: 'מוצרים שלא באתר', v: 'B2B, פריטים פרטיים, ערכות שלא מפורסמות.' },
-        { k: 'מסמכים פנימיים', v: 'PDFs, מדריכי שימוש, תקנון — שווה להעלות.' },
+        { k: 'B2B / סיטונאות', v: 'מחירונים, מינימום הזמנה — אם רלוונטי.' },
+        { k: 'מוצרים פרטיים', v: 'ערכות מותאמות, פריטים שלא בקטלוג הציבורי.' },
+        { k: 'קופונים סודיים', v: 'קוד שלא הוצג בפוסטים אבל הבוט יוכל לתת להמרות.' },
+      ],
+    },
+    {
+      title: 'תוכן ידע פנימי',
+      subtitle: 'מקורות שמעבר לאתר ול-IG',
+      points: [
+        { k: 'PDFs / מדריכים', v: 'תקנון, מדריך שימוש, FAQ פנימי — להעלאה.' },
+        { k: 'בלוגים חיצוניים', v: 'אם יש מאמרים במדיה אחרת — קישורים.' },
+        { k: 'YouTube', v: 'סרטוני הסבר חיצוניים — נתמלל אוטומטית.' },
       ],
     },
   ];
@@ -502,13 +509,13 @@ function Recommended() {
         <div className="text-center max-w-2xl mx-auto">
           <Eyebrow className="text-amber-700">מומלץ</Eyebrow>
           <h2 className="mt-6 font-black tracking-[-0.03em] text-3xl md:text-5xl text-stone-900">
-            מה שאנחנו לא יכולים
+            מה שלא ניתן לחלץ
             <br />
-            לחלץ מהסריקה
+            מסריקה ציבורית
           </h2>
           <p className="text-stone-600 mt-5 text-base md:text-lg">
-            כל השאר — לוגו, מוצרים, פרסונה, FAQ — אנחנו מסיקים אוטומטית.
-            ארבעת אלה צריכים לבוא מכם.
+            כל מה שלמעלה אנחנו עושים לבד. אלה הדברים שאנחנו לא יכולים לדעת
+            בלי שתגידו לנו.
           </p>
         </div>
 
@@ -547,21 +554,21 @@ function Recommended() {
 function Optional() {
   const items = [
     {
-      title: 'Lead Capture',
-      desc: 'מטרה ברורה: טלפון, אימייל, תיאום פגישה או קישור לרכישה. CRM יעד (Make.com / Zapier / Webhook ישיר / Gmail) ושדות חובה בטופס.',
+      title: 'תיקוני טון אחרי השקה',
+      desc: 'הסריקה האוטומטית לרוב מדויקת — אבל אם משהו לא בדיוק "אתם", נכוון יחד. הפרסונה ניתנת לעריכה ידנית.',
     },
     {
-      title: 'אנליטיקס ודשבורד',
-      desc: 'אימייל לדוח שבועי, ערוץ התראות (Slack או אימייל), והגדרה אילו אירועים שווים פינג בזמן אמת.',
+      title: 'דשבורד אנליטיקס',
+      desc: 'דוח שבועי במייל עם מספר השיחות, נושאים חמים, לידים שנפלו, ויעילות הקופונים.',
     },
     {
-      title: 'תוכן נוסף לבוט',
-      desc: 'PDF־ים פנימיים, מדריכי שימוש, תקנון, בלוג, מאמרים, קישורים ל-YouTube (יתומללו אוטומטית).',
+      title: 'התראות זמן אמת',
+      desc: 'Slack או אימייל כשנופל ליד חם, או כששאלה מסוימת חוזרת על עצמה — מוסיף שאלה ל-FAQ.',
     },
   ];
 
   return (
-    <section id="optional" className="bg-[#faf7f2] py-24 md:py-32">
+    <section id="optional" className="bg-white py-24 md:py-32">
       <div className="max-w-7xl mx-auto px-5 md:px-8" dir="rtl">
         <div className="text-center max-w-2xl mx-auto">
           <Eyebrow className="text-stone-500" >אופציונלי</Eyebrow>
@@ -588,7 +595,7 @@ function Optional() {
         </div>
 
         {/* Highlights honest callout */}
-        <div className="mt-14 max-w-4xl mx-auto bg-white border border-stone-200 rounded-3xl p-8 md:p-10">
+        <div className="mt-14 max-w-4xl mx-auto bg-[#faf7f2] border border-stone-200 rounded-3xl p-8 md:p-10">
           <div className="flex items-start gap-4">
             <div
               className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
