@@ -64,6 +64,15 @@ export interface SandwichBotInput {
   // whose code is in this whitelist (case-insensitive) reach the LLM.
   // Used by the chat stream when the visitor came in via ?ref=<slug>.
   couponCodeWhitelist?: string[];
+  // Hard input-level redaction: any of these strings (display names,
+  // coupon codes, slugs of OTHER influencers in the registry) will be
+  // scrubbed from every text field of the knowledge base before the
+  // LLM sees it. This is the only reliable way to keep cross-influencer
+  // mentions out of responses, since RAG can pull text from posts /
+  // websites / chunks that mention competing influencers, and we
+  // can't trust the LLM to honor a "do not mention" instruction
+  // when the names are right there in its context.
+  bannedTerms?: string[];
 }
 
 export interface SandwichBotOutput {
@@ -211,6 +220,51 @@ export class SandwichBot {
         coupons: (knowledgeBase.coupons || []).filter((c: any) => allow.has((c.code || '').toLowerCase())),
       };
       console.log(`   🎯 Coupon scope: ${before} → ${knowledgeBase.coupons.length} (whitelist: ${[...allow].join(',')})`);
+    }
+
+    // Input-level redaction: strip every banned term (other influencers'
+    // names + coupon codes) from every text field of the knowledge base
+    // before the LLM ever sees it. This applies to posts, websites,
+    // highlights, insights — anywhere a stray mention could leak.
+    if (input.bannedTerms && input.bannedTerms.length > 0) {
+      const terms = input.bannedTerms.filter((t) => (t || '').trim().length >= 2);
+      if (terms.length > 0) {
+        // Sort longest-first so "אורטל אמר" is matched before "אורטל" etc.
+        terms.sort((a, b) => b.length - a.length);
+        const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const re = new RegExp(`(${terms.map(escapeRe).join('|')})`, 'gi');
+        const scrub = (s: any): any =>
+          typeof s === 'string' ? s.replace(re, '███') : s;
+        const scrubObj = (o: any): any => {
+          if (!o || typeof o !== 'object') return o;
+          const out: any = Array.isArray(o) ? [] : {};
+          for (const k of Object.keys(o)) {
+            const v = (o as any)[k];
+            if (typeof v === 'string') out[k] = scrub(v);
+            else if (Array.isArray(v)) out[k] = v.map((it) => (typeof it === 'string' ? scrub(it) : scrubObj(it)));
+            else if (v && typeof v === 'object') out[k] = scrubObj(v);
+            else out[k] = v;
+          }
+          return out;
+        };
+        const scrubbed = scrubObj(knowledgeBase) as KnowledgeBase;
+        // Drop any KB items that became almost-entirely-redacted noise
+        // (e.g. a post whose caption was 90% banned terms — keeping it
+        // would just feed the LLM "███ ███ ███" which is worse than
+        // just removing the row).
+        const tooMuchRedaction = (s: any) => {
+          if (typeof s !== 'string' || s.length === 0) return false;
+          const blocks = (s.match(/███/g) || []).length;
+          return blocks * 3 / s.length > 0.4;
+        };
+        if (Array.isArray(scrubbed.posts)) {
+          scrubbed.posts = scrubbed.posts.filter(
+            (p: any) => !tooMuchRedaction(p?.caption),
+          );
+        }
+        knowledgeBase = scrubbed;
+        console.log(`   🛡  Input redaction: scrubbed ${terms.length} banned terms across KB`);
+      }
     }
 
     // If media_news account and "what's new?" intent, inject hot topics

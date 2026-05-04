@@ -1025,18 +1025,20 @@ export async function POST(req: NextRequest) {
           // reaches the bot.
           let scopedUserMessage = message;
           let couponCodeWhitelist: string[] | undefined;
+          let bannedTerms: string[] | undefined;
           if (referralScopedInfluencer) {
             const myCode = referralScopedInfluencer.coupon_code || referralScopedInfluencer.slug;
             const cfg2 = (influencer as any)?._rawConfig || {};
             const fullRegistry = (cfg2.influencer_registry as Array<{ slug: string; display_name: string; coupon_code?: string }>) || [];
-            const otherInfluencers = fullRegistry
-              .filter((it) => it.slug?.toLowerCase() !== referralScopedInfluencer!.slug?.toLowerCase())
-              .map((it) => it.display_name)
-              .filter(Boolean);
-            const otherCodes = fullRegistry
-              .filter((it) => it.slug?.toLowerCase() !== referralScopedInfluencer!.slug?.toLowerCase())
+            const others = fullRegistry.filter(
+              (it) => it.slug?.toLowerCase() !== referralScopedInfluencer!.slug?.toLowerCase(),
+            );
+            const otherInfluencers = others.map((it) => it.display_name).filter(Boolean);
+            const otherCodes = others
               .map((it) => (it.coupon_code || it.slug || '').toLowerCase())
               .filter(Boolean);
+            const otherSlugs = others.map((it) => (it.slug || '').toLowerCase()).filter(Boolean);
+
             const bannedNamesLine = otherInfluencers.length > 0
               ? ` השמות הבאים אסורים בתשובה — אל תזכירי אותם בכלל, גם לא בעקיפין: ${otherInfluencers.join('، ')}. הקודים הבאים אסורים בתשובה: ${otherCodes.join('، ')}.`
               : '';
@@ -1044,11 +1046,18 @@ export async function POST(req: NextRequest) {
             scopedUserMessage = message + ctxLine;
 
             // Whitelist for KB-level coupon filtering: only this
-            // influencer's code passes through to the LLM. Other
-            // registered influencers' codes are filtered out by the
-            // sandwich bot. (LA BEAUTÉ has no brand-only coupons today,
-            // so a single-entry whitelist is sufficient.)
+            // influencer's code passes through to the LLM.
             couponCodeWhitelist = [myCode.toLowerCase()];
+
+            // Hard input redaction: scrub other influencers' names,
+            // coupon codes and slugs from every text field of the KB
+            // before the LLM sees them. The prompt-level "don't mention"
+            // line is not enough — RAG can pull post/website chunks that
+            // mention competing influencers, and the LLM will repeat
+            // what's in its context. Belt + suspenders.
+            bannedTerms = Array.from(
+              new Set([...otherInfluencers, ...otherCodes, ...otherSlugs]),
+            ).filter((t) => (t || '').trim().length >= 2);
           }
 
           // Extract recurring topics from rolling summary for deepening (Step 4)
@@ -1084,6 +1093,7 @@ export async function POST(req: NextRequest) {
             activeCoupons: activeCoupons.length > 0 ? activeCoupons : undefined,
             conversationTopics: conversationTopics.length > 0 ? conversationTopics : undefined,
             couponCodeWhitelist,
+            bannedTerms,
             // Real-time streaming: tokens go directly to client as they arrive from OpenAI
             onToken: (token: string) => {
               if (!firstTokenSent) {
