@@ -104,6 +104,7 @@ export function useStreamChat(options: UseStreamChatOptions = {}) {
     fromSuggestion?: boolean;
     chunkId?: string;
     hiddenContext?: string; // extra context sent to API but not shown in chat
+    ref?: string;          // attribution slug from URL ?ref= or coupon copy
   }) => {
     // Cancel any existing stream
     if (abortControllerRef.current) {

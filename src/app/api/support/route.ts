@@ -123,6 +123,17 @@ export async function POST(req: NextRequest) {
       enhancedMessage = `מספר הזמנה: ${sanitizedOrderNumber}\n${enhancedMessage}`;
     }
 
+    // Attribution — copy ref_source from the originating chat_session if any.
+    let refSource: string | null = null;
+    if (sessionId) {
+      const { data: sess } = await supabase
+        .from('chat_sessions')
+        .select('ref_source')
+        .eq('id', sessionId)
+        .maybeSingle();
+      if (sess?.ref_source) refSource = sess.ref_source;
+    }
+
     // Create support request in database
     const { data: supportRequest, error: dbError } = await supabase
       .from('support_requests')
@@ -136,6 +147,7 @@ export async function POST(req: NextRequest) {
         product_id: productId || null,
         session_id: sessionId || null,
         status: 'new',
+        ref_source: refSource,
       })
       .select()
       .single();

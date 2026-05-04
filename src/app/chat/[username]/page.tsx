@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo, use } from 'react';
+import { useState, useRef, useEffect, useMemo, use, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -248,6 +248,30 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const initialTab = (searchParams.get('tab') as TabId) || 'chat';
   const sourceParam = searchParams.get('source');
   const isConferenceMode = sourceParam === 'conf';
+
+  // Attribution: read ?ref= once on mount, persist to localStorage so a
+  // refresh / deep-link doesn't lose attribution. localStorage takes
+  // priority unless the URL has a NEW ref (then URL wins and replaces).
+  // This silently tags chat / support / coupon events with the slug.
+  const refSourceRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const urlRef = searchParams.get('ref');
+    const storageKey = `chat_ref_${username}`;
+    let resolved: string | null = null;
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (urlRef) {
+        resolved = urlRef.toLowerCase();
+        localStorage.setItem(storageKey, resolved);
+      } else if (stored) {
+        resolved = stored;
+      }
+    } catch {
+      resolved = urlRef ? urlRef.toLowerCase() : null;
+    }
+    refSourceRef.current = resolved;
+  }, [username, searchParams]);
   const [activeTab, setActiveTab] = useState<TabId>(initialTab);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -351,7 +375,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     cards: streamCards,
     text: streamText,
     thinkingText,
-    sendMessage: sendStreamMessage,
+    sendMessage: sendStreamMessageRaw,
     cancel: cancelStream,
   } = useStreamChat({
     onMeta: (meta) => {
@@ -429,6 +453,15 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       setStreamingMessageId(null);
     },
   });
+
+  // Wrap sendStreamMessage so attribution `ref` is always injected
+  // (callers don't need to remember to pass it).
+  const sendStreamMessage = useCallback((params: Parameters<typeof sendStreamMessageRaw>[0]) => {
+    return sendStreamMessageRaw({
+      ...params,
+      ref: params.ref || refSourceRef.current || undefined,
+    });
+  }, [sendStreamMessageRaw]);
 
   // Track user interactions for analytics with full attribution
   const trackEvent = async (eventType: string, payload: Record<string, unknown> = {}) => {
@@ -622,18 +655,61 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Auto-open support modal when directed by engine
+  // Account-level: redirect every support-flow signal to the support tab
+  // (bypass the legacy showSupportModal popup). When the bot's response or
+  // the user's last message looks like a complaint, switch tabs immediately
+  // and pre-fill the form with the user's text. This is the canonical
+  // "complaint → tab" flow for opted-in brand accounts.
+  const accountRedirectsToTab = (influencer as any)?._rawConfig?.support_redirect_to_tab === true;
+
+  // Local detection: catch complaint signals on the user's OWN message
+  // (bot hasn't even responded yet) so the redirect feels instant.
+  const lastUserComplaintRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!accountRedirectsToTab) return;
+    const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+    if (!lastUserMsg || lastUserComplaintRef.current === lastUserMsg.id) return;
+    const text = (lastUserMsg.content || '').toLowerCase();
+    const COMPLAINT_RE = [
+      /שבור|נשבר|סדק|סדוק|פגום|מקולקל|מעוך|רוסק|נמעך|דלף|דלפה|ניזוק|נזק/,
+      /לא הגיע|לא קיבלתי|איפה ההזמנה|איפה החבילה|לא נמסר|איחור|איחר|נעלם/,
+      /לא מה שהזמנתי|מוצר שגוי|קיבלתי משהו אחר|מוצר אחר/,
+      /הקוד לא עובד|הקופון לא עובד|קופון לא תקף|בעיה בקופון|הקופון פג/,
+      /חיוב כפול|חויבתי פעמיים|לא קיבלתי החזר|החזר כספי|לבטל הזמנה|בעיה בתשלום/,
+      /תלונה|מתלוננת|לא עובד|לא פועל|תקלה|נשרף|נכוויתי|כוויה|צרב/,
+      /אני רוצה (החזר|החלפה|לבטל)/,
+      /\bבעיה\b/,
+    ];
+    const hit = COMPLAINT_RE.some((re) => re.test(text));
+    if (hit) {
+      lastUserComplaintRef.current = lastUserMsg.id;
+      setSupportPrefill({ details: lastUserMsg.content });
+      cancelStream();          // stop bot from continuing to answer
+      setIsTyping(false);
+      setActiveTab('support' as TabId);
+    }
+  }, [messages, accountRedirectsToTab, cancelStream]);
+
+  // Auto-open support modal when directed by engine — UNLESS this account
+  // opted into tab redirect (then we route to the tab instead of the modal).
   useEffect(() => {
     const lastMessage = messages[messages.length - 1];
     if (lastMessage?.role === 'assistant' && lastMessage?.uiDirectives?.showSupportModal) {
+      if (accountRedirectsToTab) {
+        // Soft-redirect: drop the modal directive and switch to tab.
+        const userMsgs = [...messages].reverse().find((m) => m.role === 'user');
+        if (userMsgs?.content) setSupportPrefill({ details: userMsgs.content });
+        setActiveTab('support' as TabId);
+        return;
+      }
       setShowSupportModal(true);
     }
-  }, [messages]);
+  }, [messages, accountRedirectsToTab]);
 
-  // Account-level redirect: when the bot detects a complaint and the
-  // account has support_redirect_to_tab=true, the stream emits
-  // uiDirectives.openSupportTab — we switch to the support tab and pass
-  // the user's complaint text down as a pre-fill.
+  // Account-level redirect: when the server-side classifier emits
+  // uiDirectives.openSupportTab — switch to the support tab + pass the
+  // user's complaint as a pre-fill. (Belt-and-suspenders with the local
+  // detection above; whichever fires first wins.)
   useEffect(() => {
     const lastMessage = messages[messages.length - 1];
     const directives = lastMessage?.uiDirectives as any;
@@ -1085,6 +1161,23 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     navigator.clipboard.writeText(code);
     setCopiedCode(brandId);
     setTimeout(() => setCopiedCode(null), 2000);
+
+    // Action attribution — copying a coupon is a strong signal that the
+    // visitor came via that influencer (or at least is converting through
+    // them). Upgrade the session ref to the code (lowercased slug) and
+    // notify the server to lock the ref on the session.
+    const slug = code.toLowerCase();
+    refSourceRef.current = slug;
+    try {
+      localStorage.setItem(`chat_ref_${username}`, slug);
+    } catch {}
+    if (sessionId) {
+      fetch('/api/chat/session/ref', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, ref: slug, lock: true, source: 'coupon_copy' }),
+      }).catch(() => {});
+    }
   };
 
   const handleSupportSubmit = async () => {

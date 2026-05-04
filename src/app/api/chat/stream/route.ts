@@ -161,7 +161,14 @@ export async function POST(req: NextRequest) {
           clientMessageId,
           fromSuggestion,
           chunkId,
+          ref: rawRef,
         } = body;
+        // Attribution slug — passed by the chat client from URL ?ref= or
+        // from a coupon copy. Lowercase + tight character whitelist; we
+        // never trust it to be safe, never echo it back to the user.
+        const refSource = typeof rawRef === 'string' && /^[a-z0-9_.-]{1,32}$/i.test(rawRef)
+          ? rawRef.toLowerCase()
+          : null;
 
         // Validate & sanitize
         const message = sanitizeChatMessage(rawMessage);
@@ -237,6 +244,29 @@ export async function POST(req: NextRequest) {
           currentSessionId = session?.id;
         }
         sessionIdForLock = currentSessionId;
+
+        // === ATTRIBUTION ===
+        // Stamp ref_source on the session if we got one in the request and
+        // either the session has none yet or its ref isn't locked. A ref
+        // becomes "locked" when an action signal arrives (coupon copy);
+        // weaker signals (URL ?ref=) cannot overwrite a locked ref.
+        if (refSource && currentSessionId) {
+          try {
+            const { data: sessRow } = await supabase
+              .from('chat_sessions')
+              .select('ref_source, ref_locked')
+              .eq('id', currentSessionId)
+              .maybeSingle();
+            if (sessRow && !sessRow.ref_locked && (!sessRow.ref_source || sessRow.ref_source !== refSource)) {
+              await supabase
+                .from('chat_sessions')
+                .update({ ref_source: refSource })
+                .eq('id', currentSessionId);
+            }
+          } catch (e) {
+            console.warn('[Stream] ref_source upsert failed (non-fatal):', e);
+          }
+        }
 
         // === IDEMPOTENCY ===
         idempotencyKey = `${accountId}:${currentSessionId}:chat:${hashMessage(message)}:${clientMessageId || 'na'}`;
