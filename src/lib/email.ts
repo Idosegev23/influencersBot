@@ -15,7 +15,9 @@ import { google } from 'googleapis';
 
 // ── Config ──
 
-const SEND_FROM = process.env.GMAIL_SEND_FROM;
+// Trim — Vercel env values can get a stray trailing \n that breaks the
+// Gmail API impersonation field (it does a strict string compare).
+const SEND_FROM = process.env.GMAIL_SEND_FROM?.trim();
 
 function getServiceAccountCredentials(): { client_email: string; private_key: string } | null {
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
