@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, getInfluencerByUsername, getProductsByInfluencer } from '@/lib/supabase';
-import { notifyBrandSupport, sendSupportConfirmation } from '@/lib/whatsapp';
 import {
   sendBrandSupportTicket,
   sendFollowerSupportConfirmation,
-  fireAndForget,
 } from '@/lib/whatsapp-notify';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { checkInfluencerAuth } from '@/lib/auth/influencer-auth';
@@ -159,31 +157,14 @@ export async function POST(req: NextRequest) {
       ? sanitizedMessage
       : firstLine;
 
-    // Send WhatsApp notification to BRAND (only if brand has WhatsApp configured)
+    // Send WhatsApp notification to BRAND via Meta Cloud API
+    // (brand_support_ticket template, gated by WHATSAPP_NOTIFY_ENABLED +
+    // WHATSAPP_TEMPLATE_BRAND_SUPPORT_TICKET).
     let whatsappSent = false;
     if (brandPhone && sanitizedBrand) {
-      console.log('[Support] Sending brand notification to:', brandPhone, 'for brand:', sanitizedBrand);
+      console.log('[Support] Sending brand_support_ticket to:', brandPhone, 'for brand:', sanitizedBrand);
       try {
-        // Legacy GREEN-API — kept in parallel until all templates APPROVED.
-        const result = await notifyBrandSupport({
-          brandName: sanitizedBrand,
-          brandPhone: brandPhone,
-          influencerName: influencer.display_name,
-          customerName: sanitizedName,
-          customerPhone: sanitizedPhone || '',
-          orderNumber: sanitizedOrderNumber || undefined,
-          problemDetails: sanitizedMessage,
-        });
-        console.log('[Support] Brand notification result:', result);
-        whatsappSent = result.success;
-      } catch (err) {
-        console.error('[Support] Brand notification error:', err);
-      }
-
-      // Meta Cloud API — brand_support_ticket template (fire-and-forget,
-      // gated by WHATSAPP_NOTIFY_ENABLED + WHATSAPP_TEMPLATE_BRAND_SUPPORT_TICKET).
-      fireAndForget(
-        sendBrandSupportTicket({
+        const result = await sendBrandSupportTicket({
           to: brandPhone,
           brand: sanitizedBrand,
           followerName: sanitizedName,
@@ -192,8 +173,12 @@ export async function POST(req: NextRequest) {
           issueType,
           description,
           influencerName: influencer.display_name,
-        })
-      );
+        });
+        console.log('[Support] brand_support_ticket result:', result);
+        whatsappSent = result.success;
+      } catch (err) {
+        console.error('[Support] brand_support_ticket error:', err);
+      }
     } else {
       console.log('[Support] Skipping brand notification - no WhatsApp phone configured for brand:', sanitizedBrand);
     }
@@ -218,33 +203,24 @@ export async function POST(req: NextRequest) {
       if (updateErr) console.error('[Support] Update notification status error:', updateErr);
     }
 
-    // Send confirmation to CUSTOMER if they provided phone
+    // Send confirmation to CUSTOMER via Meta Cloud API
+    // (follower_support_confirmation template, gated by per-template flag).
     let confirmationSent = false;
     if (sanitizedPhone) {
-      console.log('[Support] Sending customer confirmation to:', sanitizedPhone);
+      console.log('[Support] Sending follower_support_confirmation to:', sanitizedPhone);
       try {
-        // Legacy GREEN-API confirmation — kept in parallel.
-        const result = await sendSupportConfirmation(
-          sanitizedPhone,
-          sanitizedBrand || influencer.display_name
-        );
-        console.log('[Support] Customer confirmation result:', result);
-        confirmationSent = result.success;
-      } catch (err) {
-        console.error('[Support] Customer confirmation error:', err);
-      }
-
-      // Meta Cloud API — follower_support_confirmation template (fire-and-forget,
-      // gated by WHATSAPP_NOTIFY_ENABLED + WHATSAPP_TEMPLATE_FOLLOWER_SUPPORT_CONFIRMATION).
-      fireAndForget(
-        sendFollowerSupportConfirmation({
+        const result = await sendFollowerSupportConfirmation({
           to: sanitizedPhone,
           followerFirstName: sanitizedName.split(' ')[0] || sanitizedName,
           brand: sanitizedBrand || influencer.display_name,
           orderNumber: sanitizedOrderNumber || '—',
           issueType,
-        })
-      );
+        });
+        console.log('[Support] follower_support_confirmation result:', result);
+        confirmationSent = result.success;
+      } catch (err) {
+        console.error('[Support] follower_support_confirmation error:', err);
+      }
     } else {
       console.log('[Support] No customer phone provided, skipping customer notification');
     }
