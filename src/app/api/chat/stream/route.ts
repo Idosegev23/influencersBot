@@ -703,11 +703,46 @@ export async function POST(req: NextRequest) {
           ) {
             let shouldRedirect = understanding.intent === 'support';
 
-            // Fast path — explicit human-rep / bad-service requests
+            // Fast path — explicit support-tab triggers. Match common
+            // Hebrew complaint / service-request phrasings deterministically
+            // so we don't depend on the Gemini classifier honoring them
+            // (it occasionally returns low confidence on unambiguous
+            // complaints — observed in production with "השמפו דולף",
+            // "חסרים פריטים", "להחזיר מוצר").
             if (!shouldRedirect) {
-              const HUMAN_REP_RE = /נציג\s*(אנושי|שירות|שירות לקוחות)|לדבר עם (מישהו|נציג|בנאדם)|שיחזור (אלי|אליי)|שירות (גרוע|לקוי|נורא|רע)|רוצ(ה|ה|ים) נציג/;
-              if (HUMAN_REP_RE.test(message)) {
-                console.log('[Stream] 🎯 Fast-path: human-rep request detected → support_flow');
+              const SUPPORT_FAST_PATHS: RegExp[] = [
+                // human rep / bad service
+                /נציג\s*(אנושי|שירות|שירות לקוחות)/,
+                /לדבר עם (מישהו|נציג|בנאדם)/,
+                /שיחזור (אלי|אליי)/,
+                /שירות (גרוע|לקוי|נורא|רע)/,
+                /רוצ(ה|ים) נציג/,
+                // damaged / leaking / broken product
+                /דול(ף|פת|פים)/,
+                /נז(ל|לת|ילה)/,
+                /\bשבור(ה|ים)?\b/,
+                /סדוק(ה|ים)?/,
+                /פגום(ה|ים)?/,
+                /מקולקל(ת|ים)?/,
+                /ניזוק|נמעך|נשבר/,
+                // missing / wrong items
+                /חסר(ים|ה)?\s+(פריט|פריטים|מוצר|מוצרים)/,
+                /\bחוסרים\b/,
+                /לא הגיע(ה)?\s+(הזמנ|מוצר|פריט|חבילה|משלוח|מה ש)/,
+                /הגיע(ה)?\s+אבל\s+(חסר|חסרים)/,
+                // returns / refund
+                /להחזיר\s+(מוצר|הזמנה|מהזמנה|פריט)/,
+                /ביטול\s+הזמנה/,
+                /לקבל\s+החזר/,
+                /רוצ(ה|ים)\s+החזר/,
+                // open ticket / contact
+                /איך\s+(אפשר|ניתן)\s+(ליצור\s+קשר|להחזיר|לפנות)/,
+                /איך\s+(יוצרים|פונים)\s+קשר/,
+                /איפה\s+פונים\s+ל?שירות/,
+              ];
+
+              if (SUPPORT_FAST_PATHS.some((re) => re.test(message))) {
+                console.log('[Stream] 🎯 Fast-path: support trigger matched → support_flow');
                 shouldRedirect = true;
               }
             }
