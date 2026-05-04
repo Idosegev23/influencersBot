@@ -110,29 +110,17 @@ export class IncrementalScanOrchestrator {
           profile_pic_url: profile.profile_pic_url,
         });
 
-        // Persist avatar to Supabase Storage so it never expires
+        // Persist avatar to Supabase Storage so it never expires.
+        // Uses IG-specific headers (User-Agent + Referer) — without them
+        // Instagram CDN returns 403 and the avatar silently never persists.
         if (profile.profile_pic_url) {
           try {
-            const picRes = await fetch(profile.profile_pic_url);
-            if (picRes.ok) {
-              const picBuffer = Buffer.from(await picRes.arrayBuffer());
-              const picType = picRes.headers.get('content-type') || 'image/jpeg';
-              const picExt = picType.includes('png') ? 'png' : 'jpg';
-              await this.supabase.storage.from('avatars').upload(
-                `${accountId}/profile.${picExt}`, picBuffer,
-                { contentType: picType, upsert: true }
-              );
-              const { data: urlData } = this.supabase.storage.from('avatars').getPublicUrl(`${accountId}/profile.${picExt}`);
-              if (urlData?.publicUrl) {
-                const { data: acct } = await this.supabase.from('accounts').select('config').eq('id', accountId).single();
-                if (acct) {
-                  await this.supabase.from('accounts').update({ config: { ...acct.config, avatar_url: urlData.publicUrl } }).eq('id', accountId);
-                }
-              }
-              console.log('[Step 2] ✓ Avatar saved to storage');
-            }
+            const { persistAccountAvatar } = await import('@/lib/account/persist-avatar');
+            const r = await persistAccountAvatar(accountId, { force: true });
+            if (r.ok) console.log('[Step 2] ✓ Avatar saved to storage');
+            else console.warn('[Step 2] Avatar persist:', r.reason);
           } catch (avatarErr) {
-            console.warn('[Step 2] Avatar persist failed:', avatarErr);
+            console.warn('[Step 2] Avatar persist threw:', avatarErr);
           }
         }
 

@@ -342,6 +342,19 @@ async function stepPersonaRebuild(ctx: SetupContext): Promise<void> {
 }
 
 async function stepTabConfig(ctx: SetupContext): Promise<void> {
+  console.log(`   שומר את הלוגו ב-Supabase Storage (avatars)...`);
+  try {
+    const { persistAccountAvatar } = await import('../src/lib/account/persist-avatar');
+    const avatarRes = await persistAccountAvatar(ctx.accountId);
+    if (avatarRes.ok) {
+      console.log(`   ✅ לוגו נשמר (${avatarRes.source}): ${avatarRes.url}`);
+    } else {
+      console.log(`   ⚠️  לא ניתן היה לשמור לוגו: ${avatarRes.reason}`);
+    }
+  } catch (err: any) {
+    console.log(`   ⚠️  persistAccountAvatar threw: ${err?.message || err}`);
+  }
+
   console.log(`   מייצר הגדרות טאבים וצ'אט...`);
 
   const { generateTabConfig } = await import('../src/lib/chat-ui/generate-tab-config');
