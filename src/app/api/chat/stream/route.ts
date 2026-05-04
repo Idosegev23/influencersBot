@@ -1124,6 +1124,23 @@ export async function POST(req: NextRequest) {
             ).filter((t) => (t || '').trim().length >= 2);
           }
 
+          // Account-level redaction baseline — apply to EVERY chat for
+          // this account regardless of ref. Used for internal contact
+          // details (csrlabeaute@gmail.com, brand WhatsApp number) that
+          // must never reach a customer through the bot. Stored in
+          // accounts.config.contact_redact_terms as a string array.
+          const contactRedactTerms = ((influencer as any)?._rawConfig?.contact_redact_terms || []) as string[];
+          if (Array.isArray(contactRedactTerms) && contactRedactTerms.length > 0) {
+            const cleaned = contactRedactTerms.map((t) => String(t || '').trim()).filter((t) => t.length >= 2);
+            bannedTerms = Array.from(new Set([...(bannedTerms || []), ...cleaned]));
+
+            // Always-on prompt rule, independent of ref scoping. Keeps
+            // the bot from inventing or echoing brand contact details
+            // even when its training data or context contains them.
+            const contactCtxLine = `\n\n[הקשר פנימי — אל תצטטי: לעולם אל תיתני ללקוחה מספרי טלפון, מיילים פנימיים, או פרטי קשר ישירים של LA BEAUTÉ. כל פנייה לשירות לקוחות צריכה לעבור דרך טאב "תמיכה" כאן בצ'אט (טופס פנייה רשמי). אם הלקוחה שואלת איך ליצור קשר — הפני אותה לטאב התמיכה, לא לטלפון או למייל.]`;
+            scopedUserMessage = scopedUserMessage + contactCtxLine;
+          }
+
 
           // Extract recurring topics from rolling summary for deepening (Step 4)
           const conversationTopics: string[] = [];
