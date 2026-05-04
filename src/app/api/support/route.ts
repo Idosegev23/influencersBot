@@ -106,6 +106,16 @@ export async function POST(req: NextRequest) {
       console.log('[Support] Brand phone:', brandPhone, 'Brand email:', brandEmail);
     }
 
+    // Account-level fallback — for brand accounts where the influencer IS the brand,
+    // route any unmatched ticket to accounts.config.support_whatsapp_phone.
+    if (!brandPhone) {
+      const cfg = (influencer as any)?._rawConfig || {};
+      if (cfg.support_whatsapp_phone) {
+        brandPhone = cfg.support_whatsapp_phone;
+        console.log('[Support] Using account-level support phone fallback:', brandPhone);
+      }
+    }
+
     // Build enhanced message with brand and order info
     let enhancedMessage = sanitizedMessage;
     if (sanitizedBrand) {

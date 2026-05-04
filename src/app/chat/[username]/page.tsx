@@ -1789,7 +1789,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 dir="rtl"
               >
                 <div className="px-4 py-6">
-                  <div className={`mx-auto ${isMobile ? 'max-w-2xl' : 'max-w-[700px]'}`}>
+                  <div className={`mx-auto coupons-flow-container ${isMobile ? 'max-w-2xl' : 'max-w-[700px]'}`}>
                     <div className="mb-4 px-3">
                       <h2 className="support-title">קופונים</h2>
                       <p className="support-subtitle">הנחות בלעדיות בשבילכם</p>
@@ -1821,7 +1821,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         <>
                           {/* Active coupons */}
                           {active.length > 0 && (
-                            <div className="flex flex-col gap-2">
+                            <div className={isMobile ? 'flex flex-col gap-2' : 'coupons-grid'}>
                               {active.map((brand) => {
                                 const letter = (brand.brand_name || '').trim().charAt(0).toUpperCase();
                                 const isCopied = copiedCode === brand.id;
@@ -1863,7 +1863,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           {partnerships.length > 0 && (
                             <>
                               <p className="coupon-section-label mt-4">שיתופי פעולה</p>
-                              <div className="flex flex-col gap-2">
+                              <div className={isMobile ? 'flex flex-col gap-2' : 'coupons-grid'}>
                                 {partnerships.map((brand) => {
                                   const letter = (brand.brand_name || '').trim().charAt(0).toUpperCase();
                                   return (
@@ -1931,7 +1931,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 dir="rtl"
               >
                 <div className="px-4 py-6">
-                  <div className={`mx-auto ${isMobile ? 'max-w-2xl' : 'max-w-[700px]'}`}>
+                  <div className={`mx-auto support-flow-container ${isMobile ? 'max-w-2xl' : 'max-w-[700px]'}`}>
                     <AnimatePresence mode="wait">
                       {/* ---- STEP 1: Brand Selection ---- */}
                       {problemStep === 'brands' && (
@@ -1945,7 +1945,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             <h2 className="support-title">פתיחת פנייה</h2>
                             <p className="support-subtitle">בחרו את המותג שיש לכם בעיה איתו</p>
                           </div>
-                          <div className="flex flex-col gap-2">
+                          <div className={isMobile ? 'flex flex-col gap-2' : 'support-brand-grid'}>
                             {uniqueBrands.map((brand) => (
                               <button
                                 key={brand.id}
@@ -1984,6 +1984,10 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           exit={{ opacity: 0, x: -20 }}
                         >
                           <div className="mb-4 px-3 flex items-start justify-between">
+                            <div>
+                              <h2 className="support-title">פתיחת פנייה</h2>
+                              <p className="support-subtitle">מלאו את הפרטים ונחזור אליכם בהקדם</p>
+                            </div>
                             <button
                               type="button"
                               onClick={() => {
@@ -1997,10 +2001,6 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             >
                               <span className="support-back-icon" aria-hidden />
                             </button>
-                            <div>
-                              <h2 className="support-title">פתיחת פנייה</h2>
-                              <p className="support-subtitle">מלאו את הפרטים ונחזור אליכם בהקדם</p>
-                            </div>
                           </div>
 
                           <div className="flex flex-col gap-3">
@@ -2015,28 +2015,30 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                               <span className="flex-1 text-right">{problemBrand.brand_name}</span>
                             </div>
 
-                            {/* Form fields — pill inputs (Figma spec) */}
-                            <input
-                              type="text"
-                              value={problemForm.name}
-                              onChange={(e) => setProblemForm({ ...problemForm, name: e.target.value })}
-                              placeholder="שם מלא"
-                              className="support-form-input"
-                            />
-                            <input
-                              type="tel"
-                              value={problemForm.phone}
-                              onChange={(e) => setProblemForm({ ...problemForm, phone: e.target.value.replace(/\D/g, '') })}
-                              placeholder="מספר טלפון"
-                              className="support-form-input"
-                            />
-                            <input
-                              type="text"
-                              value={problemForm.order}
-                              onChange={(e) => setProblemForm({ ...problemForm, order: e.target.value })}
-                              placeholder="מספר הזמנה (אופציונלי)"
-                              className="support-form-input"
-                            />
+                            {/* Form fields — pill inputs (Figma 471:8076) */}
+                            <div className={isMobile ? 'flex flex-col gap-3' : 'support-form-row'}>
+                              <input
+                                type="text"
+                                value={problemForm.name}
+                                onChange={(e) => setProblemForm({ ...problemForm, name: e.target.value })}
+                                placeholder="שם מלא"
+                                className="support-form-input"
+                              />
+                              <input
+                                type="tel"
+                                value={problemForm.phone}
+                                onChange={(e) => setProblemForm({ ...problemForm, phone: e.target.value.replace(/\D/g, '') })}
+                                placeholder="מספר טלפון"
+                                className="support-form-input"
+                              />
+                              <input
+                                type="text"
+                                value={problemForm.order}
+                                onChange={(e) => setProblemForm({ ...problemForm, order: e.target.value })}
+                                placeholder="מספר הזמנה (אופציונלי)"
+                                className="support-form-input"
+                              />
+                            </div>
                             <textarea
                               value={problemForm.details}
                               onChange={(e) => setProblemForm({ ...problemForm, details: e.target.value })}

@@ -2663,6 +2663,59 @@ h1, h2, h3, h4, h5, h6 {
   margin: 8px 0;
 }
 
+/* ── Desktop grids (≥768px) — Figma 471:7287 / 471:7817 / 471:8076 / 471:9658 ── */
+@media (min-width: 768px) {
+  /* Wider container for support/coupons flows */
+  .support-flow-container,
+  .coupons-flow-container {
+    max-width: 900px !important;
+  }
+
+  /* Brand selection — 3-column grid */
+  .support-brand-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    width: 100%;
+  }
+
+  /* Coupons — 2-column grid */
+  .coupons-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    width: 100%;
+  }
+
+  /* Categories (product issue) — 2-column grid */
+  .support-category-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    width: 100%;
+  }
+
+  /* Problem types — 4-column grid */
+  .problem-type-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+
+  /* Form fields — 3-up row for name/phone/order */
+  .support-form-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    width: 100%;
+  }
+
+  /* Larger heading for desktop support pages */
+  .support-title {
+    font-size: 28px;
+    line-height: 32px;
+  }
+}
+
 /* ── Media Attach Button ── */
 .media-attach-btn {
   flex-shrink: 0;

@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>InfluencerBot — Manage Partnerships Like Magic</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --purple: #a855f7;
+    --pink: #ec4899;
+    --amber: #f59e0b;
+    --emerald: #34d399;
+    --bg: #07060b;
+    --card: rgba(255,255,255,0.03);
+    --border: rgba(255,255,255,0.06);
+    --text: rgba(255,255,255,0.55);
+    --text-dim: rgba(255,255,255,0.35);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: #fff; overflow-x: hidden; line-height: 1.6; }
+  ::selection { background: rgba(168,85,247,0.3); }
+  a { text-decoration: none; }
+  ul { list-style: none; padding: 0; }
+  button { font-family: inherit; }
+
+  /* ── Orbs ─────────────────── */
+  .orbs { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+  .orb { position: absolute; border-radius: 50%; filter: blur(70px); }
+  .orb-1 { top: -20%; left: -10%; width: 50vw; height: 50vw; background: radial-gradient(circle, rgba(168,85,247,0.25), transparent 70%); animation: orbFloat1 20s ease-in-out infinite; }
+  .orb-2 { top: 30%; right: -15%; width: 45vw; height: 45vw; background: radial-gradient(circle, rgba(236,72,153,0.2), transparent 70%); animation: orbFloat2 25s ease-in-out infinite; }
+  .orb-3 { bottom: -10%; left: 20%; width: 40vw; height: 40vw; background: radial-gradient(circle, rgba(59,130,246,0.2), transparent 70%); animation: orbFloat3 22s ease-in-out infinite; }
+  .orb-4 { top: 60%; right: 30%; width: 30vw; height: 30vw; background: radial-gradient(circle, rgba(251,191,36,0.15), transparent 70%); animation: orbFloat1 18s ease-in-out infinite reverse; filter: blur(60px); }
+
+  /* ── Grid ─────────────────── */
+  .grid-bg { position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.03; }
+
+  /* ── Animations ──────────── */
+  @keyframes orbFloat1 { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(30px,-50px) scale(1.05)} 66%{transform:translate(-20px,30px) scale(.95)} }
+  @keyframes orbFloat2 { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(-40px,30px) scale(1.08)} 66%{transform:translate(20px,-40px) scale(.92)} }
+  @keyframes orbFloat3 { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(50px,20px) scale(.95)} 66%{transform:translate(-30px,-30px) scale(1.05)} }
+  @keyframes gradientShift { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(32px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+  @keyframes marquee { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+  .reveal { opacity: 0; transform: translateY(32px); transition: opacity .7s cubic-bezier(.16,1,.3,1), transform .7s cubic-bezier(.16,1,.3,1); }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+
+  /* ── Nav ──────────────────── */
+  .nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 24px; transition: all .3s; border-bottom: 1px solid transparent; }
+  .nav.scrolled { background: rgba(10,10,20,0.8); backdrop-filter: blur(20px) saturate(1.5); border-bottom-color: rgba(255,255,255,0.06); }
+  .nav-inner { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; height: 72px; }
+  .nav-logo { display: flex; align-items: center; gap: 8px; }
+  .nav-logo-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, var(--purple), var(--pink)); font-size: 18px; }
+  .nav-logo-text { font-size: 20px; font-weight: 700; }
+  .nav-links { display: flex; align-items: center; gap: 32px; }
+  .nav-link { color: var(--text); font-size: 14px; font-weight: 500; transition: color .2s; }
+  .nav-link:hover { color: #fff; }
+  .lang-btn { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 12px; color: #fff; cursor: pointer; font-size: 13px; font-weight: 600; transition: background .2s; }
+  .lang-btn:hover { background: rgba(255,255,255,0.15); }
+  .nav-cta { background: linear-gradient(135deg, var(--purple), var(--pink)); color: #fff; padding: 8px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; box-shadow: 0 0 20px rgba(168,85,247,0.3); transition: box-shadow .3s; }
+  .nav-cta:hover { box-shadow: 0 0 30px rgba(168,85,247,0.5); }
+
+  /* ── Badge ────────────────── */
+  .badge { display: inline-block; padding: 6px 16px; border-radius: 999px; font-size: 13px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; background: rgba(168,85,247,0.12); color: #c084fc; border: 1px solid rgba(168,85,247,0.2); backdrop-filter: blur(8px); }
+
+  /* ── Section Title ───────── */
+  .section-title { font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 800; line-height: 1.1; text-align: center; color: #fff; margin-top: 16px; }
+  .gradient-text { background: linear-gradient(135deg, var(--purple), var(--pink), var(--amber)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+
+  /* ── Hero ─────────────────── */
+  .hero { min-height: 100vh; display: flex; align-items: center; justify-content: center; position: relative; padding: 120px 24px 80px; }
+  .hero-inner { text-align: center; max-width: 800px; position: relative; z-index: 1; }
+  .hero h1 { font-size: clamp(2.8rem, 7vw, 5rem); font-weight: 900; line-height: 1.05; margin-top: 24px; }
+  .hero h1 .gradient-text { background: linear-gradient(135deg, #a855f7 0%, #ec4899 40%, #f59e0b 70%, #34d399 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; background-size: 200% 200%; animation: gradientShift 5s ease-in-out infinite; }
+  .hero p { font-size: clamp(1rem, 2vw, 1.25rem); color: var(--text); max-width: 600px; margin: 20px auto 0; line-height: 1.7; }
+  .hero-btns { display: flex; gap: 16px; justify-content: center; margin-top: 40px; flex-wrap: wrap; }
+  .btn-primary { background: linear-gradient(135deg, var(--purple), var(--pink)); color: #fff; border: none; padding: 14px 32px; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 0 40px rgba(168,85,247,0.4), 0 8px 32px rgba(0,0,0,0.3); transition: all .3s; }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 0 60px rgba(168,85,247,0.5), 0 12px 40px rgba(0,0,0,0.3); }
+  .btn-secondary { background: rgba(255,255,255,0.06); color: #fff; border: 1px solid rgba(255,255,255,0.12); padding: 14px 32px; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; backdrop-filter: blur(8px); transition: all .3s; }
+  .btn-secondary:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.25); }
+  .hero-glow { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 120%; height: 120%; border-radius: 50%; background: radial-gradient(circle, rgba(168,85,247,0.15), rgba(236,72,153,0.08) 40%, transparent 70%); filter: blur(40px); pointer-events: none; z-index: -1; }
+
+  /* ── Logo Strip ──────────── */
+  .logos { padding: 40px 24px 80px; position: relative; z-index: 1; }
+  .logos p { text-align: center; font-size: 13px; color: rgba(255,255,255,0.3); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 32px; }
+  .logos-row { display: flex; justify-content: center; gap: 48px; flex-wrap: wrap; opacity: .3; }
+  .logos-row span { font-size: 18px; font-weight: 700; letter-spacing: .05em; }
+
+  /* ── Features ─────────────── */
+  .features { padding: 80px 24px; position: relative; z-index: 1; }
+  .features-grid { max-width: 1200px; margin: 56px auto 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; }
+  .feature-card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 32px; transition: all .4s cubic-bezier(.16,1,.3,1); position: relative; overflow: hidden; }
+  .feature-card:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.12); transform: translateY(-4px); box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+  .feature-icon { font-size: 40px; margin-bottom: 16px; }
+  .feature-card h3 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+  .feature-card p { color: rgba(255,255,255,0.5); line-height: 1.7; font-size: 15px; }
+  .card-glow { position: absolute; top: 0; right: 0; width: 150px; height: 150px; background: radial-gradient(circle, rgba(168,85,247,0.08), transparent 70%); filter: blur(30px); pointer-events: none; }
+
+  /* ── Stats ────────────────── */
+  .stats { padding: 60px 24px; position: relative; z-index: 1; }
+  .stats-grid { max-width: 1000px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; background: var(--card); border: 1px solid var(--border); border-radius: 24px; padding: 48px 24px; }
+  .stat { text-align: center; }
+  .stat-value { font-size: clamp(2rem, 4vw, 3rem); font-weight: 900; }
+  .stat-label { color: rgba(255,255,255,0.4); font-size: 14px; margin-top: 4px; font-weight: 500; }
+
+  /* ── Testimonials ─────────── */
+  .testimonials { padding: 80px 24px; position: relative; z-index: 1; }
+  .testimonials-grid { max-width: 1200px; margin: 56px auto 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+  .testimonial-card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 32px; transition: all .3s; }
+  .testimonial-card:hover { border-color: rgba(168,85,247,0.3); background: rgba(255,255,255,0.05); }
+  .testimonial-quote { font-size: 24px; opacity: .3; margin-bottom: 16px; }
+  .testimonial-text { color: rgba(255,255,255,0.7); line-height: 1.8; font-size: 15px; margin-bottom: 24px; }
+  .testimonial-author { display: flex; align-items: center; gap: 12px; }
+  .testimonial-avatar { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(168,85,247,0.2), rgba(236,72,153,0.2)); font-size: 22px; }
+  .testimonial-name { font-weight: 600; font-size: 15px; }
+  .testimonial-role { color: var(--text-dim); font-size: 13px; }
+
+  /* ── Pricing ──────────────── */
+  .pricing { padding: 80px 24px; position: relative; z-index: 1; }
+  .pricing-grid { max-width: 1100px; margin: 56px auto 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; align-items: start; }
+  .pricing-card { background: var(--card); border: 1px solid var(--border); border-radius: 24px; padding: 36px; position: relative; overflow: hidden; transition: all .3s; }
+  .pricing-card.popular { background: rgba(168,85,247,0.08); border-color: rgba(168,85,247,0.3); transform: scale(1.03); }
+  .pricing-card:hover { transform: scale(1.02); }
+  .pricing-card.popular:hover { transform: scale(1.05); }
+  .popular-badge { position: absolute; top: 16px; right: 16px; background: linear-gradient(135deg, var(--purple), var(--pink)); padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+  [dir="rtl"] .popular-badge { right: auto; left: 16px; }
+  .pricing-card h3 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+  .pricing-desc { color: rgba(255,255,255,0.4); font-size: 14px; margin-bottom: 24px; }
+  .pricing-price { display: flex; align-items: baseline; gap: 4px; margin-bottom: 24px; }
+  .pricing-amount { font-size: 48px; font-weight: 900; }
+  .pricing-period { color: var(--text-dim); font-size: 16px; }
+  .pricing-features { display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
+  .pricing-features li { color: rgba(255,255,255,0.6); font-size: 14px; display: flex; align-items: center; gap: 8px; }
+  .pricing-features li::before { content: "✓"; color: var(--purple); font-size: 16px; flex-shrink: 0; }
+  .pricing-btn { width: 100%; padding: 12px 0; border-radius: 12px; border: none; font-size: 15px; font-weight: 700; cursor: pointer; color: #fff; transition: all .3s; }
+  .pricing-btn.primary { background: linear-gradient(135deg, var(--purple), var(--pink)); box-shadow: 0 0 30px rgba(168,85,247,0.3); }
+  .pricing-btn.secondary { background: rgba(255,255,255,0.08); }
+  .pricing-btn:hover { transform: translateY(-1px); }
+  .pricing-glow { position: absolute; bottom: -50px; left: 50%; transform: translateX(-50%); width: 80%; height: 100px; background: radial-gradient(ellipse, rgba(168,85,247,0.15), transparent); filter: blur(30px); pointer-events: none; }
+
+  /* ── FAQ ──────────────────── */
+  .faq { padding: 80px 24px; position: relative; z-index: 1; }
+  .faq-list { max-width: 720px; margin: 48px auto 0; display: flex; flex-direction: column; gap: 12px; }
+  .faq-item { background: var(--card); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; transition: border-color .3s; }
+  .faq-item.open { border-color: rgba(168,85,247,0.2); }
+  .faq-q { width: 100%; padding: 20px 24px; background: none; border: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; text-align: start; color: #fff; font-size: 16px; font-weight: 600; font-family: inherit; }
+  .faq-toggle { color: var(--purple); font-size: 20px; transition: transform .3s; }
+  .faq-item.open .faq-toggle { transform: rotate(45deg); }
+  .faq-a { max-height: 0; overflow: hidden; transition: max-height .4s cubic-bezier(.16,1,.3,1); }
+  .faq-item.open .faq-a { max-height: 300px; }
+  .faq-a p { padding: 0 24px 20px; color: var(--text); line-height: 1.8; font-size: 15px; }
+
+  /* ── Footer ──────────────── */
+  .footer { padding: 40px 24px 60px; position: relative; z-index: 1; }
+  .footer-cta { max-width: 800px; margin: 0 auto; background: linear-gradient(135deg, rgba(168,85,247,0.12), rgba(236,72,153,0.08)); border: 1px solid rgba(168,85,247,0.15); border-radius: 32px; padding: 64px 40px; text-align: center; position: relative; overflow: hidden; }
+  .footer-cta h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 800; margin-bottom: 12px; }
+  .footer-cta p { color: var(--text); font-size: 17px; margin-bottom: 32px; }
+  .footer-cta .btn-primary { padding: 16px 40px; font-size: 17px; box-shadow: 0 0 50px rgba(168,85,247,0.4); }
+  .footer-cta .btn-primary:hover { box-shadow: 0 0 70px rgba(168,85,247,0.6); }
+  .footer-glow { position: absolute; width: 200px; height: 200px; filter: blur(50px); pointer-events: none; border-radius: 50%; }
+  .footer-glow-1 { top: -40px; right: -40px; background: radial-gradient(circle, rgba(236,72,153,0.15), transparent); }
+  .footer-glow-2 { bottom: -40px; left: -40px; background: radial-gradient(circle, rgba(168,85,247,0.15), transparent); }
+  [dir="rtl"] .footer-glow-1 { right: auto; left: -40px; }
+  [dir="rtl"] .footer-glow-2 { left: auto; right: -40px; }
+  .footer-bottom { max-width: 800px; margin: 60px auto 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+  .footer-copy { color: rgba(255,255,255,0.25); font-size: 13px; }
+  .footer-links { display: flex; gap: 24px; }
+  .footer-links a { color: rgba(255,255,255,0.3); font-size: 13px; transition: color .2s; }
+  .footer-links a:hover { color: rgba(255,255,255,0.6); }
+
+  /* ── Responsive ──────────── */
+  @media (max-width: 768px) {
+    .nav-link { display: none; }
+    .features-grid, .testimonials-grid, .pricing-grid { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .pricing-card.popular { transform: none; }
+    .pricing-card.popular:hover { transform: scale(1.02); }
+    .footer-bottom { flex-direction: column; text-align: center; }
+  }
+</style>
+</head>
+<body>
+  <!-- Backgrounds -->
+  <div class="orbs">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="orb orb-4"></div>
+  </div>
+  <div class="grid-bg">
+    <svg width="100%" height="100%"><defs><pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse"><path d="M 60 0 L 0 0 0 60" fill="none" stroke="white" stroke-width=".5"/></pattern></defs><rect width="100%" height="100%" fill="url(#grid)"/></svg>
+  </div>
+
+  <!-- Navbar -->
+  <nav class="nav" id="navbar">
+    <div class="nav-inner">
+      <div class="nav-logo">
+        <div class="nav-logo-icon">✦</div>
+        <span class="nav-logo-text">InfluencerBot</span>
+      </div>
+      <div class="nav-links">
+        <a class="nav-link" href="#features" data-en="Features" data-he="פיצ׳רים">Features</a>
+        <a class="nav-link" href="#pricing" data-en="Pricing" data-he="מחירים">Pricing</a>
+        <a class="nav-link" href="#testimonials" data-en="Stories" data-he="סיפורים">Stories</a>
+        <a class="nav-link" href="#faq" data-en="FAQ" data-he="שאלות">FAQ</a>
+        <button class="lang-btn" onclick="toggleLang()">🇮🇱 עברית</button>
+        <a class="nav-cta" href="#pricing" data-en="Get Started Free" data-he="התחל בחינם">Get Started Free</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="reveal"><span class="badge" data-en="AI-Powered Influencer Management" data-he="ניהול משפיענים מונע AI">AI-Powered Influencer Management</span></div>
+      <div class="reveal" style="transition-delay:.1s">
+        <h1>
+          <span data-en="Manage Partnerships." data-he="נהל שיתופי פעולה.">Manage Partnerships.</span><br>
+          <span class="gradient-text" data-en="Like Magic." data-he="כמו קסם.">Like Magic.</span>
+        </h1>
+      </div>
+      <div class="reveal" style="transition-delay:.2s">
+        <p data-en="The all-in-one platform that helps influencers track partnerships, parse contracts with AI, chat with followers, and grow their brand — effortlessly." data-he="הפלטפורמה האולטימטיבית שעוזרת למשפיענים לנהל שת״פים, לנתח חוזים עם AI, לשוחח עם עוקבים ולצמוח — בלי מאמץ.">The all-in-one platform that helps influencers track partnerships, parse contracts with AI, chat with followers, and grow their brand — effortlessly.</p>
+      </div>
+      <div class="reveal" style="transition-delay:.3s">
+        <div class="hero-btns">
+          <button class="btn-primary" data-en="Start Free Trial" data-he="התחל תקופת ניסיון">Start Free Trial</button>
+          <button class="btn-secondary" data-en="▶ Watch Demo" data-he="▶ צפה בדמו">▶ Watch Demo</button>
+        </div>
+      </div>
+      <div class="hero-glow"></div>
+    </div>
+  </section>
+
+  <!-- Logo Strip -->
+  <section class="logos">
+    <div class="reveal"><p data-en="Trusted by creators and agencies worldwide" data-he="יוצרים וסוכנויות מובילות סומכות עלינו">Trusted by creators and agencies worldwide</p></div>
+    <div class="logos-row">
+      <span class="reveal">Instagram</span>
+      <span class="reveal" style="transition-delay:.08s">TikTok</span>
+      <span class="reveal" style="transition-delay:.16s">YouTube</span>
+      <span class="reveal" style="transition-delay:.24s">Spotify</span>
+      <span class="reveal" style="transition-delay:.32s">Pinterest</span>
+      <span class="reveal" style="transition-delay:.4s">Twitter</span>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features" class="features">
+    <div style="max-width:1200px;margin:0 auto">
+      <div class="reveal" style="text-align:center"><span class="badge" data-en="Superpowers" data-he="כוחות-על">Superpowers</span></div>
+      <div class="reveal" style="transition-delay:.1s">
+        <h2 class="section-title">
+          <span data-en="Everything you need to " data-he="כל מה שצריך כדי ">Everything you need to </span>
+          <span class="gradient-text" data-en="level up" data-he="לעלות רמה">level up</span>
+        </h2>
+      </div>
+      <div class="features-grid" id="features-grid"></div>
+    </div>
+  </section>
+
+  <!-- Stats -->
+  <section class="stats">
+    <div class="stats-grid" id="stats-grid"></div>
+  </section>
+
+  <!-- Testimonials -->
+  <section id="testimonials" class="testimonials">
+    <div style="max-width:1200px;margin:0 auto">
+      <div class="reveal" style="text-align:center"><span class="badge" data-en="Love Letters" data-he="מכתבי אהבה">Love Letters</span></div>
+      <div class="reveal" style="transition-delay:.1s">
+        <h2 class="section-title">
+          <span data-en="Creators who " data-he="יוצרים ש">Creators who </span>
+          <span class="gradient-text" data-en="love us" data-he="אוהבים אותנו">love us</span>
+        </h2>
+      </div>
+      <div class="testimonials-grid" id="testimonials-grid"></div>
+    </div>
+  </section>
+
+  <!-- Pricing -->
+  <section id="pricing" class="pricing">
+    <div style="max-width:1100px;margin:0 auto">
+      <div class="reveal" style="text-align:center"><span class="badge" data-en="Simple Pricing" data-he="תמחור פשוט">Simple Pricing</span></div>
+      <div class="reveal" style="transition-delay:.1s">
+        <h2 class="section-title">
+          <span data-en="Plans that " data-he="תוכניות ש">Plans that </span>
+          <span class="gradient-text" data-en="grow with you" data-he="גדלות איתכם">grow with you</span>
+        </h2>
+      </div>
+      <div class="pricing-grid" id="pricing-grid"></div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq" class="faq">
+    <div style="max-width:720px;margin:0 auto">
+      <div class="reveal" style="text-align:center"><span class="badge" data-en="Got Questions?" data-he="יש שאלות?">Got Questions?</span></div>
+      <div class="reveal" style="transition-delay:.1s">
+        <h2 class="section-title">
+          <span data-en="Frequently " data-he="שאלות ">Frequently </span>
+          <span class="gradient-text" data-en="asked" data-he="נפוצות">asked</span>
+        </h2>
+      </div>
+      <div class="faq-list" id="faq-list"></div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="reveal">
+      <div class="footer-cta">
+        <h2 data-en="Ready to level up your creator game?" data-he="מוכנים לעלות רמה?">Ready to level up your creator game?</h2>
+        <p data-en="Join thousands of creators managing partnerships smarter." data-he="הצטרפו לאלפי יוצרים שמנהלים שת״פים חכם יותר.">Join thousands of creators managing partnerships smarter.</p>
+        <button class="btn-primary" data-en="Get Started Free" data-he="התחל בחינם">Get Started Free</button>
+        <div class="footer-glow footer-glow-1"></div>
+        <div class="footer-glow footer-glow-2"></div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span class="footer-copy" data-en="© 2026 InfluencerBot. All rights reserved." data-he="© 2026 InfluencerBot. כל הזכויות שמורות.">© 2026 InfluencerBot. All rights reserved.</span>
+      <div class="footer-links">
+        <a href="#" data-en="Privacy Policy" data-he="מדיניות פרטיות">Privacy Policy</a>
+        <a href="#" data-en="Terms of Service" data-he="תנאי שימוש">Terms of Service</a>
+        <a href="#" data-en="Contact" data-he="צור קשר">Contact</a>
+      </div>
+    </div>
+  </footer>
+
+<script>
+// ── Data ──────────────────────
+const features = {
+  en: [
+    { icon: "🤖", title: "AI Document Parser", desc: "Upload contracts, briefs & invoices — our AI extracts every detail in seconds. Supports Hebrew, English, Arabic & Russian." },
+    { icon: "💬", title: "Smart Chatbot", desc: "Your personal AI assistant that knows your content, partnerships, and audience — and chats with your followers 24/7." },
+    { icon: "📊", title: "Analytics Dashboard", desc: "Track audience growth, engagement rates, content performance and ROI — all in real-time with beautiful charts." },
+    { icon: "🔔", title: "Smart Notifications", desc: "Never miss a deadline. Get alerts for upcoming deliverables, expiring contracts, and partnership milestones." },
+    { icon: "📸", title: "Instagram Insights", desc: "Deep-dive into your Instagram analytics. Track follower demographics, best posting times, and content trends." },
+    { icon: "🎯", title: "Coupon & ROI Tracking", desc: "Create unique coupon codes, track usage, and measure the real ROI of every partnership automatically." },
+  ],
+  he: [
+    { icon: "🤖", title: "ניתוח מסמכים AI", desc: "העלו חוזים, בריפים וחשבוניות — ה-AI שלנו מחלץ כל פרט תוך שניות. תמיכה בעברית, אנגלית, ערבית ורוסית." },
+    { icon: "💬", title: "צ׳אטבוט חכם", desc: "עוזר AI אישי שמכיר את התוכן, השת״פים והקהל שלכם — ומשוחח עם העוקבים 24/7." },
+    { icon: "📊", title: "דשבורד אנליטיקס", desc: "עקבו אחר צמיחת קהל, מעורבות, ביצועי תוכן ו-ROI — הכל בזמן אמת עם גרפים מרהיבים." },
+    { icon: "🔔", title: "התראות חכמות", desc: "לא מפספסים דדליין. קבלו התראות על משימות קרובות, חוזים שפגים ואבני דרך בשת״פים." },
+    { icon: "📸", title: "תובנות אינסטגרם", desc: "צללו לעומק האנליטיקס של האינסטגרם. עקבו אחר דמוגרפיית עוקבים, זמני פרסום מיטביים וטרנדים." },
+    { icon: "🎯", title: "מעקב קופונים ו-ROI", desc: "צרו קודי קופון ייחודיים, עקבו אחר שימוש ומדדו את ה-ROI האמיתי של כל שת״פ אוטומטית." },
+  ],
+};
+
+const stats = {
+  en: [{ v: "10K+", l: "Partnerships Managed" }, { v: "98%", l: "AI Accuracy" }, { v: "3min", l: "Avg. Contract Parse" }, { v: "24/7", l: "Chatbot Availability" }],
+  he: [{ v: "10K+", l: "שת״פים מנוהלים" }, { v: "98%", l: "דיוק AI" }, { v: "3 דק׳", l: "ניתוח חוזה ממוצע" }, { v: "24/7", l: "זמינות צ׳אטבוט" }],
+};
+
+const testimonials = {
+  en: [
+    { name: "Maya Cohen", role: "Fashion Influencer • 250K followers", text: "This platform literally changed how I manage my brand deals. The AI parser saves me hours every week!", avatar: "👩‍🎨" },
+    { name: "Tom Levy", role: "Tech Reviewer • 180K followers", text: "The analytics dashboard is insane. I can finally show brands real ROI data from my campaigns.", avatar: "👨‍💻" },
+    { name: "Noa Klein", role: "Food Blogger • 320K followers", text: "Having a chatbot that actually knows my recipes and partnerships? Game changer for engagement.", avatar: "👩‍🍳" },
+  ],
+  he: [
+    { name: "מאיה כהן", role: "משפיענית אופנה • 250K עוקבים", text: "הפלטפורמה הזו שינתה לי את הדרך שבה אני מנהלת עסקאות. ה-AI Parser חוסך לי שעות כל שבוע!", avatar: "👩‍🎨" },
+    { name: "תום לוי", role: "סוקר טכנולוגיה • 180K עוקבים", text: "הדשבורד אנליטיקס פשוט מטורף. סוף סוף אני יכול להראות למותגים נתוני ROI אמיתיים.", avatar: "👨‍💻" },
+    { name: "נועה קליין", role: "בלוגרית אוכל • 320K עוקבים", text: "צ׳אטבוט שבאמת מכיר את המתכונים והשת״פים שלי? Game changer למעורבות.", avatar: "👩‍🍳" },
+  ],
+};
+
+const pricingData = {
+  en: [
+    { name: "Starter", price: "$0", period: "/month", desc: "Perfect for getting started", features: ["1 Instagram account", "Basic analytics", "5 document parses/mo", "Community support"], cta: "Start Free", popular: false },
+    { name: "Pro", price: "$29", period: "/month", desc: "For serious creators", features: ["3 Instagram accounts", "Advanced analytics & ROI", "Unlimited document parses", "AI Chatbot", "Priority support"], cta: "Start Pro Trial", popular: true },
+    { name: "Agency", price: "$99", period: "/month", desc: "For teams & agencies", features: ["Unlimited accounts", "White-label chatbot", "Team collaboration", "API access", "Dedicated account manager"], cta: "Contact Sales", popular: false },
+  ],
+  he: [
+    { name: "סטארטר", price: "₪0", period: "/חודש", desc: "מושלם להתחלה", features: ["חשבון אינסטגרם אחד", "אנליטיקס בסיסי", "5 ניתוחי מסמכים/חודש", "תמיכה קהילתית"], cta: "התחל בחינם", popular: false },
+    { name: "פרו", price: "₪99", period: "/חודש", desc: "ליוצרים רציניים", features: ["3 חשבונות אינסטגרם", "אנליטיקס מתקדם + ROI", "ניתוח מסמכים ללא הגבלה", "צ׳אטבוט AI", "תמיכה עדיפה"], cta: "התחל ניסיון פרו", popular: true },
+    { name: "סוכנות", price: "₪349", period: "/חודש", desc: "לצוותים וסוכנויות", features: ["חשבונות ללא הגבלה", "צ׳אטבוט White-label", "שיתוף פעולה צוותי", "גישת API", "מנהל חשבון ייעודי"], cta: "צור קשר", popular: false },
+  ],
+};
+
+const faqData = {
+  en: [
+    { q: "How does the AI document parser work?", a: "Upload any contract, brief, or invoice (PDF, Word, Excel, or image) and our multi-model AI chain (Gemini → Claude → GPT-4o) extracts all key details with 98% accuracy. You can review and edit before saving." },
+    { q: "Is my data secure?", a: "Absolutely. We use Supabase with Row-Level Security, encrypted storage, and role-based access control. Your data is only accessible to you and your authorized team members." },
+    { q: "Can the chatbot speak Hebrew?", a: "Yes! Our chatbot supports Hebrew, English, Arabic, and Russian. It uses your actual content and partnership data to provide accurate, personalized responses." },
+    { q: "Do you support Instagram analytics?", a: "Yes, we provide deep Instagram analytics including follower growth, demographics, engagement rates, best posting times, and content performance tracking." },
+  ],
+  he: [
+    { q: "איך עובד ניתוח המסמכים ב-AI?", a: "העלו כל חוזה, בריף או חשבונית (PDF, Word, Excel או תמונה) ושרשרת ה-AI המולטי-מודל שלנו (Gemini → Claude → GPT-4o) מחלצת את כל הפרטים המרכזיים בדיוק של 98%. ניתן לבדוק ולערוך לפני השמירה." },
+    { q: "האם המידע שלי מאובטח?", a: "בהחלט. אנו משתמשים ב-Supabase עם Row-Level Security, אחסון מוצפן ובקרת גישה מבוססת תפקידים. המידע שלכם נגיש רק לכם ולחברי הצוות המורשים." },
+    { q: "האם הצ׳אטבוט מדבר עברית?", a: "כן! הצ׳אטבוט שלנו תומך בעברית, אנגלית, ערבית ורוסית. הוא משתמש בתוכן ובנתוני השת״פים שלכם כדי לספק תשובות מדויקות ומותאמות אישית." },
+    { q: "האם יש תמיכה באנליטיקס אינסטגרם?", a: "כן, אנו מספקים אנליטיקס אינסטגרם מעמיק כולל צמיחת עוקבים, דמוגרפיה, שיעורי מעורבות, זמני פרסום מיטביים ומעקב ביצועי תוכן." },
+  ],
+};
+
+// ── State ─────────────────────
+let currentLang = "en";
+
+// ── Render Functions ──────────
+function renderFeatures() {
+  const grid = document.getElementById("features-grid");
+  grid.innerHTML = features[currentLang].map((f, i) => `
+    <div class="feature-card reveal" style="transition-delay:${i * .1}s">
+      <div class="feature-icon">${f.icon}</div>
+      <h3>${f.title}</h3>
+      <p>${f.desc}</p>
+      <div class="card-glow"></div>
+    </div>
+  `).join("");
+  observeReveals();
+}
+
+function renderStats() {
+  const grid = document.getElementById("stats-grid");
+  grid.innerHTML = stats[currentLang].map((s, i) => `
+    <div class="stat reveal" style="transition-delay:${i * .1}s">
+      <div class="stat-value gradient-text">${s.v}</div>
+      <div class="stat-label">${s.l}</div>
+    </div>
+  `).join("");
+  observeReveals();
+}
+
+function renderTestimonials() {
+  const grid = document.getElementById("testimonials-grid");
+  grid.innerHTML = testimonials[currentLang].map((t, i) => `
+    <div class="testimonial-card reveal" style="transition-delay:${i * .12}s">
+      <div class="testimonial-quote">"</div>
+      <p class="testimonial-text">${t.text}</p>
+      <div class="testimonial-author">
+        <div class="testimonial-avatar">${t.avatar}</div>
+        <div>
+          <div class="testimonial-name">${t.name}</div>
+          <div class="testimonial-role">${t.role}</div>
+        </div>
+      </div>
+    </div>
+  `).join("");
+  observeReveals();
+}
+
+function renderPricing() {
+  const grid = document.getElementById("pricing-grid");
+  grid.innerHTML = pricingData[currentLang].map((p, i) => `
+    <div class="pricing-card${p.popular ? " popular" : ""} reveal" style="transition-delay:${i * .12}s">
+      ${p.popular ? '<div class="popular-badge">POPULAR</div>' : ""}
+      <h3>${p.name}</h3>
+      <p class="pricing-desc">${p.desc}</p>
+      <div class="pricing-price">
+        <span class="pricing-amount">${p.price}</span>
+        <span class="pricing-period">${p.period}</span>
+      </div>
+      <ul class="pricing-features">${p.features.map(f => `<li>${f}</li>`).join("")}</ul>
+      <button class="pricing-btn ${p.popular ? "primary" : "secondary"}">${p.cta}</button>
+      ${p.popular ? '<div class="pricing-glow"></div>' : ""}
+    </div>
+  `).join("");
+  observeReveals();
+}
+
+function renderFaq() {
+  const list = document.getElementById("faq-list");
+  list.innerHTML = faqData[currentLang].map((f, i) => `
+    <div class="faq-item reveal" style="transition-delay:${i * .08}s" onclick="this.classList.toggle('open')">
+      <button class="faq-q">${f.q}<span class="faq-toggle">+</span></button>
+      <div class="faq-a"><p>${f.a}</p></div>
+    </div>
+  `).join("");
+  observeReveals();
+}
+
+function renderAll() {
+  renderFeatures();
+  renderStats();
+  renderTestimonials();
+  renderPricing();
+  renderFaq();
+}
+
+// ── Language Toggle ───────────
+function toggleLang() {
+  currentLang = currentLang === "en" ? "he" : "en";
+  document.documentElement.dir = currentLang === "he" ? "rtl" : "ltr";
+  document.documentElement.lang = currentLang;
+
+  // Update all data-en/data-he elements
+  document.querySelectorAll("[data-en]").forEach(el => {
+    el.textContent = el.getAttribute(`data-${currentLang}`);
+  });
+
+  // Update lang button
+  document.querySelector(".lang-btn").textContent = currentLang === "en" ? "🇮🇱 עברית" : "🇺🇸 English";
+
+  // Re-render dynamic sections
+  renderAll();
+}
+
+// ── Scroll Reveal ─────────────
+function observeReveals() {
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add("visible"); obs.unobserve(e.target); } });
+  }, { threshold: 0.15 });
+  document.querySelectorAll(".reveal:not(.visible)").forEach(el => obs.observe(el));
+}
+
+// ── Navbar scroll effect ──────
+window.addEventListener("scroll", () => {
+  document.getElementById("navbar").classList.toggle("scrolled", window.scrollY > 20);
+});
+
+// ── Init ──────────────────────
+document.addEventListener("DOMContentLoaded", () => {
+  renderAll();
+  observeReveals();
+});
+</script>
+</body>
+</html>

@@ -41,3 +41,11 @@ yarn-error.log*
 next-env.d.ts
 .claude/settings.json
 .handoff-admin-token.txt
+
+# Data dumps / exports (don't commit — contain DM contents / logs)
+ldrs-ig-dm-*
+influencers-bot-log-export-*.json
+Instagram_DM_Comparison.pdf
+
+# Playwright test output
+/test-results/

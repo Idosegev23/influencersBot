@@ -954,7 +954,7 @@ Categorized. All set in **Vercel** (production / preview / development) and loca
 ### Google
 - `GOOGLE_SERVICE_ACCOUNT_KEY` (full JSON, multiline)
 - `GMAIL_SEND_FROM` = `bestie@ldrsgroup.com`
-- `LEADS_EMAIL_TO` = `roi@ldrsgroup.com`
+- `LEADS_EMAIL_TO` = `roei@ldrsgroup.com`
 - `GOOGLE_DRIVE_LEADS_FOLDER_ID`
 
 ### LDRS conference

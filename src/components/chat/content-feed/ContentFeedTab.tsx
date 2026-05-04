@@ -471,11 +471,6 @@ function LookCard({ item, config, onAsk, index }: { item: ContentCard; config: t
 // ─── Beauty card — square image, pink/mauve palette, metadata chips ───
 
 function BeautyCard({ item, config, onAsk }: { item: ContentCard; config: typeof TYPE_CONFIG['beauty']; onAsk: (q: string, chunkId?: string) => void }) {
-  // Extract beauty-specific metadata
-  const steps = item.meta.steps || null;
-  const skinType = item.meta.skin_type || item.meta.type || null;
-  const metaLine = [steps, skinType].filter(Boolean).join(' • ');
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -488,15 +483,12 @@ function BeautyCard({ item, config, onAsk }: { item: ContentCard; config: typeof
           <img src={getProxiedImageUrl(item.imageUrl, item.shortcode || undefined)} alt={item.title} loading="lazy" />
         ) : (
           <div className="cf-beauty-card__placeholder">
-            <Sparkles className="w-8 h-8" style={{ color: '#805062' }} />
+            <Sparkles className="w-7 h-7" style={{ color: '#883fe2' }} />
           </div>
         )}
       </div>
       <div className="cf-beauty-card__body">
         <h3 className="cf-beauty-card__title">{item.title}</h3>
-        {metaLine && (
-          <p className="cf-beauty-card__meta">{metaLine}</p>
-        )}
         {item.description && (
           <p className="cf-beauty-card__desc">{item.description}</p>
         )}
@@ -736,13 +728,8 @@ export default function ContentFeedTab({ username, influencerType, tabLabel, onA
     if (influencerType === 'beauty') {
       return (
         <div className="cf-header cf-header--beauty">
-          <div className="cf-header__glass">
-            <div className="cf-header__icon" style={{ background: config.accentBg }}>
-              <Icon className="w-5 h-5" style={{ color: config.accentColor }} />
-            </div>
-            <h2 className="cf-header__title">{tabLabel}</h2>
-            <p className="cf-header__subtitle">{config.subtitle}</p>
-          </div>
+          <h2 className="cf-header__title">{tabLabel}</h2>
+          <p className="cf-header__subtitle">{config.subtitle}</p>
           {/* Category sub-tabs */}
           <div className="cf-beauty-tabs">
             {BEAUTY_CATEGORIES.map(cat => (
@@ -793,11 +780,11 @@ export default function ContentFeedTab({ username, influencerType, tabLabel, onA
 
           {/* Search */}
           {items.length > 5 && (
-            <div className={`cf-search ${influencerType === 'food' ? 'cf-search--recipe' : ''}`}>
+            <div className={`cf-search ${influencerType === 'food' ? 'cf-search--recipe' : influencerType === 'beauty' ? 'cf-search--beauty' : ''}`}>
               <Search className="w-4 h-4 cf-search__icon" />
               <input
                 type="text"
-                placeholder={influencerType === 'food' ? 'חפשו מתכון...' : influencerType === 'beauty' ? 'חפשו מוצר או שגרה...' : 'חפשו תוכן...'}
+                placeholder={influencerType === 'food' ? 'חפשו מתכון...' : influencerType === 'beauty' ? 'חיפוש מוצר' : 'חפשו תוכן...'}
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 className="cf-search__input"

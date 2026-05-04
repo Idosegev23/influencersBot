@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
         locale: locale || 'he-IL',
       },
       assigned_to: {
-        email: process.env.CONFERENCE_LEAD_OWNER_EMAIL || 'roi@ldrsgroup.com',
+        email: process.env.CONFERENCE_LEAD_OWNER_EMAIL || 'roei@ldrsgroup.com',
         name: process.env.CONFERENCE_LEAD_OWNER_NAME || 'רועי',
       },
       consent: {
@@ -184,7 +184,7 @@ export async function POST(req: NextRequest) {
       typeof _test_to === 'string' && /^[\w.+-]+@ldrsgroup\.com$/i.test(_test_to);
     const ownerEmail = isValidTestOverride
       ? _test_to
-      : process.env.CONFERENCE_LEAD_OWNER_EMAIL || 'roi@ldrsgroup.com';
+      : process.env.CONFERENCE_LEAD_OWNER_EMAIL || 'roei@ldrsgroup.com';
 
     const emailContent = buildConferenceLeadEmail({
       fullName,

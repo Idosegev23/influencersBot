@@ -32,7 +32,7 @@ function ownerName(): string {
   return process.env.CONFERENCE_LEAD_OWNER_NAME || 'רועי';
 }
 function ownerEmail(): string {
-  return process.env.CONFERENCE_LEAD_OWNER_EMAIL || 'roi@ldrsgroup.com';
+  return process.env.CONFERENCE_LEAD_OWNER_EMAIL || 'roei@ldrsgroup.com';
 }
 
 function buildOwnerNotice(args: {

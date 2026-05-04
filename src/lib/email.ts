@@ -78,12 +78,64 @@ function buildRawEmail(options: {
     .replace(/=+$/, '');
 }
 
+function buildRawEmailWithAttachments(options: {
+  to: string | string[];
+  subject: string;
+  html: string;
+  from?: string;
+  attachments: { filename: string; content: Buffer; mimeType: string }[];
+}): string {
+  const to = Array.isArray(options.to) ? options.to.join(', ') : options.to;
+  const from = options.from || `BestieAI <${SEND_FROM}>`;
+  const boundary = `=_Part_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+  const parts: string[] = [
+    `From: ${from}`,
+    `To: ${to}`,
+    `Subject: =?UTF-8?B?${Buffer.from(options.subject).toString('base64')}?=`,
+    'MIME-Version: 1.0',
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    '',
+    `--${boundary}`,
+    'Content-Type: text/html; charset=UTF-8',
+    'Content-Transfer-Encoding: 7bit',
+    '',
+    options.html,
+    '',
+  ];
+
+  for (const att of options.attachments) {
+    parts.push(
+      `--${boundary}`,
+      `Content-Type: ${att.mimeType}; name="${att.filename}"`,
+      'Content-Transfer-Encoding: base64',
+      `Content-Disposition: attachment; filename="${att.filename}"`,
+      '',
+      // Wrap base64 to 76 char lines per RFC 2045
+      att.content.toString('base64').replace(/(.{76})/g, '$1\r\n'),
+      '',
+    );
+  }
+
+  parts.push(`--${boundary}--`, '');
+
+  return Buffer.from(parts.join('\r\n'))
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
 // ── Public API ──
 
 export interface SendEmailOptions {
   to: string | string[];
   subject: string;
   html: string;
+}
+
+export interface SendEmailWithAttachmentsOptions extends SendEmailOptions {
+  attachments: { filename: string; content: Buffer; mimeType: string }[];
 }
 
 export async function sendEmail(options: SendEmailOptions): Promise<{
@@ -119,6 +171,37 @@ export async function sendEmail(options: SendEmailOptions): Promise<{
       success: false,
       error: err.message || 'Unknown error',
     };
+  }
+}
+
+export async function sendEmailWithAttachments(
+  options: SendEmailWithAttachmentsOptions,
+): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  if (!isConfigured()) {
+    console.warn('[Email] Gmail API not configured, skipping email.');
+    return { success: false, error: 'Not configured' };
+  }
+
+  try {
+    const auth = getAuthClient();
+    const gmail = google.gmail({ version: 'v1', auth });
+    const raw = buildRawEmailWithAttachments(options);
+
+    const result = await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: { raw },
+    });
+
+    console.log(
+      `[Email] Sent (${options.attachments.length} attachments) to ${
+        Array.isArray(options.to) ? options.to.join(', ') : options.to
+      } | ID: ${result.data.id}`,
+    );
+
+    return { success: true, messageId: result.data.id || undefined };
+  } catch (err: any) {
+    console.error('[Email] Send with attachments failed:', err.message || err);
+    return { success: false, error: err.message || 'Unknown error' };
   }
 }
 

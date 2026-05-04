@@ -32,7 +32,7 @@ export function buildConferenceLeadConfirmationEmail(input: ConfirmationEmailInp
 } {
   const firstName = (input.fullName || '').trim().split(/\s+/)[0] || input.fullName || '';
   const ownerName = input.ownerName || 'רועי';
-  const ownerEmail = input.ownerEmail || 'roi@ldrsgroup.com';
+  const ownerEmail = input.ownerEmail || 'roei@ldrsgroup.com';
   const subject = `🙌 קיבלנו את הפרטים שלך — נחזור אליך בהקדם`;
   const productLine = input.preferredProduct
     ? `סימנת עניין ב<strong style="color:#0c1013;">${escape(input.preferredProduct)}</strong> — נביא אותו ${escape(ownerName)} בהקשר הזה.`

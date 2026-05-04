@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Loader2, Eye, Clock, Flame, TrendingUp } from 'lucide-react';
+import { Loader2, Eye, Clock, Flame, Star } from 'lucide-react';
 import { NewsTicker } from './NewsTicker';
 import { getProxiedImageUrl } from '@/lib/image-utils';
 import type { HotTopic } from '@/lib/hot-topics/types';
@@ -50,35 +50,21 @@ function timeAgo(dateStr: string): string {
   return 'שבוע+';
 }
 
-const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
-  breaking: { color: '#FF3B30', bg: '#FFF1F0', label: 'BREAKING' },
-  hot: { color: '#FF9500', bg: '#FFF8F0', label: 'HOT' },
-  cooling: { color: '#AF52DE', bg: '#F8F0FF', label: 'TRENDING' },
-  archive: { color: '#8E8E93', bg: '#F2F2F7', label: 'ARCHIVE' },
-};
-
 // ============================================
 // Sub-components
 // ============================================
 
-/** Image card with gradient overlay — used for hero and grid */
+/** Image card with gradient overlay — figma node 460:3644 (110 × 146.664) */
 function ImageCard({
   thumbnailUrl,
   headline,
   views,
-  postedAt,
-  badge,
-  aspectRatio = '1/1',
-  headlineSize = '12px',
   onClick,
 }: {
   thumbnailUrl: string;
   headline: string;
   views: number;
   postedAt: string;
-  badge?: { label: string; color: string };
-  aspectRatio?: string;
-  headlineSize?: string;
   onClick: () => void;
 }) {
   return (
@@ -86,46 +72,38 @@ function ImageCard({
       whileTap={{ scale: 0.97 }}
       onClick={onClick}
       className="w-full relative overflow-hidden text-right"
-      style={{ borderRadius: '12px', aspectRatio }}
+      style={{ borderRadius: '8px', aspectRatio: '110 / 146.664' }}
     >
       <img
         src={getProxiedImageUrl(thumbnailUrl)}
         alt=""
-        className="absolute inset-0 w-full h-full object-cover"
+        className="absolute inset-0 w-full h-full object-cover pointer-events-none"
         loading="lazy"
       />
       <div
-        className="absolute inset-0"
+        className="absolute inset-0 pointer-events-none"
         style={{ background: 'linear-gradient(0deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.1) 45%, transparent 60%)' }}
       />
-      {badge && (
-        <div className="absolute top-2 right-2">
+      <div
+        className="absolute flex flex-col items-end justify-center gap-1"
+        style={{ left: '3px', right: '3px', bottom: '8px', height: '44px' }}
+        dir="rtl"
+      >
+        {views > 0 && (
           <span
-            className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md"
-            style={{ background: badge.color, color: '#FFF' }}
+            className="flex items-center gap-1 rounded-[4px] text-white font-medium"
+            style={{ background: 'rgba(12,16,19,0.32)', padding: '4px', fontSize: '10px', lineHeight: '10.8px' }}
           >
-            {badge.label}
-          </span>
-        </div>
-      )}
-      {views > 0 && (
-        <div className="absolute top-2 left-2">
-          <span
-            className="text-[8px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5"
-            style={{ background: 'rgba(0,0,0,0.4)', color: '#FFF', backdropFilter: 'blur(6px)' }}
-          >
-            <Eye className="w-2.5 h-2.5" />
             {formatViews(views)}
+            <Eye className="w-2.5 h-2.5" strokeWidth={1.5} />
           </span>
-        </div>
-      )}
-      <div className="absolute bottom-0 left-0 right-0 p-1.5" dir="rtl">
-        <h3
-          className="font-semibold leading-[1.2] text-white line-clamp-2"
-          style={{ fontSize: headlineSize }}
+        )}
+        <p
+          className="text-white text-right font-medium line-clamp-1 w-full"
+          style={{ fontSize: '12px', lineHeight: '10.8px' }}
         >
           {headline}
-        </h3>
+        </p>
       </div>
     </motion.button>
   );
@@ -237,13 +215,9 @@ export function NewsDiscoveryTab({ username, influencerName, onAskInChat }: News
   const breakingTopics = hotTopics.filter(t => t.status === 'breaking');
   const hotOnly = hotTopics.filter(t => t.status === 'hot');
   const allTopics = [...breakingTopics, ...hotOnly, ...hotTopics.filter(t => t.status === 'cooling')];
-  const heroTopic = breakingTopics[0] || hotOnly[0];
 
   const postsWithImages = timeline.filter(t => t.thumbnailUrl);
   const postsNoImages = timeline.filter(t => !t.thumbnailUrl);
-  // Split posts into two columns for masonry layout
-  const leftCol = postsWithImages.filter((_, i) => i % 2 === 0);
-  const rightCol = postsWithImages.filter((_, i) => i % 2 === 1);
 
   // Ticker
   const tickerHeadlines = [...breakingTopics, ...hotOnly].slice(0, 8).map(t => ({
@@ -277,133 +251,93 @@ export function NewsDiscoveryTab({ username, influencerName, onAskInChat }: News
           {/* ── Ticker ── */}
           {tickerHeadlines.length > 0 && <NewsTicker headlines={tickerHeadlines} />}
 
-          {/* ── PINTEREST GRID (2 rows of horizontal scroll) ── */}
+          {/* ── STORIES GRID (2 rows × horizontal scroll) — figma node 460:3795 ── */}
           {postsWithImages.length > 0 && (
-            <div className="pt-3 flex flex-col gap-1.5">
-              {/* Row 1 */}
-              <div className="flex gap-1.5 overflow-x-auto px-2 pb-1 scrollbar-hide">
-                {postsWithImages.filter((_, i) => i % 2 === 0).map((item, i) => (
-                  <motion.div
-                    key={item.id}
-                    className="flex-shrink-0"
-                    style={{ width: '110px' }}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.04 }}
-                  >
-                    <ImageCard
-                      thumbnailUrl={item.thumbnailUrl!}
-                      headline={item.headline}
-                      views={item.views}
-                      postedAt={item.postedAt}
-                      badge={i === 0 && heroTopic ? { label: STATUS_CONFIG[heroTopic.status]?.label || 'LIVE', color: STATUS_CONFIG[heroTopic.status]?.color || '#FF3B30' } : undefined}
-                      aspectRatio="3/4"
-                      headlineSize="9px"
-                      onClick={() => handlePostClick(item)}
-                    />
-                  </motion.div>
-                ))}
-              </div>
-              {/* Row 2 — offset for stagger */}
-              <div className="flex gap-1.5 overflow-x-auto px-2 pb-1 scrollbar-hide" style={{ paddingRight: '28px' }}>
-                {postsWithImages.filter((_, i) => i % 2 === 1).map((item, i) => (
-                  <motion.div
-                    key={item.id}
-                    className="flex-shrink-0"
-                    style={{ width: '110px' }}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.05 + i * 0.04 }}
-                  >
-                    <ImageCard
-                      thumbnailUrl={item.thumbnailUrl!}
-                      headline={item.headline}
-                      views={item.views}
-                      postedAt={item.postedAt}
-                      aspectRatio="3/4"
-                      headlineSize="9px"
-                      onClick={() => handlePostClick(item)}
-                    />
-                  </motion.div>
-                ))}
-              </div>
+            <div className="pt-3 flex flex-col gap-4" dir="rtl">
+              {[0, 1].map(rowIdx => (
+                <div
+                  key={rowIdx}
+                  className="flex gap-1.5 overflow-x-auto px-4 scrollbar-hide"
+                >
+                  {postsWithImages.filter((_, i) => i % 2 === rowIdx).map((item, i) => (
+                    <motion.div
+                      key={item.id}
+                      className="flex-shrink-0"
+                      style={{ width: '110px' }}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: rowIdx * 0.05 + i * 0.04 }}
+                    >
+                      <ImageCard
+                        thumbnailUrl={item.thumbnailUrl!}
+                        headline={item.headline}
+                        views={item.views}
+                        postedAt={item.postedAt}
+                        onClick={() => handlePostClick(item)}
+                      />
+                    </motion.div>
+                  ))}
+                </div>
+              ))}
             </div>
           )}
 
-          {/* ── HOT TOPICS ── */}
+          {/* ── HOT TOPICS — figma node 460:3919 ── */}
           {allTopics.length > 0 && (
-            <section className="pt-5 pb-1" dir="rtl">
-              <div className="flex items-center gap-2 px-4 mb-3">
-                <Flame className="w-4 h-4" style={{ color: '#FF3B30' }} />
-                <h2 className="text-[16px] font-bold" style={{ color: '#1C1C1E' }}>
-                  נושאים חמים
-                </h2>
-              </div>
+            <section className="pt-6 pb-1" dir="rtl">
+              <h2
+                className="px-4 mb-2 text-right font-medium"
+                style={{ color: '#191c1e', fontSize: '18px', lineHeight: '18px' }}
+              >
+                נושאים חמים
+              </h2>
 
-              <div className="px-4 space-y-2">
-                {allTopics.slice(0, 6).map((topic, i) => {
-                  const cfg = STATUS_CONFIG[topic.status] || STATUS_CONFIG.hot;
-                  return (
-                    <motion.button
-                      key={topic.id}
-                      initial={{ opacity: 0, x: 8 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.04 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => handleTopicClick(topic)}
-                      className="w-full text-right overflow-hidden flex items-stretch"
-                      style={{
-                        borderRadius: '16px',
-                        background: '#FFF',
-                        boxShadow: '0 1px 4px rgba(0,0,0,0.04), 0 0 0 0.5px rgba(0,0,0,0.03)',
-                      }}
-                    >
-                      {/* Color accent bar */}
-                      <div className="w-1 flex-shrink-0" style={{ background: cfg.color }} />
-                      <div className="flex-1 p-3.5">
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <span
-                            className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md ${topic.status === 'breaking' ? 'animate-pulse' : ''}`}
-                            style={{ background: cfg.bg, color: cfg.color }}
-                          >
-                            {cfg.label}
-                          </span>
-                          <div className="flex-1" />
-                          <div className="flex items-center gap-1">
-                            <TrendingUp className="w-3 h-3" style={{ color: cfg.color }} />
-                            <span className="text-[10px] font-bold" style={{ color: cfg.color }}>
-                              {Math.round(topic.heat_score)}
-                            </span>
-                          </div>
-                        </div>
-                        <h3 className="text-[14px] font-bold leading-snug" style={{ color: '#1C1C1E' }}>
+              <div className="px-4 flex flex-col gap-2">
+                {allTopics.slice(0, 6).map((topic, i) => (
+                  <motion.button
+                    key={topic.id}
+                    initial={{ opacity: 0, x: 8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.04 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => handleTopicClick(topic)}
+                    className="w-full flex items-center justify-end text-right"
+                    style={{
+                      background: '#FFF',
+                      borderRadius: '14px',
+                      borderRight: '4px solid #883fe2',
+                      padding: '16px',
+                    }}
+                  >
+                    <div className="flex-1 flex flex-col items-end gap-2 min-w-0">
+                      <div className="flex flex-col items-end gap-1 w-full">
+                        <p
+                          className="font-medium text-right whitespace-nowrap"
+                          style={{ color: '#191c1e', fontSize: '18px', lineHeight: '18px' }}
+                        >
                           {topic.topic_name}
-                        </h3>
+                        </p>
                         {topic.summary && (
-                          <p className="text-[11px] leading-relaxed mt-1 line-clamp-2" style={{ color: '#8E8E93' }}>
+                          <p
+                            className="text-right line-clamp-2 w-full"
+                            style={{ color: '#8e8e93', fontSize: '16px', lineHeight: '20px' }}
+                          >
                             {topic.summary}
                           </p>
                         )}
-                        {topic.tags && topic.tags.length > 0 && (
-                          <div className="flex items-center gap-1.5 mt-2">
-                            {topic.tags.slice(0, 3).map(tag => (
-                              <span
-                                key={tag}
-                                className="text-[9px] px-1.5 py-0.5 rounded-full"
-                                style={{ background: '#F2F2F7', color: '#8E8E93' }}
-                              >
-                                {tag}
-                              </span>
-                            ))}
-                            <span className="text-[9px]" style={{ color: '#C7C7CC' }}>
-                              {topic.coverage_count} ערוצים
-                            </span>
-                          </div>
-                        )}
                       </div>
-                    </motion.button>
-                  );
-                })}
+                      <div className="flex items-center gap-1 justify-end">
+                        <span
+                          className="text-right whitespace-nowrap"
+                          style={{ color: '#676767', fontSize: '14px', lineHeight: '20px' }}
+                        >
+                          {Math.round(topic.heat_score)}
+                        </span>
+                        <Star className="w-5 h-5" strokeWidth={1.5} style={{ color: '#191c1e' }} />
+                      </div>
+                    </div>
+                  </motion.button>
+                ))}
               </div>
             </section>
           )}

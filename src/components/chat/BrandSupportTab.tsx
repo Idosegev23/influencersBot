@@ -236,7 +236,7 @@ export default function BrandSupportTab({
   return (
     <div className={`h-full overflow-y-auto ${isMobile ? 'pb-32' : 'pb-8'}`} dir="rtl">
       <div className="px-4 py-6">
-        <div className={`mx-auto ${isMobile ? 'max-w-2xl' : 'max-w-[700px]'}`}>
+        <div className={`mx-auto support-flow-container ${isMobile ? 'max-w-2xl' : 'max-w-[700px]'}`}>
           <AnimatePresence mode="wait">
 
             {/* ======== STEP 1: Select Product (Figma 346:4206) ======== */}
@@ -325,7 +325,7 @@ export default function BrandSupportTab({
                                 transition={{ duration: 0.2 }}
                                 className="overflow-hidden"
                               >
-                                <div className="flex flex-col gap-2 mt-2 mb-2">
+                                <div className={`mt-2 mb-2 ${isMobile ? 'flex flex-col gap-2' : 'support-category-grid'}`}>
                                   {items.map(product => {
                                     const rawName = product.name_he || product.name || '';
                                     const letter = rawName.trim().charAt(0).toUpperCase();
@@ -363,7 +363,7 @@ export default function BrandSupportTab({
                   </div>
                 ) : (
                   /* Flat product list when few products or searching */
-                  <div className="flex flex-col gap-2">
+                  <div className={isMobile ? 'flex flex-col gap-2' : 'support-category-grid'}>
                     {filtered.map(product => {
                       const rawName = product.name_he || product.name || '';
                       const letter = rawName.trim().charAt(0).toUpperCase();
@@ -409,6 +409,10 @@ export default function BrandSupportTab({
                 exit={{ opacity: 0, x: -20 }}
               >
                 <div className="mb-4 px-3 flex items-start justify-between">
+                  <div>
+                    <h2 className="support-title">מה הבעיה?</h2>
+                    <p className="support-subtitle">בחרי את הבעיה שנתקלת בה</p>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setStep('product')}
@@ -417,10 +421,6 @@ export default function BrandSupportTab({
                   >
                     <span className="support-back-icon" aria-hidden />
                   </button>
-                  <div>
-                    <h2 className="support-title">מה הבעיה?</h2>
-                    <p className="support-subtitle">בחרי את הבעיה שנתקלת בה</p>
-                  </div>
                 </div>
 
                 <div className="flex flex-col gap-3">
@@ -483,6 +483,10 @@ export default function BrandSupportTab({
                 exit={{ opacity: 0, x: -20 }}
               >
                 <div className="mb-4 px-3 flex items-start justify-between">
+                  <div>
+                    <h2 className="support-title">פתיחת פנייה</h2>
+                    <p className="support-subtitle">מלאו את הפרטים ונחזור אליכם בהקדם</p>
+                  </div>
                   <button
                     type="button"
                     onClick={goBack}
@@ -491,10 +495,6 @@ export default function BrandSupportTab({
                   >
                     <span className="support-back-icon" aria-hidden />
                   </button>
-                  <div>
-                    <h2 className="support-title">פתיחת פנייה</h2>
-                    <p className="support-subtitle">מלאו את הפרטים ונחזור אליכם בהקדם</p>
-                  </div>
                 </div>
 
                 <div className="flex flex-col gap-3 mb-3">
@@ -564,29 +564,31 @@ export default function BrandSupportTab({
                   )}
                 </div>
 
-                {/* Form fields — Figma pill inputs */}
+                {/* Form fields — Figma 471:8076 pill inputs */}
                 <div className="flex flex-col gap-[6px]">
-                  <input
-                    type="text"
-                    value={form.name}
-                    onChange={e => setForm({ ...form, name: e.target.value })}
-                    placeholder="שם מלא"
-                    className="support-form-input"
-                  />
-                  <input
-                    type="tel"
-                    value={form.phone}
-                    onChange={e => setForm({ ...form, phone: e.target.value.replace(/\D/g, '') })}
-                    placeholder="מספר טלפון"
-                    className="support-form-input"
-                  />
-                  <input
-                    type="text"
-                    value={form.order}
-                    onChange={e => setForm({ ...form, order: e.target.value })}
-                    placeholder="מספר הזמנה (אופציונלי)"
-                    className="support-form-input"
-                  />
+                  <div className={isMobile ? 'flex flex-col gap-[6px]' : 'support-form-row'}>
+                    <input
+                      type="text"
+                      value={form.name}
+                      onChange={e => setForm({ ...form, name: e.target.value })}
+                      placeholder="שם מלא"
+                      className="support-form-input"
+                    />
+                    <input
+                      type="tel"
+                      value={form.phone}
+                      onChange={e => setForm({ ...form, phone: e.target.value.replace(/\D/g, '') })}
+                      placeholder="מספר טלפון"
+                      className="support-form-input"
+                    />
+                    <input
+                      type="text"
+                      value={form.order}
+                      onChange={e => setForm({ ...form, order: e.target.value })}
+                      placeholder="מספר הזמנה (אופציונלי)"
+                      className="support-form-input"
+                    />
+                  </div>
                   <textarea
                     value={form.details}
                     onChange={e => setForm({ ...form, details: e.target.value })}

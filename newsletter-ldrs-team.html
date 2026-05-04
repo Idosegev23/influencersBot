@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LDRS Platform — Newsletter #1</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --black: #0a0a0a;
+    --white: #ffffff;
+    --gray-100: #f5f5f5;
+    --gray-200: #e5e5e5;
+    --gray-400: #a3a3a3;
+    --gray-600: #525252;
+    --accent: #6366f1;
+    --accent-light: #818cf8;
+    --green: #22c55e;
+    --orange: #f59e0b;
+    --pink: #ec4899;
+    --blue: #3b82f6;
+    --purple: #a855f7;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Heebo', sans-serif;
+    background: var(--gray-100);
+    color: var(--black);
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .newsletter {
+    max-width: 680px;
+    margin: 0 auto;
+    background: var(--white);
+    box-shadow: 0 0 60px rgba(0,0,0,0.08);
+  }
+
+  /* ===== HERO ===== */
+  .hero {
+    background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+    color: white;
+    padding: 60px 40px 50px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle at 30% 50%, rgba(99,102,241,0.15) 0%, transparent 50%),
+                radial-gradient(circle at 70% 80%, rgba(168,85,247,0.1) 0%, transparent 50%);
+    animation: pulse 8s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 0.8; }
+    50% { transform: scale(1.05); opacity: 1; }
+  }
+
+  .hero-content { position: relative; z-index: 1; }
+
+  .hero-badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    padding: 6px 20px;
+    border-radius: 100px;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    margin-bottom: 24px;
+    backdrop-filter: blur(10px);
+  }
+
+  .hero h1 {
+    font-size: 42px;
+    font-weight: 900;
+    line-height: 1.2;
+    margin-bottom: 16px;
+    background: linear-gradient(135deg, #fff 0%, #c7d2fe 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .hero p {
+    font-size: 18px;
+    font-weight: 300;
+    opacity: 0.85;
+    max-width: 480px;
+    margin: 0 auto;
+    line-height: 1.8;
+  }
+
+  .hero-date {
+    margin-top: 30px;
+    font-size: 13px;
+    opacity: 0.5;
+  }
+
+  /* ===== SECTIONS ===== */
+  .section {
+    padding: 48px 40px;
+    border-bottom: 1px solid var(--gray-200);
+  }
+
+  .section:last-child { border-bottom: none; }
+
+  .section-label {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--accent);
+    margin-bottom: 12px;
+  }
+
+  .section h2 {
+    font-size: 28px;
+    font-weight: 800;
+    margin-bottom: 20px;
+    line-height: 1.3;
+  }
+
+  .section p, .section li {
+    font-size: 16px;
+    color: var(--gray-600);
+    line-height: 1.8;
+  }
+
+  .section p + p { margin-top: 16px; }
+
+  /* ===== INTRO ===== */
+  .intro-text {
+    font-size: 18px !important;
+    color: var(--black) !important;
+    font-weight: 400;
+  }
+
+  .highlight-word {
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 700;
+  }
+
+  /* ===== FEATURE CARDS ===== */
+  .feature-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 24px;
+  }
+
+  .feature-card {
+    background: var(--gray-100);
+    border-radius: 16px;
+    padding: 24px;
+    transition: transform 0.2s;
+  }
+
+  .feature-card:hover { transform: translateY(-2px); }
+
+  .feature-card.full-width {
+    grid-column: 1 / -1;
+  }
+
+  .feature-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    margin-bottom: 14px;
+  }
+
+  .feature-card h3 {
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .feature-card p {
+    font-size: 14px !important;
+    line-height: 1.7 !important;
+    color: var(--gray-600);
+  }
+
+  .icon-purple { background: #ede9fe; }
+  .icon-blue { background: #dbeafe; }
+  .icon-green { background: #dcfce7; }
+  .icon-pink { background: #fce7f3; }
+  .icon-orange { background: #fef3c7; }
+  .icon-indigo { background: #e0e7ff; }
+
+  /* ===== FLOW DIAGRAM ===== */
+  .flow {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin: 28px 0;
+  }
+
+  .flow-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    position: relative;
+    padding-bottom: 28px;
+  }
+
+  .flow-step:last-child { padding-bottom: 0; }
+
+  .flow-number {
+    min-width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 700;
+    position: relative;
+    z-index: 1;
+  }
+
+  .flow-step:not(:last-child) .flow-number::after {
+    content: '';
+    position: absolute;
+    top: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2px;
+    height: 28px;
+    background: linear-gradient(to bottom, var(--accent), var(--gray-200));
+  }
+
+  .flow-content h4 {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    margin-top: 8px;
+  }
+
+  .flow-content p {
+    font-size: 14px !important;
+    color: var(--gray-400) !important;
+  }
+
+  /* ===== STAT BOXES ===== */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 24px 0;
+  }
+
+  .stat-box {
+    text-align: center;
+    padding: 24px 16px;
+    border-radius: 16px;
+    background: var(--gray-100);
+  }
+
+  .stat-number {
+    font-size: 36px;
+    font-weight: 900;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+
+  .stat-number.purple { color: var(--accent); }
+  .stat-number.green { color: var(--green); }
+  .stat-number.pink { color: var(--pink); }
+
+  .stat-label {
+    font-size: 13px;
+    color: var(--gray-400);
+    font-weight: 500;
+  }
+
+  /* ===== QUOTE BOX ===== */
+  .quote-box {
+    background: linear-gradient(135deg, #0a0a0a, #1a1a2e);
+    color: white;
+    border-radius: 20px;
+    padding: 36px;
+    margin: 24px 0;
+    position: relative;
+  }
+
+  .quote-box::before {
+    content: '"';
+    position: absolute;
+    top: 10px;
+    right: 20px;
+    font-size: 80px;
+    opacity: 0.1;
+    font-family: serif;
+  }
+
+  .quote-box p {
+    font-size: 18px !important;
+    color: rgba(255,255,255,0.9) !important;
+    font-weight: 400;
+    line-height: 1.8 !important;
+  }
+
+  .quote-box .quote-author {
+    font-size: 14px !important;
+    color: rgba(255,255,255,0.5) !important;
+    margin-top: 16px !important;
+  }
+
+  /* ===== USE CASE CARDS ===== */
+  .usecase {
+    background: var(--gray-100);
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 16px;
+    border-right: 4px solid;
+  }
+
+  .usecase h4 {
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .usecase p { font-size: 14px !important; }
+
+  .usecase.influencer { border-color: var(--accent); }
+  .usecase.brand { border-color: var(--pink); }
+  .usecase.agency { border-color: var(--green); }
+
+  .usecase-tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .usecase.influencer .usecase-tag { background: #ede9fe; color: var(--accent); }
+  .usecase.brand .usecase-tag { background: #fce7f3; color: var(--pink); }
+  .usecase.agency .usecase-tag { background: #dcfce7; color: #15803d; }
+
+  /* ===== TECH PILLS ===== */
+  .tech-stack {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 20px 0;
+  }
+
+  .tech-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 100px;
+    background: var(--gray-100);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--gray-600);
+  }
+
+  .tech-pill span { font-size: 16px; }
+
+  /* ===== CTA ===== */
+  .cta-section {
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+    color: white;
+    padding: 52px 40px;
+    text-align: center;
+  }
+
+  .cta-section h2 {
+    font-size: 32px;
+    font-weight: 900;
+    margin-bottom: 16px;
+    color: white;
+  }
+
+  .cta-section p {
+    font-size: 17px !important;
+    color: rgba(255,255,255,0.85) !important;
+    max-width: 440px;
+    margin: 0 auto 28px;
+  }
+
+  .cta-button {
+    display: inline-block;
+    background: white;
+    color: var(--accent);
+    padding: 14px 40px;
+    border-radius: 100px;
+    font-size: 16px;
+    font-weight: 700;
+    text-decoration: none;
+    transition: transform 0.2s;
+  }
+
+  .cta-button:hover { transform: scale(1.05); }
+
+  /* ===== FOOTER ===== */
+  .footer {
+    padding: 32px 40px;
+    text-align: center;
+    border-top: 1px solid var(--gray-200);
+  }
+
+  .footer p {
+    font-size: 13px !important;
+    color: var(--gray-400) !important;
+  }
+
+  .footer-logo {
+    font-size: 20px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+    color: var(--black);
+  }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width: 600px) {
+    .hero { padding: 40px 24px 36px; }
+    .hero h1 { font-size: 32px; }
+    .section { padding: 36px 24px; }
+    .feature-grid { grid-template-columns: 1fr; }
+    .stats-row { grid-template-columns: 1fr; }
+    .cta-section { padding: 40px 24px; }
+  }
+
+  /* ===== DIVIDER ===== */
+  .mini-divider {
+    width: 60px;
+    height: 3px;
+    background: linear-gradient(to left, var(--accent), var(--purple));
+    border-radius: 3px;
+    margin: 20px 0;
+  }
+
+  /* ===== COMPARISON TABLE ===== */
+  .comparison {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0;
+    font-size: 14px;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .comparison th {
+    background: var(--black);
+    color: white;
+    padding: 14px 18px;
+    text-align: right;
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  .comparison td {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--gray-200);
+    color: var(--gray-600);
+  }
+
+  .comparison tr:last-child td { border-bottom: none; }
+  .comparison tr:nth-child(even) td { background: var(--gray-100); }
+
+  .check { color: var(--green); font-weight: 700; font-size: 18px; }
+  .cross { color: #ef4444; font-size: 18px; }
+</style>
+</head>
+<body>
+
+<div class="newsletter">
+
+  <!-- ========== HERO ========== -->
+  <div class="hero">
+    <div class="hero-content">
+      <div class="hero-badge">LDRS INTERNAL &nbsp;|&nbsp; NEWSLETTER #1</div>
+      <h1>הכירו את המערכת<br>שמשנה את הכללים</h1>
+      <p>הפלטפורמה שבנינו לא סתם עוד כלי ניהול.<br>זה מנוע AI שלם שמבין אינפלואנסרים<br>ועושה להם את העבודה.</p>
+      <div class="hero-date">מרץ 2026 &nbsp;&middot;&nbsp; גרסה פנימית</div>
+    </div>
+  </div>
+
+  <!-- ========== INTRO ========== -->
+  <div class="section">
+    <span class="section-label">בואו נתחיל מההתחלה</span>
+    <h2>אז מה זה בכלל? 🤔</h2>
+    <div class="mini-divider"></div>
+    <p class="intro-text">
+      תחשבו על אינפלואנסר שמקבל מאות הודעות ביום. "מאיפה הטופ?", "יש קוד הנחה?", "כמה עולה שיתוף פעולה?" — <span class="highlight-word">אותן שאלות שוב ושוב ושוב.</span>
+    </p>
+    <p>
+      המערכת שלנו לוקחת את כל התוכן של האינפלואנסר — פוסטים, סטוריז, סרטונים, הסכמי שת"פ, קופונים — ויוצרת ממנו <strong>צ'אטבוט AI שמדבר בדיוק כמו האינפלואנסר.</strong> הוא מכיר את כל המוצרים, יודע את כל הקופונים, ועונה ללקוחות 24/7.
+    </p>
+    <p>
+      אבל זה רק ההתחלה. המערכת היא למעשה <strong>מרכז פיקוד עסקי שלם</strong> — ניהול שת"פים, מעקב הכנסות, ניתוח קהלים, פירסור חוזים אוטומטי, ועוד.
+    </p>
+  </div>
+
+  <!-- ========== CORE FEATURES ========== -->
+  <div class="section">
+    <span class="section-label">הלב של המערכת</span>
+    <h2>הפיצ'רים המרכזיים</h2>
+    <div class="mini-divider"></div>
+
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon icon-purple">🤖</div>
+        <h3>צ'אטבוט AI חכם</h3>
+        <p>לומד את סגנון הדיבור מתוך התוכן האמיתי. לא גנרי — מדבר ממש כמו האינפלואנסר. תומך בעברית, אנגלית, ערבית ורוסית.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon icon-blue">📱</div>
+        <h3>סריקת אינסטגרם</h3>
+        <p>סורק פוסטים, סטוריז, האיילייטס, רילס ותגובות. מתמלל סרטונים אוטומטית. מתעדכן מדי יום בתוכן חדש.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon icon-pink">📄</div>
+        <h3>פירסור מסמכים חכם</h3>
+        <p>מעלים הסכם שת"פ ← המערכת קוראת אותו ← יוצרת שת"פ אוטומטי עם כל הפרטים. PDF, Word, Excel, תמונות — הכל עובד.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon icon-green">🎫</div>
+        <h3>קופונים ו-ROI</h3>
+        <p>ניהול קופונים עם מעקב שימוש בזמן אמת. חישוב ROI אוטומטי, יחס המרה, ותרשימי ביצועים לאורך זמן.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon icon-orange">🤝</div>
+        <h3>ניהול שיתופי פעולה</h3>
+        <p>Pipeline ויזואלי מטיוטה ועד סיום. ספריית מסמכים, לוח שנה עם דדליינים, ומעקב הכנסות חודשי.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon icon-indigo">📊</div>
+        <h3>אנליטיקס מלא</h3>
+        <p>4 דאשבורדים: קהלים, שת"פים, שיחות וקופונים. גרפים, טרנדים ותובנות — הכל מרוכז במקום אחד.</p>
+      </div>
+
+      <div class="feature-card full-width">
+        <div class="feature-icon icon-purple">🌐</div>
+        <h3>וידג'ט לאתרים</h3>
+        <p>שורת קוד אחת — והצ'אטבוט מותקן באתר הלקוח. סורק את כל האתר, לומד את התוכן, ועונה ללקוחות בצורה חכמה. מותאם אישית בצבעי המותג.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== HOW IT WORKS ========== -->
+  <div class="section">
+    <span class="section-label">מאחורי הקלעים</span>
+    <h2>איך זה עובד? (בפשטות)</h2>
+    <div class="mini-divider"></div>
+    <p>מרגע שמוסיפים אינפלואנסר חדש, המערכת עושה הכל לבד:</p>
+
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-number">1</div>
+        <div class="flow-content">
+          <h4>סריקת אינסטגרם</h4>
+          <p>50+ פוסטים אחרונים, האיילייטס, סרטונים, תגובות — הכל נאסף תוך דקות</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-number">2</div>
+        <div class="flow-content">
+          <h4>תמלול ועיבוד</h4>
+          <p>סרטונים מתומללים, תמונות נסרקות, טקסטים מנותחים — הכל הופך לידע מובנה</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-number">3</div>
+        <div class="flow-content">
+          <h4>בניית פרסונה</h4>
+          <p>AI מנתח את כל התוכן ובונה פרופיל אישיות מפורט — סגנון דיבור, נושאים, ערכים</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-number">4</div>
+        <div class="flow-content">
+          <h4>העשרה חכמה</h4>
+          <p>תרגום, סיכומים, שאלות סינתטיות — כל פיסת מידע מועשרת כדי שהחיפוש יהיה מדויק יותר</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-number">5</div>
+        <div class="flow-content">
+          <h4>הצ'אטבוט חי! 🎉</h4>
+          <p>עמוד צ'אט מוכן, וידג'ט מוטמע, חיבור ל-DM באינסטגרם — הכל עובד</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== THE AI MAGIC ========== -->
+  <div class="section">
+    <span class="section-label">הקסם האמיתי</span>
+    <h2>מה שעושה את הצ'אטבוט שלנו מיוחד</h2>
+    <div class="mini-divider"></div>
+
+    <div class="quote-box">
+      <p>אנחנו לא סתם מחפשים תשובות בטקסט. המערכת משתמשת ב-4 שכבות חיפוש חכם — כולל AI שמחליט בזמן אמת איזה מידע נוסף צריך כדי לתת את התשובה הכי מדויקת.</p>
+      <p class="quote-author">Hybrid Multi-Stage Retrieval — הטכנולוגיה שמפרידה אותנו מכולם</p>
+    </div>
+
+    <table class="comparison">
+      <tr>
+        <th>תכונה</th>
+        <th>המערכת שלנו</th>
+        <th>מתחרים</th>
+      </tr>
+      <tr>
+        <td>אישיות הבוט</td>
+        <td><span class="check">✓</span> נלמד מתוכן אמיתי</td>
+        <td><span class="cross">✗</span> תבניות גנריות</td>
+      </tr>
+      <tr>
+        <td>חיפוש מידע</td>
+        <td><span class="check">✓</span> 4 שכבות חכמות</td>
+        <td><span class="cross">✗</span> הכל או כלום</td>
+      </tr>
+      <tr>
+        <td>פירסור חוזים</td>
+        <td><span class="check">✓</span> AI + 4 שפות</td>
+        <td><span class="cross">✗</span> הזנה ידנית</td>
+      </tr>
+      <tr>
+        <td>DM באינסטגרם</td>
+        <td><span class="check">✓</span> מענה אוטומטי + תפריט</td>
+        <td><span class="cross">✗</span> ידני או חסר</td>
+      </tr>
+      <tr>
+        <td>End-to-End</td>
+        <td><span class="check">✓</span> סריקה → AI → צ'אט → שת"פ → ROI</td>
+        <td><span class="cross">✗</span> כלים מפוזרים</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ========== NUMBERS ========== -->
+  <div class="section">
+    <span class="section-label">במספרים</span>
+    <h2>מספרים שכדאי לדעת</h2>
+    <div class="mini-divider"></div>
+
+    <div class="stats-row">
+      <div class="stat-box">
+        <div class="stat-number purple">75%</div>
+        <div class="stat-label">חיסכון בעלויות AI</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-number green">24h</div>
+        <div class="stat-label">אונבורדינג מלא</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-number pink">24/7</div>
+        <div class="stat-label">מענה אוטומטי</div>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-box">
+        <div class="stat-number purple">4</div>
+        <div class="stat-label">שפות נתמכות</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-number green">&lt;10s</div>
+        <div class="stat-label">מהעלאה לפירסור מסמך</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-number pink">85%+</div>
+        <div class="stat-label">דיוק פירסור AI</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== USE CASES ========== -->
+  <div class="section">
+    <span class="section-label">למי זה מתאים</span>
+    <h2>שלושה סוגי לקוחות, מערכת אחת</h2>
+    <div class="mini-divider"></div>
+
+    <div class="usecase influencer">
+      <span class="usecase-tag">אינפלואנסר</span>
+      <h4>"אני לא מספיק לענות לכולם"</h4>
+      <p>הצ'אטבוט עונה בשמך, ממליץ על מוצרים עם קופונים, ומנהל את כל השת"פים שלך — חוזים, דדליינים, הכנסות. אתה יוצר תוכן, המערכת עושה את השאר.</p>
+    </div>
+
+    <div class="usecase brand">
+      <span class="usecase-tag">מותג</span>
+      <h4>"אנחנו רוצים למצוא את האינפלואנסר הנכון"</h4>
+      <p>מערכת Discovery חכמה שמתאימה אינפלואנסרים לפי קטגוריה, קהל ותחום. בנוסף — ROI בזמן אמת, מעקב קופונים, ודוחות ביצוע שקופים.</p>
+    </div>
+
+    <div class="usecase agency">
+      <span class="usecase-tag">סוכנות / Agent</span>
+      <h4>"אנחנו מנהלים 20 אינפלואנסרים"</h4>
+      <p>דאשבורד מרכזי לכל האינפלואנסרים, ניהול קמפיינים חוצי-חשבונות, תזכורות אוטומטיות על דדליינים, ודוחות ביצוע מרוכזים.</p>
+    </div>
+  </div>
+
+  <!-- ========== TECH STACK ========== -->
+  <div class="section">
+    <span class="section-label">מה מתחת למכסה</span>
+    <h2>הטכנולוגיה (לחנונים שבנו 🤓)</h2>
+    <div class="mini-divider"></div>
+    <p>המערכת בנויה על הטכנולוגיות הכי מתקדמות בשוק:</p>
+
+    <div class="tech-stack">
+      <div class="tech-pill"><span>⚡</span> Next.js 16</div>
+      <div class="tech-pill"><span>🔷</span> TypeScript</div>
+      <div class="tech-pill"><span>🎨</span> Tailwind CSS 4</div>
+      <div class="tech-pill"><span>🗄️</span> Supabase</div>
+      <div class="tech-pill"><span>🚀</span> Vercel Edge</div>
+      <div class="tech-pill"><span>🧠</span> GPT-5.4</div>
+      <div class="tech-pill"><span>✨</span> Gemini 3 Flash</div>
+      <div class="tech-pill"><span>🔴</span> Upstash Redis</div>
+    </div>
+
+    <p>אבטחה ברמה הכי גבוהה — Row-Level Security בכל טבלה, Rate Limiting על כל endpoint, הרשאות 4 רמות (Admin → Agent → Influencer → Follower), ואימות HMAC לכל webhook.</p>
+  </div>
+
+  <!-- ========== DAILY AUTOMATION ========== -->
+  <div class="section">
+    <span class="section-label">עובד בשקט ברקע</span>
+    <h2>אוטומציות שרצות כל יום</h2>
+    <div class="mini-divider"></div>
+    <p>המערכת לא ישנה. ברקע רצים תהליכים אוטומטיים:</p>
+
+    <div class="feature-grid">
+      <div class="feature-card">
+        <h3>🕐 01:00 — סריקה יומית</h3>
+        <p>בודקת תוכן חדש באינסטגרם לכל החשבונות, מתמללת סרטונים חדשים, ומעדכנת את בסיס הידע.</p>
+      </div>
+      <div class="feature-card">
+        <h3>🕑 02:00 — עדכון פרסונה</h3>
+        <p>מרעננת את פרופיל האישיות על בסיס התוכן החדש שנסרק.</p>
+      </div>
+      <div class="feature-card full-width">
+        <h3>🕕 06:00 — ניתוח שיחות</h3>
+        <p>מנתחת את כל השיחות שהתנהלו ביום הקודם — מה שאלו, מה עבד, איפה היו בעיות. תובנות שעוזרות לשפר את הבוט כל הזמן.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== ELEVATOR PITCH ========== -->
+  <div class="section" style="background: var(--gray-100);">
+    <span class="section-label">אלבטור פיץ׳</span>
+    <h2>איך מסבירים את זה ב-30 שניות?</h2>
+    <div class="mini-divider"></div>
+
+    <div class="quote-box">
+      <p>
+        "אנחנו בונים מערכת AI שהופכת את האינפלואנסר למותג דיגיטלי שלם.
+        <br><br>
+        הבוט שלנו לומד מתוך התוכן האמיתי — פוסטים, סרטונים, סטוריז — ויודע לדבר בדיוק כמו האינפלואנסר. הוא עונה ללקוחות, ממליץ על מוצרים, מספק קופונים, ומנהל שיחות 24/7.
+        <br><br>
+        מעבר לצ'אט, המערכת מנהלת שת"פים, פורסרת חוזים אוטומטית, עוקבת אחרי ROI, ונותנת אנליטיקס מלא. הכל במקום אחד."
+      </p>
+    </div>
+  </div>
+
+  <!-- ========== CTA ========== -->
+  <div class="cta-section">
+    <h2>רוצים לראות את זה בפעולה?</h2>
+    <p>תאמו הדגמה עם הצוות או שחקו עם אחד הבוטים של הלקוחות הקיימים.</p>
+    <a href="#" class="cta-button">בואו נדבר →</a>
+  </div>
+
+  <!-- ========== FOOTER ========== -->
+  <div class="footer">
+    <div class="footer-logo">LDRS</div>
+    <p>Leaders Influencer Platform &nbsp;&middot;&nbsp; Internal Newsletter &nbsp;&middot;&nbsp; March 2026</p>
+    <p style="margin-top: 8px;">For LDRS team eyes only 👀</p>
+  </div>
+
+</div>
+
+</body>
+</html>

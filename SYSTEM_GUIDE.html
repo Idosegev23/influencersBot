@@ -1,0 +1,2674 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bestie · System Guide · מדריך מערכת מלא</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+<style>
+:root {
+  --bg: #0b0d12;
+  --bg-2: #11141b;
+  --bg-3: #181c25;
+  --surface: #1c2029;
+  --border: #2a2f3a;
+  --text: #e6e8ee;
+  --text-dim: #9ba3b4;
+  --text-muted: #6b7488;
+  --accent: #7c5cff;
+  --accent-2: #4ad0ff;
+  --accent-3: #ff6b9d;
+  --green: #3ddc84;
+  --orange: #ffa657;
+  --red: #ff5d6c;
+  --yellow: #ffd166;
+  --code-bg: #0f1218;
+  --shadow: 0 6px 24px rgba(0,0,0,.35);
+  --radius: 12px;
+}
+[data-theme="light"] {
+  --bg: #f7f8fb;
+  --bg-2: #ffffff;
+  --bg-3: #eef0f5;
+  --surface: #ffffff;
+  --border: #e3e6ee;
+  --text: #1a1d27;
+  --text-dim: #4a5266;
+  --text-muted: #777f93;
+  --code-bg: #1a1d27;
+  --shadow: 0 6px 24px rgba(20,24,40,.08);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: 'Heebo', 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+  font-size: 16px;
+  min-height: 100vh;
+}
+.layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 0;
+  min-height: 100vh;
+}
+@media (max-width: 980px) { .layout { grid-template-columns: 1fr; } .sidebar { display: none; } .sidebar.open { display: block; position: fixed; inset: 0; z-index: 100; } }
+
+/* Sidebar */
+.sidebar {
+  background: var(--bg-2);
+  border-left: 1px solid var(--border);
+  padding: 24px 18px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+.sidebar h1 {
+  font-size: 22px;
+  font-weight: 800;
+  margin: 0 0 6px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.sidebar .tagline { color: var(--text-muted); font-size: 13px; margin-bottom: 18px; }
+.sidebar .search {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  font-size: 14px;
+  margin-bottom: 18px;
+  font-family: inherit;
+}
+.sidebar nav ol { list-style: none; padding: 0; margin: 0; counter-reset: navc; }
+.sidebar nav ol li { counter-increment: navc; margin-bottom: 2px; }
+.sidebar nav ol li a {
+  display: block;
+  padding: 7px 10px;
+  border-radius: 6px;
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 13.5px;
+  transition: all .15s ease;
+}
+.sidebar nav ol li a:hover { background: var(--bg-3); color: var(--text); }
+.sidebar nav ol li a::before { content: counter(navc, decimal-leading-zero) "  ·  "; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+.sidebar nav ol li a.active { background: linear-gradient(135deg, rgba(124,92,255,.15), rgba(74,208,255,.10)); color: var(--text); border-right: 2px solid var(--accent); }
+
+/* Main */
+main { padding: 0 56px 80px; max-width: 1100px; }
+@media (max-width: 980px) { main { padding: 0 20px 60px; } }
+
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 0 12px;
+  background: linear-gradient(to bottom, var(--bg) 70%, transparent);
+  margin-bottom: 18px;
+}
+.topbar .badge {
+  background: var(--bg-3);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+.topbar .grow { flex: 1; }
+.topbar button {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.topbar button:hover { border-color: var(--accent); }
+
+/* Hero */
+.hero {
+  background: radial-gradient(ellipse at top right, rgba(124,92,255,.18), transparent 60%),
+              radial-gradient(ellipse at bottom left, rgba(74,208,255,.12), transparent 50%),
+              var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 40px 36px;
+  margin-bottom: 32px;
+}
+.hero .eyebrow { color: var(--accent-2); font-size: 13px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; }
+.hero h1 {
+  font-size: 44px;
+  font-weight: 800;
+  margin: 8px 0 14px;
+  background: linear-gradient(120deg, var(--text), var(--accent), var(--accent-2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.hero p { color: var(--text-dim); font-size: 17px; max-width: 720px; }
+.hero .pill-row { margin-top: 22px; display: flex; flex-wrap: wrap; gap: 8px; }
+.hero .pill {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Sections */
+section { margin: 56px 0; scroll-margin-top: 80px; }
+section h2 {
+  font-size: 30px;
+  font-weight: 800;
+  margin: 0 0 14px;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+section h2::before {
+  content: attr(data-num);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  color: var(--accent);
+  font-weight: 600;
+  background: rgba(124,92,255,.1);
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+section .lead {
+  color: var(--text-dim);
+  font-size: 16px;
+  margin-bottom: 22px;
+  max-width: 800px;
+}
+section h3 {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 32px 0 12px;
+  color: var(--text);
+}
+section h4 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 22px 0 8px;
+  color: var(--text);
+}
+p { color: var(--text); }
+
+/* Cards */
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 16px 0; }
+.card {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+}
+.card h4 { margin-top: 0; color: var(--accent-2); }
+.card .meta { color: var(--text-muted); font-size: 12px; font-family: 'JetBrains Mono', monospace; }
+.card.glow { background: linear-gradient(135deg, rgba(124,92,255,.08), rgba(74,208,255,.04)); border-color: rgba(124,92,255,.3); }
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  font-size: 14px;
+}
+thead { background: var(--bg-3); }
+th, td { padding: 10px 14px; text-align: right; border-bottom: 1px solid var(--border); }
+th { font-weight: 600; color: var(--text); }
+tbody tr:hover { background: rgba(124,92,255,.04); }
+tbody tr:last-child td { border-bottom: none; }
+td code { background: var(--bg-3); padding: 2px 6px; border-radius: 4px; font-size: 12.5px; color: var(--accent-2); }
+
+/* Code */
+pre { background: var(--code-bg) !important; border: 1px solid var(--border); border-radius: var(--radius); padding: 16px !important; overflow-x: auto; font-size: 13px; direction: ltr; text-align: left; }
+code { font-family: 'JetBrains Mono', 'Menlo', monospace; }
+:not(pre) > code { background: var(--bg-3); padding: 2px 6px; border-radius: 4px; font-size: 13px; color: var(--accent-2); }
+
+/* Mermaid wrapper */
+.mermaid-wrap {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin: 16px 0;
+  text-align: center;
+  overflow-x: auto;
+  direction: ltr;
+}
+
+/* Callouts */
+.callout {
+  border-right: 4px solid var(--accent);
+  background: rgba(124,92,255,.06);
+  padding: 14px 18px;
+  border-radius: 8px;
+  margin: 14px 0;
+}
+.callout.warn { border-color: var(--orange); background: rgba(255,166,87,.06); }
+.callout.danger { border-color: var(--red); background: rgba(255,93,108,.06); }
+.callout.success { border-color: var(--green); background: rgba(61,220,132,.06); }
+.callout.tip { border-color: var(--accent-2); background: rgba(74,208,255,.05); }
+.callout strong { display: block; margin-bottom: 4px; font-size: 13.5px; color: var(--text); }
+
+/* Stats grid */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap: 12px; margin: 18px 0; }
+.stat {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  text-align: center;
+}
+.stat .num { font-size: 28px; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.stat .label { color: var(--text-muted); font-size: 12px; margin-top: 4px; }
+
+/* Tabs */
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin: 16px 0; flex-wrap: wrap; }
+.tabs button {
+  background: transparent;
+  color: var(--text-dim);
+  border: none;
+  padding: 10px 14px;
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tabs button.active { color: var(--accent-2); border-bottom-color: var(--accent-2); }
+.tab-pane { display: none; padding: 12px 0; }
+.tab-pane.active { display: block; }
+
+/* Details */
+details {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin: 8px 0;
+}
+details[open] { background: var(--bg-3); }
+details summary { cursor: pointer; font-weight: 600; padding: 4px 0; outline: none; }
+details summary:hover { color: var(--accent-2); }
+
+/* Footer */
+.footer {
+  margin-top: 60px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border); }
+
+/* Highlight match */
+.hl-match { background: rgba(255,209,102,.25); padding: 1px 3px; border-radius: 3px; }
+.hidden-by-search { display: none !important; }
+
+/* Hebrew/English mixed support */
+.ltr { direction: ltr; text-align: left; }
+
+/* Mobile menu button */
+.menu-btn { display: none; }
+@media (max-width: 980px) { .menu-btn { display: inline-flex; } }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar">
+    <h1>Bestie</h1>
+    <div class="tagline">מדריך מערכת מלא · System Guide</div>
+    <input class="search" id="navSearch" type="text" placeholder="🔍 חיפוש בתוכן..." />
+    <nav>
+      <ol id="navList">
+        <li><a href="#what">מה זה Bestie</a></li>
+        <li><a href="#stack">Tech Stack</a></li>
+        <li><a href="#repo">מבנה הריפו</a></li>
+        <li><a href="#arch">ארכיטקטורה כללית</a></li>
+        <li><a href="#types">סוגי חשבונות</a></li>
+        <li><a href="#routes">דפים ו-Routes</a></li>
+        <li><a href="#api">API Surface</a></li>
+        <li><a href="#components">Components</a></li>
+        <li><a href="#lib">Library Catalog</a></li>
+        <li><a href="#engines">Engines Pipeline</a></li>
+        <li><a href="#chat">Chat Pipeline</a></li>
+        <li><a href="#rag">RAG Pipeline</a></li>
+        <li><a href="#scraping">Scraping</a></li>
+        <li><a href="#persona">Personas</a></li>
+        <li><a href="#ldrs">LDRS Conference</a></li>
+        <li><a href="#handoff">WhatsApp Handoff</a></li>
+        <li><a href="#analytics">Analytics</a></li>
+        <li><a href="#widget">Widget</a></li>
+        <li><a href="#db">Database Schema</a></li>
+        <li><a href="#cron">Cron Jobs</a></li>
+        <li><a href="#env">Environment Vars</a></li>
+        <li><a href="#scripts">Scripts</a></li>
+        <li><a href="#deploy">Build · Deploy</a></li>
+        <li><a href="#setup">Setup מקומי</a></li>
+        <li><a href="#troubleshoot">Troubleshooting</a></li>
+        <li><a href="#security">Security & Compliance</a></li>
+        <li><a href="#performance">Performance & Scale</a></li>
+        <li><a href="#pitfalls">Pitfalls & Learnings</a></li>
+        <li><a href="#onboard">Onboarding Checklist</a></li>
+      </ol>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <span class="badge">📅 עודכן: 2026-04-29</span>
+      <span class="badge">v1.0</span>
+      <div class="grow"></div>
+      <button class="menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+      <button onclick="toggleTheme()">🌓 ערכת נושא</button>
+      <button onclick="window.print()">🖨 הדפסה</button>
+    </div>
+
+    <div class="hero">
+      <div class="eyebrow">Multi-tenant SaaS · Influencer Platform</div>
+      <h1>Bestie · מדריך המערכת המלא</h1>
+      <p>פלטפורמת SaaS multi-tenant שנותנת לכל "חשבון" (אינפלואנסר, מותג, סוכנות, אתר חדשות, ספק שירות) צ'אטבוט מותאם אישית - מבוסס על בסיס ידע שנבנה מאינסטגרם, אתר, שותפויות, ומסמכים שהועלו. מדריך זה מכסה את כל המערכת: מהקוד, דרך ה-DB, ועד pitfalls ב-production.</p>
+      <div class="pill-row">
+        <span class="pill">Next.js 16</span>
+        <span class="pill">React 19</span>
+        <span class="pill">TypeScript</span>
+        <span class="pill">Supabase</span>
+        <span class="pill">OpenAI GPT-5.4</span>
+        <span class="pill">Gemini 3 Flash</span>
+        <span class="pill">Claude</span>
+        <span class="pill">Upstash Redis</span>
+        <span class="pill">Tailwind 4</span>
+        <span class="pill">Vercel</span>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="num">140+</div><div class="label">API Routes</div></div>
+        <div class="stat"><div class="num">200+</div><div class="label">React Components</div></div>
+        <div class="stat"><div class="num">180+</div><div class="label">Library Files</div></div>
+        <div class="stat"><div class="num">38</div><div class="label">DB Migrations</div></div>
+        <div class="stat"><div class="num">11</div><div class="label">Cron Jobs</div></div>
+        <div class="stat"><div class="num">76</div><div class="label">CLI Scripts</div></div>
+      </div>
+    </div>
+
+<section id="what">
+  <h2 data-num="01">מה זה Bestie</h2>
+  <p class="lead">פלטפורמת SaaS multi-tenant שנותנת לכל "חשבון" צ'אטבוט מותאם, עם בסיס ידע שנבנה אוטומטית מאינסטגרם, אתר, שותפויות ומסמכים.</p>
+
+  <div class="cards">
+    <div class="card">
+      <h4>🎯 לכל חשבון יש</h4>
+      <ul>
+        <li>URL ציבורי: <code>bestie.ldrsgroup.com/chat/{username}</code></li>
+        <li>archetype (influencer · brand · service_provider · media_news...)</li>
+        <li>persona ייחודית (<code>chatbot_persona</code>)</li>
+        <li>RAG chunks מהתוכן שלהם</li>
+        <li>Widget שאפשר להטמיע באתר חיצוני</li>
+      </ul>
+    </div>
+    <div class="card glow">
+      <h4>🚀 הפריסה הראשית</h4>
+      <p><strong>LDRS</strong> עבור <strong>כנס Innovation 2026-04-30</strong> - חוויה אוצרת לסורקי QR עם פיצ'רים נוספים: תוכן IG חי, case studies, handoff ידני לאיתמר ב-WhatsApp.</p>
+    </div>
+    <div class="card">
+      <h4>🧩 רכיבים מרכזיים</h4>
+      <ul>
+        <li>צ'אט ציבורי (RAG hybrid)</li>
+        <li>דשבורד מנהל (admin panel)</li>
+        <li>דשבורד אינפלואנסר</li>
+        <li>Widget להטמעה</li>
+        <li>WhatsApp + Instagram DM אוטומטי</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="stack">
+  <h2 data-num="02">Tech Stack</h2>
+  <p class="lead">סטאק מודרני שמתמחה ב-AI-first, multi-tenant, edge-friendly.</p>
+
+  <table>
+    <thead><tr><th>שכבה</th><th>טכנולוגיה</th><th>הערות</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Runtime</strong></td><td>Node.js 24 · Next.js 16 (App Router)</td><td>TypeScript לאורך כל הקוד</td></tr>
+      <tr><td><strong>UI</strong></td><td>React 19 · Tailwind CSS 4 · framer-motion · lucide-react</td><td>RTL native</td></tr>
+      <tr><td><strong>Auth + DB</strong></td><td>Supabase (Postgres + Auth + RLS)</td><td>multi-tenant via RLS</td></tr>
+      <tr><td><strong>Cache</strong></td><td>Upstash Redis</td><td>rate-limit + L2 cache</td></tr>
+      <tr><td><strong>LLMs</strong></td><td>OpenAI GPT-5.4 · Gemini 3 Flash · Claude</td><td>chat / OCR / parser fallback</td></tr>
+      <tr><td><strong>Embeddings</strong></td><td>OpenAI text-embedding-3-large</td><td>2000 dims</td></tr>
+      <tr><td><strong>Search</strong></td><td>pgvector + FTS hybrid</td><td>BM25 + cosine</td></tr>
+      <tr><td><strong>Scraping</strong></td><td>ScrapeCreators (IG) · cheerio (websites)</td><td>websites local-only</td></tr>
+      <tr><td><strong>Email</strong></td><td>Gmail API + Google service account</td><td>impersonates bestie@ldrsgroup.com</td></tr>
+      <tr><td><strong>Storage</strong></td><td>Supabase Storage + Google Drive</td><td>media + lead briefs</td></tr>
+      <tr><td><strong>Webhooks</strong></td><td>WhatsApp Cloud · IG Graph · Make.com</td><td></td></tr>
+      <tr><td><strong>Hosting</strong></td><td>Vercel (with cron)</td><td>Pro tier (maxDuration=60)</td></tr>
+      <tr><td><strong>Analytics</strong></td><td>GA4 · Meta Pixel · TikTok Pixel + CAPI</td><td>direct (no GTM)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Dependencies מרכזיות (package.json)</h3>
+  <div class="cards">
+    <div class="card"><h4>AI</h4><div class="meta">@google/genai · @google/generative-ai · openai (6.27.0)</div></div>
+    <div class="card"><h4>DB</h4><div class="meta">@supabase/supabase-js (2.89.0) · @upstash/redis (1.36.0)</div></div>
+    <div class="card"><h4>Scraping</h4><div class="meta">apify-client (2.21.0) · cheerio (1.2.0)</div></div>
+    <div class="card"><h4>UI</h4><div class="meta">tailwindcss 4 · framer-motion (12.23) · recharts (3.6) · lucide-react (0.562)</div></div>
+    <div class="card"><h4>3D</h4><div class="meta">@react-three/fiber · drei · rapier (physics) · three (0.184)</div></div>
+    <div class="card"><h4>Documents</h4><div class="meta">pdf-parse · xlsx · googleapis (170.1)</div></div>
+    <div class="card"><h4>Testing</h4><div class="meta">Vitest 2.0 · Playwright · @testing-library/react</div></div>
+  </div>
+</section>
+
+<section id="repo">
+  <h2 data-num="03">מבנה הריפו</h2>
+  <p class="lead">תיקיות root level - מה יש איפה ולמה.</p>
+  <pre><code class="language-bash">.
+├── src/
+│   ├── app/                  Next.js App Router (pages + API)
+│   ├── components/           React UI components (200+ files)
+│   ├── engines/              Pipeline engines (understanding, decision, policy, state machine)
+│   ├── lib/                  Shared utilities, integrations, business logic (180+ files)
+│   ├── hooks/                React hooks (chat streaming, etc.)
+│   └── types/                Shared TS types
+├── public/                   Static assets + widget.js
+├── scripts/                  One-off / cron / ingest scripts (76 files)
+├── supabase/                 Supabase migrations (38 files)
+├── memory-bank/              Living docs (systemPatterns, techContext, etc.)
+├── tests/                    Vitest unit tests + Playwright E2E
+├── ANALYTICS.md              Pixel event matrix (PPC handoff)
+├── CLAUDE.md                 Instructions for Claude Code
+├── HYBRID_RETRIEVAL.md       Deep-dive on the chat retrieval strategy
+├── ROLLOUT_PLAN.md           Production rollout checklist
+├── vercel.json               Cron schedule + project config
+└── package.json              Dependencies + npm scripts</code></pre>
+
+  <h3>קבצי תיעוד ב-root</h3>
+  <table>
+    <thead><tr><th>קובץ</th><th>גודל</th><th>תיאור</th></tr></thead>
+    <tbody>
+      <tr><td><code>CLAUDE.md</code></td><td>—</td><td>הנחיות ל-Claude Code (commands, architecture)</td></tr>
+      <tr><td><code>DEVELOPER_GUIDE.md</code></td><td>49KB</td><td>הפניית פיתוח מקיפה</td></tr>
+      <tr><td><code>ANALYTICS.md</code></td><td>20KB</td><td>מטריצת events ל-GA4 + Meta + TikTok</td></tr>
+      <tr><td><code>HYBRID_RETRIEVAL.md</code></td><td>8.5KB</td><td>שיטת ה-retrieval ב-4 שלבים</td></tr>
+      <tr><td><code>ROLLOUT_PLAN.md</code></td><td>4KB</td><td>נוהל rollout ל-production</td></tr>
+      <tr><td><code>CURRENT_STATE.md</code></td><td>—</td><td>סטטוס נוכחי + bugs ידועים</td></tr>
+      <tr><td><code>FEATURE_DECK.md</code></td><td>—</td><td>פיצ'רים + product positioning</td></tr>
+      <tr><td><code>INSTAGRAM_DM_INTEGRATION_PLAN.md</code></td><td>—</td><td>זרימת DM</td></tr>
+      <tr><td><code>ONBOARDING_PROCESS.md</code></td><td>—</td><td>תהליך הרשמה</td></tr>
+      <tr><td><code>OPENAI_USAGE_MAP.md</code></td><td>—</td><td>שימושי OpenAI לפי מודול</td></tr>
+      <tr><td><code>PIPELINE_STATUS.md</code></td><td>—</td><td>מטריקות ו-bottlenecks</td></tr>
+      <tr><td><code>WHATSAPP_MIGRATION_GUIDE.md</code></td><td>—</td><td>מעבר ל-WhatsApp Cloud API</td></tr>
+    </tbody>
+  </table>
+
+  <h3>memory-bank/ (תיעוד חי)</h3>
+  <table>
+    <thead><tr><th>קובץ</th><th>גודל</th><th>מטרה</th></tr></thead>
+    <tbody>
+      <tr><td><code>README.md</code></td><td>—</td><td>אינדקס</td></tr>
+      <tr><td><code>systemPatterns.md</code></td><td>12KB</td><td>החלטות ארכיטקטוניות, RBAC, patterns</td></tr>
+      <tr><td><code>techContext.md</code></td><td>10KB</td><td>פרטי DB schema, API overview</td></tr>
+      <tr><td><code>activeContext.md</code></td><td>13KB</td><td>סטטוס נוכחי, work in progress</td></tr>
+      <tr><td><code>progress.md</code></td><td>27KB</td><td>milestones, lessons learned</td></tr>
+      <tr><td><code>productContext.md</code></td><td>9KB</td><td>פיצ'רים, user stories</td></tr>
+      <tr><td><code>projectbrief.md</code></td><td>6KB</td><td>מטרות עסקיות</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="arch">
+  <h2 data-num="04">ארכיטקטורה כללית</h2>
+  <p class="lead">המבט מלמעלה: איך הודעת מבקר זורמת מהדפדפן עד התשובה, דרך כל ה-services.</p>
+
+  <div class="mermaid-wrap">flowchart LR
+    Visitor(["Visitor"]) -->|"/chat/{u}"| Page["Next.js page"]
+    Page -->|"useStreamChat"| Stream["/api/chat/stream"]
+    Stream --> Engines{Engines}
+    Engines -->|"intent / risk"| Understanding[Understanding]
+    Engines -->|"route + policy"| Decision[Decision]
+    Engines -->|"rate / safety"| Policy[Policy]
+    Stream --> Sandwich["SandwichBot"]
+    Sandwich --> Hybrid["Hybrid retrieval (4 stages)"]
+    Hybrid -->|"FTS + vector"| Supabase[(Supabase)]
+    Sandwich -->|"prompt"| LLM[(OpenAI GPT-5.4)]
+    LLM --> Stream
+    Stream -->|"SSE"| Page
+    Page -->|"track()"| Pixels{{GA4 / Meta / TikTok}}
+    Webhook[Webhooks] -->|"IG · WhatsApp · Respond.io"| Stream
+    Cron["Vercel cron"] -->|"daily scan / topics / cache"| Stream
+    subgraph Side
+      Drive[(Google Drive)]
+      Gmail[(Gmail)]
+      Make[(Make.com)]
+      Meta[(Meta CAPI)]
+      TikTok[(TikTok Events API)]
+    end
+    Stream --> Drive
+    Stream --> Gmail
+    Stream --> Make
+    Stream --> Meta
+    Stream --> TikTok</div>
+
+  <h3>עקרונות מנחים</h3>
+  <div class="cards">
+    <div class="card">
+      <h4>Multi-tenant מ-day 1</h4>
+      <p>כל טבלת domain מכילה <code>account_id</code>. RLS policies מסננות לפי <code>auth.uid()</code> שממופה ל-account. <code>SUPABASE_SERVICE_ROLE_KEY</code> עוקף RLS לצרכי שרת.</p>
+    </div>
+    <div class="card">
+      <h4>RAG-first</h4>
+      <p>כל תוכן עובר chunking + embedding + indexing. retrieval משלב vector + BM25 + grounded_facts.</p>
+    </div>
+    <div class="card">
+      <h4>Streaming everywhere</h4>
+      <p>SSE בצ'אט, after() ל-side effects (CAPI, Drive), אסור לעצור את הזרם בשביל פעולות איטיות.</p>
+    </div>
+    <div class="card">
+      <h4>Defensive trimming</h4>
+      <p>env vars מ-Vercel נוטים להגיע עם <code>\n</code> בסוף. תמיד <code>.trim()</code> בקריאה.</p>
+    </div>
+  </div>
+</section>
+
+<section id="types">
+  <h2 data-num="05">סוגי חשבונות (Account Types & Archetypes)</h2>
+  <p class="lead">שני צירים אורתוגונליים, שניהם מאוחסנים ב-<code>accounts.config</code>.</p>
+
+  <table>
+    <thead><tr><th><code>type</code></th><th><code>archetype</code></th><th>דוגמאות</th></tr></thead>
+    <tbody>
+      <tr><td>creator</td><td>influencer</td><td>אינפלואנסר אישי (food / beauty / fashion / fitness / parenting / travel / tech)</td></tr>
+      <tr><td>creator</td><td>brand</td><td>IG של מותג (Argania, Seacret)</td></tr>
+      <tr><td>creator</td><td>service_provider</td><td>סוכנות / איש מקצוע (LDRS)</td></tr>
+      <tr><td>creator</td><td>media_news</td><td>אתר חדשות, מונחה hot-topics</td></tr>
+      <tr><td>creator</td><td>local_business</td><td>חנות פיזית / עסק שירותים</td></tr>
+      <tr><td>creator</td><td>tech_creator</td><td>ביקורות, השוואות</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout tip">
+    <strong>מה ה-archetype משפיע עליו?</strong>
+    סט הטאבים (<code>generate-tab-config.ts</code>), הוראות הפרסונה (<code>baseArchetype.ts</code>), copy של welcome screen, starter pills ברירת מחדל.
+  </div>
+
+  <h3>InfluencerType (types/index.ts)</h3>
+  <pre class="ltr"><code class="language-typescript">type InfluencerType =
+  | 'food' | 'fashion' | 'tech' | 'lifestyle'
+  | 'fitness' | 'beauty' | 'parenting' | 'travel'
+  | 'home' | 'media_news' | 'other';
+
+type ContentItemType =
+  | 'recipe' | 'review' | 'recommendation' | 'look'
+  | 'outfit' | 'style_tip' | 'tutorial' | 'routine'
+  | 'tip' | 'moment' | 'story' | 'workout'
+  | 'motivation' | 'collaboration' | 'event'
+  | 'unboxing' | 'itinerary';</code></pre>
+</section>
+
+<section id="routes">
+  <h2 data-num="06">דפים ו-Routes</h2>
+  <p class="lead">כל ה-pages במערכת - ציבוריים, אדמין, אינפלואנסר.</p>
+
+  <div class="tabs" id="routesTabs">
+    <button class="active" onclick="activateTab('routesTabs',0)">ציבורי</button>
+    <button onclick="activateTab('routesTabs',1)">אינפלואנסר</button>
+    <button onclick="activateTab('routesTabs',2)">אדמין</button>
+    <button onclick="activateTab('routesTabs',3)">פנימי / Demo</button>
+  </div>
+
+  <div class="tab-pane active">
+    <table>
+      <thead><tr><th>Route</th><th>קובץ</th><th>מטרה</th></tr></thead>
+      <tbody>
+        <tr><td><code>/</code></td><td><code>app/page.tsx</code></td><td>Landing</td></tr>
+        <tr><td><code>/chat/[username]</code></td><td><code>app/chat/[username]/page.tsx</code></td><td><strong>חוויית הצ'אט הראשית</strong></td></tr>
+        <tr><td><code>/instagram/login</code></td><td><code>app/instagram/...</code></td><td>OAuth callback</td></tr>
+        <tr><td><code>/login</code></td><td><code>app/login/...</code></td><td>אימות אינפלואנסרים</td></tr>
+        <tr><td><code>/bestieai</code></td><td><code>app/bestieai/page.tsx</code></td><td>אתר שיווקי לפלטפורמה</td></tr>
+        <tr><td><code>/demo/[id]</code></td><td><code>app/demo/[id]/page.tsx</code></td><td>הדגמה read-only של צ'אט</td></tr>
+        <tr><td><code>/contact</code> · <code>/privacy</code> · <code>/terms</code></td><td>—</td><td>סטטיים</td></tr>
+        <tr><td><code>/widget-preview</code></td><td><code>app/widget-preview/page.tsx</code></td><td>בדיקת ה-widget</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="tab-pane">
+    <table>
+      <thead><tr><th>Route</th><th>מטרה</th></tr></thead>
+      <tbody>
+        <tr><td><code>/influencer/[u]/dashboard</code></td><td>דשבורד ראשי</td></tr>
+        <tr><td><code>/influencer/[u]/analytics</code></td><td>אנליטיקה ומטריקות</td></tr>
+        <tr><td><code>/influencer/[u]/chatbot-settings</code></td><td>הגדרות בוט</td></tr>
+        <tr><td><code>/influencer/[u]/chatbot-persona</code></td><td>עורך פרסונה</td></tr>
+        <tr><td><code>/influencer/[u]/bot-content</code></td><td>תוכן שהבוט מייצר</td></tr>
+        <tr><td><code>/influencer/[u]/documents</code></td><td>ניהול מסמכים (+upload, +review)</td></tr>
+        <tr><td><code>/influencer/[u]/partnerships</code></td><td>שותפויות עם מותגים</td></tr>
+        <tr><td><code>/influencer/[u]/coupons</code></td><td>ניהול קופונים</td></tr>
+        <tr><td><code>/influencer/[u]/conversations</code></td><td>היסטוריית DM</td></tr>
+        <tr><td><code>/influencer/[u]/settings</code></td><td>הגדרות משתמש</td></tr>
+        <tr><td><code>/influencer/[u]/support</code></td><td>פניות תמיכה</td></tr>
+        <tr><td><code>/influencer/[u]/manage</code></td><td>ניהול תוכן</td></tr>
+        <tr><td><code>/influencer/[u]/share</code></td><td>שיתוף ויצוא</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="tab-pane">
+    <table>
+      <thead><tr><th>Route</th><th>מטרה</th></tr></thead>
+      <tbody>
+        <tr><td><code>/admin</code></td><td>בית הדשבורד</td></tr>
+        <tr><td><code>/admin/dashboard</code></td><td>KPIs</td></tr>
+        <tr><td><code>/admin/accounts</code></td><td>ניהול חשבונות</td></tr>
+        <tr><td><code>/admin/add</code></td><td>הוספת חשבון חדש</td></tr>
+        <tr><td><code>/admin/influencers</code></td><td>רישום אינפלואנסרים</td></tr>
+        <tr><td><code>/admin/websites/[id]</code></td><td>הגדרות אתר + תצוגה מקדימה</td></tr>
+        <tr><td><code>/admin/onboarding</code></td><td>אשף הקמת חשבון</td></tr>
+        <tr><td><code>/admin/chatbot-persona/[accountId]</code></td><td>עורך פרסונה bulk</td></tr>
+        <tr><td><code>/admin/handoff</code></td><td>טוגל handoff לאיתמר (LDRS)</td></tr>
+        <tr><td><code>/admin/monitoring</code></td><td>בריאות מערכת</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="tab-pane">
+    <table>
+      <thead><tr><th>Route</th><th>מטרה</th></tr></thead>
+      <tbody>
+        <tr><td><code>/preview/lanyard</code></td><td>תצוגת רכיב 3D Lanyard</td></tr>
+        <tr><td><code>/preview/magic-bento</code></td><td>תצוגת bento-grid</td></tr>
+        <tr><td><code>/manage/[token]/*</code></td><td>גישת token מוטמעת לעריכת תוכן</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="api">
+  <h2 data-num="07">API Surface (140+ Endpoints)</h2>
+  <p class="lead">כל ה-API endpoints, מסודרים לפי domain. כל קובץ הוא <code>route.ts</code> ב-<code>src/app/api/...</code>.</p>
+
+  <div class="callout">
+    <strong>Conventions</strong>
+    <code>runtime = 'nodejs'</code> ל-routes שנוגעים ב-Supabase / Google APIs.<br>
+    <code>dynamic = 'force-dynamic'</code> בכל מקום - אף אחד לא cacheable סטטית.<br>
+    <code>maxDuration = 60</code> ב-routes ארוכים (LLM + email + Drive עם <code>after()</code>).
+  </div>
+
+  <div class="mermaid-wrap">flowchart TD
+    subgraph PublicChat["Public Chat"]
+      init["/api/chat/init"]
+      stream["/api/chat/stream"]
+      sandwich["/api/chat/sandwich"]
+      session["/api/chat/session"]
+      media["/api/chat/analyze-media"]
+      handoffI["/api/chat/handoff/itamar"]
+      handoffP["/api/chat/handoff/poll"]
+    end
+    subgraph Forms
+      leadGeneric["/api/chat/lead"]
+      briefs["/api/briefs"]
+      support["/api/support"]
+      leadConf["/api/leads/conference"]
+    end
+    subgraph Influencer["Influencer-facing"]
+      profile["/api/influencer/[u]"]
+      onboard["/api/influencer/onboard"]
+      scan["/api/influencer/scan"]
+      persona["/api/persona/rebuild"]
+      knowledge["/api/influencer/knowledge"]
+      docs["/api/influencer/documents"]
+      partnerships["/api/influencer/partnerships"]
+      coupons["/api/influencer/coupons"]
+    end
+    subgraph Webhooks
+      igWebhook["/api/webhooks/instagram"]
+      waWebhook["/api/webhooks/whatsapp"]
+      respondio["/api/webhooks/respondio"]
+    end
+    subgraph Admin
+      adminAccounts["/api/admin/accounts"]
+      adminScrape["/api/admin/scrape"]
+      adminFullScan["/api/admin/full-scan"]
+      adminHandoff["/api/admin/handoff"]
+    end
+    subgraph Cron
+      cronScan["daily-scan"]
+      cronPersona["daily-persona-update"]
+      cronAnalyze["analyze-conversations"]
+      cronHotTopics["compute-hot-topics"]
+      cronStories["poll-stories"]
+      cronCache["prewarm-cache"]
+      cronHealth["health-alerts"]
+      cronWeekly["weekly-digest"]
+      cronHandoff["handoff-fallback"]
+    end
+    subgraph Widget
+      widgetChat["/api/widget/chat"]
+      widgetCfg["/api/widget/config"]
+    end</div>
+
+  <details>
+    <summary><strong>Chat & Conversation</strong> · 12 endpoints</summary>
+    <ol>
+      <li><code>/api/chat</code> - הצ'אט הראשי (streaming)</li>
+      <li><code>/api/chat/stream</code> - SSE handler</li>
+      <li><code>/api/chat/hybrid</code> - hybrid multi-stage retrieval</li>
+      <li><code>/api/chat/sandwich</code> - sandwich bot (legacy)</li>
+      <li><code>/api/chat/lead</code> - איסוף ליד</li>
+      <li><code>/api/chat/analyze-media</code> - ניתוח תמונה/וידאו</li>
+      <li><code>/api/chat/init</code> - אתחול session</li>
+      <li><code>/api/chat/session/create</code> - יצירת session</li>
+      <li><code>/api/chat/session/validate</code> - אימות token</li>
+      <li><code>/api/chat/session/upgrade</code> - שדרוג session (email)</li>
+      <li><code>/api/chat/handoff/itamar</code> - handoff לאיתמר</li>
+      <li><code>/api/chat/handoff/poll</code> - polling סטטוס</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><strong>Influencer Profile & Auth</strong> · 7 endpoints</summary>
+    <ol>
+      <li><code>/api/influencer/[username]</code></li>
+      <li><code>/api/influencer/auth</code></li>
+      <li><code>/api/influencer/profile</code></li>
+      <li><code>/api/influencer/settings</code></li>
+      <li><code>/api/influencer/dashboard-stats</code></li>
+      <li><code>/api/influencer/dm-settings</code></li>
+      <li><code>/api/influencer/ldrs-foryou</code></li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><strong>Documents & Parsing</strong> · 6 endpoints</summary>
+    <ol>
+      <li><code>/api/influencer/documents</code></li>
+      <li><code>/api/influencer/documents/upload</code></li>
+      <li><code>/api/influencer/documents/parse</code> - חילוץ AI</li>
+      <li><code>/api/influencer/documents/[id]</code></li>
+      <li><code>/api/influencer/documents/[id]/update-parsed</code></li>
+      <li><code>/api/influencer/documents/metadata</code></li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><strong>Partnerships & Coupons</strong> · 9 endpoints</summary>
+    <ol>
+      <li><code>/api/influencer/partnerships</code></li>
+      <li><code>/api/influencer/partnerships/create-from-parsed</code></li>
+      <li><code>/api/influencer/partnerships/[id]</code></li>
+      <li><code>/api/influencer/partnerships/[id]/documents</code></li>
+      <li><code>/api/influencer/partnerships/[id]/coupons</code></li>
+      <li><code>/api/influencer/partnerships/[id]/brand-logo</code></li>
+      <li><code>/api/influencer/coupons</code></li>
+      <li><code>/api/influencer/coupons/[id]/copy</code></li>
+      <li><code>/api/influencer/analytics/coupons</code></li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><strong>Content & Products</strong> · 4 endpoints</summary>
+    <ol>
+      <li><code>/api/influencer/content</code></li>
+      <li><code>/api/influencer/content/brands</code></li>
+      <li><code>/api/influencer/content/products</code></li>
+      <li><code>/api/influencer/content/config</code></li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><strong>Influencer Chatbot</strong> · 7 endpoints</summary>
+    <ol>
+      <li><code>/api/influencer/chatbot/persona</code></li>
+      <li><code>/api/influencer/chatbot/history</code></li>
+      <li><code>/api/influencer/chatbot/insights</code></li>
+      <li><code>/api/influencer/chatbot/knowledge</code></li>
+      <li><code>/api/influencer/chatbot/stats</code></li>
+      <li><code>/api/influencer/build-persona</code></li>
+      <li><code>/api/influencer/regenerate-greeting</code></li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><strong>Scraping & Scanning</strong> · 13 endpoints</summary>
+    <ol>
+      <li><code>/api/scraping/start</code></li>
+      <li><code>/api/scraping/status</code></li>
+      <li><code>/api/scraping/step</code></li>
+      <li><code>/api/scraping/incremental</code></li>
+      <li><code>/api/scraping/retry</code></li>
+      <li><code>/api/scraping/cancel</code></li>
+      <li><code>/api/scraping/website/start</code></li>
+      <li><code>/api/scraping/website/status</code></li>
+      <li><code>/api/scraping/website/cancel</code></li>
+      <li><code>/api/scan/start</code></li>
+      <li><code>/api/scan/status</code></li>
+      <li><code>/api/scan/worker</code></li>
+      <li><code>/api/influencer/scan/jobs</code></li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><strong>Admin Operations</strong> · 16 endpoints</summary>
+    <ol>
+      <li><code>/api/admin</code></li>
+      <li><code>/api/admin/accounts</code> · <code>[accountId]</code> · <code>check</code> · <code>finalize</code> · <code>status</code></li>
+      <li><code>/api/admin/influencers</code> · <code>[id]</code></li>
+      <li><code>/api/admin/websites</code></li>
+      <li><code>/api/admin/documents</code></li>
+      <li><code>/api/admin/scrape</code> · <code>scrape-progress/[username]</code></li>
+      <li><code>/api/admin/full-scan</code></li>
+      <li><code>/api/admin/checklist</code> · <code>summary</code></li>
+      <li><code>/api/admin/coupons</code></li>
+      <li><code>/api/admin/recommendations</code></li>
+      <li><code>/api/admin/handoff</code></li>
+      <li><code>/api/admin/ig-connection</code></li>
+      <li><code>/api/admin/re-embed</code></li>
+      <li><code>/api/admin/proxy</code></li>
+      <li><code>/api/admin/system-health</code></li>
+      <li><code>/api/admin/test-email</code></li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><strong>Discovery</strong> · 10 endpoints</summary>
+    <ol>
+      <li><code>/api/content/browse</code></li>
+      <li><code>/api/content/topics</code></li>
+      <li><code>/api/content-feed</code></li>
+      <li><code>/api/discovery/list</code> · <code>all-lists</code></li>
+      <li><code>/api/discovery/categories</code></li>
+      <li><code>/api/discovery/hot-topics</code></li>
+      <li><code>/api/discovery/generate</code></li>
+      <li><code>/api/discovery/questions</code> · <code>answer</code></li>
+      <li><code>/api/discovery/timeline</code></li>
+    </ol>
+  </details>
+
+  <details>
+    <summary><strong>Webhooks · Widget · Other</strong></summary>
+    <ol>
+      <li><code>/api/webhooks/instagram</code></li>
+      <li><code>/api/webhooks/whatsapp</code></li>
+      <li><code>/api/webhooks/respondio</code></li>
+      <li><code>/api/widget/chat</code></li>
+      <li><code>/api/widget/config</code></li>
+      <li><code>/api/widget/recommendations/click</code></li>
+      <li><code>/api/leads/conference</code></li>
+      <li><code>/api/support-flow</code></li>
+      <li><code>/api/manage/auth</code> · <code>settings</code> · <code>knowledge</code> · <code>pages</code> · <code>products</code> · <code>products/extract</code></li>
+      <li><code>/api/persona/full</code> · <code>rebuild</code></li>
+      <li><code>/api/transcribe/single</code> · <code>progress</code></li>
+      <li><code>/api/image-proxy</code></li>
+      <li><code>/api/track</code></li>
+      <li><code>/api/gdpr/delete-data</code></li>
+      <li><code>/api/debug/metrics</code></li>
+    </ol>
+  </details>
+</section>
+
+<section id="components">
+  <h2 data-num="08">Components Catalog (200+)</h2>
+  <p class="lead">200+ רכיבי React ב-<code>src/components/</code>. החשובים מסודרים לפי תחום.</p>
+
+  <h3>Chat (60+ רכיבים) · <code>src/components/chat/</code></h3>
+  <table>
+    <thead><tr><th>רכיב</th><th>תפקיד</th></tr></thead>
+    <tbody>
+      <tr><td><code>ChatInput.tsx</code></td><td>קלט טקסט + שליחה + צירוף מדיה. RTL, תומך ב-MediaAttachButton.</td></tr>
+      <tr><td><code>ChatWidget.tsx</code></td><td>מימוש widget</td></tr>
+      <tr><td><code>StarterPills.tsx</code></td><td>הצעות empty-state (account-specific או conference-specific)</td></tr>
+      <tr><td><code>NavTabs.tsx</code></td><td>capsule pill nav בתחתית הצ'אט. Figma 292:9787</td></tr>
+      <tr><td><code>BrandCards.tsx</code> / <code>EnhancedBrandCards.tsx</code></td><td>כרטיסיות מותגים שותפים + קופונים. tap → copy code או open external. tracked.</td></tr>
+      <tr><td><code>ProductsCatalogTab.tsx</code></td><td>גריד מוצרים (featured + rails). archetype: brand</td></tr>
+      <tr><td><code>ServicesCatalogTab.tsx</code></td><td>גריד שירותים (3-col מובייל). archetype: service_provider</td></tr>
+      <tr><td><code>TopicQuestionsTab.tsx</code></td><td>browse שאלות מוכנות מראש</td></tr>
+      <tr><td><code>ContentBrowseTab.tsx</code></td><td>browse posts/transcriptions לפי קטגוריה</td></tr>
+      <tr><td><code>content-feed/ContentFeedTab.tsx</code></td><td>feed לפי טאב (looks, recipes, beauty cards...)</td></tr>
+      <tr><td><code>discovery/NewsDiscoveryTab.tsx</code></td><td>hot-topics ל-media_news</td></tr>
+      <tr><td><code>MagicBento.tsx</code></td><td>React-Bits Bento grid</td></tr>
+      <tr><td><code>Lanyard.tsx</code> / <code>ConferenceBackdrop.tsx</code></td><td>3D draggable name-tag (R3F + rapier). שומר במקרה</td></tr>
+      <tr><td><code>ConferenceForYouTab.tsx</code></td><td>טאב ForYou ל-LDRS-conference (case studies + reels + highlights)</td></tr>
+      <tr><td><code>ConferenceLeadPopup.tsx</code></td><td>popup הסכמה + נושאים</td></tr>
+      <tr><td><code>LeadCapturePopup.tsx</code></td><td>popup ליד גנרי (לא-conference)</td></tr>
+      <tr><td><code>AskItamarButton.tsx</code></td><td>כפתור LDRS שפותח את ה-WhatsApp handoff modal</td></tr>
+      <tr><td><code>MediaAttachButton.tsx</code> / <code>MediaPreview.tsx</code></td><td>צירוף תמונה/וידאו → vision analyzer</td></tr>
+      <tr><td><code>DirectiveRenderer.tsx</code></td><td>מציג <code>uiDirectives</code> מה-engine (forms, cards, modals)</td></tr>
+      <tr><td><code>InlineForm.tsx</code> / <code>InlineProgress.tsx</code></td><td>form/progress UI מהמנוע</td></tr>
+      <tr><td><code>QuickActions.tsx</code></td><td>quick action bar בתחתית הודעה</td></tr>
+      <tr><td><code>BrandSupportTab.tsx</code> / <code>SupportFlowForm.tsx</code></td><td>support flow ייחודי לצ'אט</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Discovery (15 רכיבים)</h3>
+  <pre class="ltr"><code>chat/discovery/
+├── DiscoveryTab.tsx          - main discovery interface
+├── DiscoveryList.tsx
+├── DiscoveryCard.tsx
+├── CategoryGrid.tsx
+├── CategoryCard.tsx
+├── HotTopicCard.tsx
+├── NewsDiscoveryTab.tsx
+├── QuestionsView.tsx
+├── LeadMagnetPopup.tsx
+└── PrivateCollectionCard.tsx</code></pre>
+
+  <h3>Top-level / Global</h3>
+  <table>
+    <thead><tr><th>רכיב</th><th>תפקיד</th></tr></thead>
+    <tbody>
+      <tr><td><code>AnalyticsLoader.tsx</code></td><td>טוען gtag + fbq + ttq דרך next/script</td></tr>
+      <tr><td><code>AnalyticsClient.tsx</code></td><td>עוטף Loader + auto-tracking. ב-root layout</td></tr>
+      <tr><td><code>CookieConsent.tsx</code></td><td>באנר הסכמה (informational)</td></tr>
+      <tr><td><code>ServiceWorkerRegistration.tsx</code></td><td>רושם /sw.js ל-PWA</td></tr>
+      <tr><td><code>SupportForm.tsx</code></td><td>טופס "דווח על בעיה"</td></tr>
+      <tr><td><code>NavigationMenu.tsx</code></td><td>top nav</td></tr>
+      <tr><td><code>ScrapeProgressModal.tsx</code></td><td>progress חי לסקרייפ</td></tr>
+      <tr><td><code>ThemeProvider.tsx</code></td><td>dark mode</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Admin · <code>src/components/admin/</code></h3>
+  <ul>
+    <li><code>AdminShell.tsx</code> - left-rail layout ל-/admin/*</li>
+    <li><code>KpiCard.tsx</code>, <code>KpiList.tsx</code> - dashboard KPIs</li>
+    <li><code>RoleGate.tsx</code> - gates לפי <code>auth.users.role</code></li>
+    <li><code>MonitoringTab.tsx</code>, <code>PageHeader.tsx</code></li>
+  </ul>
+
+  <h3>Documents / Influencer Dashboard</h3>
+  <ul>
+    <li><code>documents/FileUploader.tsx</code> - drag-drop</li>
+    <li><code>documents/DocumentTypeSelector.tsx</code> - בחירת סוג</li>
+    <li><code>documents/BriefView.tsx</code>, <code>QuoteView.tsx</code></li>
+    <li><code>documents/ManualPartnershipForm.tsx</code> - הוספה ידנית</li>
+    <li><code>documents/ValidationErrors.tsx</code>, <code>ConfidenceIndicator.tsx</code></li>
+    <li><code>LegoBlock.tsx</code>, <code>LegoEditor.tsx</code> - building-block editor</li>
+    <li><code>CategoryPicker.tsx</code>, <code>MediaPicker.tsx</code></li>
+  </ul>
+
+  <h3>Analytics & Metrics (10 רכיבים)</h3>
+  <ul>
+    <li><code>analytics/CouponPerformanceTable.tsx</code></li>
+    <li><code>audience/GrowthChart.tsx</code>, <code>EngagementMetrics.tsx</code></li>
+    <li><code>partnerships/RevenueChart.tsx</code>, <code>PipelineChart.tsx</code></li>
+  </ul>
+
+  <h3>UI Components (shadcn-based)</h3>
+  <pre class="ltr"><code>ui/
+├── button.tsx · input.tsx · card.tsx
+├── tabs.tsx · badge.tsx · avatar.tsx
+├── sparkline.tsx (inline chart)
+└── magic-bento.tsx · marquee.tsx (animations)</code></pre>
+</section>
+
+<section id="lib">
+  <h2 data-num="09">Library Catalog · <code>src/lib/</code></h2>
+  <p class="lead">180+ קבצים. מאורגן לפי תחום אחריות.</p>
+
+  <div class="mermaid-wrap">graph LR
+    subgraph chatbot
+      sandwichBot[sandwichBot.ts<br/>orchestrator]
+      sandwichH[sandwich-bot-hybrid.ts<br/>hybrid path]
+      archetypes[archetypes/*]
+      personality[personality-wrapper.ts]
+      memory[conversation-memory.ts]
+      learner[conversation-learner.ts]
+      persona[persona-generator.ts]
+      sessions[session-manager.ts]
+    end
+    subgraph rag
+      chunker[rag/chunker.ts]
+      retrieve[rag/retrieve.ts]
+      enrich[rag/enrich.ts]
+      archs[rag/archetypes.ts]
+    end
+    subgraph scraping
+      orch[influencer-scrape-orchestrator.ts]
+      newScan[newScanOrchestrator.ts]
+      inc[incrementalScanOrchestrator.ts]
+      sc[scrapeCreatorsClient.ts]
+      web[website-scan-orchestrator.ts]
+      media[media-storage.ts]
+    end
+    subgraph integrations
+      waCloud[whatsapp-cloud/client.ts]
+      igGraph[instagram-graph/dm-handler.ts]
+      respond[respondio/client.ts]
+      google[google-workspace.ts]
+      redis[redis.ts]
+    end
+    subgraph analytics
+      track[analytics/track.ts]
+      types[analytics/types.ts]
+      hooks[analytics/hooks.ts]
+      serverTrack[analytics/server-track.ts]
+    end
+    subgraph handoff
+      forward[handoff/forward-to-itamar.ts]
+      process[handoff/process-itamar-reply.ts]
+    end</div>
+
+  <h3>chatbot/</h3>
+  <table>
+    <thead><tr><th>קובץ</th><th>מטרה</th></tr></thead>
+    <tbody>
+      <tr><td><code>sandwichBot.ts</code></td><td>הפונקציה הראשית. טוען persona + history → בונה prompt → קורא ל-OpenAI</td></tr>
+      <tr><td><code>sandwich-bot-hybrid.ts</code></td><td>הנתיב החדש. Stage 1: dense retrieve. Stage 2: function-call לשליפה נוספת. Stage 3: תשובה סופית. <strong>משתמש ב-gpt-5-nano-2025-08-07</strong></td></tr>
+      <tr><td><code>hybrid-retrieval.ts</code></td><td>Multi-stage (FTS + vector + grounded facts)</td></tr>
+      <tr><td><code>knowledge-retrieval.ts</code></td><td>FTS על <code>knowledge_documents</code></td></tr>
+      <tr><td><code>personality-wrapper.ts</code></td><td>בונה את ה-personality block</td></tr>
+      <tr><td><code>archetypes/baseArchetype.ts</code></td><td>פרומפט בסיסי. כל ה-archetypes יורשים. מציג <code>grounded_facts.behavioral_rules</code></td></tr>
+      <tr><td><code>archetypes/{food,fashion,beauty,...}.ts</code></td><td>style overrides לכל archetype</td></tr>
+      <tr><td><code>archetypes/intentRouter.ts</code></td><td>chat intent → archetype branch</td></tr>
+      <tr><td><code>conversation-memory.ts</code></td><td>מעדכן <code>chat_sessions.rolling_summary</code> כל תשובה</td></tr>
+      <tr><td><code>conversation-learner.ts</code></td><td>cron יומי: extract patterns → fold לתוך persona</td></tr>
+      <tr><td><code>persona-generator.ts</code></td><td>בונה persona מ-preprocessing</td></tr>
+      <tr><td><code>session-manager.ts</code></td><td>נעילה + claim ל-<code>chat_sessions</code></td></tr>
+      <tr><td><code>enhanced-response-builder.ts</code></td><td>מוסיף suggestions, quick replies, cards</td></tr>
+      <tr><td><code>widget-chat-handler.ts</code></td><td>נתיב צ'אט מיוחד ל-public/widget.js</td></tr>
+      <tr><td><code>thinking-messages.ts</code></td><td>טקסט "thinking..." בזמן LLM call</td></tr>
+      <tr><td><code>instructions-builder.ts</code></td><td>בונה instructions block ל-Responses-API</td></tr>
+    </tbody>
+  </table>
+
+  <h3>rag/</h3>
+  <table>
+    <thead><tr><th>קובץ</th><th>מטרה</th></tr></thead>
+    <tbody>
+      <tr><td><code>chunker.ts</code></td><td>חיתוך תוכן ל-~400 tokens עם 12% overlap. priority פיצול: paragraph → newline → sentence → clause → word → hard cut</td></tr>
+      <tr><td><code>retrieve.ts</code></td><td><strong>אלגוריתם 5 שלבים:</strong> Step 0 query expansion (Gemini 2.5 Flash) · Step 1 classification · Step 2 filters · Step 3 vector+BM25 hybrid · Step 4 heuristic rerank · Step 5 build context. caching 3 דקות, skip rerank כשvector >0.65</td></tr>
+      <tr><td><code>enrich.ts</code></td><td>סיכומים בעברית + synthetic queries + partnership enrichment + tiny-chunk cleanup. רץ אוטומטית כ-Step 4.5</td></tr>
+      <tr><td><code>archetypes.ts</code></td><td>archetype enum + DB types</td></tr>
+      <tr><td><code>embeddings.ts</code></td><td>OpenAI <code>text-embedding-3-large</code> (2000 dims)</td></tr>
+      <tr><td><code>ingest.ts</code></td><td>RAG ingestion pipeline</td></tr>
+      <tr><td><code>rerank.ts</code></td><td>Cohere rerank (אופציונלי)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>scraping/</h3>
+  <table>
+    <thead><tr><th>קובץ</th><th>מטרה</th></tr></thead>
+    <tbody>
+      <tr><td><code>influencer-scrape-orchestrator.ts</code></td><td>top-level: מתאם IG + website</td></tr>
+      <tr><td><code>newScanOrchestrator.ts</code></td><td>flow ראשון</td></tr>
+      <tr><td><code>incrementalScanOrchestrator.ts</code></td><td>delta scan יומי/שעתי</td></tr>
+      <tr><td><code>scrapeCreatorsClient.ts</code></td><td>ScrapeCreators API (החליף Apify)</td></tr>
+      <tr><td><code>apify-actors.ts</code></td><td>(legacy) fallback בלבד</td></tr>
+      <tr><td><code>runScanJob.ts</code></td><td>job runner שמזין <code>scraping_progress</code></td></tr>
+      <tr><td><code>website-scan-orchestrator.ts</code></td><td>cheerio crawl <strong>(local only - לא Vercel)</strong></td></tr>
+      <tr><td><code>website-crawler.ts</code></td><td>URL queue + page fetch + extract</td></tr>
+      <tr><td><code>image-analyzer.ts</code></td><td>Gemini Vision: classify, OCR, extract palette</td></tr>
+      <tr><td><code>media-storage.ts</code></td><td>שמירת media ל-Supabase Storage</td></tr>
+      <tr><td><code>linkis-scraper.ts</code></td><td>פתרון linkis.com short URLs</td></tr>
+      <tr><td><code>highlights-scraper.ts</code></td><td>highlights בנפרד מ-posts</td></tr>
+      <tr><td><code>preprocessing.ts</code></td><td>נורמליזציה → קלט ל-persona-generator</td></tr>
+      <tr><td><code>resumeHelper.ts</code></td><td>resume scan שנכשל</td></tr>
+      <tr><td><code>rateLimiter.ts</code></td><td>rate limit per-account</td></tr>
+    </tbody>
+  </table>
+
+  <h3>שאר התיקיות</h3>
+  <details>
+    <summary><strong>integrations</strong> · whatsapp-cloud · instagram-graph · respondio · handoff · email-templates</summary>
+    <table>
+      <tbody>
+        <tr><td><code>whatsapp-cloud/client.ts</code></td><td>sendText / sendTemplate / sendMediaByLink / markAsRead</td></tr>
+        <tr><td><code>whatsapp-cloud/signature.ts</code></td><td>HMAC-SHA256 verification + defensive trim</td></tr>
+        <tr><td><code>instagram-graph/client.ts</code></td><td>Meta Graph API wrapper</td></tr>
+        <tr><td><code>instagram-graph/dm-handler.ts</code></td><td>inbound DM handler. <strong>gated ב-<code>dm_bot_enabled</code></strong></td></tr>
+        <tr><td><code>respondio/client.ts</code></td><td>Respond.io REST</td></tr>
+        <tr><td><code>respondio/dm-chat-handler.ts</code></td><td>webhook → SandwichBot. <strong>gated ב-<code>dm_bot_enabled</code></strong></td></tr>
+        <tr><td><code>handoff/forward-to-itamar.ts</code></td><td>שולח <code>bestie_handoff_lead</code> ל-WhatsApp של איתמר. שומר ref_code 4-תווים</td></tr>
+        <tr><td><code>handoff/process-itamar-reply.ts</code></td><td>matching לפי context.id / ref-tag / latest-handoff</td></tr>
+        <tr><td><code>email-templates/conference-lead.ts</code></td><td>email פנימי לרועי</td></tr>
+        <tr><td><code>email-templates/conference-lead-confirmation.ts</code></td><td>email אישור ללקוח</td></tr>
+      </tbody>
+    </table>
+  </details>
+
+  <details>
+    <summary><strong>auth</strong> · <strong>db</strong> · <strong>cache</strong></summary>
+    <ul>
+      <li><code>auth/middleware.ts</code> - Edge middleware, מוסיף <code>x-influencer-id</code> מה-JWT</li>
+      <li><code>auth/influencer-auth.ts</code> - <code>checkInfluencerAuth(req, username)</code></li>
+      <li><code>auth/admin-auth.ts</code> - admin-only routes</li>
+      <li><code>supabase.ts</code> - service-role singleton</li>
+      <li><code>supabase-client.ts</code> - browser anon client</li>
+      <li><code>supabase/server.ts</code> - RSC-safe</li>
+      <li><code>redis.ts</code> - Upstash REST + cache helpers</li>
+      <li><code>cache.ts</code> / <code>cache-l2.ts</code> / <code>cached-loaders.ts</code> - 3-tier cache</li>
+      <li><code>rate-limit.ts</code> - <code>checkRateLimit</code></li>
+    </ul>
+  </details>
+
+  <details>
+    <summary><strong>analytics</strong> · <strong>discovery</strong> · <strong>hot-topics</strong></summary>
+    <ul>
+      <li><code>analytics/types.ts</code> - ~70 event names</li>
+      <li><code>analytics/track.ts</code> - client dispatcher (GA4/Meta/TikTok mapping)</li>
+      <li><code>analytics/hooks.ts</code> - <code>useAutoAnalytics()</code></li>
+      <li><code>analytics/server-track.ts</code> - CAPI / Events API. SHA-256 hashes PII</li>
+      <li><code>discovery/ai-generator.ts</code> - AI lists</li>
+      <li><code>discovery/categories.ts</code></li>
+      <li><code>discovery/discovery-cache.ts</code></li>
+      <li><code>hot-topics/compute.ts</code> · <code>cluster.ts</code> · <code>score.ts</code> · <code>extract-entities.ts</code></li>
+    </ul>
+  </details>
+
+  <details>
+    <summary><strong>ai-parser</strong> · <strong>ai</strong> · <strong>processing</strong></summary>
+    <ul>
+      <li><code>ai-parser/document-router.ts</code> - <strong>Coupon → coupons + KB · Partnership → partnerships (≥0.6) · Knowledge → KB (≥0.3)</strong></li>
+      <li><code>ai-parser/openai.ts</code>, <code>gemini.ts</code> - מודלים</li>
+      <li><code>ai-parser/text-extractor.ts</code> - PDF/images</li>
+      <li><code>ai/gemini-persona-builder.ts</code></li>
+      <li><code>processing/unified-processor.ts</code></li>
+      <li><code>processing/extract-coupons.ts</code></li>
+      <li><code>processing/sync-commerce-data.ts</code></li>
+      <li><code>processing/generate-chat-config.ts</code></li>
+    </ul>
+  </details>
+
+  <details>
+    <summary><strong>utilities</strong></summary>
+    <ul>
+      <li><code>image-utils.ts</code> - <code>getProxiedImageUrl()</code></li>
+      <li><code>theme.ts</code> - per-account CSS variables</li>
+      <li><code>sanitize.ts</code> - XSS-safe</li>
+      <li><code>storage.ts</code> - Supabase Storage helpers</li>
+      <li><code>email.ts</code> - email send wrapper</li>
+      <li><code>logger.ts</code> - <code>info/warn/error</code></li>
+      <li><code>sentry.ts</code> - stub</li>
+      <li><code>metrics/pipeline-metrics.ts</code> - <code>pm.mark()</code> timeline</li>
+      <li><code>recommendations/*</code> - widget products</li>
+      <li><code>partnerships/*</code> - extraction</li>
+      <li><code>flows/*</code> - state-machine flows</li>
+      <li><code>chat-ui/generate-tab-config.ts</code></li>
+      <li><code>chat/*</code> - vision analyzer + image resize</li>
+      <li><code>suggestion-cache.ts</code> - prewarm-cache cron</li>
+    </ul>
+  </details>
+</section>
+
+<section id="engines">
+  <h2 data-num="10">Engines Pipeline</h2>
+  <p class="lead">המסלול שהודעת צ'אט עוברת בתוך <code>/api/chat/stream</code>. ה-orchestrator: <code>src/engines/index.ts</code>.</p>
+
+  <div class="mermaid-wrap">flowchart LR
+    Msg[Visitor message] --> Sanitize[Sanitize + clean]
+    Sanitize --> Cache{cache hit?}
+    Cache -- yes --> Reply
+    Cache -- no --> Parallel[Parallel:<br/>Understanding + Lock + History + Personality]
+    Parallel --> HandoffGate{active handoff?}
+    HandoffGate -- yes --> Mute[Mute bot · relay to WhatsApp]
+    HandoffGate -- no --> Decision[Decision engine]
+    Decision -->|"route"| Sandwich
+    Decision -->|"support flow"| SupportFlow
+    Sandwich --> LLM[OpenAI GPT-5.4]
+    LLM --> Stream[SSE stream]
+    Stream --> SaveDB[Save user + assistant messages]
+    Stream --> Memory[Update rolling_summary]
+    Stream --> CapiServer[after():<br/>fire CAPI / Drive / cron]
+    Reply --> Stream</div>
+
+  <h3>13 השלבים של <code>processMessage()</code></h3>
+  <ol>
+    <li>Generate trace/request IDs ל-distributed tracing</li>
+    <li>Idempotency key מ-account+session+message hash</li>
+    <li>בדיקת cache - מחזיר תוצאה cached אם הבקשה כבר עובדה</li>
+    <li>Build context - יצירת session אם חדש, טעינת account + influencer</li>
+    <li>Acquire lock על session (prevents race)</li>
+    <li>Emit <code>message_received</code> event</li>
+    <li><strong>Understanding</strong> - intent, entities, risk flags</li>
+    <li><strong>Decision</strong> - בחירת handler, UI directives, model strategy</li>
+    <li><strong>Policy</strong> - security, rate limits, PII protection</li>
+    <li>Generate response (Sandwich Bot או direct)</li>
+    <li>Emit <code>response_sent</code></li>
+    <li>Update session state</li>
+    <li>Release lock + complete idempotency</li>
+  </ol>
+
+  <h3><code>src/engines/</code> - הקבצים</h3>
+  <table>
+    <thead><tr><th>קובץ</th><th>מטרה</th></tr></thead>
+    <tbody>
+      <tr><td><code>index.ts</code></td><td>orchestrator (<code>processMessage</code>)</td></tr>
+      <tr><td><code>context.ts</code> / <code>context-builder.ts</code></td><td>בונה context (account, brands, content, persona)</td></tr>
+      <tr><td><code>state-machine.ts</code></td><td>state (Chat.Active, Support.AwaitingDetails)</td></tr>
+      <tr><td><code>events.ts</code> / <code>events-emitter.ts</code></td><td>emit ל-<code>chat_events</code></td></tr>
+      <tr><td><code>idempotency.ts</code></td><td>dedupe לפי client message id</td></tr>
+      <tr><td><code>concurrency-manager.ts</code></td><td>lock per-session</td></tr>
+      <tr><td><code>understanding/</code></td><td>regex + nano-LLM intent classifier (<code>understandMessageFast</code>)</td></tr>
+      <tr><td><code>decision/</code></td><td>rule engine - chat / support / brief / lead</td></tr>
+      <tr><td><code>policy/</code></td><td>rate-limit + safety</td></tr>
+      <tr><td><code>notifications/rule-engine.ts</code></td><td>מתי לפנג את רועי / איתמר</td></tr>
+      <tr><td><code>experiments/index.ts</code></td><td>A/B flags (Vercel KV)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Decision Rules · <code>src/engines/decision/rules/</code></h3>
+  <div class="cards">
+    <div class="card"><h4>routing.ts</h4><div class="meta">איזה handler לקרוא</div></div>
+    <div class="card"><h4>cost.ts</h4><div class="meta">token budget</div></div>
+    <div class="card"><h4>security.ts</h4><div class="meta">threat detection</div></div>
+    <div class="card"><h4>personalization.ts</h4><div class="meta">user targeting</div></div>
+    <div class="card"><h4>escalation.ts</h4><div class="meta">handoff לאדם</div></div>
+  </div>
+
+  <h3>Policy Engine · runs AFTER Decision</h3>
+  <ol>
+    <li><strong>Security Level</strong> (blocking) - public/authenticated/owner_only</li>
+    <li><strong>Public Order Details Protection</strong> (overriding) - מסכה מספרי הזמנה ופלאפונים במצב ציבורי</li>
+    <li><strong>Rate Limit</strong> - per-session, per-account, per-action</li>
+    <li><strong>Cost Controls</strong> - token estimates vs budget</li>
+  </ol>
+  <p>Output: <code>{ allowed, warnings, applied policies, overrides (text redactions, handler changes) }</code></p>
+
+  <h3>Understanding</h3>
+  <p>Model: GPT-5.4 Nano (fast) → fallback ל-GPT-5. מחזיר:</p>
+  <ul>
+    <li>intent (coupon_request / support_issue / content_request / greeting / general_chat)</li>
+    <li>entities (brands, products, coupons, order numbers, phones, dates, amounts)</li>
+    <li>risk flags (privacy / legal / medical / harassment / financial)</li>
+    <li>sentiment + urgency</li>
+    <li>confidence (0-1) + ambiguity list + suggested clarifications</li>
+  </ul>
+</section>
+
+<section id="chat">
+  <h2 data-num="11">Chat Pipeline · SandwichBot · Hybrid Retrieval</h2>
+  <p class="lead">השם "sandwich" = persona slice + retrieval slice + user question slice. SandwichBot מחבר אותם ל-Responses-API call אחד.</p>
+
+  <div class="mermaid-wrap">sequenceDiagram
+    participant U as Visitor
+    participant Page as chat page
+    participant Stream as /api/chat/stream
+    participant Engine as engines/processMessage
+    participant Sandwich as SandwichBot
+    participant Retrieval as Hybrid retrieval
+    participant DB as Supabase
+    participant LLM as OpenAI GPT-5.4
+    U->>Page: types & sends
+    Page->>Stream: POST {message, sessionId, ...}
+    Stream->>Engine: processMessage()
+    Engine->>Engine: gate handoff / cache / lock
+    Engine->>Sandwich: run()
+    Sandwich->>Retrieval: query
+    Retrieval->>DB: FTS + vector + grounded_facts
+    DB-->>Retrieval: chunks
+    Retrieval-->>Sandwich: context (≤2K tokens)
+    Sandwich->>LLM: input = persona + context + history + msg
+    LLM-->>Sandwich: stream chunks
+    Sandwich-->>Stream: SSE
+    Stream-->>Page: meta · delta · cards · done
+    Page->>Page: render + analytics track()
+    Stream->>DB: saveChatMessage user + assistant
+    Stream->>DB: updateRollingSummary</div>
+
+  <h3>4 שלבי ה-Hybrid Retrieval</h3>
+  <table>
+    <thead><tr><th>שלב</th><th>מה קורה</th><th>עלות</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Stage 1</strong></td><td>Indexed FTS על posts/transcriptions/highlights/stories דרך <code>search_all_content</code> RPC. Coupons תמיד נכלל. <strong>2K token budget</strong></td><td>זול מאוד · metadata 150 chars</td></tr>
+      <tr><td><strong>Stage 2</strong></td><td>AI מנתח את ה-metadata ומחליט מה צריך עוד (function calling)</td><td>זול - מה שמופיע בתוצאות</td></tr>
+      <tr><td><strong>Stage 3</strong></td><td>Deep fetch לפי ID מטבלאות נפרדות. Posts: caption + hashtags + media + likes. Transcriptions: full text. Highlights: title + items</td><td>~20-35K tokens (רק מה שצריך)</td></tr>
+      <tr><td><strong>Stage 4</strong></td><td>format ל-prompt, החזרת תשובה</td><td>תשובה סופית</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout success">
+    <strong>הרווח</strong>
+    Hybrid: <code>$0.0005</code> · Full content: <code>$0.004</code> · <strong>פי-8 זול יותר, 2-3 שניות מהיר יותר</strong>, תומך ב-10K+ posts.
+  </div>
+
+  <h3>RAG Retrieval Algorithm (5 Steps · <code>retrieve.ts</code>)</h3>
+  <ol>
+    <li><strong>Step 0:</strong> Query expansion via Gemini 2.5 Flash (גישור פערי vocabulary)</li>
+    <li><strong>Step 1: Classification</strong> - structured (counts/dates) vs unstructured. inference של entity types & topics. time hints</li>
+    <li><strong>Step 2: Filtering</strong> - hard filters: account, entity type, time window, metadata</li>
+    <li><strong>Step 3: Vector + BM25 Hybrid</strong> - threshold 0.3, fallback 0.25. אם top similarity &lt;0.6 → expand + re-search. BM25 רק כש-vector לא בטוח &gt;0.78. merge + dedup</li>
+    <li><strong>Step 4: Heuristic Reranking</strong> - recency bonus (+0.05 ל-30 ימים), first chunk (+0.03), exact phrase (+0.25), partial keyword (+0.08-0.15), topic compatibility, LDRS conference boost</li>
+    <li><strong>Step 5: Build Context</strong> - sort + filter (&lt;0.35), dedup per source, format כ-XML ל-LLM</li>
+  </ol>
+
+  <h3>Chunker</h3>
+  <ul>
+    <li>Target: <strong>400 tokens</strong> per chunk (min 100, max 500)</li>
+    <li>Overlap: <strong>12%</strong> (48 tokens על chunk של 400)</li>
+    <li>Token estimation: <code>length / 3.5</code> (3 chars/token לעברית)</li>
+    <li>Smart split: paragraph → newline → sentence → clause → word → hard cut</li>
+    <li>Noise filter: skips nutritional tables & metadata-only sections</li>
+  </ul>
+</section>
+
+<section id="rag">
+  <h2 data-num="12">RAG Pipeline</h2>
+  <p class="lead">כל תוכן של חשבון עובר דרך הצנרת הזו - מהמקור עד chunks חיפושיים.</p>
+
+  <div class="mermaid-wrap">flowchart LR
+    Source["Instagram posts<br/>highlights<br/>website pages<br/>uploaded docs<br/>partnerships"]
+    Source --> Process["lib/processing/<br/>extract text + transcribe"]
+    Process --> Documents[(documents table)]
+    Process --> Chunker[rag/chunker.ts]
+    Chunker --> Chunks[(document_chunks)]
+    Chunks --> Embed["OpenAI text-embedding-3-large<br/>2000 dims"]
+    Embed --> Chunks
+    Chunks --> Enrich[rag/enrich.ts]
+    Enrich -- "Hebrew summary,<br/>synthetic queries" --> Chunks
+    Visitor[Visitor message] --> Retrieve[rag/retrieve.ts]
+    Retrieve --> Chunks
+    Retrieve --> Sandwich</div>
+
+  <h3>הטבלאות הקריטיות</h3>
+  <table>
+    <thead><tr><th>טבלה</th><th>תוכן</th></tr></thead>
+    <tbody>
+      <tr><td><code>documents</code></td><td>שורה אחת לכל מקור (post / website / doc)</td></tr>
+      <tr><td><code>document_chunks</code></td><td>N chunks per doc, עם embedding + FTS + metadata</td></tr>
+      <tr><td><code>chunk_hash</code></td><td>dedup</td></tr>
+    </tbody>
+  </table>
+
+  <p>Retrieval = vector cosine + BM25 + scope tag boost + grounded_facts מצורפים.</p>
+
+  <div class="callout tip">
+    <strong>Cost optimization</strong>
+    Caching של retrieval ל-3 דקות (query hash). LLM rerank נדלג כש-vector confident &gt;0.65. Query expansion רק כש-top similarity &lt;0.6.
+  </div>
+</section>
+
+<section id="scraping">
+  <h2 data-num="13">Scraping System</h2>
+  <p class="lead">איסוף מ-Instagram + websites - המנגנון המלא, מ-cron עד DB.</p>
+
+  <div class="mermaid-wrap">flowchart LR
+    Cron["Vercel cron<br/>daily-scan @ 01:00 UTC"] --> Orchestrator[influencer-scrape-orchestrator.ts]
+    AddNewAccount[Admin adds account] --> Orchestrator
+    Orchestrator --> NewScan[newScanOrchestrator.ts]
+    Orchestrator --> Inc[incrementalScanOrchestrator.ts]
+    NewScan --> SC[scrapeCreatorsClient.ts]
+    Inc --> SC
+    SC --> Profile[Profile + posts + highlights + comments]
+    Profile --> MediaStorage[media-storage.ts<br/>→ Supabase Storage]
+    Profile --> Transcribe[gemini-transcriber.ts]
+    Transcribe --> Posts[instagram_posts]
+    Transcribe --> Highlights[instagram_highlights]
+    Transcribe --> Transcripts[instagram_transcriptions]
+    Posts --> Persona[persona-generator.ts]
+    Persona --> chatbot_persona[(chatbot_persona)]
+    Posts --> Enrich[rag/enrich.ts]
+    Enrich --> Chunks[(document_chunks)]</div>
+
+  <table>
+    <thead><tr><th>נתיב</th><th>כלי</th></tr></thead>
+    <tbody>
+      <tr><td>Instagram (Vercel)</td><td><code>scrapeCreatorsClient.ts</code> - API רשמי</td></tr>
+      <tr><td>Instagram (legacy)</td><td><code>apify-actors.ts</code> - fallback בלבד</td></tr>
+      <tr><td><strong>Websites (local only)</strong></td><td><code>scripts/deep-scrape-website.mjs</code> (cheerio) - <strong>לא Vercel</strong> כי cheerio כבד</td></tr>
+      <tr><td>Highlights</td><td><code>highlights-scraper.ts</code></td></tr>
+      <tr><td>Per-image vision</td><td><code>image-analyzer.ts</code> (Gemini Vision)</td></tr>
+      <tr><td>Per-video transcription</td><td><code>gemini-transcriber.ts</code> (Gemini 3 Flash audio)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Config של Orchestrator</h3>
+  <pre class="ltr"><code class="language-typescript">interface ScrapeOrchestrationConfig {
+  highlights: boolean;
+  stories: boolean;
+  posts: boolean;
+  comments: boolean;
+  bioWebsites: boolean;
+  reels: boolean;
+  postsLimit: number;
+  commentsPerPost: number;
+  maxWebsitePages: number;
+  transcribeVideos: boolean;
+  processWithGemini: boolean;
+}</code></pre>
+
+  <h3>Stats שעוקבים</h3>
+  <p>highlightsSaved · highlightItemsSaved · storiesSaved · postsSaved · commentsSaved · websitePagesSaved · videosTranscribed · dataProcessed</p>
+</section>
+
+<section id="persona">
+  <h2 data-num="14">Personas · <code>chatbot_persona</code></h2>
+  <p class="lead">JSONB blob גדול per-account ששולט בקול של הבוט.</p>
+
+  <table>
+    <thead><tr><th>עמודה</th><th>סוג</th><th>מטרה</th></tr></thead>
+    <tbody>
+      <tr><td><code>name</code></td><td>text</td><td>שם פנימי</td></tr>
+      <tr><td><code>voice_rules</code></td><td>jsonb</td><td><strong>הענק:</strong> tone, firstPerson, avoidedWords, recurringPhrases, responseStructure, <code>grounded_facts</code>, <code>grounded_facts.behavioral_rules</code> (רשימת כללים שנכנסת ל-system prompt), <code>grounded_facts.subsidiaries</code>, <code>addressee_voice</code> (יחיד/רבים)</td></tr>
+      <tr><td><code>boundaries</code></td><td>jsonb</td><td>על מה הבוט ידבר / לא ידבר</td></tr>
+      <tr><td><code>knowledge_map</code></td><td>jsonb</td><td>טקסונומיה</td></tr>
+      <tr><td><code>response_policy</code></td><td>jsonb</td><td>length / structure / emoji</td></tr>
+      <tr><td><code>directives</code></td><td>text[]</td><td>הוראות חופשיות</td></tr>
+      <tr><td><code>interests</code>, <code>topics</code></td><td>text[]</td><td>RAG retrieval bias</td></tr>
+      <tr><td><code>slang_map</code>, <code>signature_style</code>, <code>common_phrases</code></td><td>jsonb</td><td>קול</td></tr>
+      <tr><td><code>preprocessing_data</code>, <code>gemini_raw_output</code>, <code>ai_snapshot</code></td><td>jsonb</td><td>audit trail של ה-generator</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <strong>הסקציה הכי-נערכת ב-production</strong>
+    <code>voice_rules.grounded_facts.behavioral_rules</code> - מערך מסודר של כללים שהבוט עוקב אחריהם. נרנדר כ-<code>• rule</code> ב-system prompt דרך <code>archetypes/baseArchetype.ts:362-364</code>.
+  </div>
+</section>
+
+<section id="ldrs">
+  <h2 data-num="15">LDRS Conference Flow (Special)</h2>
+  <p class="lead">מופעל כש-URL מכיל <code>?source=conf</code> ו-username הוא <code>ldrs_group</code>.</p>
+
+  <div class="mermaid-wrap">flowchart LR
+    QR[QR scan] -->|"?source=conf"| Land["/chat/ldrs_group"]
+    Land --> Detect[isConferenceMode = true]
+    Detect --> AltContent["Alternate content:<br/>• ForYou tab w/ reels + highlights + cases<br/>• Conference starter pills<br/>• 'נקבע פגישה?' suggestion always<br/>• AskItamarButton (toggle-able)"]
+    Detect --> AltLead["ConferenceLeadPopup<br/>(consent + topics)"]
+    Lead[Visitor submits lead] --> ConfApi["/api/leads/conference"]
+    ConfApi --> Email[Email Roi]
+    ConfApi --> Conf[Confirmation email back to lead]
+    ConfApi --> Drive[Drive upload]
+    ConfApi --> Make[Make.com webhook]
+    ConfApi --> CAPI[Meta CAPI + TikTok EAPI]</div>
+
+  <h3>קבצים מיוחדים</h3>
+  <ul>
+    <li><code>ConferenceForYouTab.tsx</code></li>
+    <li><code>ConferenceLeadPopup.tsx</code></li>
+    <li><code>ConferenceBackdrop.tsx</code> (3D lanyard, currently disabled)</li>
+    <li><code>AskItamarButton.tsx</code> (gated ב-<code>accounts.config.features.handoff_button_enabled</code>)</li>
+    <li><code>email-templates/conference-lead.ts</code> + <code>conference-lead-confirmation.ts</code></li>
+    <li><code>/api/leads/conference/route.ts</code></li>
+    <li><code>/api/influencer/ldrs-foryou/route.ts</code></li>
+    <li><code>/admin/handoff/page.tsx</code> - live toggle</li>
+  </ul>
+
+  <div class="callout warn">
+    <strong>זהירות</strong>
+    כל לוגיקה שמותנית ב-<code>isConferenceMode && username === 'ldrs_group'</code> היא conference-specific. אל תחיל על חשבונות אחרים בלי להבין את ההשלכות.
+  </div>
+</section>
+
+<section id="handoff">
+  <h2 data-num="16">Itamar WhatsApp Handoff Bridge</h2>
+  <p class="lead">מבקר בכנס יכול לשאול את איתמר שאלה אישית. הבוט נשתק; ההודעות עוברות ל-WhatsApp; תשובותיו חוזרות לצ'אט עם badge "✓ Itamar · אישי".</p>
+
+  <div class="mermaid-wrap">sequenceDiagram
+    participant V as Visitor
+    participant C as Bestie chat
+    participant API as /api/chat/handoff/itamar
+    participant DB as chat_handoffs
+    participant WA as WhatsApp Cloud API
+    participant I as Itamar's phone
+    participant Hook as /api/webhooks/whatsapp
+    V->>C: clicks "שלח לאיתמר"
+    C->>API: POST {sessionId, question, name, phone}
+    API->>DB: INSERT pending row + 4-char ref_code
+    API->>WA: sendTemplate(bestie_handoff_lead, [refCode, label, q])
+    WA->>I: receives WhatsApp template
+    API->>DB: status = forwarded, last_outbound_wa_message_id
+    API-->>C: 200 + refCode + sessionId
+    loop Bestie poll every 8s
+      C->>API: GET /handoff/poll?sessionId
+      API-->>C: messages + handoff statuses
+    end
+    I->>WA: replies (quote-reply or "#XXXX prefix")
+    WA->>Hook: POST messages webhook
+    Hook->>Hook: process-itamar-reply.ts<br/>match by context.id / ref / latest
+    Hook->>DB: status = replied
+    Hook->>DB: INSERT chat_messages (metadata.source = whatsapp_personal)
+    C->>C: poll picks it up → renders with badge</div>
+
+  <h3>הזרימה במלואה</h3>
+  <ol>
+    <li>Generate 4-char ref code (base32: 32^4 = ~1M combinations)</li>
+    <li>INSERT שורה ב-<code>chat_handoffs</code> (status: pending) עם metadata של המבקר</li>
+    <li>שליחת template <code>bestie_handoff_lead</code> ל-<code>ITAMAR_WHATSAPP_NUMBER</code></li>
+    <li>עדכון השורה ל-<code>forwarded</code> עם <code>wa_message_id</code> או <code>failed</code></li>
+  </ol>
+
+  <h3>Matching של תשובות נכנסות (webhook)</h3>
+  <ul>
+    <li>Quote-reply על message ID יוצא</li>
+    <li>תג <code>[#REFCODE]</code> בגוף ההודעה</li>
+    <li>handoff אחרון של אותו מספר ב-24 שעות אחרונות</li>
+  </ul>
+
+  <h3>כשהמבקר מקליד <strong>אחרי</strong> שה-handoff פעיל</h3>
+  <ul>
+    <li><code>/api/chat/stream</code> בודק שורה פעילה ב-<code>chat_handoffs</code></li>
+    <li>אם כן → mute bot, save user msg, sendText() לאיתמר (בתוך 24h customer service window)</li>
+    <li>system note: "ההודעה הועברה"</li>
+  </ul>
+
+  <div class="callout warn">
+    <strong>Fallback אחרי 6 שעות</strong>
+    אם איתמר לא ענה - cron <code>/api/cron/handoff-fallback</code> מכניס "איתמר עסוק, רועי יחזור אליך" + email לרועי.
+  </div>
+
+  <h3>WhatsApp 24h Customer Service Window</h3>
+  <ul>
+    <li>טקסט חופשי עובד רק בתוך 24h אחרי שהנמען שלח לנו אחרון</li>
+    <li>מחוץ לחלון - חייבים template מאושר. יש <code>bestie_handoff_lead</code> (UTILITY ב-spec, MARKETING ב-approval - עדיין עובד)</li>
+  </ul>
+</section>
+
+<section id="analytics">
+  <h2 data-num="17">Analytics (GA4 + Meta + TikTok)</h2>
+  <p class="lead">gtag.js + fbq + ttq ישירים, ללא GTM. CAPI / Events API בצד שרת ל-iOS 14.5+ attribution.</p>
+
+  <div class="mermaid-wrap">flowchart LR
+    RootLayout["src/app/layout.tsx"]
+    RootLayout --> Loader[AnalyticsLoader.tsx<br/>Mounts gtag/fbq/ttq]
+    RootLayout --> AutoHook[useAutoAnalytics<br/>page_load · scroll · focus · errors]
+    Component[Any component] -->|"track('event', params)"| Dispatcher[lib/analytics/track.ts]
+    Dispatcher --> GA4[(GA4)]
+    Dispatcher --> Meta[(Meta Pixel)]
+    Dispatcher --> TikTok[(TikTok Pixel)]
+    Server["API routes (e.g. /api/leads/conference)"] --> ServerTrack[lib/analytics/server-track.ts]
+    ServerTrack --> CAPI[(Meta CAPI)]
+    ServerTrack --> EAPI[(TikTok Events API)]</div>
+
+  <h3>הקבצים</h3>
+  <table>
+    <thead><tr><th>קובץ</th><th>מה הוא עושה</th></tr></thead>
+    <tbody>
+      <tr><td><code>lib/analytics/types.ts</code></td><td>Strongly-typed event names (~70)</td></tr>
+      <tr><td><code>lib/analytics/track.ts</code></td><td>client dispatcher. event-name maps לכל פלטפורמה, identity / attribution, identify()</td></tr>
+      <tr><td><code>lib/analytics/hooks.ts</code></td><td><code>useAutoAnalytics()</code> - page lifecycle / scroll / errors / session start-end</td></tr>
+      <tr><td><code>lib/analytics/server-track.ts</code></td><td>CAPI / Events API. <strong>SHA-256 hash על PII לפני שליחה</strong></td></tr>
+      <tr><td><code>components/AnalyticsLoader.tsx</code></td><td>טוען 3 pixel scripts דרך next/script</td></tr>
+      <tr><td><code>components/AnalyticsClient.tsx</code></td><td>עוטף + auto-hook. ב-root layout</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Event Mapping (לפי פלטפורמה)</h3>
+  <ul>
+    <li><strong>GA4:</strong> snake_case (page_load, lead_form_submitted)</li>
+    <li><strong>Meta:</strong> PascalCase (PageView, Lead, Schedule, ViewContent, AddToCart, Contact)</li>
+    <li><strong>TikTok:</strong> PascalCase</li>
+  </ul>
+
+  <h3>Conversions Auto-Mapped</h3>
+  <table>
+    <thead><tr><th>internal</th><th>GA4</th><th>Meta</th><th>TikTok</th></tr></thead>
+    <tbody>
+      <tr><td><code>lead_form_submitted</code></td><td>generate_lead</td><td>Lead</td><td>SubmitForm</td></tr>
+      <tr><td><code>meeting_request_submitted</code></td><td>schedule</td><td>Schedule</td><td>Contact</td></tr>
+      <tr><td><code>service_brief_submitted</code></td><td>generate_lead</td><td>Lead</td><td>CompleteRegistration</td></tr>
+      <tr><td><code>support_form_submitted</code></td><td>generate_lead</td><td>Lead</td><td>SubmitForm</td></tr>
+      <tr><td><code>handoff_form_submitted</code></td><td>contact</td><td>Contact</td><td>Contact</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Key Events</h3>
+  <p><code>page_load · lead_form_submitted · meeting_request_submitted · service_brief_submitted · widget_lead_submitted · handoff_form_submitted · whatsapp_link_clicked · phone_clicked · coupon_revealed · coupon_copied</code></p>
+</section>
+
+<section id="widget">
+  <h2 data-num="18">Embeddable Widget · <code>public/widget.js</code></h2>
+  <p class="lead">Vanilla JS (ללא React), אפשר להטמיע בכל אתר. סטנדאלון בלי תלויות.</p>
+
+  <pre class="ltr"><code class="language-jsx">&lt;script src="https://bestie.ldrsgroup.com/widget.js"
+        data-account-id="ACCOUNT_UUID"&gt;&lt;/script&gt;</code></pre>
+
+  <h3>אזורי תפקוד</h3>
+  <table>
+    <thead><tr><th>סקציה</th><th>מטרה</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Boot</strong></td><td>קריאת <code>data-account-id</code>, טעינת <code>/api/widget/config</code>, הזרקת styles + chat panel</td></tr>
+      <tr><td><strong>Trigger</strong></td><td>כפתור צף bottom-right; click → פותח את הפאנל</td></tr>
+      <tr><td><strong>Chat</strong></td><td>streams מ-<code>/api/widget/chat</code> (נפרד מ-<code>/api/chat/stream</code> - משתמש ב-<code>widget-chat-handler.ts</code>)</td></tr>
+      <tr><td><strong>Recommendations</strong></td><td>כשהבוט מזכיר מוצר, ה-widget מציג כרטיסיה + tracker click דרך <code>/api/widget/recommendations/click</code></td></tr>
+      <tr><td><strong>Analytics</strong></td><td><code>widgetTrack()</code> - piggyback על gtag/fbq/ttq של ה-host. Events: <code>widget_loaded · widget_opened · widget_closed · widget_message_sent · widget_message_received · widget_lead_submitted</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Server-side Handler</h3>
+  <p><code>lib/chatbot/widget-chat-handler.ts</code> משתמש ב-<strong>RAG vector + keyword + FTS + DB fallback</strong> להמלצות מוצרים.</p>
+
+  <h3>State</h3>
+  <p><code>isOpen · sessionId · messages[] · isLoading · config dict</code></p>
+
+  <h3>Config שאפשר לבקש מ-/api/widget/config</h3>
+  <p><code>welcomeMessage · placeholder · position · brandName · profilePic · primaryColor</code></p>
+
+  <h3>Persistence</h3>
+  <p>Session ID נשמר ב-<code>localStorage</code> כדי לתחזק שיחה בין refreshes.</p>
+</section>
+
+<section id="db">
+  <h2 data-num="19">Database Schema (טבלאות מרכזיות)</h2>
+  <p class="lead">38 migrations. כל טבלת domain מכילה <code>account_id</code> ל-multi-tenancy. RLS policies מסננות לפי <code>auth.uid()</code>.</p>
+
+  <div class="callout tip">
+    <strong>Dump מלא</strong>
+    <code>npx supabase db dump --schema public --data-only=false &gt; schema.sql</code>
+  </div>
+
+  <h3>Core / Multi-Tenant</h3>
+  <details open>
+    <summary><code>accounts</code> - השורש של multi-tenancy</summary>
+    <p><code>config</code> JSONB מכיל: <code>username</code> (גם עמודה ייחודית), <code>display_name</code>, <code>avatar_url</code>, <code>archetype</code>, <code>theme</code>, <code>tabs</code>, <code>features</code>, <code>dm_bot_enabled</code>, <code>dm_settings</code>, <code>chat_subtitle</code>, <code>header_label</code></p>
+  </details>
+
+  <details>
+    <summary><code>chatbot_persona</code> - one-to-one עם accounts</summary>
+    <ul>
+      <li><code>id</code>, <code>account_id</code> (UNIQUE), <code>name</code>, <code>tone</code>, <code>language</code></li>
+      <li><code>bio</code>, <code>description</code>, <code>interests[]</code>, <code>topics[]</code></li>
+      <li><code>voice_rules</code> jsonb - <strong>הענק</strong></li>
+      <li><code>boundaries</code>, <code>knowledge_map</code>, <code>response_policy</code> jsonb</li>
+      <li><code>directives[]</code>, <code>slang_map</code>, <code>signature_style</code>, <code>common_phrases</code></li>
+      <li><code>preprocessing_data</code>, <code>gemini_raw_output</code>, <code>ai_snapshot</code> jsonb (audit)</li>
+      <li><code>instagram_username</code>, <code>instagram_followers</code>, <code>instagram_engagement_rate</code></li>
+      <li><code>created_at</code>, <code>updated_at</code></li>
+    </ul>
+  </details>
+
+  <details>
+    <summary><code>chatbot_knowledge_base</code> - dynamic knowledge</summary>
+    <ul>
+      <li><code>id</code>, <code>account_id</code></li>
+      <li><code>knowledge_type</code> (active_partnership | coupon | product | faq | brand_info | custom)</li>
+      <li><code>title</code>, <code>content</code>, <code>keywords[]</code></li>
+      <li><code>source_type</code>, <code>source_id</code>, <code>is_active</code>, <code>priority</code></li>
+      <li><code>times_used</code>, <code>last_used_at</code></li>
+    </ul>
+  </details>
+
+  <h3>Chat & Messaging</h3>
+  <details>
+    <summary><code>chat_sessions</code> - session per chat</summary>
+    <p><code>id · account_id · thread_id (e.g. dm_ig_graph_… / handoff_conf_…) · rolling_summary · state · lead_id · last_response_id · message_count · started_at · last_message_at · ended_at · satisfaction_score · converted_to_follower · coupon_shared · coupon_used · metadata · platform (whatsapp|web|instagram|facebook) · status (active|closed|archived)</code></p>
+  </details>
+
+  <details>
+    <summary><code>chat_messages</code> - turn per row</summary>
+    <ul>
+      <li><code>id</code>, <code>session_id</code> (FK)</li>
+      <li><code>role</code> (user / assistant / system)</li>
+      <li><code>content</code> <strong>(לא <code>message</code>! חשוב!)</strong></li>
+      <li><code>metadata</code> jsonb - לדוגמה <code>{ source: 'whatsapp_personal' }</code></li>
+      <li><code>meta_mid</code> - Meta message id ל-IG dedup</li>
+      <li><code>intent</code>, <code>confidence</code> (0-1)</li>
+      <li><code>knowledge_used</code> (UUID → knowledge_base)</li>
+    </ul>
+  </details>
+
+  <details>
+    <summary><code>chat_handoffs</code> - bridge בין session ל-WhatsApp</summary>
+    <ul>
+      <li><code>ref_code</code> (4-char base32)</li>
+      <li><code>last_outbound_wa_message_id</code></li>
+      <li><code>target_phone</code>, <code>status</code> (pending / forwarded / replied / failed)</li>
+      <li>visitor metadata: name, phone, label</li>
+    </ul>
+  </details>
+
+  <details>
+    <summary><code>chat_leads</code>, <code>chat_events</code></summary>
+    <p><code>chat_leads</code> - lead capture (name + phone + serial)<br><code>chat_events</code> - event stream של pipeline (debug)</p>
+  </details>
+
+  <h3>Instagram Content</h3>
+  <details>
+    <summary><code>instagram_posts</code></summary>
+    <ul>
+      <li><code>id</code>, <code>account_id</code>, <code>shortcode</code>, <code>post_id</code>, <code>post_url</code></li>
+      <li><code>type</code> (post / reel / carousel / video), <code>caption</code>, <code>hashtags[]</code>, <code>mentions[]</code></li>
+      <li><code>media_urls</code> (jsonb), <code>thumbnail_url</code>, <code>stored_thumbnail_url</code>, <code>video_duration</code></li>
+      <li><code>likes_count</code>, <code>comments_count</code>, <code>views_count</code>, <code>engagement_rate</code></li>
+      <li><code>posted_at</code>, <code>scraped_at</code>, <code>location</code>, <code>is_sponsored</code></li>
+      <li>UNIQUE: (account_id, shortcode)</li>
+    </ul>
+  </details>
+
+  <details>
+    <summary><code>instagram_highlights</code> + <code>instagram_highlight_items</code></summary>
+    <p>Highlights ופריטיהם (item count, title, transcription_status)</p>
+  </details>
+
+  <details>
+    <summary><code>instagram_transcriptions</code></summary>
+    <p>Audio → text. מקושר ל-post_id / highlight_item_id</p>
+  </details>
+
+  <details>
+    <summary><code>instagram_comments</code></summary>
+    <ul>
+      <li><code>post_id</code> (FK), <code>comment_id</code>, <code>text</code>, <code>author_username</code>, <code>author_profile_pic</code></li>
+      <li><code>is_owner_reply</code>, <code>parent_comment_id</code> (self-ref)</li>
+      <li><code>likes_count</code>, <code>commented_at</code></li>
+      <li>UNIQUE: (post_id, comment_id)</li>
+    </ul>
+  </details>
+
+  <details>
+    <summary><code>instagram_stories</code> · <code>instagram_hashtags</code> · <code>instagram_profile_history</code></summary>
+    <p>Stories 24h. Hashtags עם frequency, related_hashtags, avg_engagement. Profile history snapshots.</p>
+  </details>
+
+  <h3>RAG Knowledge Base</h3>
+  <details>
+    <summary><code>documents</code> + <code>document_chunks</code></summary>
+    <p>One row per source. Chunks: embeddings (2000-dim) + FTS + metadata + chunk_hash for dedup.</p>
+  </details>
+
+  <details>
+    <summary><code>knowledge_documents</code></summary>
+    <p>CMS-style knowledge entries (separate from RAG)</p>
+  </details>
+
+  <h3>Business / Commerce</h3>
+  <details>
+    <summary><code>partnerships</code></summary>
+    <ul>
+      <li><code>brand_name</code>, <code>brand_contact_name</code>, <code>brand_contact_email</code></li>
+      <li><code>status</code> (lead / proposal / negotiation / contract / active / completed / cancelled)</li>
+      <li><code>proposal_amount</code>, <code>contract_amount</code>, <code>currency</code> (ILS default)</li>
+      <li><code>brief</code>, <code>deliverables</code> jsonb</li>
+      <li><code>coupon_code</code>, <code>link</code>, <code>short_link</code>, <code>category</code>, <code>is_active</code></li>
+      <li><code>proposal_date</code>, <code>contract_signed_date</code>, <code>start_date</code>, <code>end_date</code></li>
+      <li><code>notes</code>, <code>tags</code>, <code>whatsapp_phone</code></li>
+    </ul>
+  </details>
+
+  <details>
+    <summary><code>partnership_documents</code></summary>
+    <ul>
+      <li><code>filename</code>, <code>file_size</code>, <code>mime_type</code>, <code>storage_path</code></li>
+      <li><code>document_type</code> (quote / contract / brief / invoice / receipt / other)</li>
+      <li><code>parsing_status</code> (pending / processing / completed / failed / manual)</li>
+      <li><code>parsed_data</code> jsonb, <code>confidence_score</code></li>
+      <li><code>ai_model</code> (gemini / claude / openai / manual)</li>
+      <li><code>search_vector</code> TSVECTOR</li>
+    </ul>
+  </details>
+
+  <details>
+    <summary><code>tasks</code></summary>
+    <ul>
+      <li><code>partnership_id</code> (FK), <code>type</code> (general / content_creation / market_research / coupon_check / media_ads / email_marketing / ai_video / ugc / cro / contract_review / invoice_creation / meeting)</li>
+      <li><code>status</code> (pending / in_progress / completed / cancelled / blocked)</li>
+      <li><code>priority</code>, <code>assignee</code>, <code>due_date</code>, <code>estimated_hours</code>, <code>actual_hours</code></li>
+      <li><code>checklist</code>, <code>attachments</code> jsonb</li>
+    </ul>
+  </details>
+
+  <details>
+    <summary><code>service_briefs</code> · <code>widget_products</code></summary>
+    <p>Service briefs - הגשות של ספקי שירות (כולל conference handoffs). Widget products - מוצרים שמופיעים ב-widget הציבורי.</p>
+  </details>
+
+  <h3>WhatsApp / Instagram</h3>
+  <details>
+    <summary><code>whatsapp_*</code></summary>
+    <p><code>whatsapp_webhook_events</code> · <code>whatsapp_messages</code> · <code>whatsapp_conversations</code> · <code>whatsapp_contacts</code> - WhatsApp Cloud API event store</p>
+  </details>
+
+  <details>
+    <summary><code>ig_graph_connections</code></summary>
+    <p>Instagram Graph access tokens per-account</p>
+  </details>
+
+  <h3>System / Jobs</h3>
+  <details>
+    <summary><code>scan_jobs</code> + <code>scraping_progress</code></summary>
+    <ul>
+      <li><code>platform</code> (instagram / tiktok / youtube)</li>
+      <li><code>status</code> (queued / running / succeeded / failed / cancelled)</li>
+      <li><code>priority</code>, <code>attempt</code>, <code>max_attempts</code>, <code>next_run_at</code></li>
+      <li><code>locked_at</code>, <code>locked_by</code></li>
+      <li><code>result_summary</code>, <code>config</code> jsonb</li>
+    </ul>
+  </details>
+
+  <h3>Discovery</h3>
+  <details>
+    <summary><code>discovery_categories</code> · <code>discovery_questions</code> · <code>discovery_lists</code></summary>
+    <p>תוכן ה-Discovery tab</p>
+  </details>
+
+  <h3>Migrations - 38 קבצים</h3>
+  <table>
+    <thead><tr><th>#</th><th>שם</th><th>מטרה</th></tr></thead>
+    <tbody>
+      <tr><td>001</td><td>add_personalization_fields</td><td>שדות white label</td></tr>
+      <tr><td>002</td><td>add_scrape_settings</td><td>config סקרייפ</td></tr>
+      <tr><td>003</td><td>add_phone_and_whatsapp</td><td>contact channels</td></tr>
+      <tr><td>004</td><td>v2_engines</td><td>Engine v2 context, session, decision</td></tr>
+      <tr><td>005</td><td>agent_influencers</td><td>agent-influencer relationship</td></tr>
+      <tr><td>006</td><td>influencer_os_tables</td><td>core OS tables (partnerships, tasks, contracts, invoices, calendar, notifications)</td></tr>
+      <tr><td>010</td><td>storage_setup</td><td>S3-compatible</td></tr>
+      <tr><td>011</td><td>notification_engine</td><td>push + email templates</td></tr>
+      <tr><td>012</td><td>coupons_roi</td><td>coupon tracking + ROI</td></tr>
+      <tr><td>013</td><td>brand_communications</td><td>brand templates</td></tr>
+      <tr><td>014</td><td>calendar_integration</td><td>Google Calendar</td></tr>
+      <tr><td>015</td><td>chatbot_upgrades</td><td>persona, knowledge_base, conversations_v2, messages_v2</td></tr>
+      <tr><td>016</td><td>add_copy_tracking</td><td>link click tracking</td></tr>
+      <tr><td>017</td><td>satisfaction_surveys</td><td>CSAT</td></tr>
+      <tr><td>018</td><td>unify_brands_into_partnerships</td><td>migration</td></tr>
+      <tr><td>019</td><td>partnership_documents</td><td>document storage + AI parsing + FTS</td></tr>
+      <tr><td>020</td><td>instagram_raw_data</td><td>posts, comments, hashtags, profile_history</td></tr>
+      <tr><td>021</td><td>enhance_persona_fields</td><td>extended metadata</td></tr>
+      <tr><td>022</td><td>scraping_progress</td><td>progress tracking</td></tr>
+      <tr><td>023</td><td>fix_video_duration_type</td><td>type fix</td></tr>
+      <tr><td>024</td><td>remove_tone_constraint</td><td>flexible tone</td></tr>
+      <tr><td>025</td><td>add_persona_metadata</td><td>JSON metadata</td></tr>
+      <tr><td>026</td><td>highlights_stories_transcriptions</td><td>video transcription storage</td></tr>
+      <tr><td>027</td><td>scan_jobs_queue</td><td>async queue + retry + locking</td></tr>
+      <tr><td>028</td><td>conversation_insights</td><td>chat analytics</td></tr>
+      <tr><td>030</td><td>add_admin_password</td><td>admin auth</td></tr>
+      <tr><td>031</td><td>rpc_get_coupons</td><td>RPC function</td></tr>
+      <tr><td>032</td><td>full_text_search_indexes</td><td>GIN indexes</td></tr>
+      <tr><td>033</td><td>hebrew_search_support</td><td>Hebrew prefix stripping</td></tr>
+      <tr><td>034</td><td>comprehensive_indexes</td><td>performance</td></tr>
+      <tr><td>035</td><td>search_highlights_and_improvements</td><td>enhanced RPC</td></tr>
+      <tr><td>036</td><td>vector_search</td><td>pgvector</td></tr>
+      <tr><td>037</td><td>website_scraping_enhancements</td><td>website storage</td></tr>
+      <tr><td>038</td><td>whatsapp_cloud</td><td>WhatsApp Cloud integration</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="cron">
+  <h2 data-num="20">Cron Jobs · <code>vercel.json</code></h2>
+  <p class="lead">11 משימות מתוזמנות שעובדות אוטומטית ב-Vercel.</p>
+
+  <table>
+    <thead><tr><th>Path</th><th>Schedule</th><th>מטרה</th></tr></thead>
+    <tbody>
+      <tr><td><code>/api/cron/poll-stories</code></td><td><code>*/30 * * * *</code></td><td>polling של stories שייתכן והתפוגגו</td></tr>
+      <tr><td><code>/api/cron/daily-scan</code></td><td><code>*/10 1-4 * * *</code></td><td>סריקה יומית של IG (חלון 01-04 UTC)</td></tr>
+      <tr><td><code>/api/cron/daily-persona-update</code></td><td><code>0 2 * * *</code></td><td>refresh של persona מ-scrape אחרון</td></tr>
+      <tr><td><code>/api/cron/analyze-conversations</code></td><td><code>0 6 * * *</code></td><td>mining של chats אחרונים → fold ל-persona</td></tr>
+      <tr><td><code>/api/cron/process-content</code></td><td><code>*/10 5-11 * * *</code></td><td>process של תוכן בתור (transcribe, embed, ingest)</td></tr>
+      <tr><td><code>/api/cron/compute-hot-topics</code></td><td><code>0 */3 * * *</code></td><td>recompute של נושאים חמים ל-media_news</td></tr>
+      <tr><td><code>/api/cron/prewarm-cache</code></td><td><code>*/4 * * * *</code></td><td>pre-warm RAG ל-popular questions</td></tr>
+      <tr><td><code>/api/cron/health-alerts</code></td><td><code>*/10 * * * *</code></td><td>Sentry-style health check</td></tr>
+      <tr><td><code>/api/cron/weekly-digest</code></td><td><code>0 6 * * 0</code></td><td>email סטטיסטיקה שבועית</td></tr>
+      <tr><td><code>/api/cron/refresh-media-urls</code></td><td><code>0 * * * 0</code></td><td>חתימה מחדש של IG CDN URLs (שבועי)</td></tr>
+      <tr><td><code>/api/cron/handoff-fallback</code></td><td><code>*/30 * * * *</code></td><td>LDRS handoff: אם איתמר לא ענה ב-6h → fallback note + email לרועי</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout warn">
+    <strong>3 cron paths שבורים</strong>
+    <code>notifications</code>, <code>daily-digest</code>, <code>social-listening</code> מתוזמנים ב-vercel.json אבל <strong>אין להם route files</strong>. הם מחזירים 404 - no-op, אבל צריך לנקות את ה-vercel.json בפעם הבאה.
+  </div>
+</section>
+
+<section id="env">
+  <h2 data-num="21">Environment Variables</h2>
+  <p class="lead">כל המשתנים מוגדרים ב-Vercel (production / preview / development) ומקומית ב-<code>.env.local</code>. משתנים ציבוריים מתחילים ב-<code>NEXT_PUBLIC_</code>.</p>
+
+  <h3>Supabase</h3>
+  <ul>
+    <li><code>NEXT_PUBLIC_SUPABASE_URL</code> ✓ public</li>
+    <li><code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> ✓ public</li>
+    <li><code>SUPABASE_SECRET_KEY</code> (preferred) <strong>או</strong> <code>SUPABASE_SERVICE_ROLE_KEY</code></li>
+    <li><code>SUPABASE_PUBLISHABLE_KEY</code> (legacy)</li>
+  </ul>
+
+  <h3>LLMs</h3>
+  <ul>
+    <li><code>OPENAI_API_KEY</code></li>
+    <li><code>GEMINI_API_KEY</code></li>
+    <li><code>ANTHROPIC_API_KEY</code> (parser fallback בלבד)</li>
+  </ul>
+
+  <h3>Instagram (Cloud API)</h3>
+  <ul>
+    <li><code>INSTAGRAM_APP_ID</code>, <code>INSTAGRAM_APP_SECRET</code></li>
+    <li><code>INSTAGRAM_ACCESS_TOKEN</code> (system user)</li>
+    <li><code>INSTAGRAM_WEBHOOK_VERIFY_TOKEN</code></li>
+  </ul>
+
+  <h3>WhatsApp Cloud API</h3>
+  <ul>
+    <li><code>WHATSAPP_PHONE_NUMBER_ID</code></li>
+    <li><code>WHATSAPP_BUSINESS_ACCOUNT_ID</code></li>
+    <li><code>WHATSAPP_ACCESS_TOKEN</code></li>
+    <li><code>WHATSAPP_APP_SECRET</code></li>
+    <li><code>WHATSAPP_WEBHOOK_VERIFY_TOKEN</code></li>
+    <li><code>WHATSAPP_GRAPH_VERSION</code> (v21.0 default)</li>
+  </ul>
+
+  <h3>Google</h3>
+  <ul>
+    <li><code>GOOGLE_SERVICE_ACCOUNT_KEY</code> (full JSON, multiline)</li>
+    <li><code>GMAIL_SEND_FROM</code> = <code>bestie@ldrsgroup.com</code></li>
+    <li><code>LEADS_EMAIL_TO</code> = <code>roei@ldrsgroup.com</code></li>
+    <li><code>GOOGLE_DRIVE_LEADS_FOLDER_ID</code></li>
+  </ul>
+
+  <h3>LDRS Conference</h3>
+  <ul>
+    <li><code>ITAMAR_WHATSAPP_NUMBER</code> (currently <code>+972547667775</code> for testing)</li>
+    <li><code>HANDOFF_ALLOWED_NUMBERS</code> (comma list, optional extras)</li>
+    <li><code>HANDOFF_FALLBACK_HOURS</code> (default <code>6</code>)</li>
+    <li><code>HANDOFF_ADMIN_TOKEN</code> (secret ל-/admin/handoff toggle)</li>
+    <li><code>MAKE_CONFERENCE_WEBHOOK_URL</code> (Make.com)</li>
+    <li><code>CONFERENCE_LEAD_OWNER_EMAIL</code> / <code>CONFERENCE_LEAD_OWNER_NAME</code></li>
+  </ul>
+
+  <h3>Analytics (public)</h3>
+  <ul>
+    <li><code>NEXT_PUBLIC_GA4_ID</code> = <code>G-19QBYHM5FP</code></li>
+    <li><code>NEXT_PUBLIC_META_PIXEL_ID</code> = <code>1499456848104955</code></li>
+    <li><code>NEXT_PUBLIC_TIKTOK_PIXEL_ID</code> = <code>D7IFRGRC77U32HD1FN00</code></li>
+  </ul>
+
+  <h3>Analytics (server-only, optional)</h3>
+  <ul>
+    <li><code>META_CAPI_TOKEN</code>, <code>META_CAPI_TEST_CODE</code></li>
+    <li><code>TIKTOK_EVENTS_TOKEN</code></li>
+  </ul>
+
+  <h3>Cache / Queue</h3>
+  <ul>
+    <li><code>UPSTASH_REDIS_REST_URL</code></li>
+    <li><code>UPSTASH_REDIS_REST_TOKEN</code></li>
+  </ul>
+
+  <h3>Other</h3>
+  <ul>
+    <li><code>CRON_SECRET</code></li>
+    <li><code>MEMORY_V2_ENABLED</code> (feature flag)</li>
+    <li><code>WHATSAPP_NOTIFY_ENABLED</code> (feature flag)</li>
+    <li><code>SCRAPECREATORS_API_KEY</code></li>
+    <li><code>APIFY_API_TOKEN</code> (legacy fallback)</li>
+    <li><code>NEXT_PUBLIC_SENTRY_DSN</code> (אופציונלי)</li>
+  </ul>
+
+  <div class="callout warn">
+    <strong>Trim defensive תמיד</strong>
+    <code>vercel env add</code> מ-stdin יכול להוסיף <code>\n</code> בסוף. כבר עושים <code>.trim()</code> ל-<code>WHATSAPP_WEBHOOK_VERIFY_TOKEN</code>, <code>WHATSAPP_APP_SECRET</code>, <code>ITAMAR_WHATSAPP_NUMBER</code>, <code>LEADS_EMAIL_TO</code>.
+  </div>
+</section>
+
+<section id="scripts">
+  <h2 data-num="22">Scripts · <code>scripts/</code></h2>
+  <p class="lead">76 קבצים. הנה המעודכנים והכי שימושיים.</p>
+
+  <h3>Persona Building</h3>
+  <table>
+    <thead><tr><th>Script</th><th>מטרה</th></tr></thead>
+    <tbody>
+      <tr><td><code>scan-account.ts</code></td><td>סריקה מלאה לאינסטגרם של חשבון: profile + posts + highlights + comments + transcriptions + persona + RAG</td></tr>
+      <tr><td><code>rebuild-persona-gpt54.ts</code></td><td>הפעלה מחדש של persona-generator עם GPT-5.4</td></tr>
+      <tr><td><code>rebuild-all-personas.ts</code></td><td>regenerate לכל החשבונות</td></tr>
+      <tr><td><code>rebuild-persona-mcp.ts</code></td><td>שימוש ב-Claude MCP לבניית persona</td></tr>
+      <tr><td><code>build-persona-from-content.ts</code></td><td>בניית persona מ-posts/transcriptions</td></tr>
+    </tbody>
+  </table>
+
+  <h3>RAG & Knowledge</h3>
+  <table>
+    <tbody>
+      <tr><td><code>enrich-rag-chunks.ts</code></td><td>RAG enrichment עצמאי. flags: <code>--account-id [--dry-run] [--all]</code></td></tr>
+      <tr><td><code>rag-cli.ts</code></td><td>בדיקה אינטראקטיבית</td></tr>
+      <tr><td><code>rag-eval.ts</code></td><td>הערכת איכות retrieval</td></tr>
+      <tr><td><code>rebuild-rag-full.ts</code></td><td>re-embed לכל הידע</td></tr>
+      <tr><td><code>ingest-ldrs-conference-kb.mjs</code></td><td>ingest 20 docs ל-LDRS conference (חד-פעמי, idempotent)</td></tr>
+      <tr><td><code>ingest-plus1-external.mjs</code></td><td>re-ingest Plus1 כ-NOT_AFFILIATED</td></tr>
+      <tr><td><code>qa-ldrs-retrieval.mjs</code></td><td>QA של retrieval מול set שאלות</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Scanning & Scraping</h3>
+  <table>
+    <tbody>
+      <tr><td><code>deep-scrape-website.mjs</code></td><td>universal cheerio scraper. רץ <strong>מקומי, לא Vercel</strong>. <code>--account-id --url</code></td></tr>
+      <tr><td><code>scan-all-accounts.ts</code></td><td>incremental scan ל-batch של חשבונות</td></tr>
+      <tr><td><code>deep-scan-account.ts</code></td><td>ניתוח מפורט</td></tr>
+      <tr><td><code>process-all-accounts.ts</code></td><td>persona / RAG re-process bulk</td></tr>
+      <tr><td><code>persist-all-media.ts</code></td><td>backfill ל-<code>stored_*_url</code></td></tr>
+      <tr><td><code>resolve-ldrs-dm-contacts.ts</code></td><td>פתרון IGSIDs → usernames דרך Meta Graph</td></tr>
+    </tbody>
+  </table>
+
+  <h3>WhatsApp & Email</h3>
+  <table>
+    <tbody>
+      <tr><td><code>create-whatsapp-template.ts</code></td><td>יצירת template <code>bestie_handoff_lead</code> דרך Meta API</td></tr>
+      <tr><td><code>test-handoff-template.ts</code></td><td>שליחת template לבדיקה</td></tr>
+      <tr><td><code>test-conference-confirmation.ts</code></td><td>email דוגמה</td></tr>
+      <tr><td><code>test-gmail-send.mjs</code></td><td>smoke test ל-Gmail</td></tr>
+      <tr><td><code>test-drive-access.mjs</code></td><td>smoke test ל-Drive</td></tr>
+      <tr><td><code>export-ldrs-ig-dm-conversations.ts</code></td><td>ייצוא 20 שיחות LDRS DM ל-MD + JSON</td></tr>
+    </tbody>
+  </table>
+
+  <h3>QA / Critic</h3>
+  <table>
+    <tbody>
+      <tr><td><code>critic-agent.ts</code></td><td>LLM-judge על תשובות אחרונות</td></tr>
+      <tr><td><code>critic-business.ts</code></td><td>QA מנקודת מבט עסקית</td></tr>
+      <tr><td><code>critic-security.ts</code></td><td>QA אבטחה</td></tr>
+      <tr><td><code>critic-ux.ts</code></td><td>QA UX</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Migration / Maintenance</h3>
+  <table>
+    <tbody>
+      <tr><td><code>split-beauty-reviews.ts</code></td><td>migration: chunking של ביקורות</td></tr>
+      <tr><td><code>extract-products-from-rag.ts</code></td><td>חילוץ מוצרים</td></tr>
+      <tr><td><code>enrich-products.ts</code></td><td>העשרה במטה-דאטה</td></tr>
+      <tr><td><code>generate-tab-config.ts</code></td><td>יצירת config UI</td></tr>
+      <tr><td><code>backup-database.sh</code></td><td>גיבוי DB</td></tr>
+      <tr><td><code>backup-all.sh</code></td><td>גיבוי DB + Storage</td></tr>
+      <tr><td><code>run-migrations.mjs</code></td><td>החלת migrations</td></tr>
+      <tr><td><code>delete-account.ts</code></td><td>GDPR data deletion</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="deploy">
+  <h2 data-num="23">Build · Run · Deploy</h2>
+
+  <h3>Local Dev</h3>
+  <pre class="ltr"><code class="language-bash">npm install
+npm run check:env       # validates env vars
+npm run dev             # starts on :3000 with --max-http-header-size=32K</code></pre>
+
+  <h3>Tests</h3>
+  <pre class="ltr"><code class="language-bash">npm run test            # vitest
+npm run test:ui
+npm run test:coverage
+npm run test:e2e        # playwright (needs running dev server)
+npm run test:e2e:ui</code></pre>
+
+  <h3>Type-check & Lint</h3>
+  <pre class="ltr"><code class="language-bash">npm run type-check      # tsc --noEmit
+                        # ⚠ build IGNORES type errors via next.config.ts
+                        # CI must rely on this!
+npm run lint</code></pre>
+
+  <h3>Build</h3>
+  <pre class="ltr"><code class="language-bash">npm run build           # next build
+npm run start           # production locally</code></pre>
+
+  <h3>Deploy</h3>
+  <pre class="ltr"><code class="language-bash">vercel --prod --yes     # promotes to bestie.ldrsgroup.com</code></pre>
+
+  <p>Deploy artifacts ב-<code>vercel ls</code>:</p>
+  <ul>
+    <li><code>bestie.ldrsgroup.com</code> - production alias</li>
+    <li><code>influencers-bot.vercel.app</code> - Vercel default</li>
+    <li><code>influencers-{hash}-idosegev23s-projects.vercel.app</code> - כל deploy</li>
+  </ul>
+
+  <h3>DB Backups</h3>
+  <pre class="ltr"><code class="language-bash">npm run backup:db       # one-shot pg_dump
+npm run backup:all      # DB + Supabase Storage</code></pre>
+</section>
+
+<section id="setup">
+  <h2 data-num="24">Setup מקומי - שלב אחר שלב</h2>
+  <p class="lead">המדריך המלא להתחלה ב-30 דקות. אם קצרת זמן - דלג על שלבים 7-9.</p>
+
+  <h3>שלב 1: דרישות מקדימות</h3>
+  <table>
+    <thead><tr><th>כלי</th><th>גרסה מינימום</th><th>איך מתקינים</th></tr></thead>
+    <tbody>
+      <tr><td>Node.js</td><td>24.x</td><td><code>nvm install 24</code></td></tr>
+      <tr><td>npm</td><td>10.x</td><td>בא עם node</td></tr>
+      <tr><td>git</td><td>any</td><td>brew install git</td></tr>
+      <tr><td>Vercel CLI</td><td>32+</td><td><code>npm i -g vercel</code></td></tr>
+      <tr><td>Supabase CLI</td><td>1.150+</td><td><code>brew install supabase/tap/supabase</code></td></tr>
+      <tr><td>Claude Code (אופציונלי)</td><td>—</td><td>ראה <code>CLAUDE.md</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>שלב 2: Clone + Install</h3>
+  <pre class="ltr"><code class="language-bash">git clone &lt;REPO_URL&gt; bestie
+cd bestie
+npm install
+# יקח 2-4 דקות. יותקנו 1100+ packages</code></pre>
+
+  <h3>שלב 3: Environment</h3>
+  <pre class="ltr"><code class="language-bash"># העתק את הדוגמה
+cp .env.example .env.local
+
+# בקש מ-dev אחר את הערכים האמיתיים, או:
+vercel link
+vercel env pull .env.local --environment=development</code></pre>
+
+  <div class="callout">
+    <strong>Minimal env לחי-מינימום</strong>
+    אם אין לך כל הערכים, ה-<strong>קריטיים</strong> ל-dev: <code>NEXT_PUBLIC_SUPABASE_URL</code>, <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>, <code>SUPABASE_SECRET_KEY</code>, <code>OPENAI_API_KEY</code>, <code>UPSTASH_REDIS_REST_URL</code>, <code>UPSTASH_REDIS_REST_TOKEN</code>.
+  </div>
+
+  <h3>שלב 4: וידוא env</h3>
+  <pre class="ltr"><code class="language-bash">npm run check:env
+# אם משהו חסר - הוא יצרח</code></pre>
+
+  <h3>שלב 5: הרצה</h3>
+  <pre class="ltr"><code class="language-bash">npm run dev
+# פתח: http://localhost:3000
+# לבדיקה מלאה: http://localhost:3000/chat/ldrs_group?source=conf</code></pre>
+
+  <h3>שלב 6: בדיקת Supabase</h3>
+  <ol>
+    <li>פתח <a href="https://supabase.com/dashboard">Supabase Dashboard</a></li>
+    <li>בחר את הפרויקט הרלוונטי</li>
+    <li>Table Editor → <code>accounts</code> → לחפש את LDRS (<code>de38eac6-d2fb-46a7-ac09-5ec860147ca0</code>)</li>
+    <li>SQL Editor → להריץ <code>SELECT count(*) FROM document_chunks WHERE account_id = '...';</code></li>
+  </ol>
+
+  <h3>שלב 7: סקרייפ מקומי</h3>
+  <pre class="ltr"><code class="language-bash"># אופציונלי - אם רוצים נתונים חיים
+npx tsx scripts/scan-account.ts --username ldrs_group
+# idempotent - בטוח להריץ שוב</code></pre>
+
+  <h3>שלב 8: Playwright (לטסטים)</h3>
+  <pre class="ltr"><code class="language-bash">npx playwright install
+npm run test:e2e</code></pre>
+
+  <h3>שלב 9: VS Code recommended extensions</h3>
+  <ul>
+    <li>ESLint</li>
+    <li>Prettier</li>
+    <li>Tailwind CSS IntelliSense</li>
+    <li>Prisma (לסכימה)</li>
+    <li>ErrorLens</li>
+  </ul>
+
+  <h3>איך לבדוק שהכל עובד?</h3>
+  <ol>
+    <li>פתח <code>http://localhost:3000</code> - אמור לראות landing</li>
+    <li>פתח <code>http://localhost:3000/chat/ldrs_group?source=conf</code> - אמור לראות צ'אט</li>
+    <li>שלח הודעה - <code>היי</code> או <code>תגיד לי על LDRS</code></li>
+    <li>בטרמינל אחר: <code>tail -f</code> פלט dev server - תראה את ה-pipeline</li>
+    <li>בדוק שיש תגובה streamed</li>
+    <li>בדוק שב-Supabase יש שורה חדשה ב-<code>chat_messages</code></li>
+  </ol>
+</section>
+
+<section id="troubleshoot">
+  <h2 data-num="25">Troubleshooting + FAQ</h2>
+  <p class="lead">בעיות נפוצות, שגיאות, ופתרונות מהשטח.</p>
+
+  <h3>בעיות הרצה</h3>
+  <details>
+    <summary><code>EADDRINUSE: port 3000 already in use</code></summary>
+    <pre class="ltr"><code class="language-bash">lsof -ti:3000 | xargs kill -9
+# או הרץ על port אחר:
+PORT=3001 npm run dev</code></pre>
+  </details>
+
+  <details>
+    <summary><code>431 Request Header Fields Too Large</code></summary>
+    <p>ה-cookies של Supabase auth ארוכים. ה-script <code>npm run dev</code> כבר כולל <code>--max-http-header-size=32768</code>. אם בכל זאת קורה:</p>
+    <pre class="ltr"><code class="language-bash">NODE_OPTIONS='--max-http-header-size=65536' npm run dev</code></pre>
+  </details>
+
+  <details>
+    <summary><code>npm run check:env</code> נכשל</summary>
+    <p>בדוק שיש לך <code>.env.local</code> ושהוא מכיל את כל ה-vars הקריטיים. אל תשתמש ב-<code>.env</code> רגיל - Next.js יקרא <code>.env.local</code>.</p>
+  </details>
+
+  <details>
+    <summary>Build נכשל אבל <code>type-check</code> עבר</summary>
+    <p>ייתכן בעיית ESLint. הרץ <code>npm run lint</code>. אם זה ESLint - תקן את ה-errors. אם זה משהו אחר - בדוק את הלוג.</p>
+  </details>
+
+  <h3>בעיות Supabase</h3>
+  <details>
+    <summary>השאילתה מחזירה <code>[]</code> ריק למרות שיש נתונים</summary>
+    <p><strong>סיבה:</strong> הוספת ב-server code את ה-<code>anon key</code> במקום <code>service role</code>. זה גורם ל-RLS לסנן הכל.</p>
+    <pre class="ltr"><code class="language-typescript">// ❌
+import { supabase } from '@/lib/supabase-client'; // browser
+// ✅
+import { supabase } from '@/lib/supabase'; // service-role</code></pre>
+  </details>
+
+  <details>
+    <summary>"column 'message' does not exist"</summary>
+    <p>זה <code>content</code>, לא <code>message</code>. תקן ב-SELECT שלך.</p>
+  </details>
+
+  <details>
+    <summary>RLS policy מונעת insert</summary>
+    <p>ודא שאתה משתמש ב-<code>service-role client</code> בקוד שרת. ב-API routes - תמיד לייבא מ-<code>@/lib/supabase</code>.</p>
+  </details>
+
+  <h3>בעיות LLM</h3>
+  <details>
+    <summary>OpenAI מחזיר 429 Rate Limit</summary>
+    <p>בדוק את הקוטה ב-OpenAI dashboard. ל-dev עדיף key נפרד עם limit נמוך. ה-prod עובד עם quota גבוה יותר.</p>
+  </details>
+
+  <details>
+    <summary>Gemini מחזיר "internal error"</summary>
+    <p>זה ידוע ב-AI parser. ה-fallback chain: Gemini → Claude → GPT-4o. אם רואים warn "internal error" - זה נורמלי, ה-Claude יקבל את העבודה.</p>
+  </details>
+
+  <details>
+    <summary>Vector search מחזיר תוצאות לא רלוונטיות</summary>
+    <ol>
+      <li>בדוק שה-embeddings של החשבון עודכנו: <code>SELECT count(*) FROM document_chunks WHERE account_id = '...' AND embedding IS NOT NULL;</code></li>
+      <li>הרץ enrichment: <code>npx tsx scripts/enrich-rag-chunks.ts --account-id ...</code></li>
+      <li>אם החשבון חדש - הרץ scan מחדש</li>
+    </ol>
+  </details>
+
+  <h3>בעיות WhatsApp</h3>
+  <details>
+    <summary>Template נדחה / שגיאת approval</summary>
+    <p>ה-<code>bestie_handoff_lead</code> כבר מאושר. אם תיצור template חדש - תזכור ש-Marketing וגם Utility מאושרים שונה.</p>
+  </details>
+
+  <details>
+    <summary>אי-אפשר לשלוח טקסט חופשי - חייב template</summary>
+    <p>חוץ מחלון 24h של customer service. הנמען חייב לשלוח לנו קודם בתוך 24 שעות.</p>
+  </details>
+
+  <details>
+    <summary>Webhook signature mismatch</summary>
+    <p>בדוק שה-<code>WHATSAPP_APP_SECRET</code> מ-trim, וודא שאין <code>\n</code> בסוף. ב-<code>signature.ts</code> כבר יש defensive trim.</p>
+  </details>
+
+  <h3>בעיות Vercel</h3>
+  <details>
+    <summary>cron הפסיק לרוץ</summary>
+    <p>בדוק ב-Vercel dashboard → Cron → סטטוס. שים לב ש-3 cron paths שבורים (no route file). זה לא קורס - פשוט 404.</p>
+  </details>
+
+  <details>
+    <summary>Function timeout (60s)</summary>
+    <p>אנחנו ב-Pro tier עם <code>maxDuration = 60</code>. אם פונקציה לוקחת יותר - העבירה ל-cron / queue. אל תוסיף עוד timeout - זה מסתיר בעיות.</p>
+  </details>
+
+  <details>
+    <summary>env var נראה ריק ב-prod</summary>
+    <p>אחרי <code>vercel env add</code> חייב <code>vercel --prod</code> כדי שיתעדכן. גם כאן - <code>.trim()</code> תמיד.</p>
+  </details>
+
+  <h3>בעיות Frontend</h3>
+  <details>
+    <summary>צ'אט נתקע ב-"thinking..." ולא חוזר</summary>
+    <ol>
+      <li>בדוק network tab - האם ה-SSE stream פתוח?</li>
+      <li>בדוק לוגים בשרת - האם יש שגיאת <code>processMessage</code>?</li>
+      <li>בדוק ש-OpenAI כעין reachable</li>
+      <li>בדוק שאין dead lock ב-<code>chat_sessions</code> (השדה <code>locked_by</code>)</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary>תמונות מ-Instagram לא מוצגות</summary>
+    <p>ה-CDN URLs של IG פגות תוקף. אנחנו proxy אותן דרך <code>/api/image-proxy</code>. בדוק ש-cron <code>refresh-media-urls</code> רץ. תמיד השתמש ב-<code>getProxiedImageUrl()</code>.</p>
+  </details>
+
+  <h3>FAQ</h3>
+  <details>
+    <summary>איך אני בודק שתשובת הצ'אט מבוססת על מקור אמיתי?</summary>
+    <p>הפעל <code>scripts/qa-ldrs-retrieval.mjs</code> או הסתכל ב-<code>chat_events</code> בטבלה - שם נשמר ה-context שנכלל.</p>
+  </details>
+
+  <details>
+    <summary>איך אני מאפס persona של חשבון?</summary>
+    <p><code>npx tsx scripts/rebuild-persona-gpt54.ts --account-id &lt;uuid&gt;</code> - אבל קודם וודא ש-<code>preprocessing_data</code> קיים.</p>
+  </details>
+
+  <details>
+    <summary>איך מוסיפים archetype חדש?</summary>
+    <ol>
+      <li>הוסף קובץ ב-<code>src/lib/chatbot/archetypes/myArchetype.ts</code></li>
+      <li>רשום ב-<code>archetypes/index.ts</code></li>
+      <li>הוסף ל-<code>generate-tab-config.ts</code> אם הטאבים שונים</li>
+      <li>הוסף ל-<code>rag/archetypes.ts</code> את ה-enum</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary>יצא לי משהו "[הקשר פנימי - אל תצטט: ...]" - מה זה?</summary>
+    <p>חלק מההודעות מכיל context פנימי לעיצוב prompt. <strong>חייב להסיר לפני forward</strong> (למשל ל-WhatsApp). הregex ב-<code>stream/route.ts</code> ב-<code>displayMessage</code> כבר מסיר.</p>
+  </details>
+</section>
+
+<section id="security">
+  <h2 data-num="26">Security & Compliance</h2>
+  <p class="lead">איך המערכת שומרת על נתונים, על אילו threats מגנה, ומה ה-compliance posture.</p>
+
+  <h3>שכבות אבטחה</h3>
+  <div class="cards">
+    <div class="card">
+      <h4>1. Network</h4>
+      <p>HTTPS-only · HSTS · CSP · X-Frame-Options · Permissions-Policy. הגדרות ב-<code>next.config.ts</code>.</p>
+    </div>
+    <div class="card">
+      <h4>2. Application</h4>
+      <p>Rate limiting · sanitize input · output encoding · Auth middleware על routes רגישים.</p>
+    </div>
+    <div class="card">
+      <h4>3. Database</h4>
+      <p>Postgres RLS על כל טבלת domain · multi-tenant isolation · service-role בלעדי לשרת.</p>
+    </div>
+    <div class="card">
+      <h4>4. Secrets</h4>
+      <p>Vercel env (encrypted) · אסור לקמיט <code>.env*</code> · API keys מתחלפים תקופתית.</p>
+    </div>
+  </div>
+
+  <h3>RBAC - 4 רמות</h3>
+  <table>
+    <thead><tr><th>תפקיד</th><th>גישה</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Admin</strong></td><td>הכל. <code>service_role</code></td></tr>
+      <tr><td><strong>Agent</strong></td><td>ניהול חשבונות שמוקצים לו, גישה לטוולים תפעוליים</td></tr>
+      <tr><td><strong>Influencer</strong></td><td>גישה רק לחשבון שלו. <code>auth.uid() = accounts.owner_user_id</code></td></tr>
+      <tr><td><strong>Follower</strong></td><td>צ'אט אנונימי בלבד</td></tr>
+    </tbody>
+  </table>
+
+  <h3>RLS Policies (דוגמה)</h3>
+  <pre class="ltr"><code class="language-sql">-- Each domain table follows this pattern:
+ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users see only their account's messages"
+ON chat_messages FOR SELECT
+USING (
+  account_id IN (
+    SELECT account_id FROM account_users
+    WHERE user_id = auth.uid()
+  )
+);
+
+-- Service role bypasses all RLS</code></pre>
+
+  <h3>OWASP Top 10 Coverage</h3>
+  <table>
+    <thead><tr><th>איום</th><th>איך מגנים</th></tr></thead>
+    <tbody>
+      <tr><td>A01: Broken Access Control</td><td>RLS + middleware + role gates ב-UI</td></tr>
+      <tr><td>A02: Cryptographic Failures</td><td>HTTPS only · bcrypt לסיסמאות (Supabase) · no plaintext PII</td></tr>
+      <tr><td>A03: Injection</td><td>Parameterized queries (Supabase client) · <code>sanitize.ts</code> ל-HTML</td></tr>
+      <tr><td>A04: Insecure Design</td><td>idempotency keys · rate limit · session locking</td></tr>
+      <tr><td>A05: Security Misconfiguration</td><td>CSP · headers · service-role בלעדי בשרת</td></tr>
+      <tr><td>A06: Vulnerable Components</td><td>Dependabot · <code>npm audit</code> ב-CI</td></tr>
+      <tr><td>A07: Auth Failures</td><td>Supabase Auth · JWT עם expiration · rotate tokens</td></tr>
+      <tr><td>A08: Data Integrity Failures</td><td>HMAC-SHA256 verification ל-webhooks · CSP מונע injection</td></tr>
+      <tr><td>A09: Logging Failures</td><td><code>logger.ts</code> · Sentry-ready · pipeline events ב-DB</td></tr>
+      <tr><td>A10: SSRF</td><td>URL allowlist ב-image-proxy · cheerio רץ רק locally</td></tr>
+    </tbody>
+  </table>
+
+  <h3>PII Handling</h3>
+  <ul>
+    <li><strong>Server analytics:</strong> SHA-256 hash על email, phone לפני שליחה ל-Meta CAPI / TikTok</li>
+    <li><strong>chat_leads:</strong> מאוחסן עם <code>account_id</code>, RLS מסנן</li>
+    <li><strong>WhatsApp:</strong> מספרים מוצגים רק בצורה masked לתמיכה (4 ספרות אחרונות)</li>
+    <li><strong>Public Order Details Protection</strong> (policy): מסכה אוטומטית של order numbers + phones במצב צ'אט ציבורי</li>
+  </ul>
+
+  <h3>GDPR / CCPA</h3>
+  <table>
+    <thead><tr><th>זכות</th><th>איך מטפלים</th></tr></thead>
+    <tbody>
+      <tr><td>Right to Access</td><td>אינפלואנסר רואה את הנתונים בדשבורד שלו</td></tr>
+      <tr><td>Right to Erasure</td><td><code>/api/gdpr/delete-data</code> + <code>scripts/delete-account.ts</code></td></tr>
+      <tr><td>Right to Portability</td><td>Export תוכן מהדשבורד (TODO: לוודא שזמין)</td></tr>
+      <tr><td>Cookie Consent</td><td><code>CookieConsent.tsx</code> - כרגע informational. אם מתרחבים ל-EU - להוסיף gating מלא</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Webhook Security</h3>
+  <ul>
+    <li><strong>WhatsApp:</strong> HMAC-SHA256 signature verification (<code>signature.ts</code>)</li>
+    <li><strong>Instagram:</strong> verify token + signature</li>
+    <li><strong>Make.com:</strong> shared secret</li>
+    <li><strong>Cron:</strong> <code>CRON_SECRET</code> ב-header</li>
+  </ul>
+
+  <h3>Secrets Rotation Policy</h3>
+  <ul>
+    <li>OpenAI / Gemini / Anthropic API keys: בדיקה רבעונית, החלפה מיידית בחשד</li>
+    <li>Supabase service-role: rotate בעת עזיבת dev מהצוות</li>
+    <li>WhatsApp access token: System User token - אין expiration, אבל rotate שנתית מומלצת</li>
+    <li>Webhook verify tokens: ייחודיים לכל service</li>
+  </ul>
+
+  <div class="callout danger">
+    <strong>סיכונים פתוחים</strong>
+    1. CookieConsent עדיין informational - analytics fires ללא הסכמה. לרוב טריטוריה ישראלית זה תקין, אבל אם מרחיבים ל-EU צריך לתקן.<br>
+    2. ה-<code>SUPABASE_SERVICE_ROLE_KEY</code> בעל גישה מלאה - חייב להישאר בשרת בלבד, אסור ב-client bundle.<br>
+    3. Sentry stub בלבד - אם רוצים visibility אמיתי לשגיאות צריך לחבר.
+  </div>
+</section>
+
+<section id="performance">
+  <h2 data-num="27">Performance & Scale</h2>
+  <p class="lead">איך המערכת בנויה לעמוד ב-load, איפה ה-bottlenecks, מה הוסיפו לאופטימיזציה.</p>
+
+  <h3>שכבות Caching</h3>
+  <div class="mermaid-wrap">flowchart LR
+    Req[Request] --> L1[L1: in-memory<br/>cache.ts]
+    L1 -->|miss| L2[L2: Upstash Redis<br/>cache-l2.ts]
+    L2 -->|miss| DB[Supabase]
+    DB --> L2
+    L2 --> L1
+    L1 --> Req</div>
+
+  <table>
+    <thead><tr><th>שכבה</th><th>TTL</th><th>שימוש</th></tr></thead>
+    <tbody>
+      <tr><td>L1 (process memory)</td><td>10-60 שניות</td><td>per-instance, מהיר ביותר</td></tr>
+      <tr><td>L2 (Upstash Redis)</td><td>3-30 דקות</td><td>cross-instance, persistent</td></tr>
+      <tr><td>RAG retrieval cache</td><td>3 דקות</td><td>query hash → results</td></tr>
+      <tr><td>Suggestion cache</td><td>4 דקות (cron prewarm)</td><td>popular questions</td></tr>
+      <tr><td>Image proxy</td><td>24 שעות</td><td>IG CDN URLs</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Rate Limiting (per-IP, 60 sec window)</h3>
+  <table>
+    <thead><tr><th>Route</th><th>Limit</th></tr></thead>
+    <tbody>
+      <tr><td><code>/api/chat</code></td><td>100 / min</td></tr>
+      <tr><td><code>/api/influencer</code></td><td>200 / min</td></tr>
+      <tr><td><code>/api/auth</code></td><td>50 / min</td></tr>
+      <tr><td><code>/api/admin</code></td><td>20 / min</td></tr>
+      <tr><td><code>/api/widget</code></td><td>200 / min</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Database Optimizations</h3>
+  <ul>
+    <li><strong>GIN indexes</strong> ל-FTS על <code>posts</code>, <code>transcriptions</code>, <code>highlights</code></li>
+    <li><strong>pgvector HNSW</strong> ל-embedding similarity (2000-dim)</li>
+    <li><strong>Comprehensive indexes</strong> (migration 034) - composite indexes על <code>(account_id, posted_at)</code> וכו'</li>
+    <li><strong>Hebrew prefix stripping</strong> (migration 033) - מסיר ה' / ל' / מ' לפני חיפוש</li>
+    <li><strong>RPC functions</strong> ל-queries מורכבים (<code>search_all_content</code>, <code>get_coupons</code>)</li>
+  </ul>
+
+  <h3>LLM Cost Optimizations</h3>
+  <table>
+    <thead><tr><th>טכניקה</th><th>חיסכון</th></tr></thead>
+    <tbody>
+      <tr><td>Hybrid retrieval (4 stages)</td><td><strong>פי-8 זול</strong> מ-full content</td></tr>
+      <tr><td><code>gpt-5-nano</code> במקום GPT-5</td><td>~1/10 עלות</td></tr>
+      <tr><td>Skip rerank כש-vector confidence &gt;0.65</td><td>חוסך call ל-rerank</td></tr>
+      <tr><td>Idempotency cache</td><td>אפס duplicate calls</td></tr>
+      <tr><td>Conversation summarization</td><td>טוקנים לprompt קבועים גם ב-shut sessions</td></tr>
+      <tr><td>Suggestion pre-warm</td><td>שאלות נפוצות = cached answers</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Streaming + after()</h3>
+  <p>כל route ארוך משתמש ב-<code>after()</code> של Next 16 כדי לחזיר response מהר ולהמשיך side effects ברקע (Drive upload, CAPI, email):</p>
+  <pre class="ltr"><code class="language-typescript">import { after } from 'next/server';
+
+export async function POST(req: Request) {
+  const result = await processFast();
+
+  after(async () => {
+    await uploadToDrive(result);  // doesn't block response
+    await fireCAPI(result);
+    await sendConfirmationEmail(result);
+  });
+
+  return Response.json(result); // returned immediately
+}</code></pre>
+
+  <h3>Bottlenecks ידועים</h3>
+  <table>
+    <thead><tr><th>איזור</th><th>בעיה</th><th>פתרון</th></tr></thead>
+    <tbody>
+      <tr><td>cheerio website crawl</td><td>כבד מדי ל-Vercel function</td><td><strong>רץ מקומי בלבד</strong> דרך <code>scripts/deep-scrape-website.mjs</code></td></tr>
+      <tr><td>Persona generation</td><td>1-3 דקות לחשבון</td><td>Cron יומי <code>daily-persona-update</code></td></tr>
+      <tr><td>Initial scan לחשבון חדש</td><td>5-15 דקות</td><td>Background queue + progress UI</td></tr>
+      <tr><td>Vector index re-embed</td><td>מאות chunks</td><td><code>scripts/rebuild-rag-full.ts</code> במקום</td></tr>
+      <tr><td>WhatsApp 24h window</td><td>חוסם טקסט חופשי</td><td>Templates מאושרים</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Monitoring</h3>
+  <ul>
+    <li><strong>Pipeline metrics:</strong> <code>pm.mark()</code> ב-<code>/api/chat/stream</code> - שמור ב-<code>chat_runs</code> (legacy)</li>
+    <li><strong>Health alerts:</strong> cron <code>health-alerts</code> כל 10 דקות</li>
+    <li><strong>System health:</strong> <code>/api/admin/system-health</code></li>
+    <li><strong>Debug metrics:</strong> <code>/api/debug/metrics</code></li>
+    <li><strong>Sentry:</strong> stub כרגע - יחובר במלואו</li>
+  </ul>
+
+  <h3>Scale Targets</h3>
+  <div class="cards">
+    <div class="card">
+      <h4>Concurrent chats</h4>
+      <p>~500 simultaneous SSE streams ב-Pro tier. Vercel scaling אוטומטית.</p>
+    </div>
+    <div class="card">
+      <h4>Posts per account</h4>
+      <p>10K+ נבדק. retrieval מבוסס metadata - לא מעמיס בעלייה.</p>
+    </div>
+    <div class="card">
+      <h4>Total accounts</h4>
+      <p>שיטה קיימת תומכת בקלות במאות. Cron windows מצמצמים את ה-scan.</p>
+    </div>
+    <div class="card">
+      <h4>RAG chunks</h4>
+      <p>millions אפשריים עם pgvector + indexes. ה-bottleneck יהיה latency של embedding (חיצוני).</p>
+    </div>
+  </div>
+</section>
+
+<!-- NEXT-PLACEHOLDER -->
+
+    <div class="footer">
+      🛠️ אם משהו פה לא עדכני - ערוך את הקובץ ושלח PR. זה היחיד שאמור להישאר עדכני.
+      <br>Bestie · LDRS Group · bestie.ldrsgroup.com
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-typescript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-jsx.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-sql.min.js"></script>
+<script>
+// Theme
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme') || 'dark';
+  const next = cur === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('bestie-theme', next);
+  // Re-render mermaid with new theme
+  mermaid.initialize({ startOnLoad: false, theme: next === 'light' ? 'default' : 'dark', securityLevel: 'loose' });
+  document.querySelectorAll('.mermaid-wrap').forEach((wrap, i) => {
+    const code = wrap.dataset.code;
+    if (code) {
+      wrap.innerHTML = '<div class="mermaid">' + code + '</div>';
+    }
+  });
+  mermaid.run();
+}
+const savedTheme = localStorage.getItem('bestie-theme') || 'dark';
+document.documentElement.setAttribute('data-theme', savedTheme);
+
+// Mermaid init
+mermaid.initialize({ startOnLoad: false, theme: savedTheme === 'light' ? 'default' : 'dark', securityLevel: 'loose' });
+window.addEventListener('load', () => {
+  document.querySelectorAll('.mermaid-wrap').forEach(wrap => {
+    const code = wrap.textContent.trim();
+    wrap.dataset.code = code;
+    wrap.innerHTML = '<div class="mermaid">' + code + '</div>';
+  });
+  mermaid.run();
+});
+
+// Search
+const navSearch = document.getElementById('navSearch');
+navSearch.addEventListener('input', (e) => {
+  const q = e.target.value.trim().toLowerCase();
+  document.querySelectorAll('section').forEach(sec => {
+    if (!q) { sec.classList.remove('hidden-by-search'); return; }
+    const text = sec.textContent.toLowerCase();
+    sec.classList.toggle('hidden-by-search', !text.includes(q));
+  });
+  document.querySelectorAll('#navList li a').forEach(a => {
+    if (!q) { a.parentElement.style.display = ''; return; }
+    const target = document.querySelector(a.getAttribute('href'));
+    if (target) {
+      a.parentElement.style.display = target.classList.contains('hidden-by-search') ? 'none' : '';
+    }
+  });
+});
+
+// Active nav highlight
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const id = entry.target.id;
+      document.querySelectorAll('#navList li a').forEach(a => {
+        a.classList.toggle('active', a.getAttribute('href') === '#' + id);
+      });
+    }
+  });
+}, { rootMargin: '-40% 0px -55% 0px' });
+document.querySelectorAll('section[id]').forEach(s => observer.observe(s));
+
+// Tabs
+function activateTab(tabsId, idx) {
+  const tabs = document.getElementById(tabsId);
+  if (!tabs) return;
+  tabs.querySelectorAll('button').forEach((b, i) => b.classList.toggle('active', i === idx));
+  tabs.parentElement.querySelectorAll('.tab-pane').forEach((p, i) => p.classList.toggle('active', i === idx));
+}
+</script>
+</body>
+</html>
