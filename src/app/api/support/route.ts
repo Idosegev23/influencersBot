@@ -151,11 +151,22 @@ export async function POST(req: NextRequest) {
     // Derive a short "issue type" from the first line of the message;
     // the full text becomes the description. This matches the Meta
     // `brand_support_ticket` template's {{5}}=issueType, {{6}}=description.
+    // IMPORTANT: Meta rejects template body params containing \n / \t / >4
+    // consecutive spaces with error 132018. Sanitise both before passing.
+    function flattenForMeta(s: string, maxLen = 1024): string {
+      return s
+        .replace(/[\r\n\t]+/g, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim()
+        .slice(0, maxLen);
+    }
     const firstLine = sanitizedMessage.split('\n')[0].trim();
-    const issueType = firstLine.length > 0 ? firstLine.slice(0, 60) : 'פנייה כללית';
-    const description = sanitizedMessage.length > firstLine.length
-      ? sanitizedMessage
-      : firstLine;
+    const rawIssueType = firstLine.length > 0 ? firstLine : 'פנייה כללית';
+    const issueType = flattenForMeta(rawIssueType, 60);
+    const description = flattenForMeta(
+      sanitizedMessage.length > firstLine.length ? sanitizedMessage : firstLine,
+      900,
+    );
 
     // Send WhatsApp notification to BRAND via Meta Cloud API
     // (brand_support_ticket template, gated by WHATSAPP_NOTIFY_ENABLED +
