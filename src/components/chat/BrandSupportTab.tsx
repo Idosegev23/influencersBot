@@ -409,12 +409,37 @@ export default function BrandSupportTab({
                     exit={{ opacity: 0, y: -8 }}
                   >
                     {!trackingStatus.found ? (
-                      <div className="bg-white rounded-[20px] p-6 text-center">
+                      <div className="bg-white rounded-[20px] p-6 text-right">
                         <div className="w-[56px] h-[56px] mx-auto rounded-[14px] flex items-center justify-center mb-4 bg-[#f1e9fd]">
                           <Search className="w-7 h-7 text-[#883fe2]" />
                         </div>
-                        <h3 className="font-['Heebo:SemiBold',sans-serif] font-semibold text-[20px] leading-[24px] text-[#0c1013] mb-1">לא נמצא</h3>
-                        <p className="font-['Heebo:Regular',sans-serif] text-[14px] leading-[21px] text-[#676767]">{trackingStatus.statusText}</p>
+                        <h3 className="font-['Heebo:SemiBold',sans-serif] font-semibold text-[20px] leading-[24px] text-[#0c1013] mb-2 text-center">לא נמצא משלוח</h3>
+                        <p className="font-['Heebo:Regular',sans-serif] text-[14px] leading-[21px] text-[#676767] mb-4 text-center">{trackingStatus.statusText}</p>
+
+                        {/* Heuristic explainer — most common reason for
+                            "not found" is customers entering their Shopify
+                            order number (6 digits, sometimes with #)
+                            instead of the Focus shipment number (7 digits)
+                            from the shipping email. Spell that out. */}
+                        <div className="bg-[#fef9e7] border border-[#fde68a] rounded-[12px] p-4">
+                          <div className="flex gap-2 items-start mb-2">
+                            <AlertCircle className="w-[18px] h-[18px] text-[#b45309] flex-shrink-0 mt-[2px]" />
+                            <p className="font-['Heebo:SemiBold',sans-serif] font-semibold text-[14px] leading-[20px] text-[#92400e]">
+                              שימי לב — בטאב הזה צריך מספר משלוח, לא מספר הזמנה
+                            </p>
+                          </div>
+                          <ul className="font-['Heebo:Regular',sans-serif] text-[13px] leading-[20px] text-[#7c2d12] pr-6 list-disc text-right space-y-1">
+                            <li>
+                              <strong>מספר הזמנה</strong> — מופיע באישור הרכישה (~6 ספרות, לפעמים עם #).
+                            </li>
+                            <li>
+                              <strong>מספר משלוח Focus</strong> — 7 ספרות, מופיע במייל נפרד שמגיע מ-Focus כשההזמנה יוצאת למשלוח. <strong>זה המספר להזין כאן.</strong>
+                            </li>
+                            <li>
+                              אם אין עדיין מייל מ-Focus, ההזמנה כנראה לא יצאה — אפשר לפתוח פנייה דרך טאב "תמיכה".
+                            </li>
+                          </ul>
+                        </div>
                       </div>
                     ) : (
                       <>
