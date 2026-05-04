@@ -2097,6 +2097,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   initialDetails={supportPrefill?.details}
                   enableShipmentTracking={(influencer as any)?._rawConfig?.shipment_provider?.enabled === true}
                   initialMode={supportInitialMode}
+                  sessionId={sessionId}
                 />
               </motion.div>
               ) : (

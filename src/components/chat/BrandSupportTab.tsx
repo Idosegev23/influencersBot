@@ -38,6 +38,7 @@ interface BrandSupportTabProps {
   initialDetails?: string;
   enableShipmentTracking?: boolean;
   initialMode?: 'support' | 'tracking';
+  sessionId?: string | null;
 }
 
 interface ShipmentStatus {
@@ -108,7 +109,7 @@ function iconFor(cat: string): string {
 /* ------------------------------------------------------------------ */
 
 export default function BrandSupportTab({
-  accountId, username, brandName, isMobile, coupons = [], initialDetails, enableShipmentTracking, initialMode,
+  accountId, username, brandName, isMobile, coupons = [], initialDetails, enableShipmentTracking, initialMode, sessionId,
 }: BrandSupportTabProps) {
   // mode: 'support' = problem report flow (default), 'tracking' = order status lookup
   const [mode, setMode] = useState<'support' | 'tracking'>(initialMode || 'support');
@@ -323,6 +324,7 @@ export default function BrandSupportTab({
           orderNumber: form.order || null,
           problem: parts.join('\n'),
           productId: selectedProduct?.id || null,
+          sessionId: sessionId || null,
         }),
       });
       const data = await response.json();
