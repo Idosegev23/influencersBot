@@ -126,25 +126,76 @@ export default function BrandSupportTab({
   const [trackingStatus, setTrackingStatus] = useState<ShipmentStatus | null>(null);
   const [trackingLoading, setTrackingLoading] = useState(false);
   const [trackingError, setTrackingError] = useState<string | null>(null);
-
-  // Strip a leading "#" (some shipping confirmations display as "#1234")
-  // + trim whitespace
-  const cleanInput = (s: string) => s.trim().replace(/^#+/, '').replace(/\s+/g, '');
+  // Two-mode lookup:
+  //   'order'    — customer enters their order number (P2). Valid only
+  //                when the value is ≥ 6 digits and has NO `#`. Old
+  //                orders were `#180978` (6 chars + #) which can't pass
+  //                through the API; new orders are 6 digits clean.
+  //   'shipment' — customer enters the Focus shipment number (P1).
+  //                Triggered when the order number has `#` or is too
+  //                short to search reliably.
+  const [trackingMode, setTrackingMode] = useState<'order' | 'shipment'>('order');
+  const MIN_ORDER_DIGITS = 6;
 
   const lookupShipment = useCallback(async () => {
-    const num = cleanInput(trackingNumber);
-    if (!num) {
-      setTrackingError('נא להזין מספר משלוח');
+    const raw = trackingNumber.trim();
+    if (!raw) {
+      setTrackingError(trackingMode === 'order' ? 'נא להזין מספר הזמנה' : 'נא להזין מספר משלוח');
       return;
     }
+
+    if (trackingMode === 'order') {
+      // Order-number mode — validate that it can actually be searched
+      // through Focus's API. Two cases force a fallback to shipment
+      // number:
+      //   • contains '#' (legacy orders) — Focus's URL parser breaks
+      //     when sent with #, and stripping it returns wrong shipments
+      //   • shorter than MIN_ORDER_DIGITS — too generic, returns the
+      //     wrong customer's record
+      const hasHash = raw.includes('#');
+      const digitsOnly = raw.replace(/[^0-9]/g, '');
+      if (hasHash || digitsOnly.length < MIN_ORDER_DIGITS) {
+        const reason = hasHash
+          ? 'לא ניתן לחפש לפי מספר הזמנה ישנה (כולל #). הזיני בבקשה את מספר המשלוח שקיבלת מ-Focus במייל.'
+          : `המספר קצר מדי (פחות מ-${MIN_ORDER_DIGITS} ספרות). זה כנראה מספר הזמנה ישן. הזיני בבקשה את מספר המשלוח שקיבלת מ-Focus במייל.`;
+        setTrackingError(null);
+        setTrackingMode('shipment');
+        setTrackingNumber('');
+        setTrackingStatus(null);
+        // Surface the reason via an error chip in the new mode
+        setTrackingError(reason);
+        return;
+      }
+
+      // Send as P2 (reference) — clean order number
+      setTrackingLoading(true);
+      setTrackingError(null);
+      try {
+        const res = await fetch(
+          `/api/shipment/status?username=${encodeURIComponent(username)}&reference=${encodeURIComponent(digitsOnly)}`,
+        );
+        const data = await res.json();
+        if (!res.ok) {
+          setTrackingError(data?.error || 'לא ניתן לבצע את הבדיקה כרגע');
+          setTrackingStatus(null);
+        } else {
+          setTrackingStatus(data as ShipmentStatus);
+        }
+      } catch {
+        setTrackingError('אירעה שגיאה בחיבור לשירות המשלוחים');
+      } finally {
+        setTrackingLoading(false);
+      }
+      return;
+    }
+
+    // Shipment-number mode (P1)
+    const cleaned = raw.replace(/^#+/, '').replace(/\s+/g, '');
     setTrackingLoading(true);
     setTrackingError(null);
     try {
-      // Send as P1 (shipmentNumber). Per Focus's COO this is the
-      // recommended path — using REF (P2) is unreliable due to prefix
-      // tagging and can cause cross-customer confusion.
       const res = await fetch(
-        `/api/shipment/status?username=${encodeURIComponent(username)}&shipmentNumber=${encodeURIComponent(num)}`,
+        `/api/shipment/status?username=${encodeURIComponent(username)}&shipmentNumber=${encodeURIComponent(cleaned)}`,
       );
       const data = await res.json();
       if (!res.ok) {
@@ -158,7 +209,7 @@ export default function BrandSupportTab({
     } finally {
       setTrackingLoading(false);
     }
-  }, [trackingNumber, username]);
+  }, [trackingNumber, trackingMode, username]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -350,14 +401,32 @@ export default function BrandSupportTab({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
             >
-              {/* Header — same as other support steps */}
+              {/* Header — adapts to mode */}
               <div className="mb-6 px-3 flex flex-col items-end gap-[2px]">
                 <h2 className="font-['Heebo:SemiBold',sans-serif] font-semibold text-[24px] leading-[28px] text-[#0c1013] text-right">
-                  סטטוס משלוח
+                  {trackingMode === 'order' ? 'סטטוס הזמנה' : 'סטטוס משלוח'}
                 </h2>
                 <p className="font-['Heebo:Regular',sans-serif] text-[18px] leading-[24px] text-[#676767] text-right">
-                  הזיני את מספר המשלוח שקיבלת במייל מ-Focus
+                  {trackingMode === 'order'
+                    ? 'הזיני את מספר ההזמנה (מאישור הרכישה)'
+                    : 'הזיני את מספר המשלוח שקיבלת במייל מ-Focus'}
                 </p>
+              </div>
+
+              {/* Mode pill — switchable between order and shipment */}
+              <div className="mb-[12px] flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTrackingMode(trackingMode === 'order' ? 'shipment' : 'order');
+                    setTrackingError(null);
+                    setTrackingStatus(null);
+                    setTrackingNumber('');
+                  }}
+                  className="font-['Heebo:Regular',sans-serif] text-[13px] text-[#883fe2] underline px-2"
+                >
+                  {trackingMode === 'order' ? 'מעדיפה לחפש לפי מספר משלוח →' : '← חזרה למספר הזמנה'}
+                </button>
               </div>
 
               {/* Lookup card — pill input + solid purple CTA */}
@@ -370,7 +439,7 @@ export default function BrandSupportTab({
                     value={trackingNumber}
                     onChange={(e) => setTrackingNumber(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') lookupShipment(); }}
-                    placeholder="מספר משלוח"
+                    placeholder={trackingMode === 'order' ? `מספר הזמנה (${MIN_ORDER_DIGITS}+ ספרות)` : 'מספר משלוח Focus'}
                     className="w-full bg-transparent border-0 outline-none font-['Heebo:Light',sans-serif] font-light text-[18px] leading-[22.4px] text-[#0c1013] placeholder:text-[#676767] text-right"
                     dir="rtl"
                   />
