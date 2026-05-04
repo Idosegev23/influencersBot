@@ -70,25 +70,29 @@ export async function GET(req: NextRequest) {
     const lookupMode: 'p1' | 'p2' | 'p2_then_p1' = provider.lookup_mode || 'p1';
     const refPrefix: string = (provider.reference_prefix || '').trim();
     const host = provider.host || 'focusdelivery.co.il';
+    // Customer-scope safety: Focus's ship_status_xml does global ship_no
+    // lookup with NO scope, so a numeric collision returns another
+    // brand's record. We pass our master_customer_id to the client and
+    // any response with a different master is treated as "not found".
+    const expectedMasterCustomerId: number | undefined = provider.expected_master_customer_id
+      ? Number(provider.expected_master_customer_id)
+      : undefined;
 
     let view: Awaited<ReturnType<typeof getFocusShipmentStatus>>;
 
-    // Caller asked explicitly for shipmentNumber → always P1
     if (shipmentNumber && !reference) {
-      view = await getFocusShipmentStatus({ host, shipmentNumber });
+      view = await getFocusShipmentStatus({ host, shipmentNumber, expectedMasterCustomerId });
     } else {
-      // Default path uses lookupMode + the `reference` field (which is
-      // what the BrandSupportTab and the bot send by default).
       const raw = (reference || shipmentNumber)!;
       if (lookupMode === 'p1') {
-        view = await getFocusShipmentStatus({ host, shipmentNumber: raw });
+        view = await getFocusShipmentStatus({ host, shipmentNumber: raw, expectedMasterCustomerId });
       } else if (lookupMode === 'p2') {
-        view = await getFocusShipmentStatus({ host, reference: `${refPrefix}${raw}` });
+        view = await getFocusShipmentStatus({ host, reference: `${refPrefix}${raw}`, expectedMasterCustomerId });
       } else {
         // p2_then_p1
-        view = await getFocusShipmentStatus({ host, reference: `${refPrefix}${raw}` });
+        view = await getFocusShipmentStatus({ host, reference: `${refPrefix}${raw}`, expectedMasterCustomerId });
         if (!view.found) {
-          const p1 = await getFocusShipmentStatus({ host, shipmentNumber: raw });
+          const p1 = await getFocusShipmentStatus({ host, shipmentNumber: raw, expectedMasterCustomerId });
           if (p1.found) view = p1;
         }
       }
