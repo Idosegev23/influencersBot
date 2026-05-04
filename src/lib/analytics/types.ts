@@ -93,6 +93,9 @@ export type AnalyticsEventName =
   | 'coupon_redeemed_clicked'
   | 'product_card_clicked'
   | 'product_buy_clicked'
+  | 'product_selected'
+  | 'product_deselected'
+  | 'product_multi_ask'
   // Content / Discover / Topics
   | 'content_browse_loaded'
   | 'content_filter_changed'

@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { track } from '@/lib/analytics/track';
 import {
   Loader2, Search, ExternalLink, ShoppingBag,
-  X, Sparkles, AlignCenter,
+  X, Sparkles, AlignCenter, Check, Plus,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -109,36 +109,58 @@ function buildProductContext(product: Product): string {
 /*  Featured product card — white card with centered image + CTA      */
 /* ------------------------------------------------------------------ */
 
-function FeaturedProductCard({ product, onOpen }: { product: Product; onOpen: (p: Product) => void }) {
+function FeaturedProductCard({ product, selected, onOpen, onToggleSelect }: {
+  product: Product;
+  selected: boolean;
+  onOpen: (p: Product) => void;
+  onToggleSelect: (p: Product) => void;
+}) {
   const displayName = product.name_he || product.name;
   const description = product.ai_profile?.whatItDoes || product.description;
 
   return (
-    <motion.button
-      type="button"
-      onClick={() => onOpen(product)}
+    <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      className="pcat-featured"
+      className={`pcat-featured ${selected ? 'pcat-featured--selected' : ''}`}
     >
-      <div className="pcat-featured__img">
-        {product.image_url ? (
-          <img src={product.image_url} alt={displayName} loading="lazy" />
-        ) : (
-          <div className="pcat-featured__ph">
-            <ShoppingBag className="w-10 h-10" />
-          </div>
-        )}
-      </div>
-      <div className="pcat-featured__body">
-        <h2 className="pcat-featured__title">{displayName}</h2>
-        {description && <p className="pcat-featured__desc">{description}</p>}
-        <span className="pcat-featured__cta">
-          <ExternalLink className="w-3.5 h-3.5" />
-          לפרטים
-        </span>
-      </div>
-    </motion.button>
+      <button
+        type="button"
+        onClick={() => onOpen(product)}
+        className="pcat-featured__main"
+        aria-label={`${displayName} — לפרטים`}
+      >
+        <div className="pcat-featured__img">
+          {product.image_url ? (
+            <img src={product.image_url} alt={displayName} loading="lazy" />
+          ) : (
+            <div className="pcat-featured__ph">
+              <ShoppingBag className="w-10 h-10" />
+            </div>
+          )}
+        </div>
+        <div className="pcat-featured__body">
+          <h2 className="pcat-featured__title">{displayName}</h2>
+          {description && <p className="pcat-featured__desc">{description}</p>}
+          <span className="pcat-featured__cta">
+            <ExternalLink className="w-3.5 h-3.5 pcat-cta-icon" />
+            לפרטים
+          </span>
+        </div>
+      </button>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleSelect(product);
+        }}
+        className={`pcat-select-btn ${selected ? 'pcat-select-btn--on' : ''}`}
+        aria-label={selected ? 'הסרה מהבחירה' : 'הוספה לבחירה'}
+        aria-pressed={selected}
+      >
+        {selected ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+      </button>
+    </motion.div>
   );
 }
 
@@ -146,24 +168,48 @@ function FeaturedProductCard({ product, onOpen }: { product: Product; onOpen: (p
 /*  Rail product card — 140x175, purple bottom overlay                */
 /* ------------------------------------------------------------------ */
 
-function RailProductCard({ product, onOpen }: { product: Product; onOpen: (p: Product) => void }) {
+function RailProductCard({ product, selected, onOpen, onToggleSelect }: {
+  product: Product;
+  selected: boolean;
+  onOpen: (p: Product) => void;
+  onToggleSelect: (p: Product) => void;
+}) {
   const displayName = product.name_he || product.name;
   return (
-    <button type="button" onClick={() => onOpen(product)} className="pcat-rail-card">
-      {product.image_url ? (
-        <img src={product.image_url} alt={displayName} loading="lazy" className="pcat-rail-card__img" />
-      ) : (
-        <div className="pcat-rail-card__ph">
-          <ShoppingBag className="w-7 h-7" />
-        </div>
-      )}
-      <div className="pcat-rail-card__overlay">
-        <p className="pcat-rail-card__title">{displayName}</p>
-        {product.price != null && (
-          <p className="pcat-rail-card__price">₪{product.price}</p>
+    <div className={`pcat-rail-card ${selected ? 'pcat-rail-card--selected' : ''}`}>
+      <button
+        type="button"
+        onClick={() => onOpen(product)}
+        className="pcat-rail-card__main"
+        aria-label={`${displayName} — לפרטים`}
+      >
+        {product.image_url ? (
+          <img src={product.image_url} alt={displayName} loading="lazy" className="pcat-rail-card__img" />
+        ) : (
+          <div className="pcat-rail-card__ph">
+            <ShoppingBag className="w-7 h-7" />
+          </div>
         )}
-      </div>
-    </button>
+        <div className="pcat-rail-card__overlay">
+          <p className="pcat-rail-card__title">{displayName}</p>
+          {product.price != null && (
+            <p className="pcat-rail-card__price">₪{product.price}</p>
+          )}
+        </div>
+      </button>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleSelect(product);
+        }}
+        className={`pcat-select-btn pcat-select-btn--rail ${selected ? 'pcat-select-btn--on' : ''}`}
+        aria-label={selected ? 'הסרה מהבחירה' : 'הוספה לבחירה'}
+        aria-pressed={selected}
+      >
+        {selected ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+      </button>
+    </div>
   );
 }
 
@@ -171,8 +217,12 @@ function RailProductCard({ product, onOpen }: { product: Product; onOpen: (p: Pr
 /*  Category rail — title with purple right border + horizontal scroll */
 /* ------------------------------------------------------------------ */
 
-function CategoryRail({ title, products, onOpen }: {
-  title: string; products: Product[]; onOpen: (p: Product) => void;
+function CategoryRail({ title, products, selectedIds, onOpen, onToggleSelect }: {
+  title: string;
+  products: Product[];
+  selectedIds: Set<string>;
+  onOpen: (p: Product) => void;
+  onToggleSelect: (p: Product) => void;
 }) {
   if (products.length === 0) return null;
   return (
@@ -183,7 +233,13 @@ function CategoryRail({ title, products, onOpen }: {
       </header>
       <div className="pcat-rail__scroll">
         {products.map(p => (
-          <RailProductCard key={p.id} product={p} onOpen={onOpen} />
+          <RailProductCard
+            key={p.id}
+            product={p}
+            selected={selectedIds.has(p.id)}
+            onOpen={onOpen}
+            onToggleSelect={onToggleSelect}
+          />
         ))}
       </div>
     </section>
@@ -354,6 +410,38 @@ function ProductSheet({ product, onClose, onAskAbout }: {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Multi-select sticky action bar                                     */
+/* ------------------------------------------------------------------ */
+
+function MultiSelectBar({ count, onClear, onAsk }: {
+  count: number;
+  onClear: () => void;
+  onAsk: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ y: 80, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: 80, opacity: 0 }}
+      className="pcat-multibar"
+      dir="rtl"
+    >
+      <button type="button" onClick={onClear} className="pcat-multibar__clear" aria-label="ניקוי בחירה">
+        <X className="w-4 h-4" />
+        <span>ניקוי</span>
+      </button>
+      <span className="pcat-multibar__count">
+        נבחרו <strong>{count}</strong> {count === 1 ? 'מוצר' : 'מוצרים'}
+      </span>
+      <button type="button" onClick={onAsk} className="pcat-multibar__ask">
+        <Sparkles className="w-4 h-4" />
+        <span>{count === 1 ? 'שאלו על המוצר' : 'השוו ושאלו'}</span>
+      </button>
+    </motion.div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Main Component                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -363,6 +451,23 @@ export default function ProductsCatalogTab({ accountId, onAskAbout }: ProductsCa
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const toggleSelect = useCallback((p: Product) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(p.id)) {
+        next.delete(p.id);
+        track('product_deselected', { product_id: p.id, product_name: p.name });
+      } else {
+        next.add(p.id);
+        track('product_selected', { product_id: p.id, product_name: p.name });
+      }
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -409,34 +514,49 @@ export default function ProductsCatalogTab({ accountId, onAskAbout }: ProductsCa
     [filtered, featured],
   );
 
-  /** Group non-featured products into rails by product_line (or category as fallback) */
+  /**
+   * Group non-featured products into rails strictly by `product_line` (the "series").
+   * Series with fewer than MIN_RAIL_SIZE items collapse into one "סדרות נוספות" rail
+   * so the catalog stays clean instead of fragmenting into singletons.
+   */
   const rails = useMemo(() => {
+    const MIN_RAIL_SIZE = 3;
+
+    const sortItems = (items: Product[]) => [...items].sort((a, b) => {
+      if (!!b.is_featured !== !!a.is_featured) return b.is_featured ? 1 : -1;
+      if (!!b.is_on_sale !== !!a.is_on_sale) return b.is_on_sale ? 1 : -1;
+      return (a.name_he || a.name || '').localeCompare(b.name_he || b.name || '', 'he');
+    });
+
     const byLine = new Map<string, Product[]>();
-    const byCategory = new Map<string, Product[]>();
+    const orphans: Product[] = [];
     for (const p of nonFeatured) {
-      if (p.product_line) {
-        if (!byLine.has(p.product_line)) byLine.set(p.product_line, []);
-        byLine.get(p.product_line)!.push(p);
-      } else if (p.category) {
-        if (!byCategory.has(p.category)) byCategory.set(p.category, []);
-        byCategory.get(p.category)!.push(p);
+      const line = (p.product_line || '').trim();
+      if (line) {
+        if (!byLine.has(line)) byLine.set(line, []);
+        byLine.get(line)!.push(p);
+      } else {
+        orphans.push(p);
       }
     }
 
-    const groups: { title: string; products: Product[] }[] = [];
-    // Product lines first, sorted by size desc
-    [...byLine.entries()]
-      .sort((a, b) => b[1].length - a[1].length)
-      .forEach(([name, items]) => groups.push({ title: name, products: items }));
-    // Then categories not already grouped by product_line
-    [...byCategory.entries()]
-      .sort((a, b) => b[1].length - a[1].length)
-      .forEach(([cat, items]) => groups.push({ title: categoryLabel(cat), products: items }));
+    const bigLines: { title: string; products: Product[] }[] = [];
+    const smallItems: Product[] = [];
+    for (const [name, items] of byLine.entries()) {
+      if (items.length >= MIN_RAIL_SIZE) {
+        bigLines.push({ title: name, products: sortItems(items) });
+      } else {
+        smallItems.push(...items);
+      }
+    }
+    bigLines.sort((a, b) => b.products.length - a.products.length);
 
-    // Fallback: everything else in a single "כל המוצרים" rail
-    const grouped = new Set(groups.flatMap(g => g.products.map(p => p.id)));
-    const rest = nonFeatured.filter(p => !grouped.has(p.id));
-    if (rest.length > 0) groups.push({ title: 'עוד מוצרים', products: rest });
+    const groups: { title: string; products: Product[] }[] = [...bigLines];
+
+    const tail = sortItems([...smallItems, ...orphans]);
+    if (tail.length > 0) {
+      groups.push({ title: 'סדרות נוספות', products: tail });
+    }
 
     return groups;
   }, [nonFeatured]);
@@ -484,10 +604,15 @@ export default function ProductsCatalogTab({ accountId, onAskAbout }: ProductsCa
           ) : (
             <div className="pcat-body">
               {featured && (
-                <FeaturedProductCard product={featured} onOpen={(p) => {
-                  track('product_card_clicked', { product_id: p.id, product_name: p.name, placement: 'featured' });
-                  setSelectedProduct(p);
-                }} />
+                <FeaturedProductCard
+                  product={featured}
+                  selected={selectedIds.has(featured.id)}
+                  onOpen={(p) => {
+                    track('product_card_clicked', { product_id: p.id, product_name: p.name, placement: 'featured' });
+                    setSelectedProduct(p);
+                  }}
+                  onToggleSelect={toggleSelect}
+                />
               )}
 
               {rails.map(rail => (
@@ -495,18 +620,42 @@ export default function ProductsCatalogTab({ accountId, onAskAbout }: ProductsCa
                   key={rail.title}
                   title={rail.title}
                   products={rail.products}
+                  selectedIds={selectedIds}
                   onOpen={(p) => {
                     track('product_card_clicked', { product_id: p.id, product_name: p.name, placement: 'rail', rail_title: rail.title });
                     setSelectedProduct(p);
                   }}
+                  onToggleSelect={toggleSelect}
                 />
               ))}
             </div>
           )}
 
-          <div className="h-24" />
+          <div className="h-32" />
         </div>
       </div>
+
+      {selectedIds.size > 0 && (
+        <MultiSelectBar
+          count={selectedIds.size}
+          onClear={clearSelection}
+          onAsk={() => {
+            const picked = products.filter(p => selectedIds.has(p.id));
+            if (picked.length === 0) return;
+            const names = picked.map(p => p.name_he || p.name).join(', ');
+            const question = picked.length === 1
+              ? `ספרו לי על ${names}`
+              : `ספרו לי על המוצרים האלה: ${names} — איך הם משתלבים זה עם זה ומה ההבדלים?`;
+            const hidden = picked.map(buildProductContext).join('\n\n---\n\n');
+            track('product_multi_ask', {
+              count: picked.length,
+              product_ids: picked.map(p => p.id),
+            });
+            onAskAbout(question, hidden);
+            clearSelection();
+          }}
+        />
+      )}
 
       {typeof document !== 'undefined' && createPortal(
         <AnimatePresence>
