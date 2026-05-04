@@ -2070,44 +2070,9 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             </div>
                           )}
 
-                          {/* Partnerships (DISABLE variant) */}
-                          {partnerships.length > 0 && (
-                            <>
-                              <p className="coupon-section-label mt-4">שיתופי פעולה</p>
-                              <div className={isMobile ? 'flex flex-col gap-2' : 'coupons-grid'}>
-                                {partnerships.map((brand) => {
-                                  const letter = (brand.brand_name || '').trim().charAt(0).toUpperCase();
-                                  return (
-                                    <div key={brand.id} className="coupon-card-v2 coupon-card-v2--disabled">
-                                      <div className="flex gap-3 items-center min-w-0 flex-1">
-                                        {brand.image_url ? (
-                                          <img
-                                            src={getProxiedImageUrl(brand.image_url)}
-                                            alt={brand.brand_name}
-                                            className="w-10 h-10 rounded-xl object-cover flex-shrink-0"
-                                          />
-                                        ) : (
-                                          <div className="support-letter-avatar" style={{ background: '#f4f5f7', color: '#0c1013' }}>
-                                            {letter}
-                                          </div>
-                                        )}
-                                        <div className="flex flex-col min-w-0 flex-1 overflow-hidden">
-                                          <p className="coupon-card-title coupon-card-title--muted">{brand.brand_name}</p>
-                                          {(brand.description || brand.category) && (
-                                            <p className="coupon-card-subtitle coupon-card-subtitle--muted">
-                                              {brand.description || brand.category}
-                                            </p>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </>
-                          )}
+                          {/* Partnerships section removed — only show actual coupons */}
 
-                          {active.length === 0 && partnerships.length === 0 && (
+                          {active.length === 0 && (
                             <p className="text-center text-sm mt-8" style={{ color: '#999' }}>
                               {q ? 'לא נמצאו קופונים התואמים לחיפוש' : 'אין קופונים כרגע'}
                             </p>
