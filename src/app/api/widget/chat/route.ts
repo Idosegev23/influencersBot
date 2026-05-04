@@ -78,7 +78,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // CORS origin validation: check if origin matches the account's domain
+    // CORS origin validation: check if origin matches the account's domain.
+    // For accounts where the widget runs on a different domain than the
+    // chat-page username (e.g. LA BEAUTÉ — username='labeaute.israel'
+    // but widget on 'labeauteisrael.co.il'), prefer widget.domain.
     if (origin && origin !== '*') {
       const supabase = await createClient();
       const { data: account } = await supabase
@@ -86,7 +89,8 @@ export async function POST(req: NextRequest) {
         .select('config')
         .eq('id', accountId)
         .single();
-      const accountDomain = (account?.config as any)?.username; // domain stored in config.username
+      const cfg = (account?.config as any) || {};
+      const accountDomain = cfg?.widget?.domain || cfg?.username;
       if (!isOriginAllowed(origin, accountDomain)) {
         return new Response(
           JSON.stringify({ error: 'Origin not allowed for this account' }),
