@@ -44,6 +44,13 @@ export async function GET(req: NextRequest) {
     return refLookup.get(slug.toLowerCase()) || slug;
   };
 
+  // Visits (top-of-funnel — every page open)
+  const { data: visits } = await supabase
+    .from('chat_visits')
+    .select('id, ref_source, anon_id, created_at')
+    .eq('account_id', accountId)
+    .gte('created_at', sinceIso);
+
   // Sessions
   const { data: sessions } = await supabase
     .from('chat_sessions')
@@ -68,9 +75,12 @@ export async function GET(req: NextRequest) {
   type Row = {
     slug: string;
     display_name: string;
+    visits: number;
+    unique_visitors: number;
     sessions: number;
     tickets: number;
     coupon_copies: number;
+    conversion_rate: number; // sessions / visits
   };
 
   const bySlug = new Map<string, Row>();
@@ -81,12 +91,31 @@ export async function GET(req: NextRequest) {
       bySlug.set(key, {
         slug: key,
         display_name: niceName(slug),
+        visits: 0,
+        unique_visitors: 0,
         sessions: 0,
         tickets: 0,
         coupon_copies: 0,
+        conversion_rate: 0,
       });
     }
     return bySlug.get(key)!;
+  }
+
+  // Track unique visitors per slug via Set of anon_ids
+  const uniqAnon = new Map<string, Set<string>>();
+  for (const v of visits || []) {
+    const r = rowFor(v.ref_source);
+    r.visits += 1;
+    if (v.anon_id) {
+      const key = (v.ref_source || '__direct__').toLowerCase();
+      if (!uniqAnon.has(key)) uniqAnon.set(key, new Set());
+      uniqAnon.get(key)!.add(v.anon_id);
+    }
+  }
+  for (const [key, set] of uniqAnon) {
+    const r = bySlug.get(key);
+    if (r) r.unique_visitors = set.size;
   }
 
   for (const s of sessions || []) rowFor(s.ref_source).sessions += 1;
@@ -97,24 +126,35 @@ export async function GET(req: NextRequest) {
     r.coupon_copies += c.copy_count || 0;
   }
 
+  // Compute conversion rate per row
+  for (const r of bySlug.values()) {
+    r.conversion_rate = r.visits > 0 ? r.sessions / r.visits : 0;
+  }
+
   // Make sure every registered influencer has a row even if 0
   for (const it of registry) {
     if (!bySlug.has(it.slug.toLowerCase())) {
       bySlug.set(it.slug.toLowerCase(), {
         slug: it.slug.toLowerCase(),
         display_name: it.display_name || it.slug,
+        visits: 0,
+        unique_visitors: 0,
         sessions: 0,
         tickets: 0,
         coupon_copies: 0,
+        conversion_rate: 0,
       });
     }
   }
 
   const rows = [...bySlug.values()].sort(
-    (a, b) => (b.sessions + b.tickets + b.coupon_copies) - (a.sessions + a.tickets + a.coupon_copies),
+    (a, b) => (b.visits + b.sessions + b.tickets + b.coupon_copies) -
+              (a.visits + a.sessions + a.tickets + a.coupon_copies),
   );
 
   const totals = {
+    visits: (visits || []).length,
+    uniqueVisitors: new Set((visits || []).map((v) => v.anon_id).filter(Boolean)).size,
     sessions: (sessions || []).length,
     tickets: (tickets || []).length,
     couponCopies: rows.reduce((acc, r) => acc + r.coupon_copies, 0),

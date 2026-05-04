@@ -271,6 +271,25 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       resolved = urlRef ? urlRef.toLowerCase() : null;
     }
     refSourceRef.current = resolved;
+
+    // Top-of-funnel: log every page open as a visit (deduped on the
+    // server by anon_id within the past 30 minutes). This counts
+    // people who land on the chat and bounce without sending anything.
+    let anonId: string | null = null;
+    try {
+      anonId = localStorage.getItem(`anon_id_${username}`);
+      if (!anonId) {
+        anonId = `a_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+        localStorage.setItem(`anon_id_${username}`, anonId);
+      }
+    } catch {}
+
+    fetch('/api/track/visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, ref: resolved, anonId }),
+      keepalive: true,
+    }).catch(() => {});
   }, [username, searchParams]);
   const [activeTab, setActiveTab] = useState<TabId>(initialTab);
   const [messages, setMessages] = useState<Message[]>([]);

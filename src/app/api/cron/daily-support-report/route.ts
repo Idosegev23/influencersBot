@@ -316,13 +316,22 @@ function styleDataRows(ws: ExcelJS.Worksheet, startRow: number, endRow: number) 
   }
 }
 
+interface InfluencerFunnel {
+  display_name: string;
+  visits: number;
+  unique_visitors: number;
+  sessions: number;
+  tickets: number;
+}
+
 async function buildWorkbook(args: {
   brandName: string;
   windowFromIso: string;
   windowToIso: string;
   tickets: SupportTicket[];
+  funnels?: InfluencerFunnel[];
 }): Promise<Buffer> {
-  const { tickets, brandName, windowFromIso, windowToIso } = args;
+  const { tickets, brandName, windowFromIso, windowToIso, funnels } = args;
   const wb = new ExcelJS.Workbook();
   wb.creator = 'BestieAI';
   wb.created = new Date();
@@ -447,9 +456,51 @@ async function buildWorkbook(args: {
   addBreakdownSheet('לפי מותג', 'מותג', byBrand);
   addBreakdownSheet('לפי קטגוריית מוצר', 'קטגוריית מוצר', byCategory);
 
-  // ─── Sheet: לפי משפיענית ───────────────────────────────────────
+  // ─── Sheet: פניות לפי משפיענית ─────────────────────────────────
   const byInfluencer = countBy(tickets, (t) => t.ref_display);
-  addBreakdownSheet('לפי משפיענית', 'משפיענית / מקור', byInfluencer);
+  addBreakdownSheet('פניות לפי משפיענית', 'משפיענית / מקור', byInfluencer);
+
+  // ─── Sheet: משפך מלא לפי משפיענית — clicks → sessions → tickets ─
+  if (funnels && funnels.length > 0) {
+    const ws = wb.addWorksheet('משפך לפי משפיענית', { views: [RTL_VIEW] });
+    ws.columns = [
+      { header: 'משפיענית / מקור', key: 'name', width: 30 },
+      { header: 'קליקים', key: 'visits', width: 12 },
+      { header: 'גולשים ייחודיים', key: 'unique', width: 16 },
+      { header: 'סשני צ׳אט', key: 'sessions', width: 14 },
+      { header: '% המרה', key: 'conv', width: 12 },
+      { header: 'פניות תמיכה', key: 'tickets', width: 14 },
+    ];
+    styleHeader(ws.getRow(1));
+    const sortedF = [...funnels].sort((a, b) => b.visits - a.visits);
+    for (const f of sortedF) {
+      ws.addRow({
+        name: f.display_name,
+        visits: f.visits,
+        unique: f.unique_visitors,
+        sessions: f.sessions,
+        conv: f.visits > 0 ? `${((f.sessions / f.visits) * 100).toFixed(0)}%` : '—',
+        tickets: f.tickets,
+      });
+    }
+    if (sortedF.length > 0) styleDataRows(ws, 2, 1 + sortedF.length);
+    const totalVisits = sortedF.reduce((s, x) => s + x.visits, 0);
+    const totalUniq = sortedF.reduce((s, x) => s + x.unique_visitors, 0);
+    const totalSess = sortedF.reduce((s, x) => s + x.sessions, 0);
+    const totalTix = sortedF.reduce((s, x) => s + x.tickets, 0);
+    const totalRow = ws.addRow({
+      name: 'סה״כ',
+      visits: totalVisits,
+      unique: totalUniq,
+      sessions: totalSess,
+      conv: totalVisits > 0 ? `${((totalSess / totalVisits) * 100).toFixed(0)}%` : '—',
+      tickets: totalTix,
+    });
+    totalRow.eachCell((cell) => {
+      cell.font = { bold: true };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFE7FB' } };
+    });
+  }
 
   // ─── Helper: cross-tab pivot ────────────────────────────────────
   function addPivotSheet(name: string, rowLabel: string, colLabel: string,
@@ -698,16 +749,71 @@ async function processAccount(args: {
     };
   });
 
-  // Pull session-level attribution (visits without a ticket) so the
-  // dashboard counts traffic too — but the report focuses on tickets.
-  // (Daily sessions with ref_source for THIS account are already
-  // queryable from chat_sessions if needed in the future.)
+  // Build the per-influencer funnel from chat_visits + chat_sessions.
+  const [{ data: visitsRows }, { data: sessRows }] = await Promise.all([
+    supabase
+      .from('chat_visits')
+      .select('ref_source, anon_id')
+      .eq('account_id', account.id)
+      .gte('created_at', windowFromIso)
+      .lte('created_at', windowToIso),
+    supabase
+      .from('chat_sessions')
+      .select('ref_source')
+      .eq('account_id', account.id)
+      .gte('created_at', windowFromIso)
+      .lte('created_at', windowToIso),
+  ]);
+  const fmap = new Map<string, InfluencerFunnel>();
+  const fGet = (slug: string | null) => {
+    const key = (slug || '__direct__').toLowerCase();
+    if (!fmap.has(key)) {
+      fmap.set(key, {
+        display_name: slug ? (refLookup.get(key) || slug) : '— ישיר —',
+        visits: 0,
+        unique_visitors: 0,
+        sessions: 0,
+        tickets: 0,
+      });
+    }
+    return fmap.get(key)!;
+  };
+  const visitUniq = new Map<string, Set<string>>();
+  for (const v of visitsRows || []) {
+    const key = (v.ref_source || '__direct__').toLowerCase();
+    fGet(v.ref_source).visits += 1;
+    if (v.anon_id) {
+      if (!visitUniq.has(key)) visitUniq.set(key, new Set());
+      visitUniq.get(key)!.add(v.anon_id);
+    }
+  }
+  for (const [key, set] of visitUniq) {
+    const f = fmap.get(key);
+    if (f) f.unique_visitors = set.size;
+  }
+  for (const s of sessRows || []) fGet(s.ref_source).sessions += 1;
+  for (const t of tickets) fGet(t.ref_source).tickets += 1;
+  // Make sure every registered influencer is represented even with 0
+  for (const it of registry) {
+    const key = it.slug.toLowerCase();
+    if (!fmap.has(key)) {
+      fmap.set(key, {
+        display_name: it.display_name || it.slug,
+        visits: 0,
+        unique_visitors: 0,
+        sessions: 0,
+        tickets: 0,
+      });
+    }
+  }
+  const funnels = [...fmap.values()];
 
   const xlsxBuffer = await buildWorkbook({
     brandName,
     windowFromIso,
     windowToIso,
     tickets,
+    funnels,
   });
 
   const newCount = tickets.length;

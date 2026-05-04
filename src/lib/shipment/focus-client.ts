@@ -90,8 +90,12 @@ export async function getFocusShipmentStatus(args: {
   host: string;       // e.g. 'focusdelivery.co.il'
   shipmentNumber?: string;  // P1
   reference?: string;       // P2
+  expectedMasterCustomerId?: number; // safety: drop responses that
+                                     // belong to a different brand
+                                     // (Focus's ship_status_xml has
+                                     // global lookup, no scope)
 }): Promise<FocusCustomerStatusView> {
-  const { host, shipmentNumber, reference } = args;
+  const { host, shipmentNumber, reference, expectedMasterCustomerId } = args;
 
   if (!host) throw new Error('Focus host not configured');
   if (!shipmentNumber && !reference) throw new Error('Either shipmentNumber or reference is required');
@@ -135,7 +139,26 @@ export async function getFocusShipmentStatus(args: {
   const errorMessage = safeStr(data.message);
   const ship_no = safeStr(data.ship_no);
   const shgiya_yn = safeStr(data.shgiya_yn);
-  const found = shgiya_yn !== 'y' && ship_no !== '0' && ship_no !== null;
+  const responseMasterCustomerId = safeStr(data.master_customer_id);
+
+  let found = shgiya_yn !== 'y' && ship_no !== '0' && ship_no !== null;
+
+  // Safety scope check: if the caller passed an expected
+  // master_customer_id and Focus returned a record belonging to a
+  // different customer, treat the result as "not found" — Focus's
+  // ship_status_xml endpoint does global ship_no lookup with no
+  // built-in customer scoping.
+  if (
+    found &&
+    expectedMasterCustomerId !== undefined &&
+    responseMasterCustomerId &&
+    Number(responseMasterCustomerId) !== Number(expectedMasterCustomerId)
+  ) {
+    console.warn(
+      `[focus-client] Dropping cross-customer match: expected master=${expectedMasterCustomerId}, got master=${responseMasterCustomerId} for ship_no=${ship_no}`,
+    );
+    found = false;
+  }
 
   if (!found) {
     return {

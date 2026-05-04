@@ -28,6 +28,8 @@ interface SupportRequest {
   notes: string | null;
   created_at: string;
   resolved_at: string | null;
+  ref_source?: string | null;
+  ref_display?: string | null;
   products?: {
     name: string;
     coupon_code: string | null;
@@ -95,7 +97,18 @@ export default function SupportPage({
       const res = await fetch(`/api/support?username=${username}`);
       const data = await res.json();
       if (data.requests) {
-        setRequests(data.requests);
+        // Map ref_source slugs to friendly display names from the registry
+        const registry = ((influencer as any)?._rawConfig?.influencer_registry || []) as Array<{ slug: string; display_name: string; coupon_code?: string }>;
+        const refLookup = new Map<string, string>();
+        for (const it of registry) {
+          if (it.slug) refLookup.set(it.slug.toLowerCase(), it.display_name || it.slug);
+          if (it.coupon_code) refLookup.set(it.coupon_code.toLowerCase(), it.display_name || it.slug);
+        }
+        const enriched = data.requests.map((r: SupportRequest) => ({
+          ...r,
+          ref_display: r.ref_source ? (refLookup.get(r.ref_source.toLowerCase()) || r.ref_source) : null,
+        }));
+        setRequests(enriched);
       }
     } catch (error) {
       console.error('Error fetching requests:', error);
@@ -251,6 +264,19 @@ export default function SupportPage({
                         </div>
                       )}
                     </div>
+
+                    {/* Attribution chip — where the customer came from */}
+                    {request.ref_source && (
+                      <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium"
+                        style={{
+                          background: 'rgba(136, 63, 226, 0.12)',
+                          color: '#883fe2',
+                        }}
+                      >
+                        <span>↗</span>
+                        <span>הגיעה דרך: {request.ref_display || request.ref_source}</span>
+                      </div>
+                    )}
                   </div>
                 );
               })}

@@ -3,18 +3,23 @@
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronLeft, Loader2, Copy, Check, TrendingUp, Users, MessageSquare, Tag } from 'lucide-react';
+import { ChevronLeft, Loader2, Copy, Check, TrendingUp, Users, MessageSquare, Tag, MousePointerClick } from 'lucide-react';
 
 interface AttributionRow {
   slug: string;
   display_name: string;
+  visits: number;
+  unique_visitors: number;
   sessions: number;
   tickets: number;
   coupon_copies: number;
+  conversion_rate: number;
 }
 
 interface AttributionData {
   totals: {
+    visits: number;
+    uniqueVisitors: number;
     sessions: number;
     tickets: number;
     couponCopies: number;
@@ -117,14 +122,24 @@ export default function AttributionPage({ params }: { params: Promise<{ username
 
         {data && !loading && (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
               <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">סשנים</span>
+                  <span className="text-sm text-gray-500">קליקים (ביקורים)</span>
+                  <MousePointerClick className="w-5 h-5 text-[#883fe2]" />
+                </div>
+                <div className="text-3xl font-bold text-gray-900 mt-2">{data.totals.visits}</div>
+                <div className="text-xs text-gray-400 mt-1">{data.totals.uniqueVisitors} ייחודיים</div>
+              </div>
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-500">סשני צ'אט</span>
                   <Users className="w-5 h-5 text-purple-500" />
                 </div>
                 <div className="text-3xl font-bold text-gray-900 mt-2">{data.totals.sessions}</div>
-                <div className="text-xs text-gray-400 mt-1">{data.totals.days} ימים אחרונים</div>
+                <div className="text-xs text-gray-400 mt-1">
+                  {data.totals.visits > 0 ? `${((data.totals.sessions / data.totals.visits) * 100).toFixed(0)}% המרה` : '—'}
+                </div>
               </div>
               <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
                 <div className="flex items-center justify-between">
@@ -154,9 +169,12 @@ export default function AttributionPage({ params }: { params: Promise<{ username
                   <thead className="bg-gray-50 text-gray-600">
                     <tr>
                       <th className="px-4 py-3 text-right font-medium">משפיענית / מקור</th>
+                      <th className="px-4 py-3 text-right font-medium">קליקים</th>
+                      <th className="px-4 py-3 text-right font-medium">ייחודיים</th>
                       <th className="px-4 py-3 text-right font-medium">סשנים</th>
+                      <th className="px-4 py-3 text-right font-medium">% המרה</th>
                       <th className="px-4 py-3 text-right font-medium">פניות</th>
-                      <th className="px-4 py-3 text-right font-medium">העתקות קופון</th>
+                      <th className="px-4 py-3 text-right font-medium">קופון הועתק</th>
                       <th className="px-4 py-3 text-right font-medium">לינק לשיתוף</th>
                     </tr>
                   </thead>
@@ -166,7 +184,12 @@ export default function AttributionPage({ params }: { params: Promise<{ username
                       return (
                         <tr key={r.slug} className="hover:bg-gray-50">
                           <td className="px-4 py-3 font-medium text-gray-900">{r.display_name}</td>
+                          <td className="px-4 py-3 text-gray-700">{r.visits}</td>
+                          <td className="px-4 py-3 text-gray-700">{r.unique_visitors}</td>
                           <td className="px-4 py-3 text-gray-700">{r.sessions}</td>
+                          <td className="px-4 py-3 text-gray-700">
+                            {r.visits > 0 ? `${(r.conversion_rate * 100).toFixed(0)}%` : '—'}
+                          </td>
                           <td className="px-4 py-3 text-gray-700">{r.tickets}</td>
                           <td className="px-4 py-3 text-gray-700">{r.coupon_copies}</td>
                           <td className="px-4 py-3">
@@ -196,7 +219,7 @@ export default function AttributionPage({ params }: { params: Promise<{ username
                     })}
                     {data.rows.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
+                        <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
                           אין נתונים בתקופה זו
                         </td>
                       </tr>
