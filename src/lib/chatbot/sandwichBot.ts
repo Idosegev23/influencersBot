@@ -60,6 +60,10 @@ export interface SandwichBotInput {
   suggestedClarifications?: string[]; // Questions to ask when intent is ambiguous
   activeCoupons?: Array<{ brand_name: string; coupon_code: string; description?: string }>; // Available coupons for proactive mention
   conversationTopics?: string[]; // Topics from rolling_summary for deepening
+  // Attribution scoping — when set, post-filter the KB so only coupons
+  // whose code is in this whitelist (case-insensitive) reach the LLM.
+  // Used by the chat stream when the visitor came in via ?ref=<slug>.
+  couponCodeWhitelist?: string[];
 }
 
 export interface SandwichBotOutput {
@@ -194,6 +198,19 @@ export class SandwichBot {
         knowledgeQuery,
         input.rollingSummary
       );
+    }
+
+    // Attribution scoping: post-filter coupons in the KB so the LLM
+    // only sees the ones the referring influencer is allowed to mention.
+    // Other influencers' coupons literally don't exist for this session.
+    if (input.couponCodeWhitelist && input.couponCodeWhitelist.length > 0) {
+      const allow = new Set(input.couponCodeWhitelist.map((c) => (c || '').toLowerCase()));
+      const before = knowledgeBase.coupons?.length || 0;
+      knowledgeBase = {
+        ...knowledgeBase,
+        coupons: (knowledgeBase.coupons || []).filter((c: any) => allow.has((c.code || '').toLowerCase())),
+      };
+      console.log(`   🎯 Coupon scope: ${before} → ${knowledgeBase.coupons.length} (whitelist: ${[...allow].join(',')})`);
     }
 
     // If media_news account and "what's new?" intent, inject hot topics

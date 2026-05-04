@@ -1024,9 +1024,18 @@ export async function POST(req: NextRequest) {
           // codebase — it gets stripped from the displayMessage but
           // reaches the bot.
           let scopedUserMessage = message;
+          let couponCodeWhitelist: string[] | undefined;
           if (referralScopedInfluencer) {
-            const ctxLine = `\n\n[הקשר פנימי — אל תצטטי: הלקוחה הגיעה דרך הלינק האישי של ${referralScopedInfluencer.display_name}. כשהלקוחה שואלת על קוד הנחה / קופונים — הזכירי אך ורק את הקוד של ${referralScopedInfluencer.display_name}: \`${(referralScopedInfluencer.coupon_code || referralScopedInfluencer.slug)}\`. אל תזכירי משפיעניות אחרות בכלל. אם הלקוחה שואלת על משפיענית אחרת בשם — תני תשובה כללית בלי לאשר או להכחיש.]`;
+            const myCode = referralScopedInfluencer.coupon_code || referralScopedInfluencer.slug;
+            const ctxLine = `\n\n[הקשר פנימי — אל תצטטי: הלקוחה הגיעה דרך הלינק האישי של ${referralScopedInfluencer.display_name}. כשהלקוחה שואלת על קוד הנחה / קופונים — הזכירי אך ורק את הקוד של ${referralScopedInfluencer.display_name}: \`${myCode}\`. אל תזכירי משפיעניות אחרות בכלל. אם הלקוחה שואלת על משפיענית אחרת בשם — תני תשובה כללית בלי לאשר או להכחיש.]`;
             scopedUserMessage = message + ctxLine;
+
+            // Whitelist for KB-level coupon filtering: only this
+            // influencer's code passes through to the LLM. Other
+            // registered influencers' codes are filtered out by the
+            // sandwich bot. (LA BEAUTÉ has no brand-only coupons today,
+            // so a single-entry whitelist is sufficient.)
+            couponCodeWhitelist = [myCode.toLowerCase()];
           }
 
           // Extract recurring topics from rolling summary for deepening (Step 4)
@@ -1061,6 +1070,7 @@ export async function POST(req: NextRequest) {
             suggestedClarifications: understanding.suggestedClarifications?.length ? understanding.suggestedClarifications : undefined,
             activeCoupons: activeCoupons.length > 0 ? activeCoupons : undefined,
             conversationTopics: conversationTopics.length > 0 ? conversationTopics : undefined,
+            couponCodeWhitelist,
             // Real-time streaming: tokens go directly to client as they arrive from OpenAI
             onToken: (token: string) => {
               if (!firstTokenSent) {
