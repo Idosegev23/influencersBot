@@ -490,7 +490,50 @@ export async function POST(req: NextRequest) {
             const numToUse = intent.shipmentNumber
               || (awaitingShipNumber ? (displayMessage.match(/\b(\d{6,12})\b/)?.[1] || null) : null);
 
+            // For accounts that opt in to support_redirect_to_tab, route
+            // bare "where's my order?" intents to the tracking tab where
+            // the customer gets a structured form (with the same Focus
+            // master-scoped lookup we use here, but a clearer UX). When
+            // a number is already in the message we still answer inline
+            // — that's a one-shot question, no need to context-switch.
+            const accountConfigForShip = (influencer as any)?._rawConfig || {};
+            const redirectShipmentToTab = accountConfigForShip.support_redirect_to_tab === true;
+
             if (!numToUse) {
+              if (redirectShipmentToTab) {
+                const redirectMsg = 'בשמחה 🤍 פותחת לך עכשיו את טאב המשלוחים — שם אפשר להזין את מספר המשלוח שקיבלת במייל מ-Focus ולקבל סטטוס מדויק.';
+                controller.enqueue(encodeEvent({
+                  type: 'meta',
+                  traceId,
+                  requestId,
+                  decisionId: `shipping_redirect_${Date.now()}`,
+                  sessionId: currentSessionId,
+                  anonId,
+                  uiDirectives: {
+                    openSupportTab: true,
+                    supportInitialMode: 'tracking',
+                    showInputPlaceholder: null,
+                  },
+                  stateTransition: { from: session?.state || 'Idle', to: 'Idle' },
+                }));
+                controller.enqueue(encodeEvent({ type: 'delta', text: redirectMsg }));
+                controller.enqueue(encodeEvent({
+                  type: 'done',
+                  responseId: null,
+                  latencyMs: Date.now() - startedAt,
+                  fullText: redirectMsg,
+                }));
+                await Promise.all([
+                  saveChatMessage(currentSessionId, 'user', displayMessage),
+                  saveChatMessage(currentSessionId, 'assistant', redirectMsg),
+                  supabase.from('chat_sessions')
+                    .update({ state: 'Idle', updated_at: new Date().toISOString() })
+                    .eq('id', currentSessionId),
+                ]);
+                controller.close();
+                return;
+              }
+
               const askMsg = 'בשמחה — מה מספר ההזמנה / משלוח? (המספר מופיע באישור ההזמנה ובמייל המשלוח)';
               controller.enqueue(encodeEvent({
                 type: 'meta',
@@ -520,13 +563,20 @@ export async function POST(req: NextRequest) {
               return;
             }
 
-            // We have a number — look up the status
+            // We have a number — look up the status. Pass through the
+            // account's expected_master_customer_id so we drop responses
+            // that belong to a different brand at Focus (their PULL API
+            // does global ship_no lookup with no customer scoping).
             try {
               const { getFocusShipmentStatus } = await import('@/lib/shipment/focus-client');
+              const expectedMaster = shipmentCfg.expected_master_customer_id
+                ? Number(shipmentCfg.expected_master_customer_id)
+                : undefined;
               const view = shipmentCfg.type === 'focus'
                 ? await getFocusShipmentStatus({
                     host: shipmentCfg.host || 'focusdelivery.co.il',
                     shipmentNumber: numToUse,
+                    expectedMasterCustomerId: expectedMaster,
                   })
                 : { found: false, statusText: 'spec ספק משלוחים לא נתמך עדיין', errorMessage: null } as any;
 
@@ -637,9 +687,14 @@ export async function POST(req: NextRequest) {
           //   • clear showSupportModal so we don't trigger the legacy popup
           //     in parallel with our tab redirect
           //
-          // Two signals are checked:
+          // Three signals are checked:
           //   1. understanding.intent === 'support' (the main LLM agreed)
-          //   2. dedicated Gemini Flash classifier (catches LLM misses on
+          //   2. fast-path regex for explicit "I want a human rep" /
+          //      "bad service" phrasing — the Gemini classifier sometimes
+          //      treats these as borderline (no specific problem stated)
+          //      but the customer has clearly run out of patience and
+          //      should land on the form, not in another bot turn.
+          //   3. dedicated Gemini Flash classifier (catches LLM misses on
           //      Hebrew slang like "מעוך", "נשרף", indirect phrasing, etc.)
           const accountConfig = (influencer as any)?._rawConfig || {};
           if (
@@ -647,6 +702,15 @@ export async function POST(req: NextRequest) {
             decision.handler !== 'support_flow'
           ) {
             let shouldRedirect = understanding.intent === 'support';
+
+            // Fast path — explicit human-rep / bad-service requests
+            if (!shouldRedirect) {
+              const HUMAN_REP_RE = /נציג\s*(אנושי|שירות|שירות לקוחות)|לדבר עם (מישהו|נציג|בנאדם)|שיחזור (אלי|אליי)|שירות (גרוע|לקוי|נורא|רע)|רוצ(ה|ה|ים) נציג/;
+              if (HUMAN_REP_RE.test(message)) {
+                console.log('[Stream] 🎯 Fast-path: human-rep request detected → support_flow');
+                shouldRedirect = true;
+              }
+            }
 
             if (!shouldRedirect) {
               try {

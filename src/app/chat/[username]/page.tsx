@@ -729,13 +729,20 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   // Account-level redirect: when the server-side classifier emits
   // uiDirectives.openSupportTab — switch to the support tab + pass the
   // user's complaint as a pre-fill. (Belt-and-suspenders with the local
-  // detection above; whichever fires first wins.)
+  // detection above; whichever fires first wins.) When the directive
+  // also includes supportInitialMode='tracking', open the tab in the
+  // shipment-status sub-mode (used when the bot detected a "where's my
+  // order?" intent).
   useEffect(() => {
     const lastMessage = messages[messages.length - 1];
     const directives = lastMessage?.uiDirectives as any;
     if (lastMessage?.role === 'assistant' && directives?.openSupportTab) {
       const prefill = directives.supportPrefill as { details?: string } | undefined;
       if (prefill?.details) setSupportPrefill(prefill);
+      const initialMode = directives.supportInitialMode as 'support' | 'tracking' | undefined;
+      if (initialMode === 'tracking' || initialMode === 'support') {
+        setSupportInitialMode(initialMode);
+      }
       // Small delay so the redirect message has time to render in chat first
       const t = setTimeout(() => setActiveTab('support' as TabId), 1200);
       return () => clearTimeout(t);
@@ -1203,6 +1210,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
           customerPhone: supportForm.phone || null,
           message: supportForm.message,
           sessionId,
+          refSource: refSourceRef.current || null,
         }),
       });
 
@@ -1239,6 +1247,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
           customerPhone: problemForm.phone,
           orderNumber: problemForm.order || null,
           problem: problemForm.details,
+          sessionId: sessionId || null,
+          refSource: refSourceRef.current || null,
         }),
       });
       const data = await response.json();
@@ -2098,6 +2108,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   enableShipmentTracking={(influencer as any)?._rawConfig?.shipment_provider?.enabled === true}
                   initialMode={supportInitialMode}
                   sessionId={sessionId}
+                  refSource={refSourceRef.current}
                 />
               </motion.div>
               ) : (
@@ -2674,6 +2685,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 image_url: b.image_url || null,
               }))}
               initialBrand={supportBrand}
+              sessionId={sessionId}
+              refSource={refSourceRef.current}
               onClose={() => { setShowSupportModal(false); setSupportBrand(''); }}
               onSuccess={() => {
                 setSupportSuccess(true);
