@@ -221,6 +221,14 @@ export async function GET(req: NextRequest) {
         is_verified: influencer.is_verified,
         category: influencer.category,
         plan: influencer.plan,
+        // Surface attribution + support config so the dashboard can
+        // conditionally render the "פילוח לפי משפיענית" / "פניות
+        // תמיכה" sections only for accounts that have them set up.
+        _rawConfig: {
+          influencer_registry: (influencer as any)?._rawConfig?.influencer_registry || [],
+          shipment_provider: (influencer as any)?._rawConfig?.shipment_provider || null,
+          support_redirect_to_tab: (influencer as any)?._rawConfig?.support_redirect_to_tab || false,
+        },
       },
       instagram: {
         followers: latestProfile?.followers_count || influencer.followers_count || 0,

@@ -538,6 +538,57 @@ export default function InfluencerDashboardPage({
           {/* ── Left (3/5) ── */}
           <div className="lg:col-span-3 space-y-5">
 
+            {/* Attribution + Support — quick access for brand-mode accounts
+                ((influencer as any)?._rawConfig?.influencer_registry exists) */}
+            {Array.isArray((influencer as any)?._rawConfig?.influencer_registry) &&
+              (influencer as any)._rawConfig.influencer_registry.length > 0 && (
+              <Section>
+                <SectionHeader
+                  title="פילוח לפי משפיענית"
+                  sub="קליקים, סשנים, פניות"
+                  href={`/influencer/${username}/attribution`}
+                  linkText="לדוח המלא"
+                />
+                <div className="px-5 pb-5 relative z-10 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {((influencer as any)._rawConfig.influencer_registry as Array<{ slug: string; display_name: string }>)
+                    .slice(0, 4)
+                    .map((item) => (
+                      <Link
+                        key={item.slug}
+                        href={`/influencer/${username}/attribution`}
+                        className="rounded-xl p-3 transition-all hover:scale-[1.02]"
+                        style={{
+                          background: 'var(--dash-muted)',
+                          border: '1px solid var(--dash-glass-border)',
+                        }}
+                      >
+                        <p className="text-sm font-semibold truncate" style={{ color: 'var(--dash-text)' }}>
+                          {item.display_name}
+                        </p>
+                        <p className="text-[11px] mt-1" style={{ color: 'var(--dash-text-3)' }}>
+                          {`?ref=${item.slug}`}
+                        </p>
+                      </Link>
+                    ))}
+                </div>
+              </Section>
+            )}
+
+            {/* Support tickets quick view */}
+            <Section>
+              <SectionHeader
+                title="פניות תמיכה"
+                sub="לטיפול"
+                href={`/influencer/${username}/support`}
+                linkText="לכל הפניות"
+              />
+              <div className="px-5 pb-5 relative z-10">
+                <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
+                  טופסי בעיה / סטטוס משלוח שהלקוחות פתחו דרך הבוט. לחיצה על "לכל הפניות" פותחת את הניהול המלא עם chip מקור לכל פנייה.
+                </p>
+              </div>
+            </Section>
+
             {/* Chat activity */}
             <Section className="glow-border">
               <SectionHeader title="פעילות בוט" sub="30 יום" href={`/influencer/${username}/analytics`} linkText="אנליטיקס" />
