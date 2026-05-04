@@ -96,9 +96,24 @@ export async function getFocusShipmentStatus(args: {
   if (!host) throw new Error('Focus host not configured');
   if (!shipmentNumber && !reference) throw new Error('Either shipmentNumber or reference is required');
 
-  const p1 = shipmentNumber ? encodeURIComponent(shipmentNumber.trim()) : '';
-  const p2 = reference ? encodeURIComponent(reference.trim()) : '';
-  const url = `https://${host}/RunCom.Server/Request.aspx?APPNAME=run&PRGNAME=ship_status_xml&ARGUMENTS=-N${p1},-A${p2}`;
+  // Focus's parser is fragile about the ARGUMENTS string:
+  //   -N3433155,-A          works (P1 only)
+  //   -A3413433155995       works (P2 only — must not have leading "-N,")
+  //   -N,-A3413433155995    DOES NOT WORK — empty -N causes the parser
+  //                         to mis-route, even though the docs imply it
+  //                         should be valid
+  //   -N3433155,-A341343...  works (both populated)
+  // So we build the ARGUMENTS string conditionally based on which slots
+  // actually have a value.
+  let argsStr: string;
+  if (shipmentNumber && reference) {
+    argsStr = `-N${encodeURIComponent(shipmentNumber.trim())},-A${encodeURIComponent(reference.trim())}`;
+  } else if (shipmentNumber) {
+    argsStr = `-N${encodeURIComponent(shipmentNumber.trim())},-A`;
+  } else {
+    argsStr = `-A${encodeURIComponent(reference!.trim())}`;
+  }
+  const url = `https://${host}/RunCom.Server/Request.aspx?APPNAME=run&PRGNAME=ship_status_xml&ARGUMENTS=${argsStr}`;
 
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), TIMEOUT_MS);
