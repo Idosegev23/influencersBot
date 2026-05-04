@@ -15,8 +15,9 @@ const INTENT_PATTERNS: RegExp[] = [
   // "where is my order/package" — common Hebrew framing
   /איפה[\s].*?(הזמנה|משלוח|חבילה|ה?הזמנה|ה?משלוח)/,
   /היכן[\s].*?(הזמנה|משלוח|חבילה)/,
-  // "when will it arrive"
-  /מתי[\s].*?(תגיע|יגיע|אקבל|הגעה|מסירה|נמסר)/,
+  // "when will it arrive" — covers future ("תגיע / יגיע") and present
+  // tense ("מגיע / מגיעה") which Hebrew speakers use interchangeably.
+  /מתי[\s].*?(תגיע|יגיע|מגיע|מגיעה|אקבל|הגעה|מסירה|נמסר)/,
   // "track" / "tracking"
   /\bמעקב\b.*?(הזמנה|משלוח|חבילה)?/,
   /track(?:ing)?/i,
