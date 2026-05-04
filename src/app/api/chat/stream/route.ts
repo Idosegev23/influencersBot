@@ -474,6 +474,109 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        // === SHIPMENT STATUS QUICK PATH ===
+        // For accounts with a shipment_provider configured, intercept
+        // "where's my order" intents BEFORE running the heavy bot. We
+        // either answer with the live status (if a number was provided)
+        // or ask the customer for the number (and wait for the next turn).
+        const shipmentCfg = (influencer as any)?._rawConfig?.shipment_provider;
+        if (shipmentCfg?.enabled === true) {
+          const { detectShipmentIntent } = await import('@/lib/shipment/intent');
+          const intent = detectShipmentIntent(displayMessage);
+          // If the user previously asked about status and we asked for a
+          // number, this turn is just a number → treat as continuation.
+          const awaitingShipNumber = session?.state === 'OrderStatus.AwaitingNumber';
+          if (intent.isOrderStatus || awaitingShipNumber) {
+            const numToUse = intent.shipmentNumber
+              || (awaitingShipNumber ? (displayMessage.match(/\b(\d{6,12})\b/)?.[1] || null) : null);
+
+            if (!numToUse) {
+              const askMsg = 'בשמחה — מה מספר ההזמנה / משלוח? (המספר מופיע באישור ההזמנה ובמייל המשלוח)';
+              controller.enqueue(encodeEvent({
+                type: 'meta',
+                traceId,
+                requestId,
+                decisionId: `shipping_${Date.now()}`,
+                sessionId: currentSessionId,
+                anonId,
+                uiDirectives: { showInputPlaceholder: 'מספר הזמנה / משלוח' },
+                stateTransition: { from: session?.state || 'Idle', to: 'OrderStatus.AwaitingNumber' },
+              }));
+              controller.enqueue(encodeEvent({ type: 'delta', text: askMsg }));
+              controller.enqueue(encodeEvent({
+                type: 'done',
+                responseId: null,
+                latencyMs: Date.now() - startedAt,
+                fullText: askMsg,
+              }));
+              await Promise.all([
+                saveChatMessage(currentSessionId, 'user', displayMessage),
+                saveChatMessage(currentSessionId, 'assistant', askMsg),
+                supabase.from('chat_sessions')
+                  .update({ state: 'OrderStatus.AwaitingNumber', updated_at: new Date().toISOString() })
+                  .eq('id', currentSessionId),
+              ]);
+              controller.close();
+              return;
+            }
+
+            // We have a number — look up the status
+            try {
+              const { getFocusShipmentStatus } = await import('@/lib/shipment/focus-client');
+              const view = shipmentCfg.type === 'focus'
+                ? await getFocusShipmentStatus({
+                    host: shipmentCfg.host || 'focusdelivery.co.il',
+                    shipmentNumber: numToUse,
+                  })
+                : { found: false, statusText: 'spec ספק משלוחים לא נתמך עדיין', errorMessage: null } as any;
+
+              let answer: string;
+              if (!view.found) {
+                answer = `לא הצלחתי למצוא הזמנה עם מספר ${numToUse}. ${view.errorMessage || 'אולי המספר שגוי?'} בדקי שוב או צרי קשר עם שירות הלקוחות.`;
+              } else {
+                const lines: string[] = [`📦 הזמנה ${view.shipmentNumber}`, `סטטוס: ${view.statusText}`];
+                if (view.lastUpdate?.date) lines.push(`עודכן: ${view.lastUpdate.date} ${view.lastUpdate.time || ''}`.trim());
+                if (view.destinationBranch) lines.push(`סניף יעד: ${view.destinationBranch}`);
+                if (view.shipmentDirection) lines.push(`כיוון: ${view.shipmentDirection}`);
+                if (view.isDelivered) lines.push('✅ נמסר');
+                else if (view.isReturned) lines.push('↩️ הוחזר לסניף');
+                else if (view.isCanceled) lines.push('❌ בוטל');
+                answer = lines.join('\n');
+              }
+
+              controller.enqueue(encodeEvent({
+                type: 'meta',
+                traceId,
+                requestId,
+                decisionId: `shipping_${Date.now()}`,
+                sessionId: currentSessionId,
+                anonId,
+                uiDirectives: { shipmentStatus: view, showInputPlaceholder: null },
+                stateTransition: { from: session?.state || 'Idle', to: 'Idle' },
+              }));
+              controller.enqueue(encodeEvent({ type: 'delta', text: answer }));
+              controller.enqueue(encodeEvent({
+                type: 'done',
+                responseId: null,
+                latencyMs: Date.now() - startedAt,
+                fullText: answer,
+              }));
+              await Promise.all([
+                saveChatMessage(currentSessionId, 'user', displayMessage),
+                saveChatMessage(currentSessionId, 'assistant', answer),
+                supabase.from('chat_sessions')
+                  .update({ state: 'Idle', updated_at: new Date().toISOString() })
+                  .eq('id', currentSessionId),
+              ]);
+              controller.close();
+              return;
+            } catch (err) {
+              console.error('[Stream] shipment lookup failed:', err);
+              // Fall through to normal bot — better than crashing
+            }
+          }
+        }
+
         // === LEAD NAME (runs in parallel with decision engine below) ===
         const leadNamePromise = session?.lead_id
           ? Promise.resolve(

@@ -2018,6 +2018,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   isMobile={isMobile}
                   coupons={brands.map(b => ({ brand_name: b.brand_name, coupon_code: b.coupon_code, description: b.description, category: b.category }))}
                   initialDetails={supportPrefill?.details}
+                  enableShipmentTracking={(influencer as any)?._rawConfig?.shipment_provider?.enabled === true}
                 />
               </motion.div>
               ) : (
