@@ -128,14 +128,15 @@ export default function BrandSupportTab({
   const [trackingError, setTrackingError] = useState<string | null>(null);
   // Two-mode lookup:
   //   'order'    — customer enters their order number (P2). Valid only
-  //                when the value is ≥ 6 digits and has NO `#`. Old
-  //                orders were `#180978` (6 chars + #) which can't pass
-  //                through the API; new orders are 6 digits clean.
+  //                when the value is ≥ 8 digits and has NO `#`. Old
+  //                6-digit orders collide with other customers' ship_no
+  //                ranges at Focus, so we require new 8-digit format
+  //                (10000000+) to avoid cross-customer collisions.
   //   'shipment' — customer enters the Focus shipment number (P1).
   //                Triggered when the order number has `#` or is too
   //                short to search reliably.
   const [trackingMode, setTrackingMode] = useState<'order' | 'shipment'>('order');
-  const MIN_ORDER_DIGITS = 6;
+  const MIN_ORDER_DIGITS = 8;
 
   const lookupShipment = useCallback(async () => {
     const raw = trackingNumber.trim();
