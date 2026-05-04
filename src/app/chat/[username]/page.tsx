@@ -1996,7 +1996,36 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         b.brand_name?.toLowerCase().includes(q) ||
                         (b.description || '').toLowerCase().includes(q) ||
                         (b.coupon_code || '').toLowerCase().includes(q);
-                      const active = brands.filter(b => b.coupon_code && matches(b));
+
+                      // Attribution-aware filter: when the visitor came in via
+                      // ?ref=<slug> (an influencer link), only show that
+                      // influencer's coupon — not the other influencers'.
+                      // Direct visits (no ref) see all coupons as before.
+                      const ref = (refSourceRef.current || '').toLowerCase();
+                      const registry = ((influencer as any)?._rawConfig?.influencer_registry || []) as Array<{ slug: string; coupon_code?: string }>;
+                      const refSlugs = new Set(registry.map((it) => (it.slug || '').toLowerCase()));
+                      const slugCouponMap = new Map<string, string>();
+                      for (const it of registry) {
+                        if (it.slug && it.coupon_code) {
+                          slugCouponMap.set(it.slug.toLowerCase(), it.coupon_code.toLowerCase());
+                        }
+                      }
+                      const isInfluencerCoupon = (b: typeof brands[number]) => {
+                        const code = (b.coupon_code || '').toLowerCase();
+                        if (!code) return false;
+                        // a coupon is "an influencer coupon" if its code matches
+                        // any registered slug or coupon_code in the registry
+                        return refSlugs.has(code)
+                          || [...slugCouponMap.values()].includes(code);
+                      };
+                      const visibleByRef = (b: typeof brands[number]) => {
+                        if (!ref) return true;             // direct visit — show all
+                        if (!isInfluencerCoupon(b)) return true; // non-influencer coupon → always show
+                        // Influencer coupon: show only if it's THIS ref's coupon
+                        const myCode = slugCouponMap.get(ref) || ref;
+                        return (b.coupon_code || '').toLowerCase() === myCode;
+                      };
+                      const active = brands.filter(b => b.coupon_code && matches(b) && visibleByRef(b));
                       const partnerships = brands.filter(b => !b.coupon_code && matches(b));
 
                       return (
