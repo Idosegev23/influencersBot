@@ -18,8 +18,10 @@ const INTENT_PATTERNS: RegExp[] = [
   // "when will it arrive" — covers future ("תגיע / יגיע") and present
   // tense ("מגיע / מגיעה") which Hebrew speakers use interchangeably.
   /מתי[\s].*?(תגיע|יגיע|מגיע|מגיעה|אקבל|הגעה|מסירה|נמסר)/,
-  // "track" / "tracking"
-  /\bמעקב\b.*?(הזמנה|משלוח|חבילה)?/,
+  // "track" / "tracking" — noun form (מעקב), infinitive (לעקוב), and
+  // present-tense (עוקב/ת) verbal forms; Hebrew \b word-boundaries are
+  // unreliable so we don't use them.
+  /(מעקב|לעקוב|עוקב(ת|ים)?)\s.*?(הזמנה|משלוח|חבילה|אחרי\s+ה?(הזמנה|משלוח|חבילה))/,
   /track(?:ing)?/i,
   // "the order/shipment is late / didn't arrive yet"
   /(הזמנה|משלוח|חבילה).*?(לא הגיע|לא הגיעה|מאחר|מאחרת)/,
