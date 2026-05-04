@@ -733,6 +733,24 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const accountIdFilter = url.searchParams.get('account_id');
   const hoursWindow = Number(url.searchParams.get('hours') || '24');
+  const force = url.searchParams.get('force') === '1';
+
+  // Israel-time gate: vercel.json schedules two UTC slots (19:00 + 20:00)
+  // so one of them always lands on 22:00 Asia/Jerusalem regardless of DST.
+  // The other one is silently skipped here. Manual reruns can pass ?force=1
+  // to bypass the time check.
+  const ilHour = Number(
+    new Intl.DateTimeFormat('en-IL', {
+      timeZone: 'Asia/Jerusalem',
+      hour: '2-digit',
+      hour12: false,
+    }).format(new Date()),
+  );
+
+  if (!force && ilHour !== 22) {
+    console.log(`[daily-support-report] skip — IL hour is ${ilHour}, target 22`);
+    return NextResponse.json({ skipped: true, ilHour, reason: 'not 22:00 IL' });
+  }
 
   const windowToIso = new Date().toISOString();
   const windowFromIso = new Date(Date.now() - hoursWindow * 60 * 60 * 1000).toISOString();
