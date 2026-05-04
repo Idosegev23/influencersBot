@@ -194,9 +194,16 @@ export async function loadInfluencerProfileCached(
         influencer_type: config.influencer_type || 'other',
         theme: config.theme || {},
         status: account.status || 'active',
-        
+
         // Include raw config for other fields
         ...config,
+        // Mirror getInfluencerByUsername (lib/supabase.ts) — `_rawConfig`
+        // is the canonical handle that downstream code (stream/route.ts,
+        // BrandSupportTab, etc.) uses to read JSONB-only settings like
+        // influencer_registry, shipment_provider, support_redirect_to_tab.
+        // Without it, ref scoping silently no-ops because the registry
+        // is read via `influencer._rawConfig.influencer_registry`.
+        _rawConfig: config,
       } as Influencer;
     },
     {

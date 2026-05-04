@@ -342,8 +342,11 @@ export const CacheKeys = {
     `account:${accountId}:stable`,
   
   // Influencer profile (display_name, type, avatar, etc.)
-  influencerProfile: (influencerId: string) => 
-    `influencer:${influencerId}:profile`,
+  // v2 — added `_rawConfig` so downstream code can read JSONB-only
+  // settings like influencer_registry / shipment_provider without
+  // a fresh DB hit. Old `:profile` entries are abandoned on TTL.
+  influencerProfile: (influencerId: string) =>
+    `influencer:${influencerId}:profile:v2`,
   
   // Persona (tone, style, greeting, etc.)
   persona: (accountId: string, version?: string) => 
