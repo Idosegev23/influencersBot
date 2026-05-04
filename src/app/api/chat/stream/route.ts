@@ -1060,6 +1060,14 @@ export async function POST(req: NextRequest) {
             ).filter((t) => (t || '').trim().length >= 2);
           }
 
+          // TEMP DIAG — emit a debug field on the existing 'meta'-like
+          // path so we can verify the scoping code is running in prod.
+          // Will be removed once redaction is confirmed working.
+          controller.enqueue(encodeEvent({
+            type: 'thinking',
+            text: `[DEBUG ref=${refSource||'-'} scoped=${!!referralScopedInfluencer} bannedN=${bannedTerms?.length||0} terms=${(bannedTerms||[]).slice(0,5).join(',')}]`,
+          } as any));
+
           // Extract recurring topics from rolling summary for deepening (Step 4)
           const conversationTopics: string[] = [];
           if (session?.rolling_summary) {
