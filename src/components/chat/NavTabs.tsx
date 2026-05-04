@@ -66,7 +66,11 @@ export function NavTabs({ tabs, activeTab, onTabChange }: NavTabsProps) {
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           const iconName = getTabIconName(tab);
-          const iconUrl = `/icons/${iconName}.svg`;
+          // Cache-bust v=2: nav SVG files were deleted then restored.
+          // Browsers that received a 404 have cached the negative
+          // result under cache-control:immutable for a year. The query
+          // string forces a fresh fetch.
+          const iconUrl = `/icons/${iconName}.svg?v=2`;
 
           return (
             <button
