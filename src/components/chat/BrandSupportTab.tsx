@@ -126,45 +126,13 @@ export default function BrandSupportTab({
   const [trackingStatus, setTrackingStatus] = useState<ShipmentStatus | null>(null);
   const [trackingLoading, setTrackingLoading] = useState(false);
   const [trackingError, setTrackingError] = useState<string | null>(null);
-  // Two-step lookup: try P2 (order number) first; if not found we ask
-  // the customer for the Focus shipment number (P1).
-  const [trackingStep, setTrackingStep] = useState<'order' | 'shipment'>('order');
-  const [shipmentNumberInput, setShipmentNumberInput] = useState('');
 
-  // Normalize what the customer typed: strip a leading "#" (Shopify
-  // order numbers display as "#1234"), trim whitespace, drop spaces.
+  // Strip a leading "#" (some shipping confirmations display as "#1234")
+  // + trim whitespace
   const cleanInput = (s: string) => s.trim().replace(/^#+/, '').replace(/\s+/g, '');
 
-  const lookupOrderNumber = useCallback(async () => {
+  const lookupShipment = useCallback(async () => {
     const num = cleanInput(trackingNumber);
-    if (!num) {
-      setTrackingError('נא להזין מספר הזמנה');
-      return;
-    }
-    setTrackingLoading(true);
-    setTrackingError(null);
-    try {
-      const res = await fetch(
-        `/api/shipment/status?username=${encodeURIComponent(username)}&reference=${encodeURIComponent(num)}`,
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        setTrackingError(data?.error || 'לא ניתן לבצע את הבדיקה כרגע');
-        setTrackingStatus(null);
-      } else {
-        setTrackingStatus(data as ShipmentStatus);
-        // If P2 didn't find anything, advance to ask for shipment number
-        if (!data.found) setTrackingStep('shipment');
-      }
-    } catch {
-      setTrackingError('אירעה שגיאה בחיבור לשירות המשלוחים');
-    } finally {
-      setTrackingLoading(false);
-    }
-  }, [trackingNumber, username]);
-
-  const lookupShipmentNumber = useCallback(async () => {
-    const num = cleanInput(shipmentNumberInput);
     if (!num) {
       setTrackingError('נא להזין מספר משלוח');
       return;
@@ -172,12 +140,16 @@ export default function BrandSupportTab({
     setTrackingLoading(true);
     setTrackingError(null);
     try {
+      // Send as P1 (shipmentNumber). Per Focus's COO this is the
+      // recommended path — using REF (P2) is unreliable due to prefix
+      // tagging and can cause cross-customer confusion.
       const res = await fetch(
         `/api/shipment/status?username=${encodeURIComponent(username)}&shipmentNumber=${encodeURIComponent(num)}`,
       );
       const data = await res.json();
       if (!res.ok) {
         setTrackingError(data?.error || 'לא ניתן לבצע את הבדיקה כרגע');
+        setTrackingStatus(null);
       } else {
         setTrackingStatus(data as ShipmentStatus);
       }
@@ -186,10 +158,7 @@ export default function BrandSupportTab({
     } finally {
       setTrackingLoading(false);
     }
-  }, [shipmentNumberInput, username]);
-
-  // Backward compat for any existing onClick using the old name
-  const lookupShipment = lookupOrderNumber;
+  }, [trackingNumber, username]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -384,10 +353,10 @@ export default function BrandSupportTab({
               {/* Header — same as other support steps */}
               <div className="mb-6 px-3 flex flex-col items-end gap-[2px]">
                 <h2 className="font-['Heebo:SemiBold',sans-serif] font-semibold text-[24px] leading-[28px] text-[#0c1013] text-right">
-                  סטטוס הזמנה
+                  סטטוס משלוח
                 </h2>
                 <p className="font-['Heebo:Regular',sans-serif] text-[18px] leading-[24px] text-[#676767] text-right">
-                  הזיני את מספר ההזמנה שקיבלת באישור הרכישה
+                  הזיני את מספר המשלוח שקיבלת במייל מ-Focus
                 </p>
               </div>
 
@@ -396,11 +365,12 @@ export default function BrandSupportTab({
                 <div className="bg-white h-[60px] flex items-center px-[20px] rounded-[60px]">
                   <input
                     type="text"
+                    inputMode="numeric"
                     autoFocus
                     value={trackingNumber}
                     onChange={(e) => setTrackingNumber(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') lookupShipment(); }}
-                    placeholder="מספר הזמנה"
+                    placeholder="מספר משלוח"
                     className="w-full bg-transparent border-0 outline-none font-['Heebo:Light',sans-serif] font-light text-[18px] leading-[22.4px] text-[#0c1013] placeholder:text-[#676767] text-right"
                     dir="rtl"
                   />
@@ -436,66 +406,7 @@ export default function BrandSupportTab({
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -8 }}
                   >
-                    {!trackingStatus.found && trackingStep === 'shipment' ? (
-                      <div className="bg-white rounded-[20px] p-[20px]">
-                        <div className="flex items-center gap-[12px] mb-[16px]">
-                          <div className="w-[40px] h-[40px] rounded-[10px] flex items-center justify-center bg-[#f1e9fd]">
-                            <Search className="w-[20px] h-[20px] text-[#883fe2]" />
-                          </div>
-                          <div className="flex-1 text-right">
-                            <p className="font-['Heebo:SemiBold',sans-serif] font-semibold text-[16px] leading-[22px] text-[#0c1013]">
-                              לא מצאתי לפי מספר ההזמנה
-                            </p>
-                            <p className="font-['Heebo:Regular',sans-serif] text-[14px] leading-[20px] text-[#676767]">
-                              נסי בבקשה את <b>מספר המשלוח</b> מחברת השליחויות
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col gap-[12px]">
-                          <div className="bg-[#f4f5f7] h-[60px] flex items-center px-[20px] rounded-[60px]">
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              autoFocus
-                              value={shipmentNumberInput}
-                              onChange={(e) => setShipmentNumberInput(e.target.value)}
-                              onKeyDown={(e) => { if (e.key === 'Enter') lookupShipmentNumber(); }}
-                              placeholder="מספר משלוח"
-                              className="w-full bg-transparent border-0 outline-none font-['Heebo:Light',sans-serif] font-light text-[18px] leading-[22.4px] text-[#0c1013] placeholder:text-[#676767] text-right"
-                              dir="rtl"
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            onClick={lookupShipmentNumber}
-                            disabled={trackingLoading || !shipmentNumberInput.trim()}
-                            className="h-[52px] flex items-center justify-center px-[20px] rounded-[60px] transition-opacity active:opacity-90"
-                            style={{
-                              background: trackingLoading || !shipmentNumberInput.trim() ? '#676767' : '#883fe2',
-                              color: '#ffffff',
-                            }}
-                          >
-                            {trackingLoading ? (
-                              <Loader2 className="w-[18px] h-[18px] animate-spin" />
-                            ) : (
-                              <span className="font-['Heebo:Regular',sans-serif] text-[18px] leading-[22.4px]">בדיקה לפי מספר משלוח</span>
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setTrackingStep('order');
-                              setTrackingStatus(null);
-                              setShipmentNumberInput('');
-                            }}
-                            className="font-['Heebo:Regular',sans-serif] text-[14px] text-[#676767] underline self-end"
-                          >
-                            חזרה — נסי מספר הזמנה אחר
-                          </button>
-                        </div>
-                      </div>
-                    ) : !trackingStatus.found ? (
+                    {!trackingStatus.found ? (
                       <div className="bg-white rounded-[20px] p-6 text-center">
                         <div className="w-[56px] h-[56px] mx-auto rounded-[14px] flex items-center justify-center mb-4 bg-[#f1e9fd]">
                           <Search className="w-7 h-7 text-[#883fe2]" />
