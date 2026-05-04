@@ -35,6 +35,7 @@ interface BrandSupportTabProps {
   brandName: string;
   isMobile: boolean;
   coupons?: Coupon[];
+  initialDetails?: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -91,7 +92,7 @@ function iconFor(cat: string): string {
 /* ------------------------------------------------------------------ */
 
 export default function BrandSupportTab({
-  accountId, username, brandName, isMobile, coupons = [],
+  accountId, username, brandName, isMobile, coupons = [], initialDetails,
 }: BrandSupportTabProps) {
   const [step, setStep] = useState<'product' | 'type' | 'form' | 'success'>('product');
   const [products, setProducts] = useState<Product[]>([]);
@@ -104,8 +105,17 @@ export default function BrandSupportTab({
   const [selectedType, setSelectedType] = useState<ProblemTypeId | null>(null);
   const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null);
 
-  // Form
-  const [form, setForm] = useState({ name: '', phone: '', order: '', details: '' });
+  // Form (seed details from a chat-redirect prefill if provided)
+  const [form, setForm] = useState({ name: '', phone: '', order: '', details: initialDetails || '' });
+
+  // If a new prefill arrives later (e.g. user complains again from chat),
+  // update the details field as long as the user hasn't typed something else.
+  useEffect(() => {
+    if (initialDetails && !form.details) {
+      setForm((f) => ({ ...f, details: initialDetails }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialDetails]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

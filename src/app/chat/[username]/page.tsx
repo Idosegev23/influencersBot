@@ -264,6 +264,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [tapCount, setTapCount] = useState(0);
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [supportBrand, setSupportBrand] = useState<string>('');
+  const [supportPrefill, setSupportPrefill] = useState<{ details?: string } | null>(null);
   const [showNewChatConfirm, setShowNewChatConfirm] = useState(false);
   const [supportForm, setSupportForm] = useState({ name: '', phone: '', message: '' });
   const [supportLoading, setSupportLoading] = useState(false);
@@ -626,6 +627,22 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     const lastMessage = messages[messages.length - 1];
     if (lastMessage?.role === 'assistant' && lastMessage?.uiDirectives?.showSupportModal) {
       setShowSupportModal(true);
+    }
+  }, [messages]);
+
+  // Account-level redirect: when the bot detects a complaint and the
+  // account has support_redirect_to_tab=true, the stream emits
+  // uiDirectives.openSupportTab — we switch to the support tab and pass
+  // the user's complaint text down as a pre-fill.
+  useEffect(() => {
+    const lastMessage = messages[messages.length - 1];
+    const directives = lastMessage?.uiDirectives as any;
+    if (lastMessage?.role === 'assistant' && directives?.openSupportTab) {
+      const prefill = directives.supportPrefill as { details?: string } | undefined;
+      if (prefill?.details) setSupportPrefill(prefill);
+      // Small delay so the redirect message has time to render in chat first
+      const t = setTimeout(() => setActiveTab('support' as TabId), 1200);
+      return () => clearTimeout(t);
     }
   }, [messages]);
 
@@ -1918,6 +1935,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   brandName={influencer.display_name}
                   isMobile={isMobile}
                   coupons={brands.map(b => ({ brand_name: b.brand_name, coupon_code: b.coupon_code, description: b.description, category: b.category }))}
+                  initialDetails={supportPrefill?.details}
                 />
               </motion.div>
               ) : (

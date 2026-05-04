@@ -510,6 +510,51 @@ export async function POST(req: NextRequest) {
 
         // === HANDLE SUPPORT FLOW HAND-OFF ===
         if (decision.handler === 'support_flow' || isInSupportFlow) {
+          // Account-level setting: bypass the in-chat conversational support
+          // flow and instead redirect the user to the dedicated support tab.
+          // Used by brand accounts that want every complaint funnelled
+          // through the structured form (so it lands in support_requests
+          // and the daily Excel report) rather than handled in chat.
+          const redirectToTab = (influencer as any)?._rawConfig?.support_redirect_to_tab === true;
+
+          if (redirectToTab && !isInSupportFlow) {
+            console.log('[Stream] 🎯 Redirecting to support tab (account opted-in)');
+            const redirectMessage = 'מבינה אותך 💜 אני מעבירה אותך עכשיו לטופס פנייה רשמית — שם תוכלי לבחור את המוצר, סוג הבעיה ולכתוב את הפירוט. הצוות שלנו יחזור אליך בהקדם.';
+            controller.enqueue(encodeEvent({
+              type: 'meta',
+              traceId,
+              requestId,
+              decisionId: decision.decisionId,
+              sessionId: currentSessionId,
+              anonId,
+              uiDirectives: {
+                ...decision.uiDirectives,
+                openSupportTab: true,
+                supportPrefill: { details: message },
+              },
+              stateTransition: { from: session?.state || 'Idle', to: 'Support.Redirected' },
+            }));
+            controller.enqueue(encodeEvent({ type: 'delta', text: redirectMessage }));
+            controller.enqueue(encodeEvent({
+              type: 'done',
+              responseId: null,
+              latencyMs: Date.now() - startedAt,
+              fullText: redirectMessage,
+            }));
+
+            await Promise.all([
+              saveChatMessage(currentSessionId, 'user', displayMessage),
+              saveChatMessage(currentSessionId, 'assistant', redirectMessage),
+              supabase
+                .from('chat_sessions')
+                .update({ state: 'Support.Redirected', updated_at: new Date().toISOString() })
+                .eq('id', currentSessionId),
+            ]);
+
+            controller.close();
+            return;
+          }
+
           console.log('[Stream] 🔄 Handing off to support flow...', {
             viaHandler: decision.handler === 'support_flow',
             viaSessionState: isInSupportFlow,
