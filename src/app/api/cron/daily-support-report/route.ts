@@ -47,6 +47,14 @@ interface SupportTicket {
   problem_type: string;       // extracted from message
   product_name: string | null; // joined or extracted from message
   product_category: string;    // joined from widget_products
+  ref_source: string | null;   // attribution slug (e.g. 'danielamit')
+  ref_display: string;         // human-readable name from registry
+}
+
+interface InfluencerRegistryItem {
+  slug: string;
+  display_name: string;
+  coupon_code?: string;
 }
 
 // PROBLEM_TYPES labels live in BrandSupportTab.tsx — mirror them here so
@@ -385,6 +393,7 @@ async function buildWorkbook(args: {
       { header: 'שם לקוח', key: 'name', width: 20 },
       { header: 'טלפון', key: 'phone', width: 16 },
       { header: 'מותג', key: 'brand', width: 16 },
+      { header: 'משפיענית', key: 'ref', width: 18 },
       { header: 'מוצר', key: 'product', width: 28 },
       { header: 'קטגוריית מוצר', key: 'category', width: 18 },
       { header: 'סוג בעיה', key: 'problem', width: 16 },
@@ -399,6 +408,7 @@ async function buildWorkbook(args: {
         name: t.customer_name || '',
         phone: t.customer_phone || '',
         brand: t.brand || '',
+        ref: t.ref_display,
         product: t.product_name || '',
         category: t.product_category || '',
         problem: t.problem_type,
@@ -436,6 +446,10 @@ async function buildWorkbook(args: {
   addBreakdownSheet('לפי סוג בעיה', 'סוג בעיה', byProblem);
   addBreakdownSheet('לפי מותג', 'מותג', byBrand);
   addBreakdownSheet('לפי קטגוריית מוצר', 'קטגוריית מוצר', byCategory);
+
+  // ─── Sheet: לפי משפיענית ───────────────────────────────────────
+  const byInfluencer = countBy(tickets, (t) => t.ref_display);
+  addBreakdownSheet('לפי משפיענית', 'משפיענית / מקור', byInfluencer);
 
   // ─── Helper: cross-tab pivot ────────────────────────────────────
   function addPivotSheet(name: string, rowLabel: string, colLabel: string,
@@ -509,6 +523,14 @@ async function buildWorkbook(args: {
     (t) => t.brand || '— ללא —',
   );
 
+  addPivotSheet(
+    'פיבוט — משפיענית × סוג',
+    'משפיענית',
+    'סוג בעיה',
+    (t) => t.ref_display,
+    (t) => t.problem_type,
+  );
+
   // ─── Sheet: מגמה יומית ──────────────────────────────────────────
   {
     const ws = wb.addWorksheet('מגמה יומית', { views: [RTL_VIEW] });
@@ -542,6 +564,15 @@ async function buildWorkbook(args: {
           topNSorted(byCategory, 10).map(([k]) => k),
           topNSorted(byCategory, 10).map(([, v]) => v),
           '#10b981',
+        ),
+      },
+      {
+        title: 'פניות לפי משפיענית',
+        cfg: barChartConfig(
+          'פניות לפי משפיענית',
+          topNSorted(byInfluencer, 10).map(([k]) => k),
+          topNSorted(byInfluencer, 10).map(([, v]) => v),
+          '#f59e0b',
         ),
       },
       {
@@ -612,7 +643,7 @@ async function processAccount(args: {
   const { data: rows, error } = await supabase
     .from('support_requests')
     .select(
-      'id, customer_name, customer_phone, brand, order_number, message, product_id, created_at',
+      'id, customer_name, customer_phone, brand, order_number, message, product_id, created_at, ref_source',
     )
     .eq('account_id', account.id)
     .gte('created_at', windowFromIso)
@@ -639,8 +670,17 @@ async function processAccount(args: {
     }
   }
 
+  // Influencer registry for human-readable attribution names
+  const registry: InfluencerRegistryItem[] = (cfg.influencer_registry as InfluencerRegistryItem[]) || [];
+  const refLookup = new Map<string, string>();
+  for (const item of registry) {
+    if (item.slug) refLookup.set(item.slug.toLowerCase(), item.display_name || item.slug);
+    if (item.coupon_code) refLookup.set(item.coupon_code.toLowerCase(), item.display_name || item.slug);
+  }
+
   const tickets: SupportTicket[] = (rows || []).map((r) => {
     const productInfo = r.product_id ? productLookup.get(r.product_id) : undefined;
+    const slug = (r.ref_source || '').toLowerCase() || null;
     return {
       id: r.id,
       customer_name: r.customer_name,
@@ -653,8 +693,15 @@ async function processAccount(args: {
       problem_type: extractProblemType(r.message),
       product_name: productInfo?.name || extractProductFromMessage(r.message),
       product_category: productInfo?.category || '— ללא מוצר —',
+      ref_source: slug,
+      ref_display: slug ? (refLookup.get(slug) || slug) : '— ישיר / לא ידוע —',
     };
   });
+
+  // Pull session-level attribution (visits without a ticket) so the
+  // dashboard counts traffic too — but the report focuses on tickets.
+  // (Daily sessions with ref_source for THIS account are already
+  // queryable from chat_sessions if needed in the future.)
 
   const xlsxBuffer = await buildWorkbook({
     brandName,
