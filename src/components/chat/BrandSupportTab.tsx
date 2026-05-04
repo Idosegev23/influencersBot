@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, X, CheckCircle } from 'lucide-react';
+import { Loader2, X, CheckCircle, Package, MapPin, Clock, Search, AlertCircle, Truck } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -296,31 +296,40 @@ export default function BrandSupportTab({
       <div className="px-4 py-6">
         <div className={`mx-auto support-flow-container ${isMobile ? 'max-w-2xl' : 'max-w-[700px]'}`}>
 
-          {/* ======== MODE TOGGLE (only when shipment tracking is enabled) ======== */}
+          {/* ======== MODE TOGGLE — pill switcher with purple→pink gradient on active ======== */}
           {enableShipmentTracking && (
-            <div className="mb-5 flex gap-2 p-1 bg-[#f4f5f7] rounded-2xl">
+            <div className="mb-5 relative flex p-1 rounded-full bg-white border border-[#f0e8fa]" style={{ boxShadow: '0 8px 24px rgba(124,58,237,0.06), 0 1px 0 rgba(0,0,0,0.03)' }}>
               <button
                 type="button"
                 onClick={() => { setMode('support'); setTrackingStatus(null); setTrackingError(null); }}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition ${
-                  mode === 'support'
-                    ? 'bg-white shadow-sm text-[#0c1013]'
-                    : 'text-[#676767]'
+                className={`relative z-10 flex-1 flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-full text-sm font-semibold transition-all ${
+                  mode === 'support' ? 'text-white' : 'text-[#676767] hover:text-[#0c1013]'
                 }`}
               >
+                <AlertCircle className="w-4 h-4" />
                 בעיה במוצר
               </button>
               <button
                 type="button"
                 onClick={() => setMode('tracking')}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition ${
-                  mode === 'tracking'
-                    ? 'bg-white shadow-sm text-[#0c1013]'
-                    : 'text-[#676767]'
+                className={`relative z-10 flex-1 flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-full text-sm font-semibold transition-all ${
+                  mode === 'tracking' ? 'text-white' : 'text-[#676767] hover:text-[#0c1013]'
                 }`}
               >
+                <Truck className="w-4 h-4" />
                 סטטוס משלוח
               </button>
+              <motion.div
+                layoutId="support-tab-active"
+                className="absolute top-1 bottom-1 rounded-full"
+                style={{
+                  background: 'linear-gradient(135deg, #883fe2 0%, #ec4899 100%)',
+                  boxShadow: '0 6px 20px rgba(136,63,226,0.35)',
+                  width: 'calc(50% - 4px)',
+                  right: mode === 'support' ? '4px' : 'calc(50% + 0px)',
+                }}
+                transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+              />
             </div>
           )}
 
@@ -328,17 +337,37 @@ export default function BrandSupportTab({
           {mode === 'tracking' && enableShipmentTracking && (
             <motion.div
               key="tracking-flow"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
             >
-              <div className="mb-4 px-3">
-                <h2 className="support-title">בדיקת סטטוס משלוח</h2>
-                <p className="support-subtitle">הזיני את מספר ההזמנה / משלוח שמופיע באישור ההזמנה</p>
+              {/* Hero: gradient header with brand identity */}
+              <div className="mb-4 px-3 flex items-center gap-3">
+                <div
+                  className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: 'linear-gradient(135deg, #883fe2 0%, #ec4899 100%)', boxShadow: '0 8px 20px rgba(136,63,226,0.25)' }}
+                >
+                  <Package className="w-6 h-6 text-white" strokeWidth={2.2} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h2 className="support-title" style={{ marginBottom: 2 }}>איפה ההזמנה שלי?</h2>
+                  <p className="support-subtitle">הזיני את מספר ההזמנה ונראה לך מצב עדכני</p>
+                </div>
               </div>
 
-              <div className="bg-white rounded-3xl p-5 mb-3" style={{ boxShadow: '0 1px 0 rgba(0,0,0,0.04), 0 8px 24px rgba(124,58,237,0.06)' }}>
-                <label className="block text-sm font-medium text-[#0c1013] mb-2">מספר הזמנה / משלוח</label>
+              {/* Lookup card */}
+              <div
+                className="relative bg-white rounded-3xl p-5 mb-3 overflow-hidden"
+                style={{ boxShadow: '0 1px 0 rgba(0,0,0,0.04), 0 12px 32px rgba(136,63,226,0.08)', border: '1px solid #f9e8f3' }}
+              >
+                <div
+                  className="absolute top-0 left-0 right-0 h-1"
+                  style={{ background: 'linear-gradient(90deg, #883fe2 0%, #ec4899 100%)' }}
+                />
+                <label className="flex items-center gap-1.5 text-sm font-semibold text-[#0c1013] mb-2.5">
+                  <Search className="w-4 h-4 text-[#883fe2]" />
+                  מספר הזמנה / משלוח
+                </label>
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -348,109 +377,193 @@ export default function BrandSupportTab({
                     onChange={(e) => setTrackingNumber(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') lookupShipment(); }}
                     placeholder="לדוגמה: 3433155"
-                    className="flex-1 bg-[#f4f5f7] border-0 rounded-2xl px-4 py-3 text-[#0c1013] placeholder:text-[#a9a9a9] outline-none focus:ring-2 focus:ring-purple-200"
+                    className="flex-1 bg-[#f4f5f7] border-0 rounded-2xl px-4 py-3 text-[#0c1013] placeholder:text-[#a9a9a9] outline-none focus:ring-2 focus:ring-[#883fe2]/30 transition"
                     dir="rtl"
                   />
                   <button
                     type="button"
                     onClick={lookupShipment}
                     disabled={trackingLoading || !trackingNumber.trim()}
-                    className="px-5 py-3 rounded-2xl bg-purple-600 text-white font-semibold hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="px-5 py-3 rounded-2xl text-white font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 active:scale-[0.97]"
+                    style={{
+                      background: trackingLoading || !trackingNumber.trim()
+                        ? '#a9a9a9'
+                        : 'linear-gradient(135deg, #883fe2 0%, #ec4899 100%)',
+                      boxShadow: trackingLoading || !trackingNumber.trim() ? 'none' : '0 8px 20px rgba(136,63,226,0.3)',
+                    }}
                   >
                     {trackingLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'בדיקה'}
                   </button>
                 </div>
                 {trackingError && (
-                  <p className="mt-3 text-sm text-red-600">{trackingError}</p>
+                  <motion.p
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-3 flex items-center gap-1.5 text-sm text-red-600"
+                  >
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    {trackingError}
+                  </motion.p>
                 )}
               </div>
 
-              {trackingStatus && (
-                <motion.div
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-white rounded-3xl p-5"
-                  style={{ boxShadow: '0 1px 0 rgba(0,0,0,0.04), 0 8px 24px rgba(124,58,237,0.06)' }}
-                >
-                  {!trackingStatus.found ? (
-                    <div className="text-center py-3">
-                      <div className="text-4xl mb-2">🔍</div>
-                      <h3 className="font-semibold text-[#0c1013] mb-1">לא נמצא משלוח</h3>
-                      <p className="text-sm text-[#676767]">{trackingStatus.statusText}</p>
-                      <p className="text-xs text-[#a9a9a9] mt-3">בדקי שהמספר תקין, או צרי קשר עם שירות הלקוחות אם הבעיה ממשיכה.</p>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex items-start justify-between mb-4 gap-3">
-                        <div>
-                          <div className="text-xs text-[#a9a9a9]">מספר משלוח</div>
-                          <div className="text-lg font-bold text-[#0c1013]">{trackingStatus.shipmentNumber}</div>
+              <AnimatePresence mode="wait">
+                {trackingStatus && (
+                  <motion.div
+                    key={trackingStatus.shipmentNumber || 'not-found'}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    className="relative bg-white rounded-3xl overflow-hidden"
+                    style={{ boxShadow: '0 1px 0 rgba(0,0,0,0.04), 0 12px 32px rgba(136,63,226,0.08)', border: '1px solid #f9e8f3' }}
+                  >
+                    {!trackingStatus.found ? (
+                      <div className="text-center py-10 px-6">
+                        <div
+                          className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center mb-4"
+                          style={{ background: 'linear-gradient(135deg, #fdf4f8 0%, #f4f0ff 100%)' }}
+                        >
+                          <Search className="w-7 h-7 text-[#a9a9a9]" />
                         </div>
-                        <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                          trackingStatus.isDelivered ? 'bg-green-50 text-green-700'
-                          : trackingStatus.isReturned ? 'bg-amber-50 text-amber-700'
-                          : trackingStatus.isCanceled ? 'bg-red-50 text-red-700'
-                          : 'bg-purple-50 text-purple-700'
-                        }`}>
-                          {trackingStatus.isDelivered ? '✅ נמסר'
-                          : trackingStatus.isReturned ? '↩️ הוחזר'
-                          : trackingStatus.isCanceled ? '❌ בוטל'
-                          : '🚚 בדרך'}
-                        </div>
+                        <h3 className="font-bold text-[#0c1013] text-lg mb-1.5">לא מצאנו משלוח כזה</h3>
+                        <p className="text-sm text-[#676767] mb-2">{trackingStatus.statusText}</p>
+                        <p className="text-xs text-[#a9a9a9]">בדקי שהמספר תקין, או פני לשירות הלקוחות אם הבעיה ממשיכה.</p>
                       </div>
+                    ) : (
+                      <>
+                        {/* Status Hero — gradient strip per status state */}
+                        <div
+                          className="px-5 pt-5 pb-4"
+                          style={{
+                            background: trackingStatus.isDelivered
+                              ? 'linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%)'
+                              : trackingStatus.isReturned
+                              ? 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)'
+                              : trackingStatus.isCanceled
+                              ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)'
+                              : 'linear-gradient(135deg, #faf5ff 0%, #fce7f3 100%)',
+                          }}
+                        >
+                          <div className="flex items-start justify-between gap-3 mb-3">
+                            <div className="min-w-0">
+                              <div className="text-[11px] font-medium text-[#676767] uppercase tracking-wider">מספר משלוח</div>
+                              <div className="text-2xl font-extrabold text-[#0c1013] tabular-nums">{trackingStatus.shipmentNumber}</div>
+                            </div>
+                            <div
+                              className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap flex items-center gap-1.5 ${
+                                trackingStatus.isDelivered ? 'bg-green-600 text-white'
+                                : trackingStatus.isReturned ? 'bg-amber-500 text-white'
+                                : trackingStatus.isCanceled ? 'bg-red-500 text-white'
+                                : 'text-white'
+                              }`}
+                              style={!trackingStatus.isDelivered && !trackingStatus.isReturned && !trackingStatus.isCanceled
+                                ? { background: 'linear-gradient(135deg, #883fe2 0%, #ec4899 100%)' }
+                                : undefined}
+                            >
+                              {trackingStatus.isDelivered ? <><CheckCircle className="w-3.5 h-3.5" /> נמסר</>
+                              : trackingStatus.isReturned ? '↩️ הוחזר'
+                              : trackingStatus.isCanceled ? '❌ בוטל'
+                              : <><Truck className="w-3.5 h-3.5" /> בדרך</>}
+                            </div>
+                          </div>
 
-                      <div className="bg-[#f4f5f7] rounded-2xl p-4 mb-4">
-                        <div className="text-xs text-[#676767] mb-1">סטטוס נוכחי</div>
-                        <div className="text-base font-semibold text-[#0c1013]">{trackingStatus.statusText}</div>
-                        {(trackingStatus.lastUpdate?.date || trackingStatus.destinationBranch) && (
-                          <div className="mt-2 flex flex-wrap gap-3 text-xs text-[#676767]">
-                            {trackingStatus.lastUpdate?.date && (
-                              <span>עודכן: {trackingStatus.lastUpdate.date} {trackingStatus.lastUpdate.time || ''}</span>
-                            )}
-                            {trackingStatus.destinationBranch && (
-                              <span>סניף יעד: {trackingStatus.destinationBranch}</span>
-                            )}
+                          <div className="text-base font-bold text-[#0c1013] leading-snug">
+                            {trackingStatus.statusText}
+                          </div>
+
+                          {(trackingStatus.lastUpdate?.date || trackingStatus.destinationBranch) && (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {trackingStatus.lastUpdate?.date && (
+                                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/70 text-[11px] text-[#0c1013] font-medium">
+                                  <Clock className="w-3 h-3 text-[#883fe2]" />
+                                  {trackingStatus.lastUpdate.date} {trackingStatus.lastUpdate.time || ''}
+                                </div>
+                              )}
+                              {trackingStatus.destinationBranch && (
+                                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/70 text-[11px] text-[#0c1013] font-medium">
+                                  <MapPin className="w-3 h-3 text-[#ec4899]" />
+                                  {trackingStatus.destinationBranch}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Timeline */}
+                        {trackingStatus.history && trackingStatus.history.length > 0 && (
+                          <div className="px-5 py-4">
+                            <div className="text-[11px] font-semibold text-[#676767] uppercase tracking-wider mb-3">
+                              היסטוריית המסלול
+                            </div>
+                            <div className="relative">
+                              {/* connecting line */}
+                              <div
+                                className="absolute right-[7px] top-2 bottom-2 w-px"
+                                style={{ background: 'linear-gradient(to bottom, #f4f0ff, #fce7f3)' }}
+                              />
+                              <div className="space-y-3">
+                                {trackingStatus.history.map((h, i) => {
+                                  const isLatest = i === trackingStatus.history.length - 1;
+                                  return (
+                                    <motion.div
+                                      key={i}
+                                      initial={{ opacity: 0, x: -10 }}
+                                      animate={{ opacity: 1, x: 0 }}
+                                      transition={{ delay: i * 0.04 }}
+                                      className="relative flex items-start gap-3"
+                                    >
+                                      <div
+                                        className={`w-3.5 h-3.5 rounded-full flex-shrink-0 mt-1 ${isLatest ? 'ring-4 ring-purple-100' : ''}`}
+                                        style={{
+                                          background: isLatest
+                                            ? 'linear-gradient(135deg, #883fe2 0%, #ec4899 100%)'
+                                            : '#d4d4d4',
+                                        }}
+                                      />
+                                      <div className="flex-1 min-w-0 pb-1">
+                                        <div className={`text-sm leading-tight ${isLatest ? 'font-bold text-[#0c1013]' : 'font-medium text-[#0c1013]'}`}>
+                                          {h.desc}
+                                        </div>
+                                        {(h.date || h.time) && (
+                                          <div className="text-[11px] text-[#a9a9a9] mt-0.5 tabular-nums">
+                                            {h.date} {h.time}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </motion.div>
+                                  );
+                                })}
+                              </div>
+                            </div>
                           </div>
                         )}
-                      </div>
 
-                      {trackingStatus.history && trackingStatus.history.length > 0 && (
-                        <div>
-                          <div className="text-xs text-[#a9a9a9] mb-2">היסטוריית מסלול</div>
-                          <div className="space-y-2">
-                            {trackingStatus.history.map((h, i) => (
-                              <div key={i} className="flex items-start gap-3">
-                                <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
-                                  i === trackingStatus.history.length - 1 ? 'bg-purple-600' : 'bg-[#d4d4d4]'
-                                }`} />
-                                <div className="flex-1 min-w-0">
-                                  <div className="text-sm text-[#0c1013]">{h.desc}</div>
-                                  {(h.date || h.time) && (
-                                    <div className="text-xs text-[#a9a9a9]">{h.date} {h.time}</div>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
+                        {/* CTA */}
+                        <div className="px-5 pb-5 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMode('support');
+                              setStep('type');
+                              setSelectedType('shipping');
+                              setForm((f) => ({ ...f, order: trackingStatus.shipmentNumber || '' }));
+                            }}
+                            className="w-full py-3 rounded-2xl text-sm font-semibold flex items-center justify-center gap-2 transition active:scale-[0.98]"
+                            style={{
+                              background: 'linear-gradient(135deg, #fef2f2 0%, #fef3c7 100%)',
+                              color: '#92400e',
+                              border: '1px solid #fed7aa',
+                            }}
+                          >
+                            <AlertCircle className="w-4 h-4" />
+                            יש בעיה במשלוח? פתחי פנייה
+                          </button>
                         </div>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMode('support');
-                          setStep('type');
-                          setSelectedType('shipping');
-                          setForm((f) => ({ ...f, order: trackingStatus.shipmentNumber || '' }));
-                        }}
-                        className="mt-4 w-full py-3 rounded-2xl bg-[#f4f5f7] text-[#0c1013] text-sm font-medium hover:bg-[#ececef] transition"
-                      >
-                        ⚠️ יש בעיה במשלוח? פתחי פנייה
-                      </button>
-                    </>
-                  )}
-                </motion.div>
-              )}
+                      </>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           )}
 
