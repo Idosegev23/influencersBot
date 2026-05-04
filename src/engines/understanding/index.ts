@@ -213,27 +213,41 @@ function createDefaultResult(message: string, processingTimeMs: number): Underst
   let topic = 'general';
   let suggestedHandler: RouteHints['suggestedHandler'] = 'chat';
   
-  // PRIORITY: Support flow - check FIRST before other intents
-  if (
-    (lowerMessage.includes('בעיה') && lowerMessage.includes('הזמנה')) ||
-    (lowerMessage.includes('תקלה') && lowerMessage.includes('הזמנה')) ||
-    lowerMessage.includes('בעיה בהזמנה') ||
-    lowerMessage.includes('בעיה עם הזמנה') ||
-    lowerMessage.includes('בעיה בקופון') ||
-    lowerMessage.includes('הקופון לא עובד') ||
-    lowerMessage.includes('לא הגיעה הזמנה') ||
-    lowerMessage.includes('איפה ההזמנה')
-  ) {
+  // PRIORITY: Support flow - check FIRST before other intents.
+  // Must catch real-world complaint vocabulary (broken/damaged/missing
+  // delivery/wrong item/billing) — not just literal "בעיה בהזמנה".
+  const SUPPORT_KEYWORDS = [
+    // Damaged / broken
+    'שבור', 'שבורה', 'נשבר', 'סדק', 'סדוק', 'סדוקה', 'פגום', 'פגומה',
+    'מקולקל', 'מקולקלת', 'ניזוק', 'דלף', 'דלפה', 'נזק',
+    // Wrong item
+    'מוצר שגוי', 'לא מה שהזמנתי', 'קיבלתי משהו אחר', 'מוצר אחר',
+    // Delivery
+    'לא הגיע', 'לא הגיעה', 'לא קיבלתי', 'לא נמסר', 'איפה ההזמנה',
+    'איפה החבילה', 'איחור במשלוח', 'איחר',
+    // Coupon issues
+    'הקוד לא עובד', 'הקופון לא עובד', 'קופון לא תקף', 'לא מקבלת הנחה',
+    'בעיה בקופון', 'הקופון פג',
+    // Payment
+    'חיוב כפול', 'חויבתי פעמיים', 'לא קיבלתי החזר', 'החזר כספי', 'לבטל הזמנה',
+    'בעיה בתשלום',
+    // Quality / dissatisfaction
+    'לא מתאים', 'התאכזבתי', 'איכות',
+    // Generic
+    'בעיה', 'תקלה', 'לא עובד', 'לא פועל', 'תלונה', 'מתלוננת',
+    // Action requests after problem
+    'אני רוצה החזר', 'אני רוצה החלפה', 'אני רוצה לבטל',
+  ];
+
+  const isSupportMessage = SUPPORT_KEYWORDS.some((kw) => lowerMessage.includes(kw));
+
+  if (isSupportMessage) {
     intent = 'support';
     topic = 'support';
     suggestedHandler = 'support_flow';
   } else if (lowerMessage.includes('קופון') || lowerMessage.includes('הנחה') || lowerMessage.includes('קוד')) {
     intent = 'coupon';
     topic = 'coupons';
-  } else if (lowerMessage.includes('בעיה') || lowerMessage.includes('תקלה') || lowerMessage.includes('לא עובד')) {
-    intent = 'support';
-    topic = 'support';
-    suggestedHandler = 'support_flow';
   } else if (lowerMessage.includes('מחיר') || lowerMessage.includes('לקנות') || lowerMessage.includes('כמה עולה')) {
     intent = 'sales';
     topic = 'pricing';

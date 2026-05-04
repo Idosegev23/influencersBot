@@ -496,6 +496,37 @@ export async function POST(req: NextRequest) {
             handler: decision.handler,
             intent: understanding.intent,
           });
+
+          // SAFETY NET — for accounts that opt-in to redirect-to-support-tab,
+          // a missed classification by the LLM is a real cost (the bot starts
+          // chit-chatting about a complaint instead of handing off). Run a
+          // local keyword scan as backup and force handler='support_flow' if
+          // strong complaint signals are present.
+          const accountConfig = (influencer as any)?._rawConfig || {};
+          if (
+            accountConfig.support_redirect_to_tab === true &&
+            decision.handler !== 'support_flow'
+          ) {
+            const lower = (message || '').toLowerCase();
+            const STRONG_COMPLAINT_PATTERNS: RegExp[] = [
+              /שבור|נשבר|סדק|סדוק|פגום|מקולקל|דלף|דלפה|ניזוק|נזק/,
+              /לא הגיע|לא קיבלתי|איפה ההזמנה|איפה החבילה|לא נמסר|איחור|איחר/,
+              /לא מה שהזמנתי|מוצר שגוי|קיבלתי משהו אחר|מוצר אחר/,
+              /הקוד לא עובד|הקופון לא עובד|קופון לא תקף|בעיה בקופון|הקופון פג/,
+              /חיוב כפול|חויבתי פעמיים|לא קיבלתי החזר|החזר כספי|לבטל הזמנה|בעיה בתשלום/,
+              /תלונה|מתלוננת|לא עובד|לא פועל|תקלה/,
+              /אני רוצה (החזר|החלפה|לבטל)/,
+            ];
+            const looksLikeComplaint = STRONG_COMPLAINT_PATTERNS.some((re) => re.test(lower));
+            if (looksLikeComplaint) {
+              console.log('[Stream] 🎯 Keyword override → support_flow (LLM said:', decision.handler, ')');
+              decision = {
+                ...decision,
+                handler: 'support_flow',
+                stateTransition: { from: session?.state || 'Idle', to: 'Support.Detected' },
+              } as typeof decision;
+            }
+          }
         } else {
           // Already in support flow - force support_flow handler
           console.log('[Stream] 🔄 Already in support flow, continuing...');
