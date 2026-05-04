@@ -1027,7 +1027,20 @@ export async function POST(req: NextRequest) {
           let couponCodeWhitelist: string[] | undefined;
           if (referralScopedInfluencer) {
             const myCode = referralScopedInfluencer.coupon_code || referralScopedInfluencer.slug;
-            const ctxLine = `\n\n[הקשר פנימי — אל תצטטי: הלקוחה הגיעה דרך הלינק האישי של ${referralScopedInfluencer.display_name}. כשהלקוחה שואלת על קוד הנחה / קופונים — הזכירי אך ורק את הקוד של ${referralScopedInfluencer.display_name}: \`${myCode}\`. אל תזכירי משפיעניות אחרות בכלל. אם הלקוחה שואלת על משפיענית אחרת בשם — תני תשובה כללית בלי לאשר או להכחיש.]`;
+            const cfg2 = (influencer as any)?._rawConfig || {};
+            const fullRegistry = (cfg2.influencer_registry as Array<{ slug: string; display_name: string; coupon_code?: string }>) || [];
+            const otherInfluencers = fullRegistry
+              .filter((it) => it.slug?.toLowerCase() !== referralScopedInfluencer!.slug?.toLowerCase())
+              .map((it) => it.display_name)
+              .filter(Boolean);
+            const otherCodes = fullRegistry
+              .filter((it) => it.slug?.toLowerCase() !== referralScopedInfluencer!.slug?.toLowerCase())
+              .map((it) => (it.coupon_code || it.slug || '').toLowerCase())
+              .filter(Boolean);
+            const bannedNamesLine = otherInfluencers.length > 0
+              ? ` השמות הבאים אסורים בתשובה — אל תזכירי אותם בכלל, גם לא בעקיפין: ${otherInfluencers.join('، ')}. הקודים הבאים אסורים בתשובה: ${otherCodes.join('، ')}.`
+              : '';
+            const ctxLine = `\n\n[הקשר פנימי — אל תצטטי: הלקוחה הגיעה דרך הלינק האישי של ${referralScopedInfluencer.display_name}. כשהלקוחה שואלת על קוד הנחה / קופונים — הזכירי אך ורק את הקוד \`${myCode}\` של ${referralScopedInfluencer.display_name}.${bannedNamesLine} אם הלקוחה שואלת ישירות על משפיענית אחרת בשם — תני תשובה כללית-נטרלית בלי לאשר, להכחיש או להזכיר את שמה.]`;
             scopedUserMessage = message + ctxLine;
 
             // Whitelist for KB-level coupon filtering: only this
