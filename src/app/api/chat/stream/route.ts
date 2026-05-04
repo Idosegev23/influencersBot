@@ -1063,10 +1063,15 @@ export async function POST(req: NextRequest) {
           // TEMP DIAG — emit a debug field on the existing 'meta'-like
           // path so we can verify the scoping code is running in prod.
           // Will be removed once redaction is confirmed working.
-          controller.enqueue(encodeEvent({
-            type: 'thinking',
-            text: `[DEBUG ref=${refSource||'-'} scoped=${!!referralScopedInfluencer} bannedN=${bannedTerms?.length||0} terms=${(bannedTerms||[]).slice(0,5).join(',')}]`,
-          } as any));
+          {
+            const dbgCfg = (influencer as any)?._rawConfig || {};
+            const dbgRegistry = (dbgCfg.influencer_registry || []) as Array<any>;
+            const dbgSlugs = dbgRegistry.map((r: any) => r?.slug).filter(Boolean).join('|');
+            controller.enqueue(encodeEvent({
+              type: 'thinking',
+              text: `[DEBUG ref=${refSource||'-'} scoped=${!!referralScopedInfluencer} bannedN=${bannedTerms?.length||0} regLen=${dbgRegistry.length} slugs=${dbgSlugs} cfgKeys=${Object.keys(dbgCfg).join(',')}]`,
+            } as any));
+          }
 
           // Extract recurring topics from rolling summary for deepening (Step 4)
           const conversationTopics: string[] = [];
