@@ -58,24 +58,40 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: `unsupported provider: ${provider.type}` }, { status: 501 });
     }
 
-    // P2 (reference) = brand-side order number. Focus often expects a
-    // brand identification prefix prepended (e.g. "LB12345"). The
-    // prefix is configured per-account on `provider.reference_prefix`.
-    // P1 (shipmentNumber) = Focus internal numeric ship_no — only used
-    // as a deliberate user-driven fallback (not automatic).
+    // Lookup-mode strategy is per-account because different brands
+    // are mapped to Focus differently:
+    //   • 'p1' — the customer-facing order number IS the Focus ship_no.
+    //     Just send P1. (LA BEAUTÉ works this way — Focus sync'd ship_no
+    //     to Shopify order ID.)
+    //   • 'p2' — order number is the brand-side reference, prefixed
+    //     with brand letters at Focus. Send P2 with prefix.
+    //   • 'p2_then_p1' — try P2 first, fall back to P1 on not-found.
+    //     Useful when the brand has both legacy and new orders.
+    const lookupMode: 'p1' | 'p2' | 'p2_then_p1' = provider.lookup_mode || 'p1';
     const refPrefix: string = (provider.reference_prefix || '').trim();
+    const host = provider.host || 'focusdelivery.co.il';
 
     let view: Awaited<ReturnType<typeof getFocusShipmentStatus>>;
-    if (reference) {
-      view = await getFocusShipmentStatus({
-        host: provider.host || 'focusdelivery.co.il',
-        reference: `${refPrefix}${reference}`,
-      });
+
+    // Caller asked explicitly for shipmentNumber → always P1
+    if (shipmentNumber && !reference) {
+      view = await getFocusShipmentStatus({ host, shipmentNumber });
     } else {
-      view = await getFocusShipmentStatus({
-        host: provider.host || 'focusdelivery.co.il',
-        shipmentNumber: shipmentNumber!,
-      });
+      // Default path uses lookupMode + the `reference` field (which is
+      // what the BrandSupportTab and the bot send by default).
+      const raw = (reference || shipmentNumber)!;
+      if (lookupMode === 'p1') {
+        view = await getFocusShipmentStatus({ host, shipmentNumber: raw });
+      } else if (lookupMode === 'p2') {
+        view = await getFocusShipmentStatus({ host, reference: `${refPrefix}${raw}` });
+      } else {
+        // p2_then_p1
+        view = await getFocusShipmentStatus({ host, reference: `${refPrefix}${raw}` });
+        if (!view.found) {
+          const p1 = await getFocusShipmentStatus({ host, shipmentNumber: raw });
+          if (p1.found) view = p1;
+        }
+      }
     }
 
     return NextResponse.json(view);
