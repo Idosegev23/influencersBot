@@ -1161,23 +1161,12 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     navigator.clipboard.writeText(code);
     setCopiedCode(brandId);
     setTimeout(() => setCopiedCode(null), 2000);
-
-    // Action attribution — copying a coupon is a strong signal that the
-    // visitor came via that influencer (or at least is converting through
-    // them). Upgrade the session ref to the code (lowercased slug) and
-    // notify the server to lock the ref on the session.
-    const slug = code.toLowerCase();
-    refSourceRef.current = slug;
-    try {
-      localStorage.setItem(`chat_ref_${username}`, slug);
-    } catch {}
-    if (sessionId) {
-      fetch('/api/chat/session/ref', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, ref: slug, lock: true, source: 'coupon_copy' }),
-      }).catch(() => {});
-    }
+    // NOTE: We deliberately DO NOT change the session's ref_source on
+    // coupon copy. Attribution is "where did the visitor come from",
+    // and a customer might land via danielamit's link but then copy
+    // hadar's code (because she scrolled). That customer should still
+    // count as danielamit's lead — the entry URL wins.
+    // coupon copy_count is tracked separately on the coupons table.
   };
 
   const handleSupportSubmit = async () => {

@@ -1,16 +1,17 @@
 /**
- * Stamp / upgrade the ref_source attribution on a chat_session.
+ * Stamp ref_source attribution on a chat_session.
  *
- * Called from the client after an action that strengthens attribution
- * (e.g. user copied a coupon code → ref should be locked to that code).
+ * Currently used for late URL attribution (e.g. an open chat session
+ * that picked up ?ref= on a follow-up page). Coupon copies do NOT
+ * trigger this endpoint — attribution is "where the visitor came from",
+ * and copying someone else's code shouldn't reattribute the session.
  *
  * Body: { sessionId: string, ref: string, lock?: boolean, source?: string }
  *
- * Lock semantics:
- *   - lock=false: only set ref if not already locked AND not already set
- *     to a different value (URL-style soft attribution)
- *   - lock=true: overwrite any prior value AND set ref_locked=true so
- *     no further softer signal can change it (action attribution)
+ * Lock semantics (kept for future use, e.g. an explicit admin override):
+ *   - lock=false (default): only set ref if not already locked AND not
+ *     already set to a different value
+ *   - lock=true: overwrite any prior value AND set ref_locked=true
  */
 
 import { NextRequest, NextResponse } from 'next/server';
