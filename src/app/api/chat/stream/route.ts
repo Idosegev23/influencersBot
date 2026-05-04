@@ -983,9 +983,51 @@ export async function POST(req: NextRequest) {
           const leadName = await leadNamePromise;
 
           // Build proactive enrichment data
-          const activeCoupons = brands
+          let activeCoupons = brands
             .filter(b => b.coupon_code)
             .map(b => ({ brand_name: b.brand_name, coupon_code: b.coupon_code, description: b.description }));
+
+          // Attribution scoping: when the visitor came in via an
+          // influencer link (?ref=<slug>), filter the coupons the bot
+          // can mention down to JUST that influencer's coupon. Other
+          // influencers' coupons are hidden from the LLM context entirely
+          // — the bot literally doesn't know about them for this session.
+          let referralScopedInfluencer: { slug: string; display_name: string; coupon_code?: string } | null = null;
+          {
+            const cfg = (influencer as any)?._rawConfig || {};
+            const sessionRef = (refSource || '').toLowerCase();
+            const registry = (cfg.influencer_registry as Array<{ slug: string; display_name: string; coupon_code?: string }>) || [];
+            if (sessionRef && registry.length > 0) {
+              const match = registry.find(
+                (it) => it.slug?.toLowerCase() === sessionRef || it.coupon_code?.toLowerCase() === sessionRef,
+              );
+              if (match) {
+                referralScopedInfluencer = match;
+                const myCode = (match.coupon_code || match.slug).toLowerCase();
+                const registeredCodes = new Set(
+                  registry.map((it) => (it.coupon_code || it.slug).toLowerCase()),
+                );
+                activeCoupons = activeCoupons.filter((c) => {
+                  const code = (c.coupon_code || '').toLowerCase();
+                  if (!code) return false;
+                  // hide other influencers' coupons; keep mine + brand-only coupons
+                  if (registeredCodes.has(code)) return code === myCode;
+                  return true;
+                });
+              }
+            }
+          }
+
+          // Inject a hidden context line so the LLM knows the user is
+          // scoped to a specific influencer. The pattern matches the
+          // existing `\n\n[הקשר ...]` convention used elsewhere in the
+          // codebase — it gets stripped from the displayMessage but
+          // reaches the bot.
+          let scopedUserMessage = message;
+          if (referralScopedInfluencer) {
+            const ctxLine = `\n\n[הקשר פנימי — אל תצטטי: הלקוחה הגיעה דרך הלינק האישי של ${referralScopedInfluencer.display_name}. כשהלקוחה שואלת על קוד הנחה / קופונים — הזכירי אך ורק את הקוד של ${referralScopedInfluencer.display_name}: \`${(referralScopedInfluencer.coupon_code || referralScopedInfluencer.slug)}\`. אל תזכירי משפיעניות אחרות בכלל. אם הלקוחה שואלת על משפיענית אחרת בשם — תני תשובה כללית בלי לאשר או להכחיש.]`;
+            scopedUserMessage = message + ctxLine;
+          }
 
           // Extract recurring topics from rolling summary for deepening (Step 4)
           const conversationTopics: string[] = [];
@@ -999,7 +1041,7 @@ export async function POST(req: NextRequest) {
           }
 
           const sandwichResult = await processSandwichMessageWithMetadata({
-            userMessage: message,
+            userMessage: scopedUserMessage,
             accountId,
             username: username,
             influencerName,
