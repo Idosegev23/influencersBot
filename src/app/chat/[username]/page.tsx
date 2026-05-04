@@ -289,6 +289,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [supportBrand, setSupportBrand] = useState<string>('');
   const [supportPrefill, setSupportPrefill] = useState<{ details?: string } | null>(null);
+  const [supportInitialMode, setSupportInitialMode] = useState<'support' | 'tracking'>('support');
   const [showNewChatConfirm, setShowNewChatConfirm] = useState(false);
   const [supportForm, setSupportForm] = useState({ name: '', phone: '', message: '' });
   const [supportLoading, setSupportLoading] = useState(false);
@@ -1403,6 +1404,37 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           showDisclaimer={hasCommercialContent}
                           inputRef={inputRef}
                         />
+
+                        {/* Persistent quick CTAs (empty state) */}
+                        {(influencer as any)?._rawConfig?.support_redirect_to_tab === true && (
+                          <div className="mt-3 flex gap-2 px-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSupportInitialMode('support');
+                                setActiveTab('support' as TabId);
+                              }}
+                              className="flex-1 h-[44px] flex items-center justify-center gap-[6px] px-[16px] rounded-[60px] transition-opacity active:opacity-90"
+                              style={{ background: '#883fe2', color: '#ffffff' }}
+                            >
+                              <span className="font-['Heebo:Regular',sans-serif] text-[14px] leading-[21px]">בעיה בהזמנה</span>
+                            </button>
+                            {(influencer as any)?._rawConfig?.shipment_provider?.enabled === true && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSupportInitialMode('tracking');
+                                  setActiveTab('support' as TabId);
+                                }}
+                                className="flex-1 h-[44px] flex items-center justify-center gap-[6px] px-[16px] rounded-[60px] transition-opacity active:opacity-90"
+                                style={{ background: '#ffffff', color: '#883fe2', border: '1px solid #f1e9fd' }}
+                              >
+                                <span className="font-['Heebo:Regular',sans-serif] text-[14px] leading-[21px]">סטטוס משלוחים</span>
+                              </button>
+                            )}
+                          </div>
+                        )}
+
                         {/* Conference handoff button — also rendered in
                             empty state so visitors can go straight to
                             Itamar without chatting with the bot first. */}
@@ -1874,6 +1906,38 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                       showDisclaimer={hasCommercialContent}
                       inputRef={inputRef}
                     />
+
+                    {/* Persistent quick CTAs for accounts with structured support
+                        flow (LA BEAUTÉ). Always visible under the input so
+                        customers don't have to type to reach the form. */}
+                    {(influencer as any)?._rawConfig?.support_redirect_to_tab === true && (
+                      <div className="mt-3 flex gap-2 px-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSupportInitialMode('support');
+                            setActiveTab('support' as TabId);
+                          }}
+                          className="flex-1 h-[44px] flex items-center justify-center gap-[6px] px-[16px] rounded-[60px] transition-opacity active:opacity-90"
+                          style={{ background: '#883fe2', color: '#ffffff' }}
+                        >
+                          <span className="font-['Heebo:Regular',sans-serif] text-[14px] leading-[21px]">בעיה בהזמנה</span>
+                        </button>
+                        {(influencer as any)?._rawConfig?.shipment_provider?.enabled === true && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSupportInitialMode('tracking');
+                              setActiveTab('support' as TabId);
+                            }}
+                            className="flex-1 h-[44px] flex items-center justify-center gap-[6px] px-[16px] rounded-[60px] transition-opacity active:opacity-90"
+                            style={{ background: '#ffffff', color: '#883fe2', border: '1px solid #f1e9fd' }}
+                          >
+                            <span className="font-['Heebo:Regular',sans-serif] text-[14px] leading-[21px]">סטטוס משלוחים</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </motion.div>
@@ -2019,6 +2083,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   coupons={brands.map(b => ({ brand_name: b.brand_name, coupon_code: b.coupon_code, description: b.description, category: b.category }))}
                   initialDetails={supportPrefill?.details}
                   enableShipmentTracking={(influencer as any)?._rawConfig?.shipment_provider?.enabled === true}
+                  initialMode={supportInitialMode}
                 />
               </motion.div>
               ) : (
