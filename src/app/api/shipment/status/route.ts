@@ -23,8 +23,10 @@ export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
     const username = url.searchParams.get('username');
-    const shipmentNumber = url.searchParams.get('shipmentNumber');
-    const reference = url.searchParams.get('reference');
+    // Strip the customer-facing "#" prefix Shopify uses, plus surrounding whitespace
+    const sanitize = (v: string | null) => (v ? v.trim().replace(/^#+/, '').replace(/\s+/g, '') : v);
+    const shipmentNumber = sanitize(url.searchParams.get('shipmentNumber'));
+    const reference = sanitize(url.searchParams.get('reference'));
 
     if (!username) {
       return NextResponse.json({ error: 'username required' }, { status: 400 });
@@ -56,11 +58,25 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: `unsupported provider: ${provider.type}` }, { status: 501 });
     }
 
-    const view = await getFocusShipmentStatus({
-      host: provider.host || 'focusdelivery.co.il',
-      shipmentNumber: shipmentNumber || undefined,
-      reference: reference || undefined,
-    });
+    // P2 (reference) = brand-side order number. Focus often expects a
+    // brand identification prefix prepended (e.g. "LB12345"). The
+    // prefix is configured per-account on `provider.reference_prefix`.
+    // P1 (shipmentNumber) = Focus internal numeric ship_no — only used
+    // as a deliberate user-driven fallback (not automatic).
+    const refPrefix: string = (provider.reference_prefix || '').trim();
+
+    let view: Awaited<ReturnType<typeof getFocusShipmentStatus>>;
+    if (reference) {
+      view = await getFocusShipmentStatus({
+        host: provider.host || 'focusdelivery.co.il',
+        reference: `${refPrefix}${reference}`,
+      });
+    } else {
+      view = await getFocusShipmentStatus({
+        host: provider.host || 'focusdelivery.co.il',
+        shipmentNumber: shipmentNumber!,
+      });
+    }
 
     return NextResponse.json(view);
   } catch (e: any) {
