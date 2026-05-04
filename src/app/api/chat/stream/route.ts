@@ -497,32 +497,45 @@ export async function POST(req: NextRequest) {
             intent: understanding.intent,
           });
 
-          // DEDICATED COMPLAINT CLASSIFIER — for accounts that opt-in to
-          // redirect-to-support-tab. The main understanding LLM sometimes
-          // misses Hebrew complaints (slang: "מעוך", "נשרף", soft phrasing
-          // as questions, etc.). A focused binary classifier on Gemini Flash
-          // is far more reliable. Costs ~300-500ms latency, fires only for
-          // opted-in accounts that didn't already get support_flow from the
-          // primary path.
+          // ACCOUNT-LEVEL REDIRECT — for accounts that opt in to
+          // support_redirect_to_tab, ANY signal of a complaint must:
+          //   • force handler='support_flow' (overriding routing_support
+          //     rule which sets handler='chat' + showSupportModal:true)
+          //   • clear showSupportModal so we don't trigger the legacy popup
+          //     in parallel with our tab redirect
+          //
+          // Two signals are checked:
+          //   1. understanding.intent === 'support' (the main LLM agreed)
+          //   2. dedicated Gemini Flash classifier (catches LLM misses on
+          //      Hebrew slang like "מעוך", "נשרף", indirect phrasing, etc.)
           const accountConfig = (influencer as any)?._rawConfig || {};
           if (
             accountConfig.support_redirect_to_tab === true &&
             decision.handler !== 'support_flow'
           ) {
-            try {
-              const { classifyComplaint } = await import('@/lib/chatbot/complaint-classifier');
-              const cls = await classifyComplaint(message);
-              console.log('[Stream] complaint classifier:', cls);
-              if (cls.isComplaint && cls.confidence >= 0.5) {
-                console.log('[Stream] 🎯 Classifier override → support_flow (was:', decision.handler, ')');
-                decision = {
-                  ...decision,
-                  handler: 'support_flow',
-                  stateTransition: { from: session?.state || 'Idle', to: 'Support.Detected' },
-                } as typeof decision;
+            let shouldRedirect = understanding.intent === 'support';
+
+            if (!shouldRedirect) {
+              try {
+                const { classifyComplaint } = await import('@/lib/chatbot/complaint-classifier');
+                const cls = await classifyComplaint(message);
+                console.log('[Stream] complaint classifier:', cls);
+                if (cls.isComplaint && cls.confidence >= 0.5) shouldRedirect = true;
+              } catch (err) {
+                console.warn('[Stream] complaint classifier threw, leaving handler as-is:', err);
               }
-            } catch (err) {
-              console.warn('[Stream] complaint classifier threw, leaving handler as-is:', err);
+            }
+
+            if (shouldRedirect) {
+              console.log('[Stream] 🎯 Override → support_flow (was:', decision.handler, ')');
+              const cleanedDirectives = { ...(decision.uiDirectives || {}) };
+              delete (cleanedDirectives as any).showSupportModal;
+              decision = {
+                ...decision,
+                handler: 'support_flow',
+                uiDirectives: cleanedDirectives,
+                stateTransition: { from: session?.state || 'Idle', to: 'Support.Detected' },
+              } as typeof decision;
             }
           }
         } else {
