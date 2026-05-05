@@ -36,7 +36,6 @@ async function markAlertSent(alertKey: string): Promise<void> {
 // ── Thresholds ──
 const THRESHOLDS = {
   dbLatencyMs: 1000,
-  redisLatencyMs: 100,
   chatSessionsPerHour: 500,
   redisCommandsPerDay: 8000,
   messagesPerHour: 2000,
@@ -63,18 +62,12 @@ export async function GET(req: NextRequest) {
       await markAlertSent('redis-down');
       alerts.push('redis-down');
     }
-  } else if (redisHealth.latencyMs > THRESHOLDS.redisLatencyMs) {
-    if (await shouldSendAlert('redis-slow')) {
-      await sendAdminAlert({
-        level: 'warning',
-        subject: 'Redis latency גבוה',
-        message: `Redis latency: ${redisHealth.latencyMs}ms (סף: ${THRESHOLDS.redisLatencyMs}ms). ביצועי cache עלולים להיפגע.`,
-        adminEmails: ADMIN_EMAILS,
-      });
-      await markAlertSent('redis-slow');
-      alerts.push('redis-slow');
-    }
   }
+  // Redis latency alert disabled — 100-200ms is normal for Upstash cold
+  // hops from Vercel and was creating noisy "Redis latency 108ms" emails
+  // without actionable signal. The latency is still visible on the
+  // /admin/dashboard live monitor, and a real Redis outage still pages
+  // via the redis-down branch above.
 
   // ── Check Redis daily commands ──
   if (isRedisAvailable()) {
