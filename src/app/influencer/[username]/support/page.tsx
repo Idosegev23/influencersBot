@@ -372,7 +372,7 @@ function TicketList({
   onSelect: (id: string) => void;
 }) {
   return (
-    <div className="space-y-2 max-h-[80vh] overflow-y-auto pr-1">
+    <div className="space-y-2 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto lg:pr-1">
       {tickets.map((t) => {
         const c = STATUS_COLOR[t.status];
         const Icon = STATUS_ICON[t.status];
@@ -615,8 +615,10 @@ function TicketDetail({
   const Icon = STATUS_ICON[ticket.status];
 
   return (
-    <div className="p-5 rounded-2xl space-y-5 max-h-[80vh] overflow-y-auto"
-      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+    <div
+      className="p-5 rounded-2xl space-y-5 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto"
+      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+    >
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div>
@@ -1246,10 +1248,15 @@ function SendDialog({
   }, [template, requestedDetail, trackingNumber, replacementProduct]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
-      <div className="max-w-lg w-full rounded-2xl p-5 space-y-4"
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
+      style={{ background: 'rgba(0,0,0,0.6)' }}
+    >
+      <div
+        className="max-w-lg w-full rounded-2xl p-5 space-y-4 max-h-[calc(100vh-2rem)] overflow-y-auto my-auto"
         style={{ background: '#1f2937', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
-        dir="rtl">
+        dir="rtl"
+      >
         <h3 className="text-lg font-semibold">שליחת הודעת WhatsApp ללקוחה</h3>
 
         {template === 'awaiting_customer' && (
