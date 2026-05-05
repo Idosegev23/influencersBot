@@ -481,70 +481,79 @@ function TicketDetail({
     }
   };
 
-  // Auto-resolve the actual Focus ship_no for this ticket's order#.
-  // The brand should never have to type or look up the 7-digit Focus
-  // number manually — it's part of every "shipped" notification we
-  // send to the customer, so we resolve it as soon as a ticket is
-  // opened. State machine:
-  //   'idle'    — not started
-  //   'loading' — Focus call in flight
-  //   'found'   — got a ship_no, persisted
-  //   'pending' — Focus says not yet shipped (no record)
-  //   'error'   — network / API failure
-  const [shipNoResolution, setShipNoResolution] = useState<
-    'idle' | 'loading' | 'found' | 'pending' | 'error'
-  >('idle');
+  // Focus shipment status — fetched live whenever a ticket opens. We
+  // don't just store the ship_no, we keep the full status view (current
+  // stage, last scan timestamp, destination branch) so the brand can
+  // see exactly where the package is without leaving the CRM.
+  //
+  // Resolution state: 'idle' → 'loading' → ('found' | 'pending' | 'error')
+  //   pending = Focus has no record (order hasn't shipped yet)
+  //   error   = API/network failure (retry is fine)
+  type FocusView = {
+    found: boolean;
+    shipmentNumber: string | null;
+    statusText: string;
+    isDelivered: boolean;
+    isCanceled: boolean;
+    isReturned: boolean;
+    lastUpdate?: { date: string | null; time: string | null };
+    destinationBranch?: string | null;
+    shipmentDirection?: string | null;
+    history?: Array<{ desc: string; date: string | null; time: string | null }>;
+  };
+  const [focusView, setFocusView] = useState<FocusView | null>(null);
+  const [focusState, setFocusState] = useState<'idle' | 'loading' | 'found' | 'pending' | 'error'>('idle');
 
-  const resolveShipNo = useCallback(
-    async (force = false): Promise<string | null> => {
-      if (!ticket?.order_number) return null;
-      // Don't re-resolve if we already have a tracking_number, unless forced
-      // (e.g. the user explicitly cleared it).
-      if (!force && ticket.tracking_number) return ticket.tracking_number;
-
-      setShipNoResolution('loading');
-      try {
-        const orderClean = ticket.order_number.replace(/[^0-9]/g, '');
-        const res = await fetch(
-          `/api/shipment/status?username=${encodeURIComponent(username)}&reference=${encodeURIComponent(orderClean)}`,
-        );
-        const data = await res.json();
-        if (!res.ok) {
-          setShipNoResolution('error');
-          return null;
-        }
-        if (!data.found || !data.shipmentNumber) {
-          setShipNoResolution('pending');
-          return null;
-        }
-        setTrackingNumber(data.shipmentNumber);
-        setShipNoResolution('found');
-        // Persist on the ticket so the next caller (notify dispatch,
-        // page refresh, daily report) reads it directly.
+  const resolveFocus = useCallback(async (): Promise<FocusView | null> => {
+    if (!ticket?.order_number) {
+      setFocusState('idle');
+      setFocusView(null);
+      return null;
+    }
+    setFocusState('loading');
+    try {
+      const orderClean = ticket.order_number.replace(/[^0-9]/g, '');
+      const res = await fetch(
+        `/api/shipment/status?username=${encodeURIComponent(username)}&reference=${encodeURIComponent(orderClean)}`,
+      );
+      const data = (await res.json()) as FocusView | { error: string };
+      if (!res.ok) {
+        setFocusState('error');
+        setFocusView(null);
+        return null;
+      }
+      if (!('found' in data) || !data.found || !data.shipmentNumber) {
+        setFocusState('pending');
+        setFocusView(data as FocusView);
+        return null;
+      }
+      setFocusView(data as FocusView);
+      setFocusState('found');
+      setTrackingNumber(data.shipmentNumber);
+      // Persist tracking_number on the ticket if it's new — so other
+      // surfaces (notification template, history) read the same value.
+      if (data.shipmentNumber !== (ticket.tracking_number || '')) {
         await fetch(`/api/influencer/${username}/support-tickets/${ticketId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tracking_number: data.shipmentNumber }),
         });
-        return data.shipmentNumber as string;
-      } catch {
-        setShipNoResolution('error');
-        return null;
       }
-    },
-    [username, ticketId, ticket?.order_number, ticket?.tracking_number],
-  );
-
-  // Auto-fire on ticket load: if there's an order# and we don't yet
-  // have a stored ship_no, ask Focus.
-  useEffect(() => {
-    if (!ticket) return;
-    if (ticket.tracking_number) {
-      setShipNoResolution('found');
-      return;
+      return data as FocusView;
+    } catch {
+      setFocusState('error');
+      setFocusView(null);
+      return null;
     }
-    if (ticket.order_number && shipNoResolution === 'idle') {
-      void resolveShipNo();
+  }, [username, ticketId, ticket?.order_number, ticket?.tracking_number]);
+
+  // Auto-fire on every ticket open. Resets state first so we don't
+  // carry over a previous ticket's "found" view.
+  useEffect(() => {
+    setFocusView(null);
+    setFocusState('idle');
+    if (ticket?.order_number) {
+      void resolveFocus();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticket?.id]);
@@ -613,6 +622,17 @@ function TicketDetail({
           <ChevronLeft className="w-5 h-5" />
         </button>
       </div>
+
+      {/* Focus shipment status — most important info, lives at the top.
+          Auto-resolves when a ticket is opened: takes the order_number
+          from the ticket, calls Focus, displays the actual ship_no plus
+          live delivery state. */}
+      <FocusShipmentCard
+        orderNumber={ticket.order_number}
+        view={focusView}
+        state={focusState}
+        onRefresh={() => void resolveFocus()}
+      />
 
       {/* Customer block */}
       <div className="rounded-xl p-3 space-y-2" style={{ background: 'rgba(255,255,255,0.04)' }}>
@@ -719,46 +739,27 @@ function TicketDetail({
             style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--dash-text, #fff)' }}
           />
         </div>
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <div className="text-xs" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>
-              מספר משלוח Focus (7 ספרות)
+        {/* Manual override for tracking_number — kept hidden by default
+            since the FocusShipmentCard at the top fills + persists this
+            automatically. Surfaced in a collapsible only when the
+            resolver came back 'pending' (no Focus record yet) and the
+            brand wants to type the number from somewhere else. */}
+        {focusState !== 'found' && (
+          <div>
+            <div className="text-xs mb-1.5" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>
+              מספר משלוח Focus (אופציונלי — אם קיבלת מערוץ אחר)
             </div>
-            {shipNoResolution === 'loading' && (
-              <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--dash-text-3, #6b7280)' }}>
-                <Loader2 className="w-3 h-3 animate-spin" />
-                מאתר ב-Focus לפי #{ticket.order_number || ''}...
-              </span>
-            )}
-            {shipNoResolution === 'found' && (
-              <span className="text-[11px]" style={{ color: '#22c55e' }}>
-                ✓ אותר אוטומטית מ-Focus
-              </span>
-            )}
-            {shipNoResolution === 'pending' && (
-              <span className="text-[11px]" style={{ color: '#f59e0b' }}>
-                ההזמנה עוד לא יצאה ב-Focus
-              </span>
-            )}
-            {shipNoResolution === 'error' && (
-              <span className="text-[11px]" style={{ color: '#ef4444' }}>
-                שגיאה בחיפוש Focus
-              </span>
-            )}
+            <input
+              type="text"
+              value={trackingNumber}
+              onChange={(e) => setTrackingNumber(e.target.value)}
+              placeholder="3409393"
+              className="w-full text-sm p-2.5 rounded-xl outline-none"
+              style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--dash-text, #fff)' }}
+              dir="ltr"
+            />
           </div>
-          <input
-            type="text"
-            value={trackingNumber}
-            onChange={(e) => setTrackingNumber(e.target.value)}
-            placeholder="3409393"
-            className="w-full text-sm p-2.5 rounded-xl outline-none"
-            style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--dash-text, #fff)' }}
-            dir="ltr"
-          />
-          <p className="text-[11px] mt-1 opacity-60">
-            המספר נטען אוטומטית מ-Focus לפי מספר ההזמנה. אם ההזמנה עוד לא נשלחה — המספר ייטען כשהיא תצא.
-          </p>
-        </div>
+        )}
         {(ticket.status === 'resolved' || ticket.status === 'closed') && (
           <div>
             <div className="text-xs mb-1.5" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>סיכום הטיפול</div>
@@ -853,6 +854,253 @@ function TicketDetail({
           onSend={(extra) => handleSendTemplate(showSendDialog, extra)}
         />
       )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Focus shipment card — top-of-panel, prominent, auto-resolved       */
+/* ------------------------------------------------------------------ */
+
+interface FocusViewProps {
+  found: boolean;
+  shipmentNumber: string | null;
+  statusText: string;
+  isDelivered: boolean;
+  isCanceled: boolean;
+  isReturned: boolean;
+  lastUpdate?: { date: string | null; time: string | null };
+  destinationBranch?: string | null;
+  shipmentDirection?: string | null;
+}
+
+function FocusShipmentCard({
+  orderNumber,
+  view,
+  state,
+  onRefresh,
+}: {
+  orderNumber: string | null;
+  view: FocusViewProps | null;
+  state: 'idle' | 'loading' | 'found' | 'pending' | 'error';
+  onRefresh: () => void;
+}) {
+  // No order number on the ticket — nothing to look up. Render a small
+  // hint so the brand knows why this card is empty.
+  if (!orderNumber) {
+    return (
+      <div className="rounded-2xl p-4"
+        style={{
+          background: 'rgba(107,114,128,0.1)',
+          border: '1px dashed rgba(107,114,128,0.4)',
+        }}>
+        <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>
+          <Truck className="w-4 h-4" />
+          <span>אין מספר הזמנה בפנייה — אי אפשר לאתר משלוח אוטומטית.</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (state === 'loading' || state === 'idle') {
+    return (
+      <div className="rounded-2xl p-5"
+        style={{
+          background: 'rgba(136,63,226,0.08)',
+          border: '1px solid rgba(136,63,226,0.25)',
+        }}>
+        <div className="flex items-center gap-3">
+          <Loader2 className="w-5 h-5 animate-spin" style={{ color: '#883fe2' }} />
+          <div>
+            <div className="text-sm font-semibold" style={{ color: 'var(--dash-text, #fff)' }}>
+              מאתר ב-Focus לפי הזמנה <code dir="ltr">#{orderNumber}</code>...
+            </div>
+            <div className="text-xs mt-0.5" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>
+              מאחזר את מספר המשלוח האמיתי וסטטוס מהמערכת של חברת השילוח.
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (state === 'pending') {
+    return (
+      <div className="rounded-2xl p-5"
+        style={{
+          background: 'rgba(245,158,11,0.08)',
+          border: '1px solid rgba(245,158,11,0.3)',
+        }}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: 'rgba(245,158,11,0.15)' }}>
+              <Package className="w-5 h-5" style={{ color: '#f59e0b' }} />
+            </div>
+            <div>
+              <div className="text-base font-semibold" style={{ color: 'var(--dash-text, #fff)' }}>
+                ההזמנה עדיין לא יצאה למשלוח
+              </div>
+              <div className="text-xs mt-1" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>
+                Focus עוד לא קיבלו את הזמנה <code dir="ltr">#{orderNumber}</code>. ברגע שהיא תצא — מספר המשלוח יופיע כאן אוטומטית.
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onRefresh}
+            className="p-2 rounded-lg flex-shrink-0"
+            style={{ color: '#f59e0b' }}
+            title="נסי שוב"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (state === 'error') {
+    return (
+      <div className="rounded-2xl p-5"
+        style={{
+          background: 'rgba(239,68,68,0.08)',
+          border: '1px solid rgba(239,68,68,0.3)',
+        }}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <Truck className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#ef4444' }} />
+            <div>
+              <div className="text-sm font-semibold" style={{ color: 'var(--dash-text, #fff)' }}>
+                שגיאה בקבלת סטטוס המשלוח מ-Focus
+              </div>
+              <div className="text-xs mt-1" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>
+                לחיצה על Refresh תנסה שוב.
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onRefresh}
+            className="p-2 rounded-lg flex-shrink-0"
+            style={{ color: '#ef4444' }}
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // state === 'found'
+  if (!view || !view.shipmentNumber) return null;
+
+  const dotColor = view.isDelivered
+    ? '#22c55e'
+    : view.isReturned
+    ? '#f59e0b'
+    : view.isCanceled
+    ? '#ef4444'
+    : '#06b6d4';
+  const lightBg = view.isDelivered
+    ? 'rgba(34,197,94,0.1)'
+    : view.isReturned
+    ? 'rgba(245,158,11,0.1)'
+    : view.isCanceled
+    ? 'rgba(239,68,68,0.1)'
+    : 'rgba(6,182,212,0.1)';
+  const border = view.isDelivered
+    ? 'rgba(34,197,94,0.3)'
+    : view.isReturned
+    ? 'rgba(245,158,11,0.3)'
+    : view.isCanceled
+    ? 'rgba(239,68,68,0.3)'
+    : 'rgba(6,182,212,0.3)';
+
+  return (
+    <div className="rounded-2xl p-5"
+      style={{ background: lightBg, border: `1px solid ${border}` }}>
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: `${dotColor}26` }}>
+            <Truck className="w-6 h-6" style={{ color: dotColor }} />
+          </div>
+          <div>
+            <div className="text-[11px] uppercase tracking-wide opacity-70"
+              style={{ color: 'var(--dash-text-2, #9ca3af)' }}>
+              מספר משלוח Focus
+            </div>
+            <div className="flex items-center gap-2">
+              <code className="text-2xl font-bold tabular-nums" dir="ltr"
+                style={{ color: 'var(--dash-text, #fff)' }}>
+                {view.shipmentNumber}
+              </code>
+              <button
+                onClick={() => navigator.clipboard.writeText(view.shipmentNumber || '')}
+                className="opacity-60 hover:opacity-100"
+                title="העתק"
+                style={{ color: 'var(--dash-text-2, #9ca3af)' }}
+              >
+                <Copy className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="text-[11px] mt-0.5"
+              style={{ color: 'var(--dash-text-3, #6b7280)' }}>
+              הזמנה <code dir="ltr">#{orderNumber}</code> · ↻ אותר אוטומטית
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-col items-end gap-1">
+          <span
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
+            style={{ background: `${dotColor}33`, color: dotColor }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: dotColor }} />
+            {view.statusText}
+          </span>
+          <button
+            onClick={onRefresh}
+            className="p-1 rounded-md opacity-50 hover:opacity-100"
+            title="רענן"
+            style={{ color: 'var(--dash-text-2, #9ca3af)' }}
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Stage details — last scan, branch, direction */}
+      <div className="grid grid-cols-2 gap-3 text-xs">
+        {view.destinationBranch && (
+          <div>
+            <div className="opacity-70" style={{ color: 'var(--dash-text-3, #6b7280)' }}>
+              סניף יעד
+            </div>
+            <div className="mt-0.5 font-medium" style={{ color: 'var(--dash-text, #fff)' }}>
+              {view.destinationBranch}
+            </div>
+          </div>
+        )}
+        {view.lastUpdate?.date && (
+          <div>
+            <div className="opacity-70" style={{ color: 'var(--dash-text-3, #6b7280)' }}>
+              עדכון אחרון
+            </div>
+            <div className="mt-0.5 font-medium tabular-nums" style={{ color: 'var(--dash-text, #fff)' }}>
+              {view.lastUpdate.date}{view.lastUpdate.time ? ` ${view.lastUpdate.time}` : ''}
+            </div>
+          </div>
+        )}
+        {view.shipmentDirection && (
+          <div>
+            <div className="opacity-70" style={{ color: 'var(--dash-text-3, #6b7280)' }}>
+              סוג מסירה
+            </div>
+            <div className="mt-0.5 font-medium" style={{ color: 'var(--dash-text, #fff)' }}>
+              {view.shipmentDirection}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
