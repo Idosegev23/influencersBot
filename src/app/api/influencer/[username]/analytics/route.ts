@@ -80,28 +80,73 @@ export async function GET(
     .lte('created_at', toIso);
   if (refFilter) visitsQ1 = visitsQ1.eq('ref_source', refFilter);
 
-  let visitsQ2 = supabase
-    .from('chat_visits')
-    .select('anon_id')
-    .eq('account_id', accountId)
-    .gte('created_at', fromIso)
-    .lte('created_at', toIso);
-  if (refFilter) visitsQ2 = visitsQ2.eq('ref_source', refFilter);
+  // Supabase JS caps select to 1000 rows by default; high-traffic
+  // accounts had their unique-visitor count silently truncated. Pull
+  // anon_ids in 1000-row pages until exhausted. Cap at 200 pages
+  // (~200K rows) as a runaway guard.
+  async function pullAnonIds(): Promise<string[]> {
+    const PAGE = 1000;
+    const out: string[] = [];
+    let from = 0;
+    for (let i = 0; i < 200; i++) {
+      let q = supabase
+        .from('chat_visits')
+        .select('anon_id')
+        .eq('account_id', accountId)
+        .gte('created_at', fromIso)
+        .lte('created_at', toIso)
+        .order('created_at', { ascending: true })
+        .range(from, from + PAGE - 1);
+      if (refFilter) q = q.eq('ref_source', refFilter);
+      const { data, error } = await q;
+      if (error) {
+        console.error('[analytics] anon_id chunk error:', error);
+        break;
+      }
+      const rows = data || [];
+      for (const r of rows) {
+        if ((r as any).anon_id) out.push((r as any).anon_id as string);
+      }
+      if (rows.length < PAGE) break;
+      from += PAGE;
+    }
+    return out;
+  }
 
-  const [{ count: visitsTotal }, visitsUniqueRes] = await Promise.all([visitsQ1, visitsQ2]);
-  const uniqueVisitors = new Set(
-    (visitsUniqueRes.data || []).map((r: any) => r.anon_id).filter(Boolean),
-  ).size;
+  // Sessions — same ref filter, also chunked.
+  async function pullSessions(): Promise<Array<{ id: string; message_count: number; created_at: string; ref_source: string | null }>> {
+    const PAGE = 1000;
+    const out: Array<{ id: string; message_count: number; created_at: string; ref_source: string | null }> = [];
+    let from = 0;
+    for (let i = 0; i < 200; i++) {
+      let q = supabase
+        .from('chat_sessions')
+        .select('id, message_count, created_at, ref_source')
+        .eq('account_id', accountId)
+        .gte('created_at', fromIso)
+        .lte('created_at', toIso)
+        .order('created_at', { ascending: true })
+        .range(from, from + PAGE - 1);
+      if (refFilter) q = q.eq('ref_source', refFilter);
+      const { data, error } = await q;
+      if (error) {
+        console.error('[analytics] sessions chunk error:', error);
+        break;
+      }
+      const rows = (data || []) as any[];
+      out.push(...rows);
+      if (rows.length < PAGE) break;
+      from += PAGE;
+    }
+    return out;
+  }
 
-  // Sessions — same ref filter.
-  let sessionQuery = supabase
-    .from('chat_sessions')
-    .select('id, message_count, created_at, ref_source')
-    .eq('account_id', accountId)
-    .gte('created_at', fromIso)
-    .lte('created_at', toIso);
-  if (refFilter) sessionQuery = sessionQuery.eq('ref_source', refFilter);
-  const { data: sessions } = await sessionQuery;
+  const [{ count: visitsTotal }, anonIds, sessions] = await Promise.all([
+    visitsQ1,
+    pullAnonIds(),
+    pullSessions(),
+  ]);
+  const uniqueVisitors = new Set(anonIds).size;
 
   let sessionIds = (sessions || []).map((s: any) => s.id);
 

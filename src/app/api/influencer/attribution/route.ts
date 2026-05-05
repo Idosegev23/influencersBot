@@ -44,26 +44,55 @@ export async function GET(req: NextRequest) {
     return refLookup.get(slug.toLowerCase()) || slug;
   };
 
-  // Visits (top-of-funnel — every page open)
-  const { data: visits } = await supabase
-    .from('chat_visits')
-    .select('id, ref_source, anon_id, created_at')
-    .eq('account_id', accountId)
-    .gte('created_at', sinceIso);
+  // Supabase JS caps a query at 1000 rows by default — for accounts
+  // with high traffic that silently truncated visits / sessions /
+  // tickets, so the brand dashboard underreported. Pull in 1000-row
+  // pages until the table is exhausted. No artificial upper bound;
+  // even 100K rows is just ~100 round-trips.
+  async function fetchAll<T>(
+    table: 'chat_visits' | 'chat_sessions' | 'support_requests',
+    cols: string,
+  ): Promise<T[]> {
+    const PAGE = 1000;
+    const out: T[] = [];
+    let from = 0;
+    // Bail safety after 200 pages (= 200K rows) to avoid runaway
+    // requests if something goes weird; this is well above any
+    // reasonable account size and we'll see it in logs if it ever hits.
+    for (let i = 0; i < 200; i++) {
+      const { data, error } = await supabase
+        .from(table)
+        .select(cols)
+        .eq('account_id', accountId)
+        .gte('created_at', sinceIso)
+        .order('created_at', { ascending: true })
+        .range(from, from + PAGE - 1);
+      if (error) {
+        console.error(`[attribution] ${table} chunk error:`, error);
+        break;
+      }
+      const rows = (data || []) as T[];
+      out.push(...rows);
+      if (rows.length < PAGE) break;
+      from += PAGE;
+    }
+    return out;
+  }
 
-  // Sessions
-  const { data: sessions } = await supabase
-    .from('chat_sessions')
-    .select('id, ref_source, created_at')
-    .eq('account_id', accountId)
-    .gte('created_at', sinceIso);
-
-  // Support tickets
-  const { data: tickets } = await supabase
-    .from('support_requests')
-    .select('id, ref_source, created_at')
-    .eq('account_id', accountId)
-    .gte('created_at', sinceIso);
+  const [visits, sessions, tickets] = await Promise.all([
+    fetchAll<{ id: string; ref_source: string | null; anon_id: string | null; created_at: string }>(
+      'chat_visits',
+      'id, ref_source, anon_id, created_at',
+    ),
+    fetchAll<{ id: string; ref_source: string | null; created_at: string }>(
+      'chat_sessions',
+      'id, ref_source, created_at',
+    ),
+    fetchAll<{ id: string; ref_source: string | null; created_at: string }>(
+      'support_requests',
+      'id, ref_source, created_at',
+    ),
+  ]);
 
   // Coupons (for copy_count totals — global, not date-filtered, but we
   // still attribute by code)
