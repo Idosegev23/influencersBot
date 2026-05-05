@@ -123,28 +123,38 @@ export default function BrandSupportTab({
   }, [initialMode]);
   const [step, setStep] = useState<'product' | 'type' | 'form' | 'success'>('product');
 
-  // Tracking sub-flow state
+  // Tracking sub-flow state. P2 (order-number) lookup is now enabled —
+  // Focus's URL format `-N,-A<ref>,-A,-N<customer>` was confirmed by
+  // Tzvika (2026-05-05) to scope the search to a single master, so
+  // there's no risk of cross-brand collisions.
   const [trackingNumber, setTrackingNumber] = useState('');
   const [trackingStatus, setTrackingStatus] = useState<ShipmentStatus | null>(null);
   const [trackingLoading, setTrackingLoading] = useState(false);
   const [trackingError, setTrackingError] = useState<string | null>(null);
-  // Shipment-only lookup. Order-number (P2) lookup is disabled until we
-  // have a reliable Focus endpoint that searches by ref2 within a single
-  // customer scope — see notes in src/lib/shipment/focus-client.ts.
+  const [trackingMode, setTrackingMode] = useState<'order' | 'shipment'>('shipment');
 
   const lookupShipment = useCallback(async () => {
     const raw = trackingNumber.trim();
     if (!raw) {
-      setTrackingError('נא להזין מספר משלוח');
+      setTrackingError(trackingMode === 'order' ? 'נא להזין מספר הזמנה' : 'נא להזין מספר משלוח');
       return;
     }
 
     const cleaned = raw.replace(/^#+/, '').replace(/\s+/g, '');
+    if (!/^\d+$/.test(cleaned)) {
+      setTrackingError('המספר צריך להכיל ספרות בלבד');
+      return;
+    }
+
     setTrackingLoading(true);
     setTrackingError(null);
     try {
+      const param =
+        trackingMode === 'order'
+          ? `reference=${encodeURIComponent(cleaned)}`
+          : `shipmentNumber=${encodeURIComponent(cleaned)}`;
       const res = await fetch(
-        `/api/shipment/status?username=${encodeURIComponent(username)}&shipmentNumber=${encodeURIComponent(cleaned)}`,
+        `/api/shipment/status?username=${encodeURIComponent(username)}&${param}`,
       );
       const data = await res.json();
       if (!res.ok) {
@@ -158,7 +168,7 @@ export default function BrandSupportTab({
     } finally {
       setTrackingLoading(false);
     }
-  }, [trackingNumber, username]);
+  }, [trackingNumber, trackingMode, username]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -352,14 +362,46 @@ export default function BrandSupportTab({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
             >
-              {/* Header — shipment-only */}
-              <div className="mb-6 px-3 flex flex-col items-end gap-[2px]">
+              {/* Header — toggles between order-number and shipment-number lookup */}
+              <div className="mb-4 px-3 flex flex-col items-end gap-[2px]">
                 <h2 className="font-['Heebo:SemiBold',sans-serif] font-semibold text-[24px] leading-[28px] text-[#0c1013] text-right">
-                  סטטוס משלוח
+                  {trackingMode === 'order' ? 'סטטוס לפי מספר הזמנה' : 'סטטוס לפי מספר משלוח'}
                 </h2>
                 <p className="font-['Heebo:Regular',sans-serif] text-[18px] leading-[24px] text-[#676767] text-right">
-                  הזיני את מספר המשלוח שקיבלת במייל מ-Focus
+                  {trackingMode === 'order'
+                    ? 'הזיני את מספר ההזמנה (מאישור הרכישה)'
+                    : 'הזיני את מספר המשלוח שקיבלת במייל מ-Focus'}
                 </p>
+              </div>
+
+              {/* Mode toggle — pill switcher */}
+              <div className="flex gap-[8px] mb-[12px] px-3 justify-end">
+                {([
+                  { id: 'order' as const, label: 'מספר הזמנה' },
+                  { id: 'shipment' as const, label: 'מספר משלוח' },
+                ]).map((opt) => {
+                  const active = trackingMode === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => {
+                        if (opt.id === trackingMode) return;
+                        setTrackingMode(opt.id);
+                        setTrackingError(null);
+                        setTrackingStatus(null);
+                        setTrackingNumber('');
+                      }}
+                      className="px-[16px] py-[8px] rounded-[60px] text-[14px] font-medium transition-colors"
+                      style={{
+                        background: active ? '#883fe2' : '#f1e9fd',
+                        color: active ? '#ffffff' : '#883fe2',
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Lookup card — pill input + solid purple CTA */}
@@ -372,7 +414,7 @@ export default function BrandSupportTab({
                     value={trackingNumber}
                     onChange={(e) => setTrackingNumber(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') lookupShipment(); }}
-                    placeholder="מספר משלוח Focus"
+                    placeholder={trackingMode === 'order' ? 'מספר הזמנה (מאישור הרכישה)' : 'מספר משלוח Focus (7 ספרות)'}
                     className="w-full bg-transparent border-0 outline-none font-['Heebo:Light',sans-serif] font-light text-[18px] leading-[22.4px] text-[#0c1013] placeholder:text-[#676767] text-right"
                     dir="rtl"
                   />
@@ -416,28 +458,33 @@ export default function BrandSupportTab({
                         <h3 className="font-['Heebo:SemiBold',sans-serif] font-semibold text-[20px] leading-[24px] text-[#0c1013] mb-2 text-center">לא נמצא משלוח</h3>
                         <p className="font-['Heebo:Regular',sans-serif] text-[14px] leading-[21px] text-[#676767] mb-4 text-center">{trackingStatus.statusText}</p>
 
-                        {/* Heuristic explainer — most common reason for
-                            "not found" is customers entering their Shopify
-                            order number (6 digits, sometimes with #)
-                            instead of the Focus shipment number (7 digits)
-                            from the shipping email. Spell that out. */}
+                        {/* Mode-aware "not found" hint. Now that both
+                            order# and shipment# lookups work, the most
+                            useful hint is "try the other one" plus a
+                            fallback to opening a support ticket. */}
                         <div className="bg-[#fef9e7] border border-[#fde68a] rounded-[12px] p-4">
                           <div className="flex gap-2 items-start mb-2">
                             <AlertCircle className="w-[18px] h-[18px] text-[#b45309] flex-shrink-0 mt-[2px]" />
                             <p className="font-['Heebo:SemiBold',sans-serif] font-semibold text-[14px] leading-[20px] text-[#92400e]">
-                              שימי לב — בטאב הזה צריך מספר משלוח, לא מספר הזמנה
+                              {trackingMode === 'order'
+                                ? 'ההזמנה הזו עדיין לא נמצאה במערכת השילוח'
+                                : 'מספר המשלוח לא נמצא'}
                             </p>
                           </div>
                           <ul className="font-['Heebo:Regular',sans-serif] text-[13px] leading-[20px] text-[#7c2d12] pr-6 list-disc text-right space-y-1">
-                            <li>
-                              <strong>מספר הזמנה</strong> — מופיע באישור הרכישה (~6 ספרות, לפעמים עם #).
-                            </li>
-                            <li>
-                              <strong>מספר משלוח Focus</strong> — 7 ספרות, מופיע במייל נפרד שמגיע מ-Focus כשההזמנה יוצאת למשלוח. <strong>זה המספר להזין כאן.</strong>
-                            </li>
-                            <li>
-                              אם אין עדיין מייל מ-Focus, ההזמנה כנראה לא יצאה — אפשר לפתוח פנייה דרך טאב "תמיכה".
-                            </li>
+                            {trackingMode === 'order' ? (
+                              <>
+                                <li>ייתכן שההזמנה עוד לא יצאה מהמחסן — מקבלים מייל מ-Focus כשהיא יוצאת.</li>
+                                <li>או נסי לחפש לפי <strong>מספר משלוח</strong> (7 ספרות) — אם כבר קיבלת מייל מ-Focus.</li>
+                                <li>אם עברו מעל 5 ימי עסקים, אפשר לפתוח פנייה דרך טאב "תמיכה" ונבדוק.</li>
+                              </>
+                            ) : (
+                              <>
+                                <li>בדקי שמספר המשלוח הוא מהמייל של <strong>Focus</strong> (7 ספרות).</li>
+                                <li>או נסי לחפש לפי <strong>מספר הזמנה</strong> מאישור הרכישה.</li>
+                                <li>אם אין מייל מ-Focus עדיין, ההזמנה כנראה לא יצאה — אפשר לפתוח פנייה דרך טאב "תמיכה".</li>
+                              </>
+                            )}
                           </ul>
                         </div>
                       </div>

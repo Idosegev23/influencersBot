@@ -481,6 +481,51 @@ function TicketDetail({
     }
   };
 
+  // Resolve the actual Focus ship_no for this ticket's order# and
+  // populate tracking_number. The CRM should always show the real
+  // 7-digit Focus number (the one the customer gets in the email),
+  // not the Shopify order_number that the brand types into a label.
+  const [resolvingShipNo, setResolvingShipNo] = useState(false);
+  const [resolveError, setResolveError] = useState<string | null>(null);
+  const handleResolveShipNo = async () => {
+    if (!ticket?.order_number) {
+      setResolveError('אין מספר הזמנה בפנייה');
+      return;
+    }
+    setResolvingShipNo(true);
+    setResolveError(null);
+    try {
+      const orderClean = ticket.order_number.replace(/[^0-9]/g, '');
+      const res = await fetch(
+        `/api/shipment/status?username=${encodeURIComponent(username)}&reference=${encodeURIComponent(orderClean)}`,
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setResolveError(data?.error || 'שגיאה בחיפוש');
+        return;
+      }
+      if (!data.found || !data.shipmentNumber) {
+        setResolveError('לא נמצא משלוח להזמנה זו ב-Focus עדיין');
+        return;
+      }
+      setTrackingNumber(data.shipmentNumber);
+      // Persist immediately so the brand doesn't have to click "save" too.
+      const patch = await fetch(`/api/influencer/${username}/support-tickets/${ticketId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tracking_number: data.shipmentNumber }),
+      });
+      if (patch.ok) {
+        await fetchTicket();
+        onChange();
+      }
+    } catch (err) {
+      setResolveError('שגיאה בחיבור');
+    } finally {
+      setResolvingShipNo(false);
+    }
+  };
+
   const handleSendTemplate = async (
     template: 'in_progress' | 'awaiting_customer' | 'shipped' | 'resolved',
     extra: Record<string, string> = {},
@@ -651,19 +696,42 @@ function TicketDetail({
             style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--dash-text, #fff)' }}
           />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <div className="text-xs mb-1.5" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>מספר משלוח Focus</div>
+        <div>
+          <div className="text-xs mb-1.5" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>מספר משלוח Focus (7 ספרות)</div>
+          <div className="flex gap-2">
             <input
               type="text"
               value={trackingNumber}
               onChange={(e) => setTrackingNumber(e.target.value)}
               placeholder="3409393"
-              className="w-full text-sm p-2.5 rounded-xl outline-none"
+              className="flex-1 text-sm p-2.5 rounded-xl outline-none"
               style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--dash-text, #fff)' }}
               dir="ltr"
             />
+            {ticket.order_number && (
+              <button
+                type="button"
+                onClick={handleResolveShipNo}
+                disabled={resolvingShipNo}
+                className="px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-1.5 disabled:opacity-50"
+                style={{ background: '#883fe2', color: '#fff', whiteSpace: 'nowrap' }}
+                title={`חיפוש ב-Focus לפי הזמנה ${ticket.order_number}`}
+              >
+                {resolvingShipNo ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Search className="w-3.5 h-3.5" />
+                )}
+                חפש מ-Focus לפי #{ticket.order_number}
+              </button>
+            )}
           </div>
+          {resolveError && (
+            <p className="text-[11px] mt-1.5 text-red-400">{resolveError}</p>
+          )}
+          <p className="text-[11px] mt-1 opacity-60">
+            מספר המשלוח הוא הקוד שהלקוחה רואה במייל מ-Focus, לא מספר ההזמנה מ-Shopify.
+          </p>
         </div>
         {(ticket.status === 'resolved' || ticket.status === 'closed') && (
           <div>

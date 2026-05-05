@@ -80,6 +80,12 @@ export async function GET(req: NextRequest) {
 
     let view: Awaited<ReturnType<typeof getFocusShipmentStatus>>;
 
+    // P2 lookups require the customer code to be scoped — Focus
+    // confirmed the URL format `-N,-A<ref>,-A,-N<customer>` (Tzvika,
+    // 2026-05-05). The expected_master_customer_id from config doubles
+    // as the customer code passed to Focus.
+    const customerCode = expectedMasterCustomerId;
+
     if (shipmentNumber && !reference) {
       view = await getFocusShipmentStatus({ host, shipmentNumber, expectedMasterCustomerId });
     } else {
@@ -87,10 +93,20 @@ export async function GET(req: NextRequest) {
       if (lookupMode === 'p1') {
         view = await getFocusShipmentStatus({ host, shipmentNumber: raw, expectedMasterCustomerId });
       } else if (lookupMode === 'p2') {
-        view = await getFocusShipmentStatus({ host, reference: `${refPrefix}${raw}`, expectedMasterCustomerId });
+        view = await getFocusShipmentStatus({
+          host,
+          reference: `${refPrefix}${raw}`,
+          customerCode,
+          expectedMasterCustomerId,
+        });
       } else {
         // p2_then_p1
-        view = await getFocusShipmentStatus({ host, reference: `${refPrefix}${raw}`, expectedMasterCustomerId });
+        view = await getFocusShipmentStatus({
+          host,
+          reference: `${refPrefix}${raw}`,
+          customerCode,
+          expectedMasterCustomerId,
+        });
         if (!view.found) {
           const p1 = await getFocusShipmentStatus({ host, shipmentNumber: raw, expectedMasterCustomerId });
           if (p1.found) view = p1;

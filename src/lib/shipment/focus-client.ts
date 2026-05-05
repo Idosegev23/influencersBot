@@ -88,33 +88,47 @@ const xmlParser = new XMLParser({
  */
 export async function getFocusShipmentStatus(args: {
   host: string;       // e.g. 'focusdelivery.co.il'
-  shipmentNumber?: string;  // P1
-  reference?: string;       // P2
-  expectedMasterCustomerId?: number; // safety: drop responses that
-                                     // belong to a different brand
-                                     // (Focus's ship_status_xml has
-                                     // global lookup, no scope)
+  shipmentNumber?: string;  // P1 — Focus ship_no (7 digits, from email)
+  reference?: string;       // P2 — order_number (Shopify), the customer-side id
+  customerCode?: number;    // master_customer_id at Focus, e.g. 10038 for LA BEAUTÉ.
+                            // REQUIRED to scope P2 lookups by reference. Without
+                            // it Focus does global ship_no lookup with no scope.
+  expectedMasterCustomerId?: number; // legacy belt-and-suspenders: drop
+                                     // responses with a different master.
+                                     // Now redundant when customerCode is set
+                                     // (Focus does the scoping itself), but
+                                     // safe to keep.
 }): Promise<FocusCustomerStatusView> {
-  const { host, shipmentNumber, reference, expectedMasterCustomerId } = args;
+  const { host, shipmentNumber, reference, customerCode, expectedMasterCustomerId } = args;
 
   if (!host) throw new Error('Focus host not configured');
   if (!shipmentNumber && !reference) throw new Error('Either shipmentNumber or reference is required');
 
-  // Focus's parser is fragile about the ARGUMENTS string:
-  //   -N3433155,-A          works (P1 only)
-  //   -A3413433155995       works (P2 only — must not have leading "-N,")
-  //   -N,-A3413433155995    DOES NOT WORK — empty -N causes the parser
-  //                         to mis-route, even though the docs imply it
-  //                         should be valid
-  //   -N3433155,-A341343...  works (both populated)
-  // So we build the ARGUMENTS string conditionally based on which slots
-  // actually have a value.
+  // Focus's `ship_status_xml` accepts a 4-slot ARGUMENTS string:
+  //   slot 1: -N<ship_no>      (or empty)
+  //   slot 2: -A<reference>    (the customer's order_number)
+  //   slot 3: -A               (legacy / unused)
+  //   slot 4: -N<customer_code>   (master_customer_id — REQUIRED for P2)
+  //
+  // Two valid shapes Focus supports:
+  //   • P1 only:   `-N<shipNo>,-A`                — ship_no global lookup
+  //   • P2 scoped: `-N,-A<ref>,-A,-N<customer>`   — order# scoped to one
+  //                                                 customer master
+  // The scoped form is what Tzvika at Focus confirmed (2026-05-05) — it
+  // returns the actual ship_no for that customer's order, with no risk
+  // of a cross-brand collision.
   let argsStr: string;
-  if (shipmentNumber && reference) {
+  if (reference && customerCode != null) {
+    // Scoped P2 — preferred for any reference lookup
+    argsStr = `-N,-A${encodeURIComponent(reference.trim())},-A,-N${encodeURIComponent(String(customerCode))}`;
+  } else if (shipmentNumber && reference) {
     argsStr = `-N${encodeURIComponent(shipmentNumber.trim())},-A${encodeURIComponent(reference.trim())}`;
   } else if (shipmentNumber) {
     argsStr = `-N${encodeURIComponent(shipmentNumber.trim())},-A`;
   } else {
+    // Legacy unscoped P2 — kept for older callers; Focus parses it but
+    // returns a global ship_no fallback so callers should pass
+    // customerCode whenever possible.
     argsStr = `-A${encodeURIComponent(reference!.trim())}`;
   }
   const url = `https://${host}/RunCom.Server/Request.aspx?APPNAME=run&PRGNAME=ship_status_xml&ARGUMENTS=${argsStr}`;
