@@ -20,6 +20,7 @@ import {
   Copy,
   History,
   ChevronLeft,
+  X,
 } from 'lucide-react';
 import { getInfluencerByUsername } from '@/lib/supabase';
 import type { Influencer } from '@/types';
@@ -193,7 +194,11 @@ export default function SupportPage({
   const fetchList = useCallback(async (statusFilter: typeof filter, q: string) => {
     const url = new URL(`/api/influencer/${username}/support-tickets`, window.location.origin);
     if (statusFilter !== 'all') url.searchParams.set('status', statusFilter);
-    if (q.trim()) url.searchParams.set('q', q.trim());
+    // Normalise the search term: strip leading '#' (some order numbers
+    // are stored as "#180988", others as "180988" — searching either
+    // form should match both). The API also strips defensively.
+    const cleanedQ = q.trim().replace(/^#+/, '').trim();
+    if (cleanedQ) url.searchParams.set('q', cleanedQ);
     const res = await fetch(url.toString());
     if (!res.ok) return;
     const data = await res.json();
@@ -210,6 +215,17 @@ export default function SupportPage({
   const handleSearch = async () => {
     await fetchList(filter, search);
   };
+
+  // Debounced live search — fire ~300ms after the user stops typing.
+  // Cleared deps so a quick erase also returns to the unfiltered list.
+  useEffect(() => {
+    if (!influencer) return;
+    const t = setTimeout(() => {
+      fetchList(filter, search);
+    }, 300);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
 
   if (loading) {
     return (
@@ -240,29 +256,32 @@ export default function SupportPage({
           </button>
         </div>
 
-        {/* Search */}
-        <div className="mb-4 flex gap-2">
-          <div className="flex-1 flex items-center gap-2 rounded-xl px-3 py-2"
+        {/* Live search — debounced to ~300ms; matches name / phone /
+            order# / message text. No "submit" button — typing is enough. */}
+        <div className="mb-4">
+          <div className="flex items-center gap-2 rounded-xl px-3 py-2.5"
             style={{ background: 'rgba(255,255,255,0.06)' }}>
-            <Search className="w-4 h-4" style={{ color: 'var(--dash-text-3, #6b7280)' }} />
+            <Search className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--dash-text-3, #6b7280)' }} />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
-              placeholder="חיפוש לפי שם, טלפון, מספר הזמנה, או טקסט בפנייה..."
+              placeholder="חיפוש לפי שם, מספר נייד, מספר הזמנה, או טקסט בפנייה..."
               className="flex-1 bg-transparent outline-none text-sm"
               dir="rtl"
               style={{ color: 'var(--dash-text, #fff)' }}
             />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="p-0.5 rounded opacity-50 hover:opacity-100"
+                style={{ color: 'var(--dash-text-2, #9ca3af)' }}
+                title="נקה"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
-          <button
-            onClick={handleSearch}
-            className="px-4 py-2 rounded-xl text-sm font-medium"
-            style={{ background: '#883fe2', color: '#fff' }}
-          >
-            חפש
-          </button>
         </div>
 
         {/* Filter pills */}
@@ -386,7 +405,7 @@ function TicketList({
             </p>
             <div className="flex items-center justify-between text-[11px]" style={{ color: 'var(--dash-text-3, #6b7280)' }}>
               <span>{formatRelative(t.created_at)}</span>
-              {t.order_number && <span>#{t.order_number}</span>}
+              {t.order_number && <span>#{t.order_number.replace(/^#+/, '')}</span>}
             </div>
           </button>
         );
@@ -875,7 +894,7 @@ interface FocusViewProps {
 }
 
 function FocusShipmentCard({
-  orderNumber,
+  orderNumber: rawOrderNumber,
   view,
   state,
   onRefresh,
@@ -885,6 +904,11 @@ function FocusShipmentCard({
   state: 'idle' | 'loading' | 'found' | 'pending' | 'error';
   onRefresh: () => void;
 }) {
+  // Order numbers are stored in support_requests.order_number with the
+  // exact form the customer typed — sometimes "186870", sometimes
+  // "#186870". Strip any leading '#' so we render a single hash in our
+  // display ("#186870"), never "##186870".
+  const orderNumber = rawOrderNumber ? rawOrderNumber.replace(/^#+/, '') : null;
   // No order number on the ticket — nothing to look up. Render a small
   // hint so the brand knows why this card is empty.
   if (!orderNumber) {

@@ -85,14 +85,17 @@ export async function GET(
     }
   }
 
-  // Free-text search across name / phone / order # / message.
-  // Postgres `or` filter — escape commas in the input or this trips up
-  // PostgREST's parser (we strip them defensively).
+  // Free-text search across name / phone / order # / message. Strip the
+  // leading '#' (order numbers can be stored either way — see notes
+  // alongside the page-side normalisation). Strip commas/parens so
+  // PostgREST's `or` parser doesn't choke on user input.
   if (q.length > 0) {
-    const safe = q.replace(/[,()]/g, ' ').slice(0, 80);
-    query = query.or(
-      `customer_name.ilike.%${safe}%,customer_phone.ilike.%${safe}%,order_number.ilike.%${safe}%,message.ilike.%${safe}%`,
-    );
+    const safe = q.replace(/^#+/, '').replace(/[,()]/g, ' ').slice(0, 80);
+    if (safe.length > 0) {
+      query = query.or(
+        `customer_name.ilike.%${safe}%,customer_phone.ilike.%${safe}%,order_number.ilike.%${safe}%,message.ilike.%${safe}%`,
+      );
+    }
   }
 
   if (fromIso) query = query.gte('created_at', fromIso);
