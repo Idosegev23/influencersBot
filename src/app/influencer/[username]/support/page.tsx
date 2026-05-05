@@ -372,7 +372,7 @@ function TicketList({
   onSelect: (id: string) => void;
 }) {
   return (
-    <div className="space-y-2 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto lg:pr-1">
+    <div className="space-y-2">
       {tickets.map((t) => {
         const c = STATUS_COLOR[t.status];
         const Icon = STATUS_ICON[t.status];
