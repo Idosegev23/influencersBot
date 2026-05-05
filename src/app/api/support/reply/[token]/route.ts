@@ -33,6 +33,20 @@ export async function GET(
     return NextResponse.json({ error: 'invalid token' }, { status: 404 });
   }
 
+  // Pull the latest brand→customer notification so the page can show
+  // exactly what was asked of the customer (e.g. "send a photo of the
+  // damaged product"). Without this the reply page is generic and the
+  // customer has to dig through WhatsApp to remember what was asked.
+  const { data: latestNotif } = await supabase
+    .from('support_ticket_history')
+    .select('action, body_text, whatsapp_template_name, created_at')
+    .eq('ticket_id', ticket.id)
+    .eq('action', 'customer_notified')
+    .not('body_text', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
   // Public view — strip internal fields
   return NextResponse.json({
     ticket: {
@@ -47,6 +61,13 @@ export async function GET(
       last_customer_notified_at: ticket.last_customer_notified_at,
       tracking_number: ticket.tracking_number,
     },
+    latestMessage: latestNotif
+      ? {
+          body: latestNotif.body_text,
+          template: latestNotif.whatsapp_template_name,
+          sent_at: latestNotif.created_at,
+        }
+      : null,
   });
 }
 

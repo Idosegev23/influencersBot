@@ -97,10 +97,20 @@ export async function POST(
 
   let result: Awaited<ReturnType<typeof sendSupportStatusInProgress>>;
   let templateName: string;
+  // The same body text we render server-side for the WhatsApp message.
+  // We persist it on the history row so the customer-facing reply page
+  // can show "the brand sent you: <message>" — the customer should
+  // never have to switch between WhatsApp and the reply page to see
+  // what was asked.
+  let bodyText: string;
 
   switch (tpl) {
     case 'in_progress':
       templateName = 'support_status_in_progress';
+      bodyText =
+        `היי ${fname} 👋\n` +
+        `הפנייה שלך ל-${brand} (#${code}) התקבלה ואנחנו מטפלים בה כעת ✨\n` +
+        `נחזור אליך בהקדם עם עדכון. תודה על הסבלנות 🤍`;
       result = await sendSupportStatusInProgress({
         to: ticket.customer_phone,
         customerFirstName: fname,
@@ -118,6 +128,11 @@ export async function POST(
         );
       }
       templateName = 'support_status_awaiting_customer';
+      bodyText =
+        `היי ${fname} 👋\n` +
+        `בנוגע לפנייה שלך ל-${brand} (#${code}) — אנחנו צריכים ממך פרט נוסף כדי להמשיך:\n` +
+        `${detail}\n\n` +
+        `אפשר להגיב כאן בעמוד עם תמונה / טקסט. תודה 🤍`;
       result = await sendSupportStatusAwaitingCustomer({
         to: ticket.customer_phone,
         customerFirstName: fname,
@@ -138,6 +153,11 @@ export async function POST(
         );
       }
       templateName = 'support_status_shipped';
+      bodyText =
+        `היי ${fname} 👋\n` +
+        `בנוגע לפנייה שלך ל-${brand} (#${code}) — שלחנו לך בדואר ${what}.\n` +
+        `מספר משלוח Focus למעקב: ${tracking}\n` +
+        `מקווים שהכל יסתדר 🤍`;
       result = await sendSupportStatusShipped({
         to: ticket.customer_phone,
         customerFirstName: fname,
@@ -147,8 +167,6 @@ export async function POST(
         trackingNumber: tracking,
         replyToken,
       });
-      // Persist tracking on the ticket so subsequent shipped notifications
-      // can default to it without the brand having to retype.
       if (tracking !== (ticket.tracking_number || '')) {
         await supabase
           .from('support_requests')
@@ -160,6 +178,11 @@ export async function POST(
     case 'resolved': {
       const summary = (body.resolutionSummary || 'הטיפול הושלם.').toString().trim();
       templateName = 'support_status_resolved';
+      bodyText =
+        `היי ${fname} 👋\n` +
+        `הפנייה שלך ל-${brand} (#${code}) טופלה ✅\n` +
+        `${summary}\n\n` +
+        `אם יש משהו נוסף, אנחנו כאן 🤍`;
       result = await sendSupportStatusResolved({
         to: ticket.customer_phone,
         customerFirstName: fname,
@@ -175,7 +198,9 @@ export async function POST(
   }
 
   // Audit: log the attempt regardless of success — the brand should
-  // be able to see "we tried to send X but Meta said Y".
+  // be able to see "we tried to send X but Meta said Y". Also persist
+  // the rendered message body so the reply page can show it to the
+  // customer with full context.
   await supabase.from('support_ticket_history').insert({
     ticket_id: ticket.id,
     account_id: influencer.id,
@@ -183,19 +208,45 @@ export async function POST(
     actor: username,
     whatsapp_template_name: templateName,
     whatsapp_message_id: result.wa_message_id || null,
+    body_text: bodyText,
     note: result.success
       ? null
       : `Send failed: ${result.error?.message || 'unknown'}`,
   });
 
   if (result.success) {
-    await supabase
-      .from('support_requests')
-      .update({
-        last_customer_notified_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', ticket.id);
+    // Auto-transition status when sending a notification — the act of
+    // sending the message implies the new state.
+    const STATUS_BY_TEMPLATE: Record<TemplateKey, string | null> = {
+      in_progress: 'in_progress',
+      awaiting_customer: 'awaiting_customer',
+      shipped: 'shipped',
+      resolved: 'resolved',
+    };
+    const newStatus = STATUS_BY_TEMPLATE[tpl];
+    const update: Record<string, any> = {
+      last_customer_notified_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    if (newStatus) {
+      update.status = newStatus;
+      if (newStatus === 'resolved') {
+        update.resolved_at = new Date().toISOString();
+      }
+    }
+    await supabase.from('support_requests').update(update).eq('id', ticket.id);
+
+    // Mirror the status change in the audit log too.
+    if (newStatus) {
+      await supabase.from('support_ticket_history').insert({
+        ticket_id: ticket.id,
+        account_id: influencer.id,
+        action: 'status_change',
+        actor: username,
+        to_status: newStatus,
+        note: `auto-transition (sent ${templateName})`,
+      });
+    }
   }
 
   return NextResponse.json({

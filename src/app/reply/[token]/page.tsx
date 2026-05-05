@@ -15,6 +15,12 @@ interface PublicTicket {
   tracking_number: string | null;
 }
 
+interface LatestMessage {
+  body: string;
+  template: string | null;
+  sent_at: string;
+}
+
 const STATUS_LABEL: Record<string, string> = {
   new: 'חדש',
   in_progress: 'בטיפול',
@@ -33,6 +39,7 @@ interface AttachedFile {
 export default function ReplyPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params);
   const [ticket, setTicket] = useState<PublicTicket | null>(null);
+  const [latestMessage, setLatestMessage] = useState<LatestMessage | null>(null);
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -49,6 +56,7 @@ export default function ReplyPage({ params }: { params: Promise<{ token: string 
       }
       const data = await res.json();
       setTicket(data.ticket);
+      setLatestMessage(data.latestMessage || null);
     } finally {
       setLoading(false);
     }
@@ -157,18 +165,12 @@ export default function ReplyPage({ params }: { params: Promise<{ token: string 
       <div className="max-w-xl mx-auto pt-6 pb-12">
         {/* Header */}
         <div className="bg-white rounded-2xl p-6 mb-4" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-          <div className="flex items-center justify-between mb-3">
-            <h1 className="text-xl font-bold text-gray-900">
-              היי {ticket.customer_name?.split(/\s+/)[0] || 'לקוחה'} 👋
-            </h1>
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">
-              {STATUS_LABEL[ticket.status] || ticket.status}
-            </span>
-          </div>
+          <h1 className="text-xl font-bold text-gray-900 mb-1">
+            היי {ticket.customer_name?.split(/\s+/)[0] || 'לקוחה'} 👋
+          </h1>
           <p className="text-sm text-gray-600 leading-relaxed">
-            הפנייה שלך ל-<strong>{ticket.brand || 'המותג'}</strong> בהליך טיפול.
-            <br />
-            בדף הזה אפשר להוסיף עוד פרטים, לשאול שאלה, או להגיב לעדכון אחרון.
+            פנייה ל-<strong>{ticket.brand || 'המותג'}</strong> · סטטוס נוכחי:{' '}
+            <strong>{STATUS_LABEL[ticket.status] || ticket.status}</strong>
           </p>
           <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-500">
             <span className="px-2 py-1 rounded bg-gray-100">
@@ -177,11 +179,34 @@ export default function ReplyPage({ params }: { params: Promise<{ token: string 
             {ticket.order_number && (
               <span className="px-2 py-1 rounded bg-gray-100 inline-flex items-center gap-1">
                 <Package className="w-3 h-3" />
-                הזמנה: <code className="font-mono">{ticket.order_number}</code>
+                הזמנה: <code className="font-mono">{ticket.order_number.replace(/^#+/, '')}</code>
               </span>
             )}
           </div>
         </div>
+
+        {/* Brand's latest message — pulled from history.body_text. This
+            is the message we sent the customer over WhatsApp. Showing
+            it here means the customer doesn't have to switch back to
+            WhatsApp to remember what was asked. */}
+        {latestMessage && (
+          <div className="bg-purple-50 border border-purple-200 rounded-2xl p-5 mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold text-purple-900">
+                הודעה מ-{ticket.brand || 'המותג'}
+              </div>
+              <div className="text-xs text-purple-700">
+                {new Date(latestMessage.sent_at).toLocaleString('he-IL', {
+                  dateStyle: 'short',
+                  timeStyle: 'short',
+                })}
+              </div>
+            </div>
+            <pre className="whitespace-pre-wrap text-sm font-sans text-gray-800 leading-relaxed">
+              {latestMessage.body}
+            </pre>
+          </div>
+        )}
 
         {/* Original message — context for the customer */}
         <div className="bg-white rounded-2xl p-5 mb-4" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
