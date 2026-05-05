@@ -29,13 +29,46 @@ import {
 } from 'lucide-react';
 import {
   getInfluencerByUsername,
-  getAnalyticsSummary,
   getDailyStats,
   getTopProducts,
-  type AnalyticsSummary,
   type DailyStats,
   type TopProduct,
 } from '@/lib/supabase';
+
+// New accurate analytics shape — matches /api/influencer/[username]/analytics.
+// Replaces the legacy AnalyticsSummary which conflated sessions with
+// unique visitors and lacked topic distribution.
+interface AccurateAnalytics {
+  range: { from: string; to: string };
+  visits: { total: number; unique: number };
+  sessions: { total: number; with_message: number };
+  messages: { user: number; assistant: number; total: number };
+  avg_user_msgs_per_session: number;
+  topics: Record<string, number>;
+  conversions: { coupon_copies: number; product_clicks: number };
+}
+
+const TOPIC_LABEL: Record<string, string> = {
+  shipment_status: 'סטטוס משלוח',
+  complaint: 'תלונה / מוצר פגום',
+  return_or_exchange: 'החזרה / החלפה',
+  support_request: 'פנייה לתמיכה',
+  coupon: 'קופונים',
+  product_question: 'שאלת מוצר',
+  greeting: 'ברכה',
+  other: 'אחר',
+};
+
+const TOPIC_COLOR: Record<string, string> = {
+  shipment_status: '#06b6d4',
+  complaint: '#ef4444',
+  return_or_exchange: '#f59e0b',
+  support_request: '#a855f7',
+  coupon: '#22c55e',
+  product_question: '#3b82f6',
+  greeting: '#94a3b8',
+  other: '#6b7280',
+};
 import { formatNumber } from '@/lib/utils';
 import type { Influencer } from '@/types';
 
@@ -60,8 +93,8 @@ export default function AnalyticsPage({
   const [influencer, setInfluencer] = useState<Influencer | null>(null);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange>('30d');
-  const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
-  const [previousSummary, setPreviousSummary] = useState<AnalyticsSummary | null>(null);
+  const [summary, setSummary] = useState<AccurateAnalytics | null>(null);
+  const [previousSummary, setPreviousSummary] = useState<AccurateAnalytics | null>(null);
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
 
@@ -112,10 +145,23 @@ export default function AnalyticsPage({
 
         setInfluencer(inf);
 
-        // Load analytics data
+        // Load accurate analytics from the new endpoint that distinguishes
+        // visits / sessions / unique visitors and bundles topic counts.
+        const fetchAnalytics = async (from: Date, to: Date) => {
+          const url = new URL(
+            `/api/influencer/${encodeURIComponent(username)}/analytics`,
+            window.location.origin,
+          );
+          url.searchParams.set('from', from.toISOString());
+          url.searchParams.set('to', to.toISOString());
+          const res = await fetch(url.toString());
+          if (!res.ok) throw new Error('analytics fetch failed');
+          return res.json() as Promise<AccurateAnalytics>;
+        };
+
         const [summaryData, prevSummaryData, dailyData, topProds] = await Promise.all([
-          getAnalyticsSummary(inf.id, startDate, endDate),
-          getAnalyticsSummary(inf.id, prevStartDate, prevEndDate),
+          fetchAnalytics(startDate, endDate),
+          fetchAnalytics(prevStartDate, prevEndDate),
           getDailyStats(inf.id, startDate, endDate),
           getTopProducts(inf.id, startDate, endDate, 5),
         ]);
@@ -151,10 +197,22 @@ export default function AnalyticsPage({
 
   if (!influencer || !summary) return null;
 
-  const sessionsChange = getChange(summary.totalSessions, previousSummary?.totalSessions || 0);
-  const messagesChange = getChange(summary.totalMessages, previousSummary?.totalMessages || 0);
-  const couponsChange = getChange(summary.totalCouponCopies, previousSummary?.totalCouponCopies || 0);
-  const clicksChange = getChange(summary.totalProductClicks, previousSummary?.totalProductClicks || 0);
+  const visitorsChange = getChange(
+    summary.visits.unique,
+    previousSummary?.visits.unique || 0,
+  );
+  const sessionsChange = getChange(
+    summary.sessions.with_message,
+    previousSummary?.sessions.with_message || 0,
+  );
+  const userMsgsChange = getChange(
+    summary.messages.user,
+    previousSummary?.messages.user || 0,
+  );
+  const couponsChange = getChange(
+    summary.conversions.coupon_copies,
+    previousSummary?.conversions.coupon_copies || 0,
+  );
 
   // Format dates for chart
   const formatDate = (dateStr: string) => {
@@ -199,37 +257,43 @@ export default function AnalyticsPage({
       </div>
 
       <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-6">
-        {/* Summary Stats */}
+        {/* Summary Stats — accurate counts. "מבקרים ייחודיים" replaces
+            the old "שיחות" tile that conflated sessions with visitors;
+            sessions are now the more useful "with at least one message"
+            count, and messages count user side only. */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {[
+            {
+              icon: <Users className="w-6 h-6 text-cyan-400" />,
+              iconBg: 'rgba(6,182,212,0.15)',
+              change: visitorsChange,
+              value: formatNumber(summary.visits.unique),
+              label: 'מבקרים ייחודיים',
+              sub: `${formatNumber(summary.visits.total)} ביקורי דף בסך הכל`,
+            },
             {
               icon: <MessageCircle className="w-6 h-6 text-blue-400" />,
               iconBg: 'rgba(59,130,246,0.15)',
               change: sessionsChange,
-              value: formatNumber(summary.totalSessions),
-              label: 'שיחות',
+              value: formatNumber(summary.sessions.with_message),
+              label: 'שיחות בפועל',
+              sub: `מתוך ${formatNumber(summary.sessions.total)} פתיחות צ'אט`,
             },
             {
               icon: <TrendingUp className="w-6 h-6 text-green-400" />,
               iconBg: 'rgba(34,197,94,0.15)',
-              change: messagesChange,
-              value: formatNumber(summary.totalMessages),
-              label: 'הודעות',
-              sub: `ממוצע ${summary.avgMessagesPerSession} לשיחה`,
+              change: userMsgsChange,
+              value: formatNumber(summary.messages.user),
+              label: 'הודעות מלקוחות',
+              sub: `ממוצע ${summary.avg_user_msgs_per_session} לשיחה`,
             },
             {
               icon: <Copy className="w-6 h-6 text-purple-400" />,
               iconBg: 'rgba(168,85,247,0.15)',
               change: couponsChange,
-              value: formatNumber(summary.totalCouponCopies),
+              value: formatNumber(summary.conversions.coupon_copies),
               label: 'קופונים הועתקו',
-            },
-            {
-              icon: <MousePointer className="w-6 h-6 text-orange-400" />,
-              iconBg: 'rgba(249,115,22,0.15)',
-              change: clicksChange,
-              value: formatNumber(summary.totalProductClicks),
-              label: 'קליקים על מוצרים',
+              sub: `${formatNumber(summary.conversions.product_clicks)} קליקים על מוצרים`,
             },
           ].map((card, i) => (
             <div
@@ -272,6 +336,61 @@ export default function AnalyticsPage({
             </div>
           ))}
         </div>
+
+        {/* Topic distribution — what customers chat about */}
+        {(() => {
+          const entries = Object.entries(summary.topics)
+            .sort(([, a], [, b]) => (b as number) - (a as number));
+          const total = entries.reduce((s, [, n]) => s + (n as number), 0);
+          if (total === 0) return null;
+          return (
+            <div
+              className="glass-card rounded-2xl p-6 mb-8 animate-slide-up"
+              style={{
+                background: 'rgba(255,255,255,0.03)',
+                borderColor: 'var(--dash-glass-border)',
+                border: '1px solid',
+              }}
+            >
+              <h3 className="text-lg font-semibold mb-1 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
+                <BarChart3 className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
+                על מה הלקוחות מדברים
+              </h3>
+              <p className="text-xs mb-5" style={{ color: 'var(--dash-text-3)' }}>
+                סיווג לפי ההודעה הראשונה בשיחה ({total} שיחות בטווח)
+              </p>
+              <div className="space-y-3">
+                {entries.map(([topic, count]) => {
+                  const pct = total > 0 ? Math.round(((count as number) / total) * 100) : 0;
+                  const color = TOPIC_COLOR[topic] || '#6b7280';
+                  const label = TOPIC_LABEL[topic] || topic;
+                  return (
+                    <div key={topic}>
+                      <div className="flex items-center justify-between mb-1.5 text-sm">
+                        <span style={{ color: 'var(--dash-text)' }}>{label}</span>
+                        <span className="tabular-nums" style={{ color: 'var(--dash-text-2)' }}>
+                          {formatNumber(count as number)} <span className="opacity-60">· {pct}%</span>
+                        </span>
+                      </div>
+                      <div
+                        className="h-2 rounded-full overflow-hidden"
+                        style={{ background: 'rgba(255,255,255,0.05)' }}
+                      >
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{
+                            width: `${pct}%`,
+                            background: color,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
@@ -467,7 +586,7 @@ export default function AnalyticsPage({
               <Users className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
               <span style={{ color: 'var(--dash-text-2)' }}>מבקרים ייחודיים</span>
             </div>
-            <p className="text-3xl font-bold" style={{ color: 'var(--dash-text)' }}>{formatNumber(summary.uniqueVisitors)}</p>
+            <p className="text-3xl font-bold" style={{ color: 'var(--dash-text)' }}>{formatNumber(summary.visits.unique)}</p>
           </div>
 
           <div
@@ -481,7 +600,7 @@ export default function AnalyticsPage({
               <MessageCircle className="w-6 h-6" style={{ color: 'var(--dash-positive)' }} />
               <span style={{ color: 'var(--dash-text-2)' }}>ממוצע הודעות לשיחה</span>
             </div>
-            <p className="text-3xl font-bold" style={{ color: 'var(--dash-text)' }}>{summary.avgMessagesPerSession}</p>
+            <p className="text-3xl font-bold" style={{ color: 'var(--dash-text)' }}>{summary.avg_user_msgs_per_session}</p>
           </div>
 
           <div
@@ -496,8 +615,8 @@ export default function AnalyticsPage({
               <span style={{ color: 'var(--dash-text-2)' }}>שיעור המרה</span>
             </div>
             <p className="text-3xl font-bold" style={{ color: 'var(--dash-text)' }}>
-              {summary.totalSessions > 0
-                ? Math.round((summary.totalCouponCopies / summary.totalSessions) * 100)
+              {summary.sessions.with_message > 0
+                ? Math.round((summary.conversions.coupon_copies / summary.sessions.with_message) * 100)
                 : 0}%
             </p>
             <p className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>קופונים / שיחות</p>
