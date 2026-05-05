@@ -10,6 +10,7 @@ import {
   MessageCircle,
   LifeBuoy,
   TrendingUp,
+  BarChart3,
   Settings,
   Sun,
   Moon,
@@ -17,6 +18,7 @@ import {
 
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'דשבורד', icon: LayoutDashboard },
+  { key: 'analytics', label: 'אנליטיקס', icon: BarChart3 },
   { key: 'partnerships', label: 'שת״פים', icon: Briefcase },
   { key: 'coupons', label: 'קופונים', icon: Tag },
   { key: 'conversations', label: 'שיחות', icon: MessageCircle },
