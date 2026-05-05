@@ -712,22 +712,20 @@ export async function POST(req: NextRequest) {
             if (!shouldRedirect) {
               const SUPPORT_FAST_PATHS: RegExp[] = [
                 // bare "תמיכה" — strongest signal, customer is asking for support.
-                // The single Hebrew word + question mark / EOL handles both
-                // "תמיכה?" and the ChatTab quick-reply that just sends "תמיכה".
                 /^\s*תמיכה[\s.,?!]*$/,
-                // generic "open a ticket / contact" phrasings, including the
-                // "via support" form Hebrew speakers use.
+                // generic "open a ticket / contact" phrasings
                 /איך\s+(אפשר|ניתן)?\s*(ליצור\s+קשר|להחזיר|לפנות)/,
                 /איך\s+(יוצרים|פונים)(\s+קשר|\s+דרך\s+ה?תמיכה|\s+ל?תמיכה)?/,
                 /(פנייה|פניה)\s+ל?תמיכה/,
                 /(דרך|בטופס)\s+ה?תמיכה/,
                 /איפה\s+פונים\s+ל?שירות/,
-                // human rep / bad service
+                // human rep / bad service / escalation
                 /נציג\s*(אנושי|שירות|שירות לקוחות)/,
                 /לדבר עם (מישהו|נציג|בנאדם)/,
                 /שיחזור (אלי|אליי)/,
                 /שירות (גרוע|לקוי|נורא|רע)/,
                 /רוצ(ה|ים) נציג/,
+                /אין\s+(מענה|תגובה|התייחסות)/,
                 // damaged / leaking / broken product
                 /דול(ף|פת|פים)/,
                 /נז(ל|לת|ילה)/,
@@ -736,11 +734,21 @@ export async function POST(req: NextRequest) {
                 /פגום(ה|ים)?/,
                 /מקולקל(ת|ים)?/,
                 /ניזוק|נמעך|נשבר/,
-                // missing / wrong items
-                /חסר(ים|ה)?\s+(פריט|פריטים|מוצר|מוצרים)/,
+                // wrong / mismatched item
+                /טעות\s+ב?(הזמנ|מוצר|חבילה|משלוח)/,
+                /מוצר\s+(לא\s+נכון|שגוי|אחר|שונה)/,
+                /הגיע\s+(לא\s+נכון|מוצר\s+אחר|מוצר\s+שונה)/,
+                // missing items — broaden the חסר match
+                /חסר(ים|ה)?\s+(פריט|פריטים|מוצר|מוצרים|בחבילה|במשלוח|לי\s+ב?חבילה|לי\s+ב?משלוח|בו)/,
                 /\bחוסרים\b/,
+                /לא\s+(שמו|הכניסו)\s+לי/,
+                /לא\s+קיבלתי\s+את\s+(המוצר|הפריט|החבילה|הזמנ|הבושם|השמפו|המסכה)/,
                 /לא הגיע(ה)?\s+(הזמנ|מוצר|פריט|חבילה|משלוח|מה ש)/,
                 /הגיע(ה)?\s+אבל\s+(חסר|חסרים)/,
+                /הגיעה?\s+(הזמנה|חבילה|משלוח).*?\s+(חסר|בלי|אבל\s+ב?לי)/,
+                // exchange / replacement
+                /להחליף|החלפת\s+(מוצר|הזמנה|פריט)/,
+                /רוצ(ה|ים)\s+להחליף/,
                 // returns / refund
                 /להחזיר\s+(מוצר|הזמנה|מהזמנה|פריט)/,
                 /ביטול\s+הזמנה/,
