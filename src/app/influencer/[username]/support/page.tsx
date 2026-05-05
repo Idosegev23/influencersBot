@@ -153,6 +153,9 @@ export default function SupportPage({
   const [filter, setFilter] = useState<'all' | TicketStatus>('new');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(50);
+  const [total, setTotal] = useState<number>(0);
 
   // Boot: auth + load
   useEffect(() => {
@@ -187,11 +190,23 @@ export default function SupportPage({
   // Refetch on filter change
   useEffect(() => {
     if (!influencer) return;
-    fetchList(filter, search);
+    setPage(1);
+    fetchList(filter, search, 1);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
 
-  const fetchList = useCallback(async (statusFilter: typeof filter, q: string) => {
+  // Refetch on page change
+  useEffect(() => {
+    if (!influencer) return;
+    fetchList(filter, search, page);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
+
+  const fetchList = useCallback(async (
+    statusFilter: typeof filter,
+    q: string,
+    p: number = 1,
+  ) => {
     const url = new URL(`/api/influencer/${username}/support-tickets`, window.location.origin);
     if (statusFilter !== 'all') url.searchParams.set('status', statusFilter);
     // Normalise the search term: strip leading '#' (some order numbers
@@ -199,11 +214,14 @@ export default function SupportPage({
     // form should match both). The API also strips defensively.
     const cleanedQ = q.trim().replace(/^#+/, '').trim();
     if (cleanedQ) url.searchParams.set('q', cleanedQ);
+    if (p > 1) url.searchParams.set('page', String(p));
     const res = await fetch(url.toString());
     if (!res.ok) return;
     const data = await res.json();
     setTickets(data.tickets || []);
     setCounts(data.counts || {});
+    setTotal(data.total || 0);
+    setPageSize(data.pageSize || 50);
   }, [username]);
 
   const handleRefresh = async () => {
@@ -217,11 +235,13 @@ export default function SupportPage({
   };
 
   // Debounced live search — fire ~300ms after the user stops typing.
-  // Cleared deps so a quick erase also returns to the unfiltered list.
+  // Reset to page 1 on a new query (otherwise you'd be on page 4 of
+  // a different result set with no rows).
   useEffect(() => {
     if (!influencer) return;
     const t = setTimeout(() => {
-      fetchList(filter, search);
+      setPage(1);
+      fetchList(filter, search, 1);
     }, 300);
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -330,18 +350,36 @@ export default function SupportPage({
           </div>
         ) : (
           <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] gap-4">
-            <TicketList
-              tickets={tickets}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-            />
+            <div>
+              <TicketList
+                tickets={tickets}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+              />
+              {/* Pagination — server returns 50 per page; without this
+                  control the brand could only ever see the first page. */}
+              {total > pageSize && (
+                <Pagination
+                  page={page}
+                  pageSize={pageSize}
+                  total={total}
+                  onChange={(p) => {
+                    setPage(p);
+                    setSelectedId(null);
+                    if (typeof window !== 'undefined') {
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                  }}
+                />
+              )}
+            </div>
             <div className="lg:sticky lg:top-4 self-start">
               {selectedId ? (
                 <TicketDetail
                   username={username}
                   ticketId={selectedId}
                   influencer={influencer}
-                  onChange={() => fetchList(filter, search)}
+                  onChange={() => fetchList(filter, search, page)}
                   onClose={() => setSelectedId(null)}
                 />
               ) : (
@@ -1126,6 +1164,92 @@ function FocusShipmentCard({
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Pagination                                                         */
+/* ------------------------------------------------------------------ */
+
+function Pagination({
+  page,
+  pageSize,
+  total,
+  onChange,
+}: {
+  page: number;
+  pageSize: number;
+  total: number;
+  onChange: (p: number) => void;
+}) {
+  const lastPage = Math.max(1, Math.ceil(total / pageSize));
+  if (lastPage <= 1) return null;
+
+  // Build a compact page-number list: [1, ..., page-1, page, page+1, ..., last]
+  const pages: (number | 'gap')[] = [];
+  const add = (n: number) => { if (!pages.includes(n)) pages.push(n); };
+  add(1);
+  if (page - 2 > 2) pages.push('gap');
+  for (let p = Math.max(2, page - 1); p <= Math.min(lastPage - 1, page + 1); p++) add(p);
+  if (page + 2 < lastPage - 1) pages.push('gap');
+  if (lastPage > 1) add(lastPage);
+
+  const fromIdx = (page - 1) * pageSize + 1;
+  const toIdx = Math.min(page * pageSize, total);
+
+  return (
+    <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="text-xs" style={{ color: 'var(--dash-text-3, #6b7280)' }}>
+          {fromIdx}–{toIdx} מתוך {total}
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onChange(Math.max(1, page - 1))}
+            disabled={page === 1}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium disabled:opacity-40"
+            style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--dash-text-2, #9ca3af)' }}
+          >
+            ← הקודם
+          </button>
+          {pages.map((p, i) => {
+            if (p === 'gap') {
+              return (
+                <span key={`gap-${i}`} className="px-1.5 text-xs" style={{ color: 'var(--dash-text-3, #6b7280)' }}>
+                  …
+                </span>
+              );
+            }
+            const active = p === page;
+            return (
+              <button
+                key={p}
+                type="button"
+                onClick={() => onChange(p)}
+                disabled={active}
+                className="min-w-[32px] px-2 py-1.5 rounded-lg text-xs font-medium"
+                style={{
+                  background: active ? '#883fe2' : 'rgba(255,255,255,0.05)',
+                  color: active ? '#fff' : 'var(--dash-text-2, #9ca3af)',
+                }}
+              >
+                {p}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => onChange(Math.min(lastPage, page + 1))}
+            disabled={page >= lastPage}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium disabled:opacity-40"
+            style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--dash-text-2, #9ca3af)' }}
+          >
+            הבא →
+          </button>
+        </div>
       </div>
     </div>
   );
