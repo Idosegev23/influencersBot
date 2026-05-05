@@ -45,11 +45,12 @@ export async function GET(
   const influencer = await getInfluencerByUsername(username);
   if (!influencer) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
+  // No FK on product_id — fetch the row alone, then resolve the product
+  // separately from widget_products (which is the actual table the chat
+  // BrandSupportTab writes its product picker against).
   const { data: ticket, error } = await supabase
     .from('support_requests')
-    .select(
-      `*, products:product_id (name, coupon_code, brand)`,
-    )
+    .select('*')
     .eq('account_id', influencer.id)
     .eq('id', id)
     .maybeSingle();

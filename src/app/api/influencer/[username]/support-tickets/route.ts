@@ -56,6 +56,9 @@ export async function GET(
   const toIso = url.searchParams.get('to');
   const page = Math.max(1, Number(url.searchParams.get('page') || '1'));
 
+  // Note: support_requests has no FK on product_id — PostgREST cannot
+  // auto-embed the products row. Resolve product details separately
+  // below if needed (none of the list-view UI uses them today).
   let query = supabase
     .from('support_requests')
     .select(
@@ -63,8 +66,7 @@ export async function GET(
       id, account_id, customer_name, customer_phone, message, brand,
       order_number, product_id, status, created_at, updated_at,
       ref_source, internal_notes, assigned_to, last_customer_notified_at,
-      tracking_number, resolution_summary, resolved_at,
-      products:product_id (name, coupon_code, brand)
+      tracking_number, resolution_summary, resolved_at
     `,
       { count: 'exact' },
     )

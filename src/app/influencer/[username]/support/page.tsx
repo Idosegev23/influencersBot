@@ -67,6 +67,8 @@ interface HistoryEntry {
   whatsapp_message_id: string | null;
   actor: string | null;
   created_at: string;
+  attachment_url?: string | null;
+  attachment_filename?: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -686,27 +688,61 @@ function TicketDetail({
         </button>
       </div>
 
-      {/* History */}
+      {/* History — chronological feed including customer replies */}
       {history.length > 0 && (
         <div>
           <div className="text-xs mb-2 flex items-center gap-1.5" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>
             <History className="w-3.5 h-3.5" />
-            היסטוריה
+            היסטוריה ושיחה
           </div>
-          <ol className="space-y-2 text-xs">
-            {history.map((h) => (
-              <li key={h.id} className="flex gap-2 items-start">
-                <span className="flex-shrink-0 w-1.5 h-1.5 rounded-full mt-1.5" style={{ background: '#883fe2' }} />
-                <div className="flex-1">
-                  <div style={{ color: 'var(--dash-text-2, #9ca3af)' }}>
-                    {historyLine(h)}
+          <ol className="space-y-3 text-xs">
+            {history.map((h) => {
+              const isCustomerReply = h.action === 'customer_reply';
+              return (
+                <li key={h.id} className="flex gap-2 items-start">
+                  <span
+                    className="flex-shrink-0 w-1.5 h-1.5 rounded-full mt-1.5"
+                    style={{ background: isCustomerReply ? '#22c55e' : '#883fe2' }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span style={{ color: 'var(--dash-text-2, #9ca3af)' }}>{historyLine(h)}</span>
+                      {isCustomerReply && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                          style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e' }}>
+                          תגובה חדשה
+                        </span>
+                      )}
+                    </div>
+                    {h.note && (isCustomerReply || h.action === 'note_added') && (
+                      <div className="mt-1 p-2 rounded-lg whitespace-pre-wrap"
+                        style={{
+                          background: isCustomerReply ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.04)',
+                          color: 'var(--dash-text, #fff)',
+                          fontSize: '13px',
+                          lineHeight: '1.5',
+                        }}>
+                        {h.note}
+                      </div>
+                    )}
+                    {h.attachment_url && (
+                      <a
+                        href={h.attachment_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block mt-1 text-xs underline"
+                        style={{ color: '#883fe2' }}
+                      >
+                        קובץ מצורף: {h.attachment_filename || 'קובץ'}
+                      </a>
+                    )}
+                    <div className="opacity-60 mt-0.5">
+                      {formatRelative(h.created_at)} · {h.actor || '—'}
+                    </div>
                   </div>
-                  <div className="opacity-60 mt-0.5">
-                    {formatRelative(h.created_at)} · {h.actor || '—'}
-                  </div>
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ol>
         </div>
       )}
@@ -752,6 +788,7 @@ function historyLine(h: HistoryEntry): string {
     const ok = !h.note?.startsWith('Send failed');
     return `${ok ? 'נשלחה' : 'ניסיון לשלוח'} הודעת WhatsApp: ${h.whatsapp_template_name || '?'}${ok ? '' : ` (${h.note})`}`;
   }
+  if (h.action === 'customer_reply') return `תגובת הלקוחה`;
   return h.action;
 }
 

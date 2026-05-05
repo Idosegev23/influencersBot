@@ -297,41 +297,49 @@ export async function sendInfluencerWeeklyDigest(p: {
 // positional {{n}} placeholders — order matters.
 // =====================================================================
 
+// All four support-status templates use template version v2 — these
+// were re-submitted with a URL button so the customer can reply via
+// /reply/<token> instead of via WhatsApp text reply (which we don't
+// have a UI to surface). v1 was kept body-only and superseded.
+//
+// {{1}} body params... | URL button {{1}} = reply token
+//
 // support_status_in_progress
-//   {{1}} customer first name | {{2}} brand | {{3}} ticket short code
 export async function sendSupportStatusInProgress(p: {
   to: string;
   customerFirstName: string;
   brand: string;
   ticketShortCode: string;
+  replyToken: string;
 }): Promise<WhatsAppSendResult> {
   return runTemplate({
-    templateName: 'support_status_in_progress',
+    templateName: 'support_status_in_progress_v2',
     flagName: 'SUPPORT_STATUS_IN_PROGRESS',
     to: p.to,
     bodyParams: [p.customerFirstName, p.brand, p.ticketShortCode],
+    urlButtonParam: p.replyToken,
   });
 }
 
 // support_status_awaiting_customer
-//   {{1}} name | {{2}} brand | {{3}} ticket | {{4}} what we need
 export async function sendSupportStatusAwaitingCustomer(p: {
   to: string;
   customerFirstName: string;
   brand: string;
   ticketShortCode: string;
   requestedDetail: string;
+  replyToken: string;
 }): Promise<WhatsAppSendResult> {
   return runTemplate({
-    templateName: 'support_status_awaiting_customer',
+    templateName: 'support_status_awaiting_customer_v2',
     flagName: 'SUPPORT_STATUS_AWAITING_CUSTOMER',
     to: p.to,
     bodyParams: [p.customerFirstName, p.brand, p.ticketShortCode, p.requestedDetail],
+    urlButtonParam: p.replyToken,
   });
 }
 
 // support_status_shipped
-//   {{1}} name | {{2}} brand | {{3}} ticket | {{4}} what was shipped | {{5}} tracking #
 export async function sendSupportStatusShipped(p: {
   to: string;
   customerFirstName: string;
@@ -339,9 +347,10 @@ export async function sendSupportStatusShipped(p: {
   ticketShortCode: string;
   whatWasShipped: string;
   trackingNumber: string;
+  replyToken: string;
 }): Promise<WhatsAppSendResult> {
   return runTemplate({
-    templateName: 'support_status_shipped',
+    templateName: 'support_status_shipped_v2',
     flagName: 'SUPPORT_STATUS_SHIPPED',
     to: p.to,
     bodyParams: [
@@ -351,20 +360,21 @@ export async function sendSupportStatusShipped(p: {
       p.whatWasShipped,
       p.trackingNumber,
     ],
+    urlButtonParam: p.replyToken,
   });
 }
 
 // support_status_resolved
-//   {{1}} name | {{2}} brand | {{3}} ticket | {{4}} resolution summary
 export async function sendSupportStatusResolved(p: {
   to: string;
   customerFirstName: string;
   brand: string;
   ticketShortCode: string;
   resolutionSummary: string;
+  replyToken: string;
 }): Promise<WhatsAppSendResult> {
   return runTemplate({
-    templateName: 'support_status_resolved',
+    templateName: 'support_status_resolved_v2',
     flagName: 'SUPPORT_STATUS_RESOLVED',
     to: p.to,
     bodyParams: [
@@ -373,6 +383,7 @@ export async function sendSupportStatusResolved(p: {
       p.ticketShortCode,
       p.resolutionSummary,
     ],
+    urlButtonParam: p.replyToken,
   });
 }
 

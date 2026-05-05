@@ -31,6 +31,7 @@ import {
   sendSupportStatusShipped,
   sendSupportStatusResolved,
 } from '@/lib/whatsapp-notify';
+import { ensureReplyToken } from '@/lib/support/reply-token';
 
 export const runtime = 'nodejs';
 
@@ -89,6 +90,11 @@ export async function POST(
   const brand = ticket.brand || influencer.display_name || 'המותג';
   const code = shortCode(ticket.id);
 
+  // Mint a reply token for this ticket if it doesn't have one yet.
+  // The token gets passed to the template URL button so the customer
+  // can hit /reply/<token> from WhatsApp.
+  const replyToken = (await ensureReplyToken(ticket.id)) || '';
+
   let result: Awaited<ReturnType<typeof sendSupportStatusInProgress>>;
   let templateName: string;
 
@@ -100,6 +106,7 @@ export async function POST(
         customerFirstName: fname,
         brand,
         ticketShortCode: code,
+        replyToken,
       });
       break;
     case 'awaiting_customer': {
@@ -117,6 +124,7 @@ export async function POST(
         brand,
         ticketShortCode: code,
         requestedDetail: detail,
+        replyToken,
       });
       break;
     }
@@ -137,6 +145,7 @@ export async function POST(
         ticketShortCode: code,
         whatWasShipped: what,
         trackingNumber: tracking,
+        replyToken,
       });
       // Persist tracking on the ticket so subsequent shipped notifications
       // can default to it without the brand having to retype.
@@ -157,6 +166,7 @@ export async function POST(
         brand,
         ticketShortCode: code,
         resolutionSummary: summary,
+        replyToken,
       });
       break;
     }

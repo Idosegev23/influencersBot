@@ -8,7 +8,8 @@ import {
   Briefcase,
   Tag,
   MessageCircle,
-  Bot,
+  LifeBuoy,
+  TrendingUp,
   Settings,
   Sun,
   Moon,
@@ -19,7 +20,8 @@ const NAV_ITEMS = [
   { key: 'partnerships', label: 'שת״פים', icon: Briefcase },
   { key: 'coupons', label: 'קופונים', icon: Tag },
   { key: 'conversations', label: 'שיחות', icon: MessageCircle },
-  { key: 'chatbot-persona', label: 'הבוט שלי', icon: Bot },
+  { key: 'support', label: 'פניות תמיכה', icon: LifeBuoy },
+  { key: 'attribution', label: 'שיוך', icon: TrendingUp },
   { key: 'settings', label: 'הגדרות', icon: Settings },
 ];
 

@@ -31,55 +31,72 @@ interface TemplateSpec {
   description: string;
   body: string; // {{1}}, {{2}}, ... placeholders
   example_body_text: string[]; // sample values for each {{n}}
+  // URL button — {{1}} is appended to the URL at send time.
+  // Example URL = https://bestie.ldrsgroup.com/reply/{{1}}
+  // Example value = a real reply token to satisfy Meta's example check.
+  url_button: { display_text: string; url: string; example_suffix: string };
 }
 
-// Hebrew templates. The {{n}} placeholders are positional and must be
-// supplied in the same order at send time. Keep body under ~1024 chars
-// or Meta will reject; ours are well within.
+const REPLY_BASE = process.env.NEXT_PUBLIC_APP_URL || 'https://bestie.ldrsgroup.com';
+const REPLY_URL = `${REPLY_BASE.replace(/\/$/, '')}/reply/{{1}}`;
+const REPLY_EXAMPLE = `${REPLY_BASE.replace(/\/$/, '')}/reply/abc123XYZ_-token`;
+const REPLY_BUTTON = {
+  display_text: 'להגיב לפנייה',
+  url: REPLY_URL,
+  example_suffix: 'abc123XYZ_-token',
+};
+
+// Hebrew templates v2 — all with a URL button to /reply/<token> so the
+// customer can reply through the brand-side dashboard instead of via
+// WhatsApp text reply (we don't have a UI for inbound free-text yet).
 const TEMPLATES: TemplateSpec[] = [
   {
-    name: 'support_status_in_progress',
+    name: 'support_status_in_progress_v2',
     description: 'Brand started handling the ticket',
     body:
       'היי {{1}} 👋\n' +
       'הפנייה שלך ל-{{2}} (#{{3}}) התקבלה ואנחנו מטפלים בה כעת ✨\n' +
-      'נחזור אליך בהקדם עם עדכון. תודה על הסבלנות 🤍',
+      'נחזור אליך בהקדם עם עדכון. אם רוצה להוסיף פרטים — אפשר ללחוץ על הכפתור למטה.',
     example_body_text: ['מיכל', 'LA BEAUTÉ', 'A123'],
+    url_button: REPLY_BUTTON,
   },
   {
-    name: 'support_status_awaiting_customer',
+    name: 'support_status_awaiting_customer_v2',
     description: 'Brand needs more info from customer',
     body:
       'היי {{1}} 👋\n' +
       'בנוגע לפנייה שלך ל-{{2}} (#{{3}}) — אנחנו צריכים ממך פרט נוסף כדי להמשיך:\n' +
       '{{4}}\n\n' +
-      'אפשר להשיב כאן או דרך טופס הפנייה שמילאת. תודה 🤍',
+      'לחיצה על הכפתור למטה תפתח עמוד מאובטח שבו אפשר לשלוח את המידע. תודה 🤍',
     example_body_text: ['מיכל', 'LA BEAUTÉ', 'A123', 'תמונה של המוצר הפגום'],
+    url_button: REPLY_BUTTON,
   },
   {
-    name: 'support_status_shipped',
+    name: 'support_status_shipped_v2',
     description: 'Replacement / refund shipped',
     body:
       'היי {{1}} 👋\n' +
       'בנוגע לפנייה שלך ל-{{2}} (#{{3}}) — שלחנו לך בדואר {{4}}.\n' +
       'מספר משלוח Focus למעקב: {{5}}\n' +
-      'מקווים שהכל יסתדר 🤍',
+      'מקווים שהכל יסתדר. אם יש שאלה — הכפתור למטה פותח את עמוד הפנייה שלך.',
     example_body_text: ['מיכל', 'LA BEAUTÉ', 'A123', 'מוצר חלופי', '3409393'],
+    url_button: REPLY_BUTTON,
   },
   {
-    name: 'support_status_resolved',
+    name: 'support_status_resolved_v2',
     description: 'Issue resolved',
     body:
       'היי {{1}} 👋\n' +
       'הפנייה שלך ל-{{2}} (#{{3}}) טופלה ✅\n' +
       '{{4}}\n\n' +
-      'אם יש משהו נוסף, אנחנו כאן 🤍',
+      'אם יש משהו נוסף, הכפתור למטה ייפתח את עמוד הפנייה ותוכלי להגיב שם.',
     example_body_text: [
       'מיכל',
       'LA BEAUTÉ',
       'A123',
       'שלחנו לך מוצר חלופי במקום זה שהגיע פגום.',
     ],
+    url_button: REPLY_BUTTON,
   },
 ];
 
@@ -93,6 +110,17 @@ async function createOne(spec: TemplateSpec) {
         type: 'BODY',
         text: spec.body,
         example: { body_text: [spec.example_body_text] },
+      },
+      {
+        type: 'BUTTONS',
+        buttons: [
+          {
+            type: 'URL',
+            text: spec.url_button.display_text,
+            url: spec.url_button.url,
+            example: [spec.url_button.example_suffix],
+          },
+        ],
       },
     ],
   };
