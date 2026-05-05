@@ -76,7 +76,7 @@ export async function POST(
 
   const { data: ticket } = await supabase
     .from('support_requests')
-    .select('id, customer_name, customer_phone, brand, tracking_number, account_id')
+    .select('id, customer_name, customer_phone, brand, order_number, tracking_number, account_id')
     .eq('id', id)
     .eq('account_id', influencer.id)
     .maybeSingle();
@@ -144,26 +144,41 @@ export async function POST(
       break;
     }
     case 'shipped': {
-      const what = (body.whatWasShipped || 'מוצר חלופי').toString().trim();
       const tracking = (body.trackingNumber || ticket.tracking_number || '').toString().trim();
+      const replacementProduct = (body.replacementProduct || '').toString().trim();
+      const estimatedDelivery = ((body.estimatedDelivery || '').toString().trim()) || 'תוך 3-5 ימי עסקים';
       if (!tracking) {
         return NextResponse.json(
           { error: 'trackingNumber is required for shipped' },
           { status: 400 },
         );
       }
-      templateName = 'support_status_shipped';
+      if (!replacementProduct) {
+        return NextResponse.json(
+          { error: 'replacementProduct is required for shipped' },
+          { status: 400 },
+        );
+      }
+      // Use the customer-facing Shopify order number (cleaned of '#'
+      // prefix) for {{3}} so the customer sees something they
+      // recognise. Fall back to the internal ticket short code only if
+      // somehow the order_number is missing — better than no value.
+      const orderRef = (ticket.order_number || '').replace(/^#+/, '').trim() || code;
+      templateName = 'support_status_shipped_v4';
+      // Mirrors the body of support_status_shipped_v4 in Meta — keep
+      // these in sync.
       bodyText =
         `היי ${fname} 👋\n` +
-        `בנוגע לפנייה שלך ל-${brand} (#${code}) — שלחנו לך בדואר ${what}.\n` +
+        `בנוגע להזמנה ${orderRef} ב-${brand} — נשלח אלייך ${replacementProduct} אשר יסופק ${estimatedDelivery}.\n` +
         `מספר משלוח Focus למעקב: ${tracking}\n` +
-        `מקווים שהכל יסתדר 🤍`;
+        `תודה שפנית ל-${brand} 🤍`;
       result = await sendSupportStatusShipped({
         to: ticket.customer_phone,
         customerFirstName: fname,
         brand,
-        ticketShortCode: code,
-        whatWasShipped: what,
+        orderNumber: orderRef,
+        replacementProduct,
+        estimatedDelivery,
         trackingNumber: tracking,
         replyToken,
       });

@@ -72,14 +72,24 @@ const TEMPLATES: TemplateSpec[] = [
     url_button: REPLY_BUTTON,
   },
   {
-    name: 'support_status_shipped_v2',
-    description: 'Replacement / refund shipped',
+    name: 'support_status_shipped_v4',
+    description: 'Replacement shipped — brand-approved copy (v4) with 6 vars',
+    // {{1}} customer first name | {{2}} brand (used twice) |
+    // {{3}} original order number | {{4}} replacement product name |
+    // {{5}} estimated delivery | {{6}} Focus shipment number
     body:
       'היי {{1}} 👋\n' +
-      'בנוגע לפנייה שלך ל-{{2}} (#{{3}}) — שלחנו לך בדואר {{4}}.\n' +
-      'מספר משלוח Focus למעקב: {{5}}\n' +
-      'מקווים שהכל יסתדר. אם יש שאלה — הכפתור למטה פותח את עמוד הפנייה שלך.',
-    example_body_text: ['מיכל', 'LA BEAUTÉ', 'A123', 'מוצר חלופי', '3409393'],
+      'בנוגע להזמנה {{3}} ב-{{2}} — נשלח אלייך {{4}} אשר יסופק {{5}}.\n' +
+      'מספר משלוח Focus למעקב: {{6}}\n' +
+      'תודה שפנית ל-{{2}} 🤍',
+    example_body_text: [
+      'מיכל',
+      'LA BEAUTÉ',
+      '186870',
+      'סרום INTENSIVE 100ml',
+      'תוך 3-5 ימי עסקים',
+      '3409393',
+    ],
     url_button: REPLY_BUTTON,
   },
   {
@@ -139,11 +149,21 @@ async function createOne(spec: TemplateSpec) {
   if (!res.ok) {
     const code = json?.error?.code;
     const msg = json?.error?.message || res.statusText;
-    if (code === 100 && /already exists/i.test(msg)) {
+    const detail =
+      json?.error?.error_user_msg ||
+      json?.error?.error_user_title ||
+      json?.error?.error_data?.details ||
+      JSON.stringify(json?.error || json).slice(0, 300);
+    if (
+      code === 100 &&
+      (/already exists/i.test(msg) ||
+        /יש תוכן/i.test(detail) ||
+        /already has content/i.test(detail))
+    ) {
       console.log(`  · ${spec.name}: already exists, skipped`);
       return { name: spec.name, status: 'exists' as const };
     }
-    console.error(`  ✗ ${spec.name}: ${msg}`);
+    console.error(`  ✗ ${spec.name}: ${msg}\n      ↳ ${detail}`);
     return { name: spec.name, status: 'error' as const, error: msg };
   }
 

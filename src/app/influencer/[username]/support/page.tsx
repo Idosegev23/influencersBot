@@ -1181,7 +1181,11 @@ function SendDialog({
   onSend: (extra: Record<string, string>) => void;
 }) {
   const [requestedDetail, setRequestedDetail] = useState('');
-  const [whatWasShipped, setWhatWasShipped] = useState('מוצר חלופי');
+  // v4 shipped template adds product name + ETA as variables (the
+  // brand can personalise per send). Old v2/v3's hardcoded
+  // "המוצר החלופי" / "בימים הקרובים" are now per-send fields.
+  const [replacementProduct, setReplacementProduct] = useState('');
+  const [estimatedDelivery, setEstimatedDelivery] = useState('תוך 3-5 ימי עסקים');
   const [trackingNumber, setTrackingNumber] = useState(ticket.tracking_number || '');
   const [resolutionSummary, setResolutionSummary] = useState(ticket.resolution_summary || 'הטיפול הושלם.');
   const [resolvingTracking, setResolvingTracking] = useState(false);
@@ -1216,6 +1220,9 @@ function SendDialog({
   const fname = ticket.customer_name?.split(/\s+/)[0] || 'לקוחה';
   const brand = ticket.brand || influencer?.display_name || 'המותג';
   const code = shortCode(ticket.id);
+  // v4 shipped template uses the customer-facing order number (not
+  // the internal ticket short code) — strip leading '#' if present.
+  const orderRef = (ticket.order_number || '').replace(/^#+/, '').trim() || code;
 
   const preview = useMemo(() => {
     switch (template) {
@@ -1224,17 +1231,19 @@ function SendDialog({
       case 'awaiting_customer':
         return `היי ${fname} 👋\nבנוגע לפנייה שלך ל-${brand} (#${code}) — אנחנו צריכים ממך פרט נוסף כדי להמשיך:\n${requestedDetail || '___'}\n\nאפשר להשיב כאן או דרך טופס הפנייה שמילאת. תודה 🤍`;
       case 'shipped':
-        return `היי ${fname} 👋\nבנוגע לפנייה שלך ל-${brand} (#${code}) — שלחנו לך בדואר ${whatWasShipped}.\nמספר משלוח Focus למעקב: ${trackingNumber || '___'}\nמקווים שהכל יסתדר 🤍`;
+        return `היי ${fname} 👋\nבנוגע להזמנה ${orderRef} ב-${brand} — נשלח אלייך ${replacementProduct || '___'} אשר יסופק ${estimatedDelivery || '___'}.\nמספר משלוח Focus למעקב: ${trackingNumber || '___'}\nתודה שפנית ל-${brand} 🤍`;
       case 'resolved':
         return `היי ${fname} 👋\nהפנייה שלך ל-${brand} (#${code}) טופלה ✅\n${resolutionSummary}\n\nאם יש משהו נוסף, אנחנו כאן 🤍`;
     }
-  }, [template, fname, brand, code, requestedDetail, whatWasShipped, trackingNumber, resolutionSummary]);
+  }, [template, fname, brand, code, orderRef, requestedDetail, replacementProduct, estimatedDelivery, trackingNumber, resolutionSummary]);
 
   const canSend = useMemo(() => {
     if (template === 'awaiting_customer') return requestedDetail.trim().length > 0;
-    if (template === 'shipped') return trackingNumber.trim().length > 0;
+    if (template === 'shipped') {
+      return trackingNumber.trim().length > 0 && replacementProduct.trim().length > 0;
+    }
     return true;
-  }, [template, requestedDetail, trackingNumber]);
+  }, [template, requestedDetail, trackingNumber, replacementProduct]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
@@ -1260,15 +1269,46 @@ function SendDialog({
         {template === 'shipped' && (
           <>
             <div>
-              <div className="text-xs mb-1.5" style={{ color: '#9ca3af' }}>מה נשלח</div>
+              <div className="text-xs mb-1.5" style={{ color: '#9ca3af' }}>שם המוצר החלופי שנשלח</div>
               <input
                 type="text"
-                value={whatWasShipped}
-                onChange={(e) => setWhatWasShipped(e.target.value)}
+                value={replacementProduct}
+                onChange={(e) => setReplacementProduct(e.target.value)}
+                placeholder="לדוגמה: סרום INTENSIVE 100ml"
                 className="w-full text-sm p-2.5 rounded-xl outline-none"
                 style={{ background: 'rgba(255,255,255,0.05)' }}
+                dir="rtl"
               />
             </div>
+
+            <div>
+              <div className="text-xs mb-1.5" style={{ color: '#9ca3af' }}>זמן הגעה משוער</div>
+              <input
+                type="text"
+                value={estimatedDelivery}
+                onChange={(e) => setEstimatedDelivery(e.target.value)}
+                className="w-full text-sm p-2.5 rounded-xl outline-none"
+                style={{ background: 'rgba(255,255,255,0.05)' }}
+                dir="rtl"
+              />
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {['תוך 3-5 ימי עסקים', 'השבוע', 'מחר', 'תוך 24 שעות'].map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => setEstimatedDelivery(opt)}
+                    className="px-2.5 py-1 rounded-lg text-[11px] transition-colors"
+                    style={{
+                      background: estimatedDelivery === opt ? '#883fe2' : 'rgba(255,255,255,0.05)',
+                      color: estimatedDelivery === opt ? '#fff' : '#9ca3af',
+                    }}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <div className="text-xs" style={{ color: '#9ca3af' }}>מספר משלוח Focus</div>
@@ -1334,8 +1374,9 @@ function SendDialog({
               const extra: Record<string, string> = {};
               if (template === 'awaiting_customer') extra.requestedDetail = requestedDetail;
               if (template === 'shipped') {
-                extra.whatWasShipped = whatWasShipped;
                 extra.trackingNumber = trackingNumber;
+                extra.replacementProduct = replacementProduct;
+                extra.estimatedDelivery = estimatedDelivery;
               }
               if (template === 'resolved') extra.resolutionSummary = resolutionSummary;
               onSend(extra);

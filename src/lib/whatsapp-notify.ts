@@ -339,25 +339,31 @@ export async function sendSupportStatusAwaitingCustomer(p: {
   });
 }
 
-// support_status_shipped
+// support_status_shipped — v4 introduces 3 more body vars (order#,
+// product name, ETA) so the message reads as a real handover. Body
+// params (in order): name, brand, order#, product, eta, tracking.
+// {{2}} (brand) is referenced twice in the template body — Meta is
+// fine with that, we still pass it once in bodyParams.
 export async function sendSupportStatusShipped(p: {
   to: string;
   customerFirstName: string;
   brand: string;
-  ticketShortCode: string;
-  whatWasShipped: string;
+  orderNumber: string;
+  replacementProduct: string;
+  estimatedDelivery: string;
   trackingNumber: string;
   replyToken: string;
 }): Promise<WhatsAppSendResult> {
   return runTemplate({
-    templateName: 'support_status_shipped_v2',
+    templateName: 'support_status_shipped_v4',
     flagName: 'SUPPORT_STATUS_SHIPPED',
     to: p.to,
     bodyParams: [
       p.customerFirstName,
       p.brand,
-      p.ticketShortCode,
-      p.whatWasShipped,
+      p.orderNumber,
+      p.replacementProduct,
+      p.estimatedDelivery,
       p.trackingNumber,
     ],
     urlButtonParam: p.replyToken,
