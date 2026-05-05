@@ -86,31 +86,69 @@ export async function GET(req: NextRequest) {
     // as the customer code passed to Focus.
     const customerCode = expectedMasterCustomerId;
 
+    // Length-based variant strategy. See the bulk script for the
+    // rationale; mirrored here so the customer chat + CRM auto-resolve
+    // behave identically.
+    const tryVariants = async (value: string): Promise<typeof view> => {
+      const v = value.replace(/[^0-9]/g, '');
+      const variants: Array<() => Promise<typeof view>> = [];
+
+      if (v.length <= 6) {
+        // Short — only '#'-prefixed P2.
+        variants.push(() =>
+          getFocusShipmentStatus({
+            host,
+            reference: `#${v}`,
+            customerCode,
+            expectedMasterCustomerId,
+          }),
+        );
+      } else if (v.length === 7) {
+        // P1 first (Focus ship_no copied from email), then '#'-prefixed P2.
+        variants.push(() => getFocusShipmentStatus({ host, shipmentNumber: v, expectedMasterCustomerId }));
+        variants.push(() =>
+          getFocusShipmentStatus({
+            host,
+            reference: `#${v}`,
+            customerCode,
+            expectedMasterCustomerId,
+          }),
+        );
+      } else {
+        // 8+ digits — plain P2.
+        variants.push(() =>
+          getFocusShipmentStatus({
+            host,
+            reference: v,
+            customerCode,
+            expectedMasterCustomerId,
+          }),
+        );
+      }
+
+      let last: typeof view | null = null;
+      for (const tryNext of variants) {
+        const r = await tryNext();
+        if (r.found) return r;
+        last = r;
+      }
+      return last!;
+    };
+
     if (shipmentNumber && !reference) {
+      // Explicit P1 — caller provided a shipment number directly.
       view = await getFocusShipmentStatus({ host, shipmentNumber, expectedMasterCustomerId });
     } else {
       const raw = (reference || shipmentNumber)!;
       if (lookupMode === 'p1') {
         view = await getFocusShipmentStatus({ host, shipmentNumber: raw, expectedMasterCustomerId });
-      } else if (lookupMode === 'p2') {
-        view = await getFocusShipmentStatus({
-          host,
-          reference: `${refPrefix}${raw}`,
-          customerCode,
-          expectedMasterCustomerId,
-        });
       } else {
-        // p2_then_p1
-        view = await getFocusShipmentStatus({
-          host,
-          reference: `${refPrefix}${raw}`,
-          customerCode,
-          expectedMasterCustomerId,
-        });
-        if (!view.found) {
-          const p1 = await getFocusShipmentStatus({ host, shipmentNumber: raw, expectedMasterCustomerId });
-          if (p1.found) view = p1;
-        }
+        // 'p2' or 'p2_then_p1' — both resolve through the length-based
+        // variants. The legacy `refPrefix` from config is preserved for
+        // accounts that still depend on it (e.g. brand-letters prefix
+        // in front of the digits); LA BEAUTÉ has it empty.
+        const seed = `${refPrefix}${raw}`;
+        view = await tryVariants(seed);
       }
     }
 

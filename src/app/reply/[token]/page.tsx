@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, use, useCallback } from 'react';
-import { Loader2, Send, CheckCircle2, AlertCircle, Package } from 'lucide-react';
+import { Loader2, Send, CheckCircle2, AlertCircle, Package, Paperclip, X, FileText } from 'lucide-react';
 
 interface PublicTicket {
   id: string;
@@ -25,6 +25,11 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: 'בוטל',
 };
 
+interface AttachedFile {
+  file: File;
+  preview: string | null; // object URL for images
+}
+
 export default function ReplyPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params);
   const [ticket, setTicket] = useState<PublicTicket | null>(null);
@@ -33,6 +38,7 @@ export default function ReplyPage({ params }: { params: Promise<{ token: string 
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [attachment, setAttachment] = useState<AttachedFile | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -52,15 +58,64 @@ export default function ReplyPage({ params }: { params: Promise<{ token: string 
     load();
   }, [load]);
 
+  const handleAttach = (file: File) => {
+    setError(null);
+    if (file.size > 10 * 1024 * 1024) {
+      setError('הקובץ גדול מ-10MB.');
+      return;
+    }
+    const isImg = file.type.startsWith('image/');
+    const isPdf = file.type === 'application/pdf';
+    if (!isImg && !isPdf) {
+      setError('רק תמונות או PDF.');
+      return;
+    }
+    if (attachment?.preview) URL.revokeObjectURL(attachment.preview);
+    setAttachment({
+      file,
+      preview: isImg ? URL.createObjectURL(file) : null,
+    });
+  };
+
+  const handleRemoveAttachment = () => {
+    if (attachment?.preview) URL.revokeObjectURL(attachment.preview);
+    setAttachment(null);
+  };
+
   const handleSend = async () => {
-    if (!text.trim()) return;
+    if (!text.trim() && !attachment) return;
     setSending(true);
     setError(null);
     try {
+      // Upload attachment first (if any) so we can reference its URL
+      // in the reply payload.
+      let attachmentUrl: string | null = null;
+      let attachmentFilename: string | null = null;
+      if (attachment) {
+        const fd = new FormData();
+        fd.append('file', attachment.file);
+        const upRes = await fetch(`/api/support/reply/${encodeURIComponent(token)}/upload`, {
+          method: 'POST',
+          body: fd,
+        });
+        if (!upRes.ok) {
+          const data = await upRes.json().catch(() => ({}));
+          setError(data.error || 'העלאת הקובץ נכשלה');
+          return;
+        }
+        const upData = await upRes.json();
+        attachmentUrl = upData.url;
+        attachmentFilename = upData.filename;
+      }
+
       const res = await fetch(`/api/support/reply/${encodeURIComponent(token)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text.trim() }),
+        body: JSON.stringify({
+          text: text.trim() || (attachmentFilename ? `(נשלח קובץ: ${attachmentFilename})` : ''),
+          attachmentUrl,
+          attachmentFilename,
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -69,6 +124,7 @@ export default function ReplyPage({ params }: { params: Promise<{ token: string 
       }
       setSent(true);
       setText('');
+      handleRemoveAttachment();
     } finally {
       setSending(false);
     }
@@ -166,6 +222,57 @@ export default function ReplyPage({ params }: { params: Promise<{ token: string 
                 style={{ color: '#111827' }}
                 disabled={sending}
               />
+
+              {/* Attachment preview / picker */}
+              {attachment ? (
+                <div className="mt-3 p-3 rounded-xl border border-gray-200 flex items-center gap-3">
+                  {attachment.preview ? (
+                    <img
+                      src={attachment.preview}
+                      alt={attachment.file.name}
+                      className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                      <FileText className="w-6 h-6 text-gray-500" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {attachment.file.name}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {(attachment.file.size / 1024).toFixed(0)} KB
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleRemoveAttachment}
+                    className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500"
+                    type="button"
+                    aria-label="הסר קובץ"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <label
+                  className="mt-3 inline-flex items-center gap-2 text-sm text-purple-700 hover:text-purple-900 cursor-pointer"
+                >
+                  <Paperclip className="w-4 h-4" />
+                  <span>לצרף תמונה או PDF</span>
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleAttach(f);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+              )}
+
               {error && (
                 <p className="text-xs text-red-600 mt-2 flex items-center gap-1.5">
                   <AlertCircle className="w-3.5 h-3.5" />
@@ -175,7 +282,7 @@ export default function ReplyPage({ params }: { params: Promise<{ token: string 
               <div className="flex justify-end mt-3">
                 <button
                   onClick={handleSend}
-                  disabled={!text.trim() || sending}
+                  disabled={(!text.trim() && !attachment) || sending}
                   className="px-5 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 disabled:opacity-50 transition-opacity"
                   style={{ background: '#883fe2', color: '#fff' }}
                 >
