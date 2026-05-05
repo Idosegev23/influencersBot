@@ -291,6 +291,92 @@ export async function sendInfluencerWeeklyDigest(p: {
 }
 
 // =====================================================================
+// SUPPORT-CRM templates — fire when a brand admin transitions a ticket
+// status. All UTILITY category. Submitted via
+// scripts/create-support-status-templates.ts. Each template body uses
+// positional {{n}} placeholders — order matters.
+// =====================================================================
+
+// support_status_in_progress
+//   {{1}} customer first name | {{2}} brand | {{3}} ticket short code
+export async function sendSupportStatusInProgress(p: {
+  to: string;
+  customerFirstName: string;
+  brand: string;
+  ticketShortCode: string;
+}): Promise<WhatsAppSendResult> {
+  return runTemplate({
+    templateName: 'support_status_in_progress',
+    flagName: 'SUPPORT_STATUS_IN_PROGRESS',
+    to: p.to,
+    bodyParams: [p.customerFirstName, p.brand, p.ticketShortCode],
+  });
+}
+
+// support_status_awaiting_customer
+//   {{1}} name | {{2}} brand | {{3}} ticket | {{4}} what we need
+export async function sendSupportStatusAwaitingCustomer(p: {
+  to: string;
+  customerFirstName: string;
+  brand: string;
+  ticketShortCode: string;
+  requestedDetail: string;
+}): Promise<WhatsAppSendResult> {
+  return runTemplate({
+    templateName: 'support_status_awaiting_customer',
+    flagName: 'SUPPORT_STATUS_AWAITING_CUSTOMER',
+    to: p.to,
+    bodyParams: [p.customerFirstName, p.brand, p.ticketShortCode, p.requestedDetail],
+  });
+}
+
+// support_status_shipped
+//   {{1}} name | {{2}} brand | {{3}} ticket | {{4}} what was shipped | {{5}} tracking #
+export async function sendSupportStatusShipped(p: {
+  to: string;
+  customerFirstName: string;
+  brand: string;
+  ticketShortCode: string;
+  whatWasShipped: string;
+  trackingNumber: string;
+}): Promise<WhatsAppSendResult> {
+  return runTemplate({
+    templateName: 'support_status_shipped',
+    flagName: 'SUPPORT_STATUS_SHIPPED',
+    to: p.to,
+    bodyParams: [
+      p.customerFirstName,
+      p.brand,
+      p.ticketShortCode,
+      p.whatWasShipped,
+      p.trackingNumber,
+    ],
+  });
+}
+
+// support_status_resolved
+//   {{1}} name | {{2}} brand | {{3}} ticket | {{4}} resolution summary
+export async function sendSupportStatusResolved(p: {
+  to: string;
+  customerFirstName: string;
+  brand: string;
+  ticketShortCode: string;
+  resolutionSummary: string;
+}): Promise<WhatsAppSendResult> {
+  return runTemplate({
+    templateName: 'support_status_resolved',
+    flagName: 'SUPPORT_STATUS_RESOLVED',
+    to: p.to,
+    bodyParams: [
+      p.customerFirstName,
+      p.brand,
+      p.ticketShortCode,
+      p.resolutionSummary,
+    ],
+  });
+}
+
+// =====================================================================
 // 6) influencer_welcome_v2 — new influencer account activated
 //    Category: UTILITY  |  Vars: body {{1}}, url {{1}}
 //    Trigger: /api/admin/accounts/finalize
