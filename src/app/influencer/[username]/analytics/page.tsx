@@ -97,6 +97,10 @@ export default function AnalyticsPage({
   const [previousSummary, setPreviousSummary] = useState<AccurateAnalytics | null>(null);
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
+  // Filters — apply to all metrics, topics, and conversions.
+  // refFilter null = "all", otherwise an influencer slug.
+  const [refFilter, setRefFilter] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   // Calculate date ranges
   const { startDate, endDate, prevStartDate, prevEndDate } = useMemo(() => {
@@ -154,6 +158,8 @@ export default function AnalyticsPage({
           );
           url.searchParams.set('from', from.toISOString());
           url.searchParams.set('to', to.toISOString());
+          if (refFilter) url.searchParams.set('ref', refFilter);
+          if (search.trim()) url.searchParams.set('q', search.trim());
           const res = await fetch(url.toString());
           if (!res.ok) throw new Error('analytics fetch failed');
           return res.json() as Promise<AccurateAnalytics>;
@@ -178,7 +184,41 @@ export default function AnalyticsPage({
     }
 
     loadData();
-  }, [username, router, startDate, endDate, prevStartDate, prevEndDate]);
+  // refFilter intentionally re-fires the load; search is debounced
+  // separately below.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [username, router, startDate, endDate, prevStartDate, prevEndDate, refFilter]);
+
+  // Debounced search — fire 350ms after the user stops typing.
+  useEffect(() => {
+    if (!influencer) return;
+    const t = setTimeout(() => {
+      // Re-trigger the load by setting a no-op state if needed; easier
+      // to inline a fetch here mirroring the loadData branch.
+      const fetchAnalytics = async (from: Date, to: Date) => {
+        const url = new URL(
+          `/api/influencer/${encodeURIComponent(username)}/analytics`,
+          window.location.origin,
+        );
+        url.searchParams.set('from', from.toISOString());
+        url.searchParams.set('to', to.toISOString());
+        if (refFilter) url.searchParams.set('ref', refFilter);
+        if (search.trim()) url.searchParams.set('q', search.trim());
+        const res = await fetch(url.toString());
+        if (!res.ok) return null;
+        return res.json() as Promise<AccurateAnalytics>;
+      };
+      Promise.all([
+        fetchAnalytics(startDate, endDate),
+        fetchAnalytics(prevStartDate, prevEndDate),
+      ]).then(([s, p]) => {
+        if (s) setSummary(s);
+        if (p) setPreviousSummary(p);
+      });
+    }, 350);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
 
   // Calculate change percentages
   const getChange = (current: number, previous: number): { value: number; isPositive: boolean } => {
@@ -196,6 +236,11 @@ export default function AnalyticsPage({
   }
 
   if (!influencer || !summary) return null;
+
+  const registry = (((influencer as any)?._rawConfig?.influencer_registry || []) as Array<{
+    slug: string;
+    display_name?: string;
+  }>);
 
   const visitorsChange = getChange(
     summary.visits.unique,
@@ -257,6 +302,72 @@ export default function AnalyticsPage({
       </div>
 
       <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-6">
+        {/* Filters — ref source chips + free-text search. Both narrow
+            every metric below: visits, sessions, messages, topics, and
+            conversions. */}
+        <div className="mb-6 space-y-3">
+          {registry.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs whitespace-nowrap" style={{ color: 'var(--dash-text-3)' }}>
+                סינון לפי משפיענית:
+              </span>
+              <button
+                onClick={() => setRefFilter(null)}
+                className="px-3 py-1.5 rounded-xl text-xs font-medium transition-colors"
+                style={{
+                  background: !refFilter ? 'var(--color-primary)' : 'rgba(255,255,255,0.05)',
+                  color: !refFilter ? '#fff' : 'var(--dash-text-2)',
+                }}
+              >
+                הכל
+              </button>
+              {registry.map((r) => {
+                const active = refFilter === r.slug.toLowerCase();
+                return (
+                  <button
+                    key={r.slug}
+                    onClick={() => setRefFilter(active ? null : r.slug.toLowerCase())}
+                    className="px-3 py-1.5 rounded-xl text-xs font-medium transition-colors"
+                    style={{
+                      background: active ? 'var(--color-primary)' : 'rgba(255,255,255,0.05)',
+                      color: active ? '#fff' : 'var(--dash-text-2)',
+                    }}
+                  >
+                    {r.display_name || r.slug}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <div className="flex items-center gap-2 rounded-xl px-3 py-2.5"
+            style={{ background: 'rgba(255,255,255,0.06)' }}>
+            <BarChart3 className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--dash-text-3)' }} />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder='חיפוש בתוך השיחות (לדוגמה "דולף", "החזר")'
+              className="flex-1 bg-transparent outline-none text-sm"
+              dir="rtl"
+              style={{ color: 'var(--dash-text)' }}
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="text-xs opacity-60 hover:opacity-100"
+                style={{ color: 'var(--dash-text-2)' }}
+              >
+                נקה
+              </button>
+            )}
+          </div>
+          {(refFilter || search.trim()) && summary && (
+            <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
+              סינון פעיל — {summary.sessions.with_message} שיחות תואמות ב-{dateRange === '7d' ? '7 הימים' : dateRange === '14d' ? '14 הימים' : dateRange === '30d' ? '30 הימים' : '90 הימים'} האחרונים
+            </p>
+          )}
+        </div>
+
         {/* Summary Stats — accurate counts. "מבקרים ייחודיים" replaces
             the old "שיחות" tile that conflated sessions with visitors;
             sessions are now the more useful "with at least one message"

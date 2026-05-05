@@ -30,15 +30,29 @@ import { requireAdminAuth } from '@/lib/auth/admin-auth';
 
 export const runtime = 'nodejs';
 
-function parseRange(req: NextRequest): { fromIso: string; toIso: string } {
+function parseRange(req: NextRequest): {
+  fromIso: string;
+  toIso: string;
+  refFilter: string | null;
+  search: string | null;
+} {
   const url = new URL(req.url);
   const fromParam = url.searchParams.get('from');
   const toParam = url.searchParams.get('to');
   const days = Number(url.searchParams.get('days') || '7');
-  if (fromParam && toParam) return { fromIso: fromParam, toIso: toParam };
+  const refFilter = (url.searchParams.get('ref') || '').trim().toLowerCase() || null;
+  const search = (url.searchParams.get('q') || '').trim().slice(0, 80) || null;
+  if (fromParam && toParam) {
+    return { fromIso: fromParam, toIso: toParam, refFilter, search };
+  }
   const to = new Date();
   const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-  return { fromIso: from.toISOString(), toIso: to.toISOString() };
+  return {
+    fromIso: from.toISOString(),
+    toIso: to.toISOString(),
+    refFilter,
+    search,
+  };
 }
 
 export async function GET(
@@ -55,36 +69,60 @@ export async function GET(
   const influencer = await getInfluencerByUsername(username);
   if (!influencer) return NextResponse.json({ error: 'not found' }, { status: 404 });
   const accountId = influencer.id;
-  const { fromIso, toIso } = parseRange(req);
+  const { fromIso, toIso, refFilter, search } = parseRange(req);
 
-  // Visits — page opens
-  const [{ count: visitsTotal }, visitsUniqueRes] = await Promise.all([
-    supabase
-      .from('chat_visits')
-      .select('id', { count: 'exact', head: true })
-      .eq('account_id', accountId)
-      .gte('created_at', fromIso)
-      .lte('created_at', toIso),
-    supabase
-      .from('chat_visits')
-      .select('anon_id')
-      .eq('account_id', accountId)
-      .gte('created_at', fromIso)
-      .lte('created_at', toIso),
-  ]);
+  // Visits — page opens. ref filter applies if set.
+  let visitsQ1 = supabase
+    .from('chat_visits')
+    .select('id', { count: 'exact', head: true })
+    .eq('account_id', accountId)
+    .gte('created_at', fromIso)
+    .lte('created_at', toIso);
+  if (refFilter) visitsQ1 = visitsQ1.eq('ref_source', refFilter);
+
+  let visitsQ2 = supabase
+    .from('chat_visits')
+    .select('anon_id')
+    .eq('account_id', accountId)
+    .gte('created_at', fromIso)
+    .lte('created_at', toIso);
+  if (refFilter) visitsQ2 = visitsQ2.eq('ref_source', refFilter);
+
+  const [{ count: visitsTotal }, visitsUniqueRes] = await Promise.all([visitsQ1, visitsQ2]);
   const uniqueVisitors = new Set(
     (visitsUniqueRes.data || []).map((r: any) => r.anon_id).filter(Boolean),
   ).size;
 
-  // Sessions
-  const { data: sessions } = await supabase
+  // Sessions — same ref filter.
+  let sessionQuery = supabase
     .from('chat_sessions')
-    .select('id, message_count, created_at')
+    .select('id, message_count, created_at, ref_source')
     .eq('account_id', accountId)
     .gte('created_at', fromIso)
     .lte('created_at', toIso);
+  if (refFilter) sessionQuery = sessionQuery.eq('ref_source', refFilter);
+  const { data: sessions } = await sessionQuery;
 
-  const sessionIds = (sessions || []).map((s: any) => s.id);
+  let sessionIds = (sessions || []).map((s: any) => s.id);
+
+  // Free-text search across user messages — narrow the session set to
+  // those that contain the keyword. We do this after the ref filter so
+  // both can compose ("danielamit's tickets that mention 'דולף'").
+  if (search) {
+    const matched = new Set<string>();
+    const CHUNK = 200;
+    for (let i = 0; i < sessionIds.length; i += CHUNK) {
+      const batch = sessionIds.slice(i, i + CHUNK);
+      const { data: msgs } = await supabase
+        .from('chat_messages')
+        .select('session_id')
+        .in('session_id', batch)
+        .eq('role', 'user')
+        .ilike('content', `%${search.replace(/[%_]/g, '\\$&')}%`);
+      for (const m of msgs || []) matched.add(m.session_id);
+    }
+    sessionIds = sessionIds.filter((id) => matched.has(id));
+  }
   const sessionsTotal = sessionIds.length;
 
   // Messages
@@ -112,8 +150,8 @@ export async function GET(
     }
   }
 
-  // Topics — first user message of each session, classified.
-  const topics = await classifyTopics(accountId, fromIso, toIso);
+  // Topics — first user message of each (already-filtered) session.
+  const topics = await classifyTopicsForSessions(sessionIds);
 
   // Conversion events — coupon copies + product clicks. The legacy
   // getAnalyticsSummary already does this; mirroring here so the
@@ -167,23 +205,12 @@ export async function GET(
  * such letters mid-word (e.g. "קופון" singular vs "קופונים" plural),
  * use a character class like [נן] or list both forms explicitly.
  */
-async function classifyTopics(
-  accountId: string,
-  fromIso: string,
-  toIso: string,
+async function classifyTopicsForSessions(
+  sessionIds: string[],
 ): Promise<Record<string, number>> {
-  const { data: sessions } = await supabase
-    .from('chat_sessions')
-    .select('id')
-    .eq('account_id', accountId)
-    .gte('created_at', fromIso)
-    .lte('created_at', toIso);
-  const sessionIds = (sessions || []).map((s: any) => s.id);
   if (sessionIds.length === 0) return {};
 
-  // Fetch user messages with the smallest created_at per session.
-  // Doing in chunks to keep query manageable.
-  const firstByType: Record<string, string> = {}; // session_id → text
+  const firstByType: Record<string, string> = {};
   const CHUNK = 200;
   for (let i = 0; i < sessionIds.length; i += CHUNK) {
     const batch = sessionIds.slice(i, i + CHUNK);
