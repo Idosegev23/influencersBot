@@ -280,6 +280,21 @@ export default function BrandSupportTab({
       }
       parts.push(`פירוט: ${form.details}`);
 
+      // Defensive fallback — if the prop is null but localStorage has
+      // a ref for this username, use it. Production data showed 873/1014
+      // visits had a ref but only 15/387 tickets — most of the gap was
+      // either timing (prop captured before useEffect populated it) or
+      // a re-render path that lost the ref. Reading directly at submit
+      // is the simplest belt-and-suspenders.
+      let effectiveRef = refSource || null;
+      if (!effectiveRef && typeof window !== 'undefined') {
+        try {
+          effectiveRef = window.localStorage.getItem(`chat_ref_${username}`) || null;
+        } catch {
+          /* ignore — private mode etc. */
+        }
+      }
+
       const response = await fetch('/api/support', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -292,7 +307,7 @@ export default function BrandSupportTab({
           problem: parts.join('\n'),
           productId: selectedProduct?.id || null,
           sessionId: sessionId || null,
-          refSource: refSource || null,
+          refSource: effectiveRef,
         }),
       });
       const data = await response.json();

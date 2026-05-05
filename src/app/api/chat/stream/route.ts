@@ -711,6 +711,17 @@ export async function POST(req: NextRequest) {
             // "חסרים פריטים", "להחזיר מוצר").
             if (!shouldRedirect) {
               const SUPPORT_FAST_PATHS: RegExp[] = [
+                // bare "תמיכה" — strongest signal, customer is asking for support.
+                // The single Hebrew word + question mark / EOL handles both
+                // "תמיכה?" and the ChatTab quick-reply that just sends "תמיכה".
+                /^\s*תמיכה[\s.,?!]*$/,
+                // generic "open a ticket / contact" phrasings, including the
+                // "via support" form Hebrew speakers use.
+                /איך\s+(אפשר|ניתן)?\s*(ליצור\s+קשר|להחזיר|לפנות)/,
+                /איך\s+(יוצרים|פונים)(\s+קשר|\s+דרך\s+ה?תמיכה|\s+ל?תמיכה)?/,
+                /(פנייה|פניה)\s+ל?תמיכה/,
+                /(דרך|בטופס)\s+ה?תמיכה/,
+                /איפה\s+פונים\s+ל?שירות/,
                 // human rep / bad service
                 /נציג\s*(אנושי|שירות|שירות לקוחות)/,
                 /לדבר עם (מישהו|נציג|בנאדם)/,
@@ -735,10 +746,6 @@ export async function POST(req: NextRequest) {
                 /ביטול\s+הזמנה/,
                 /לקבל\s+החזר/,
                 /רוצ(ה|ים)\s+החזר/,
-                // open ticket / contact
-                /איך\s+(אפשר|ניתן)\s+(ליצור\s+קשר|להחזיר|לפנות)/,
-                /איך\s+(יוצרים|פונים)\s+קשר/,
-                /איפה\s+פונים\s+ל?שירות/,
               ];
 
               if (SUPPORT_FAST_PATHS.some((re) => re.test(message))) {

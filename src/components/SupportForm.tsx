@@ -19,9 +19,11 @@ interface SupportFormProps {
   onClose: () => void;
   onSuccess?: () => void;
   initialBrand?: string;
+  sessionId?: string | null;
+  refSource?: string | null;
 }
 
-export default function SupportForm({ username, influencerName, products, onClose, onSuccess, initialBrand }: SupportFormProps) {
+export default function SupportForm({ username, influencerName, products, onClose, onSuccess, initialBrand, sessionId, refSource }: SupportFormProps) {
   const [step, setStep] = useState<'brand' | 'details' | 'success'>(initialBrand ? 'details' : 'brand');
   const [selectedBrand, setSelectedBrand] = useState<string>(initialBrand || '');
   const [formData, setFormData] = useState({
@@ -60,6 +62,16 @@ export default function SupportForm({ username, influencerName, products, onClos
     setLoading(true);
     setError(null);
 
+    // Defensive ref fallback — see BrandSupportTab for the rationale.
+    let effectiveRef = refSource || null;
+    if (!effectiveRef && typeof window !== 'undefined') {
+      try {
+        effectiveRef = window.localStorage.getItem(`chat_ref_${username}`) || null;
+      } catch {
+        /* ignore */
+      }
+    }
+
     try {
       const response = await fetch('/api/support', {
         method: 'POST',
@@ -71,6 +83,8 @@ export default function SupportForm({ username, influencerName, products, onClos
           customerPhone: formData.customerPhone,
           orderNumber: formData.orderNumber,
           problem: formData.problem,
+          sessionId: sessionId || null,
+          refSource: effectiveRef,
         }),
       });
 
