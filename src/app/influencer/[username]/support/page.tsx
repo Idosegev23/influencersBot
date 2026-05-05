@@ -481,50 +481,73 @@ function TicketDetail({
     }
   };
 
-  // Resolve the actual Focus ship_no for this ticket's order# and
-  // populate tracking_number. The CRM should always show the real
-  // 7-digit Focus number (the one the customer gets in the email),
-  // not the Shopify order_number that the brand types into a label.
-  const [resolvingShipNo, setResolvingShipNo] = useState(false);
-  const [resolveError, setResolveError] = useState<string | null>(null);
-  const handleResolveShipNo = async () => {
-    if (!ticket?.order_number) {
-      setResolveError('אין מספר הזמנה בפנייה');
+  // Auto-resolve the actual Focus ship_no for this ticket's order#.
+  // The brand should never have to type or look up the 7-digit Focus
+  // number manually — it's part of every "shipped" notification we
+  // send to the customer, so we resolve it as soon as a ticket is
+  // opened. State machine:
+  //   'idle'    — not started
+  //   'loading' — Focus call in flight
+  //   'found'   — got a ship_no, persisted
+  //   'pending' — Focus says not yet shipped (no record)
+  //   'error'   — network / API failure
+  const [shipNoResolution, setShipNoResolution] = useState<
+    'idle' | 'loading' | 'found' | 'pending' | 'error'
+  >('idle');
+
+  const resolveShipNo = useCallback(
+    async (force = false): Promise<string | null> => {
+      if (!ticket?.order_number) return null;
+      // Don't re-resolve if we already have a tracking_number, unless forced
+      // (e.g. the user explicitly cleared it).
+      if (!force && ticket.tracking_number) return ticket.tracking_number;
+
+      setShipNoResolution('loading');
+      try {
+        const orderClean = ticket.order_number.replace(/[^0-9]/g, '');
+        const res = await fetch(
+          `/api/shipment/status?username=${encodeURIComponent(username)}&reference=${encodeURIComponent(orderClean)}`,
+        );
+        const data = await res.json();
+        if (!res.ok) {
+          setShipNoResolution('error');
+          return null;
+        }
+        if (!data.found || !data.shipmentNumber) {
+          setShipNoResolution('pending');
+          return null;
+        }
+        setTrackingNumber(data.shipmentNumber);
+        setShipNoResolution('found');
+        // Persist on the ticket so the next caller (notify dispatch,
+        // page refresh, daily report) reads it directly.
+        await fetch(`/api/influencer/${username}/support-tickets/${ticketId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tracking_number: data.shipmentNumber }),
+        });
+        return data.shipmentNumber as string;
+      } catch {
+        setShipNoResolution('error');
+        return null;
+      }
+    },
+    [username, ticketId, ticket?.order_number, ticket?.tracking_number],
+  );
+
+  // Auto-fire on ticket load: if there's an order# and we don't yet
+  // have a stored ship_no, ask Focus.
+  useEffect(() => {
+    if (!ticket) return;
+    if (ticket.tracking_number) {
+      setShipNoResolution('found');
       return;
     }
-    setResolvingShipNo(true);
-    setResolveError(null);
-    try {
-      const orderClean = ticket.order_number.replace(/[^0-9]/g, '');
-      const res = await fetch(
-        `/api/shipment/status?username=${encodeURIComponent(username)}&reference=${encodeURIComponent(orderClean)}`,
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        setResolveError(data?.error || 'שגיאה בחיפוש');
-        return;
-      }
-      if (!data.found || !data.shipmentNumber) {
-        setResolveError('לא נמצא משלוח להזמנה זו ב-Focus עדיין');
-        return;
-      }
-      setTrackingNumber(data.shipmentNumber);
-      // Persist immediately so the brand doesn't have to click "save" too.
-      const patch = await fetch(`/api/influencer/${username}/support-tickets/${ticketId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tracking_number: data.shipmentNumber }),
-      });
-      if (patch.ok) {
-        await fetchTicket();
-        onChange();
-      }
-    } catch (err) {
-      setResolveError('שגיאה בחיבור');
-    } finally {
-      setResolvingShipNo(false);
+    if (ticket.order_number && shipNoResolution === 'idle') {
+      void resolveShipNo();
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticket?.id]);
 
   const handleSendTemplate = async (
     template: 'in_progress' | 'awaiting_customer' | 'shipped' | 'resolved',
@@ -697,40 +720,43 @@ function TicketDetail({
           />
         </div>
         <div>
-          <div className="text-xs mb-1.5" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>מספר משלוח Focus (7 ספרות)</div>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={trackingNumber}
-              onChange={(e) => setTrackingNumber(e.target.value)}
-              placeholder="3409393"
-              className="flex-1 text-sm p-2.5 rounded-xl outline-none"
-              style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--dash-text, #fff)' }}
-              dir="ltr"
-            />
-            {ticket.order_number && (
-              <button
-                type="button"
-                onClick={handleResolveShipNo}
-                disabled={resolvingShipNo}
-                className="px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-1.5 disabled:opacity-50"
-                style={{ background: '#883fe2', color: '#fff', whiteSpace: 'nowrap' }}
-                title={`חיפוש ב-Focus לפי הזמנה ${ticket.order_number}`}
-              >
-                {resolvingShipNo ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Search className="w-3.5 h-3.5" />
-                )}
-                חפש מ-Focus לפי #{ticket.order_number}
-              </button>
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="text-xs" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>
+              מספר משלוח Focus (7 ספרות)
+            </div>
+            {shipNoResolution === 'loading' && (
+              <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--dash-text-3, #6b7280)' }}>
+                <Loader2 className="w-3 h-3 animate-spin" />
+                מאתר ב-Focus לפי #{ticket.order_number || ''}...
+              </span>
+            )}
+            {shipNoResolution === 'found' && (
+              <span className="text-[11px]" style={{ color: '#22c55e' }}>
+                ✓ אותר אוטומטית מ-Focus
+              </span>
+            )}
+            {shipNoResolution === 'pending' && (
+              <span className="text-[11px]" style={{ color: '#f59e0b' }}>
+                ההזמנה עוד לא יצאה ב-Focus
+              </span>
+            )}
+            {shipNoResolution === 'error' && (
+              <span className="text-[11px]" style={{ color: '#ef4444' }}>
+                שגיאה בחיפוש Focus
+              </span>
             )}
           </div>
-          {resolveError && (
-            <p className="text-[11px] mt-1.5 text-red-400">{resolveError}</p>
-          )}
+          <input
+            type="text"
+            value={trackingNumber}
+            onChange={(e) => setTrackingNumber(e.target.value)}
+            placeholder="3409393"
+            className="w-full text-sm p-2.5 rounded-xl outline-none"
+            style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--dash-text, #fff)' }}
+            dir="ltr"
+          />
           <p className="text-[11px] mt-1 opacity-60">
-            מספר המשלוח הוא הקוד שהלקוחה רואה במייל מ-Focus, לא מספר ההזמנה מ-Shopify.
+            המספר נטען אוטומטית מ-Focus לפי מספר ההזמנה. אם ההזמנה עוד לא נשלחה — המספר ייטען כשהיא תצא.
           </p>
         </div>
         {(ticket.status === 'resolved' || ticket.status === 'closed') && (
@@ -821,6 +847,7 @@ function TicketDetail({
           template={showSendDialog}
           ticket={ticket}
           influencer={influencer}
+          username={username}
           sending={sending}
           onClose={() => setShowSendDialog(null)}
           onSend={(extra) => handleSendTemplate(showSendDialog, extra)}
@@ -868,6 +895,7 @@ function SendDialog({
   template,
   ticket,
   influencer,
+  username,
   sending,
   onClose,
   onSend,
@@ -875,6 +903,7 @@ function SendDialog({
   template: 'in_progress' | 'awaiting_customer' | 'shipped' | 'resolved';
   ticket: Ticket;
   influencer: Influencer | null;
+  username: string;
   sending: boolean;
   onClose: () => void;
   onSend: (extra: Record<string, string>) => void;
@@ -883,6 +912,34 @@ function SendDialog({
   const [whatWasShipped, setWhatWasShipped] = useState('מוצר חלופי');
   const [trackingNumber, setTrackingNumber] = useState(ticket.tracking_number || '');
   const [resolutionSummary, setResolutionSummary] = useState(ticket.resolution_summary || 'הטיפול הושלם.');
+  const [resolvingTracking, setResolvingTracking] = useState(false);
+
+  // Auto-resolve ship_no on dialog open if we're sending the "shipped"
+  // template and the parent hasn't filled it in yet (e.g. user clicked
+  // before the parent's auto-resolve finished).
+  useEffect(() => {
+    if (template !== 'shipped') return;
+    if (trackingNumber) return;
+    if (!ticket.order_number) return;
+    let cancelled = false;
+    (async () => {
+      setResolvingTracking(true);
+      try {
+        const orderClean = ticket.order_number!.replace(/[^0-9]/g, '');
+        const res = await fetch(
+          `/api/shipment/status?username=${encodeURIComponent(username)}&reference=${encodeURIComponent(orderClean)}`,
+        );
+        const data = await res.json();
+        if (!cancelled && res.ok && data.found && data.shipmentNumber) {
+          setTrackingNumber(data.shipmentNumber);
+        }
+      } finally {
+        if (!cancelled) setResolvingTracking(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [template, ticket.id]);
 
   const fname = ticket.customer_name?.split(/\s+/)[0] || 'לקוחה';
   const brand = ticket.brand || influencer?.display_name || 'המותג';
@@ -941,16 +998,29 @@ function SendDialog({
               />
             </div>
             <div>
-              <div className="text-xs mb-1.5" style={{ color: '#9ca3af' }}>מספר משלוח Focus</div>
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="text-xs" style={{ color: '#9ca3af' }}>מספר משלוח Focus</div>
+                {resolvingTracking && (
+                  <span className="text-[11px] flex items-center gap-1" style={{ color: '#9ca3af' }}>
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    מאתר ב-Focus...
+                  </span>
+                )}
+              </div>
               <input
                 type="text"
                 value={trackingNumber}
                 onChange={(e) => setTrackingNumber(e.target.value)}
-                placeholder="3409393"
+                placeholder={resolvingTracking ? 'מאתר...' : '3409393'}
                 className="w-full text-sm p-2.5 rounded-xl outline-none"
                 style={{ background: 'rgba(255,255,255,0.05)' }}
                 dir="ltr"
               />
+              {!trackingNumber && !resolvingTracking && (
+                <p className="text-[11px] mt-1" style={{ color: '#fbbf24' }}>
+                  לא נמצא מספר משלוח אוטומטית — ייתכן שההזמנה עוד לא יצאה. אפשר להזין ידנית.
+                </p>
+              )}
             </div>
           </>
         )}
