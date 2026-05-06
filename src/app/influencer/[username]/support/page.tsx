@@ -21,6 +21,8 @@ import {
   History,
   ChevronLeft,
   X,
+  Download,
+  Calendar,
 } from 'lucide-react';
 import { getInfluencerByUsername } from '@/lib/supabase';
 import type { Influencer } from '@/types';
@@ -64,6 +66,7 @@ interface HistoryEntry {
   from_status: string | null;
   to_status: string | null;
   note: string | null;
+  body_text?: string | null; // exact rendered WhatsApp body for customer_notified
   whatsapp_template_name: string | null;
   whatsapp_message_id: string | null;
   actor: string | null;
@@ -156,6 +159,11 @@ export default function SupportPage({
   const [page, setPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(50);
   const [total, setTotal] = useState<number>(0);
+  // Date range — narrows the list. Empty = no bound on that side.
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Boot: auth + load
   useEffect(() => {
@@ -202,6 +210,18 @@ export default function SupportPage({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
+  // Refetch on date-range change — debounced briefly so a quick edit
+  // doesn't fire two requests.
+  useEffect(() => {
+    if (!influencer) return;
+    const t = setTimeout(() => {
+      setPage(1);
+      fetchList(filter, search, 1);
+    }, 250);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateFrom, dateTo]);
+
   const fetchList = useCallback(async (
     statusFilter: typeof filter,
     q: string,
@@ -215,6 +235,8 @@ export default function SupportPage({
     const cleanedQ = q.trim().replace(/^#+/, '').trim();
     if (cleanedQ) url.searchParams.set('q', cleanedQ);
     if (p > 1) url.searchParams.set('page', String(p));
+    if (dateFrom) url.searchParams.set('from', new Date(dateFrom + 'T00:00:00').toISOString());
+    if (dateTo) url.searchParams.set('to', new Date(dateTo + 'T23:59:59').toISOString());
     const res = await fetch(url.toString());
     if (!res.ok) return;
     const data = await res.json();
@@ -222,7 +244,40 @@ export default function SupportPage({
     setCounts(data.counts || {});
     setTotal(data.total || 0);
     setPageSize(data.pageSize || 50);
-  }, [username]);
+  }, [username, dateFrom, dateTo]);
+
+  const handleExport = useCallback(async () => {
+    setExporting(true);
+    try {
+      const url = new URL(
+        `/api/influencer/${username}/support-tickets/export`,
+        window.location.origin,
+      );
+      if (filter !== 'all') url.searchParams.set('status', filter);
+      const cleanedQ = search.trim().replace(/^#+/, '').trim();
+      if (cleanedQ) url.searchParams.set('q', cleanedQ);
+      if (dateFrom) url.searchParams.set('from', new Date(dateFrom + 'T00:00:00').toISOString());
+      if (dateTo) url.searchParams.set('to', new Date(dateTo + 'T23:59:59').toISOString());
+      const res = await fetch(url.toString());
+      if (!res.ok) {
+        alert('הייצוא נכשל — נסי שוב');
+        return;
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get('content-disposition') || '';
+      const m = cd.match(/filename="([^"]+)"/);
+      const name = m?.[1] || 'support.xlsx';
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = name;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(link.href);
+    } finally {
+      setExporting(false);
+    }
+  }, [username, filter, search, dateFrom, dateTo]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -259,22 +314,91 @@ export default function SupportPage({
     <div className="min-h-screen" dir="rtl" style={{ color: 'var(--dash-text, #fff)' }}>
       <div className="max-w-7xl mx-auto p-4 animate-slide-up">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold">פניות תמיכה</h1>
             <p className="text-sm" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>
               {counts.new || 0} חדשות · {counts.in_progress || 0} בטיפול · {counts.shipped || 0} במשלוח · סה״כ {counts.all || 0}
             </p>
           </div>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="p-2 rounded-lg"
-            style={{ color: 'var(--dash-text-2, #9ca3af)' }}
-          >
-            <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowFilters((v) => !v)}
+              className="px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5"
+              style={{
+                background: showFilters ? '#883fe2' : 'rgba(255,255,255,0.06)',
+                color: showFilters ? '#fff' : 'var(--dash-text-2, #9ca3af)',
+              }}
+              title="סינון לפי תאריך"
+            >
+              <Calendar className="w-4 h-4" />
+              {dateFrom || dateTo ? 'סינון פעיל' : 'תאריכים'}
+            </button>
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              className="px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5 disabled:opacity-50"
+              style={{ background: '#883fe2', color: '#fff' }}
+              title="ייצוא לאקסל"
+            >
+              {exporting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              ייצא לאקסל
+            </button>
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="p-2 rounded-lg"
+              style={{ color: 'var(--dash-text-2, #9ca3af)' }}
+            >
+              <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
         </div>
+
+        {/* Date filter row — visible when toggled, takes effect immediately */}
+        {showFilters && (
+          <div className="mb-4 p-3 rounded-xl flex items-center gap-3 flex-wrap"
+            style={{ background: 'rgba(136,63,226,0.08)', border: '1px solid rgba(136,63,226,0.2)' }}>
+            <div className="flex items-center gap-2">
+              <span className="text-xs" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>מתאריך:</span>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="text-sm p-1.5 rounded-lg outline-none"
+                style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--dash-text, #fff)', minWidth: 140 }}
+                dir="ltr"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>עד:</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="text-sm p-1.5 rounded-lg outline-none"
+                style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--dash-text, #fff)', minWidth: 140 }}
+                dir="ltr"
+              />
+            </div>
+            {(dateFrom || dateTo) && (
+              <button
+                onClick={() => { setDateFrom(''); setDateTo(''); }}
+                className="text-xs px-2 py-1 rounded-lg"
+                style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--dash-text-2, #9ca3af)' }}
+              >
+                נקה תאריכים
+              </button>
+            )}
+            <span className="text-[11px] mr-auto" style={{ color: 'var(--dash-text-3, #6b7280)' }}>
+              הסינון משפיע גם על הייצוא לאקסל.
+            </span>
+          </div>
+        )}
 
         {/* Live search — debounced to ~300ms; matches name / phone /
             order# / message text. No "submit" button — typing is enough. */}
@@ -852,11 +976,13 @@ function TicketDetail({
           <ol className="space-y-3 text-xs">
             {history.map((h) => {
               const isCustomerReply = h.action === 'customer_reply';
+              const isBrandMessage = h.action === 'customer_notified';
+              const dotColor = isCustomerReply ? '#22c55e' : isBrandMessage ? '#06b6d4' : '#883fe2';
               return (
                 <li key={h.id} className="flex gap-2 items-start">
                   <span
                     className="flex-shrink-0 w-1.5 h-1.5 rounded-full mt-1.5"
-                    style={{ background: isCustomerReply ? '#22c55e' : '#883fe2' }}
+                    style={{ background: dotColor }}
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
@@ -867,11 +993,44 @@ function TicketDetail({
                           תגובה חדשה
                         </span>
                       )}
+                      {isBrandMessage && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                          style={{ background: 'rgba(6,182,212,0.15)', color: '#06b6d4' }}>
+                          נשלח ללקוחה
+                        </span>
+                      )}
                     </div>
-                    {h.note && (isCustomerReply || h.action === 'note_added') && (
+                    {/* Customer reply text — green tint */}
+                    {h.note && isCustomerReply && (
                       <div className="mt-1 p-2 rounded-lg whitespace-pre-wrap"
                         style={{
-                          background: isCustomerReply ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.04)',
+                          background: 'rgba(34,197,94,0.08)',
+                          color: 'var(--dash-text, #fff)',
+                          fontSize: '13px',
+                          lineHeight: '1.5',
+                        }}>
+                        {h.note}
+                      </div>
+                    )}
+                    {/* Brand notification body — cyan tint, exactly the
+                        text the customer received over WhatsApp */}
+                    {isBrandMessage && h.body_text && (
+                      <div className="mt-1 p-2 rounded-lg whitespace-pre-wrap"
+                        style={{
+                          background: 'rgba(6,182,212,0.08)',
+                          border: '1px solid rgba(6,182,212,0.2)',
+                          color: 'var(--dash-text, #fff)',
+                          fontSize: '13px',
+                          lineHeight: '1.5',
+                        }}>
+                        {h.body_text}
+                      </div>
+                    )}
+                    {/* Internal note text — neutral tint, brand-only */}
+                    {h.note && h.action === 'note_added' && (
+                      <div className="mt-1 p-2 rounded-lg whitespace-pre-wrap"
+                        style={{
+                          background: 'rgba(255,255,255,0.04)',
                           color: 'var(--dash-text, #fff)',
                           fontSize: '13px',
                           lineHeight: '1.5',
@@ -1278,8 +1437,22 @@ function historyLine(h: HistoryEntry): string {
   if (h.action === 'note_added') return `הערה פנימית עודכנה`;
   if (h.action === 'assigned') return `הוקצה ל: ${h.note}`;
   if (h.action === 'customer_notified') {
-    const ok = !h.note?.startsWith('Send failed');
-    return `${ok ? 'נשלחה' : 'ניסיון לשלוח'} הודעת WhatsApp: ${h.whatsapp_template_name || '?'}${ok ? '' : ` (${h.note})`}`;
+    const failed = h.note?.startsWith('Send failed');
+    const TEMPLATE_LABEL: Record<string, string> = {
+      support_status_in_progress: 'התחלנו לטפל',
+      support_status_in_progress_v2: 'התחלנו לטפל',
+      support_status_awaiting_customer: 'בקשה לפרטים נוספים',
+      support_status_awaiting_customer_v2: 'בקשה לפרטים נוספים',
+      support_status_shipped: 'יצא למשלוח',
+      support_status_shipped_v2: 'יצא למשלוח',
+      support_status_shipped_v3: 'יצא למשלוח',
+      support_status_shipped_v4: 'יצא למשלוח',
+      support_status_resolved: 'הפנייה טופלה',
+      support_status_resolved_v2: 'הפנייה טופלה',
+    };
+    const friendly = TEMPLATE_LABEL[h.whatsapp_template_name || ''] || h.whatsapp_template_name || 'הודעה';
+    if (failed) return `ניסיון שליחה נכשל (${friendly}) — ${h.note}`;
+    return `הודעה ללקוחה: ${friendly}`;
   }
   if (h.action === 'customer_reply') return `תגובת הלקוחה`;
   return h.action;
