@@ -186,6 +186,25 @@ function ProductSheet({
   const promoPercent = product.ai_profile?.promo_percent;
   const [showFullInci, setShowFullInci] = useState(false);
 
+  // ESC closes the sheet on desktop
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  // Lock body scroll while the sheet is open so the page underneath can't
+  // scroll along with the sheet content. Restored on unmount.
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -199,14 +218,31 @@ function ProductSheet({
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 32, stiffness: 320 }}
+        // Drag-down to dismiss — natural mobile gesture, the bar at the top of
+        // the sheet acts as the visible affordance.
+        drag="y"
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={{ top: 0, bottom: 0.6 }}
+        onDragEnd={(_, info) => {
+          // Either velocity or distance can trigger dismissal
+          if (info.offset.y > 140 || info.velocity.y > 600) onClose();
+        }}
         dir="rtl"
         onClick={(e) => e.stopPropagation()}
         className="dpc-sheet"
       >
-        <div className="dpc-sheet__handle" aria-hidden />
-        <button type="button" onClick={onClose} aria-label="סגירה" className="dpc-sheet__close">
-          <X className="w-5 h-5" />
-        </button>
+        {/* Sticky header — keeps a tap-target close affordance always visible */}
+        <header className="dpc-sheet__topbar">
+          <div className="dpc-sheet__handle" aria-hidden />
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="סגירה"
+            className="dpc-sheet__close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </header>
 
         <div className="dpc-sheet__scroll">
           {product.image_url && (
