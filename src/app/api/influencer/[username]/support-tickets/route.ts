@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase, getInfluencerByUsername } from '@/lib/supabase';
 import { checkInfluencerAuth } from '@/lib/auth/influencer-auth';
 import { requireAdminAuth } from '@/lib/auth/admin-auth';
+import { getAgentSession } from '@/lib/auth/agent-auth';
 
 export const runtime = 'nodejs';
 
@@ -55,17 +56,20 @@ export async function GET(
   const fromIso = url.searchParams.get('from');
   const toIso = url.searchParams.get('to');
   const page = Math.max(1, Number(url.searchParams.get('page') || '1'));
+  // ?mine=1 → only tickets assigned to the logged-in agent
+  const mineOnly = url.searchParams.get('mine') === '1';
+  const assignedAgentId = url.searchParams.get('assigned_agent_id');
+  // ?unassigned=1 → only tickets with no assignee
+  const unassignedOnly = url.searchParams.get('unassigned') === '1';
 
-  // Note: support_requests has no FK on product_id — PostgREST cannot
-  // auto-embed the products row. Resolve product details separately
-  // below if needed (none of the list-view UI uses them today).
   let query = supabase
     .from('support_requests')
     .select(
       `
       id, account_id, customer_name, customer_phone, message, brand,
       order_number, product_id, status, created_at, updated_at,
-      ref_source, internal_notes, assigned_to, last_customer_notified_at,
+      ref_source, internal_notes, assigned_to, assigned_agent_id,
+      last_customer_notified_at,
       tracking_number, resolution_summary, resolved_at
     `,
       { count: 'exact' },
@@ -73,6 +77,18 @@ export async function GET(
     .eq('account_id', influencer.id)
     .order('created_at', { ascending: false })
     .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+
+  if (mineOnly) {
+    const agent = await getAgentSession(username);
+    if (!agent) {
+      return NextResponse.json({ error: 'not_authenticated_as_agent' }, { status: 401 });
+    }
+    query = query.eq('assigned_agent_id', agent.agent_id);
+  } else if (assignedAgentId) {
+    query = query.eq('assigned_agent_id', assignedAgentId);
+  } else if (unassignedOnly) {
+    query = query.is('assigned_agent_id', null);
+  }
 
   // Status filter — allow comma-separated list, e.g. ?status=new,in_progress
   if (statusParam && statusParam !== 'all') {

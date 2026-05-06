@@ -13,6 +13,7 @@ import { supabase, getInfluencerByUsername } from '@/lib/supabase';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { checkInfluencerAuth } from '@/lib/auth/influencer-auth';
 import { requireAdminAuth } from '@/lib/auth/admin-auth';
+import { getAgentSession } from '@/lib/auth/agent-auth';
 
 export const runtime = 'nodejs';
 
@@ -88,10 +89,14 @@ export async function PATCH(
     return NextResponse.json({ error: 'bad json' }, { status: 400 });
   }
 
+  // Identify the acting agent (if logged in via agent session). Falls back to
+  // the username for legacy/influencer auth.
+  const agent = await getAgentSession(username);
+
   // Snapshot the existing row so we can record what changed in history.
   const { data: existing } = await supabase
     .from('support_requests')
-    .select('id, status, internal_notes, assigned_to, tracking_number, resolution_summary')
+    .select('id, status, internal_notes, assigned_to, assigned_agent_id, tracking_number, resolution_summary')
     .eq('account_id', influencer.id)
     .eq('id', id)
     .maybeSingle();
@@ -124,7 +129,7 @@ export async function PATCH(
   }
 
   if (typeof body.internal_notes === 'string') {
-    const cleaned = sanitizeHtml(body.internal_notes).slice(0, 4000);
+    const cleaned = sanitizeHtml(body.internal_notes);
     if (cleaned !== (existing.internal_notes || '')) {
       update.internal_notes = cleaned;
       historyEntries.push({ action: 'note_added', note: cleaned.slice(0, 200) });
@@ -139,7 +144,7 @@ export async function PATCH(
   }
 
   if (typeof body.resolution_summary === 'string') {
-    const cleaned = sanitizeHtml(body.resolution_summary).slice(0, 4000);
+    const cleaned = sanitizeHtml(body.resolution_summary);
     if (cleaned !== (existing.resolution_summary || '')) {
       update.resolution_summary = cleaned;
     }
@@ -150,6 +155,39 @@ export async function PATCH(
     if (cleaned !== (existing.assigned_to || '')) {
       update.assigned_to = cleaned || null;
       historyEntries.push({ action: 'assigned', note: cleaned || 'unassigned' });
+    }
+  }
+
+  // Structured assignment by agent_id (preferred — drives analytics).
+  // body.assignToSelf=true → assign to the logged-in agent
+  // body.assigned_agent_id (string|null) → explicit assignment / unassign
+  if (body.assignToSelf === true && agent) {
+    if (existing.assigned_agent_id !== agent.agent_id) {
+      update.assigned_agent_id = agent.agent_id;
+      update.assigned_to = agent.display_name;
+      historyEntries.push({ action: 'assigned', note: agent.display_name });
+    }
+  } else if ('assigned_agent_id' in body) {
+    const next = body.assigned_agent_id == null ? null : String(body.assigned_agent_id);
+    if (next !== (existing.assigned_agent_id || null)) {
+      update.assigned_agent_id = next;
+      if (next) {
+        const { data: a } = await supabase
+          .from('support_agents')
+          .select('first_name, last_name, account_id')
+          .eq('id', next)
+          .maybeSingle();
+        if (a && a.account_id === influencer.id) {
+          const display = `${a.first_name} ${a.last_name}`;
+          update.assigned_to = display;
+          historyEntries.push({ action: 'assigned', note: display });
+        } else {
+          return NextResponse.json({ error: 'agent not in this account' }, { status: 400 });
+        }
+      } else {
+        update.assigned_to = null;
+        historyEntries.push({ action: 'assigned', note: 'unassigned' });
+      }
     }
   }
 
@@ -169,11 +207,13 @@ export async function PATCH(
   }
 
   if (historyEntries.length > 0) {
-    const actor = username; // best-effort attribution
+    const actor = agent ? agent.display_name : username;
+    const actor_agent_id = agent ? agent.agent_id : null;
     const rows = historyEntries.map((h) => ({
       ticket_id: id,
       account_id: influencer.id,
       actor,
+      actor_agent_id,
       ...h,
     }));
     const { error: histErr } = await supabase.from('support_ticket_history').insert(rows);

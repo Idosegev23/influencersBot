@@ -23,6 +23,9 @@ import {
   X,
   Download,
   Calendar,
+  LogOut,
+  BarChart3,
+  UserCheck,
 } from 'lucide-react';
 import { getInfluencerByUsername } from '@/lib/supabase';
 import type { Influencer } from '@/types';
@@ -53,6 +56,7 @@ interface Ticket {
   ref_source: string | null;
   internal_notes: string | null;
   assigned_to: string | null;
+  assigned_agent_id: string | null;
   last_customer_notified_at: string | null;
   tracking_number: string | null;
   resolution_summary: string | null;
@@ -149,11 +153,19 @@ export default function SupportPage({
   const router = useRouter();
 
   const [influencer, setInfluencer] = useState<Influencer | null>(null);
+  const [agent, setAgent] = useState<{
+    id: string;
+    display_name: string;
+    is_admin: boolean;
+    account_id: string;
+  } | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<'all' | TicketStatus>('new');
+  // Owner filter — agents typically want to see "their" tickets first.
+  const [ownerFilter, setOwnerFilter] = useState<'all' | 'mine' | 'unassigned'>('all');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [page, setPage] = useState<number>(1);
@@ -170,12 +182,34 @@ export default function SupportPage({
     let cancelled = false;
     (async () => {
       try {
-        const authRes = await fetch(`/api/influencer/auth?username=${username}`);
-        const authData = await authRes.json();
-        if (!authData.authenticated) {
-          router.push(`/influencer/${username}`);
-          return;
+        // Try agent session first (preferred for accounts that have configured
+        // per-agent login, e.g. LA BEAUTÉ).
+        const agentRes = await fetch(`/api/agent/me?accountUsername=${username}`, { cache: 'no-store' });
+        const agentData = await agentRes.json();
+        let agentAuthed = !!agentData.authenticated;
+
+        if (!agentAuthed) {
+          // Fall back to legacy influencer cookie.
+          const authRes = await fetch(`/api/influencer/auth?username=${username}`);
+          const authData = await authRes.json();
+          if (!authData.authenticated) {
+            // For LA BEAUTÉ specifically, route to the dedicated login page.
+            if (username === 'labeaute.israel') {
+              router.push('/labeaute/login');
+            } else {
+              router.push(`/influencer/${username}`);
+            }
+            return;
+          }
+        } else if (!cancelled) {
+          setAgent({
+            id: agentData.agent.id,
+            display_name: agentData.agent.display_name,
+            is_admin: agentData.agent.is_admin,
+            account_id: agentData.agent.account_id,
+          });
         }
+
         const inf = await getInfluencerByUsername(username);
         if (!inf) {
           router.push(`/influencer/${username}`);
@@ -195,13 +229,28 @@ export default function SupportPage({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [username]);
 
+  const handleAgentLogout = useCallback(async () => {
+    try {
+      await fetch('/api/agent/logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountUsername: username }),
+      });
+    } catch {}
+    if (username === 'labeaute.israel') {
+      router.push('/labeaute/login');
+    } else {
+      router.push(`/influencer/${username}`);
+    }
+  }, [username, router]);
+
   // Refetch on filter change
   useEffect(() => {
     if (!influencer) return;
     setPage(1);
     fetchList(filter, search, 1);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter]);
+  }, [filter, ownerFilter]);
 
   // Refetch on page change
   useEffect(() => {
@@ -229,14 +278,13 @@ export default function SupportPage({
   ) => {
     const url = new URL(`/api/influencer/${username}/support-tickets`, window.location.origin);
     if (statusFilter !== 'all') url.searchParams.set('status', statusFilter);
-    // Normalise the search term: strip leading '#' (some order numbers
-    // are stored as "#180988", others as "180988" — searching either
-    // form should match both). The API also strips defensively.
     const cleanedQ = q.trim().replace(/^#+/, '').trim();
     if (cleanedQ) url.searchParams.set('q', cleanedQ);
     if (p > 1) url.searchParams.set('page', String(p));
     if (dateFrom) url.searchParams.set('from', new Date(dateFrom + 'T00:00:00').toISOString());
     if (dateTo) url.searchParams.set('to', new Date(dateTo + 'T23:59:59').toISOString());
+    if (ownerFilter === 'mine') url.searchParams.set('mine', '1');
+    else if (ownerFilter === 'unassigned') url.searchParams.set('unassigned', '1');
     const res = await fetch(url.toString());
     if (!res.ok) return;
     const data = await res.json();
@@ -244,7 +292,7 @@ export default function SupportPage({
     setCounts(data.counts || {});
     setTotal(data.total || 0);
     setPageSize(data.pageSize || 50);
-  }, [username, dateFrom, dateTo]);
+  }, [username, dateFrom, dateTo, ownerFilter]);
 
   const handleExport = useCallback(async () => {
     setExporting(true);
@@ -313,6 +361,53 @@ export default function SupportPage({
   return (
     <div className="min-h-screen" dir="rtl" style={{ color: 'var(--dash-text, #fff)' }}>
       <div className="max-w-7xl mx-auto p-4 animate-slide-up">
+        {/* Agent header bar — only when an agent session is active */}
+        {agent && (
+          <div
+            className="mb-3 px-3 py-2 rounded-xl flex items-center justify-between flex-wrap gap-2"
+            style={{
+              background: 'rgba(136,63,226,0.08)',
+              border: '1px solid rgba(136,63,226,0.2)',
+            }}
+          >
+            <div className="flex items-center gap-2 text-sm">
+              <UserCheck className="w-4 h-4" style={{ color: '#883fe2' }} />
+              <span style={{ color: 'var(--dash-text, #fff)' }}>
+                מחובר/ת כ:{' '}
+                <span className="font-semibold">{agent.display_name}</span>
+              </span>
+              {agent.is_admin && (
+                <span
+                  className="px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                  style={{ background: '#883fe2', color: '#fff' }}
+                >
+                  אדמין
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {agent.is_admin && (
+                <button
+                  onClick={() => router.push('/labeaute/admin/analytics')}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5"
+                  style={{ background: '#883fe2', color: '#fff' }}
+                >
+                  <BarChart3 className="w-3.5 h-3.5" />
+                  אנליטיקה
+                </button>
+              )}
+              <button
+                onClick={handleAgentLogout}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5"
+                style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--dash-text-2, #9ca3af)' }}
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                התנתק
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -358,6 +453,29 @@ export default function SupportPage({
             </button>
           </div>
         </div>
+
+        {/* Owner filter — only meaningful when an agent is logged in */}
+        {agent && (
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
+            {[
+              { key: 'all' as const, label: 'כל הפניות' },
+              { key: 'mine' as const, label: 'בטיפולי' },
+              { key: 'unassigned' as const, label: 'ללא מטפל/ת' },
+            ].map((opt) => (
+              <button
+                key={opt.key}
+                onClick={() => setOwnerFilter(opt.key)}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                style={{
+                  background: ownerFilter === opt.key ? '#883fe2' : 'rgba(255,255,255,0.06)',
+                  color: ownerFilter === opt.key ? '#fff' : 'var(--dash-text-2, #9ca3af)',
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Date filter row — visible when toggled, takes effect immediately */}
         {showFilters && (
@@ -503,6 +621,7 @@ export default function SupportPage({
                   username={username}
                   ticketId={selectedId}
                   influencer={influencer}
+                  agent={agent}
                   onChange={() => fetchList(filter, search, page)}
                   onClose={() => setSelectedId(null)}
                 />
@@ -584,12 +703,14 @@ function TicketDetail({
   username,
   ticketId,
   influencer,
+  agent,
   onChange,
   onClose,
 }: {
   username: string;
   ticketId: string;
   influencer: Influencer | null;
+  agent: { id: string; display_name: string; is_admin: boolean; account_id: string } | null;
   onChange: () => void;
   onClose: () => void;
 }) {
@@ -659,6 +780,41 @@ function TicketDetail({
       }
     } finally {
       setSavingNote(false);
+    }
+  };
+
+  const [assigning, setAssigning] = useState(false);
+  const handleAssignToSelf = async () => {
+    if (!agent) return;
+    setAssigning(true);
+    try {
+      const res = await fetch(`/api/influencer/${username}/support-tickets/${ticketId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assignToSelf: true }),
+      });
+      if (res.ok) {
+        await fetchTicket();
+        onChange();
+      }
+    } finally {
+      setAssigning(false);
+    }
+  };
+  const handleUnassign = async () => {
+    setAssigning(true);
+    try {
+      const res = await fetch(`/api/influencer/${username}/support-tickets/${ticketId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assigned_agent_id: null }),
+      });
+      if (res.ok) {
+        await fetchTicket();
+        onChange();
+      }
+    } finally {
+      setAssigning(false);
     }
   };
 
@@ -805,6 +961,55 @@ function TicketDetail({
           <ChevronLeft className="w-5 h-5" />
         </button>
       </div>
+
+      {/* Assignee row */}
+      {agent && (
+        <div
+          className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs"
+          style={{ background: 'rgba(255,255,255,0.04)' }}
+        >
+          <div className="flex items-center gap-2" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>
+            <UserCheck className="w-3.5 h-3.5" />
+            {ticket.assigned_to ? (
+              <span>
+                מטפל/ת: <span className="font-semibold" style={{ color: 'var(--dash-text, #fff)' }}>{ticket.assigned_to}</span>
+                {ticket.assigned_agent_id === agent.id && (
+                  <span className="mr-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                    style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e' }}>
+                    זה אני
+                  </span>
+                )}
+              </span>
+            ) : (
+              <span>ללא מטפל/ת</span>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5">
+            {ticket.assigned_agent_id !== agent.id && (
+              <button
+                onClick={handleAssignToSelf}
+                disabled={assigning}
+                className="px-2.5 py-1 rounded-lg text-[11px] font-medium flex items-center gap-1 disabled:opacity-50"
+                style={{ background: '#883fe2', color: '#fff' }}
+              >
+                {assigning && <Loader2 className="w-3 h-3 animate-spin" />}
+                {ticket.assigned_agent_id ? 'קח/י לי' : 'הקצה לי'}
+              </button>
+            )}
+            {ticket.assigned_agent_id === agent.id && (
+              <button
+                onClick={handleUnassign}
+                disabled={assigning}
+                className="px-2.5 py-1 rounded-lg text-[11px] font-medium flex items-center gap-1 disabled:opacity-50"
+                style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--dash-text-2, #9ca3af)' }}
+              >
+                {assigning && <Loader2 className="w-3 h-3 animate-spin" />}
+                שחרר/י
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Focus shipment status — most important info, lives at the top.
           Auto-resolves when a ticket is opened: takes the order_number
