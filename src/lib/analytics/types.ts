@@ -96,6 +96,7 @@ export type AnalyticsEventName =
   | 'product_selected'
   | 'product_deselected'
   | 'product_multi_ask'
+  | 'product_claim_filter'
   // Content / Discover / Topics
   | 'content_browse_loaded'
   | 'content_filter_changed'

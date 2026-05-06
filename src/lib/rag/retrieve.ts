@@ -154,6 +154,16 @@ const ENTITY_KEYWORDS: Record<EntityType, string[]> = {
   knowledge_base: ['faq', 'about', 'info', 'question', 'שאלה', 'מידע'],
   document: ['document', 'file', 'pdf', 'contract', 'invoice', 'מסמך', 'קובץ', 'חשבונית'],
   website: ['website', 'site', 'link', 'url', 'page', 'אתר', 'לינק', 'קישור'],
+  product: [
+    // English
+    'product', 'cream', 'serum', 'sunscreen', 'moisturizer', 'cleanser', 'toner',
+    'shampoo', 'conditioner', 'mask', 'oil', 'lotion', 'lip balm',
+    // Hebrew — product types
+    'מוצר', 'תכשיר', 'קרם', 'סרום', 'מסיכה', 'מסכה', 'טונר', 'שמפו', 'מרכך',
+    'שמן', 'סבון', 'מסיר איפור', 'בלם', 'שפתון', 'קרם הגנה',
+    // Use-case / suitability — these trigger product retrieval (recommendations)
+    'הריון', 'היריון', 'הנקה', 'בהריון', 'מאושר',
+  ],
 };
 
 // Topic keywords for cross-domain filtering

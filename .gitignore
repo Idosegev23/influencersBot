@@ -49,3 +49,6 @@ Instagram_DM_Comparison.pdf
 
 # Playwright test output
 /test-results/
+
+# Local scraper caches (contain raw catalog dumps — multi-MB, regenerated on demand)
+scripts/.dekel-cache/

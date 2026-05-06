@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 
     let query = supabase
       .from('widget_products')
-      .select('id, name, name_he, description, price, original_price, currency, category, subcategory, product_line, volume, key_ingredients, benefits, target_audience, image_url, product_url, is_available, is_on_sale, is_featured, priority, ai_profile')
+      .select('id, slug, name, name_he, brand, description, usage, claims, ingredients, price, original_price, currency, category, subcategory, product_line, volume, key_ingredients, benefits, target_audience, image_url, product_url, is_available, is_on_sale, is_featured, priority, ai_profile')
       .eq('account_id', accountId)
       .order('category')
       .order('name');

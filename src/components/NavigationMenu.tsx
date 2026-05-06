@@ -12,26 +12,68 @@ import {
   TrendingUp,
   BarChart3,
   Settings,
+  Sparkles,
   Sun,
   Moon,
 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
-const NAV_ITEMS = [
+// Tabs are gated by archetype + features. brandOnly tabs render only for archetypes
+// that act as commerce/brands; requiresProducts shows up only when a product catalog
+// has been ingested.
+const BASE_NAV_ITEMS: {
+  key: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  brandOnly?: boolean;
+  requiresProducts?: boolean;
+}[] = [
   { key: 'dashboard', label: 'דשבורד', icon: LayoutDashboard },
   { key: 'analytics', label: 'אנליטיקס', icon: BarChart3 },
   { key: 'partnerships', label: 'שת״פים', icon: Briefcase },
   { key: 'coupons', label: 'קופונים', icon: Tag },
+  { key: 'products', label: 'מוצרים', icon: Sparkles, requiresProducts: true },
   { key: 'conversations', label: 'שיחות', icon: MessageCircle },
-  { key: 'support', label: 'פניות תמיכה', icon: LifeBuoy },
-  { key: 'attribution', label: 'שיוך', icon: TrendingUp },
+  { key: 'support', label: 'פניות תמיכה', icon: LifeBuoy, brandOnly: true },
+  { key: 'attribution', label: 'שיוך', icon: TrendingUp, brandOnly: true },
   { key: 'settings', label: 'הגדרות', icon: Settings },
 ];
+
+const BRAND_LIKE_ARCHETYPES = new Set(['brand', 'local_business']);
 
 export function NavigationMenu() {
   const params = useParams();
   const pathname = usePathname();
   const { theme, toggle } = useTheme();
   const username = params.username as string;
+
+  const [features, setFeatures] = useState<{ archetype: string | null; hasProducts: boolean } | null>(null);
+  useEffect(() => {
+    if (!username) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/influencer/nav-features?username=${username}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setFeatures({ archetype: data.archetype || null, hasProducts: !!data.hasProducts });
+      } catch {}
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [username]);
+
+  // Default to most-permissive view while loading so brand accounts don't see a flicker
+  // of missing tabs. Influencer-only adjustments apply once nav-features lands.
+  const isBrandLike = features ? BRAND_LIKE_ARCHETYPES.has(features.archetype || '') : true;
+  const hasProducts = features ? features.hasProducts : false;
+
+  const NAV_ITEMS = BASE_NAV_ITEMS.filter((item) => {
+    if (item.brandOnly && !isBrandLike) return false;
+    if (item.requiresProducts && !hasProducts) return false;
+    return true;
+  });
 
   return (
     <>

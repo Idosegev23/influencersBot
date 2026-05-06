@@ -15,7 +15,8 @@ export type EntityType =
   | 'coupon'
   | 'knowledge_base'
   | 'document'
-  | 'website';
+  | 'website'
+  | 'product';
 
 export const ENTITY_TYPE_SOURCE_TABLE: Record<EntityType, string> = {
   post: 'instagram_posts',
@@ -26,6 +27,7 @@ export const ENTITY_TYPE_SOURCE_TABLE: Record<EntityType, string> = {
   knowledge_base: 'chatbot_knowledge_base',
   document: 'partnership_documents',
   website: 'instagram_bio_websites',
+  product: 'widget_products',
 };
 
 // ============================================

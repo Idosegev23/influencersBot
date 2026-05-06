@@ -46,6 +46,7 @@ export const ARCHETYPE_CONFIGS: Record<AccountArchetype, ArchetypeConfig> = {
     typeWeights: {
       coupon: +0.15,
       partnership: +0.12,
+      product: +0.12, // creators with a product catalog (e.g. Dekel) → boost product hits
       post: +0.05,
       transcription: +0.03,
       highlight: 0,
@@ -56,6 +57,7 @@ export const ARCHETYPE_CONFIGS: Record<AccountArchetype, ArchetypeConfig> = {
     typeCaps: {
       coupon: 8,
       partnership: 6,
+      product: 6,
       post: 6,
       transcription: 4,
       highlight: 3,

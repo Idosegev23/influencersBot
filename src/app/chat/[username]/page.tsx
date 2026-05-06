@@ -2403,6 +2403,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 key="products"
                 accountId={influencer.id}
                 accountType={influencer.influencer_type}
+                username={username}
                 onAskAbout={(question: string, hiddenContext?: string) => {
                   setActiveTab('chat');
                   maybeShowLeadPopup();
@@ -2462,6 +2463,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   key="products-from-topics"
                   accountId={influencer.id}
                   accountType={influencer.influencer_type}
+                  username={username}
                   onAskAbout={(question: string, hiddenContext?: string) => {
                     setActiveTab('chat');
                     maybeShowLeadPopup();
