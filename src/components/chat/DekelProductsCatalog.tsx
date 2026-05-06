@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, X, ExternalLink, Sparkles, Beaker } from 'lucide-react';
+import { Search, X, ExternalLink, Sparkles, Beaker, ChevronDown, Check } from 'lucide-react';
 import { track } from '@/lib/analytics/track';
 import { IngredientDictProvider, InciList, type IngredientInfo } from './IngredientTooltip';
 
@@ -81,22 +81,6 @@ const PRIMARY_CLAIM_FILTERS: { value: string; label: string }[] = [
 function brandShortName(brand?: string | null): string {
   if (!brand) return '';
   return brand.split('|')[0].trim();
-}
-
-// DOM-safe identifier for jump-to-brand anchors. Hebrew/Latin/digits stay,
-// everything else (spaces, pipes, punctuation) collapses to a dash.
-function brandSlug(brand: string): string {
-  return `dpc-brand-${brand.replace(/[^\p{L}\p{N}]+/gu, '-')}`;
-}
-
-// First letter for alphabetic grouping. Strips bidi marks and digits, falls
-// back to '#' so nothing gets lost from the index.
-function brandInitial(brand: string): string {
-  const cleaned = brand.replace(/[‎‏‪-‮]/g, '').trim();
-  for (const ch of cleaned) {
-    if (/\p{L}/u.test(ch)) return ch.toUpperCase();
-  }
-  return '#';
 }
 
 function buildProductContext(p: DekelProduct): string {
@@ -169,10 +153,12 @@ function useDropdownResults(
 
 function ProductSheet({
   product,
+  dictionary,
   onClose,
   onAskAbout,
 }: {
   product: DekelProduct;
+  dictionary: Record<string, IngredientInfo>;
   onClose: () => void;
   onAskAbout: (q: string, hiddenContext?: string) => void;
 }) {
@@ -185,6 +171,25 @@ function ProductSheet({
   const otherClaims = claims.filter((c) => !PRIMARY_CLAIM_FILTERS.some((f) => f.value === c));
   const promoPercent = product.ai_profile?.promo_percent;
   const [showFullInci, setShowFullInci] = useState(false);
+
+  // Derive "actives" from the INCI list when we don't have Dekel's authored
+  // bullets. We use the global ingredient dictionary: anything rated "מעולה"
+  // or "טוב" with a function listed is an active ingredient — that's the
+  // editorial signal Dekel uses on her own site.
+  const derivedActives = useMemo(() => {
+    if (detailed.length > 0) return null; // prefer authored data
+    if (!inci.length) return null;
+    const out: { name: string; note: string | null }[] = [];
+    for (const name of inci) {
+      const info = dictionary[name];
+      if (!info) continue;
+      if (info.rating === 'מעולה' || info.rating === 'טוב') {
+        out.push({ name, note: info.function || null });
+      }
+      if (out.length >= 12) break;
+    }
+    return out.length > 0 ? out : null;
+  }, [detailed.length, inci, dictionary]);
 
   // ESC closes the sheet on desktop
   useEffect(() => {
@@ -271,10 +276,25 @@ function ProductSheet({
             <section className="dpc-sheet__section">
               <h3 className="dpc-sheet__section-title">
                 <Beaker className="w-3.5 h-3.5" />
-                רכיבי מפתח
+                חומרים פעילים
               </h3>
               <ul className="dpc-sheet__ing-list">
                 {detailed.slice(0, 25).map((ing, i) => (
+                  <li key={i} className="dpc-sheet__ing">
+                    <div className="dpc-sheet__ing-name">{ing.name}</div>
+                    {ing.note && <div className="dpc-sheet__ing-note">{ing.note}</div>}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : derivedActives && derivedActives.length > 0 ? (
+            <section className="dpc-sheet__section">
+              <h3 className="dpc-sheet__section-title">
+                <Beaker className="w-3.5 h-3.5" />
+                חומרים פעילים
+              </h3>
+              <ul className="dpc-sheet__ing-list">
+                {derivedActives.map((ing, i) => (
                   <li key={i} className="dpc-sheet__ing">
                     <div className="dpc-sheet__ing-name">{ing.name}</div>
                     {ing.note && <div className="dpc-sheet__ing-note">{ing.note}</div>}
@@ -286,7 +306,7 @@ function ProductSheet({
             <section className="dpc-sheet__section">
               <h3 className="dpc-sheet__section-title">
                 <Beaker className="w-3.5 h-3.5" />
-                מרכיבים עיקריים
+                חומרים פעילים
               </h3>
               <div className="dpc-sheet__chip-row">
                 {fallbackKey.map((ing, i) => (
@@ -498,59 +518,32 @@ export default function DekelProductsCatalog({ username, accountId, products, on
   const totalUnfiltered = products.length;
   const hasFilters = !!(activeClaim || activeIngredient || activeBrand || search.trim());
 
-  // Group products by brand → sorted, indexed-by-letter sections.
-  // Only renders when there are no active filters; once the user filters/searches
-  // we collapse back to a flat grid so the result set stays focused.
-  const brandSections = useMemo(() => {
-    if (hasFilters) return null;
-    const map = new Map<string, DekelProduct[]>();
-    for (const p of filtered) {
-      const key = (p.brand || 'אחר').trim();
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(p);
+  // All brands with product counts — fed to the brand picker sheet.
+  const brandList = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const p of products) {
+      const b = (p.brand || '').trim();
+      if (!b) continue;
+      map.set(b, (map.get(b) || 0) + 1);
     }
     return [...map.entries()]
-      .sort(([a], [b]) => brandShortName(a).localeCompare(brandShortName(b), 'he'))
-      .map(([brand, items]) => ({
-        brand,
-        shortName: brandShortName(brand) || 'אחר',
-        slug: brandSlug(brand),
-        initial: brandInitial(brandShortName(brand) || brand),
-        products: [...items].sort((a, b) =>
-          (a.name_he || a.name || '').localeCompare(b.name_he || b.name || '', 'he')
-        ),
-      }));
-  }, [filtered, hasFilters]);
+      .map(([brand, count]) => ({ brand, count, shortName: brandShortName(brand) }))
+      .sort((a, b) => a.shortName.localeCompare(b.shortName, 'he'));
+  }, [products]);
 
-  // Map first-letter → first section slug, so a single tap on the alphabet
-  // scrolls to the first brand starting with that letter.
-  const alphaIndex = useMemo(() => {
-    if (!brandSections) return null;
-    // Hebrew alphabet covers ~all our brands; we keep Latin as a fallback bucket
-    // for non-Hebrew brands (rare). Order: Hebrew א..ת, then Latin A..Z.
-    const HEB = 'אבגדהוזחטיכלמנסעפצקרשת'.split('');
-    const LAT = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-    const firstSlugByLetter = new Map<string, string>();
-    for (const s of brandSections) {
-      const ch = s.initial;
-      // Map final letters (ך ם ן ף ץ) back to their main form for indexing
-      const normalized = ({ ך: 'כ', ם: 'מ', ן: 'נ', ף: 'פ', ץ: 'צ' } as Record<string, string>)[ch] || ch;
-      if (!firstSlugByLetter.has(normalized)) firstSlugByLetter.set(normalized, s.slug);
-    }
-    const letters: { letter: string; slug?: string }[] = [];
-    for (const ch of HEB) letters.push({ letter: ch, slug: firstSlugByLetter.get(ch) });
-    // Only show Latin letters if at least one brand starts there
-    const hasLatin = LAT.some((ch) => firstSlugByLetter.has(ch));
-    if (hasLatin) {
-      for (const ch of LAT) letters.push({ letter: ch, slug: firstSlugByLetter.get(ch) });
-    }
-    return letters;
-  }, [brandSections]);
+  // Sort the result set alphabetically by brand → product name. Visually this
+  // means same-brand products cluster naturally without explicit section headers.
+  const sortedFiltered = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      const ba = brandShortName(a.brand);
+      const bb = brandShortName(b.brand);
+      const c = ba.localeCompare(bb, 'he');
+      if (c !== 0) return c;
+      return (a.name_he || a.name || '').localeCompare(b.name_he || b.name || '', 'he');
+    });
+  }, [filtered]);
 
-  const jumpToBrand = (slug: string) => {
-    const el = document.getElementById(slug);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
+  const [brandPickerOpen, setBrandPickerOpen] = useState(false);
 
   return (
     <IngredientDictProvider dictionary={dictionary}>
@@ -656,69 +649,59 @@ export default function DekelProductsCatalog({ username, accountId, products, on
           </AnimatePresence>
         </div>
 
-        {/* Chip row — claims + active "smart" pill (ingredient/brand) */}
-        {(claimAvailability.size > 0 || activeIngredient || activeBrand) && (
-          <div className="dpc-chips" role="tablist" aria-label="סינון">
-            {(activeIngredient || activeBrand) && (
-              <span className="dpc-active-pill">
-                {activeIngredient || activeBrand}
-                <button
-                  type="button"
-                  onClick={clearSmartFilter}
-                  aria-label="נקה סינון"
-                  className="dpc-active-pill__close"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            )}
-            {PRIMARY_CLAIM_FILTERS.filter((f) => claimAvailability.has(f.value)).map((f) => {
-              const isActive = activeClaim === f.value;
-              return (
-                <button
-                  key={f.value}
-                  type="button"
-                  onClick={() => {
-                    track('product_claim_filter', { kind: 'claim', value: isActive ? null : f.value });
-                    setActiveClaim(isActive ? null : f.value);
-                  }}
-                  className={`dpc-chip ${isActive ? 'dpc-chip--active' : ''}`}
-                  role="tab"
-                  aria-selected={isActive}
-                >
-                  <span>{f.label}</span>
-                  <span className="dpc-chip__count">{claimAvailability.get(f.value)}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
+        {/* Chip row — brand picker first, then active filter pills, then claim chips */}
+        <div className="dpc-chips" role="tablist" aria-label="סינון">
+          <button
+            type="button"
+            onClick={() => setBrandPickerOpen(true)}
+            className={`dpc-chip dpc-chip--accent ${activeBrand ? 'dpc-chip--active' : ''}`}
+            aria-haspopup="dialog"
+          >
+            <span>{activeBrand ? brandShortName(activeBrand) : 'כל המותגים'}</span>
+            {!activeBrand && <span className="dpc-chip__count">{brandList.length}</span>}
+            <ChevronDown className="w-3.5 h-3.5" style={{ marginInlineStart: 2 }} />
+          </button>
+          {activeIngredient && (
+            <span className="dpc-active-pill">
+              {activeIngredient}
+              <button
+                type="button"
+                onClick={clearSmartFilter}
+                aria-label="נקה סינון"
+                className="dpc-active-pill__close"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+          {PRIMARY_CLAIM_FILTERS.filter((f) => claimAvailability.has(f.value)).map((f) => {
+            const isActive = activeClaim === f.value;
+            return (
+              <button
+                key={f.value}
+                type="button"
+                onClick={() => {
+                  track('product_claim_filter', { kind: 'claim', value: isActive ? null : f.value });
+                  setActiveClaim(isActive ? null : f.value);
+                }}
+                className={`dpc-chip ${isActive ? 'dpc-chip--active' : ''}`}
+                role="tab"
+                aria-selected={isActive}
+              >
+                <span>{f.label}</span>
+                <span className="dpc-chip__count">{claimAvailability.get(f.value)}</span>
+              </button>
+            );
+          })}
+        </div>
 
         <div className="dpc-summary">
           {hasFilters
             ? `${filtered.length} מתוך ${totalUnfiltered.toLocaleString('he-IL')} תכשירים`
-            : `${totalUnfiltered.toLocaleString('he-IL')} תכשירים · ${brandSections?.length ?? 0} מותגים`}
+            : `${totalUnfiltered.toLocaleString('he-IL')} תכשירים · ${brandList.length} מותגים`}
         </div>
 
-        {/* Alphabet jumper — only when grouped by brand */}
-        {alphaIndex && alphaIndex.length > 0 && (
-          <div className="dpc-alpha" role="navigation" aria-label="קפיצה לפי אות">
-            {alphaIndex.map(({ letter, slug }) => (
-              <button
-                key={letter}
-                type="button"
-                onClick={() => slug && jumpToBrand(slug)}
-                disabled={!slug}
-                className={`dpc-alpha__letter ${!slug ? 'dpc-alpha__letter--disabled' : ''}`}
-                aria-label={slug ? `קפיצה למותגים ב-${letter}` : `אין מותגים ב-${letter}`}
-              >
-                {letter}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {filtered.length === 0 ? (
+        {sortedFiltered.length === 0 ? (
           <div className="dpc-empty">
             <p>לא נמצאו תכשירים תואמים</p>
             {hasFilters && (
@@ -734,35 +717,9 @@ export default function DekelProductsCatalog({ username, accountId, products, on
               </button>
             )}
           </div>
-        ) : brandSections ? (
-          // Grouped-by-brand view (default)
-          <div>
-            {brandSections.map((section) => (
-              <section key={section.slug} id={section.slug} className="dpc-brand-section">
-                <header className="dpc-brand-header">
-                  <h2 className="dpc-brand-header__name">{section.shortName}</h2>
-                  <span className="dpc-brand-header__count">
-                    {section.products.length} {section.products.length === 1 ? 'תכשיר' : 'תכשירים'}
-                  </span>
-                </header>
-                <div className="dpc-grid">
-                  {section.products.map((p) => (
-                    <ProductCard
-                      key={p.id}
-                      product={p}
-                      showDot={!!activeClaim && (p.claims || []).includes(activeClaim)}
-                      hideBrand
-                      onClick={() => onCardClick(p)}
-                    />
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
         ) : (
-          // Flat grid (when filtered/searched)
           <div className="dpc-grid">
-            {filtered.map((p) => (
+            {sortedFiltered.map((p) => (
               <ProductCard
                 key={p.id}
                 product={p}
@@ -781,6 +738,7 @@ export default function DekelProductsCatalog({ username, accountId, products, on
               <IngredientDictProvider dictionary={dictionary}>
                 <ProductSheet
                   product={selected}
+                  dictionary={dictionary}
                   onClose={() => setSelected(null)}
                   onAskAbout={onAskAbout}
                 />
@@ -789,8 +747,163 @@ export default function DekelProductsCatalog({ username, accountId, products, on
           </AnimatePresence>,
           document.body
         )}
+
+      {mounted &&
+        createPortal(
+          <AnimatePresence>
+            {brandPickerOpen && (
+              <BrandPicker
+                brands={brandList}
+                active={activeBrand}
+                onPick={(b) => {
+                  if (b === activeBrand) {
+                    setActiveBrand(null);
+                  } else {
+                    setActiveBrand(b);
+                    setActiveIngredient(null);
+                    setSearch('');
+                  }
+                  track('product_claim_filter', { kind: 'brand', value: b });
+                  setBrandPickerOpen(false);
+                }}
+                onClose={() => setBrandPickerOpen(false)}
+              />
+            )}
+          </AnimatePresence>,
+          document.body
+        )}
     </div>
     </IngredientDictProvider>
+  );
+}
+
+// ============================================================================
+// Brand picker — bottom-sheet with searchable list of brands
+// ============================================================================
+
+function BrandPicker({
+  brands,
+  active,
+  onPick,
+  onClose,
+}: {
+  brands: { brand: string; count: number; shortName: string }[];
+  active: string | null;
+  onPick: (brand: string | null) => void;
+  onClose: () => void;
+}) {
+  const [q, setQ] = useState('');
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    if (!needle) return brands;
+    return brands.filter((b) => b.brand.toLowerCase().includes(needle));
+  }, [brands, q]);
+
+  // ESC + body lock — same UX contract as the product sheet
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+      className="dpc-bp-wrap"
+    >
+      <motion.div
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 32, stiffness: 320 }}
+        drag="y"
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={{ top: 0, bottom: 0.6 }}
+        onDragEnd={(_, info) => {
+          if (info.offset.y > 140 || info.velocity.y > 600) onClose();
+        }}
+        dir="rtl"
+        onClick={(e) => e.stopPropagation()}
+        className="dpc-bp"
+      >
+        <div className="dpc-bp__topbar">
+          <span className="dpc-bp__title">בחירת מותג</span>
+          <button type="button" className="dpc-bp__close" aria-label="סגירה" onClick={onClose}>
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="dpc-bp__search">
+          <input
+            type="text"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="חיפוש מותג…"
+            className="dpc-bp__search-input"
+            autoFocus
+          />
+        </div>
+        <ul className="dpc-bp__list">
+          <li>
+            <button
+              type="button"
+              className={`dpc-bp__row ${!active ? 'dpc-bp__row--active' : ''}`}
+              onClick={() => {
+                onPick(null);
+              }}
+            >
+              <span className="dpc-bp__row-name">כל המותגים</span>
+              <span className="dpc-bp__row-count">
+                {brands.reduce((s, b) => s + b.count, 0)}
+              </span>
+              {!active && (
+                <span className="dpc-bp__row-check">
+                  <Check className="w-3.5 h-3.5" />
+                </span>
+              )}
+            </button>
+          </li>
+          {filtered.map((b) => {
+            const isActive = b.brand === active;
+            return (
+              <li key={b.brand}>
+                <button
+                  type="button"
+                  className={`dpc-bp__row ${isActive ? 'dpc-bp__row--active' : ''}`}
+                  onClick={() => onPick(b.brand)}
+                >
+                  <span className="dpc-bp__row-name">{b.shortName}</span>
+                  <span className="dpc-bp__row-count">{b.count}</span>
+                  {isActive && (
+                    <span className="dpc-bp__row-check">
+                      <Check className="w-3.5 h-3.5" />
+                    </span>
+                  )}
+                </button>
+              </li>
+            );
+          })}
+          {filtered.length === 0 && (
+            <li
+              style={{ padding: '40px 12px', textAlign: 'center', color: '#6b6357', fontSize: 13 }}
+            >
+              לא נמצא מותג בשם "{q}"
+            </li>
+          )}
+        </ul>
+      </motion.div>
+    </motion.div>
   );
 }
 

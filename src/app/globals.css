@@ -5542,67 +5542,136 @@ body[data-service-sheet-open] .mobile-bottom-tabs {
   font-variant-numeric: tabular-nums;
 }
 
-/* Alphabet index strip — quick jump to a brand by initial letter */
-.dpc-alpha {
+/* Accent chip variant — used by the "Browse brands" entry point so it reads
+   as a primary action rather than a filter. Slightly heavier weight + caret. */
+.dpc-chip--accent {
+  background: #1a1612;
+  color: #faf7f2;
+  border-color: #1a1612;
+  font-weight: 500;
+}
+.dpc-chip--accent:hover { background: #2c2620; border-color: #2c2620; }
+.dpc-chip--accent .dpc-chip__count { color: rgba(250,247,242,0.65); }
+
+/* ── Brand picker — full-width sheet with searchable brand list ── */
+.dpc-bp-wrap {
+  position: fixed;
+  inset: 0;
+  background: rgba(15,12,8,0.55);
+  backdrop-filter: blur(6px);
+  z-index: 1600;
   display: flex;
-  flex-wrap: wrap;
-  gap: 2px;
-  margin-bottom: 18px;
-  padding: 4px 4px 8px;
+  align-items: flex-end;
+  justify-content: center;
+  cursor: pointer;
+}
+.dpc-bp {
+  background: #faf7f2;
+  width: 100%;
+  max-width: 560px;
+  max-height: 82vh;
+  border-radius: 24px 24px 0 0;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 -20px 48px rgba(15,12,8,0.18);
+  cursor: default;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+.dpc-bp__topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  flex-shrink: 0;
   border-bottom: 1px solid rgba(26,22,18,0.06);
 }
-.dpc-alpha__letter {
+.dpc-bp__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1612;
+}
+.dpc-bp__close {
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  width: 32px;
+  height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 26px;
-  height: 26px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: transparent;
-  border: none;
-  font-size: 12.5px;
-  font-weight: 500;
-  color: #1a1612;
   cursor: pointer;
-  letter-spacing: 0.2px;
-  transition: background 0.15s, color 0.15s;
-}
-.dpc-alpha__letter:hover { background: rgba(26,22,18,0.06); }
-.dpc-alpha__letter--disabled {
-  color: rgba(26,22,18,0.20);
-  cursor: default;
-  pointer-events: none;
-}
-
-/* Brand-grouped section — header + grid */
-.dpc-brand-section {
-  margin-bottom: 38px;
-  scroll-margin-top: 80px; /* keep header below sticky search when jumping */
-}
-.dpc-brand-section:last-child { margin-bottom: 0; }
-.dpc-brand-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 0 4px 12px;
-  margin-bottom: 16px;
-  border-bottom: 1px solid rgba(26,22,18,0.08);
-}
-.dpc-brand-header__name {
-  font-size: 16px;
-  font-weight: 500;
   color: #1a1612;
-  letter-spacing: 0.2px;
+}
+.dpc-bp__close:hover { background: rgba(26,22,18,0.06); }
+.dpc-bp__search {
+  padding: 12px 18px 0;
+}
+.dpc-bp__search-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgba(26,22,18,0.10);
+  border-radius: 999px;
+  background: #ffffff;
+  font-size: 14px;
+  color: #1a1612;
+  outline: none;
+}
+.dpc-bp__search-input::placeholder { color: #9a8f80; }
+.dpc-bp__search-input:focus { border-color: rgba(26,22,18,0.30); }
+.dpc-bp__list {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 6px 8px 16px;
+  list-style: none;
   margin: 0;
 }
-.dpc-brand-header__count {
+.dpc-bp__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 14px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: start;
+  font: inherit;
+  color: #1a1612;
+}
+.dpc-bp__row:hover { background: rgba(26,22,18,0.05); }
+.dpc-bp__row--active { background: rgba(26,22,18,0.06); }
+.dpc-bp__row-name {
+  flex: 1;
+  font-size: 14.5px;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+}
+.dpc-bp__row-count {
   font-size: 11px;
   color: #6b6357;
   letter-spacing: 1.4px;
   text-transform: uppercase;
   font-variant-numeric: tabular-nums;
+}
+.dpc-bp__row-check {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #1a1612;
+  color: #faf7f2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.dpc-bp__clear-row {
+  border-top: 1px solid rgba(26,22,18,0.06);
+  margin-top: 6px;
+  padding-top: 14px;
 }
 
 /* Grid — fewer, larger cards for premium feel */
