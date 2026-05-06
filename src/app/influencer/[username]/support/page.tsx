@@ -182,32 +182,35 @@ export default function SupportPage({
     let cancelled = false;
     (async () => {
       try {
-        // Try agent session first (preferred for accounts that have configured
-        // per-agent login, e.g. LA BEAUTÉ).
+        // For accounts that enforce per-agent login (LA BEAUTÉ today), the
+        // agent session is the *only* accepted auth — the legacy influencer
+        // cookie can't bypass attribution.
+        const enforceAgentLogin = username === 'labeaute.israel';
+
         const agentRes = await fetch(`/api/agent/me?accountUsername=${username}`, { cache: 'no-store' });
         const agentData = await agentRes.json();
-        let agentAuthed = !!agentData.authenticated;
+        const agentAuthed = !!agentData.authenticated;
 
-        if (!agentAuthed) {
-          // Fall back to legacy influencer cookie.
+        if (agentAuthed) {
+          if (!cancelled) {
+            setAgent({
+              id: agentData.agent.id,
+              display_name: agentData.agent.display_name,
+              is_admin: agentData.agent.is_admin,
+              account_id: agentData.agent.account_id,
+            });
+          }
+        } else if (enforceAgentLogin) {
+          router.push('/labeaute/login');
+          return;
+        } else {
+          // Other accounts: allow legacy influencer cookie.
           const authRes = await fetch(`/api/influencer/auth?username=${username}`);
           const authData = await authRes.json();
           if (!authData.authenticated) {
-            // For LA BEAUTÉ specifically, route to the dedicated login page.
-            if (username === 'labeaute.israel') {
-              router.push('/labeaute/login');
-            } else {
-              router.push(`/influencer/${username}`);
-            }
+            router.push(`/influencer/${username}`);
             return;
           }
-        } else if (!cancelled) {
-          setAgent({
-            id: agentData.agent.id,
-            display_name: agentData.agent.display_name,
-            is_admin: agentData.agent.is_admin,
-            account_id: agentData.agent.account_id,
-          });
         }
 
         const inf = await getInfluencerByUsername(username);
