@@ -48,6 +48,32 @@ interface AccurateAnalytics {
   conversions: { coupon_copies: number; product_clicks: number };
 }
 
+// Extended analytics from the v2 internal pipeline (UTM/exits/GSC/funnel).
+interface InternalAnalytics {
+  totals: {
+    visits: number;
+    new_visitors: number;
+    returning_visitors: number;
+    bounce_rate_pct: number;
+    avg_duration_sec: number;
+    external_exits: number;
+    back_to_ig: number;
+    back_to_site: number;
+    leads: number;
+    support_tickets: number;
+  };
+  series: Array<{ date: string; new_visitors: number; returning_visitors: number }>;
+  breakdown: {
+    ref_source: Array<{ source: string; visits: number }>;
+    device: Array<{ device: string; visits: number }>;
+  };
+  funnel: Array<{ stage: string; count: number }>;
+  gsc: {
+    top_queries: Array<{ query: string; clicks: number; impressions: number; ctr: number; position: number }>;
+    provisioning: { gsc_site_url: string | null; gsc_status: string } | null;
+  };
+}
+
 const TOPIC_LABEL: Record<string, string> = {
   shipment_status: 'סטטוס משלוח',
   complaint: 'תלונה / מוצר פגום',
@@ -95,6 +121,7 @@ export default function AnalyticsPage({
   const [dateRange, setDateRange] = useState<DateRange>('30d');
   const [summary, setSummary] = useState<AccurateAnalytics | null>(null);
   const [previousSummary, setPreviousSummary] = useState<AccurateAnalytics | null>(null);
+  const [internalSummary, setInternalSummary] = useState<InternalAnalytics | null>(null);
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   // Filters — apply to all metrics, topics, and conversions.
@@ -165,17 +192,31 @@ export default function AnalyticsPage({
           return res.json() as Promise<AccurateAnalytics>;
         };
 
-        const [summaryData, prevSummaryData, dailyData, topProds] = await Promise.all([
+        const fetchInternal = async (): Promise<InternalAnalytics | null> => {
+          const days = parseInt(dateRange);
+          const url = `/api/influencer/${encodeURIComponent(username)}/analytics/summary?days=${days}`;
+          try {
+            const res = await fetch(url);
+            if (!res.ok) return null;
+            return (await res.json()) as InternalAnalytics;
+          } catch {
+            return null;
+          }
+        };
+
+        const [summaryData, prevSummaryData, dailyData, topProds, internalData] = await Promise.all([
           fetchAnalytics(startDate, endDate),
           fetchAnalytics(prevStartDate, prevEndDate),
           getDailyStats(inf.id, startDate, endDate),
           getTopProducts(inf.id, startDate, endDate, 5),
+          fetchInternal(),
         ]);
 
         setSummary(summaryData);
         setPreviousSummary(prevSummaryData);
         setDailyStats(dailyData);
         setTopProducts(topProds);
+        setInternalSummary(internalData);
       } catch (error) {
         console.error('Error loading data:', error);
       } finally {
@@ -733,7 +774,135 @@ export default function AnalyticsPage({
             <p className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>קופונים / שיחות</p>
           </div>
         </div>
+
+        {internalSummary && (
+          <section className="max-w-6xl mx-auto px-4 sm:px-6 mt-10 space-y-6">
+            <div>
+              <h2 className="text-xl font-bold" style={{ color: 'var(--dash-text)' }}>אנליטיקס פנימי</h2>
+              <p className="text-sm mt-1" style={{ color: 'var(--dash-text-3)' }}>
+                נתונים שנאספים ישירות מהמערכת שלנו — חוצים adblockers ומקורות חיצוניים.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <KpiTile label="חדשים" value={internalSummary.totals.new_visitors.toLocaleString('he-IL')} />
+              <KpiTile label="חוזרים" value={internalSummary.totals.returning_visitors.toLocaleString('he-IL')} />
+              <KpiTile label="Bounce Rate" value={`${internalSummary.totals.bounce_rate_pct}%`} />
+              <KpiTile
+                label="זמן שיחה ממוצע"
+                value={`${Math.round(internalSummary.totals.avg_duration_sec)}s`}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="rounded-2xl p-4 border" style={{ background: 'var(--dash-card)', borderColor: 'var(--dash-border)' }}>
+                <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--dash-text)' }}>פאנל המרה</h3>
+                <ul className="space-y-2 text-sm">
+                  {internalSummary.funnel.map((row) => {
+                    const top = internalSummary.funnel[0]?.count || 1;
+                    const pct = top > 0 ? Math.round((row.count / top) * 100) : 0;
+                    const label =
+                      row.stage === 'visits' ? 'ביקורים' :
+                      row.stage === 'sessions' ? 'שיחות' :
+                      row.stage === 'engaged' ? 'שיחות עם אינטראקציה' :
+                      'לידים + פניות תמיכה';
+                    return (
+                      <li key={row.stage}>
+                        <div className="flex justify-between mb-1">
+                          <span style={{ color: 'var(--dash-text)' }}>{label}</span>
+                          <span style={{ color: 'var(--dash-text-3)' }}>{row.count} ({pct}%)</span>
+                        </div>
+                        <div className="h-2 rounded" style={{ background: 'var(--dash-border)' }}>
+                          <div className="h-full rounded" style={{ width: `${pct}%`, background: '#6366f1' }} />
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+
+              <div className="rounded-2xl p-4 border" style={{ background: 'var(--dash-card)', borderColor: 'var(--dash-border)' }}>
+                <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--dash-text)' }}>יציאות</h3>
+                <div className="h-44">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={[
+                      { label: 'יציאות חיצוניות', value: internalSummary.totals.external_exits },
+                      { label: 'חזרה לאינסטגרם', value: internalSummary.totals.back_to_ig },
+                      { label: 'חזרה לאתר', value: internalSummary.totals.back_to_site },
+                    ]}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--dash-border)" />
+                      <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                      <YAxis tick={{ fontSize: 10 }} />
+                      <Tooltip />
+                      <Bar dataKey="value" fill="#f59e0b" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="rounded-2xl p-4 border" style={{ background: 'var(--dash-card)', borderColor: 'var(--dash-border)' }}>
+                <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--dash-text)' }}>מקורות תנועה (Top 10)</h3>
+                {internalSummary.breakdown.ref_source.length ? (
+                  <ul className="space-y-1 text-sm">
+                    {internalSummary.breakdown.ref_source.map((s) => (
+                      <li key={s.source} className="flex justify-between">
+                        <span className="truncate" style={{ color: 'var(--dash-text)' }}>{s.source}</span>
+                        <span className="font-mono text-xs" style={{ color: 'var(--dash-text-3)' }}>{s.visits}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>אין נתונים</p>
+                )}
+              </div>
+
+              <div className="rounded-2xl p-4 border" style={{ background: 'var(--dash-card)', borderColor: 'var(--dash-border)' }}>
+                <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--dash-text)' }}>Search Console — Top Queries</h3>
+                {internalSummary.gsc.top_queries.length ? (
+                  <table className="w-full text-xs">
+                    <thead style={{ color: 'var(--dash-text-3)' }}>
+                      <tr>
+                        <th className="text-right pb-1">Query</th>
+                        <th className="text-right pb-1">Clicks</th>
+                        <th className="text-right pb-1">Pos.</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {internalSummary.gsc.top_queries.slice(0, 10).map((r, i) => (
+                        <tr key={i} style={{ borderTop: '1px solid var(--dash-border)' }}>
+                          <td className="py-1 truncate max-w-[160px]" style={{ color: 'var(--dash-text)' }}>{r.query}</td>
+                          <td className="py-1 text-right font-mono" style={{ color: 'var(--dash-text)' }}>{r.clicks}</td>
+                          <td className="py-1 text-right font-mono" style={{ color: 'var(--dash-text-3)' }}>{Number(r.position).toFixed(1)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
+                    {internalSummary.gsc.provisioning?.gsc_site_url
+                      ? 'אין שאילתות ב-7 הימים האחרונים.'
+                      : 'GSC לא מחובר. צרו קשר עם הצוות לחיבור Search Console.'}
+                  </p>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
       </main>
+    </div>
+  );
+}
+
+function KpiTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div
+      className="rounded-2xl p-4 border"
+      style={{ background: 'var(--dash-card)', borderColor: 'var(--dash-border)' }}
+    >
+      <p className="text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>{label}</p>
+      <p className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>{value}</p>
     </div>
   );
 }

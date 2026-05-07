@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import crypto from 'node:crypto';
 
 /**
  * Simple in-memory rate limiter for middleware
@@ -72,10 +73,110 @@ function checkRateLimit(
   return { success: true, remaining: config.maxRequests - entry.count };
 }
 
+const ATTR_COOKIE = 'ldrs_attr';
+const ATTR_COOKIE_TTL_SEC = 90 * 24 * 60 * 60;
+const ATTR_PARAMS = [
+  'utm_source',
+  'utm_medium',
+  'utm_campaign',
+  'utm_term',
+  'utm_content',
+  'gclid',
+  'fbclid',
+  'ttclid',
+] as const;
+
+const RESERVED_PATHS = new Set([
+  'admin',
+  'api',
+  'auth',
+  'bestieai',
+  'dashboard',
+  'influencer',
+  'login',
+  'logout',
+  'privacy',
+  'support',
+  'terms',
+  '_next',
+  'icons',
+  'fonts',
+  'images',
+]);
+
+function isChatSurfacePath(pathname: string): boolean {
+  if (!pathname.startsWith('/')) return false;
+  const segments = pathname.split('/').filter(Boolean);
+  if (segments.length === 0) return false;
+  const first = segments[0];
+  if (RESERVED_PATHS.has(first)) return false;
+  if (first.includes('.')) return false;
+  return true;
+}
+
+function signAttrPayload(payload: string): string {
+  const secret =
+    process.env.ANALYTICS_WIDGET_SECRET ||
+    process.env.IP_HASH_SALT ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    '';
+  if (!secret) return '';
+  return crypto.createHmac('sha256', secret).update(payload).digest('base64url');
+}
+
+function maybeWriteAttributionCookie(request: NextRequest, response: NextResponse): void {
+  if (request.cookies.get(ATTR_COOKIE)) return;
+  const url = request.nextUrl;
+  const captured: Record<string, string> = {};
+  for (const key of ATTR_PARAMS) {
+    const v = url.searchParams.get(key);
+    if (v) captured[key] = v.slice(0, 200);
+  }
+  const referer = request.headers.get('referer') || '';
+  let referrerHost = '';
+  if (referer) {
+    try {
+      referrerHost = new URL(referer).host;
+    } catch {
+      /* ignore */
+    }
+  }
+  const hasAttribution = Object.keys(captured).length > 0 || referrerHost;
+  if (!hasAttribution) return;
+
+  const payload = {
+    ...captured,
+    referrer_host: referrerHost || undefined,
+    landing_path: url.pathname,
+    arrival_at: new Date().toISOString(),
+  };
+  const payloadStr = JSON.stringify(payload);
+  const sig = signAttrPayload(payloadStr);
+  if (!sig) return;
+  const cookieValue = `${Buffer.from(payloadStr).toString('base64url')}.${sig}`;
+
+  response.cookies.set(ATTR_COOKIE, cookieValue, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: ATTR_COOKIE_TTL_SEC,
+  });
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const ip = getClientIP(request);
-  
+
+  // Page-level attribution capture: write a signed cookie on first visit
+  // to a chat surface so /api/track/visit can persist UTM/gclid/referrer
+  // server-side, bypassing adblockers that target client-side trackers.
+  if (!pathname.startsWith('/api/') && isChatSurfacePath(pathname)) {
+    const response = NextResponse.next();
+    maybeWriteAttributionCookie(request, response);
+    return response;
+  }
+
   // Rate limit API routes
   if (pathname.startsWith('/api/')) {
     let config = RATE_LIMITS.admin;

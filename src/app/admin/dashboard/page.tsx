@@ -18,6 +18,7 @@ import {
   ExternalLink,
   Settings2,
   ChevronLeft,
+  BarChart3,
 } from 'lucide-react';
 import type { Influencer } from '@/types';
 import { formatNumber } from '@/lib/utils';
@@ -169,6 +170,10 @@ function DashboardContent() {
         description="מבט-על על החשבונות, האתרים והפעילות של המערכת — הכל במסך אחד."
         actions={
           <>
+            <ButtonLink href="/admin/analytics" variant="outline" size="sm">
+              <BarChart3 className="w-3.5 h-3.5" />
+              אנליטיקס
+            </ButtonLink>
             <ButtonLink href="/admin/accounts" variant="outline" size="sm">
               <Users className="w-3.5 h-3.5" />
               כל החשבונות

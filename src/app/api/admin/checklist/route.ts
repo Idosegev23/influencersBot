@@ -74,6 +74,13 @@ const CHECKLIST_TEMPLATE: { section: string; tasks: { key: string; title: string
     ],
   },
   {
+    section: 'אנליטיקס',
+    tasks: [
+      { key: 'analytics_gsc_connect', title: 'חיבור Search Console (אם יש דומיין) — /admin/influencers/[id]/analytics-setup' },
+      { key: 'analytics_dashboard_smoke', title: 'בדיקת דשבורד אנליטיקס — KPIs נטענים, גרפים מוצגים' },
+    ],
+  },
+  {
     section: 'בדיקות ואימות',
     tasks: [
       { key: 'test_chat_general', title: 'בדיקת צ׳אט — שאלה כללית' },

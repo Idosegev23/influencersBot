@@ -53,6 +53,7 @@ import { ConferenceLeadPopup } from '@/components/chat/ConferenceLeadPopup';
 import { ConferenceForYouTab } from '@/components/chat/ConferenceForYouTab';
 import { AskItamarButton } from '@/components/chat/AskItamarButton';
 import { track, setAnalyticsContext, identify } from '@/lib/analytics/track';
+import { startSessionTracker, setSessionTab, endSessionTracker } from '@/lib/analytics/session-end';
 
 // Itamar handoff button kill-switch is now DB-driven:
 // accounts.config.features.handoff_button_enabled (boolean).
@@ -565,11 +566,21 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     
     loadData();
 
-    // ── analytics: track entering the chat page for this account
-    track('session_start', {
+    // ── analytics: track entering the chat page for this account.
+    // startSessionTracker fires session_start internally and registers
+    // visibility/idle listeners that fire session_end with duration_sec.
+    startSessionTracker({ lastTab: undefined });
+    track('page_view', {
       username,
       is_conference: isConferenceMode,
     });
+
+    // Pair: end the session (and flush analytics) when the page unmounts
+    // via SPA navigation. visibilitychange/pagehide already covered by
+    // startSessionTracker for browser-level tear-down.
+    return () => {
+      endSessionTracker('manual');
+    };
 
     // Preload discovery categories for the empty state (skip for media_news — uses hot topics instead)
     fetch(`/api/discovery/categories?username=${encodeURIComponent(username)}`)
@@ -616,6 +627,71 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       currentTab: activeTab,
     });
   }, [influencer?.id, sessionId, activeTab]);
+
+  // ── analytics: delegated capture of clicks on outbound links + dynamic
+  // CTAs. Fires before navigation so the event is queued to sendBeacon
+  // even if the click leaves the page. Classifies destination so we know
+  // whether the user went back to Instagram, the brand site, or elsewhere.
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      const target = e.target as HTMLElement | null;
+      if (!target || typeof target.closest !== 'function') return;
+
+      const cta = target.closest<HTMLElement>('[data-cta]');
+      if (cta) {
+        const ctaName = cta.getAttribute('data-cta') || '';
+        if (ctaName) {
+          track('dynamic_cta_clicked', {
+            cta_name: ctaName,
+            cta_label: cta.getAttribute('data-cta-label') || cta.textContent?.slice(0, 80) || '',
+            current_tab: activeTab,
+          });
+        }
+      }
+
+      const anchor = target.closest<HTMLAnchorElement>('a[href]');
+      if (!anchor) return;
+      const rawHref = anchor.getAttribute('href');
+      if (!rawHref) return;
+      const isExternal =
+        anchor.target === '_blank' ||
+        /^(https?:|mailto:|tel:|whatsapp:)/i.test(rawHref);
+      if (!isExternal) return;
+
+      let host = '';
+      let kind: 'instagram' | 'whatsapp' | 'mailto' | 'tel' | 'external' = 'external';
+      try {
+        if (/^mailto:/i.test(rawHref)) {
+          kind = 'mailto';
+        } else if (/^tel:/i.test(rawHref)) {
+          kind = 'tel';
+        } else if (/^whatsapp:/i.test(rawHref)) {
+          kind = 'whatsapp';
+        } else {
+          host = new URL(rawHref, window.location.href).host;
+          if (/(^|\.)instagram\.com$/i.test(host)) kind = 'instagram';
+        }
+      } catch {
+        /* invalid url */
+      }
+
+      const payload = {
+        url: rawHref.slice(0, 500),
+        host,
+        kind,
+        current_tab: activeTab,
+      };
+
+      if (kind === 'instagram') {
+        track('back_to_instagram_clicked', payload);
+      } else {
+        track('external_link_clicked', payload);
+      }
+    }
+
+    document.addEventListener('click', handleClick, true);
+    return () => document.removeEventListener('click', handleClick, true);
+  }, [activeTab]);
 
   // ── SEO: per-tab document title + description for Google Ads sitelinks.
   // Each tab needs distinct meta so Google won't merge them under one canonical.
@@ -1216,6 +1292,10 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
 
       if (response.ok) {
         setSupportSuccess(true);
+        track('support_ticket_submitted', {
+          source: 'support_modal',
+          has_phone: !!supportForm.phone,
+        });
         setTimeout(() => {
           setShowSupportModal(false);
           setSupportSuccess(false);
@@ -1253,6 +1333,11 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'שגיאה בשליחת הפנייה');
+      track('support_ticket_submitted', {
+        source: 'problem_form',
+        brand: problemBrand.brand_name,
+        has_order: !!problemForm.order,
+      });
       setProblemStep('success');
     } catch (err) {
       setProblemError(err instanceof Error ? err.message : 'שגיאה בשליחת הפנייה');
@@ -1363,6 +1448,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   activeTab={activeTab}
                   onTabChange={(id) => {
                     track('tab_changed', { from_tab: activeTab, to_tab: id });
+                    track('tab_view', { tab_id: id });
+                    setSessionTab(id);
                     setActiveTab(id as TabId);
                   }}
                 />

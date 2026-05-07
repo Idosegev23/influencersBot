@@ -13,6 +13,7 @@
  */
 
 import type { AnalyticsEventName, EventParams, GlobalParams } from './types';
+import { configureDbBeacon, enqueueDbEvent, flush as flushDbBeacon } from './db-beacon';
 
 declare global {
   interface Window {
@@ -256,6 +257,11 @@ export function setAnalyticsContext(ctx: {
   if (ctx.accountId !== undefined) _accountId = ctx.accountId;
   if (ctx.sessionId !== undefined) _sessionId = ctx.sessionId;
   if (ctx.currentTab !== undefined) _currentTab = ctx.currentTab;
+  configureDbBeacon({
+    accountId: _accountId,
+    sessionId: _sessionId,
+    anonId: getClientId(),
+  });
 }
 
 function buildGlobals(): GlobalParams {
@@ -353,6 +359,15 @@ export function track(name: AnalyticsEventName, params: EventParams = {}): void 
       console.warn('[track] ttq error', err);
     }
   }
+
+  // 4) Internal DB pipeline — only allow-listed events get persisted to
+  // Supabase via /api/analytics/track. Firehose events (scroll_depth,
+  // viewport_focus etc.) are dropped here.
+  enqueueDbEvent(name, clean);
+}
+
+export function flushAnalytics(): void {
+  flushDbBeacon();
 }
 
 // ---------------------------------------------------------------------------

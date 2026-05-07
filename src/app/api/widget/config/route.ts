@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { signWidgetToken } from '@/lib/analytics/widget-token';
 
 function getCorsHeaders(origin: string): Record<string, string> {
   return {
@@ -43,6 +44,13 @@ export async function GET(req: NextRequest) {
     const config = account?.config || {};
     const widgetConfig = config.widget || {};
 
+    let analyticsToken: string | null = null;
+    try {
+      analyticsToken = signWidgetToken(accountId);
+    } catch (err) {
+      console.warn('[Widget Config] could not sign analytics token:', err);
+    }
+
     return NextResponse.json(
       {
         theme: {
@@ -56,6 +64,7 @@ export async function GET(req: NextRequest) {
         welcomeMessage: widgetConfig.welcomeMessage || 'שלום! איך אפשר לעזור?',
         placeholder: widgetConfig.placeholder || 'שאלו משהו...',
         domain: widgetConfig.domain || config.username || '',
+        analyticsToken,
       },
       { headers: corsHeaders },
     );
