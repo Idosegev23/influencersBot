@@ -163,7 +163,51 @@ export async function ingestBatch(batch: IngestBatch, stamps: IngestStamps): Pro
     return { ok: false, accepted: 0, rejected, status: 500, error: 'insert_failed' };
   }
 
+  // Propagate session lifecycle events into chat_sessions columns so the
+  // rollup can compute avg_duration_sec / exit_kind without re-reading
+  // events.payload. Fire-and-forget: failures are logged but don't break
+  // the ingest response.
+  try {
+    await propagateSessionLifecycle(rows, batch.sessionId);
+  } catch (err) {
+    console.warn('[analytics] propagateSessionLifecycle failed:', err);
+  }
+
   return { ok: true, accepted: rows.length, rejected, status: 200 };
+}
+
+async function propagateSessionLifecycle(
+  rows: Array<{ type: string; session_id: string | null; payload: Record<string, unknown>; created_at: string }>,
+  sessionId: string | null
+): Promise<void> {
+  if (!sessionId) return;
+
+  const tabChange = rows.find((r) => r.type === 'tab_changed' || r.type === 'tab_view');
+  const sessionEnd = rows.find((r) => r.type === 'session_end');
+
+  const update: Record<string, unknown> = {
+    last_event_at: rows[rows.length - 1]?.created_at || new Date().toISOString(),
+  };
+
+  if (tabChange) {
+    const tabId =
+      (tabChange.payload?.to_tab as string) ||
+      (tabChange.payload?.tab_id as string) ||
+      undefined;
+    if (tabId) update.last_tab = tabId;
+  }
+
+  if (sessionEnd) {
+    const dur = Number((sessionEnd.payload as any)?.duration_sec);
+    const exit = (sessionEnd.payload as any)?.exit_kind;
+    update.ended_at = sessionEnd.created_at;
+    if (Number.isFinite(dur) && dur >= 0) update.duration_sec = Math.round(dur);
+    if (typeof exit === 'string') update.exit_kind = exit.slice(0, 32);
+    if ((sessionEnd.payload as any)?.last_tab) update.last_tab = (sessionEnd.payload as any).last_tab;
+  }
+
+  const supabase = await createClient();
+  await supabase.from('chat_sessions').update(update).eq('id', sessionId);
 }
 
 /**
