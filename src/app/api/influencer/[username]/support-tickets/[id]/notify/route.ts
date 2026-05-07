@@ -25,6 +25,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase, getInfluencerByUsername } from '@/lib/supabase';
 import { checkInfluencerAuth } from '@/lib/auth/influencer-auth';
 import { requireAdminAuth } from '@/lib/auth/admin-auth';
+import { getAgentSession } from '@/lib/auth/agent-auth';
 import {
   sendSupportStatusInProgress,
   sendSupportStatusAwaitingCustomer,
@@ -32,6 +33,12 @@ import {
   sendSupportStatusResolved,
 } from '@/lib/whatsapp-notify';
 import { ensureReplyToken } from '@/lib/support/reply-token';
+
+// Meta template BODY hard cap is 1024; the resolved template wraps the
+// summary with ~120 chars of fixed text + variables, so we leave the
+// agent 900 chars of summary headroom and reject earlier with a clear
+// message. Source: WHATSAPP_TEMPLATES_SPEC.md.
+const RESOLUTION_SUMMARY_MAX = 900;
 
 export const runtime = 'nodejs';
 
@@ -61,6 +68,10 @@ export async function POST(
 
   const influencer = await getInfluencerByUsername(username);
   if (!influencer) return NextResponse.json({ error: 'not found' }, { status: 404 });
+
+  // Identify the acting agent (if logged in via agent session) so the
+  // history row carries the real name rather than the account username.
+  const agent = await getAgentSession(username);
 
   let body: any;
   try {
@@ -192,6 +203,17 @@ export async function POST(
     }
     case 'resolved': {
       const summary = (body.resolutionSummary || 'הטיפול הושלם.').toString().trim();
+      if (summary.length > RESOLUTION_SUMMARY_MAX) {
+        return NextResponse.json(
+          {
+            error: 'resolution_summary_too_long',
+            limit: RESOLUTION_SUMMARY_MAX,
+            length: summary.length,
+            message: `סיכום הטיפול ארוך מדי — מקסימום ${RESOLUTION_SUMMARY_MAX} תווים, נשלחו ${summary.length}.`,
+          },
+          { status: 400 },
+        );
+      }
       templateName = 'support_status_resolved';
       bodyText =
         `היי ${fname} 👋\n` +
@@ -220,7 +242,8 @@ export async function POST(
     ticket_id: ticket.id,
     account_id: influencer.id,
     action: 'customer_notified',
-    actor: username,
+    actor: agent?.display_name || username,
+    actor_agent_id: agent?.agent_id || null,
     whatsapp_template_name: templateName,
     whatsapp_message_id: result.wa_message_id || null,
     body_text: bodyText,
@@ -257,7 +280,8 @@ export async function POST(
         ticket_id: ticket.id,
         account_id: influencer.id,
         action: 'status_change',
-        actor: username,
+        actor: agent?.display_name || username,
+    actor_agent_id: agent?.agent_id || null,
         to_status: newStatus,
         note: `auto-transition (sent ${templateName})`,
       });

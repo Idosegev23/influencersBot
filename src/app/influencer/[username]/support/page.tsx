@@ -26,6 +26,9 @@ import {
   LogOut,
   BarChart3,
   UserCheck,
+  Image as ImageIcon,
+  MessageCircle,
+  AlertTriangle,
 } from 'lucide-react';
 import { getInfluencerByUsername } from '@/lib/supabase';
 import type { Influencer } from '@/types';
@@ -728,6 +731,17 @@ function TicketDetail({
   const [showSendDialog, setShowSendDialog] = useState<null | 'in_progress' | 'awaiting_customer' | 'shipped' | 'resolved'>(null);
   const [sending, setSending] = useState(false);
 
+  // 24-hour service window for free-form messages
+  const [serviceWindow, setServiceWindow] = useState<{
+    withinWindow: boolean;
+    expiresAt: string | null;
+    lastInboundAt: string | null;
+  } | null>(null);
+  const [directBody, setDirectBody] = useState('');
+  const [directImage, setDirectImage] = useState<File | null>(null);
+  const [directImageCaption, setDirectImageCaption] = useState('');
+  const [sendingDirect, setSendingDirect] = useState(false);
+
   const fetchTicket = useCallback(async () => {
     setLoading(true);
     const res = await fetch(`/api/influencer/${username}/support-tickets/${ticketId}`);
@@ -742,7 +756,60 @@ function TicketDetail({
     setTrackingNumber(data.ticket?.tracking_number || '');
     setResolutionSummary(data.ticket?.resolution_summary || '');
     setLoading(false);
+    // Fire-and-forget: fetch the 24h service window status. Doesn't block render.
+    fetch(`/api/influencer/${username}/support-tickets/${ticketId}/window`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((w) => { if (w) setServiceWindow(w); })
+      .catch(() => {});
   }, [username, ticketId]);
+
+  const handleSendDirectText = async () => {
+    const txt = directBody.trim();
+    if (!txt) return;
+    setSendingDirect(true);
+    try {
+      const res = await fetch(`/api/influencer/${username}/support-tickets/${ticketId}/send-text`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body: txt }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setDirectBody('');
+        await fetchTicket();
+        onChange();
+      } else {
+        alert(`שליחה נכשלה: ${data.message || data.error || 'שגיאה'}`);
+      }
+    } finally {
+      setSendingDirect(false);
+    }
+  };
+
+  const handleSendDirectImage = async () => {
+    if (!directImage) return;
+    setSendingDirect(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', directImage);
+      if (directImageCaption.trim()) fd.append('caption', directImageCaption.trim());
+      const res = await fetch(`/api/influencer/${username}/support-tickets/${ticketId}/send-image`, {
+        method: 'POST',
+        body: fd,
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setDirectImage(null);
+        setDirectImageCaption('');
+        await fetchTicket();
+        onChange();
+      } else {
+        alert(`שליחה נכשלה: ${data.message || data.error || 'שגיאה'}`);
+      }
+    } finally {
+      setSendingDirect(false);
+    }
+  };
 
   useEffect(() => {
     fetchTicket();
@@ -915,7 +982,8 @@ function TicketDetail({
         onChange();
         setShowSendDialog(null);
       } else {
-        alert(`שליחה נכשלה: ${data.error || 'שגיאה'}`);
+        const msg = data.message || data.error || 'שגיאה';
+        alert(`שליחה נכשלה: ${msg}`);
       }
     } finally {
       setSending(false);
@@ -1118,6 +1186,135 @@ function TicketDetail({
         )}
       </div>
 
+      {/* Direct message — free-form text + image, only inside the 24h window */}
+      {ticket.customer_phone && (
+        <div className="rounded-xl p-3"
+          style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)' }}>
+          <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+            <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: '#86efac' }}>
+              <MessageCircle className="w-4 h-4" />
+              שיחה ישירה ללקוחה
+            </div>
+            {serviceWindow ? (
+              serviceWindow.withinWindow ? (
+                <span className="text-[11px] px-2 py-0.5 rounded-full"
+                  style={{ background: 'rgba(34,197,94,0.2)', color: '#22c55e' }}>
+                  ✓ חלון 24 שעות פתוח{serviceWindow.expiresAt ? ` · נסגר ${formatRelative(serviceWindow.expiresAt)}` : ''}
+                </span>
+              ) : (
+                <span className="text-[11px] px-2 py-0.5 rounded-full flex items-center gap-1"
+                  style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24' }}>
+                  <AlertTriangle className="w-3 h-3" />
+                  חלון 24 שעות סגור
+                </span>
+              )
+            ) : (
+              <span className="text-[11px] opacity-60">בודק חלון…</span>
+            )}
+          </div>
+
+          {serviceWindow && !serviceWindow.withinWindow && (
+            <p className="text-[11px] mb-2" style={{ color: '#fbbf24' }}>
+              הלקוחה לא הגיבה ב-24 שעות האחרונות. אפשר לשלוח רק תבניות סטטוס (לחצנים למעלה).
+              {serviceWindow.lastInboundAt && (
+                <> תגובה אחרונה ממנה: {formatRelative(serviceWindow.lastInboundAt)}.</>
+              )}
+            </p>
+          )}
+
+          {/* Free-form text */}
+          <div className="space-y-2">
+            <textarea
+              value={directBody}
+              onChange={(e) => setDirectBody(e.target.value.slice(0, 4000))}
+              placeholder="הודעה חופשית ללקוחה (בתוך חלון 24 שעות בלבד)"
+              disabled={!serviceWindow?.withinWindow || sendingDirect}
+              rows={3}
+              className="w-full text-sm p-2.5 rounded-xl outline-none resize-y disabled:opacity-50"
+              style={{ background: 'rgba(255,255,255,0.05)', color: '#fff' }}
+            />
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] opacity-60">{directBody.length} / 4000</span>
+              <button
+                onClick={handleSendDirectText}
+                disabled={!directBody.trim() || !serviceWindow?.withinWindow || sendingDirect}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 disabled:opacity-50"
+                style={{ background: '#22c55e', color: '#fff' }}
+              >
+                {sendingDirect && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <Send className="w-3.5 h-3.5" />
+                שליחה
+              </button>
+            </div>
+          </div>
+
+          {/* Image picker */}
+          <div className="mt-3 pt-3 space-y-2"
+            style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="flex items-center gap-2 flex-wrap">
+              <label
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 cursor-pointer ${(!serviceWindow?.withinWindow || sendingDirect) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--dash-text-2, #9ca3af)' }}
+              >
+                <ImageIcon className="w-3.5 h-3.5" />
+                {directImage ? directImage.name : 'בחירת תמונה'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={!serviceWindow?.withinWindow || sendingDirect}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) {
+                      if (f.size > 10 * 1024 * 1024) {
+                        alert('הקובץ גדול מ-10MB');
+                        e.target.value = '';
+                        return;
+                      }
+                      setDirectImage(f);
+                    }
+                  }}
+                />
+              </label>
+              {directImage && (
+                <button
+                  onClick={() => setDirectImage(null)}
+                  className="text-[11px] opacity-70"
+                  style={{ color: '#9ca3af' }}
+                >
+                  ביטול
+                </button>
+              )}
+            </div>
+            {directImage && (
+              <input
+                type="text"
+                value={directImageCaption}
+                onChange={(e) => setDirectImageCaption(e.target.value.slice(0, 1024))}
+                placeholder="כיתוב לתמונה (אופציונלי)"
+                disabled={sendingDirect}
+                className="w-full text-sm p-2 rounded-lg outline-none"
+                style={{ background: 'rgba(255,255,255,0.05)', color: '#fff' }}
+              />
+            )}
+            {directImage && (
+              <div className="flex justify-end">
+                <button
+                  onClick={handleSendDirectImage}
+                  disabled={!serviceWindow?.withinWindow || sendingDirect}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 disabled:opacity-50"
+                  style={{ background: '#22c55e', color: '#fff' }}
+                >
+                  {sendingDirect && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <Send className="w-3.5 h-3.5" />
+                  שליחת תמונה
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Editable details */}
       <div className="space-y-3">
         <div>
@@ -1185,7 +1382,14 @@ function TicketDetail({
             {history.map((h) => {
               const isCustomerReply = h.action === 'customer_reply';
               const isBrandMessage = h.action === 'customer_notified';
-              const dotColor = isCustomerReply ? '#22c55e' : isBrandMessage ? '#06b6d4' : '#883fe2';
+              const isAgentDirect = h.action === 'agent_message' || h.action === 'agent_image';
+              const dotColor = isCustomerReply
+                ? '#22c55e'
+                : isBrandMessage
+                ? '#06b6d4'
+                : isAgentDirect
+                ? '#10b981'
+                : '#883fe2';
               return (
                 <li key={h.id} className="flex gap-2 items-start">
                   <span
@@ -1227,6 +1431,19 @@ function TicketDetail({
                         style={{
                           background: 'rgba(6,182,212,0.08)',
                           border: '1px solid rgba(6,182,212,0.2)',
+                          color: 'var(--dash-text, #fff)',
+                          fontSize: '13px',
+                          lineHeight: '1.5',
+                        }}>
+                        {h.body_text}
+                      </div>
+                    )}
+                    {/* Agent free-form message / image caption — emerald tint */}
+                    {isAgentDirect && h.body_text && (
+                      <div className="mt-1 p-2 rounded-lg whitespace-pre-wrap"
+                        style={{
+                          background: 'rgba(16,185,129,0.08)',
+                          border: '1px solid rgba(16,185,129,0.2)',
                           color: 'var(--dash-text, #fff)',
                           fontSize: '13px',
                           lineHeight: '1.5',
@@ -1663,6 +1880,16 @@ function historyLine(h: HistoryEntry): string {
     return `הודעה ללקוחה: ${friendly}`;
   }
   if (h.action === 'customer_reply') return `תגובת הלקוחה`;
+  if (h.action === 'agent_message') {
+    const failed = h.note?.startsWith('Send failed');
+    if (failed) return `ניסיון שליחת הודעה חופשית נכשל — ${h.note}`;
+    return `הודעה חופשית ללקוחה`;
+  }
+  if (h.action === 'agent_image') {
+    const failed = h.note?.startsWith('Send failed');
+    if (failed) return `ניסיון שליחת תמונה נכשל — ${h.note}`;
+    return `תמונה ללקוחה`;
+  }
   return h.action;
 }
 
@@ -1851,12 +2078,30 @@ function SendDialog({
 
         {template === 'resolved' && (
           <div>
-            <div className="text-xs mb-1.5" style={{ color: '#9ca3af' }}>סיכום הטיפול</div>
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="text-xs" style={{ color: '#9ca3af' }}>סיכום הטיפול</div>
+              <div
+                className="text-[11px]"
+                style={{
+                  color:
+                    resolutionSummary.length > 850
+                      ? '#fbbf24'
+                      : resolutionSummary.length >= 900
+                      ? '#ef4444'
+                      : '#6b7280',
+                }}
+              >
+                {resolutionSummary.length} / 900
+              </div>
+            </div>
             <textarea
               value={resolutionSummary}
-              onChange={(e) => setResolutionSummary(e.target.value)}
-              className="w-full text-sm p-3 rounded-xl outline-none resize-y min-h-[80px]"
+              onChange={(e) => setResolutionSummary(e.target.value.slice(0, 900))}
+              maxLength={900}
+              rows={8}
+              className="w-full text-sm p-3 rounded-xl outline-none resize-y min-h-[200px]"
               style={{ background: 'rgba(255,255,255,0.05)' }}
+              placeholder="פירוט מלא של מה שנעשה כדי לסגור את הפנייה — כל הפרטים שהלקוחה צריכה לראות"
             />
           </div>
         )}
