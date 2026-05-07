@@ -29,6 +29,7 @@ import {
   Image as ImageIcon,
   MessageCircle,
   AlertTriangle,
+  Trash2,
 } from 'lucide-react';
 import { getInfluencerByUsername } from '@/lib/supabase';
 import type { Influencer } from '@/types';
@@ -786,6 +787,30 @@ function TicketDetail({
     }
   };
 
+  const [deleting, setDeleting] = useState(false);
+  const handleDeleteTicket = async () => {
+    if (!agent?.is_admin) return;
+    const confirmed = window.confirm(
+      'למחוק את הפנייה לחלוטין?\n\nכולל היסטוריית השיחה, ההערות הפנימיות, וכל הקבצים שהועלו. פעולה לא הפיכה.',
+    );
+    if (!confirmed) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/influencer/${username}/support-tickets/${ticketId}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (data.ok) {
+        onChange();
+        onClose();
+      } else {
+        alert(`מחיקה נכשלה: ${data.message || data.error || 'שגיאה'}`);
+      }
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const handleSendDirectImage = async () => {
     if (!directImage) return;
     setSendingDirect(true);
@@ -1496,6 +1521,31 @@ function TicketDetail({
           onClose={() => setShowSendDialog(null)}
           onSend={(extra) => handleSendTemplate(showSendDialog, extra)}
         />
+      )}
+
+      {/* Danger zone — admin-only delete */}
+      {agent?.is_admin && (
+        <div
+          className="mt-2 p-3 rounded-xl"
+          style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}
+        >
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="text-xs" style={{ color: '#9ca3af' }}>
+              <span className="font-semibold" style={{ color: '#fca5a5' }}>אזור מסוכן</span>
+              <span className="opacity-70"> — מחיקה לחלוטין כולל היסטוריה וקבצים. לא הפיך.</span>
+            </div>
+            <button
+              onClick={handleDeleteTicket}
+              disabled={deleting}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 disabled:opacity-50"
+              style={{ background: '#ef4444', color: '#fff' }}
+            >
+              {deleting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              <Trash2 className="w-3.5 h-3.5" />
+              מחיקת פנייה
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

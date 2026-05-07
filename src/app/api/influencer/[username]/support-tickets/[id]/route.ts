@@ -222,3 +222,71 @@ export async function PATCH(
 
   return NextResponse.json({ ok: true, updated: Object.keys(update).filter((k) => k !== 'updated_at') });
 }
+
+/**
+ * Hard-delete a ticket — admin only.
+ *
+ * Authorization: must be either a platform admin OR a support_agent
+ * with `is_admin = true` on this account. Regular agents (including
+ * the influencer's brand-admin cookie) cannot delete tickets.
+ *
+ * Side effects: support_ticket_history rows cascade automatically
+ * (FK on delete CASCADE). Storage attachments under
+ * `support-attachments/<ticket_id>/` are removed best-effort.
+ */
+export async function DELETE(
+  _req: NextRequest,
+  ctx: { params: Promise<{ username: string; id: string }> },
+) {
+  const { username, id } = await ctx.params;
+
+  const platformAdmin = (await requireAdminAuth()) === null;
+  const agent = await getAgentSession(username);
+  const agentIsAdmin = !!agent?.is_admin;
+
+  if (!platformAdmin && !agentIsAdmin) {
+    return NextResponse.json({ error: 'admin_only', message: 'רק אדמין יכול למחוק פניות' }, { status: 403 });
+  }
+
+  const influencer = await getInfluencerByUsername(username);
+  if (!influencer) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+
+  // Verify the ticket belongs to this account before deleting.
+  const { data: ticket } = await supabase
+    .from('support_requests')
+    .select('id')
+    .eq('id', id)
+    .eq('account_id', influencer.id)
+    .maybeSingle();
+
+  if (!ticket) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+
+  // Best-effort: remove any uploaded attachments for this ticket.
+  try {
+    const bucket = supabase.storage.from('support-attachments');
+    const { data: files } = await bucket.list(id);
+    if (files && files.length > 0) {
+      const paths = files.map((f) => `${id}/${f.name}`);
+      await bucket.remove(paths);
+    }
+  } catch (e) {
+    console.warn('[ticket DELETE] storage cleanup failed (non-fatal):', e);
+  }
+
+  const { error: delErr } = await supabase
+    .from('support_requests')
+    .delete()
+    .eq('id', id)
+    .eq('account_id', influencer.id);
+
+  if (delErr) {
+    console.error('[ticket DELETE] db error:', delErr);
+    return NextResponse.json({ error: 'delete_failed' }, { status: 500 });
+  }
+
+  console.log(
+    `[ticket DELETE] ticket=${id} account=${influencer.id} by=${agent?.display_name || 'platform_admin'} (${agent?.agent_id || '-'})`,
+  );
+
+  return NextResponse.json({ ok: true });
+}
