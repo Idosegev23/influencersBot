@@ -9,6 +9,7 @@ import {
   X, Sparkles, AlignCenter, Check, Plus,
 } from 'lucide-react';
 import DekelProductsCatalog from './DekelProductsCatalog';
+import { CatalogLoader } from './CatalogLoader';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -857,11 +858,7 @@ export default function ProductsCatalogTab({ accountId, onAskAbout, username }: 
   const food = isFoodBrand(products);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-6 h-6 animate-spin" style={{ color: '#883fe2' }} />
-      </div>
-    );
+    return <CatalogLoader />;
   }
 
   // Editorial catalogs (claim-tagged products like Dekel's) get the polished
