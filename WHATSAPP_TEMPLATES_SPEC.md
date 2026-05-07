@@ -11,6 +11,7 @@
 > | `brand_support_ticket` | UTILITY | ✅ APPROVED |
 > | `influencer_weekly_digest_v2` | UTILITY | PENDING |
 > | `influencer_welcome_v2` | UTILITY | PENDING |
+> | `support_delivered_feedback_v1` | UTILITY | TO SUBMIT |
 >
 > **למה `_v2`?** בתהליך ההגשה הראשון יצרנו טמפלטים עם URLs שגויים (`bestieai.com`).
 > אחרי מחיקה, Meta נועלת את השם+שפה למשך זמן בלתי-ידוע (~4 שבועות לפי ההודעה של Meta),
@@ -290,6 +291,95 @@ BestieAI
 
 ### Sample value ל-Body
 - `{{1}}` = `דניאל`
+
+---
+
+## Template 7: `support_delivered_feedback`
+
+**מתי נשלח:** חברת המשלוחים מדווחת ב-webhook שמשלוח **נמסר ללקוחה**.
+**למי:** הטלפון של הלקוחה שעל הפנייה (`support_requests.customer_phone`).
+**trigger בקוד:** `POST /api/webhooks/shipping/<accountToken>` עם `status='delivered'` (או מקביל מותרגם — ראה `src/lib/shipment/webhook-mapper.ts`). הטריגר ב-`runTemplate` נמצא ב-`src/lib/whatsapp-notify.ts → sendSupportDeliveredFeedback()`.
+
+**multi-brand:** המותג נשלח כ-variable `{{2}}` בגוף ההודעה — אותה תבנית בדיוק עובדת ל-LA BEAUTÉ, Argania, או כל מותג עתידי. ה-WABA של BestieAI שולח, המותג מוזכר רק כטקסט.
+
+### שדות ב-Meta Manager
+
+| שדה | ערך |
+|------|------|
+| Name | `support_delivered_feedback_v1` |
+| Category | **Utility** (אישור פוסט-עסקה — לא marketing) |
+| Language | Hebrew (he) |
+| **Header** | **None** (אין header — הגוף עצמו מוביל את ההודעה) |
+| **Body** | ראה למטה |
+| **Footer** | `BestieAI` |
+| **Buttons** | URL (Dynamic) — כפתור אחד |
+
+### Body (העתק כמו שזה — שים לב ל-LTR פלוס emoji ❤️)
+```
+היי {{1}} 🤍
+שמחים שהמשלוח שלך מ-{{2}} הגיע בשלום.
+מקווים שאת מרוצה — אם משהו לא בסדר או רוצה להגיד תודה, אנחנו כאן 👇
+```
+
+> **משתנים:**
+> - `{{1}}` = שם פרטי של הלקוחה (`firstName(customer_name)`)
+> - `{{2}}` = שם המותג (`support_requests.brand` — נשלח ב-payload שונה לכל מותג)
+
+### Footer
+```
+BestieAI
+```
+
+### Button: URL (Dynamic) — Feedback page
+- Type: **Visit website** → **Dynamic**
+- Button text (סטטי, לא משתנה): `איך זה היה?`
+- URL: `https://bestie.ldrsgroup.com/feedback/{{1}}`
+- **Sample value** (חובה): `kP9aB2cD4eF6gH8iJ0kL2mN4oP6qR8s` (32 תווים base64url — כל ערך אקראי באורך כזה יתקבל)
+
+### Sample values ל-Body (למילוי בהגשה)
+- `{{1}}` = `מיכל`
+- `{{2}}` = `LA BEAUTÉ`
+
+### דגשים שיגדילו את הסיכוי שהתבנית תאושר
+- ✅ **תוכן Utility נטו** — אישור הגעת משלוח + פתיחת ערוץ פניות. אין קריאה לפעולה שיווקית.
+- ✅ **משתנים עם הקשר** — שם פרטי + שם מותג זהו הקשר עסקי ברור (transactional).
+- ✅ **כפתור single-purpose** — מוביל ל-feedback ספציפי לפנייה הזו, לא להומפייג'.
+- ❌ **אסור לכתוב ב-body שמות חברות מקצרים בעברית** ("המותג", "החברה") — Meta דוחים בגלל "vague language". תמיד {{2}} עם sample value אמיתי.
+- ❌ **אסור** "תהנו מהמשלוח", "חזרו אלינו", "קנו עוד" — Meta יסווג כ-Marketing.
+
+### בדיקה אחרי אישור
+```bash
+TO="972547667775"   # החלף בטלפון שלך
+TOKEN="kP9aB2cD4eF6gH8iJ0kL2mN4oP6qR8s"
+
+curl -s -X POST "https://graph.facebook.com/v21.0/$WHATSAPP_PHONE_NUMBER_ID/messages" \
+  -H "Authorization: Bearer $WHATSAPP_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"messaging_product\":\"whatsapp\",
+    \"to\":\"$TO\",
+    \"type\":\"template\",
+    \"template\":{
+      \"name\":\"support_delivered_feedback_v1\",
+      \"language\":{\"code\":\"he\"},
+      \"components\":[
+        {\"type\":\"body\",\"parameters\":[
+          {\"type\":\"text\",\"text\":\"מיכל\"},
+          {\"type\":\"text\",\"text\":\"LA BEAUTÉ\"}
+        ]},
+        {\"type\":\"button\",\"sub_type\":\"url\",\"index\":\"0\",\"parameters\":[
+          {\"type\":\"text\",\"text\":\"$TOKEN\"}
+        ]}
+      ]
+    }
+  }'
+```
+
+לאחר שזה מוצלח, הפעל את התבנית בקוד:
+```bash
+# Vercel env:
+WHATSAPP_TEMPLATE_SUPPORT_DELIVERED_FEEDBACK=true
+```
 
 ---
 
