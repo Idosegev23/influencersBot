@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import crypto from 'node:crypto';
 
 /**
  * Simple in-memory rate limiter for middleware
- * Note: This resets on cold start, which provides basic protection
+ * Note: This resets on cold start, which provides basic protection.
+ *
+ * Edge-runtime: this file runs on Vercel Edge, so we can't import from
+ * node:crypto. We use the Web Crypto API (globalThis.crypto.subtle) for
+ * the HMAC signing of the attribution cookie below.
  */
 
 interface RateLimitEntry {
@@ -114,17 +117,40 @@ function isChatSurfacePath(pathname: string): boolean {
   return true;
 }
 
-function signAttrPayload(payload: string): string {
+// Edge-runtime base64url helpers — no Buffer/node:crypto available here.
+function strToBase64Url(str: string): string {
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function bytesToBase64Url(bytes: ArrayBuffer): string {
+  const arr = new Uint8Array(bytes);
+  let bin = '';
+  for (let i = 0; i < arr.byteLength; i++) bin += String.fromCharCode(arr[i]);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function signAttrPayload(payload: string): Promise<string> {
   const secret =
     process.env.ANALYTICS_WIDGET_SECRET ||
     process.env.IP_HASH_SALT ||
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     '';
   if (!secret) return '';
-  return crypto.createHmac('sha256', secret).update(payload).digest('base64url');
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload));
+  return bytesToBase64Url(sig);
 }
 
-function maybeWriteAttributionCookie(request: NextRequest, response: NextResponse): void {
+async function maybeWriteAttributionCookie(request: NextRequest, response: NextResponse): Promise<void> {
   if (request.cookies.get(ATTR_COOKIE)) return;
   const url = request.nextUrl;
   const captured: Record<string, string> = {};
@@ -151,9 +177,9 @@ function maybeWriteAttributionCookie(request: NextRequest, response: NextRespons
     arrival_at: new Date().toISOString(),
   };
   const payloadStr = JSON.stringify(payload);
-  const sig = signAttrPayload(payloadStr);
+  const sig = await signAttrPayload(payloadStr);
   if (!sig) return;
-  const cookieValue = `${Buffer.from(payloadStr).toString('base64url')}.${sig}`;
+  const cookieValue = `${strToBase64Url(payloadStr)}.${sig}`;
 
   response.cookies.set(ATTR_COOKIE, cookieValue, {
     httpOnly: true,
@@ -164,7 +190,7 @@ function maybeWriteAttributionCookie(request: NextRequest, response: NextRespons
   });
 }
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const ip = getClientIP(request);
 
@@ -173,7 +199,7 @@ export function middleware(request: NextRequest) {
   // server-side, bypassing adblockers that target client-side trackers.
   if (!pathname.startsWith('/api/') && isChatSurfacePath(pathname)) {
     const response = NextResponse.next();
-    maybeWriteAttributionCookie(request, response);
+    await maybeWriteAttributionCookie(request, response);
     return response;
   }
 
