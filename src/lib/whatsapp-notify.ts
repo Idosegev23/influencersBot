@@ -393,6 +393,28 @@ export async function sendSupportStatusResolved(p: {
   });
 }
 
+// support_delivered_feedback_v1 — delivery confirmation + 2-button feedback
+//   Category: UTILITY  |  Vars: body {{1}} {{2}}, url {{1}} (= feedback token)
+//   Trigger: shipping webhook receives mapped_status='delivered'
+//   Body suggestion (for Meta registration):
+//     היי {{1}} 🤍
+//     שמחים שהמשלוח שלך מ-{{2}} הגיע בשלום.
+//     מקווים שאת מרוצה — אם משהו לא בסדר או רוצה להגיד תודה, אנחנו כאן 👇
+export async function sendSupportDeliveredFeedback(p: {
+  to: string;
+  customerFirstName: string;
+  brand: string;
+  feedbackToken: string;
+}): Promise<WhatsAppSendResult> {
+  return runTemplate({
+    templateName: 'support_delivered_feedback_v1',
+    flagName: 'SUPPORT_DELIVERED_FEEDBACK',
+    to: p.to,
+    bodyParams: [p.customerFirstName, p.brand],
+    urlButtonParam: p.feedbackToken,
+  });
+}
+
 // =====================================================================
 // 6) influencer_welcome_v2 — new influencer account activated
 //    Category: UTILITY  |  Vars: body {{1}}, url {{1}}

@@ -65,6 +65,11 @@ interface Ticket {
   tracking_number: string | null;
   resolution_summary: string | null;
   resolved_at: string | null;
+  delivered_at?: string | null;
+  last_shipment_status?: string | null;
+  feedback_status?: 'pending' | 'positive' | 'issue' | 'expired' | null;
+  feedback_sent_at?: string | null;
+  feedback_responded_at?: string | null;
   products?: { name: string; coupon_code: string | null; brand: string | null } | null;
 }
 
@@ -170,6 +175,8 @@ export default function SupportPage({
   const [filter, setFilter] = useState<'all' | TicketStatus>('new');
   // Owner filter — agents typically want to see "their" tickets first.
   const [ownerFilter, setOwnerFilter] = useState<'all' | 'mine' | 'unassigned'>('all');
+  // Feedback filter — surface "issue reported" tickets quickly.
+  const [feedbackFilter, setFeedbackFilter] = useState<'all' | 'issue' | 'positive' | 'pending'>('all');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [page, setPage] = useState<number>(1);
@@ -257,7 +264,7 @@ export default function SupportPage({
     setPage(1);
     fetchList(filter, search, 1);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, ownerFilter]);
+  }, [filter, ownerFilter, feedbackFilter]);
 
   // Refetch on page change
   useEffect(() => {
@@ -292,6 +299,7 @@ export default function SupportPage({
     if (dateTo) url.searchParams.set('to', new Date(dateTo + 'T23:59:59').toISOString());
     if (ownerFilter === 'mine') url.searchParams.set('mine', '1');
     else if (ownerFilter === 'unassigned') url.searchParams.set('unassigned', '1');
+    if (feedbackFilter !== 'all') url.searchParams.set('feedback', feedbackFilter);
     const res = await fetch(url.toString());
     if (!res.ok) return;
     const data = await res.json();
@@ -299,7 +307,7 @@ export default function SupportPage({
     setCounts(data.counts || {});
     setTotal(data.total || 0);
     setPageSize(data.pageSize || 50);
-  }, [username, dateFrom, dateTo, ownerFilter]);
+  }, [username, dateFrom, dateTo, ownerFilter, feedbackFilter]);
 
   const handleExport = useCallback(async () => {
     setExporting(true);
@@ -476,6 +484,25 @@ export default function SupportPage({
                 style={{
                   background: ownerFilter === opt.key ? '#883fe2' : 'rgba(255,255,255,0.06)',
                   color: ownerFilter === opt.key ? '#fff' : 'var(--dash-text-2, #9ca3af)',
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+            <span className="opacity-30 mx-1">|</span>
+            {[
+              { key: 'all' as const, label: 'כל הפידבקים', bg: 'rgba(255,255,255,0.06)', fg: 'var(--dash-text-2, #9ca3af)' },
+              { key: 'issue' as const, label: '⚠ בעיה דווחה', bg: '#fbbf24', fg: '#1f2937' },
+              { key: 'positive' as const, label: '✓ פידבק חיובי', bg: '#22c55e', fg: '#fff' },
+              { key: 'pending' as const, label: '⏳ ממתינות לפידבק', bg: '#06b6d4', fg: '#fff' },
+            ].map((opt) => (
+              <button
+                key={opt.key}
+                onClick={() => setFeedbackFilter(opt.key)}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                style={{
+                  background: feedbackFilter === opt.key ? opt.bg : 'rgba(255,255,255,0.06)',
+                  color: feedbackFilter === opt.key ? opt.fg : 'var(--dash-text-2, #9ca3af)',
                 }}
               >
                 {opt.label}
@@ -1058,6 +1085,41 @@ function TicketDetail({
         </button>
       </div>
 
+      {/* Feedback badge — visible after delivered template was sent */}
+      {ticket.feedback_status && (
+        <div
+          className="px-3 py-2 rounded-xl text-xs flex items-center justify-between gap-2"
+          style={{
+            background:
+              ticket.feedback_status === 'issue'
+                ? 'rgba(251,191,36,0.12)'
+                : ticket.feedback_status === 'positive'
+                ? 'rgba(34,197,94,0.12)'
+                : 'rgba(6,182,212,0.10)',
+            border:
+              ticket.feedback_status === 'issue'
+                ? '1px solid rgba(251,191,36,0.35)'
+                : ticket.feedback_status === 'positive'
+                ? '1px solid rgba(34,197,94,0.35)'
+                : '1px solid rgba(6,182,212,0.30)',
+          }}
+        >
+          <span style={{ color: 'var(--dash-text, #fff)' }}>
+            {ticket.feedback_status === 'positive' && '✓ פידבק חיובי מהלקוחה'}
+            {ticket.feedback_status === 'issue' && '⚠ הלקוחה דיווחה על בעיה'}
+            {ticket.feedback_status === 'pending' && '⏳ ממתין לפידבק לקוחה'}
+            {ticket.feedback_status === 'expired' && '⏱ חלון הפידבק פג'}
+          </span>
+          <span className="opacity-70">
+            {ticket.feedback_responded_at
+              ? `הגיב/ה ${formatRelative(ticket.feedback_responded_at)}`
+              : ticket.feedback_sent_at
+              ? `נשלח ${formatRelative(ticket.feedback_sent_at)}`
+              : ''}
+          </span>
+        </div>
+      )}
+
       {/* Assignee row */}
       {agent && (
         <div
@@ -1408,12 +1470,18 @@ function TicketDetail({
               const isCustomerReply = h.action === 'customer_reply';
               const isBrandMessage = h.action === 'customer_notified';
               const isAgentDirect = h.action === 'agent_message' || h.action === 'agent_image';
+              const isShipment = h.action === 'shipment_event';
+              const isFeedback = h.action === 'customer_feedback';
               const dotColor = isCustomerReply
                 ? '#22c55e'
                 : isBrandMessage
                 ? '#06b6d4'
                 : isAgentDirect
                 ? '#10b981'
+                : isShipment
+                ? '#a78bfa'
+                : isFeedback
+                ? (h.note === 'issue' ? '#fbbf24' : '#22c55e')
                 : '#883fe2';
               return (
                 <li key={h.id} className="flex gap-2 items-start">
@@ -1469,6 +1537,20 @@ function TicketDetail({
                         style={{
                           background: 'rgba(16,185,129,0.08)',
                           border: '1px solid rgba(16,185,129,0.2)',
+                          color: 'var(--dash-text, #fff)',
+                          fontSize: '13px',
+                          lineHeight: '1.5',
+                        }}>
+                        {h.body_text}
+                      </div>
+                    )}
+                    {/* Customer feedback — issue body in amber tint, positive
+                        is just the badge above (no body text). */}
+                    {isFeedback && h.note === 'issue' && h.body_text && (
+                      <div className="mt-1 p-2 rounded-lg whitespace-pre-wrap"
+                        style={{
+                          background: 'rgba(251,191,36,0.10)',
+                          border: '1px solid rgba(251,191,36,0.3)',
                           color: 'var(--dash-text, #fff)',
                           fontSize: '13px',
                           lineHeight: '1.5',
@@ -1939,6 +2021,25 @@ function historyLine(h: HistoryEntry): string {
     const failed = h.note?.startsWith('Send failed');
     if (failed) return `ניסיון שליחת תמונה נכשל — ${h.note}`;
     return `תמונה ללקוחה`;
+  }
+  if (h.action === 'shipment_event') {
+    const labels: Record<string, string> = {
+      dispatched: 'נקלט אצל חברת השליחויות',
+      in_transit: 'בדרך אל הלקוחה',
+      at_branch: 'הגיע לסניף',
+      out_for_delivery: 'יצא למסירה אחרונה',
+      delivered: 'נמסר ללקוחה ✓',
+      returned: 'הוחזר',
+      cancelled: 'בוטל',
+      failed_delivery: 'מסירה נכשלה',
+      unknown: 'עדכון משלוח',
+    };
+    return `🚚 ${labels[h.note || 'unknown'] || labels.unknown}`;
+  }
+  if (h.action === 'customer_feedback') {
+    if (h.note === 'positive') return '✓ הלקוחה: הכל מצוין';
+    if (h.note === 'issue') return '⚠ הלקוחה דיווחה על בעיה';
+    return 'פידבק לקוחה';
   }
   return h.action;
 }

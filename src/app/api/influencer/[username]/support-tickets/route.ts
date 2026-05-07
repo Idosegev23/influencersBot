@@ -61,6 +61,8 @@ export async function GET(
   const assignedAgentId = url.searchParams.get('assigned_agent_id');
   // ?unassigned=1 → only tickets with no assignee
   const unassignedOnly = url.searchParams.get('unassigned') === '1';
+  // ?feedback=issue|positive|pending — feedback status filter
+  const feedbackParam = url.searchParams.get('feedback');
 
   let query = supabase
     .from('support_requests')
@@ -70,13 +72,19 @@ export async function GET(
       order_number, product_id, status, created_at, updated_at,
       ref_source, internal_notes, assigned_to, assigned_agent_id,
       last_customer_notified_at,
-      tracking_number, resolution_summary, resolved_at
+      tracking_number, resolution_summary, resolved_at,
+      delivered_at, last_shipment_status, feedback_status, feedback_sent_at,
+      feedback_responded_at
     `,
       { count: 'exact' },
     )
     .eq('account_id', influencer.id)
     .order('created_at', { ascending: false })
     .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+
+  if (feedbackParam && ['pending', 'positive', 'issue', 'expired'].includes(feedbackParam)) {
+    query = query.eq('feedback_status', feedbackParam);
+  }
 
   if (mineOnly) {
     const agent = await getAgentSession(username);

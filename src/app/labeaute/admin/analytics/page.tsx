@@ -12,6 +12,9 @@ import {
   RefreshCw,
   LogOut,
   AlertCircle,
+  Heart,
+  AlertTriangle,
+  Truck,
 } from 'lucide-react';
 
 const ACCOUNT_USERNAME = 'labeaute.israel';
@@ -57,10 +60,20 @@ type ActivityRow = {
   created_at: string;
 };
 
+type FeedbackBlock = {
+  delivered: number;
+  sent: number;
+  positive: number;
+  issue: number;
+  pending: number;
+  response_rate_pct: number | null;
+};
+
 type AnalyticsResponse = {
   window: { from: string; to: string };
   statusCounts: Record<string, number>;
   overall: { total: number; resolved: number; avg_resolution_minutes: number | null };
+  feedback?: FeedbackBlock;
   agents: AgentRow[];
   activity: ActivityRow[];
 };
@@ -269,6 +282,39 @@ export default function LabeauteAnalyticsPage() {
           />
           <KpiCard icon={<Users className="w-4 h-4" />} label="סוכנות פעילות" value={data.agents.length.toString()} />
         </div>
+
+        {/* Feedback funnel */}
+        {data.feedback && (
+          <Section title="לולאת פידבק (post-delivery)">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <KpiCard
+                icon={<Truck className="w-4 h-4" />}
+                label="נמסרו"
+                value={data.feedback.delivered.toString()}
+              />
+              <KpiCard
+                icon={<BarChart3 className="w-4 h-4" />}
+                label="פניות שביקשנו פידבק"
+                value={data.feedback.sent.toString()}
+              />
+              <KpiCard
+                icon={<Heart className="w-4 h-4" />}
+                label="פידבק חיובי"
+                value={data.feedback.positive.toString()}
+              />
+              <KpiCard
+                icon={<AlertTriangle className="w-4 h-4" />}
+                label="דווחו בעיות"
+                value={data.feedback.issue.toString()}
+              />
+              <KpiCard
+                icon={<CheckCircle className="w-4 h-4" />}
+                label="אחוז מענה"
+                value={data.feedback.response_rate_pct == null ? '—' : `${data.feedback.response_rate_pct}%`}
+              />
+            </div>
+          </Section>
+        )}
 
         {/* Status breakdown */}
         <Section title="התפלגות סטטוסים">

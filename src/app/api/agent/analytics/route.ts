@@ -41,7 +41,9 @@ export async function GET(req: NextRequest) {
   // 1) Per-status totals (windowed) + overall counts
   const { data: ticketRows, error: tErr } = await supabase
     .from('support_requests')
-    .select('id, status, assigned_agent_id, created_at, resolved_at')
+    .select(
+      'id, status, assigned_agent_id, created_at, resolved_at, delivered_at, feedback_status, feedback_sent_at, feedback_responded_at',
+    )
     .eq('account_id', session.account_id)
     .gte('created_at', fromIso)
     .lte('created_at', toIso);
@@ -145,6 +147,22 @@ export async function GET(req: NextRequest) {
     ? Math.round(overallResolutionMins.reduce((s, n) => s + n, 0) / overallResolutionMins.length)
     : null;
 
+  // 4) Feedback funnel — % of delivered tickets that came back, positive vs issue
+  let deliveredCount = 0;
+  let feedbackSent = 0;
+  let feedbackPositive = 0;
+  let feedbackIssue = 0;
+  let feedbackPending = 0;
+  for (const t of tickets) {
+    if (t.delivered_at) deliveredCount += 1;
+    if (t.feedback_sent_at) feedbackSent += 1;
+    if (t.feedback_status === 'positive') feedbackPositive += 1;
+    if (t.feedback_status === 'issue') feedbackIssue += 1;
+    if (t.feedback_status === 'pending') feedbackPending += 1;
+  }
+  const feedbackResponded = feedbackPositive + feedbackIssue;
+  const feedbackResponseRate = feedbackSent > 0 ? Math.round((feedbackResponded / feedbackSent) * 100) : null;
+
   return NextResponse.json({
     window: { from: fromIso, to: toIso },
     statusCounts,
@@ -152,6 +170,14 @@ export async function GET(req: NextRequest) {
       total: tickets.length,
       resolved: overallResolutionMins.length,
       avg_resolution_minutes: overallAvg,
+    },
+    feedback: {
+      delivered: deliveredCount,
+      sent: feedbackSent,
+      positive: feedbackPositive,
+      issue: feedbackIssue,
+      pending: feedbackPending,
+      response_rate_pct: feedbackResponseRate,
     },
     agents: agentBreakdown,
     activity: history.slice(0, 25),
