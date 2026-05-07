@@ -11,7 +11,7 @@
 > | `brand_support_ticket` | UTILITY | ✅ APPROVED |
 > | `influencer_weekly_digest_v2` | UTILITY | PENDING |
 > | `influencer_welcome_v2` | UTILITY | PENDING |
-> | `support_delivered_feedback_v1` | UTILITY | TO SUBMIT |
+> | `support_delivered_feedback_v1` | UTILITY | PENDING (id `1758589532243932`, submitted 2026-05-07) |
 >
 > **למה `_v2`?** בתהליך ההגשה הראשון יצרנו טמפלטים עם URLs שגויים (`bestieai.com`).
 > אחרי מחיקה, Meta נועלת את השם+שפה למשך זמן בלתי-ידוע (~4 שבועות לפי ההודעה של Meta),
