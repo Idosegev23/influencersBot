@@ -7,11 +7,17 @@
  * אין צורך ב-findLinkedSocialAccount — הכל באותו חשבון.
  */
 
+import { randomUUID } from 'crypto';
 import { createClient } from '@/lib/supabase/server';
 import { processSandwichMessageWithMetadata } from './sandwichBot';
 import { buildPersonalityFromDB } from './personality-wrapper';
 import { updateRollingSummary, shouldUpdateSummary } from './conversation-memory';
-import { getRecommendations } from '@/lib/recommendations/engine';
+import { getRecommendations, type ProductRecommendation } from '@/lib/recommendations/engine';
+import {
+  stripIntent,
+  buildObjectionBlock,
+  type IntentEnvelope,
+} from './widget-objections';
 
 // ============================================
 // Type Definitions
@@ -27,6 +33,12 @@ export interface WidgetChatParams {
 export interface WidgetChatResult {
   response: string;
   sessionId: string;
+  // Phase 1: structured product recommendations for client-side card rendering.
+  // Empty array when no products were recommended this turn.
+  products: ProductRecommendation[];
+  // Phase 2: parsed <<INTENT>> envelope from this turn's response. null when
+  // the model didn't emit one (e.g. error path, malformed envelope).
+  intent: IntentEnvelope | null;
 }
 
 // ============================================
@@ -51,7 +63,11 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
   }
 
   if (!session) {
-    sessionId = `widget_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    // chat_sessions.id is UUID. The previous code generated a string here
+    // (`widget_${ts}_${rand}`) which silently failed the UUID type-check —
+    // sessions were never persisted, so no history, no rolling summary,
+    // and Phase 2 intent-injection had no prior turn to read.
+    sessionId = randomUUID();
     await supabase.from('chat_sessions').insert({
       id: sessionId,
       account_id: accountId,
@@ -59,9 +75,9 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
     });
   }
 
-  // 2. Load account info + conversation history in parallel
+  // 2. Load account info + conversation history + last-turn intent in parallel
   //    Note: username and display_name live inside config JSONB, not as direct columns
-  const [accountResult, historyData] = await Promise.all([
+  const [accountResult, historyData, lastIntentRow] = await Promise.all([
     supabase
       .from('accounts')
       .select('id, type, config')
@@ -75,6 +91,18 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
       .order('created_at', { ascending: false })
       .limit(10)
       .then(r => r.data),
+    // Phase 2: fetch the prior assistant turn's intent envelope so we can
+    // inject objection-handling guidance for *this* turn when the visitor
+    // signaled hesitation last time.
+    supabase
+      .from('chat_messages')
+      .select('intent')
+      .eq('session_id', sessionId)
+      .eq('role', 'assistant')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then((r: any) => r?.data?.intent as IntentEnvelope | null),
   ]);
 
   const config = accountResult?.config || {};
@@ -101,6 +129,7 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
 
   // 4. Fetch product recommendations (fire parallel, non-blocking if fails)
   let recommendationBlock = '';
+  let recommendedProducts: ProductRecommendation[] = [];
   try {
     const recResult = await getRecommendations({
       accountId,
@@ -110,6 +139,7 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
       strategy: 'auto',
     });
     recommendationBlock = recResult.promptBlock;
+    recommendedProducts = recResult.products;
   } catch (err: any) {
     console.error('[WidgetChat] Recommendations error (non-fatal):', err.message);
   }
@@ -119,10 +149,13 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
   let fullText = '';
   let responseId: string | null = null;
 
-  // Merge recommendation block into widgetConfig for prompt injection
+  // Merge recommendation + objection blocks into widgetConfig for prompt injection.
+  // Objection block is null unless prior turn flagged hesitation — additive guidance.
+  const objectionBlock = buildObjectionBlock(config.widget || null, lastIntentRow || null);
   const widgetConfigWithRecs = {
     ...(config.widget || {}),
     _recommendationBlock: recommendationBlock,
+    ...(objectionBlock ? { _objectionBlock: objectionBlock } : {}),
   };
 
   try {
@@ -163,6 +196,12 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
     fullText = 'מצטער, לא הצלחתי לעבד את הבקשה. נסו שוב.';
   }
 
+  // Phase 2: extract <<INTENT>> envelope from the (already suggestion-stripped)
+  // response. cleanText is what the user sees; turnIntent persists for the
+  // next turn's objection injection + ships to the client for layout decisions.
+  const { cleanText, intent: turnIntent } = stripIntent(fullText);
+  fullText = cleanText;
+
   // 6. Save messages + update session state (parallel)
   const msgCount = (session?.message_count || 0) + 2;
   await Promise.all([
@@ -175,6 +214,9 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
       session_id: sessionId,
       role: 'assistant',
       content: fullText,
+      // Phase 2: persist the turn's parsed envelope so the next turn can
+      // look it up for objection injection. Always nullable.
+      intent: turnIntent || null,
     }),
     supabase
       .from('chat_sessions')
@@ -193,7 +235,12 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
     ).catch(err => console.error('[WidgetChat] Summary update failed:', err));
   }
 
-  return { response: fullText, sessionId: sessionId! };
+  return {
+    response: fullText,
+    sessionId: sessionId!,
+    products: recommendedProducts,
+    intent: turnIntent || null,
+  };
 }
 
 // ============================================

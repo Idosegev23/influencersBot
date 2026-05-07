@@ -6,6 +6,7 @@
 import { NextRequest } from 'next/server';
 import { processWidgetMessage } from '@/lib/chatbot/widget-chat-handler';
 import { createClient } from '@/lib/supabase/server';
+import type { ProductRecommendation } from '@/lib/recommendations/engine';
 
 // ============================================
 // CORS Headers
@@ -57,6 +58,28 @@ export async function OPTIONS(req: NextRequest) {
 const _encoder = new TextEncoder();
 function encodeEvent(event: Record<string, any>): Uint8Array {
   return _encoder.encode(JSON.stringify(event) + '\n');
+}
+
+// ============================================
+// Card DTO — versioned wire contract for widget v4
+// ============================================
+// Keep this stable. New optional fields OK; renames/removals require widget bump.
+function toCardDTO(p: ProductRecommendation) {
+  return {
+    id: p.id,
+    name: p.name,
+    image: p.imageUrl,
+    price: p.price,
+    originalPrice: p.originalPrice,
+    isOnSale: p.isOnSale,
+    productUrl: p.productUrl,
+    ctaLabel: p.isOnSale ? 'קני במבצע' : 'לפרטים נוספים',
+    recommendedFor: p.recommendedFor || null,
+    badge: p.badge || null,
+    socialProof: p.socialProof || null,
+    keyClaims: p.keyClaims || [],
+    reason: p.aiWhy || null,
+  };
 }
 
 // ============================================
@@ -132,12 +155,41 @@ export async function POST(req: NextRequest) {
             },
           });
 
+          // Phase 2: emit parsed intent envelope ahead of cards so the client
+          // can pick the layout (compare vs stack) and persist lastTopic for
+          // the next page-load's smart chips.
+          if (result.intent) {
+            controller.enqueue(
+              encodeEvent({
+                type: 'intent',
+                stage: result.intent.stage,
+                objection: result.intent.objection,
+                topic: result.intent.topic,
+                confidence: result.intent.confidence,
+              }),
+            );
+          }
+
+          // Send structured product cards (widget v4) before done.
+          // Empty products array → still emit, so client can clear stale cards.
+          const cards = (result.products || []).map(toCardDTO);
+          const layout = result.intent?.stage === 'comparing' ? 'compare' : 'stack';
+          controller.enqueue(
+            encodeEvent({
+              type: 'cards',
+              products: cards,
+              layout,
+            }),
+          );
+
           // Send done event
           controller.enqueue(
             encodeEvent({
               type: 'done',
               sessionId: result.sessionId,
               fullText: result.response,
+              productCount: cards.length,
+              intent: result.intent || null,
             }),
           );
         } catch (error: any) {

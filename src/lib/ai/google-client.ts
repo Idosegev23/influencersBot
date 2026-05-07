@@ -18,7 +18,8 @@ export function getGeminiClient(): GoogleGenAI {
 
 /** Model constants — single place to update when new versions drop */
 export const MODELS = {
-  /** Main chat — best quality/speed ratio ($0.50/$3 per 1M) */
+  /** Main chat — best quality/speed ratio ($0.50/$3 per 1M).
+   *  Note: 3.1-flash (non-lite) is not yet released — only lite + pro at 3.1. */
   CHAT_FAST: 'gemini-3-flash-preview',
   /** Cheapest chat — widget, understanding engine ($0.25/$1.50 per 1M) */
   CHAT_LITE: 'gemini-3.1-flash-lite-preview',

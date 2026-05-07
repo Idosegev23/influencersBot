@@ -34,6 +34,15 @@ export type RecommendationStrategy =
   | 'featured'
   | 'auto';
 
+export interface SocialProof {
+  rating?: number;
+  review_count?: number;
+  top_review?: { text: string; author?: string; rating?: number };
+  purchase_signal?: string;
+}
+
+export type ProductBadge = 'SALE' | 'BESTSELLER' | 'NEW' | null;
+
 export interface ProductRecommendation {
   id: string;
   name: string;
@@ -51,6 +60,11 @@ export interface ProductRecommendation {
   aiWhy: string; // Why this product is recommended (from ai_profile)
   strategy: RecommendationStrategy;
   score: number; // Ranking score (0-100)
+  // Phase 1 widget v4 additive fields (all optional — Bestie callers ignore)
+  socialProof?: SocialProof | null;
+  recommendedFor?: string | null; // human-readable matched-need ("לשיער יבש")
+  badge?: ProductBadge; // SALE | BESTSELLER | NEW
+  keyClaims?: string[]; // up to 3 from product.claims
 }
 
 export interface RecommendationResult {
@@ -116,7 +130,7 @@ export async function getRecommendations(req: RecommendationRequest): Promise<Re
     if (seen.has(sp.product.id)) continue;
     if (sp.product.id === req.currentProductId) continue; // Don't recommend what they're looking at
     seen.add(sp.product.id);
-    topProducts.push(formatRecommendation(sp.product, effectiveStrategy, sp.score));
+    topProducts.push(formatRecommendation(sp.product, effectiveStrategy, sp.score, sp.matchedTriggers));
     if (topProducts.length >= maxResults) break;
   }
 
@@ -165,6 +179,7 @@ function detectBestStrategy(context: string, currentProductId?: string): Recomme
 interface ScoredProduct {
   product: any;
   score: number;
+  matchedTriggers?: string[]; // populated by need_based scoring for recommendedFor
 }
 
 async function scoreNeedBased(products: any[], context: string): Promise<ScoredProduct[]> {
@@ -181,12 +196,14 @@ async function scoreNeedBased(products: any[], context: string): Promise<ScoredP
 
   for (const product of products) {
     let score = 0;
+    const matchedTriggers: string[] = [];
 
     // 1. Keyword matching on conversationTriggers (highest weight)
     const triggers = product.ai_profile?.conversationTriggers || [];
     for (const trigger of triggers) {
       if (lower.includes(trigger.toLowerCase())) {
         score += 25;
+        matchedTriggers.push(trigger);
       }
     }
 
@@ -249,7 +266,7 @@ async function scoreNeedBased(products: any[], context: string): Promise<ScoredP
     // 9. Sale boost (small)
     if (product.is_on_sale) score += 5;
 
-    scored.push({ product, score });
+    scored.push({ product, score, matchedTriggers });
   }
 
   return scored;
@@ -362,16 +379,23 @@ function scoreFeatured(products: any[]): ScoredProduct[] {
 // Format Recommendation
 // ============================================
 
-function formatRecommendation(product: any, strategy: RecommendationStrategy, score: number): ProductRecommendation {
+function formatRecommendation(
+  product: any,
+  strategy: RecommendationStrategy,
+  score: number,
+  matchedTriggers?: string[],
+): ProductRecommendation {
   const profile = product.ai_profile || {};
   const aiWhy = profile.sellingPoints?.[0] || profile.whatItDoes || product.description || '';
+  const price = product.price ? parseFloat(product.price) : null;
+  const originalPrice = product.original_price ? parseFloat(product.original_price) : null;
 
   return {
     id: product.id,
     name: product.name,
     description: aiWhy,
-    price: product.price ? parseFloat(product.price) : null,
-    originalPrice: product.original_price ? parseFloat(product.original_price) : null,
+    price,
+    originalPrice,
     imageUrl: product.image_url,
     productUrl: product.product_url,
     category: product.category,
@@ -383,7 +407,28 @@ function formatRecommendation(product: any, strategy: RecommendationStrategy, sc
     aiWhy,
     strategy,
     score,
+    socialProof: product.social_proof || null,
+    recommendedFor: matchedTriggers && matchedTriggers.length > 0 ? matchedTriggers[0] : null,
+    badge: computeBadge(product, price, originalPrice),
+    keyClaims: Array.isArray(product.claims) ? product.claims.slice(0, 3) : [],
   };
+}
+
+function computeBadge(
+  product: any,
+  price: number | null,
+  originalPrice: number | null,
+): ProductBadge {
+  if (product.is_on_sale && originalPrice && price && originalPrice > price) {
+    const pct = Math.round(((originalPrice - price) / originalPrice) * 100);
+    return pct > 0 ? 'SALE' : null;
+  }
+  if (product.is_featured && (product.priority || 0) >= 5) return 'BESTSELLER';
+  if (product.created_at) {
+    const ageDays = (Date.now() - new Date(product.created_at).getTime()) / (1000 * 60 * 60 * 24);
+    if (ageDays < 30) return 'NEW';
+  }
+  return null;
 }
 
 // ============================================
