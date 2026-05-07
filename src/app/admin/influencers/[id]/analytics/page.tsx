@@ -2,6 +2,7 @@
 
 import { use, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   AreaChart,
   Area,
@@ -15,6 +16,14 @@ import {
 } from 'recharts';
 import { KpiCard } from '@/components/admin/KpiCard';
 import { Card } from '@/components/ui/card';
+
+interface AccountListItem {
+  id: string;
+  username: string;
+  display_name: string;
+  type: string;
+  status: string;
+}
 
 type Range = '7' | '14' | '30' | '90';
 
@@ -56,6 +65,8 @@ interface Summary {
     messages_bot: number;
     avg_duration_sec: number;
     bounce_rate_pct: number;
+    conversation_starters?: number;
+    dynamic_clicks?: number;
   };
   breakdown: {
     ref_source: Array<{ source: string; visits: number }>;
@@ -93,10 +104,31 @@ const EXIT_LABELS = [
 
 export default function AdminAnalyticsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const router = useRouter();
   const [range, setRange] = useState<Range>('30');
   const [data, setData] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [accounts, setAccounts] = useState<AccountListItem[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const r = await fetch('/api/admin/analytics/accounts-list');
+        if (!r.ok) return;
+        const j = await r.json();
+        if (alive) setAccounts(j.accounts || []);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const currentAccount = accounts.find((a) => a.id === id);
 
   useEffect(() => {
     let alive = true;
@@ -131,24 +163,52 @@ export default function AdminAnalyticsPage({ params }: { params: Promise<{ id: s
   return (
     <main className="min-h-screen bg-gray-50 p-6" dir="rtl">
       <div className="max-w-6xl mx-auto space-y-6">
-        <header className="flex items-center justify-between">
-          <div>
-            <Link href={`/admin/influencers/${id}`} className="text-sm text-blue-600 hover:underline">
-              ← חזרה לפרופיל
-            </Link>
-            <h1 className="text-2xl font-bold mt-1">אנליטיקס</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <RangeButton current={range} value="7" setRange={setRange} />
-            <RangeButton current={range} value="14" setRange={setRange} />
-            <RangeButton current={range} value="30" setRange={setRange} />
-            <RangeButton current={range} value="90" setRange={setRange} />
-            <Link
-              href={`/admin/influencers/${id}/analytics-setup`}
-              className="text-xs text-gray-600 hover:text-gray-900 underline mr-2"
-            >
-              הגדרת GSC
-            </Link>
+        <header className="flex flex-col gap-3">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <Link href="/admin/analytics" className="text-sm text-blue-600 hover:underline">
+                ← כל החשבונות
+              </Link>
+              <h1 className="text-2xl font-bold mt-1">
+                אנליטיקס
+                {currentAccount && (
+                  <span className="text-base font-normal text-gray-600 mr-2">— {currentAccount.display_name}</span>
+                )}
+              </h1>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                value={id}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  if (next && next !== id) router.push(`/admin/influencers/${next}/analytics`);
+                }}
+                className="px-3 py-1.5 border rounded text-sm bg-white max-w-[220px]"
+              >
+                {accounts.length === 0 && <option value={id}>טוען חשבונות…</option>}
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.display_name} {a.username ? `· ${a.username}` : ''}
+                  </option>
+                ))}
+              </select>
+              <RangeButton current={range} value="7" setRange={setRange} />
+              <RangeButton current={range} value="14" setRange={setRange} />
+              <RangeButton current={range} value="30" setRange={setRange} />
+              <RangeButton current={range} value="90" setRange={setRange} />
+              <Link
+                href={`/admin/influencers/${id}/analytics-setup`}
+                className="text-xs text-gray-600 hover:text-gray-900 underline"
+              >
+                הגדרת GSC
+              </Link>
+              <Link
+                href={`/admin/influencers/${id}`}
+                className="text-xs text-gray-600 hover:text-gray-900 underline"
+              >
+                פרופיל
+              </Link>
+            </div>
           </div>
         </header>
 
@@ -187,6 +247,14 @@ export default function AdminAnalyticsPage({ params }: { params: Promise<{ id: s
           <KpiCard
             label="Bounce Rate"
             value={data ? `${data.totals.bounce_rate_pct}%` : '—'}
+            loading={loading}
+          />
+          <KpiCard label="Conversation Starters" value={fmt(data?.totals.conversation_starters)} loading={loading} />
+          <KpiCard label="Dynamic Clicks" value={fmt(data?.totals.dynamic_clicks)} loading={loading} />
+          <KpiCard label="זמן שיחה ממוצע" value={data ? `${data.totals.avg_duration_sec}s` : '—'} loading={loading} />
+          <KpiCard
+            label="הודעות (משתמש/בוט)"
+            value={`${fmt(data?.totals.messages_user)} / ${fmt(data?.totals.messages_bot)}`}
             loading={loading}
           />
         </section>

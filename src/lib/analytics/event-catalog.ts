@@ -28,9 +28,26 @@ export const EVENT_CATALOG: Record<string, EventDef> = {
   // Chat engagement
   chat_message_sent: { category: 'engagement', surface: 'chat' },
   chat_message_received: { category: 'engagement', surface: 'chat' },
+
+  // Conversation starters / suggestion pills
+  starter_pill_clicked: { category: 'engagement', surface: 'chat' },
   suggestion_pill_clicked: { category: 'engagement', surface: 'chat' },
   conversation_starter_clicked: { category: 'engagement', surface: 'chat' },
+  meeting_pill_clicked: { category: 'engagement', surface: 'chat' },
+
+  // Dynamic CTAs / cards (every clickable element the bot/page renders)
   dynamic_cta_clicked: { category: 'engagement', surface: 'shared' },
+  product_card_clicked: { category: 'engagement', surface: 'chat' },
+  product_buy_clicked: { category: 'engagement', surface: 'chat' },
+  brand_card_opened: { category: 'engagement', surface: 'chat' },
+  service_card_opened: { category: 'engagement', surface: 'chat' },
+  topic_question_clicked: { category: 'engagement', surface: 'chat' },
+  topic_card_clicked: { category: 'engagement', surface: 'chat' },
+  case_study_clicked: { category: 'engagement', surface: 'chat' },
+  reel_clicked: { category: 'engagement', surface: 'chat' },
+  highlight_clicked: { category: 'engagement', surface: 'chat' },
+  content_card_clicked: { category: 'engagement', surface: 'chat' },
+  discovery_category_opened: { category: 'engagement', surface: 'chat' },
 
   // Navigation
   tab_changed: { category: 'navigation', surface: 'chat' },
@@ -42,7 +59,9 @@ export const EVENT_CATALOG: Record<string, EventDef> = {
   meeting_request_submitted: { category: 'conversion', surface: 'chat' },
   support_form_submitted: { category: 'conversion', surface: 'chat' },
   support_ticket_submitted: { category: 'conversion', surface: 'chat' },
+  coupon_revealed: { category: 'conversion', surface: 'chat' },
   coupon_copied: { category: 'conversion', surface: 'chat' },
+  coupon_redeemed_clicked: { category: 'conversion', surface: 'chat' },
   product_clicked: { category: 'engagement', surface: 'chat' },
 
   // Widget

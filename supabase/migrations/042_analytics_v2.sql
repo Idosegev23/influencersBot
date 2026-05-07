@@ -165,4 +165,160 @@ CREATE INDEX IF NOT EXISTS idx_analytics_anomalies_open
   ON analytics_anomalies(account_id, created_at DESC)
   WHERE acknowledged_at IS NULL;
 
+-- Add aggregate columns for conversation starters + dynamic CTA clicks.
+ALTER TABLE analytics_daily_rollup
+  ADD COLUMN IF NOT EXISTS dynamic_clicks         INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS conversation_starters  INTEGER NOT NULL DEFAULT 0;
+
+-- Daily rollup function. Re-run idempotently on a window of days
+-- (default 3) and UPSERT into analytics_daily_rollup. Counts both
+-- the legacy engines events (message_received / response_sent /
+-- support_started / link_opened) and the new client pipeline names
+-- (chat_message_*, support_ticket_submitted, external_link_clicked,
+-- back_to_*, starter_pill_clicked, etc.) so the rollup is correct
+-- regardless of which surface fired the event.
+CREATE OR REPLACE FUNCTION analytics_daily_rollup_run(window_days INT DEFAULT 3)
+RETURNS INT
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  inserted_count INT := 0;
+BEGIN
+  INSERT INTO analytics_daily_rollup AS r (
+    account_id, date, ref_source, device,
+    visits, unique_visitors, new_visitors, returning_visitors,
+    sessions, sessions_with_message,
+    messages_user, messages_bot,
+    leads, support_tickets, coupon_copies,
+    external_exits, back_to_ig, back_to_site,
+    conversation_starters, dynamic_clicks,
+    avg_duration_sec, bounce_count, computed_at
+  )
+  WITH visits AS (
+    SELECT
+      cv.account_id,
+      (cv.created_at AT TIME ZONE 'UTC')::date AS date,
+      COALESCE(cv.ref_source, '') AS ref_source,
+      COALESCE(cv.device, '') AS device,
+      COUNT(*) AS visits,
+      COUNT(DISTINCT cv.anon_id) FILTER (WHERE cv.anon_id IS NOT NULL) AS unique_visitors,
+      COUNT(*) FILTER (WHERE NOT cv.is_returning) AS new_visitors,
+      COUNT(*) FILTER (WHERE cv.is_returning) AS returning_visitors
+    FROM chat_visits cv
+    WHERE cv.created_at >= (CURRENT_DATE - (window_days - 1) * INTERVAL '1 day')
+      AND cv.created_at < (CURRENT_DATE + INTERVAL '1 day')
+    GROUP BY 1, 2, 3, 4
+  ),
+  sessions AS (
+    SELECT
+      cs.account_id,
+      (cs.created_at AT TIME ZONE 'UTC')::date AS date,
+      COALESCE(cs.ref_source, '') AS ref_source,
+      ''::text AS device,
+      COUNT(*) AS sessions,
+      COUNT(*) FILTER (WHERE cs.message_count > 0) AS sessions_with_message,
+      COALESCE(AVG(cs.duration_sec) FILTER (WHERE cs.duration_sec IS NOT NULL), 0)::int AS avg_duration_sec,
+      COUNT(*) FILTER (WHERE cs.message_count <= 1) AS bounce_count
+    FROM chat_sessions cs
+    WHERE cs.created_at >= (CURRENT_DATE - (window_days - 1) * INTERVAL '1 day')
+      AND cs.created_at < (CURRENT_DATE + INTERVAL '1 day')
+    GROUP BY 1, 2, 3, 4
+  ),
+  events_agg AS (
+    SELECT
+      e.account_id,
+      (e.created_at AT TIME ZONE 'UTC')::date AS date,
+      ''::text AS ref_source,
+      ''::text AS device,
+      COUNT(*) FILTER (WHERE e.type IN ('chat_message_sent','message_received')) AS messages_user,
+      COUNT(*) FILTER (WHERE e.type IN ('chat_message_received','response_sent')) AS messages_bot,
+      COUNT(*) FILTER (WHERE e.type IN ('lead_form_submitted','meeting_request_submitted','widget_lead_submitted')) AS leads,
+      COUNT(*) FILTER (WHERE e.type IN ('support_ticket_submitted','support_started')) AS support_tickets,
+      COUNT(*) FILTER (WHERE e.type = 'coupon_copied') AS coupon_copies,
+      COUNT(*) FILTER (WHERE e.type IN ('external_link_clicked','link_opened')) AS external_exits,
+      COUNT(*) FILTER (WHERE e.type = 'back_to_instagram_clicked') AS back_to_ig,
+      COUNT(*) FILTER (WHERE e.type = 'back_to_website_clicked') AS back_to_site,
+      COUNT(*) FILTER (WHERE e.type IN (
+        'starter_pill_clicked','suggestion_pill_clicked','conversation_starter_clicked','meeting_pill_clicked'
+      )) AS conversation_starters,
+      COUNT(*) FILTER (WHERE e.type IN (
+        'dynamic_cta_clicked','product_card_clicked','product_buy_clicked','product_clicked',
+        'brand_card_opened','service_card_opened','topic_question_clicked','topic_card_clicked',
+        'case_study_clicked','reel_clicked','highlight_clicked','content_card_clicked',
+        'discovery_category_opened','quick_action_clicked','card_clicked','coupon_revealed','coupon_redeemed_clicked'
+      )) AS dynamic_clicks
+    FROM events e
+    WHERE e.created_at >= (CURRENT_DATE - (window_days - 1) * INTERVAL '1 day')
+      AND e.created_at < (CURRENT_DATE + INTERVAL '1 day')
+    GROUP BY 1, 2, 3, 4
+  ),
+  combined AS (
+    SELECT account_id, date, ref_source, device,
+           visits, unique_visitors, new_visitors, returning_visitors,
+           0::int AS sessions, 0::int AS sessions_with_message,
+           0::int AS messages_user, 0::int AS messages_bot,
+           0::int AS leads, 0::int AS support_tickets, 0::int AS coupon_copies,
+           0::int AS external_exits, 0::int AS back_to_ig, 0::int AS back_to_site,
+           0::int AS conversation_starters, 0::int AS dynamic_clicks,
+           0::int AS avg_duration_sec, 0::int AS bounce_count
+    FROM visits
+    UNION ALL
+    SELECT account_id, date, ref_source, device,
+           0, 0, 0, 0,
+           sessions, sessions_with_message,
+           0, 0, 0, 0, 0, 0, 0, 0,
+           0, 0,
+           avg_duration_sec, bounce_count
+    FROM sessions
+    UNION ALL
+    SELECT account_id, date, ref_source, device,
+           0, 0, 0, 0, 0, 0,
+           messages_user, messages_bot,
+           leads, support_tickets, coupon_copies,
+           external_exits, back_to_ig, back_to_site,
+           conversation_starters, dynamic_clicks,
+           0, 0
+    FROM events_agg
+  )
+  SELECT
+    account_id, date, ref_source, device,
+    SUM(visits)::int, SUM(unique_visitors)::int,
+    SUM(new_visitors)::int, SUM(returning_visitors)::int,
+    SUM(sessions)::int, SUM(sessions_with_message)::int,
+    SUM(messages_user)::int, SUM(messages_bot)::int,
+    SUM(leads)::int, SUM(support_tickets)::int, SUM(coupon_copies)::int,
+    SUM(external_exits)::int, SUM(back_to_ig)::int, SUM(back_to_site)::int,
+    SUM(conversation_starters)::int, SUM(dynamic_clicks)::int,
+    MAX(avg_duration_sec)::int, SUM(bounce_count)::int,
+    NOW()
+  FROM combined
+  GROUP BY account_id, date, ref_source, device
+  ON CONFLICT (account_id, date, ref_source, device) DO UPDATE SET
+    visits = EXCLUDED.visits,
+    unique_visitors = EXCLUDED.unique_visitors,
+    new_visitors = EXCLUDED.new_visitors,
+    returning_visitors = EXCLUDED.returning_visitors,
+    sessions = EXCLUDED.sessions,
+    sessions_with_message = EXCLUDED.sessions_with_message,
+    messages_user = EXCLUDED.messages_user,
+    messages_bot = EXCLUDED.messages_bot,
+    leads = EXCLUDED.leads,
+    support_tickets = EXCLUDED.support_tickets,
+    coupon_copies = EXCLUDED.coupon_copies,
+    external_exits = EXCLUDED.external_exits,
+    back_to_ig = EXCLUDED.back_to_ig,
+    back_to_site = EXCLUDED.back_to_site,
+    conversation_starters = EXCLUDED.conversation_starters,
+    dynamic_clicks = EXCLUDED.dynamic_clicks,
+    avg_duration_sec = EXCLUDED.avg_duration_sec,
+    bounce_count = EXCLUDED.bounce_count,
+    computed_at = NOW();
+
+  GET DIAGNOSTICS inserted_count = ROW_COUNT;
+  RETURN inserted_count;
+END;
+$$;
+
 COMMIT;

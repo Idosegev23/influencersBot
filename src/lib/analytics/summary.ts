@@ -27,6 +27,8 @@ export interface DailyPoint {
   avg_duration_sec: number;
   messages_user: number;
   messages_bot: number;
+  conversation_starters: number;
+  dynamic_clicks: number;
 }
 
 export interface AnalyticsSummary {
@@ -70,6 +72,8 @@ const ZERO_DAY = (date: string): DailyPoint => ({
   avg_duration_sec: 0,
   messages_user: 0,
   messages_bot: 0,
+  conversation_starters: 0,
+  dynamic_clicks: 0,
 });
 
 const NUMERIC_FIELDS: Array<keyof DailyPoint> = [
@@ -87,6 +91,8 @@ const NUMERIC_FIELDS: Array<keyof DailyPoint> = [
   'back_to_site',
   'messages_user',
   'messages_bot',
+  'conversation_starters',
+  'dynamic_clicks',
 ];
 
 function dateRange(days: number): string[] {
@@ -186,6 +192,29 @@ export async function getAccountAnalyticsSummary(opts: {
       (counts.get('external_link_clicked') || 0) + (counts.get('link_opened') || 0);
     liveDay.back_to_ig = counts.get('back_to_instagram_clicked') || 0;
     liveDay.back_to_site = counts.get('back_to_website_clicked') || 0;
+    liveDay.conversation_starters =
+      (counts.get('starter_pill_clicked') || 0) +
+      (counts.get('suggestion_pill_clicked') || 0) +
+      (counts.get('conversation_starter_clicked') || 0) +
+      (counts.get('meeting_pill_clicked') || 0);
+    liveDay.dynamic_clicks =
+      (counts.get('dynamic_cta_clicked') || 0) +
+      (counts.get('product_card_clicked') || 0) +
+      (counts.get('product_buy_clicked') || 0) +
+      (counts.get('product_clicked') || 0) +
+      (counts.get('brand_card_opened') || 0) +
+      (counts.get('service_card_opened') || 0) +
+      (counts.get('topic_question_clicked') || 0) +
+      (counts.get('topic_card_clicked') || 0) +
+      (counts.get('case_study_clicked') || 0) +
+      (counts.get('reel_clicked') || 0) +
+      (counts.get('highlight_clicked') || 0) +
+      (counts.get('content_card_clicked') || 0) +
+      (counts.get('discovery_category_opened') || 0) +
+      (counts.get('quick_action_clicked') || 0) +
+      (counts.get('card_clicked') || 0) +
+      (counts.get('coupon_revealed') || 0) +
+      (counts.get('coupon_redeemed_clicked') || 0);
   }
   dailyByDate.set(today, liveDay);
 
