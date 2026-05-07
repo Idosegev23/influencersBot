@@ -161,16 +161,23 @@ export async function PATCH(
   // Structured assignment by agent_id (preferred — drives analytics).
   // body.assignToSelf=true → assign to the logged-in agent
   // body.assigned_agent_id (string|null) → explicit assignment / unassign
+  //
+  // History note format: "<previous> ← <new>" when there was a previous
+  // assignee (so the audit log shows who *took* it from whom). The
+  // `actor` column already records WHO clicked the button.
   if (body.assignToSelf === true && agent) {
     if (existing.assigned_agent_id !== agent.agent_id) {
       update.assigned_agent_id = agent.agent_id;
       update.assigned_to = agent.display_name;
-      historyEntries.push({ action: 'assigned', note: agent.display_name });
+      const prev = existing.assigned_to;
+      const note = prev ? `${prev} ← ${agent.display_name}` : agent.display_name;
+      historyEntries.push({ action: 'assigned', note });
     }
   } else if ('assigned_agent_id' in body) {
     const next = body.assigned_agent_id == null ? null : String(body.assigned_agent_id);
     if (next !== (existing.assigned_agent_id || null)) {
       update.assigned_agent_id = next;
+      const prev = existing.assigned_to;
       if (next) {
         const { data: a } = await supabase
           .from('support_agents')
@@ -180,13 +187,14 @@ export async function PATCH(
         if (a && a.account_id === influencer.id) {
           const display = `${a.first_name} ${a.last_name}`;
           update.assigned_to = display;
-          historyEntries.push({ action: 'assigned', note: display });
+          const note = prev ? `${prev} ← ${display}` : display;
+          historyEntries.push({ action: 'assigned', note });
         } else {
           return NextResponse.json({ error: 'agent not in this account' }, { status: 400 });
         }
       } else {
         update.assigned_to = null;
-        historyEntries.push({ action: 'assigned', note: 'unassigned' });
+        historyEntries.push({ action: 'assigned', note: prev ? `${prev} ← לא משויך` : 'לא משויך' });
       }
     }
   }

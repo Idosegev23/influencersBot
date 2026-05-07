@@ -1149,9 +1149,14 @@ function TicketDetail({
                 disabled={assigning}
                 className="px-2.5 py-1 rounded-lg text-[11px] font-medium flex items-center gap-1 disabled:opacity-50"
                 style={{ background: '#883fe2', color: '#fff' }}
+                title={
+                  ticket.assigned_agent_id
+                    ? `משיכה אליי (כרגע אצל ${ticket.assigned_to || 'מישהו אחר'})`
+                    : 'הקצה אליי'
+                }
               >
                 {assigning && <Loader2 className="w-3 h-3 animate-spin" />}
-                {ticket.assigned_agent_id ? 'קח/י לי' : 'הקצה לי'}
+                {ticket.assigned_agent_id ? 'משיכה אליי' : 'הקצה אליי'}
               </button>
             )}
             {ticket.assigned_agent_id === agent.id && (
@@ -1992,7 +1997,10 @@ function historyLine(h: HistoryEntry): string {
     return `סטטוס: ${fromLabel} → ${toLabel}${h.note ? ` · "${h.note}"` : ''}`;
   }
   if (h.action === 'note_added') return `הערה פנימית עודכנה`;
-  if (h.action === 'assigned') return `הוקצה ל: ${h.note}`;
+  if (h.action === 'assigned') {
+    if (h.actor === 'system') return `🤖 הקצאה אוטומטית: ${h.note}`;
+    return `הוקצה ל: ${h.note}`;
+  }
   if (h.action === 'customer_notified') {
     const failed = h.note?.startsWith('Send failed');
     const TEMPLATE_LABEL: Record<string, string> = {

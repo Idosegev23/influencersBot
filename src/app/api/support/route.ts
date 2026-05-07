@@ -8,20 +8,22 @@ import { sanitizeHtml } from '@/lib/sanitize';
 import { checkInfluencerAuth } from '@/lib/auth/influencer-auth';
 import { emitServerConversion } from '@/lib/analytics/server-track';
 import { requireAdminAuth } from '@/lib/auth/admin-auth';
+import { autoAssignNewTicket } from '@/lib/support/auto-assign';
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { 
-      username, 
-      customerName, 
-      customerPhone, 
-      message, 
+    const {
+      username,
+      customerName,
+      customerPhone,
+      message,
       problem,
       brand,
       orderNumber,
       productId,
-      sessionId 
+      sessionId,
+      refSource: clientRefSource,
     } = body;
 
     // Support both old format (message) and new format (problem)
@@ -123,7 +125,11 @@ export async function POST(req: NextRequest) {
       enhancedMessage = `מספר הזמנה: ${sanitizedOrderNumber}\n${enhancedMessage}`;
     }
 
-    // Attribution — copy ref_source from the originating chat_session if any.
+    // Attribution priority:
+    //   1) ref_source from the originating chat_session (if a session exists)
+    //   2) refSource sent directly from the client (read from `?ref=` /
+    //      localStorage on the chat page) — used when the visitor opens the
+    //      support tab WITHOUT chatting first, so no chat_session was created.
     let refSource: string | null = null;
     if (sessionId) {
       const { data: sess } = await supabase
@@ -132,6 +138,9 @@ export async function POST(req: NextRequest) {
         .eq('id', sessionId)
         .maybeSingle();
       if (sess?.ref_source) refSource = sess.ref_source;
+    }
+    if (!refSource && typeof clientRefSource === 'string' && clientRefSource.trim()) {
+      refSource = clientRefSource.trim().toLowerCase().slice(0, 100);
     }
 
     // Create support request in database
@@ -159,6 +168,11 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Auto-assign to a random active agent for accounts that have agents
+    // configured. Best-effort: if there are no agents (legacy influencers),
+    // the ticket stays unassigned. The act is recorded with actor='system'.
+    void autoAssignNewTicket(supportRequest.id, influencer.id);
 
     // Derive a short "issue type" from the first line of the message;
     // the full text becomes the description. This matches the Meta
