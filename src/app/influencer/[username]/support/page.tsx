@@ -210,6 +210,14 @@ export default function SupportPage({
               is_admin: agentData.agent.is_admin,
               account_id: agentData.agent.account_id,
             });
+            // Default landing view for an agent: their own tickets.
+            // Admins see the full queue (they need the bird's-eye view).
+            if (!agentData.agent.is_admin) {
+              setOwnerFilter('mine');
+              // status filter 'all' so the agent sees everything they own,
+              // not just `new` (which would hide in_progress / awaiting work).
+              setFilter('all');
+            }
           }
         } else if (enforceAgentLogin) {
           router.push('/labeaute/login');

@@ -29,11 +29,15 @@ export type AssignableAgent = {
  * the ticket unassigned.
  */
 export async function pickRandomActiveAgent(accountId: string): Promise<AssignableAgent | null> {
+  // Admins are managers, not frontline support — exclude them from the
+  // auto-assignment pool. They can still pull tickets manually if they
+  // choose to.
   const { data, error } = await supabase
     .from('support_agents')
     .select('id, first_name, last_name, is_admin')
     .eq('account_id', accountId)
-    .eq('is_active', true);
+    .eq('is_active', true)
+    .eq('is_admin', false);
 
   if (error || !data || data.length === 0) return null;
 
