@@ -664,7 +664,7 @@ function ProductSheet({ product, onClose, onAskAbout }: {
               onClick={e => e.stopPropagation()}
             >
               <ExternalLink className="w-3.5 h-3.5" />
-              לסקירה המלאה של דקל
+              לדף המוצר באתר
             </a>
           )}
           <button
@@ -915,6 +915,33 @@ export default function ProductsCatalogTab({ accountId, onAskAbout, username }: 
             <div className="pcat-empty">
               <ShoppingBag className="w-14 h-14 mx-auto mb-3" style={{ color: '#d1d5db' }} />
               <p>{searchQuery || activeCategory ? 'לא נמצאו מוצרים' : 'אין מוצרים עדיין'}</p>
+            </div>
+          ) : products.length >= 50 ? (
+            // Big-catalog brands (e.g. retailers like Foot Locker) render as a flat
+            // grid — rails-by-line fall apart when product_line is missing for most
+            // items. Click → existing ProductSheet popup.
+            <div className="pcat-body">
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                  gap: 12,
+                  padding: '0 12px',
+                }}
+              >
+                {filtered.map(p => (
+                  <RailProductCard
+                    key={p.id}
+                    product={p}
+                    selected={selectedIds.has(p.id)}
+                    onOpen={(prod) => {
+                      track('product_card_clicked', { product_id: prod.id, product_name: prod.name, placement: 'grid' });
+                      setSelectedProduct(prod);
+                    }}
+                    onToggleSelect={toggleSelect}
+                  />
+                ))}
+              </div>
             </div>
           ) : (
             <div className="pcat-body">

@@ -444,7 +444,7 @@ function ProductDetailModal({ product, onClose }: { product: Product; onClose: (
                 style={{ color: 'var(--color-primary)' }}
               >
                 <ExternalLink className="w-3 h-3" />
-                לדף המוצר באתר של דקל
+                לדף המוצר באתר
               </a>
             )}
           </div>
