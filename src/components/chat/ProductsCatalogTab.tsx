@@ -228,6 +228,202 @@ function FeaturedProductCard({ product, selected, onOpen, onToggleSelect }: {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Editorial grid card — magazine style, no overlay on image          */
+/*  Used by big-catalog brands (rendered in a flat responsive grid).   */
+/* ------------------------------------------------------------------ */
+
+function EditorialGridCard({ product, selected, onOpen, onToggleSelect }: {
+  product: Product;
+  selected: boolean;
+  onOpen: (p: Product) => void;
+  onToggleSelect: (p: Product) => void;
+}) {
+  const displayName = product.name_he || product.name;
+  const brand = product.brand?.split('|')[0].trim();
+
+  return (
+    <div
+      style={{
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        background: '#fff',
+        borderRadius: 14,
+        overflow: 'hidden',
+        boxShadow: selected
+          ? '0 0 0 2px #883fe2, 0 6px 20px rgba(136,63,226,0.14)'
+          : '0 1px 2px rgba(0,0,0,0.04)',
+        transition: 'transform 180ms ease, box-shadow 180ms ease',
+        cursor: 'pointer',
+      }}
+      onMouseEnter={(e) => {
+        if (!selected) (e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 22px rgba(0,0,0,0.10)';
+      }}
+      onMouseLeave={(e) => {
+        if (!selected) (e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)';
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => onOpen(product)}
+        aria-label={`${displayName} — לפרטים`}
+        style={{
+          all: 'unset',
+          display: 'block',
+          width: '100%',
+          cursor: 'pointer',
+        }}
+      >
+        <div
+          style={{
+            width: '100%',
+            aspectRatio: '1 / 1',
+            background: '#f5f4f1',
+            overflow: 'hidden',
+            position: 'relative',
+          }}
+        >
+          {product.image_url ? (
+            <img
+              src={product.image_url}
+              alt={displayName}
+              loading="lazy"
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                display: 'block',
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#cfcfcf',
+              }}
+            >
+              <ShoppingBag className="w-9 h-9" />
+            </div>
+          )}
+          {product.is_on_sale && (
+            <span
+              style={{
+                position: 'absolute',
+                top: 10,
+                insetInlineStart: 10,
+                background: '#883fe2',
+                color: '#fff',
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: 0.5,
+                padding: '4px 9px',
+                borderRadius: 999,
+                textTransform: 'uppercase',
+              }}
+            >
+              SALE
+            </span>
+          )}
+        </div>
+
+        <div style={{ padding: '12px 13px 14px' }}>
+          {brand && (
+            <p
+              style={{
+                margin: 0,
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: 1.2,
+                textTransform: 'uppercase',
+                color: '#9ca3af',
+                marginBottom: 4,
+              }}
+            >
+              {brand}
+            </p>
+          )}
+          <p
+            style={{
+              margin: 0,
+              fontSize: 13.5,
+              fontWeight: 500,
+              lineHeight: 1.35,
+              color: '#1f2937',
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              minHeight: '2.7em',
+              marginBottom: 8,
+            }}
+          >
+            {displayName}
+          </p>
+          {product.price != null && (
+            <p
+              style={{
+                margin: 0,
+                fontSize: 14,
+                fontWeight: 700,
+                color: '#111827',
+              }}
+            >
+              ₪{product.price}
+              {product.original_price && product.original_price > product.price && (
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 500,
+                    color: '#9ca3af',
+                    textDecoration: 'line-through',
+                    marginInlineStart: 6,
+                  }}
+                >
+                  ₪{product.original_price}
+                </span>
+              )}
+            </p>
+          )}
+        </div>
+      </button>
+
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleSelect(product);
+        }}
+        aria-label={selected ? 'הסרה מהבחירה' : 'הוספה לבחירה'}
+        aria-pressed={selected}
+        style={{
+          position: 'absolute',
+          top: 10,
+          insetInlineEnd: 10,
+          width: 30,
+          height: 30,
+          borderRadius: 999,
+          background: selected ? '#883fe2' : 'rgba(255,255,255,0.95)',
+          color: selected ? '#fff' : '#374151',
+          border: 'none',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.10)',
+          transition: 'all 160ms ease',
+        }}
+      >
+        {selected ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+      </button>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Rail product card — 140x175, purple bottom overlay                */
 /* ------------------------------------------------------------------ */
 
@@ -917,20 +1113,20 @@ export default function ProductsCatalogTab({ accountId, onAskAbout, username }: 
               <p>{searchQuery || activeCategory ? 'לא נמצאו מוצרים' : 'אין מוצרים עדיין'}</p>
             </div>
           ) : products.length >= 50 ? (
-            // Big-catalog brands (e.g. retailers like Foot Locker) render as a flat
-            // grid — rails-by-line fall apart when product_line is missing for most
-            // items. Click → existing ProductSheet popup.
+            // Big-catalog brands (e.g. retailers like Foot Locker) render as an
+            // editorial grid — rails-by-line fall apart when product_line is
+            // missing for most items. Click → existing ProductSheet popup.
             <div className="pcat-body">
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-                  gap: 12,
-                  padding: '0 12px',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                  gap: 16,
+                  padding: '0 14px 14px',
                 }}
               >
                 {filtered.map(p => (
-                  <RailProductCard
+                  <EditorialGridCard
                     key={p.id}
                     product={p}
                     selected={selectedIds.has(p.id)}
