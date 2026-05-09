@@ -240,6 +240,8 @@ function EditorialGridCard({ product, selected, onOpen, onToggleSelect }: {
 }) {
   const displayName = product.name_he || product.name;
   const brand = product.brand?.split('|')[0].trim();
+  const subtitle = brand || (product.category ? categoryLabel(product.category) : '');
+  const onSale = product.is_on_sale || (product.original_price != null && product.original_price > (product.price ?? 0));
 
   return (
     <div
@@ -247,40 +249,25 @@ function EditorialGridCard({ product, selected, onOpen, onToggleSelect }: {
         position: 'relative',
         display: 'flex',
         flexDirection: 'column',
-        background: '#fff',
-        borderRadius: 14,
-        overflow: 'hidden',
-        boxShadow: selected
-          ? '0 0 0 2px #883fe2, 0 6px 20px rgba(136,63,226,0.14)'
-          : '0 1px 2px rgba(0,0,0,0.04)',
-        transition: 'transform 180ms ease, box-shadow 180ms ease',
+        background: 'transparent',
         cursor: 'pointer',
-      }}
-      onMouseEnter={(e) => {
-        if (!selected) (e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 22px rgba(0,0,0,0.10)';
-      }}
-      onMouseLeave={(e) => {
-        if (!selected) (e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)';
       }}
     >
       <button
         type="button"
         onClick={() => onOpen(product)}
         aria-label={`${displayName} — לפרטים`}
-        style={{
-          all: 'unset',
-          display: 'block',
-          width: '100%',
-          cursor: 'pointer',
-        }}
+        style={{ all: 'unset', display: 'block', width: '100%', cursor: 'pointer' }}
       >
         <div
           style={{
             width: '100%',
             aspectRatio: '1 / 1',
-            background: '#f5f4f1',
+            background: '#f4f4f4',
             overflow: 'hidden',
             position: 'relative',
+            outline: selected ? '2px solid #111' : 'none',
+            outlineOffset: -2,
           }}
         >
           {product.image_url ? (
@@ -293,35 +280,28 @@ function EditorialGridCard({ product, selected, onOpen, onToggleSelect }: {
                 height: '100%',
                 objectFit: 'cover',
                 display: 'block',
+                transition: 'transform 320ms ease',
               }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLImageElement).style.transform = 'scale(1.04)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLImageElement).style.transform = 'scale(1)'; }}
             />
           ) : (
-            <div
-              style={{
-                width: '100%',
-                height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#cfcfcf',
-              }}
-            >
+            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cfcfcf' }}>
               <ShoppingBag className="w-9 h-9" />
             </div>
           )}
-          {product.is_on_sale && (
+          {onSale && (
             <span
               style={{
                 position: 'absolute',
                 top: 10,
                 insetInlineStart: 10,
-                background: '#883fe2',
+                background: '#FF6900',
                 color: '#fff',
                 fontSize: 10,
                 fontWeight: 700,
-                letterSpacing: 0.5,
-                padding: '4px 9px',
-                borderRadius: 999,
+                letterSpacing: 0.6,
+                padding: '4px 8px',
                 textTransform: 'uppercase',
               }}
             >
@@ -330,62 +310,53 @@ function EditorialGridCard({ product, selected, onOpen, onToggleSelect }: {
           )}
         </div>
 
-        <div style={{ padding: '12px 13px 14px' }}>
-          {brand && (
-            <p
-              style={{
-                margin: 0,
-                fontSize: 10,
-                fontWeight: 600,
-                letterSpacing: 1.2,
-                textTransform: 'uppercase',
-                color: '#9ca3af',
-                marginBottom: 4,
-              }}
-            >
-              {brand}
-            </p>
-          )}
+        <div style={{ paddingTop: 10, paddingInline: 0 }}>
           <p
             style={{
               margin: 0,
               fontSize: 13.5,
-              fontWeight: 500,
-              lineHeight: 1.35,
-              color: '#1f2937',
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
+              fontWeight: 600,
+              lineHeight: 1.3,
+              color: '#111',
+              whiteSpace: 'nowrap',
               overflow: 'hidden',
-              minHeight: '2.7em',
-              marginBottom: 8,
+              textOverflow: 'ellipsis',
             }}
           >
             {displayName}
           </p>
+          {subtitle && (
+            <p
+              style={{
+                margin: 0,
+                marginTop: 2,
+                fontSize: 12,
+                fontWeight: 400,
+                color: '#6b6b6b',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {subtitle}
+            </p>
+          )}
           {product.price != null && (
             <p
               style={{
                 margin: 0,
-                fontSize: 14,
-                fontWeight: 700,
-                color: '#111827',
+                marginTop: 6,
+                fontSize: 13.5,
+                fontWeight: 600,
+                color: '#111',
               }}
             >
-              ₪{product.price}
-              {product.original_price && product.original_price > product.price && (
-                <span
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 500,
-                    color: '#9ca3af',
-                    textDecoration: 'line-through',
-                    marginInlineStart: 6,
-                  }}
-                >
+              {onSale && product.original_price && product.original_price > product.price && (
+                <span style={{ fontWeight: 400, color: '#999', textDecoration: 'line-through', marginInlineEnd: 8 }}>
                   ₪{product.original_price}
                 </span>
               )}
+              ₪{product.price}
             </p>
           )}
         </div>
@@ -401,23 +372,23 @@ function EditorialGridCard({ product, selected, onOpen, onToggleSelect }: {
         aria-pressed={selected}
         style={{
           position: 'absolute',
-          top: 10,
-          insetInlineEnd: 10,
-          width: 30,
-          height: 30,
+          top: 8,
+          insetInlineEnd: 8,
+          width: 28,
+          height: 28,
           borderRadius: 999,
-          background: selected ? '#883fe2' : 'rgba(255,255,255,0.95)',
-          color: selected ? '#fff' : '#374151',
+          background: selected ? '#111' : 'rgba(255,255,255,0.92)',
+          color: selected ? '#fff' : '#111',
           border: 'none',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 1px 4px rgba(0,0,0,0.10)',
-          transition: 'all 160ms ease',
+          backdropFilter: 'blur(4px)',
+          transition: 'all 140ms ease',
         }}
       >
-        {selected ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+        {selected ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
       </button>
     </div>
   );
@@ -1114,15 +1085,28 @@ export default function ProductsCatalogTab({ accountId, onAskAbout, username }: 
             </div>
           ) : products.length >= 50 ? (
             // Big-catalog brands (e.g. retailers like Foot Locker) render as an
-            // editorial grid — rails-by-line fall apart when product_line is
-            // missing for most items. Click → existing ProductSheet popup.
+            // editorial grid — Nike/Adidas-style flat layout with the photo as
+            // the card. Click → existing ProductSheet popup.
             <div className="pcat-body">
+              <p
+                style={{
+                  margin: 0,
+                  padding: '0 14px 12px',
+                  fontSize: 12,
+                  color: '#6b6b6b',
+                  fontWeight: 500,
+                }}
+              >
+                {filtered.length.toLocaleString('he-IL')} מוצרים
+                {activeCategory ? ` • ${categoryLabel(activeCategory)}` : ''}
+              </p>
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-                  gap: 16,
-                  padding: '0 14px 14px',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(165px, 1fr))',
+                  columnGap: 14,
+                  rowGap: 32,
+                  padding: '0 14px 32px',
                 }}
               >
                 {filtered.map(p => (
