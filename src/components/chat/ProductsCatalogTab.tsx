@@ -268,18 +268,53 @@ function BigCatalogGrid({ products, selectedIds, activeCategory, onOpen, onToggl
   return (
     <div className="pcat-body bcg-root">
       <style>{`
+        /* Big-catalog mode breaks out of the 414px mobile container so desktop
+           gets a real catalog width. */
+        .pcat-tab:has(.bcg-root) { overflow-x: hidden; }
+        .pcat-tab__inner:has(.bcg-root) { max-width: none; padding: 16px 0 0; }
+        .bcg-root { width: 100%; max-width: 100%; overflow-x: hidden; box-sizing: border-box; }
+        .bcg-root *, .bcg-root *::before, .bcg-root *::after { box-sizing: border-box; }
+        @media (min-width: 1024px) {
+          .pcat-tab__inner:has(.bcg-root) { max-width: 1280px; padding: 24px 0 0; }
+        }
         .bcg-meta { margin: 0; padding: 0 12px 10px; font-size: 12px; color: #6b6b6b; font-weight: 500; }
         .bcg-grid {
           display: grid;
-          grid-template-columns: repeat(2, 1fr);
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           column-gap: 8px;
           row-gap: 22px;
           padding: 0 12px 24px;
+          width: 100%;
         }
-        @media (min-width: 600px) { .bcg-grid { grid-template-columns: repeat(3, 1fr); column-gap: 12px; row-gap: 28px; } }
-        @media (min-width: 1024px) { .bcg-grid { grid-template-columns: repeat(4, 1fr); column-gap: 16px; row-gap: 32px; padding: 0 16px 32px; } }
-        @media (min-width: 1440px) { .bcg-grid { grid-template-columns: repeat(5, 1fr); } }
+        @media (min-width: 600px) { .bcg-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 12px; row-gap: 28px; } }
+        @media (min-width: 1024px) { .bcg-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); column-gap: 16px; row-gap: 32px; padding: 0 16px 32px; } }
+        @media (min-width: 1440px) { .bcg-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
         .bcg-loadmore { text-align: center; padding: 18px 0 32px; font-size: 12px; color: #9ca3af; }
+        /* EditorialGridCard styles — declared once at the grid level */
+        .egc-root { position: relative; cursor: pointer; min-width: 0; max-width: 100%; }
+        .egc-img-wrap { width: 100%; aspect-ratio: 1 / 1; background: #f4f4f4; overflow: hidden; position: relative; }
+        .egc-img-wrap.is-sel { outline: 2px solid #111; outline-offset: -2px; }
+        .egc-img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 320ms ease; }
+        .egc-root:hover .egc-img { transform: scale(1.04); }
+        .egc-sale { position: absolute; top: 8px; inset-inline-start: 8px; background: #FF6900; color: #fff; font-size: 9px; font-weight: 700; letter-spacing: 0.6px; padding: 3px 6px; text-transform: uppercase; }
+        .egc-meta { padding-top: 8px; min-width: 0; }
+        .egc-name { margin: 0; font-size: 12px; font-weight: 600; line-height: 1.3; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+        .egc-sub { margin: 1px 0 0; font-size: 11px; font-weight: 400; color: #6b6b6b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+        .egc-price { margin: 4px 0 0; font-size: 12px; font-weight: 600; color: #111; }
+        .egc-original { font-weight: 400; color: #999; text-decoration: line-through; margin-inline-end: 6px; }
+        .egc-toggle { position: absolute; top: 6px; inset-inline-end: 6px; width: 26px; height: 26px; border-radius: 999px; background: rgba(255,255,255,0.92); color: #111; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); transition: all 140ms ease; }
+        .egc-toggle.is-sel { background: #111; color: #fff; }
+        @media (min-width: 600px) {
+          .egc-name { font-size: 13px; }
+          .egc-sub { font-size: 11.5px; }
+          .egc-price { font-size: 13px; margin-top: 5px; }
+          .egc-meta { padding-top: 10px; }
+        }
+        @media (min-width: 1024px) {
+          .egc-name { font-size: 13.5px; }
+          .egc-sub { font-size: 12px; }
+          .egc-price { font-size: 13.5px; margin-top: 6px; }
+        }
       `}</style>
       <p className="bcg-meta">
         {products.length.toLocaleString('he-IL')} מוצרים
@@ -325,46 +360,6 @@ function EditorialGridCard({ product, selected, onOpen, onToggleSelect }: {
 
   return (
     <div className="egc-root">
-      <style>{`
-        .egc-root { position: relative; cursor: pointer; }
-        .egc-img-wrap {
-          width: 100%; aspect-ratio: 1 / 1; background: #f4f4f4;
-          overflow: hidden; position: relative;
-        }
-        .egc-img-wrap.is-sel { outline: 2px solid #111; outline-offset: -2px; }
-        .egc-img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 320ms ease; }
-        .egc-root:hover .egc-img { transform: scale(1.04); }
-        .egc-sale {
-          position: absolute; top: 8px; inset-inline-start: 8px;
-          background: #FF6900; color: #fff; font-size: 9px; font-weight: 700;
-          letter-spacing: 0.6px; padding: 3px 6px; text-transform: uppercase;
-        }
-        .egc-meta { padding-top: 8px; }
-        .egc-name { margin: 0; font-size: 12px; font-weight: 600; line-height: 1.3; color: #111;
-                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .egc-sub { margin: 1px 0 0; font-size: 11px; font-weight: 400; color: #6b6b6b;
-                   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .egc-price { margin: 4px 0 0; font-size: 12px; font-weight: 600; color: #111; }
-        .egc-original { font-weight: 400; color: #999; text-decoration: line-through; margin-inline-end: 6px; }
-        .egc-toggle {
-          position: absolute; top: 6px; inset-inline-end: 6px; width: 26px; height: 26px;
-          border-radius: 999px; background: rgba(255,255,255,0.92); color: #111;
-          border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
-          backdrop-filter: blur(4px); transition: all 140ms ease;
-        }
-        .egc-toggle.is-sel { background: #111; color: #fff; }
-        @media (min-width: 600px) {
-          .egc-name { font-size: 13px; }
-          .egc-sub { font-size: 11.5px; }
-          .egc-price { font-size: 13px; margin-top: 5px; }
-          .egc-meta { padding-top: 10px; }
-        }
-        @media (min-width: 1024px) {
-          .egc-name { font-size: 13.5px; }
-          .egc-sub { font-size: 12px; }
-          .egc-price { font-size: 13.5px; margin-top: 6px; }
-        }
-      `}</style>
       <button
         type="button"
         onClick={() => onOpen(product)}
