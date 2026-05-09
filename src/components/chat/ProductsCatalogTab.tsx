@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { track } from '@/lib/analytics/track';
@@ -228,6 +228,86 @@ function FeaturedProductCard({ product, selected, onOpen, onToggleSelect }: {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Big-catalog grid — responsive cols + infinite scroll               */
+/*  Mobile 2 cols / Tablet 3 / Desktop 4. Loads 60 at a time.          */
+/* ------------------------------------------------------------------ */
+
+const PAGE_BATCH = 60;
+
+function BigCatalogGrid({ products, selectedIds, activeCategory, onOpen, onToggleSelect }: {
+  products: Product[];
+  selectedIds: Set<string>;
+  activeCategory: string | null;
+  onOpen: (p: Product) => void;
+  onToggleSelect: (p: Product) => void;
+}) {
+  const [visibleCount, setVisibleCount] = useState(PAGE_BATCH);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // Reset to first page when filter changes
+  useEffect(() => {
+    setVisibleCount(PAGE_BATCH);
+  }, [activeCategory, products.length]);
+
+  // IntersectionObserver — auto-load next batch when sentinel is near viewport
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        setVisibleCount((c) => Math.min(c + PAGE_BATCH, products.length));
+      }
+    }, { rootMargin: '600px 0px' });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [products.length]);
+
+  const visible = products.slice(0, visibleCount);
+  const hasMore = visibleCount < products.length;
+
+  return (
+    <div className="pcat-body bcg-root">
+      <style>{`
+        .bcg-meta { margin: 0; padding: 0 12px 10px; font-size: 12px; color: #6b6b6b; font-weight: 500; }
+        .bcg-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          column-gap: 8px;
+          row-gap: 22px;
+          padding: 0 12px 24px;
+        }
+        @media (min-width: 600px) { .bcg-grid { grid-template-columns: repeat(3, 1fr); column-gap: 12px; row-gap: 28px; } }
+        @media (min-width: 1024px) { .bcg-grid { grid-template-columns: repeat(4, 1fr); column-gap: 16px; row-gap: 32px; padding: 0 16px 32px; } }
+        @media (min-width: 1440px) { .bcg-grid { grid-template-columns: repeat(5, 1fr); } }
+        .bcg-loadmore { text-align: center; padding: 18px 0 32px; font-size: 12px; color: #9ca3af; }
+      `}</style>
+      <p className="bcg-meta">
+        {products.length.toLocaleString('he-IL')} מוצרים
+        {activeCategory ? ` • ${categoryLabel(activeCategory)}` : ''}
+        {' · '}
+        <span style={{ opacity: 0.7 }}>
+          מציג {visible.length.toLocaleString('he-IL')}
+        </span>
+      </p>
+      <div className="bcg-grid">
+        {visible.map(p => (
+          <EditorialGridCard
+            key={p.id}
+            product={p}
+            selected={selectedIds.has(p.id)}
+            onOpen={onOpen}
+            onToggleSelect={onToggleSelect}
+          />
+        ))}
+      </div>
+      {hasMore && (
+        <div ref={sentinelRef} className="bcg-loadmore">טוען עוד מוצרים…</div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Editorial grid card — magazine style, no overlay on image          */
 /*  Used by big-catalog brands (rendered in a flat responsive grid).   */
 /* ------------------------------------------------------------------ */
@@ -244,117 +324,71 @@ function EditorialGridCard({ product, selected, onOpen, onToggleSelect }: {
   const onSale = product.is_on_sale || (product.original_price != null && product.original_price > (product.price ?? 0));
 
   return (
-    <div
-      style={{
-        position: 'relative',
-        display: 'flex',
-        flexDirection: 'column',
-        background: 'transparent',
-        cursor: 'pointer',
-      }}
-    >
+    <div className="egc-root">
+      <style>{`
+        .egc-root { position: relative; cursor: pointer; }
+        .egc-img-wrap {
+          width: 100%; aspect-ratio: 1 / 1; background: #f4f4f4;
+          overflow: hidden; position: relative;
+        }
+        .egc-img-wrap.is-sel { outline: 2px solid #111; outline-offset: -2px; }
+        .egc-img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 320ms ease; }
+        .egc-root:hover .egc-img { transform: scale(1.04); }
+        .egc-sale {
+          position: absolute; top: 8px; inset-inline-start: 8px;
+          background: #FF6900; color: #fff; font-size: 9px; font-weight: 700;
+          letter-spacing: 0.6px; padding: 3px 6px; text-transform: uppercase;
+        }
+        .egc-meta { padding-top: 8px; }
+        .egc-name { margin: 0; font-size: 12px; font-weight: 600; line-height: 1.3; color: #111;
+                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .egc-sub { margin: 1px 0 0; font-size: 11px; font-weight: 400; color: #6b6b6b;
+                   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .egc-price { margin: 4px 0 0; font-size: 12px; font-weight: 600; color: #111; }
+        .egc-original { font-weight: 400; color: #999; text-decoration: line-through; margin-inline-end: 6px; }
+        .egc-toggle {
+          position: absolute; top: 6px; inset-inline-end: 6px; width: 26px; height: 26px;
+          border-radius: 999px; background: rgba(255,255,255,0.92); color: #111;
+          border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+          backdrop-filter: blur(4px); transition: all 140ms ease;
+        }
+        .egc-toggle.is-sel { background: #111; color: #fff; }
+        @media (min-width: 600px) {
+          .egc-name { font-size: 13px; }
+          .egc-sub { font-size: 11.5px; }
+          .egc-price { font-size: 13px; margin-top: 5px; }
+          .egc-meta { padding-top: 10px; }
+        }
+        @media (min-width: 1024px) {
+          .egc-name { font-size: 13.5px; }
+          .egc-sub { font-size: 12px; }
+          .egc-price { font-size: 13.5px; margin-top: 6px; }
+        }
+      `}</style>
       <button
         type="button"
         onClick={() => onOpen(product)}
         aria-label={`${displayName} — לפרטים`}
         style={{ all: 'unset', display: 'block', width: '100%', cursor: 'pointer' }}
       >
-        <div
-          style={{
-            width: '100%',
-            aspectRatio: '1 / 1',
-            background: '#f4f4f4',
-            overflow: 'hidden',
-            position: 'relative',
-            outline: selected ? '2px solid #111' : 'none',
-            outlineOffset: -2,
-          }}
-        >
+        <div className={`egc-img-wrap${selected ? ' is-sel' : ''}`}>
           {product.image_url ? (
-            <img
-              src={product.image_url}
-              alt={displayName}
-              loading="lazy"
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                display: 'block',
-                transition: 'transform 320ms ease',
-              }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLImageElement).style.transform = 'scale(1.04)'; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLImageElement).style.transform = 'scale(1)'; }}
-            />
+            <img src={product.image_url} alt={displayName} loading="lazy" className="egc-img" />
           ) : (
             <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cfcfcf' }}>
-              <ShoppingBag className="w-9 h-9" />
+              <ShoppingBag className="w-7 h-7" />
             </div>
           )}
-          {onSale && (
-            <span
-              style={{
-                position: 'absolute',
-                top: 10,
-                insetInlineStart: 10,
-                background: '#FF6900',
-                color: '#fff',
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: 0.6,
-                padding: '4px 8px',
-                textTransform: 'uppercase',
-              }}
-            >
-              SALE
-            </span>
-          )}
+          {onSale && <span className="egc-sale">SALE</span>}
         </div>
 
-        <div style={{ paddingTop: 10, paddingInline: 0 }}>
-          <p
-            style={{
-              margin: 0,
-              fontSize: 13.5,
-              fontWeight: 600,
-              lineHeight: 1.3,
-              color: '#111',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            {displayName}
-          </p>
-          {subtitle && (
-            <p
-              style={{
-                margin: 0,
-                marginTop: 2,
-                fontSize: 12,
-                fontWeight: 400,
-                color: '#6b6b6b',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
-            >
-              {subtitle}
-            </p>
-          )}
+        <div className="egc-meta">
+          <p className="egc-name">{displayName}</p>
+          {subtitle && <p className="egc-sub">{subtitle}</p>}
           {product.price != null && (
-            <p
-              style={{
-                margin: 0,
-                marginTop: 6,
-                fontSize: 13.5,
-                fontWeight: 600,
-                color: '#111',
-              }}
-            >
+            <p className="egc-price">
               {onSale && product.original_price && product.original_price > product.price && (
-                <span style={{ fontWeight: 400, color: '#999', textDecoration: 'line-through', marginInlineEnd: 8 }}>
-                  ₪{product.original_price}
-                </span>
+                <span className="egc-original">₪{product.original_price}</span>
               )}
               ₪{product.price}
             </p>
@@ -370,23 +404,7 @@ function EditorialGridCard({ product, selected, onOpen, onToggleSelect }: {
         }}
         aria-label={selected ? 'הסרה מהבחירה' : 'הוספה לבחירה'}
         aria-pressed={selected}
-        style={{
-          position: 'absolute',
-          top: 8,
-          insetInlineEnd: 8,
-          width: 28,
-          height: 28,
-          borderRadius: 999,
-          background: selected ? '#111' : 'rgba(255,255,255,0.92)',
-          color: selected ? '#fff' : '#111',
-          border: 'none',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backdropFilter: 'blur(4px)',
-          transition: 'all 140ms ease',
-        }}
+        className={`egc-toggle${selected ? ' is-sel' : ''}`}
       >
         {selected ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
       </button>
@@ -1087,42 +1105,17 @@ export default function ProductsCatalogTab({ accountId, onAskAbout, username }: 
             // Big-catalog brands (e.g. retailers like Foot Locker) render as an
             // editorial grid — Nike/Adidas-style flat layout with the photo as
             // the card. Click → existing ProductSheet popup.
-            <div className="pcat-body">
-              <p
-                style={{
-                  margin: 0,
-                  padding: '0 14px 12px',
-                  fontSize: 12,
-                  color: '#6b6b6b',
-                  fontWeight: 500,
-                }}
-              >
-                {filtered.length.toLocaleString('he-IL')} מוצרים
-                {activeCategory ? ` • ${categoryLabel(activeCategory)}` : ''}
-              </p>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(165px, 1fr))',
-                  columnGap: 14,
-                  rowGap: 32,
-                  padding: '0 14px 32px',
-                }}
-              >
-                {filtered.map(p => (
-                  <EditorialGridCard
-                    key={p.id}
-                    product={p}
-                    selected={selectedIds.has(p.id)}
-                    onOpen={(prod) => {
-                      track('product_card_clicked', { product_id: prod.id, product_name: prod.name, placement: 'grid' });
-                      setSelectedProduct(prod);
-                    }}
-                    onToggleSelect={toggleSelect}
-                  />
-                ))}
-              </div>
-            </div>
+            // Infinite scroll (60 batch) keeps the page from rendering 1500+ DOM nodes.
+            <BigCatalogGrid
+              products={filtered}
+              selectedIds={selectedIds}
+              activeCategory={activeCategory}
+              onOpen={(prod) => {
+                track('product_card_clicked', { product_id: prod.id, product_name: prod.name, placement: 'grid' });
+                setSelectedProduct(prod);
+              }}
+              onToggleSelect={toggleSelect}
+            />
           ) : (
             <div className="pcat-body">
               {featured && (
