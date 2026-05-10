@@ -25,6 +25,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyWhatsAppSignature } from '@/lib/whatsapp-cloud/signature';
 import { createClient } from '@/lib/supabase';
 import { isItamarSender, processItamarReply } from '@/lib/handoff/process-itamar-reply';
+import { routeInboundToTicket } from '@/lib/support/route-inbound';
 
 export const runtime = 'nodejs';          // need crypto + Buffer
 export const dynamic = 'force-dynamic';   // never cache
@@ -237,6 +238,24 @@ async function processWebhook(payload: any): Promise<void> {
           .from('whatsapp_conversations')
           .update({ unread_count: (convo.unread_count ?? 0) + 1 })
           .eq('id', convo.id);
+
+        // Route this inbound to a support ticket if we can identify
+        // one. Skips the Itamar handoff sender — that flow has its own
+        // routing above. Best-effort: errors are swallowed because the
+        // raw message is already persisted in whatsapp_messages.
+        if (!isItamarSender(waId)) {
+          try {
+            await routeInboundToTicket({
+              waId,
+              textBody,
+              contextId: msg.context?.id ?? null,
+              waMessageId: msg.id,
+              contactId: contact.id,
+            });
+          } catch (err) {
+            console.error('[whatsapp webhook] support routing failed', err);
+          }
+        }
       }
 
       // -----------------------------------------------------------------

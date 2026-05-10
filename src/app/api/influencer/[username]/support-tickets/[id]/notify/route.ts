@@ -31,6 +31,7 @@ import {
   sendSupportStatusAwaitingCustomer,
   sendSupportStatusShipped,
   sendSupportStatusResolved,
+  sendSupportFreeformMessage,
 } from '@/lib/whatsapp-notify';
 import { ensureReplyToken } from '@/lib/support/reply-token';
 
@@ -39,10 +40,11 @@ import { ensureReplyToken } from '@/lib/support/reply-token';
 // agent 900 chars of summary headroom and reject earlier with a clear
 // message. Source: WHATSAPP_TEMPLATES_SPEC.md.
 const RESOLUTION_SUMMARY_MAX = 900;
+const FREEFORM_CONTENT_MAX = 900;
 
 export const runtime = 'nodejs';
 
-const TEMPLATE_KEYS = ['in_progress', 'awaiting_customer', 'shipped', 'resolved'] as const;
+const TEMPLATE_KEYS = ['in_progress', 'awaiting_customer', 'shipped', 'resolved', 'freeform'] as const;
 type TemplateKey = (typeof TEMPLATE_KEYS)[number];
 
 function shortCode(uuid: string): string {
@@ -201,6 +203,39 @@ export async function POST(
       }
       break;
     }
+    case 'freeform': {
+      const content = (body.content || '').toString().trim();
+      if (!content) {
+        return NextResponse.json(
+          { error: 'content is required for freeform' },
+          { status: 400 },
+        );
+      }
+      if (content.length > FREEFORM_CONTENT_MAX) {
+        return NextResponse.json(
+          {
+            error: 'freeform_content_too_long',
+            limit: FREEFORM_CONTENT_MAX,
+            length: content.length,
+            message: `הודעה ארוכה מדי — מקסימום ${FREEFORM_CONTENT_MAX} תווים, נשלחו ${content.length}.`,
+          },
+          { status: 400 },
+        );
+      }
+      templateName = 'support_freeform_message';
+      bodyText =
+        `היי ${fname} 👋\n` +
+        `עדכון בנוגע לפנייה שלך ל-${brand}:\n\n` +
+        `${content}\n\n` +
+        `– צוות ${brand} 🤍`;
+      result = await sendSupportFreeformMessage({
+        to: ticket.customer_phone,
+        customerFirstName: fname,
+        brand,
+        content,
+      });
+      break;
+    }
     case 'resolved': {
       const summary = (body.resolutionSummary || 'הטיפול הושלם.').toString().trim();
       if (summary.length > RESOLUTION_SUMMARY_MAX) {
@@ -260,6 +295,7 @@ export async function POST(
       awaiting_customer: 'awaiting_customer',
       shipped: 'shipped',
       resolved: 'resolved',
+      freeform: null, // freeform follow-up does not change status
     };
     const newStatus = STATUS_BY_TEMPLATE[tpl];
     const update: Record<string, any> = {

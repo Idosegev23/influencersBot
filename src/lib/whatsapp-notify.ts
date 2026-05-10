@@ -393,6 +393,27 @@ export async function sendSupportStatusResolved(p: {
   });
 }
 
+// support_freeform_message — freeform follow-up outside the 24h window.
+//   Category: UTILITY  |  Vars: body {{1}} {{2}} {{3}}  |  no buttons
+//   Trigger: support page "שליחה כתבנית" when service window is closed.
+//   The body wraps the agent's free text with a fixed greeting + sign-off
+//   so Meta accepts the template; the FOOTER explicitly invites a reply
+//   in WhatsApp itself (no URL button) so the customer's response opens
+//   the 24h service window for follow-up free-text via send-text.
+export async function sendSupportFreeformMessage(p: {
+  to: string;
+  customerFirstName: string;
+  brand: string;
+  content: string; // up to ~900 chars
+}): Promise<WhatsAppSendResult> {
+  return runTemplate({
+    templateName: 'support_freeform_message',
+    flagName: 'SUPPORT_FREEFORM_MESSAGE',
+    to: p.to,
+    bodyParams: [p.customerFirstName, p.brand, p.content],
+  });
+}
+
 // support_delivered_feedback_v1 — delivery confirmation + 2-button feedback
 //   Category: UTILITY  |  Vars: body {{1}} {{2}}, url {{1}} (= feedback token)
 //   Trigger: shipping webhook receives mapped_status='delivered'

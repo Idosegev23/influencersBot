@@ -822,6 +822,38 @@ function TicketDetail({
     }
   };
 
+  // Outside the 24h window we can't send a free-form message; instead we
+  // dispatch the support_freeform_message template, which wraps the
+  // agent's text with a fixed greeting and invites the customer to reply
+  // here in WhatsApp (re-opening the service window for further free
+  // text). Capped at 900 chars by the template body limit.
+  const handleSendFreeformTemplate = async () => {
+    const txt = directBody.trim();
+    if (!txt) return;
+    if (txt.length > 900) {
+      alert(`הודעה ארוכה מדי — מקסימום 900 תווים, נשלחו ${txt.length}.`);
+      return;
+    }
+    setSendingDirect(true);
+    try {
+      const res = await fetch(`/api/influencer/${username}/support-tickets/${ticketId}/notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ template: 'freeform', content: txt }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setDirectBody('');
+        await fetchTicket();
+        onChange();
+      } else {
+        alert(`שליחה נכשלה: ${data.message || data.error || 'שגיאה'}`);
+      }
+    } finally {
+      setSendingDirect(false);
+    }
+  };
+
   const [deleting, setDeleting] = useState(false);
   const handleDeleteTicket = async () => {
     if (!agent?.is_admin) return;
@@ -1315,35 +1347,49 @@ function TicketDetail({
 
           {serviceWindow && !serviceWindow.withinWindow && (
             <p className="text-[11px] mb-2" style={{ color: '#fbbf24' }}>
-              הלקוחה לא הגיבה ב-24 שעות האחרונות. אפשר לשלוח רק תבניות סטטוס (לחצנים למעלה).
+              הלקוחה לא הגיבה ב-24 שעות האחרונות — ההודעה תישלח כתבנית WhatsApp (עד 900 תווים).
               {serviceWindow.lastInboundAt && (
                 <> תגובה אחרונה ממנה: {formatRelative(serviceWindow.lastInboundAt)}.</>
               )}
             </p>
           )}
 
-          {/* Free-form text */}
+          {/* Free-form text — auto-routes between send-text (window open)
+              and the support_freeform_message template (window closed).
+              The template caps content at 900 chars due to Meta's body
+              limit; send-text allows up to 4000. */}
           <div className="space-y-2">
             <textarea
               value={directBody}
-              onChange={(e) => setDirectBody(e.target.value.slice(0, 4000))}
-              placeholder="הודעה חופשית ללקוחה (בתוך חלון 24 שעות בלבד)"
-              disabled={!serviceWindow?.withinWindow || sendingDirect}
+              onChange={(e) => {
+                const cap = serviceWindow?.withinWindow ? 4000 : 900;
+                setDirectBody(e.target.value.slice(0, cap));
+              }}
+              placeholder={
+                serviceWindow?.withinWindow
+                  ? 'הודעה חופשית ללקוחה'
+                  : 'הודעה ללקוחה (תישלח כתבנית WhatsApp — עד 900 תווים)'
+              }
+              disabled={sendingDirect}
               rows={3}
               className="w-full text-sm p-2.5 rounded-xl outline-none resize-y disabled:opacity-50"
               style={{ background: 'rgba(255,255,255,0.05)', color: '#fff' }}
             />
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] opacity-60">{directBody.length} / 4000</span>
+              <span className="text-[11px] opacity-60">
+                {directBody.length} / {serviceWindow?.withinWindow ? 4000 : 900}
+              </span>
               <button
-                onClick={handleSendDirectText}
-                disabled={!directBody.trim() || !serviceWindow?.withinWindow || sendingDirect}
+                onClick={
+                  serviceWindow?.withinWindow ? handleSendDirectText : handleSendFreeformTemplate
+                }
+                disabled={!directBody.trim() || sendingDirect}
                 className="px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 disabled:opacity-50"
                 style={{ background: '#22c55e', color: '#fff' }}
               >
                 {sendingDirect && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 <Send className="w-3.5 h-3.5" />
-                שליחה
+                {serviceWindow?.withinWindow ? 'שליחה' : 'שליחה כתבנית'}
               </button>
             </div>
           </div>
