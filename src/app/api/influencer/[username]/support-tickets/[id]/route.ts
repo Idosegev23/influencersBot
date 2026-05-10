@@ -62,11 +62,14 @@ export async function GET(
   }
   if (!ticket) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
+  // Newest first — the UI renders in array order, and agents want the
+  // latest event at the top so a fresh customer reply jumps into view
+  // without scrolling.
   const { data: history } = await supabase
     .from('support_ticket_history')
     .select('*')
     .eq('ticket_id', id)
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: false });
 
   return NextResponse.json({ ticket, history: history || [] });
 }

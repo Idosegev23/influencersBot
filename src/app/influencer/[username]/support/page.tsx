@@ -31,7 +31,7 @@ import {
   AlertTriangle,
   Trash2,
 } from 'lucide-react';
-import { getInfluencerByUsername } from '@/lib/supabase';
+import { getInfluencerByUsername, supabase } from '@/lib/supabase';
 import type { Influencer } from '@/types';
 
 /* ------------------------------------------------------------------ */
@@ -824,15 +824,41 @@ function TicketDetail({
 
   // Background poll while the ticket is open: every 15s pull fresh
   // history + window status. Cheap (one ticket, one window, no images)
-  // and means the agent sees a customer reply land in real time and
-  // the textarea auto-flips from "send template" → "send free text"
-  // the moment Meta opens the 24h window.
+  // and means the agent sees a customer reply land even when Realtime
+  // misses an event. Realtime push (below) is the fast path; polling
+  // is the safety net.
   useEffect(() => {
     const id = setInterval(() => {
       fetchTicket(true).catch(() => {});
     }, 15_000);
     return () => clearInterval(id);
   }, [fetchTicket]);
+
+  // Realtime push: subscribe to INSERTs on support_ticket_history for
+  // this ticket. When a customer reply lands (via the WhatsApp webhook
+  // or the /reply/<token> page) or another agent appends a row, refresh
+  // the panel within ~50ms. Falls back to the 15s poll silently if the
+  // websocket can't connect.
+  useEffect(() => {
+    const channel = supabase
+      .channel(`support_ticket_history_${ticketId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'support_ticket_history',
+          filter: `ticket_id=eq.${ticketId}`,
+        },
+        () => {
+          fetchTicket(true).catch(() => {});
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [ticketId, fetchTicket]);
 
   const handleSendDirectText = async () => {
     const txt = directBody.trim();
