@@ -42,9 +42,66 @@ interface RouteInput {
 const TERMINAL_STATUSES = new Set(['resolved', 'closed', 'cancelled']);
 const RECENT_OUTBOUND_WINDOW_MS = 24 * 60 * 60 * 1000;
 
+type MatchedBy = 'context' | 'recent_outbound' | 'phone';
+type Alternative = {
+  ticket_id: string;
+  account_id: string;
+  brand: string | null;
+  customer_name: string | null;
+  last_outbound_at: string;
+};
+type RoutingMeta = {
+  matched_by: MatchedBy;
+  ambiguous: boolean;
+  alternatives: Alternative[];
+};
+
 export async function routeInboundToTicket(
   input: RouteInput,
-): Promise<{ ticketId: string | null; matchedBy: 'context' | 'recent_outbound' | 'phone' | null }> {
+): Promise<{ ticketId: string | null; matchedBy: MatchedBy | null; ambiguous?: boolean }> {
+  // Pull recent outbound activity to this phone up front — used both
+  // for Strategy 2 routing AND to detect cross-account ambiguity for
+  // strategies 1/3. Joining support_requests gives us customer_phone
+  // (so we can filter by toWaId match) and brand/customer_name for the
+  // alternatives list shown in the UI banner.
+  const sinceIso = new Date(Date.now() - RECENT_OUTBOUND_WINDOW_MS).toISOString();
+  const { data: rawOutbounds } = await supabase
+    .from('support_ticket_history')
+    .select(
+      'ticket_id, account_id, created_at, support_requests!inner(customer_phone, brand, customer_name)',
+    )
+    .in('action', ['customer_notified', 'agent_message', 'agent_image'])
+    .not('whatsapp_message_id', 'is', null)
+    .gte('created_at', sinceIso)
+    .order('created_at', { ascending: false })
+    .limit(80);
+
+  // Filter to outbounds that match this phone, dedup per ticket (keep
+  // the most recent outbound per ticket_id since the array is already
+  // ordered by created_at desc).
+  const recentByTicket = new Map<string, Alternative>();
+  for (const r of (rawOutbounds || []) as any[]) {
+    const phone = r.support_requests?.customer_phone;
+    if (!phone || toWaId(phone) !== input.waId) continue;
+    if (!recentByTicket.has(r.ticket_id)) {
+      recentByTicket.set(r.ticket_id, {
+        ticket_id: r.ticket_id,
+        account_id: r.account_id,
+        brand: r.support_requests?.brand ?? null,
+        customer_name: r.support_requests?.customer_name ?? null,
+        last_outbound_at: r.created_at,
+      });
+    }
+  }
+  const recentList = [...recentByTicket.values()];
+  const distinctAccounts = new Set(recentList.map((r) => r.account_id));
+
+  function buildMeta(matchedBy: MatchedBy, chosenTicketId: string): RoutingMeta {
+    const ambiguous = distinctAccounts.size > 1;
+    const alternatives = recentList.filter((r) => r.ticket_id !== chosenTicketId);
+    return { matched_by: matchedBy, ambiguous, alternatives };
+  }
+
   // ── Strategy 1: thread by context.id ─────────────────────────────────
   if (input.contextId) {
     const { data: histRow } = await supabase
@@ -54,41 +111,30 @@ export async function routeInboundToTicket(
       .maybeSingle();
 
     if (histRow?.ticket_id) {
-      await applyReply(histRow.ticket_id, histRow.account_id, input);
-      return { ticketId: histRow.ticket_id, matchedBy: 'context' };
+      // context.id is deterministic — even when other brands have
+      // outbounds in the window, ambiguous=false here.
+      const meta: RoutingMeta = {
+        matched_by: 'context',
+        ambiguous: false,
+        alternatives: recentList.filter((r) => r.ticket_id !== histRow.ticket_id),
+      };
+      await applyReply(histRow.ticket_id, histRow.account_id, input, meta);
+      return { ticketId: histRow.ticket_id, matchedBy: 'context', ambiguous: false };
     }
   }
 
   // ── Strategy 2: most recent outbound from us to this phone ──────────
-  // Look up our own outbound history rows for this phone (any ticket,
-  // any status) within the last 24h. Whatsapp_message_id on the row
-  // proves it was a real send. The most recent one is overwhelmingly
-  // likely to be what the customer is replying to.
-  const sinceIso = new Date(Date.now() - RECENT_OUTBOUND_WINDOW_MS).toISOString();
-  const { data: recentOutbounds } = await supabase
-    .from('support_ticket_history')
-    .select('ticket_id, account_id, created_at, support_requests!inner(customer_phone)')
-    .in('action', ['customer_notified', 'agent_message', 'agent_image'])
-    .not('whatsapp_message_id', 'is', null)
-    .gte('created_at', sinceIso)
-    .order('created_at', { ascending: false })
-    .limit(50);
-
-  if (recentOutbounds) {
-    const match = recentOutbounds.find((r: any) => {
-      const phone = r.support_requests?.customer_phone;
-      return phone && toWaId(phone) === input.waId;
-    });
-    if (match) {
-      await applyReply(match.ticket_id, match.account_id, input);
-      return { ticketId: match.ticket_id, matchedBy: 'recent_outbound' };
-    }
+  // Most replies arrive within minutes of the outbound. Pick the most
+  // recent (recentList is sorted desc) — flag as ambiguous when there's
+  // outbound activity from a different account in the same window.
+  if (recentList.length > 0) {
+    const top = recentList[0];
+    const meta = buildMeta('recent_outbound', top.ticket_id);
+    await applyReply(top.ticket_id, top.account_id, input, meta);
+    return { ticketId: top.ticket_id, matchedBy: 'recent_outbound', ambiguous: meta.ambiguous };
   }
 
   // ── Strategy 3: most recent non-terminal ticket for this phone ──────
-  // Cold-start reply with no recent outbound from us. Phones are stored
-  // in inconsistent formats (with/without country code) so we normalise
-  // both sides via toWaId() and compare in JS.
   const { data: candidates } = await supabase
     .from('support_requests')
     .select('id, account_id, customer_phone, status, updated_at')
@@ -103,8 +149,9 @@ export async function routeInboundToTicket(
         !TERMINAL_STATUSES.has(t.status),
     );
     if (ticket) {
-      await applyReply(ticket.id, ticket.account_id, input);
-      return { ticketId: ticket.id, matchedBy: 'phone' };
+      const meta = buildMeta('phone', ticket.id);
+      await applyReply(ticket.id, ticket.account_id, input, meta);
+      return { ticketId: ticket.id, matchedBy: 'phone', ambiguous: meta.ambiguous };
     }
   }
 
@@ -115,6 +162,7 @@ async function applyReply(
   ticketId: string,
   accountId: string,
   input: RouteInput,
+  routingMeta: RoutingMeta,
 ): Promise<void> {
   await supabase.from('support_ticket_history').insert({
     ticket_id: ticketId,
@@ -124,6 +172,7 @@ async function applyReply(
     note: input.textBody,
     body_text: input.textBody,
     whatsapp_message_id: input.waMessageId,
+    routing_meta: routingMeta,
   });
 
   // Reopen if awaiting/new — terminal statuses are left alone so a late

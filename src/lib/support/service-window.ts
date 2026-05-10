@@ -2,10 +2,15 @@
  * 24-hour customer-service window check.
  *
  * Meta only allows free-form (non-template) outbound messages within 24
- * hours of the customer's last inbound. The window is tracked per phone
- * number on `whatsapp_conversations.service_window_expires_at`. If the
- * customer has never replied through WhatsApp, no conversation row
- * exists — we treat that as "window closed, send a template instead".
+ * hours of the customer's last inbound. The window lives at the WhatsApp
+ * BUSINESS PHONE NUMBER level — not per account/brand: once a customer
+ * has replied to any message we sent from our number, ANY agent on that
+ * number can send free-form text for the next 24h, regardless of which
+ * brand the conversation started with.
+ *
+ * The accountId arg is accepted for backward compat but no longer used
+ * to filter; the truth source is `whatsapp_conversations` keyed on
+ * (phone_number_id, contact_id).
  */
 
 import { supabase } from '@/lib/supabase';
@@ -18,7 +23,7 @@ export type ServiceWindow = {
 };
 
 export async function getServiceWindow(
-  accountId: string,
+  _accountId: string,
   customerPhone: string | null,
 ): Promise<ServiceWindow> {
   if (!customerPhone) {
@@ -27,12 +32,9 @@ export async function getServiceWindow(
 
   const waId = toWaId(customerPhone);
 
-  // contact ↔ account is 1:1; if the customer has chatted with this brand
-  // through WhatsApp we'll find a row here. (Inbound webhook upserts it.)
   const { data: contact } = await supabase
     .from('whatsapp_contacts')
     .select('id')
-    .eq('account_id', accountId)
     .eq('wa_id', waId)
     .maybeSingle();
 

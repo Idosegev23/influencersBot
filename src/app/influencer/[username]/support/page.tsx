@@ -73,6 +73,20 @@ interface Ticket {
   products?: { name: string; coupon_code: string | null; brand: string | null } | null;
 }
 
+interface RoutingAlternative {
+  ticket_id: string;
+  account_id: string;
+  brand: string | null;
+  customer_name: string | null;
+  last_outbound_at: string;
+}
+
+interface RoutingMeta {
+  matched_by: 'context' | 'recent_outbound' | 'phone';
+  ambiguous: boolean;
+  alternatives: RoutingAlternative[];
+}
+
 interface HistoryEntry {
   id: string;
   action: string;
@@ -86,6 +100,7 @@ interface HistoryEntry {
   created_at: string;
   attachment_url?: string | null;
   attachment_filename?: string | null;
+  routing_meta?: RoutingMeta | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -778,26 +793,46 @@ function TicketDetail({
   const [directImageCaption, setDirectImageCaption] = useState('');
   const [sendingDirect, setSendingDirect] = useState(false);
 
-  const fetchTicket = useCallback(async () => {
-    setLoading(true);
+  // Polling fetch that doesn't toggle the loading spinner. Used by the
+  // 15s background poll so the agent sees fresh replies + window
+  // changes without manual refresh. The first call still uses the
+  // spinning version so the panel feels responsive on open.
+  const fetchTicket = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     const res = await fetch(`/api/influencer/${username}/support-tickets/${ticketId}`);
     if (!res.ok) {
-      setLoading(false);
+      if (!silent) setLoading(false);
       return;
     }
     const data = await res.json();
     setTicket(data.ticket);
     setHistory(data.history || []);
-    setInternalNotes(data.ticket?.internal_notes || '');
-    setTrackingNumber(data.ticket?.tracking_number || '');
-    setResolutionSummary(data.ticket?.resolution_summary || '');
-    setLoading(false);
+    // Don't trample local edits-in-progress on background polls — only
+    // hydrate the editable fields on the foreground (initial) load.
+    if (!silent) {
+      setInternalNotes(data.ticket?.internal_notes || '');
+      setTrackingNumber(data.ticket?.tracking_number || '');
+      setResolutionSummary(data.ticket?.resolution_summary || '');
+      setLoading(false);
+    }
     // Fire-and-forget: fetch the 24h service window status. Doesn't block render.
     fetch(`/api/influencer/${username}/support-tickets/${ticketId}/window`, { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
       .then((w) => { if (w) setServiceWindow(w); })
       .catch(() => {});
   }, [username, ticketId]);
+
+  // Background poll while the ticket is open: every 15s pull fresh
+  // history + window status. Cheap (one ticket, one window, no images)
+  // and means the agent sees a customer reply land in real time and
+  // the textarea auto-flips from "send template" → "send free text"
+  // the moment Meta opens the 24h window.
+  useEffect(() => {
+    const id = setInterval(() => {
+      fetchTicket(true).catch(() => {});
+    }, 15_000);
+    return () => clearInterval(id);
+  }, [fetchTicket]);
 
   const handleSendDirectText = async () => {
     const txt = directBody.trim();
@@ -1588,6 +1623,19 @@ function TicketDetail({
                         {h.note}
                       </div>
                     )}
+                    {/* Ambiguous routing banner — surfaced when the reply
+                        landed here via the recent-outbound heuristic but
+                        another brand also messaged this phone in the
+                        same window. Lets the agent re-attach to the
+                        intended ticket. */}
+                    {isCustomerReply && h.routing_meta?.ambiguous && (
+                      <AmbiguityBanner
+                        historyId={h.id}
+                        meta={h.routing_meta}
+                        username={username}
+                        onMoved={fetchTicket}
+                      />
+                    )}
                     {/* Brand notification body — cyan tint, exactly the
                         text the customer received over WhatsApp */}
                     {isBrandMessage && h.body_text && (
@@ -2042,6 +2090,72 @@ function Pagination({
   );
 }
 
+function AmbiguityBanner({
+  historyId,
+  meta,
+  username,
+  onMoved,
+}: {
+  historyId: string;
+  meta: RoutingMeta;
+  username: string;
+  onMoved: () => void;
+}) {
+  const [moving, setMoving] = useState<string | null>(null);
+  const handleMove = async (targetTicketId: string) => {
+    setMoving(targetTicketId);
+    try {
+      const res = await fetch(`/api/influencer/${username}/support-tickets/move-history`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ historyId, targetTicketId }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        onMoved();
+      } else {
+        alert(`העברה נכשלה: ${data.message || data.error || 'שגיאה'}`);
+      }
+    } finally {
+      setMoving(null);
+    }
+  };
+  return (
+    <div className="mt-1 p-2 rounded-lg flex flex-col gap-2"
+      style={{
+        background: 'rgba(217,119,6,0.08)',
+        border: '1px solid rgba(217,119,6,0.3)',
+      }}>
+      <div className="flex items-start gap-1.5 text-[11px]" style={{ color: '#b45309' }}>
+        <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-px" />
+        <span>
+          זיהוי אוטומטי — באותו חלון נשלחה הודעה גם למותג אחר. אם התגובה לא לטיקט הנוכחי, אפשר להעביר:
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {meta.alternatives.map((alt) => (
+          <button
+            key={alt.ticket_id}
+            onClick={() => handleMove(alt.ticket_id)}
+            disabled={moving !== null}
+            className="px-2 py-1 rounded-md text-[11px] font-medium flex items-center gap-1 disabled:opacity-50"
+            style={{
+              background: 'var(--dash-surface-solid, #fff)',
+              color: 'var(--dash-text)',
+              border: '1px solid var(--dash-border, rgba(0,0,0,0.1))',
+            }}
+          >
+            {moving === alt.ticket_id && <Loader2 className="w-3 h-3 animate-spin" />}
+            <span>
+              {alt.brand || 'מותג'} · {alt.customer_name || 'לקוחה'} · {formatRelative(alt.last_outbound_at)}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function NotifyButton({ label, onClick, disabled }: { label: string; onClick: () => void; disabled?: boolean }) {
   return (
     <button
@@ -2087,6 +2201,8 @@ function historyLine(h: HistoryEntry): string {
     return `הודעה ללקוחה: ${friendly}`;
   }
   if (h.action === 'customer_reply') return `תגובת הלקוחה`;
+  if (h.action === 'reply_moved_out') return `תגובה הועברה לטיקט אחר`;
+  if (h.action === 'reply_moved_in') return `תגובה התקבלה מטיקט אחר`;
   if (h.action === 'agent_message') {
     const failed = h.note?.startsWith('Send failed');
     if (failed) return `ניסיון שליחת הודעה חופשית נכשל — ${h.note}`;
