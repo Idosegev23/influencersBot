@@ -62,6 +62,10 @@ type BucketAgg = {
   category_breakdown: Record<string, number>;
 };
 
+type AccountAgg = BucketAgg & {
+  templates: BucketAgg[]; // billable-cost-sorted per-template breakdown for this account
+};
+
 export async function GET(req: NextRequest) {
   const denied = await requireAdminAuth();
   if (denied) return denied;
@@ -154,6 +158,9 @@ export async function GET(req: NextRequest) {
   const byAccount = new Map<BucketKey, BucketAgg>();
   const byTemplate = new Map<BucketKey, BucketAgg>();
   const byCategory = new Map<BucketKey, BucketAgg>();
+  // (account_id, template_name) → BucketAgg — used to attach per-template
+  // drilldown to each account row so the billing view is one click away.
+  const byAccountTemplate = new Map<string, Map<BucketKey, BucketAgg>>();
 
   let totalCount = 0;
   let totalBillable = 0;
@@ -195,6 +202,12 @@ export async function GET(req: NextRequest) {
     apply(bucket(templateKey, templateKey, byTemplate));
     apply(bucket(categoryKey, categoryKey, byCategory));
 
+    // Per-account x per-template billing matrix.
+    if (!byAccountTemplate.has(accountKey)) {
+      byAccountTemplate.set(accountKey, new Map());
+    }
+    apply(bucket(templateKey, templateKey, byAccountTemplate.get(accountKey)!));
+
     totalCount += 1;
     if (isFailed) totalFailed += 1;
     if (isBillable) totalBillable += 1;
@@ -207,6 +220,11 @@ export async function GET(req: NextRequest) {
       .map((b) => ({ ...b, cost_ils: usdToIls(b.cost_usd) }))
       .sort((a, b) => b.cost_usd - a.cost_usd || b.count - a.count);
 
+  const byAccountWithTemplates: AccountAgg[] = finalize(byAccount).map((acc) => ({
+    ...acc,
+    templates: byAccountTemplate.has(acc.key) ? finalize(byAccountTemplate.get(acc.key)!) : [],
+  }));
+
   return NextResponse.json({
     dateRange: { days, sinceIso, untilIso: new Date().toISOString() },
     totals: {
@@ -217,7 +235,7 @@ export async function GET(req: NextRequest) {
       cost_usd: totalCostUsd,
       cost_ils: usdToIls(totalCostUsd),
     },
-    byAccount: finalize(byAccount),
+    byAccount: byAccountWithTemplates,
     byTemplate: finalize(byTemplate),
     byCategory: finalize(byCategory),
   });

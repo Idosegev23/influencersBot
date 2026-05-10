@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import { ChevronLeft, Loader2, MessageSquare, AlertCircle } from 'lucide-react';
+import { ChevronLeft, ChevronDown, ChevronUp, Loader2, MessageSquare, AlertCircle } from 'lucide-react';
 
 interface BucketRow {
   key: string;
@@ -16,6 +16,10 @@ interface BucketRow {
   category_breakdown: Record<string, number>;
 }
 
+interface AccountRow extends BucketRow {
+  templates: BucketRow[];
+}
+
 interface CostData {
   dateRange: { days: number; sinceIso: string; untilIso: string };
   totals: {
@@ -26,7 +30,7 @@ interface CostData {
     cost_usd: number;
     cost_ils: number;
   };
-  byAccount: BucketRow[];
+  byAccount: AccountRow[];
   byTemplate: BucketRow[];
   byCategory: BucketRow[];
 }
@@ -133,13 +137,16 @@ export default function AdminWhatsappCostPage() {
               <KpiCard label="עלות ש״ח (משוער)" value={fmtIls(data.totals.cost_ils)} accent="emerald" />
             </div>
 
-            {/* By Account */}
-            <Section title="לפי חשבון">
-              <BreakdownTable rows={data.byAccount} firstColLabel="חשבון" />
+            {/* By Account — primary billing view, with per-template drilldown */}
+            <Section
+              title="לפי חשבון (לחיוב)"
+              subtitle="לחיצה על שורה פותחת פירוט תבניות לאותו חשבון"
+            >
+              <AccountBillingTable rows={data.byAccount} />
             </Section>
 
-            {/* By Template */}
-            <Section title="לפי תבנית">
+            {/* By Template — flat across all accounts */}
+            <Section title="לפי תבנית (כל החשבונות)">
               <BreakdownTable rows={sortedTemplates} firstColLabel="תבנית" />
             </Section>
 
@@ -185,12 +192,126 @@ function KpiCard({
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="mb-6">
-      <h2 className="text-sm font-semibold text-gray-700 mb-2">{title}</h2>
+      <div className="flex items-baseline gap-2 mb-2">
+        <h2 className="text-sm font-semibold text-gray-700">{title}</h2>
+        {subtitle && <span className="text-xs text-gray-400">— {subtitle}</span>}
+      </div>
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">{children}</div>
     </div>
+  );
+}
+
+function AccountBillingTable({ rows }: { rows: AccountRow[] }) {
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  if (!rows.length) {
+    return <div className="p-4 text-sm text-gray-400 text-center">אין נתונים</div>;
+  }
+  const toggle = (key: string) =>
+    setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
+  return (
+    <table className="w-full text-sm">
+      <thead className="bg-gray-50 text-gray-500 text-xs">
+        <tr>
+          <th className="text-right px-4 py-2 font-medium">חשבון</th>
+          <th className="text-left px-4 py-2 font-medium">הודעות</th>
+          <th className="text-left px-4 py-2 font-medium">חיוב</th>
+          <th className="text-left px-4 py-2 font-medium">חינם</th>
+          <th className="text-left px-4 py-2 font-medium">נכשלו</th>
+          <th className="text-left px-4 py-2 font-medium">USD</th>
+          <th className="text-left px-4 py-2 font-medium">₪ (משוער)</th>
+          <th className="px-2 py-2"></th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-gray-100">
+        {rows.map((r) => (
+          <FragmentRow
+            key={r.key}
+            row={r}
+            isExpanded={!!expanded[r.key]}
+            onToggle={() => toggle(r.key)}
+          />
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function FragmentRow({
+  row,
+  isExpanded,
+  onToggle,
+}: {
+  row: AccountRow;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
+  const hasDrilldown = row.templates.length > 0;
+  return (
+    <>
+      <tr
+        className={hasDrilldown ? 'cursor-pointer hover:bg-gray-50' : ''}
+        onClick={hasDrilldown ? onToggle : undefined}
+      >
+        <td className="px-4 py-2 text-gray-900 font-medium">{row.label}</td>
+        <td className="px-4 py-2 text-gray-700 text-left tabular-nums">{fmtNum(row.count)}</td>
+        <td className="px-4 py-2 text-gray-700 text-left tabular-nums">{fmtNum(row.billable)}</td>
+        <td className="px-4 py-2 text-gray-400 text-left tabular-nums">{fmtNum(row.free)}</td>
+        <td className="px-4 py-2 text-rose-500 text-left tabular-nums">
+          {row.failed ? fmtNum(row.failed) : '—'}
+        </td>
+        <td className="px-4 py-2 text-emerald-600 text-left tabular-nums font-semibold">
+          {fmtUsd(row.cost_usd)}
+        </td>
+        <td className="px-4 py-2 text-emerald-600 text-left tabular-nums">{fmtIls(row.cost_ils)}</td>
+        <td className="px-2 py-2 text-gray-400">
+          {hasDrilldown && (isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
+        </td>
+      </tr>
+      {isExpanded && hasDrilldown && (
+        <tr>
+          <td colSpan={8} className="bg-gray-50/50 p-0">
+            <div className="px-4 py-3">
+              <div className="text-[11px] text-gray-500 mb-2">פירוט תבניות עבור {row.label}</div>
+              <table className="w-full text-xs">
+                <thead className="text-gray-400">
+                  <tr>
+                    <th className="text-right px-2 py-1 font-normal">תבנית</th>
+                    <th className="text-left px-2 py-1 font-normal">הודעות</th>
+                    <th className="text-left px-2 py-1 font-normal">חיוב</th>
+                    <th className="text-left px-2 py-1 font-normal">חינם</th>
+                    <th className="text-left px-2 py-1 font-normal">USD</th>
+                    <th className="text-left px-2 py-1 font-normal">₪</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200/50">
+                  {row.templates.map((t) => (
+                    <tr key={t.key}>
+                      <td className="px-2 py-1 text-gray-700">{t.label}</td>
+                      <td className="px-2 py-1 text-gray-600 text-left tabular-nums">{fmtNum(t.count)}</td>
+                      <td className="px-2 py-1 text-gray-600 text-left tabular-nums">{fmtNum(t.billable)}</td>
+                      <td className="px-2 py-1 text-gray-400 text-left tabular-nums">{fmtNum(t.free)}</td>
+                      <td className="px-2 py-1 text-emerald-600 text-left tabular-nums">{fmtUsd(t.cost_usd)}</td>
+                      <td className="px-2 py-1 text-emerald-600 text-left tabular-nums">{fmtIls(t.cost_ils)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 
