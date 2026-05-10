@@ -1323,30 +1323,30 @@ function TicketDetail({
         <div className="rounded-xl p-3"
           style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)' }}>
           <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-            <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: '#86efac' }}>
+            <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: '#15803d' }}>
               <MessageCircle className="w-4 h-4" />
               שיחה ישירה ללקוחה
             </div>
             {serviceWindow ? (
               serviceWindow.withinWindow ? (
                 <span className="text-[11px] px-2 py-0.5 rounded-full"
-                  style={{ background: 'rgba(34,197,94,0.2)', color: '#22c55e' }}>
+                  style={{ background: 'rgba(34,197,94,0.2)', color: '#15803d' }}>
                   ✓ חלון 24 שעות פתוח{serviceWindow.expiresAt ? ` · נסגר ${formatRelative(serviceWindow.expiresAt)}` : ''}
                 </span>
               ) : (
                 <span className="text-[11px] px-2 py-0.5 rounded-full flex items-center gap-1"
-                  style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24' }}>
+                  style={{ background: 'rgba(217,119,6,0.15)', color: '#b45309' }}>
                   <AlertTriangle className="w-3 h-3" />
                   חלון 24 שעות סגור
                 </span>
               )
             ) : (
-              <span className="text-[11px] opacity-60">בודק חלון…</span>
+              <span className="text-[11px]" style={{ color: 'var(--dash-text-3)' }}>בודק חלון…</span>
             )}
           </div>
 
           {serviceWindow && !serviceWindow.withinWindow && (
-            <p className="text-[11px] mb-2" style={{ color: '#fbbf24' }}>
+            <p className="text-[11px] mb-2" style={{ color: '#b45309' }}>
               הלקוחה לא הגיבה ב-24 שעות האחרונות — ההודעה תישלח כתבנית WhatsApp (עד 900 תווים).
               {serviceWindow.lastInboundAt && (
                 <> תגובה אחרונה ממנה: {formatRelative(serviceWindow.lastInboundAt)}.</>
@@ -1373,10 +1373,14 @@ function TicketDetail({
               disabled={sendingDirect}
               rows={3}
               className="w-full text-sm p-2.5 rounded-xl outline-none resize-y disabled:opacity-50"
-              style={{ background: 'rgba(255,255,255,0.05)', color: '#fff' }}
+              style={{
+                background: 'var(--dash-surface-solid, #fff)',
+                color: 'var(--dash-text, #1a1a2e)',
+                border: '1px solid var(--dash-border, rgba(0,0,0,0.1))',
+              }}
             />
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] opacity-60">
+              <span className="text-[11px]" style={{ color: 'var(--dash-text-3)' }}>
                 {directBody.length} / {serviceWindow?.withinWindow ? 4000 : 900}
               </span>
               <button
@@ -1385,7 +1389,7 @@ function TicketDetail({
                 }
                 disabled={!directBody.trim() || sendingDirect}
                 className="px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 disabled:opacity-50"
-                style={{ background: '#22c55e', color: '#fff' }}
+                style={{ background: '#15803d', color: '#fff' }}
               >
                 {sendingDirect && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 <Send className="w-3.5 h-3.5" />
@@ -1396,11 +1400,15 @@ function TicketDetail({
 
           {/* Image picker */}
           <div className="mt-3 pt-3 space-y-2"
-            style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            style={{ borderTop: '1px solid var(--dash-border, rgba(0,0,0,0.06))' }}>
             <div className="flex items-center gap-2 flex-wrap">
               <label
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 cursor-pointer ${(!serviceWindow?.withinWindow || sendingDirect) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--dash-text-2, #9ca3af)' }}
+                style={{
+                  background: 'var(--dash-surface, rgba(0,0,0,0.04))',
+                  color: 'var(--dash-text-2)',
+                  border: '1px solid var(--dash-border, rgba(0,0,0,0.08))',
+                }}
               >
                 <ImageIcon className="w-3.5 h-3.5" />
                 {directImage ? directImage.name : 'בחירת תמונה'}
@@ -1425,8 +1433,8 @@ function TicketDetail({
               {directImage && (
                 <button
                   onClick={() => setDirectImage(null)}
-                  className="text-[11px] opacity-70"
-                  style={{ color: '#9ca3af' }}
+                  className="text-[11px]"
+                  style={{ color: 'var(--dash-text-3)' }}
                 >
                   ביטול
                 </button>
@@ -1440,7 +1448,11 @@ function TicketDetail({
                 placeholder="כיתוב לתמונה (אופציונלי)"
                 disabled={sendingDirect}
                 className="w-full text-sm p-2 rounded-lg outline-none"
-                style={{ background: 'rgba(255,255,255,0.05)', color: '#fff' }}
+                style={{
+                  background: 'var(--dash-surface-solid, #fff)',
+                  color: 'var(--dash-text, #1a1a2e)',
+                  border: '1px solid var(--dash-border, rgba(0,0,0,0.1))',
+                }}
               />
             )}
             {directImage && (
@@ -1449,7 +1461,7 @@ function TicketDetail({
                   onClick={handleSendDirectImage}
                   disabled={!serviceWindow?.withinWindow || sendingDirect}
                   className="px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 disabled:opacity-50"
-                  style={{ background: '#22c55e', color: '#fff' }}
+                  style={{ background: '#15803d', color: '#fff' }}
                 >
                   {sendingDirect && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   <Send className="w-3.5 h-3.5" />
@@ -1569,7 +1581,7 @@ function TicketDetail({
                       <div className="mt-1 p-2 rounded-lg whitespace-pre-wrap"
                         style={{
                           background: 'rgba(34,197,94,0.08)',
-                          color: 'var(--dash-text, #fff)',
+                          color: 'var(--dash-text, #1a1a2e)',
                           fontSize: '13px',
                           lineHeight: '1.5',
                         }}>
@@ -1583,7 +1595,7 @@ function TicketDetail({
                         style={{
                           background: 'rgba(6,182,212,0.08)',
                           border: '1px solid rgba(6,182,212,0.2)',
-                          color: 'var(--dash-text, #fff)',
+                          color: 'var(--dash-text, #1a1a2e)',
                           fontSize: '13px',
                           lineHeight: '1.5',
                         }}>
@@ -1596,7 +1608,7 @@ function TicketDetail({
                         style={{
                           background: 'rgba(16,185,129,0.08)',
                           border: '1px solid rgba(16,185,129,0.2)',
-                          color: 'var(--dash-text, #fff)',
+                          color: 'var(--dash-text, #1a1a2e)',
                           fontSize: '13px',
                           lineHeight: '1.5',
                         }}>
@@ -1610,7 +1622,7 @@ function TicketDetail({
                         style={{
                           background: 'rgba(251,191,36,0.10)',
                           border: '1px solid rgba(251,191,36,0.3)',
-                          color: 'var(--dash-text, #fff)',
+                          color: 'var(--dash-text, #1a1a2e)',
                           fontSize: '13px',
                           lineHeight: '1.5',
                         }}>
@@ -1622,7 +1634,7 @@ function TicketDetail({
                       <div className="mt-1 p-2 rounded-lg whitespace-pre-wrap"
                         style={{
                           background: 'rgba(255,255,255,0.04)',
-                          color: 'var(--dash-text, #fff)',
+                          color: 'var(--dash-text, #1a1a2e)',
                           fontSize: '13px',
                           lineHeight: '1.5',
                         }}>
@@ -2068,6 +2080,7 @@ function historyLine(h: HistoryEntry): string {
       support_status_shipped_v4: 'יצא למשלוח',
       support_status_resolved: 'הפנייה טופלה',
       support_status_resolved_v2: 'הפנייה טופלה',
+      support_freeform_message: 'הודעה חופשית',
     };
     const friendly = TEMPLATE_LABEL[h.whatsapp_template_name || ''] || h.whatsapp_template_name || 'הודעה';
     if (failed) return `ניסיון שליחה נכשל (${friendly}) — ${h.note}`;
