@@ -98,26 +98,32 @@ export async function GET(req: NextRequest) {
   }
 
   // 2. Build a wa_message_id → account_id map from support_ticket_history.
-  // Fetch only the rows we need.
-  const waIds = messages.map((m) => m.wa_message_id).filter((x): x is string => !!x);
+  // Originally we ran `.in('whatsapp_message_id', batch)` per chunk, but
+  // wamid values are ~62 chars of base64 (+ url-encoded `==`); 500 of
+  // them inflate the request URL past PostgREST's limit and the call
+  // silently returns no rows — every message ends up bucketed under
+  // "system". Instead, pull every history row in the same date window
+  // with a wa_message_id and build the map locally. One paged query,
+  // no URL-length surprises.
   const accountByWaId = new Map<string, string>();
-  if (waIds.length) {
-    for (let i = 0; i < waIds.length; i += 500) {
-      const slice = waIds.slice(i, i + 500);
-      const { data, error } = await supabase
-        .from('support_ticket_history')
-        .select('whatsapp_message_id, account_id')
-        .in('whatsapp_message_id', slice);
-      if (error) {
-        console.error('[whatsapp-cost] history lookup error:', error);
-        break;
-      }
-      for (const row of (data || []) as HistoryRow[]) {
-        if (!accountByWaId.has(row.whatsapp_message_id)) {
-          accountByWaId.set(row.whatsapp_message_id, row.account_id);
-        }
+  for (let from = 0; from < 200_000; from += 1000) {
+    const { data, error } = await supabase
+      .from('support_ticket_history')
+      .select('whatsapp_message_id, account_id')
+      .not('whatsapp_message_id', 'is', null)
+      .gte('created_at', sinceIso)
+      .order('created_at', { ascending: true })
+      .range(from, from + 999);
+    if (error) {
+      console.error('[whatsapp-cost] history page error:', error);
+      break;
+    }
+    for (const row of (data || []) as HistoryRow[]) {
+      if (!accountByWaId.has(row.whatsapp_message_id)) {
+        accountByWaId.set(row.whatsapp_message_id, row.account_id);
       }
     }
+    if ((data || []).length < 1000) break;
   }
 
   // 3. Resolve account display names for the IDs we found.
