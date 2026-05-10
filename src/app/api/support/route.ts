@@ -213,6 +213,20 @@ export async function POST(req: NextRequest) {
         });
         console.log('[Support] brand_support_ticket result:', result);
         whatsappSent = result.success;
+        // Link the brand notification to the ticket so the cost
+        // dashboard attributes its WhatsApp spend to the right account.
+        // (Without this row the message gets bucketed under "system".)
+        if (supportRequest) {
+          await supabase.from('support_ticket_history').insert({
+            ticket_id: supportRequest.id,
+            account_id: influencer.id,
+            action: 'brand_notified',
+            actor: 'system',
+            whatsapp_template_name: 'brand_support_ticket',
+            whatsapp_message_id: result.wa_message_id || null,
+            note: result.success ? null : `Send failed: ${result.error?.message || 'unknown'}`,
+          });
+        }
       } catch (err) {
         console.error('[Support] brand_support_ticket error:', err);
       }
@@ -255,6 +269,19 @@ export async function POST(req: NextRequest) {
         });
         console.log('[Support] follower_support_confirmation result:', result);
         confirmationSent = result.success;
+        // Same as brand_support_ticket above — link to the ticket so
+        // the cost dashboard attributes spend to the right account.
+        if (supportRequest) {
+          await supabase.from('support_ticket_history').insert({
+            ticket_id: supportRequest.id,
+            account_id: influencer.id,
+            action: 'customer_notified',
+            actor: 'system',
+            whatsapp_template_name: 'follower_support_confirmation',
+            whatsapp_message_id: result.wa_message_id || null,
+            note: result.success ? null : `Send failed: ${result.error?.message || 'unknown'}`,
+          });
+        }
       } catch (err) {
         console.error('[Support] follower_support_confirmation error:', err);
       }

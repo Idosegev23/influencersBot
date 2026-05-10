@@ -2221,6 +2221,8 @@ function historyLine(h: HistoryEntry): string {
       support_status_resolved: 'הפנייה טופלה',
       support_status_resolved_v2: 'הפנייה טופלה',
       support_freeform_message: 'הודעה חופשית',
+      follower_support_confirmation: 'אישור פתיחת פנייה ללקוחה',
+      brand_support_ticket: 'התראה למותג',
     };
     const friendly = TEMPLATE_LABEL[h.whatsapp_template_name || ''] || h.whatsapp_template_name || 'הודעה';
     if (failed) return `ניסיון שליחה נכשל (${friendly}) — ${h.note}`;
@@ -2229,6 +2231,11 @@ function historyLine(h: HistoryEntry): string {
   if (h.action === 'customer_reply') return `תגובת הלקוחה`;
   if (h.action === 'reply_moved_out') return `תגובה הועברה לטיקט אחר`;
   if (h.action === 'reply_moved_in') return `תגובה התקבלה מטיקט אחר`;
+  if (h.action === 'brand_notified') {
+    const failed = h.note?.startsWith('Send failed');
+    if (failed) return `התראה למותג נכשלה — ${h.note}`;
+    return `התראת WhatsApp נשלחה למותג`;
+  }
   if (h.action === 'agent_message') {
     const failed = h.note?.startsWith('Send failed');
     if (failed) return `ניסיון שליחת הודעה חופשית נכשל — ${h.note}`;
