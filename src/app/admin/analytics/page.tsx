@@ -79,9 +79,15 @@ export default function AdminAnalyticsIndexPage() {
   return (
     <main className="min-h-screen bg-gray-50 p-6" dir="rtl">
       <div className="max-w-6xl mx-auto space-y-4">
-        <header className="flex items-center justify-between">
+        <header className="flex items-center justify-between flex-wrap gap-2">
           <h1 className="text-2xl font-bold">אנליטיקס — כל החשבונות</h1>
           <div className="flex items-center gap-2">
+            <Link
+              href="/admin/analytics/whatsapp-cost"
+              className="px-3 py-1 rounded text-sm bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
+            >
+              עלויות WhatsApp →
+            </Link>
             <input
               type="text"
               value={filter}

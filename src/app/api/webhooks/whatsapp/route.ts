@@ -274,6 +274,18 @@ async function processWebhook(payload: any): Promise<void> {
           update.error_message = status.errors?.[0]?.title || status.errors?.[0]?.message || null;
         }
 
+        // Pricing — Meta attaches it to status events (typically the
+        // 'sent' event, occasionally on 'delivered' too). Persist all
+        // fields so the admin cost dashboard can join straight from
+        // whatsapp_messages without re-parsing the raw payload.
+        if (status.pricing) {
+          update.pricing = status.pricing;
+          if (typeof status.pricing.billable === 'boolean') update.pricing_billable = status.pricing.billable;
+          if (typeof status.pricing.category === 'string') update.pricing_category = status.pricing.category;
+          if (typeof status.pricing.pricing_model === 'string') update.pricing_model = status.pricing.pricing_model;
+          if (typeof status.pricing.type === 'string') update.pricing_type = status.pricing.type;
+        }
+
         await supabase
           .from('whatsapp_messages')
           .update(update)
