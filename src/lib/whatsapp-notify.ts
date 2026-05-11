@@ -104,6 +104,17 @@ async function persistOutbound(args: {
 // ---------------------------------------------------------------------
 type TParam = { type: 'text'; text: string };
 
+// Meta rejects template body/header params containing newlines, tabs,
+// or 5+ consecutive spaces with error 132018. Free-text params come
+// from textareas (e.g. resolutionSummary, requestedDetail) where the
+// agent can hit Enter — sanitise here so every template benefits.
+function sanitizeParam(s: string): string {
+  return String(s ?? '')
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/ {4,}/g, ' ')
+    .trim();
+}
+
 async function runTemplate(args: {
   templateName: string;
   flagName: string;
@@ -123,13 +134,13 @@ async function runTemplate(args: {
   if (args.headerParams?.length) {
     components.push({
       type: 'header',
-      parameters: args.headerParams.map<TParam>((t) => ({ type: 'text', text: t })),
+      parameters: args.headerParams.map<TParam>((t) => ({ type: 'text', text: sanitizeParam(t) })),
     });
   }
   if (args.bodyParams?.length) {
     components.push({
       type: 'body',
-      parameters: args.bodyParams.map<TParam>((t) => ({ type: 'text', text: t })),
+      parameters: args.bodyParams.map<TParam>((t) => ({ type: 'text', text: sanitizeParam(t) })),
     });
   }
   if (args.urlButtonParam != null) {
