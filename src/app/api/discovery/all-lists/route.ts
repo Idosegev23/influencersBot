@@ -4,6 +4,7 @@ import { CATEGORY_MAP, DISCOVERY_CATEGORIES, resolveCategoryTitle } from '@/lib/
 import { executeDataQuery } from '@/lib/discovery/data-queries';
 import { cachedDataList, cachedAIList, cachedCategories } from '@/lib/discovery/discovery-cache';
 import { checkDataAvailability } from '@/lib/discovery/data-queries';
+import { buildGovMinistryDiscoveryRows } from '@/lib/discovery/gov-ministry-discovery';
 import type { DiscoveryItem, DiscoveryCategoryAvailability } from '@/lib/discovery/types';
 
 interface DiscoveryRow {
@@ -40,6 +41,15 @@ export async function GET(req: NextRequest) {
 
     const accountId = account.id;
     const influencerName = account.config?.display_name || account.config?.username || username;
+    const archetype = account.config?.archetype;
+
+    // government_ministry archetype: discover feed is built from scraped pages
+    // (instagram_bio_websites), not from Instagram posts. Different data source,
+    // different categorization — bypass the data_driven / ai_generated pipeline.
+    if (archetype === 'government_ministry') {
+      const rows = await buildGovMinistryDiscoveryRows(supabase, accountId);
+      return NextResponse.json({ rows, influencerName });
+    }
 
     // Get available categories first
     const categories = await cachedCategories(accountId, async () => {

@@ -148,6 +148,14 @@ export class SandwichBot {
       classification.confidence = 0.8;
     }
 
+    // government_ministry accounts: same reasoning — ministry chats are factual/service-oriented,
+    // intent classifier might wrongly bucket questions about regulations as "skincare" or "fitness".
+    if (accountArchetype === 'government_ministry' && classification.primaryArchetype !== 'general') {
+      console.log(`   → Override: ${classification.primaryArchetype} → general (government_ministry account)`);
+      classification.primaryArchetype = 'general';
+      classification.confidence = 0.8;
+    }
+
     // ==========================================
     // Retrieve Knowledge Base (skip if cached)
     // ==========================================

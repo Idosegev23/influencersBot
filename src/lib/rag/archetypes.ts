@@ -20,6 +20,7 @@ export type AccountArchetype =
   | 'influencer'
   | 'brand'
   | 'service_provider'
+  | 'government_ministry'
   | 'media_news'
   | 'local_business'
   | 'tech_creator'
@@ -122,6 +123,39 @@ export const ARCHETYPE_CONFIGS: Record<AccountArchetype, ArchetypeConfig> = {
       highlight: 3,
     },
     docCap: 4,
+  },
+
+  /**
+   * Government ministry / public authority (e.g. רשות השירות הלאומי-אזרחי, הרשות הלאומית לבטיחות בדרכים)
+   * Website content (regulations, publications, announcements) is the entire authoritative source.
+   * No coupons, no partnerships, no products. Recency matters for news/circulars but
+   * regulations and laws are long-lived → moderate recency bonus.
+   */
+  government_ministry: {
+    typeWeights: {
+      website: +0.12,
+      knowledge_base: +0.08,
+      document: +0.05,
+      post: 0,
+      transcription: 0,
+      highlight: 0,
+      coupon: -0.20,
+      partnership: -0.20,
+      product: -0.20,
+    },
+    typeCaps: {
+      website: 10,
+      knowledge_base: 4,
+      document: 4,
+      post: 0,
+      transcription: 0,
+      highlight: 0,
+      coupon: 0,
+      partnership: 0,
+      product: 0,
+    },
+    docCap: 4,
+    recencyMultiplier: 1.3,
   },
 
   /**

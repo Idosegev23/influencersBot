@@ -62,6 +62,10 @@ const ARCHETYPE_TABS: Record<string, { id: string; label: string; icon: any }[]>
     { id: 'content', label: 'תוכן', icon: FileText },
     { id: 'settings', label: 'הגדרות צ׳אט', icon: Settings },
   ],
+  government_ministry: [
+    { id: 'content', label: 'תוכן ופרסומים', icon: FileText },
+    { id: 'settings', label: 'הגדרות צ׳אט', icon: Settings },
+  ],
   media_news: [
     { id: 'content', label: 'תוכן', icon: FileText },
     { id: 'settings', label: 'הגדרות צ׳אט', icon: Settings },
@@ -83,6 +87,7 @@ const ARCHETYPE_LABELS: Record<string, { brandsTitle: string; brandsEmpty: strin
   influencer: { brandsTitle: 'שיתופי פעולה', brandsEmpty: 'אין שיתופי פעולה עדיין', couponsTitle: 'קופונים' },
   brand: { brandsTitle: 'שותפים', brandsEmpty: 'אין שותפים עדיין', couponsTitle: 'מבצעים וקופונים' },
   service_provider: { brandsTitle: 'לקוחות', brandsEmpty: 'אין לקוחות עדיין', couponsTitle: 'קופונים' },
+  government_ministry: { brandsTitle: 'יחידות', brandsEmpty: 'אין יחידות עדיין', couponsTitle: '—' },
   media_news: { brandsTitle: 'שותפים', brandsEmpty: 'אין שותפים עדיין', couponsTitle: 'קופונים' },
   local_business: { brandsTitle: 'שותפים', brandsEmpty: 'אין שותפים עדיין', couponsTitle: 'הטבות וקופונים' },
   tech_creator: { brandsTitle: 'שותפים', brandsEmpty: 'אין שותפים עדיין', couponsTitle: 'דילים וקופונים' },

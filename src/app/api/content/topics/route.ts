@@ -31,6 +31,13 @@ export async function GET(req: NextRequest) {
   }
 
   const displayName = account.config?.display_name || username;
+  const archetype = account.config?.archetype;
+
+  // government_ministry: groups come from chatbot_persona.knowledge_map
+  // (services, publication types, core topics) — not from RAG document_chunks.
+  if (archetype === 'government_ministry') {
+    return buildGovMinistryGroups(supabase, account.id);
+  }
 
   // Get first chunk per document with title
   let query = supabase
@@ -174,4 +181,55 @@ function buildQuestion(title: string, entityType: string): string {
 
   // Default
   return `ספרו לי על ${title}`;
+}
+
+/**
+ * government_ministry archetype — "שירותים ומידע" tab content.
+ * Groups come from chatbot_persona.knowledge_map:
+ *   - key_services      → "שירותים שאנחנו מספקים"  (question = "איך אפשר {service}?")
+ *   - key_publications  → "סוגי פרסומים"            (question = "אילו {publication} יש לכם?")
+ *   - core_topics       → "נושאים מרכזיים"          (question = "ספרו לי על {topic}")
+ */
+async function buildGovMinistryGroups(supabase: any, accountId: string) {
+  const { data: persona } = await supabase
+    .from('chatbot_persona')
+    .select('knowledge_map')
+    .eq('account_id', accountId)
+    .maybeSingle();
+
+  const km = persona?.knowledge_map || {};
+  const services: string[] = Array.isArray(km.key_services) ? km.key_services : [];
+  const publications: string[] = Array.isArray(km.key_publications) ? km.key_publications : [];
+  const topics: string[] = Array.isArray(km.core_topics) ? km.core_topics : [];
+
+  const dedupe = (arr: string[]) =>
+    Array.from(new Set(arr.map((s) => s.trim()).filter((s) => s.length >= 3 && s.length <= 120)));
+
+  const groups: { label: string; items: { title: string; question: string }[] }[] = [];
+
+  const svc = dedupe(services);
+  if (svc.length > 0) {
+    groups.push({
+      label: 'שירותים שאנחנו מספקים',
+      items: svc.slice(0, 30).map((s) => ({ title: s, question: `איך אפשר ${s}?` })),
+    });
+  }
+
+  const pubs = dedupe(publications);
+  if (pubs.length > 0) {
+    groups.push({
+      label: 'סוגי פרסומים',
+      items: pubs.slice(0, 30).map((p) => ({ title: p, question: `אילו ${p} פורסמו לאחרונה?` })),
+    });
+  }
+
+  const tps = dedupe(topics);
+  if (tps.length > 0) {
+    groups.push({
+      label: 'נושאים מרכזיים',
+      items: tps.slice(0, 30).map((t) => ({ title: t, question: `ספרו לי על ${t}` })),
+    });
+  }
+
+  return NextResponse.json({ groups });
 }

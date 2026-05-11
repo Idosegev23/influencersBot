@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, Search, ChevronLeft, FileText, Video, ImageIcon, Handshake } from 'lucide-react';
+import { Loader2, Search, ChevronLeft, FileText, Video, ImageIcon, Handshake, Briefcase, BookOpen, Tag } from 'lucide-react';
 import { track } from '@/lib/analytics/track';
 
 interface QuestionItem {
@@ -27,6 +27,10 @@ const GROUP_ICONS: Record<string, typeof FileText> = {
   'סרטונים': Video,
   'פוסטים': ImageIcon,
   'שיתופי פעולה': Handshake,
+  // government_ministry archetype groups
+  'שירותים שאנחנו מספקים': Briefcase,
+  'סוגי פרסומים': BookOpen,
+  'נושאים מרכזיים': Tag,
 };
 
 export default function TopicQuestionsTab({

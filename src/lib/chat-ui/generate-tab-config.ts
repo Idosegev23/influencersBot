@@ -4,12 +4,13 @@
  * Used by: scan-account.ts, generate-tab-config script, content-processor
  *
  * Tab structure per archetype:
- *   influencer:       צ׳אט | גלו | content_feed (per type) | [קופונים] | [בעיה במוצר]
- *   brand:            צ׳אט | גלו | מוצרים | [מבצעים] | [בעיה במוצר]
- *   media_news:       צ׳אט | גלו | [קופונים]
- *   service_provider: צ׳אט | גלו | שירותים
- *   local_business:   צ׳אט | גלו | מוצרים | [הטבות] | [בעיה במוצר]
- *   tech_creator:     צ׳אט | גלו | סקירות
+ *   influencer:          צ׳אט | גלו | content_feed (per type) | [קופונים] | [בעיה במוצר]
+ *   brand:               צ׳אט | גלו | מוצרים | [מבצעים] | [בעיה במוצר]
+ *   media_news:          צ׳אט | גלו | [קופונים]
+ *   service_provider:    צ׳אט | גלו | שירותים
+ *   government_ministry: צ׳אט | גלו | שירותים ומידע
+ *   local_business:      צ׳אט | גלו | מוצרים | [הטבות] | [בעיה במוצר]
+ *   tech_creator:        צ׳אט | גלו | סקירות
  */
 
 import { createClient } from '@/lib/supabase/server';
@@ -78,6 +79,7 @@ const SUBTITLE_TEMPLATES: Record<string, Record<string, string>> = {
   },
   media_news: { _default: 'אני כאן לעזור עם חדשות, עדכונים ובידור' },
   service_provider: { _default: 'אני כאן לעזור בכל עניין ונושא מקצועי' },
+  government_ministry: { _default: 'אני כאן לעזור עם מידע, שירותים ופרסומים' },
   local_business: {
     food: 'אני כאן לעזור עם מוצרים, הזמנות ומידע',
     other: 'אני כאן לעזור עם מידע, מוצרים ושירותים',
@@ -101,6 +103,7 @@ const HEADER_LABELS: Record<string, Record<string, string>> = {
   brand: { home: 'בית ועיצוב', fashion: 'סניקרס ואופנה', _default: 'מותג' },
   media_news: { _default: 'חדשות ומדיה' },
   service_provider: { _default: 'Assistant' },
+  government_ministry: { _default: 'שירותים ומידע' },
   local_business: { food: 'אוכל ומעדנייה', _default: 'עסק מקומי' },
   tech_creator: { _default: 'טכנולוגיה וסקירות' },
 };
@@ -119,6 +122,8 @@ function generateGreeting(displayName: string, archetype: string): string {
       return `היי, אני העוזר של ${firstName}. שאלו אותי על חדשות, בידור ועדכונים`;
     case 'service_provider':
       return `היי, אני העוזר של ${firstName}. שאלו אותי על השירותים, הפרויקטים והניסיון שלנו`;
+    case 'government_ministry':
+      return `שלום, אני העוזר החכם של ${displayName}. שאלו אותי על שירותים, פרסומים ונהלים`;
     case 'local_business':
       return `היי, אני העוזר של ${firstName}. שאלו אותי על המוצרים, שעות פתיחה והזמנות`;
     case 'tech_creator':
@@ -181,6 +186,8 @@ export async function generateTabConfig(accountId: string): Promise<TabGeneratio
     tabs.push({ id: 'topics', label: 'מוצרים', type: 'topics' });
   } else if (archetype === 'service_provider') {
     tabs.push({ id: 'topics', label: 'שירותים', type: 'topics' });
+  } else if (archetype === 'government_ministry') {
+    tabs.push({ id: 'topics', label: 'שירותים ומידע', type: 'topics' });
   } else if (archetype === 'tech_creator') {
     tabs.push({ id: 'topics', label: 'סקירות', type: 'topics' });
   }
