@@ -82,7 +82,7 @@ export default function DemoTab({ accountId, brandColor = '#0c1013', language }:
     }
     setSubmitting(true);
     try {
-      track('demo_request_submit', { account_id: accountId, team_size: form.teamSize });
+      try { track('demo_request_submit', { account_id: accountId, team_size: form.teamSize }); } catch { /* */ }
       const message = [
         `Demo request from ${form.name}`,
         `Email: ${form.email}`,

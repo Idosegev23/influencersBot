@@ -1432,7 +1432,14 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       <link href={getGoogleFontsUrl(influencer.theme)} rel="stylesheet" />
       <meta name="theme-color" content="#f4f5f7" />
       
-      <main className="chat-page flex flex-col overflow-hidden" style={{ position: 'relative' }}>
+      <main
+        className="chat-page flex flex-col overflow-hidden"
+        style={{
+          position: 'relative',
+          direction: (influencer as any).language === 'en' ? 'ltr' : 'rtl',
+        }}
+        dir={(influencer as any).language === 'en' ? 'ltr' : 'rtl'}
+      >
         {/* Header */}
         <header className={`sticky top-0 z-50 ${isMobile ? 'glass px-4 h-[76px] flex items-center' : 'px-4 py-[10px]'}`} style={{ position: 'sticky', zIndex: 50, isolation: 'isolate' }}>
           {isMobile ? (
@@ -1682,7 +1689,16 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             </div>
                           )}
                           <div
-                            className={`flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'} items-end gap-2`}
+                            // CSS `justify-start/end` is physical, not logical — under LTR
+                            // `justify-start` = left and we need user bubbles on the right
+                            // (WhatsApp-style). Flip the assignment when the account language
+                            // is English so the visual conversation flows the same way as
+                            // it does for Hebrew accounts.
+                            className={`flex ${
+                              (influencer as any).language === 'en'
+                                ? (msg.role === 'user' ? 'justify-end' : 'justify-start')
+                                : (msg.role === 'user' ? 'justify-start' : 'justify-end')
+                            } items-end gap-2`}
                           >
                             {/* Bot avatar (assistant messages only) - hidden on mobile via CSS */}
                             {msg.role === 'assistant' && influencer.avatar_url && (

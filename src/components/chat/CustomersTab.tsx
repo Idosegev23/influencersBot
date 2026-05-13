@@ -68,7 +68,7 @@ export default function CustomersTab({ caseStudies, brandColor = '#0c1013', lang
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.04, duration: 0.3 }}
               onClick={() => {
-                track('case_study_clicked', { case_id: cs.id, brand: cs.brand });
+                try { track('case_study_clicked', { case_id: cs.id, brand: cs.brand }); } catch { /* */ }
                 onAskAbout(prompt);
               }}
               className="text-left bg-white border border-gray-200 rounded-2xl p-4 hover:border-gray-400 hover:shadow-md transition-all"

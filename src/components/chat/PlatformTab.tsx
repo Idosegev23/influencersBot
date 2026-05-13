@@ -82,7 +82,10 @@ export default function PlatformTab({ workspaces, brandColor = '#0c1013', langua
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.04, duration: 0.3 }}
               onClick={() => {
-                track('platform_workspace_clicked', { workspace_id: ws.id, workspace_title: ws.title });
+                // Defensive: never let analytics block the click handler — the
+                // event type is registered separately and a stale build can
+                // throw here. The user-visible action must always run.
+                try { track('platform_workspace_clicked', { workspace_id: ws.id, workspace_title: ws.title }); } catch { /* */ }
                 onAskAbout(prompt);
               }}
               className="text-left bg-white border border-gray-200 rounded-2xl p-4 hover:border-gray-400 hover:shadow-md transition-all group"
