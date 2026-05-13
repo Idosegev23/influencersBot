@@ -2706,6 +2706,11 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   const userMsg = { id: Date.now().toString(), role: 'user' as const, content: question };
                   setMessages(prev => [...prev, userMsg]);
                   const assistantMessageId = (Date.now() + 1).toString();
+                  // Critical: register this message id as the streaming target.
+                  // Without it, `streamingMessageIdRef.current` stays null and
+                  // `onDone` can't update the empty placeholder with the
+                  // response text — visible symptom is an empty bot bubble.
+                  setStreamingMessageId(assistantMessageId);
                   setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant', content: '' }]);
                   setIsTyping(true);
                   sendStreamMessage({
@@ -2728,6 +2733,11 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   const userMsg = { id: Date.now().toString(), role: 'user' as const, content: question };
                   setMessages(prev => [...prev, userMsg]);
                   const assistantMessageId = (Date.now() + 1).toString();
+                  // Critical: register this message id as the streaming target.
+                  // Without it, `streamingMessageIdRef.current` stays null and
+                  // `onDone` can't update the empty placeholder with the
+                  // response text — visible symptom is an empty bot bubble.
+                  setStreamingMessageId(assistantMessageId);
                   setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant', content: '' }]);
                   setIsTyping(true);
                   sendStreamMessage({
