@@ -181,7 +181,11 @@ export async function loadInfluencerProfileCached(
         username: config.username || latestProfile?.username || 'unknown',
         display_name: config.display_name || latestProfile?.full_name || persona?.name || config.username || 'Unknown',
         subdomain: config.subdomain || config.username || account.id,
-        
+        // Authoritative language from the accounts.language column (NOT
+        // config.language — that's a different JSONB-only field a few legacy
+        // accounts set). Defaults to 'he' so existing flows are unchanged.
+        language: account.language || (config.language as string) || 'he',
+
         // Instagram profile data
         instagram_username: latestProfile?.username || persona?.instagram_username || config.username,
         followers_count: latestProfile?.followers_count || persona?.instagram_followers || 0,
@@ -190,7 +194,7 @@ export async function loadInfluencerProfileCached(
         bio: latestProfile?.bio || null,
         is_verified: latestProfile?.is_verified || false,
         category: latestProfile?.category || null,
-        
+
         influencer_type: config.influencer_type || 'other',
         theme: config.theme || {},
         status: account.status || 'active',
@@ -233,20 +237,22 @@ export async function loadAccountStableCached(
     async () => {
       const { data } = await supabase
         .from('accounts')
-        .select('id, mode, plan, config')
+        .select('id, mode, plan, config, language, timezone')
         .eq('id', accountId)
         .single();
-      
+
       if (!data) return null;
-      
+
       const config = (data.config as Record<string, unknown>) || {};
-      
+
       return {
         id: data.id,
         mode: (data.mode || 'creator') as 'creator' | 'brand',
         plan: data.plan || 'free',
-        timezone: (config.timezone as string) || 'Asia/Jerusalem',
-        language: (config.language as string) || 'he',
+        timezone: data.timezone || (config.timezone as string) || 'Asia/Jerusalem',
+        // `accounts.language` column is authoritative; legacy `config.language`
+        // is a JSONB fallback some old rows still use.
+        language: data.language || (config.language as string) || 'he',
         allowedChannels: (config.allowedChannels as string[]) || ['chat'],
         features: {
           supportFlowEnabled: (config.supportFlowEnabled as boolean) ?? true,

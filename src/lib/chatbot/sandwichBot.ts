@@ -105,13 +105,15 @@ export class SandwichBot {
     // Resolve account archetype (media_news, etc.) — used for prompt tuning
     // ==========================================
     let accountArchetype: string | undefined;
+    let accountLanguage: string | undefined;
     try {
       const { data: acctRow } = await supabase
         .from('accounts')
-        .select('config')
+        .select('config, language')
         .eq('id', input.accountId)
         .single();
       accountArchetype = (acctRow?.config as any)?.archetype;
+      accountLanguage = acctRow?.language || undefined;
     } catch {}
 
     // ==========================================
@@ -356,6 +358,7 @@ export class SandwichBot {
           username: input.username,
           influencerName: input.influencerName,
           accountArchetype,
+          language: accountLanguage,
         },
         onToken: input.onToken,
         modelTier: input.modelTier,

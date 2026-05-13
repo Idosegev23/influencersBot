@@ -101,6 +101,7 @@ export interface ArchetypeInput {
     username: string;
     influencerName: string;
     accountArchetype?: string; // 'media_news' etc.
+    language?: string; // ISO code from accounts.language ('he' default, 'en' for international SaaS like IMAI)
   };
   onToken?: (token: string) => void; // Real-time streaming callback
   modelTier?: 'nano' | 'standard' | 'full'; // From decision engine modelStrategy

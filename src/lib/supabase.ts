@@ -186,7 +186,9 @@ export async function getInfluencerByUsername(username: string): Promise<Influen
     username: config.username || latestProfile?.username || username,
     display_name: config.display_name || latestProfile?.full_name || persona?.name || config.username || 'Unknown',
     subdomain: config.subdomain || config.username || account.id,
-    
+    // Authoritative account language — column wins over legacy JSONB field.
+    language: (account as any).language || (config.language as string) || 'he',
+
     // Instagram profile data
     instagram_username: latestProfile?.username || persona?.instagram_username || config.username,
     followers_count: latestProfile?.followers_count || persona?.instagram_followers || 0,

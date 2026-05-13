@@ -61,10 +61,38 @@ function encodeEvent(event: Record<string, any>): Uint8Array {
 }
 
 // ============================================
+// Locale strings for server-side widget responses.
+// Mirrors the LOCALES table in public/widget.js — anything the client renders
+// from a server-sourced field (CTAs, thinking indicators, errors) needs an
+// entry here so the language flips end-to-end.
+// ============================================
+const WIDGET_LOCALES: Record<string, {
+  cta: { sale: string; default: string };
+  thinking: string[];
+  errorProcessing: string;
+}> = {
+  he: {
+    cta: { sale: 'קני במבצע', default: 'לפרטים נוספים' },
+    thinking: ['רגע, בודק... 🔍', 'שנייה, בודק...', 'אחלה, תן לי רגע...', 'בודק את זה...'],
+    errorProcessing: 'שגיאה בעיבוד הבקשה',
+  },
+  en: {
+    cta: { sale: 'Shop the deal', default: 'View details' },
+    thinking: ['One sec, checking... 🔍', 'Just a moment...', 'Looking into it...', 'Pulling that up...'],
+    errorProcessing: 'Something went wrong processing your request',
+  },
+};
+
+function resolveLocale(language: string | null | undefined) {
+  const key = (language || 'he').toLowerCase();
+  return WIDGET_LOCALES[key] || WIDGET_LOCALES.he;
+}
+
+// ============================================
 // Card DTO — versioned wire contract for widget v4
 // ============================================
 // Keep this stable. New optional fields OK; renames/removals require widget bump.
-function toCardDTO(p: ProductRecommendation) {
+function toCardDTO(p: ProductRecommendation, loc: ReturnType<typeof resolveLocale>) {
   return {
     id: p.id,
     name: p.name,
@@ -73,7 +101,7 @@ function toCardDTO(p: ProductRecommendation) {
     originalPrice: p.originalPrice,
     isOnSale: p.isOnSale,
     productUrl: p.productUrl,
-    ctaLabel: p.isOnSale ? 'קני במבצע' : 'לפרטים נוספים',
+    ctaLabel: p.isOnSale ? loc.cta.sale : loc.cta.default,
     recommendedFor: p.recommendedFor || null,
     badge: p.badge || null,
     socialProof: p.socialProof || null,
@@ -101,18 +129,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // CORS origin validation: check if origin matches the account's domain.
-    // For accounts where the widget runs on a different domain than the
-    // chat-page username (e.g. LA BEAUTÉ — username='labeaute.israel'
-    // but widget on 'labeauteisrael.co.il'), prefer widget.domain.
+    // CORS origin validation + load account language in one query so we don't
+    // hit Supabase twice on every chat turn. `language` falls back to 'he' so
+    // existing accounts are byte-for-byte identical to before this i18n work.
+    const supabase = await createClient();
+    const { data: account } = await supabase
+      .from('accounts')
+      .select('config, language')
+      .eq('id', accountId)
+      .single();
+    const cfg = (account?.config as any) || {};
+    const accountLanguage = account?.language || 'he';
+    const loc = resolveLocale(accountLanguage);
+
     if (origin && origin !== '*') {
-      const supabase = await createClient();
-      const { data: account } = await supabase
-        .from('accounts')
-        .select('config')
-        .eq('id', accountId)
-        .single();
-      const cfg = (account?.config as any) || {};
       const accountDomain = cfg?.widget?.domain || cfg?.username;
       if (!isOriginAllowed(origin, accountDomain)) {
         return new Response(
@@ -132,16 +162,10 @@ export async function POST(req: NextRequest) {
           );
 
           // Send thinking indicator (immediate — reduces perceived latency)
-          const thinkingTexts = [
-            'רגע, בודק... 🔍',
-            'שנייה, בודק...',
-            'אחלה, תן לי רגע...',
-            'בודק את זה...',
-          ];
           controller.enqueue(
             encodeEvent({
               type: 'thinking',
-              text: thinkingTexts[Math.floor(Math.random() * thinkingTexts.length)],
+              text: loc.thinking[Math.floor(Math.random() * loc.thinking.length)],
             }),
           );
 
@@ -172,7 +196,7 @@ export async function POST(req: NextRequest) {
 
           // Send structured product cards (widget v4) before done.
           // Empty products array → still emit, so client can clear stale cards.
-          const cards = (result.products || []).map(toCardDTO);
+          const cards = (result.products || []).map((p) => toCardDTO(p, loc));
           const layout = result.intent?.stage === 'comparing' ? 'compare' : 'stack';
           controller.enqueue(
             encodeEvent({
@@ -195,7 +219,7 @@ export async function POST(req: NextRequest) {
         } catch (error: any) {
           console.error('[Widget Chat] Error:', error);
           controller.enqueue(
-            encodeEvent({ type: 'error', message: 'שגיאה בעיבוד הבקשה' }),
+            encodeEvent({ type: 'error', message: loc.errorProcessing }),
           );
         } finally {
           controller.close();

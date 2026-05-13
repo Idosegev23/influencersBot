@@ -581,8 +581,11 @@ export async function POST(req: NextRequest) {
                 : { found: false, statusText: 'spec ספק משלוחים לא נתמך עדיין', errorMessage: null } as any;
 
               let answer: string;
+              const isEn = (influencer as any).language === 'en';
               if (!view.found) {
-                answer = `לא הצלחתי למצוא הזמנה עם מספר ${numToUse}. ${view.errorMessage || 'אולי המספר שגוי?'} בדקי שוב או צרי קשר עם שירות הלקוחות.`;
+                answer = isEn
+                  ? `I couldn't find an order with number ${numToUse}. ${view.errorMessage || 'Maybe the number is off?'} Please double-check or contact customer support.`
+                  : `לא הצלחתי למצוא הזמנה עם מספר ${numToUse}. ${view.errorMessage || 'אולי המספר שגוי?'} בדקי שוב או צרי קשר עם שירות הלקוחות.`;
               } else {
                 const lines: string[] = [`📦 הזמנה ${view.shipmentNumber}`, `סטטוס: ${view.statusText}`];
                 if (view.lastUpdate?.date) lines.push(`עודכן: ${view.lastUpdate.date} ${view.lastUpdate.time || ''}`.trim());
@@ -653,7 +656,7 @@ export async function POST(req: NextRequest) {
             mode: 'creator',
             profileId: influencer.id,
             timezone: 'Asia/Jerusalem',
-            language: 'he',
+            language: (influencer as any).language || 'he',
             plan: 'pro',
             allowedChannels: ['chat'],
             security: { publicChatAllowed: true, requireAuthForSupport: false, allowedOrigins: [] },
@@ -992,7 +995,7 @@ export async function POST(req: NextRequest) {
         // === SEND THINKING INDICATOR (immediate — reduces perceived latency) ===
         controller.enqueue(encodeEvent({
           type: 'thinking',
-          text: getSmartThinkingMessage(message),
+          text: getSmartThinkingMessage(message, (influencer as any).language || 'he'),
         }));
 
         // === SEND CARDS (if needed) ===
@@ -1276,12 +1279,19 @@ export async function POST(req: NextRequest) {
           // Smart fallback based on error type
           const isTimeout = sandwichError.message?.includes('timeout') || sandwichError.code === 'ECONNRESET';
           const isRateLimit = sandwichError.status === 429;
+          const isEn = (influencer as any).language === 'en';
           if (isRateLimit) {
-            fullText = 'אופס, יותר מדי הודעות ברגע 😅 נסה שוב עוד כמה שניות!';
+            fullText = isEn
+              ? 'Whoa, too many messages at once 😅 Try again in a few seconds!'
+              : 'אופס, יותר מדי הודעות ברגע 😅 נסה שוב עוד כמה שניות!';
           } else if (isTimeout) {
-            fullText = 'לקח לי יותר מדי זמן לענות 😊 אפשר לנסות שוב? אולי תנסח/י את השאלה קצת אחרת';
+            fullText = isEn
+              ? 'That took longer than expected 😊 Want to try again? Maybe rephrase the question slightly.'
+              : 'לקח לי יותר מדי זמן לענות 😊 אפשר לנסות שוב? אולי תנסח/י את השאלה קצת אחרת';
           } else {
-            fullText = 'אופס, משהו השתבש אצלי 😅 נסה לשלוח שוב או לנסח את השאלה אחרת';
+            fullText = isEn
+              ? 'Something went wrong on my side 😅 Please try sending again or rephrase your question.'
+              : 'אופס, משהו השתבש אצלי 😅 נסה לשלוח שוב או לנסח את השאלה אחרת';
           }
           controller.enqueue(encodeEvent({ type: 'delta', text: fullText }));
         }

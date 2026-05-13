@@ -69,7 +69,10 @@ export abstract class BaseArchetype {
     const criticalGuardrail = triggeredGuardrails.find(g => g.severity === 'critical');
     if (criticalGuardrail) {
       const rule = this.definition.guardrails.find(r => r.id === criticalGuardrail.ruleId);
-      const rawResponse = rule?.blockedResponse || 'מצטער/ת, אני לא יכול/ה לעזור בזה. כדאי להתייעץ עם מומחה/ית.';
+      const blockedFallback = (input.accountContext.language || 'he').toLowerCase() === 'en'
+        ? "Sorry, I can't help with that. It's best to consult an expert."
+        : 'מצטער/ת, אני לא יכול/ה לעזור בזה. כדאי להתייעץ עם מומחה/ית.';
+      const rawResponse = rule?.blockedResponse || blockedFallback;
       
       return {
         response: this.replaceName(rawResponse, influencerName),
@@ -568,7 +571,16 @@ export abstract class BaseArchetype {
       }
 
       // Build archetype-specific instructions (replaces system prompt)
-      const todayDate = new Date().toLocaleDateString('he-IL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      const accountLanguage = (input.accountContext.language || 'he').toLowerCase();
+      const isEnglish = accountLanguage === 'en';
+      // Authoritative output-language directive — overrides any Hebrew phrasing
+      // in the prompts below. The prompt scaffolding stays in Hebrew (one source
+      // of truth for tone & structure); only the *output language* flips.
+      const LANG_DIRECTIVE_EN = '🌍 OUTPUT LANGUAGE: Respond to the user ONLY in English. The instructions below are written in Hebrew for internal authoring convenience — translate the *intent*, never the *output*. Hebrew tags such as <<SUGGESTIONS>> / <<INTENT>> remain literal, but the human-facing strings inside them and every visible word in your reply MUST be English. Do not transliterate, do not mix languages.\n\n';
+      const langDirective = isEnglish ? LANG_DIRECTIVE_EN : '';
+      const todayDate = isEnglish
+        ? new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+        : new Date().toLocaleDateString('he-IL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
       const todayISO = new Date().toISOString().split('T')[0];
       const isMediaNews = input.accountContext.accountArchetype === 'media_news';
       const isGovMinistry = input.accountContext.accountArchetype === 'government_ministry';
@@ -576,7 +588,7 @@ export abstract class BaseArchetype {
       // ═══════════════════════════════════════════════
       // MEDIA NEWS: Completely different system prompt
       // ═══════════════════════════════════════════════
-      const instructions = isMediaNews ? `אתה ${influencerName} — ערוץ חדשות בידור. אתה עורך חדשות דיגיטלי חד, מדויק, ממוקד.
+      const instructions = isMediaNews ? `${langDirective}אתה ${influencerName} — ערוץ חדשות בידור. אתה עורך חדשות דיגיטלי חד, מדויק, ממוקד.
 
 📅 היום: ${todayDate} (${todayISO})
 
@@ -636,7 +648,7 @@ ${personaContextBlock}
       // ═══════════════════════════════════════════════
       // GOVERNMENT MINISTRY: Formal, factual, citation-aware prompt
       // ═══════════════════════════════════════════════
-      isGovMinistry ? `אתה עוזר חכם של ${influencerName} — גוף ממשלתי / רשות ציבורית. אתה מספק מידע אמין, מדויק ועדכני בלבד על בסיס הפרסומים הרשמיים של הרשות.
+      isGovMinistry ? `${langDirective}אתה עוזר חכם של ${influencerName} — גוף ממשלתי / רשות ציבורית. אתה מספק מידע אמין, מדויק ועדכני בלבד על בסיס הפרסומים הרשמיים של הרשות.
 
 📅 היום: ${todayDate} (${todayISO})
 
@@ -679,7 +691,7 @@ ${personaContextBlock}
       // ═══════════════════════════════════════════════
       // REGULAR INFLUENCER: Original system prompt
       // ═══════════════════════════════════════════════
-      `אתה ${influencerName}, יוצר/ת תוכן שמנהל/ת שיחה טבעית עם הקהל — בגובה העיניים, לא כמו מכונת חיפוש.
+      `${langDirective}אתה ${influencerName}, יוצר/ת תוכן שמנהל/ת שיחה טבעית עם הקהל — בגובה העיניים, לא כמו מכונת חיפוש.
 📅 תאריך היום: ${todayDate}
 
 ⚠️ **מגדר**: ${(personalityConfig?.voiceRules?.firstPerson && /נקבה|female|feminine/i.test(personalityConfig.voiceRules.firstPerson)) ? 'דברי בלשון נקבה. פני לעוקבות בלשון נקבה כברירת מחדל, אלא אם ברור שמדובר בגבר.' : (personalityConfig?.voiceRules?.firstPerson && /זכר|male|masculine/i.test(personalityConfig.voiceRules.firstPerson)) ? 'דבר בלשון זכר. פנה לעוקבים בלשון ניטרלית או זכר כברירת מחדל.' : 'דבר/י בלשון ניטרלית. השתמש/י בסלאש כשצריך: "ממליצ/ה", "אומר/ת".'}
@@ -714,7 +726,31 @@ ${input.mode === 'dm' ? `
 • דבר כאילו אתה שולח הודעה ישירה לחבר — חם, אישי, וקצר.
 • פסקאות קצרות כמו בווטסאפ.
 • אל תהיה פורמלי מדי — זו שיחת DM, לא אתר.` : ''}
-${input.mode === 'widget' ? `
+${input.mode === 'widget' && input.accountContext.accountArchetype === 'b2b_saas' ? `
+🧭 Widget mode — B2B SaaS platform guide. You are NOT a retail store.
+
+🎭 Voice: You speak for the platform itself. Third-person plural — "we offer", "our team supports", "the platform integrates". Never "I personally" / "I tried".
+
+📏 Length: Target ~500 characters. Visitors are technical buyers / marketers — concise is respected. Go deeper only when they ask for specifics. Never repeat info already covered.
+
+🎯 Goal: move the visitor toward the right next step — feature exploration → demo → trial → sales contact. Every reply earns the next click; don't try to "win" the chat.
+
+🧩 What you have to offer: feature workspaces, integrations, case studies, pricing tiers, demos, docs. 🚫 There are NO physical products, NO product images, NO SKUs, NO "Add to cart". The product-cards row in the UI will stay empty for this account — that's expected.
+
+🔗 Links: It's fine to mention a page name in plain text (e.g. "the Consumer Intelligence workspace") so the visitor knows what to search for. 🚫 Do NOT paste raw URLs and do NOT use markdown links — the embedding site handles navigation.
+
+🤝 CTA discipline: When the visitor signals real interest (asks pricing, integration depth, security, enterprise scale) — propose a concrete next step in ONE short sentence: "Want me to set up a demo?" / "I can connect you with our team." Don't pitch — invite.
+
+🚫 Off-topic: If asked about something outside the platform (general marketing advice, unrelated tools, news) — politely note the scope and redirect: "That's outside what I can speak to — but if you're evaluating us for X, I can show you Y."
+
+👋 Greeting: "Hi" / "Hello" → one warm sentence + ONE qualifying question (industry, team size, use case). 🚫 Do NOT pitch features in the greeting.
+
+📊 Stage tag — required at the end of EVERY reply (exactly once):
+<<INTENT>>{"stage":"exploring|comparing|evaluating|ready_for_demo|hesitating|support","confidence":0.0-1.0,"objection":"price|integration|security|timeline|adoption|trust|none","topic":"short topic in English"}<</INTENT>>
+• stage: where the buyer is in the evaluation journey.
+• objection: if hesitating, the type of concern; otherwise "none".
+• topic: e.g. "creator discovery for DTC brands".
+🚫 Do NOT show this tag in the visible reply — it's stripped before display. 🚫 No explanation before or after it.` : input.mode === 'widget' ? `
 🛒 מצב ווידג'ט — concierge חנות, לא חברה:
 
 🎭 קול: את/ה דובר/ת בשם המותג, לא בשם משפיענית. גוף שלישי — "אצלנו יש", "באתר תמצא/י", "המותג שלנו". בלי "אני אישית", "ניסיתי", "מהניסיון שלי".
@@ -776,13 +812,16 @@ ${input.mode === 'widget' ? `📌 בווידג'ט — 🚫 אל תוסיף <<SUG
 השם שלך: ${influencerName} (לעולם אל תכתוב [שם המשפיענית])`;
 
       const userNameLine = input.userName ? `\n👤 שם המשתמש/ת: ${input.userName} — פנה/י אליו/ה בשם כשזה מתאים באופן טבעי.\n` : '';
+      const answerLanguageLine = isEnglish
+        ? 'Respond in English only. If the question is broad — ask one focused follow-up (with a short hint of what you have). If the intent is clear — give a full answer.'
+        : 'ענה בעברית. אם השאלה רחבה — שאל/י שאלה מכוונת (עם רמז קצר למה שיש לך). אם ברור מה רוצים — תן/י תשובה מלאה.';
       const userPrompt = `${kbContext}
 ${userNameLine}
-💬 הודעת המשתמש:
+💬 ${isEnglish ? 'User message' : 'הודעת המשתמש'}:
 "${input.userMessage}"
 
-ענה בעברית. אם השאלה רחבה — שאל/י שאלה מכוונת (עם רמז קצר למה שיש לך). אם ברור מה רוצים — תן/י תשובה מלאה.
-🚨 אל תמציא תוכן שלא מופיע בבסיס הידע.`;
+${answerLanguageLine}
+🚨 ${isEnglish ? "Do not fabricate content that isn't in the knowledge base." : 'אל תמציא תוכן שלא מופיע בבסיס הידע.'}`;
 
       // Resolve model based on decision engine's modelStrategy
       const { primary: primaryModel, fallback: fallbackModel } = resolveModel(input.modelTier);
@@ -903,8 +942,11 @@ ${userNameLine}
 
     } catch (error) {
       console.error('[BaseArchetype] All models failed:', error);
+      const fallbackText = (input.accountContext.language || 'he').toLowerCase() === 'en'
+        ? 'Oops, something went wrong. Want to try again?'
+        : 'אופס, משהו השתבש... אפשר לנסות שוב?';
       return {
-        text: `אופס, משהו השתבש... אפשר לנסות שוב?`,
+        text: fallbackText,
         responseId: null,
       };
     }

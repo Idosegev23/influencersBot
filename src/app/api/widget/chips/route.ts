@@ -115,10 +115,17 @@ async function generateChips(ctx: ChipsContext): Promise<string[] | null> {
   if (!client) return null;
 
   const targetCount = ctx.mode === 'follow_up' ? 3 : MAX_CHIPS;
-  const instructions =
-    ctx.mode === 'follow_up'
-      ? `אתה מייצר ${targetCount} צ'יפסים קצרים בעברית להמשך שיחה בצ'אט באתר מסחרי. כל צ'יפ הוא שאלה/בקשה קצרה (עד 6 מילים) שהמבקר/ת היה/יתה מקליק/ה עכשיו אחרי תשובת הבוט. תכוון/י לדיוק על הקשר השיחה.`
-      : `אתה מייצר ${targetCount} צ'יפסים קצרים בעברית בתור שאלות פתיחה לצ'אט באתר מותג. כל צ'יפ הוא שאלה (עד 6 מילים) שלקוח/ה אנונימי/ת היה/יתה מקליק/ה כדי להתחיל שיחה. הם צריכים להרגיש native למותג ולסוג העמוד שהמבקר/ת רואה.`;
+  // Resolve the chip-output language. `ctx.lang` flows in from the widget
+  // (`document.documentElement.lang` || 'he'). Anything we don't have a
+  // dedicated prompt for falls back to Hebrew to preserve existing behavior.
+  const chipLang = (ctx.lang || 'he').toLowerCase().startsWith('en') ? 'en' : 'he';
+  const instructions = chipLang === 'en'
+    ? (ctx.mode === 'follow_up'
+        ? `Generate ${targetCount} short English chips for follow-up conversation on a commercial website chat. Each chip is a short question/request (max 6 words) the visitor would tap right after the bot's reply. Aim for precise relevance to the conversation context.`
+        : `Generate ${targetCount} short English chips as conversation starters for a brand website chat. Each chip is a question (max 6 words) an anonymous visitor would tap to start a chat. They must feel native to the brand and the page type the visitor is on.`)
+    : (ctx.mode === 'follow_up'
+        ? `אתה מייצר ${targetCount} צ'יפסים קצרים בעברית להמשך שיחה בצ'אט באתר מסחרי. כל צ'יפ הוא שאלה/בקשה קצרה (עד 6 מילים) שהמבקר/ת היה/יתה מקליק/ה עכשיו אחרי תשובת הבוט. תכוון/י לדיוק על הקשר השיחה.`
+        : `אתה מייצר ${targetCount} צ'יפסים קצרים בעברית בתור שאלות פתיחה לצ'אט באתר מותג. כל צ'יפ הוא שאלה (עד 6 מילים) שלקוח/ה אנונימי/ת היה/יתה מקליק/ה כדי להתחיל שיחה. הם צריכים להרגיש native למותג ולסוג העמוד שהמבקר/ת רואה.`);
 
   const input =
     ctx.mode === 'follow_up'
@@ -151,7 +158,7 @@ Language: ${ctx.lang}`;
                 chips: {
                   type: 'array',
                   items: { type: 'string' },
-                  description: `${targetCount} short Hebrew chip strings, max 6 words each`,
+                  description: `${targetCount} short ${chipLang === 'en' ? 'English' : 'Hebrew'} chip strings, max 6 words each`,
                 },
               },
               required: ['chips'],
@@ -223,12 +230,15 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: account } = await supabase
     .from('accounts')
-    .select('config')
+    .select('config, language')
     .eq('id', accountId)
     .single();
 
   const config: any = account?.config || {};
   const widgetConfig: any = config.widget || {};
+  // Account language is authoritative — `lang` from the request body comes
+  // from <html lang> which the embedding site may not set correctly.
+  const effectiveLang = account?.language || lang || 'he';
 
   // Disabled by store owner
   if (widgetConfig.chips_enabled === false) {
@@ -248,7 +258,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 3. Cache lookup (initial mode only — follow_up depends on live conversation)
-  const cacheKey = `chips:${accountId}:${pagePattern}:${isReturning ? 1 : 0}:${lang}`;
+  const cacheKey = `chips:${accountId}:${pagePattern}:${isReturning ? 1 : 0}:${effectiveLang}`;
   if (mode === 'initial') {
     const hit = cacheGet<string[]>(cacheKey);
     if (hit?.value && hit.value.length) {
@@ -270,15 +280,16 @@ export async function POST(req: NextRequest) {
   const sampleNames = (productSamples || []).map((p: any) => p.name).filter(Boolean);
 
   // 5. Generate via gpt-5.4 (same model as the chat — no mixing)
+  const brandFallback = effectiveLang.toLowerCase().startsWith('en') ? 'the brand' : 'המותג';
   const generated = await generateChips({
-    brandName: config.display_name || config.username || 'המותג',
+    brandName: config.display_name || config.username || brandFallback,
     brandSummary: config.persona_summary || widgetConfig.welcomeMessage,
     pagePattern,
     pageTitle: body.pageTitle,
     isReturning,
     lastTopic,
     productSamples: sampleNames,
-    lang,
+    lang: effectiveLang,
     mode,
     lastUserMsg: body.lastUserMsg,
     lastBotMsg: body.lastBotMsg,

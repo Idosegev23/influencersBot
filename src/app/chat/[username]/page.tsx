@@ -148,6 +148,31 @@ const DEFAULT_TABS: { id: string; label: string; type: string; topic?: string }[
   { id: 'support', label: 'בעיה בהזמנה', type: 'support' },
 ];
 
+// User-visible strings on the chat surface. The chat page itself is mostly
+// Hebrew-skinned; this helper covers the strings that surface as error/edge-case
+// fallbacks where the language flip matters (form errors, retry copy, etc.).
+// Add more keys here as new English-language accounts onboard.
+const CHAT_PAGE_STRINGS = {
+  he: {
+    streamRetry: 'אופס, משהו השתבש. נסה לשלוח שוב',
+    botFallback: 'מצטער, משהו השתבש. נסה שוב!',
+    sendError: 'אופס, משהו השתבש. נסה לשלוח שוב או לנסח את השאלה אחרת',
+    requiredFields: 'נא למלא את כל השדות החובה',
+    submitError: 'שגיאה בשליחת הפנייה',
+  },
+  en: {
+    streamRetry: 'Something went wrong. Please try sending again.',
+    botFallback: "Sorry, something went wrong. Try again!",
+    sendError: 'Something went wrong. Try sending again or rephrasing your question.',
+    requiredFields: 'Please fill in all required fields.',
+    submitError: 'Error submitting your request.',
+  },
+} as const;
+
+function chatStrings(influencer: Influencer | null) {
+  return ((influencer as any)?.language === 'en') ? CHAT_PAGE_STRINGS.en : CHAT_PAGE_STRINGS.he;
+}
+
 /**
  * Parse AI-generated suggestions from bot response.
  * Format: <<SUGGESTIONS>>suggestion1|suggestion2|suggestion3<</SUGGESTIONS>>
@@ -465,7 +490,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       if (msgId) {
         setMessages(prev => prev.map(m =>
           m.id === msgId
-            ? { ...m, content: error.message || 'אופס, משהו השתבש. נסה לשלוח שוב' }
+            ? { ...m, content: error.message || chatStrings(influencer).streamRetry }
             : m
         ));
       }
@@ -1209,7 +1234,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       if (data.responseId) setResponseId(data.responseId);
       if (data.sessionId) setSessionId(data.sessionId);
 
-      const rawResponse = data.response || 'מצטער, משהו השתבש. נסה שוב!';
+      const rawResponse = data.response || chatStrings(influencer).botFallback;
       const { cleanText: cleanResponse, suggestions: parsedSuggestions } = parseSuggestions(rawResponse, {
         conferenceMode: isConferenceMode && username === 'ldrs_group',
       });
@@ -1242,7 +1267,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'אופס, משהו השתבש. נסה לשלוח שוב או לנסח את השאלה אחרת',
+        content: chatStrings(influencer).sendError,
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
@@ -1311,7 +1336,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
 
   const handleProblemSubmit = async () => {
     if (!problemBrand || !problemForm.name || !problemForm.phone || !problemForm.details || !influencer) {
-      setProblemError('נא למלא את כל השדות החובה');
+      setProblemError(chatStrings(influencer).requiredFields);
       return;
     }
     setProblemLoading(true);
@@ -1332,7 +1357,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
         }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'שגיאה בשליחת הפנייה');
+      if (!response.ok) throw new Error(data.error || chatStrings(influencer).submitError);
       track('support_ticket_submitted', {
         source: 'problem_form',
         brand: problemBrand.brand_name,
@@ -1340,7 +1365,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       });
       setProblemStep('success');
     } catch (err) {
-      setProblemError(err instanceof Error ? err.message : 'שגיאה בשליחת הפנייה');
+      setProblemError(err instanceof Error ? err.message : chatStrings(influencer).submitError);
     } finally {
       setProblemLoading(false);
     }

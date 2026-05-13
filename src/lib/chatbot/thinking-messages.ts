@@ -324,6 +324,20 @@ const DEFAULT_MESSAGES = [
   'עוברת על זה... ✨',
 ];
 
+// English equivalents for non-Hebrew accounts (IMAI etc.). Category keywords
+// are Hebrew-only by design, so for English accounts we always serve from this
+// pool — keeps the experience consistent without forcing English keyword matching.
+const DEFAULT_MESSAGES_EN = [
+  'One sec, checking... 🔍',
+  'Just a moment... ✨',
+  'Thinking... 💭',
+  'Let me look that up... ✨',
+  'Looking into it... 🔍',
+  'One moment... ✨',
+  'Hang on... 💭',
+  'Pulling that up... ✨',
+];
+
 // ============================================
 // Matching Logic
 // ============================================
@@ -331,8 +345,16 @@ const DEFAULT_MESSAGES = [
 /**
  * Get a smart thinking message based on the user's message content.
  * Pure keyword matching — no AI, instant.
+ *
+ * `language` (optional, default 'he') gates keyword matching: only Hebrew
+ * accounts get category-specific messages because the keyword lists are
+ * Hebrew. English accounts always get the English default pool.
  */
-export function getSmartThinkingMessage(userMessage: string): string {
+export function getSmartThinkingMessage(userMessage: string, language: string = 'he'): string {
+  if ((language || 'he').toLowerCase() === 'en') {
+    return DEFAULT_MESSAGES_EN[Math.floor(Math.random() * DEFAULT_MESSAGES_EN.length)];
+  }
+
   const lowerMessage = userMessage.toLowerCase();
 
   // Find all matching categories and score them

@@ -41,11 +41,54 @@
   var chips = [];
   var lastTopic = null;
   try { lastTopic = localStorage.getItem('ibot_last_topic_' + ACCOUNT_ID); } catch (e) { /* */ }
+
+  // ============================================
+  // Locales — every visible string + layout direction lives here.
+  // New languages: add another entry; widget picks via `language` from config
+  // (default 'he' for back-compat with existing Hebrew accounts).
+  // ============================================
+  var LOCALES = {
+    he: {
+      dir: 'rtl',
+      font: 'Heebo',
+      googleFont: 'Heebo:wght@400;500;600;700',
+      welcomeMessage: 'שלום! איך אפשר לעזור? ✨',
+      placeholder: 'כתבו הודעה...',
+      brandName: 'העוזר החכם',
+      status: 'זמין',
+      defaultCta: 'לפרטים',
+      recommendedFor: 'מומלץ ל: ',
+      currencyPrefix: '₪',
+      currencyPosition: 'prefix',
+      badge: { SALE: 'מבצע', NEW: 'חדש', DEFAULT: 'מומלץ' },
+      errorMessage: 'שגיאה בעיבוד הבקשה.',
+      connectionError: 'שגיאה בחיבור. נסו שוב.',
+    },
+    en: {
+      dir: 'ltr',
+      font: 'Inter',
+      googleFont: 'Inter:wght@400;500;600;700',
+      welcomeMessage: 'Hi! How can I help? ✨',
+      placeholder: 'Type a message...',
+      brandName: 'AI Assistant',
+      status: 'Online',
+      defaultCta: 'View',
+      recommendedFor: 'Recommended for: ',
+      currencyPrefix: '$',
+      currencyPosition: 'prefix',
+      badge: { SALE: 'SALE', NEW: 'NEW', DEFAULT: 'PICK' },
+      errorMessage: 'Something went wrong processing your request.',
+      connectionError: 'Connection error. Please try again.',
+    },
+  };
+  var locale = LOCALES.he; // overwritten once /api/widget/config responds
+
   var config = {
-    welcomeMessage: 'שלום! איך אפשר לעזור? ✨',
-    placeholder: 'כתבו הודעה...',
+    language: 'he',
+    welcomeMessage: locale.welcomeMessage,
+    placeholder: locale.placeholder,
     position: 'bottom-right',
-    brandName: 'העוזר החכם',
+    brandName: locale.brandName,
     profilePic: null,
     primaryColor: '#0c1013',
   };
@@ -235,30 +278,33 @@
   };
 
   // ============================================
-  // Load Heebo Font
+  // Inject CSS Animations (font loaded once locale is resolved)
   // ============================================
 
-  var fontLink = document.createElement('link');
-  fontLink.rel = 'stylesheet';
-  fontLink.href = 'https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&display=swap';
-  document.head.appendChild(fontLink);
-
-  // ============================================
-  // Inject CSS Animations
-  // ============================================
-
+  var fontLinkEl = null;
   var styleEl = document.createElement('style');
-  styleEl.textContent =
-    '@keyframes ibot-slide-up{from{opacity:0;transform:translateY(20px) scale(0.95);}to{opacity:1;transform:translateY(0) scale(1);}}' +
-    '@keyframes ibot-bounce{0%,80%,100%{transform:translateY(0);}40%{transform:translateY(-5px);}}' +
-    '@keyframes ibot-msg-in{from{opacity:0;transform:translateX(10px);}to{opacity:1;transform:translateX(0);}}' +
-    '@keyframes ibot-fade-in{from{opacity:0;}to{opacity:1;}}' +
-    '#ibot-widget-container *{box-sizing:border-box;font-family:"Heebo",system-ui,-apple-system,sans-serif;}' +
-    '#ibot-widget-container input:focus{outline:none;}' +
-    '#ibot-widget-container ::-webkit-scrollbar{width:4px;}' +
-    '#ibot-widget-container ::-webkit-scrollbar-track{background:transparent;}' +
-    '#ibot-widget-container ::-webkit-scrollbar-thumb{background:rgba(150,150,150,0.3);border-radius:4px;}';
   document.head.appendChild(styleEl);
+
+  function applyLocaleAssets() {
+    // Google Font for the resolved locale — loaded once.
+    if (!fontLinkEl) {
+      fontLinkEl = document.createElement('link');
+      fontLinkEl.rel = 'stylesheet';
+      fontLinkEl.href = 'https://fonts.googleapis.com/css2?family=' + locale.googleFont + '&display=swap';
+      document.head.appendChild(fontLinkEl);
+    }
+    styleEl.textContent =
+      '@keyframes ibot-slide-up{from{opacity:0;transform:translateY(20px) scale(0.95);}to{opacity:1;transform:translateY(0) scale(1);}}' +
+      '@keyframes ibot-bounce{0%,80%,100%{transform:translateY(0);}40%{transform:translateY(-5px);}}' +
+      '@keyframes ibot-msg-in{from{opacity:0;transform:translateX(10px);}to{opacity:1;transform:translateX(0);}}' +
+      '@keyframes ibot-fade-in{from{opacity:0;}to{opacity:1;}}' +
+      '#ibot-widget-container *{box-sizing:border-box;font-family:"' + locale.font + '",system-ui,-apple-system,sans-serif;}' +
+      '#ibot-widget-container input:focus{outline:none;}' +
+      '#ibot-widget-container ::-webkit-scrollbar{width:4px;}' +
+      '#ibot-widget-container ::-webkit-scrollbar-track{background:transparent;}' +
+      '#ibot-widget-container ::-webkit-scrollbar-thumb{background:rgba(150,150,150,0.3);border-radius:4px;}';
+  }
+  applyLocaleAssets();
 
   // ============================================
   // Load Config
@@ -267,6 +313,16 @@
   fetch(BASE_URL + '/api/widget/config?accountId=' + ACCOUNT_ID)
     .then(function (r) { return r.json(); })
     .then(function (data) {
+      // Resolve locale FIRST so default strings reflect the account's language
+      // before we apply per-account overrides.
+      if (data.language && LOCALES[data.language]) {
+        config.language = data.language;
+        locale = LOCALES[data.language];
+        config.welcomeMessage = locale.welcomeMessage;
+        config.placeholder = locale.placeholder;
+        config.brandName = locale.brandName;
+        applyLocaleAssets();
+      }
       if (data.theme) {
         config.position = data.theme.position || config.position;
         if (data.theme.primaryColor) config.primaryColor = data.theme.primaryColor;
@@ -301,7 +357,7 @@
   function updateContainerPosition() {
     container.style.cssText = 'position:fixed;z-index:2147483647;' +
       (config.position === 'bottom-left' ? 'bottom:24px;left:24px;' : 'bottom:24px;right:24px;') +
-      'font-family:"Heebo",system-ui,sans-serif;direction:rtl;';
+      'font-family:"' + locale.font + '",system-ui,sans-serif;direction:' + locale.dir + ';';
   }
 
   // ============================================
@@ -434,7 +490,7 @@
       '<div style="font-weight:700;font-size:23px;line-height:normal;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(config.brandName) + '</div>' +
       '<div style="display:flex;align-items:center;gap:4px;margin-top:2px;">' +
       '<span style="width:10px;height:10px;border-radius:50%;background:#22c55e;flex-shrink:0;"></span>' +
-      '<span style="font-size:16px;white-space:nowrap;">זמין</span>' +
+      '<span style="font-size:16px;white-space:nowrap;">' + escapeHtml(locale.status) + '</span>' +
       '</div></div>' +
       // Mobile: close button in header
       (isMobile
@@ -445,7 +501,7 @@
       '</div>' +
 
       // ---- Messages area (padding matches header 16px) ----
-      '<div id="ibot-messages" style="flex:1;overflow-y:auto;padding:12px 16px;direction:rtl;">' +
+      '<div id="ibot-messages" style="flex:1;overflow-y:auto;padding:12px 16px;direction:' + locale.dir + ';">' +
       msgsHtml +
       '</div>' +
 
@@ -470,7 +526,7 @@
       // Input field
       '<input id="ibot-input" type="text" placeholder="' + escapeHtml(config.placeholder) + '" ' +
       'style="flex:1;border:none;outline:none;font-size:16px;color:' + pc + ';background:transparent;' +
-      'direction:rtl;font-family:inherit;text-align:right;min-width:0;" />' +
+      'direction:' + locale.dir + ';font-family:inherit;text-align:' + (locale.dir === 'rtl' ? 'right' : 'left') + ';min-width:0;" />' +
       '</div></div>' +
 
       '</div>' +
@@ -631,7 +687,7 @@
                     render();
                   }
                 } else if (event.type === 'error') {
-                  messages[messages.length - 1].content = event.message || 'שגיאה בעיבוד הבקשה.';
+                  messages[messages.length - 1].content = event.message || locale.errorMessage;
                   isLoading = false;
                   render();
                 } else if (event.type === 'done') {
@@ -650,7 +706,7 @@
           }).catch(function () {
             isLoading = false;
             thinkingText = null;
-            messages[messages.length - 1].content = 'שגיאה בחיבור. נסו שוב.';
+            messages[messages.length - 1].content = locale.connectionError;
             render();
           });
         }
@@ -660,7 +716,7 @@
       .catch(function () {
         isLoading = false;
         thinkingText = null;
-        messages[messages.length - 1].content = 'שגיאה בחיבור. נסו שוב.';
+        messages[messages.length - 1].content = locale.connectionError;
         render();
       });
   }
@@ -695,7 +751,7 @@
     }
     if (!pills) return '';
     return (
-      '<div style="padding:0 16px 4px;display:flex;gap:6px;overflow-x:auto;direction:rtl;flex-shrink:0;' +
+      '<div style="padding:0 16px 4px;display:flex;gap:6px;overflow-x:auto;direction:' + locale.dir + ';flex-shrink:0;' +
       '-webkit-overflow-scrolling:touch;scrollbar-width:none;" ' +
       'onwheel="if(this.scrollWidth>this.clientWidth){this.scrollLeft+=event.deltaY;event.preventDefault();}">' +
       pills +
@@ -710,14 +766,14 @@
     var cardsHtml = '';
     for (var i = 0; i < products.length; i++) {
       var p = products[i] || {};
-      var price = p.price != null ? '₪' + p.price : '';
+      var price = p.price != null ? locale.currencyPrefix + p.price : '';
       var orig = p.originalPrice && p.originalPrice > p.price
-        ? '<span style="color:#9ca3af;text-decoration:line-through;font-size:12px;margin-right:6px;">₪' + p.originalPrice + '</span>'
+        ? '<span style="color:#9ca3af;text-decoration:line-through;font-size:12px;margin-right:6px;">' + locale.currencyPrefix + p.originalPrice + '</span>'
         : '';
       var badge = '';
       if (p.badge) {
         var badgeColor = p.badge === 'SALE' ? '#dc2626' : (p.badge === 'NEW' ? '#16a34a' : '#7c3aed');
-        var badgeText = p.badge === 'SALE' ? 'מבצע' : (p.badge === 'NEW' ? 'חדש' : 'מומלץ');
+        var badgeText = locale.badge[p.badge] || locale.badge.DEFAULT;
         badge =
           '<div style="position:absolute;top:6px;right:6px;background:' + badgeColor + ';color:#fff;' +
           'font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;letter-spacing:0.3px;">' +
@@ -729,7 +785,7 @@
           'onerror="this.style.display=\'none\';this.parentNode.style.background=\'#f3f4f6\';this.parentNode.style.height=\'120px\';" />'
         : '<div style="width:100%;height:120px;background:#f3f4f6;border-radius:10px 10px 0 0;"></div>';
       var recFor = p.recommendedFor
-        ? '<div style="font-size:11px;color:#6b7280;margin-bottom:4px;">מומלץ ל: ' + escapeHtml(p.recommendedFor) + '</div>'
+        ? '<div style="font-size:11px;color:#6b7280;margin-bottom:4px;">' + escapeHtml(locale.recommendedFor) + escapeHtml(p.recommendedFor) + '</div>'
         : '';
       var sp = p.socialProof || {};
       var spLine = '';
@@ -764,13 +820,13 @@
         '<button style="margin-top:8px;background:' + pc + ';color:#fff;border:none;border-radius:8px;' +
         'padding:7px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;width:100%;" ' +
         'onclick="event.stopPropagation();window.__ibotCardClick(\'' + safeId + '\',' + i + ')">' +
-        escapeHtml(p.ctaLabel || 'לפרטים') + '</button>' +
+        escapeHtml(p.ctaLabel || locale.defaultCta) + '</button>' +
         '</div></div>';
     }
     if (!cardsHtml) return '';
     return (
       '<div style="display:flex;justify-content:flex-end;margin-bottom:12px;animation:ibot-msg-in 0.3s ease-out;">' +
-      '<div style="display:flex;gap:8px;overflow-x:auto;width:100%;padding-bottom:4px;direction:rtl;' +
+      '<div style="display:flex;gap:8px;overflow-x:auto;width:100%;padding-bottom:4px;direction:' + locale.dir + ';' +
       '-webkit-overflow-scrolling:touch;scrollbar-width:none;">' +
       cardsHtml +
       '</div></div>'

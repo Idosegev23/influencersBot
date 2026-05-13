@@ -37,12 +37,23 @@ export async function GET(req: NextRequest) {
     const supabase = await createClient();
     const { data: account } = await supabase
       .from('accounts')
-      .select('config, security_config')
+      .select('config, security_config, language')
       .eq('id', accountId)
       .single();
 
     const config = account?.config || {};
     const widgetConfig = config.widget || {};
+    // Resolve language: widget override > account column > default. Anything
+    // we don't have strings for falls back to 'he' so widget.js still renders.
+    const SUPPORTED_LANGS = new Set(['he', 'en']);
+    const rawLang = widgetConfig.language || account?.language || 'he';
+    const language = SUPPORTED_LANGS.has(rawLang) ? rawLang : 'he';
+
+    const FALLBACKS: Record<string, { welcome: string; placeholder: string }> = {
+      he: { welcome: 'שלום! איך אפשר לעזור?', placeholder: 'שאלו משהו...' },
+      en: { welcome: 'Hi! How can I help?', placeholder: 'Ask something...' },
+    };
+    const fb = FALLBACKS[language];
 
     let analyticsToken: string | null = null;
     try {
@@ -53,6 +64,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(
       {
+        language,
         theme: {
           primaryColor: widgetConfig.primaryColor || config.theme?.colors?.primary || '#6366f1',
           fontFamily: config.theme?.fonts?.body || 'system-ui',
@@ -61,8 +73,8 @@ export async function GET(req: NextRequest) {
         },
         brandName: config.display_name || config.username || '',
         profilePic: config.profile_pic_url || null,
-        welcomeMessage: widgetConfig.welcomeMessage || 'שלום! איך אפשר לעזור?',
-        placeholder: widgetConfig.placeholder || 'שאלו משהו...',
+        welcomeMessage: widgetConfig.welcomeMessage || fb.welcome,
+        placeholder: widgetConfig.placeholder || fb.placeholder,
         domain: widgetConfig.domain || config.username || '',
         analyticsToken,
       },

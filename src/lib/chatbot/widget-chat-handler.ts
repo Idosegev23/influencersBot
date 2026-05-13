@@ -80,7 +80,7 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
   const [accountResult, historyData, lastIntentRow] = await Promise.all([
     supabase
       .from('accounts')
-      .select('id, type, config')
+      .select('id, type, config, language')
       .eq('id', accountId)
       .single()
       .then(r => r.data),
@@ -193,7 +193,9 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
     });
   } catch (error: any) {
     console.error('[WidgetChat] SandwichBot error:', error.message);
-    fullText = 'מצטער, לא הצלחתי לעבד את הבקשה. נסו שוב.';
+    fullText = (accountResult?.language === 'en')
+      ? "Sorry, I couldn't process that. Please try again."
+      : 'מצטער, לא הצלחתי לעבד את הבקשה. נסו שוב.';
   }
 
   // Phase 2: extract <<INTENT>> envelope from the (already suggestion-stripped)
