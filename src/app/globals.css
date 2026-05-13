@@ -192,7 +192,10 @@ body {
   background: var(--color-background);
   color: var(--color-text);
   min-height: 100vh;
-  direction: rtl;
+  /* Inherit direction from <html dir="..."> so per-route LTR wrappers
+     (e.g. /chat/[username] for IMAI) can flip the subtree to LTR
+     without fighting body-level RTL cascade. */
+  direction: inherit;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

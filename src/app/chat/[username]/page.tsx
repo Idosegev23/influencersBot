@@ -1399,7 +1399,10 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" dir="rtl">
+      // No explicit dir — inherits from the chat layout wrapper, which sets
+      // ltr/rtl based on accounts.language. Hardcoded dir="rtl" here used to
+      // force Hebrew-aligned spinner padding even for English accounts.
+      <div className="min-h-screen flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -1407,9 +1410,9 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
 
   if (notFound || !influencer) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6" dir="rtl">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">לא נמצא</h1>
-        <p className="text-gray-600">הצ'אטבוט הזה לא קיים או לא פעיל</p>
+      <div className="min-h-screen flex flex-col items-center justify-center p-6">
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Not found</h1>
+        <p className="text-gray-600">This chatbot doesn’t exist or isn’t active.</p>
       </div>
     );
   }
@@ -2110,7 +2113,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className={`coupons-tab h-full overflow-y-auto ${isMobile ? 'pb-32' : 'pb-8'}`}
-                dir="rtl"
+                dir={(influencer as any).language === 'en' ? 'ltr' : 'rtl'}
               >
                 <div className="px-4 py-6">
                   <div className={`mx-auto coupons-flow-container ${isMobile ? 'max-w-2xl' : 'max-w-[700px]'}`}>
@@ -2251,7 +2254,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className={`problem-tab h-full overflow-y-auto ${isMobile ? 'pb-32' : 'pb-8'}`}
-                dir="rtl"
+                dir={(influencer as any).language === 'en' ? 'ltr' : 'rtl'}
               >
                 <div className="px-4 py-6">
                   <div className={`mx-auto support-flow-container ${isMobile ? 'max-w-2xl' : 'max-w-[700px]'}`}>
