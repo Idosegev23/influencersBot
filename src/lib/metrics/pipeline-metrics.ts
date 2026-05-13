@@ -54,7 +54,7 @@ export interface PipelineMetricsData {
   expandQuerySkippedNoResults: boolean;
   keywordSupplementCalled: boolean;
   keywordSupplementSkipped: boolean;
-  thresholdUsed: '0.4' | '0.25_fallback' | '0.4+0.25_expanded';
+  thresholdUsed: '0.4' | '0.25_fallback' | '0.4+0.25_expanded' | '0.25_no_entity_filter';
   chunksReturned: number;
   topSimilarity: number;
   suggestionFallbackTriggered: boolean;

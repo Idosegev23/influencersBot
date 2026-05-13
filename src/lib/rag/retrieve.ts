@@ -151,7 +151,11 @@ const ENTITY_KEYWORDS: Record<EntityType, string[]> = {
   highlight: ['highlight', 'story', 'stories', 'הילייט', 'סטורי'],
   partnership: ['partnership', 'brand', 'collab', 'sponsor', 'deal', 'contract', 'שיתוף', 'מותג', 'חוזה', 'ספונסר'],
   coupon: ['coupon', 'discount', 'code', 'promo', 'sale', 'קופון', 'הנחה', 'קוד', 'מבצע'],
-  knowledge_base: ['faq', 'about', 'info', 'question', 'שאלה', 'מידע'],
+  // Keep only words that signal "I'm asking the brand for a fact" — generic
+  // English fillers like 'about' / 'info' / 'question' over-match ("Tell me
+  // about X", "I have a question about Y") and routed B2B SaaS / website
+  // accounts to a non-existent knowledge_base entity, returning zero RAG hits.
+  knowledge_base: ['faq', 'שאלות נפוצות', 'מידע רשמי'],
   document: ['document', 'file', 'pdf', 'contract', 'invoice', 'מסמך', 'קובץ', 'חשבונית'],
   website: ['website', 'site', 'link', 'url', 'page', 'אתר', 'לינק', 'קישור'],
   product: [
@@ -585,6 +589,36 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
       });
     if (fallbackResults?.length) {
       candidates = fallbackResults as CandidateRow[];
+    }
+  }
+
+  // Step 3d-bis: Last-resort fallback — if we still got zero results AND we
+  // were filtering by entity_types, try once more with NO entity-type filter.
+  // This covers two real-world cases:
+  //   1. The classifier mis-routed the query (e.g. "Tell me about X" → KB,
+  //      but the account is website-only). The account has the right content,
+  //      just under a different entity_type bucket.
+  //   2. New archetypes (b2b_saas, etc.) whose corpus doesn't fit the existing
+  //      entity-type taxonomy yet.
+  // Hebrew accounts with rich multi-entity corpora are unaffected — they hit
+  // results at the 0.3 / 0.25 thresholds before reaching this branch.
+  if (candidates.length === 0 && baseEmbedding && entityTypes && entityTypes.length > 0) {
+    pm?.set('thresholdUsed', '0.25_no_entity_filter');
+    log.info('Zero results even at 0.25 — retrying without entity-type filter', {
+      droppedEntityTypes: entityTypes,
+    }, accountId);
+    const { data: unfilteredResults } = await supabase
+      .rpc('match_document_chunks', {
+        p_account_id: accountId,
+        p_embedding: JSON.stringify(baseEmbedding),
+        p_match_count: 20,
+        p_match_threshold: 0.25,
+        p_entity_types: null, // no filter
+        p_updated_after: timeWindow?.after || null,
+        p_topics: null,
+      });
+    if (unfilteredResults?.length) {
+      candidates = unfilteredResults as CandidateRow[];
     }
   }
 
