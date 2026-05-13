@@ -8,11 +8,11 @@
  * Other tab types fall back to the legacy /icons/<name>.svg set.
  */
 const LABEL_ICONS: Record<string, string> = {
+  // Hebrew labels (existing accounts)
   'צ׳אט': 'nav/comment',
   'גלו': 'nav/screen-play',
   'ForYou': 'nav/screen-play',
   'שירותים': 'nav/bonus-alt',
-  // legacy fallbacks
   'טיפוח': 'tipuach',
   'לוקים': 'lookim',
   'מתכונים': 'matkonim',
@@ -27,9 +27,25 @@ const LABEL_ICONS: Record<string, string> = {
   'מוצרים': 'mozarim',
   'בעיה במוצר': 'baaya',
   'בעיה בהזמנה': 'baaya_motzar',
+  // English labels (IMAI and future int'l accounts)
+  'Chat': 'nav/comment',
+  'Discover': 'nav/screen-play',
+  'Platform': 'nav/bonus-alt',
+  'Customers': 'mozarim',
+  'Demo': 'baaya',
+  'Features': 'nav/bonus-alt',
+  'Products': 'mozarim',
+  'Services': 'nav/bonus-alt',
+  'Promos': 'coupons',
+  'Offers': 'mivzaim',
+  'Deals': 'mivzaim',
+  'Perks': 'mivzaim',
+  'Get support': 'baaya',
+  'Reviews': 'skirot',
+  'Tips & picks': 'hamlazot',
 };
 
-/* ── Icon mapping by tab id (fallback) ── */
+/* ── Icon mapping by tab id (fallback) — language-agnostic ── */
 const TAB_ICONS: Record<string, string> = {
   chat: 'nav/comment',
   discover: 'nav/screen-play',
@@ -38,6 +54,9 @@ const TAB_ICONS: Record<string, string> = {
   content_feed: 'ham',
   coupons: 'coupons',
   support: 'baaya',
+  platform: 'nav/bonus-alt',
+  customers: 'mozarim',
+  demo: 'baaya',
 };
 
 function getTabIconName(tab: TabItem): string {

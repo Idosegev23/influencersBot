@@ -120,6 +120,9 @@ export type AnalyticsEventName =
   | 'widget_message_sent'
   | 'widget_message_received'
   | 'widget_lead_submitted'
+  // B2B SaaS tabs (Platform / Customers / Demo for accounts like IMAI)
+  | 'platform_workspace_clicked'
+  | 'demo_request_submit'
   // Errors & perf
   | 'js_error'
   | 'unhandled_promise_rejection'

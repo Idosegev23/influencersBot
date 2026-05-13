@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { getAccountByUsername } from '@/lib/supabase';
+import { dirForLang } from '@/lib/i18n/chat-ui';
 
 interface Props {
   params: Promise<{ username: string }>;
@@ -110,6 +111,29 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default function ChatLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+export default async function ChatLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ username: string }>;
+}) {
+  const { username } = await params;
+  let lang = 'he';
+  try {
+    const account = await getAccountByUsername(username);
+    lang = (account as any)?.language || (account?.config as any)?.language || 'he';
+  } catch {
+    // ignore — falls through to Hebrew default
+  }
+  const dir = dirForLang(lang);
+  // The root <html> is locked to he/rtl (marketing site default). We override
+  // for the chat subtree so English accounts (IMAI) render LTR with English
+  // form controls. `lang` here is informational for screen readers and CSS
+  // pseudo-classes; `dir` is what actually drives layout.
+  return (
+    <div lang={lang} dir={dir} style={{ direction: dir }}>
+      {children}
+    </div>
+  );
 }

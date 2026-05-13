@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { CheckCircle2, Circle, ArrowRight } from 'lucide-react';
+import { getChatUiStrings } from '@/lib/i18n/chat-ui';
 
 export interface ProgressData {
   current: number;
@@ -10,9 +11,12 @@ export interface ProgressData {
   steps?: string[];
 }
 
-interface InlineProgressProps extends ProgressData {}
+interface InlineProgressProps extends ProgressData {
+  language?: string;
+}
 
-export function InlineProgress({ current, total, label, steps }: InlineProgressProps) {
+export function InlineProgress({ current, total, label, steps, language }: InlineProgressProps) {
+  const ui = getChatUiStrings(language);
   const percentage = Math.min(100, Math.round((current / total) * 100));
 
   return (
@@ -20,7 +24,7 @@ export function InlineProgress({ current, total, label, steps }: InlineProgressP
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <span className="text-sm font-medium text-gray-700">
-          {label || 'מתקדמים...'}
+          {label || ui.loading.working}
         </span>
         <span className="text-xs font-mono text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
           {current}/{total}

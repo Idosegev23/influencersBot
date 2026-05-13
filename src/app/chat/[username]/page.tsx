@@ -37,6 +37,9 @@ const ContentFeedTab = dynamic(() => import('@/components/chat/content-feed/Cont
 const ProductsCatalogTab = dynamic(() => import('@/components/chat/ProductsCatalogTab'), { ssr: false });
 const BrandSupportTab = dynamic(() => import('@/components/chat/BrandSupportTab'), { ssr: false });
 const ServicesCatalogTab = dynamic(() => import('@/components/chat/ServicesCatalogTab'), { ssr: false });
+const PlatformTab = dynamic(() => import('@/components/chat/PlatformTab'), { ssr: false });
+const CustomersTab = dynamic(() => import('@/components/chat/CustomersTab'), { ssr: false });
+const DemoTab = dynamic(() => import('@/components/chat/DemoTab'), { ssr: false });
 import { applyTheme, getGoogleFontsUrl } from '@/lib/theme';
 import { getProxiedImageUrl } from '@/lib/image-utils';
 import { BrandCards } from '@/components/chat/BrandCards';
@@ -147,6 +150,16 @@ const DEFAULT_TABS: { id: string; label: string; type: string; topic?: string }[
   { id: 'coupons', label: 'קופונים', type: 'coupons' },
   { id: 'support', label: 'בעיה בהזמנה', type: 'support' },
 ];
+
+const DEFAULT_TABS_EN: { id: string; label: string; type: string; topic?: string }[] = [
+  { id: 'chat', label: 'Chat', type: 'chat' },
+  { id: 'discover', label: 'Discover', type: 'discover' },
+  { id: 'support', label: 'Get support', type: 'support' },
+];
+
+function defaultTabsForLang(lang: string | null | undefined) {
+  return (lang || 'he').toLowerCase() === 'en' ? DEFAULT_TABS_EN : DEFAULT_TABS;
+}
 
 // User-visible strings on the chat surface. The chat page itself is mostly
 // Hebrew-skinned; this helper covers the strings that surface as error/edge-case
@@ -722,7 +735,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   // Each tab needs distinct meta so Google won't merge them under one canonical.
   useEffect(() => {
     if (!influencer?.display_name) return;
-    const tabs = (influencer as any).tabs || DEFAULT_TABS;
+    const tabs = (influencer as any).tabs || defaultTabsForLang((influencer as any).language);
     const tabLabel = tabs.find((t: { id: string }) => t.id === activeTab)?.label || 'צ׳אט';
     const accountName = influencer.display_name;
     document.title = `${tabLabel} · ${accountName}`;
@@ -1053,9 +1066,14 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       }
     }
 
-    // Other accounts: regular LeadCapturePopup at 4+ messages
+    // Other accounts: regular LeadCapturePopup at 4+ messages.
+    // Skip entirely for English / international accounts — the popup copy is
+    // Hebrew-only and the qualification flow assumes Israeli market context.
+    // B2B SaaS accounts (IMAI etc.) have their own Demo tab for capture.
+    const accountLang = (influencer as any)?.language || 'he';
     if (
       username !== 'ldrs_group' &&
+      accountLang !== 'en' &&
       userMsgCountRef.current >= 4 &&
       !leadInfo &&
       !showLeadPopup
@@ -1465,10 +1483,10 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 <NavTabs
                   tabs={
                     isConferenceMode && username === 'ldrs_group'
-                      ? (influencer.tabs || DEFAULT_TABS).map((t: any) =>
+                      ? (influencer.tabs || defaultTabsForLang((influencer as any).language)).map((t: any) =>
                           t.id === 'discover' ? { ...t, label: 'ForYou' } : t
                         )
-                      : influencer.tabs || DEFAULT_TABS
+                      : influencer.tabs || defaultTabsForLang((influencer as any).language)
                   }
                   activeTab={activeTab}
                   onTabChange={(id) => {
@@ -1544,6 +1562,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           username={username}
                           showDisclaimer={hasCommercialContent}
                           inputRef={inputRef}
+                          language={(influencer as any).language || 'he'}
                         />
 
                         {/* Persistent quick CTAs (empty state) */}
@@ -1612,7 +1631,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           }}
                           disabled={isTyping || isStreamActive}
                           extraPill={
-                            (influencer.tabs || DEFAULT_TABS).some((t: { id: string }) => t.id === 'discover')
+                            (influencer.tabs || defaultTabsForLang((influencer as any).language)).some((t: { id: string }) => t.id === 'discover')
                               ? { label: 'גלו עוד', onClick: () => setActiveTab('discover') }
                               : undefined
                           }
@@ -2046,6 +2065,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                       username={username}
                       showDisclaimer={hasCommercialContent}
                       inputRef={inputRef}
+                      language={(influencer as any).language || 'he'}
                     />
 
                     {/* Persistent quick CTAs for accounts with structured support
@@ -2602,7 +2622,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 <TopicQuestionsTab
                   key="topics"
                   username={username}
-                  tabLabel={(influencer.tabs || DEFAULT_TABS).find((t: { id: string }) => t.id === 'topics')?.label || 'תוכן'}
+                  tabLabel={(influencer.tabs || defaultTabsForLang((influencer as any).language)).find((t: { id: string }) => t.id === 'topics')?.label || 'תוכן'}
                   onAskAbout={(question: string) => {
                     setActiveTab('chat');
                     maybeShowLeadPopup();
@@ -2628,7 +2648,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 key="content_feed"
                 username={username}
                 influencerType={(influencer.influencer_type as InfluencerType) || 'other'}
-                tabLabel={(influencer.tabs || DEFAULT_TABS).find((t: { id: string }) => t.id === 'content_feed')?.label || 'תוכן'}
+                tabLabel={(influencer.tabs || defaultTabsForLang((influencer as any).language)).find((t: { id: string }) => t.id === 'content_feed')?.label || 'תוכן'}
                 influencerName={influencer.display_name}
                 influencerAvatar={influencer.avatar_url}
                 onAskAbout={(question: string, chunkId?: string, hiddenContext?: string) => {
@@ -2656,6 +2676,57 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   });
                 }}
               />
+            ) : activeTab === 'platform' ? (
+              <PlatformTab
+                key="platform"
+                workspaces={((influencer as any)?._rawConfig?.platform_workspaces || []) as any}
+                brandColor={(influencer.theme as any)?.colors?.primary || '#0c1013'}
+                language={(influencer as any).language || 'he'}
+                onAskAbout={(question: string) => {
+                  setActiveTab('chat');
+                  const userMsg = { id: Date.now().toString(), role: 'user' as const, content: question };
+                  setMessages(prev => [...prev, userMsg]);
+                  const assistantMessageId = (Date.now() + 1).toString();
+                  setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant', content: '' }]);
+                  setIsTyping(true);
+                  sendStreamMessage({
+                    message: question,
+                    username,
+                    sessionId: sessionId || undefined,
+                    previousResponseId: responseId || undefined,
+                    clientMessageId: assistantMessageId,
+                  });
+                }}
+              />
+            ) : activeTab === 'customers' ? (
+              <CustomersTab
+                key="customers"
+                caseStudies={((influencer as any)?._rawConfig?.case_studies || []) as any}
+                brandColor={(influencer.theme as any)?.colors?.primary || '#0c1013'}
+                language={(influencer as any).language || 'he'}
+                onAskAbout={(question: string) => {
+                  setActiveTab('chat');
+                  const userMsg = { id: Date.now().toString(), role: 'user' as const, content: question };
+                  setMessages(prev => [...prev, userMsg]);
+                  const assistantMessageId = (Date.now() + 1).toString();
+                  setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant', content: '' }]);
+                  setIsTyping(true);
+                  sendStreamMessage({
+                    message: question,
+                    username,
+                    sessionId: sessionId || undefined,
+                    previousResponseId: responseId || undefined,
+                    clientMessageId: assistantMessageId,
+                  });
+                }}
+              />
+            ) : activeTab === 'demo' ? (
+              <DemoTab
+                key="demo"
+                accountId={influencer.id}
+                brandColor={(influencer.theme as any)?.colors?.primary || '#0c1013'}
+                language={(influencer as any).language || 'he'}
+              />
             ) : null}
           </AnimatePresence>
         </div>
@@ -2666,10 +2737,10 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
             <NavTabs
               tabs={
                 isConferenceMode && username === 'ldrs_group'
-                  ? (influencer.tabs || DEFAULT_TABS).map((t: any) =>
+                  ? (influencer.tabs || defaultTabsForLang((influencer as any).language)).map((t: any) =>
                       t.id === 'discover' ? { ...t, label: 'ForYou' } : t
                     )
-                  : influencer.tabs || DEFAULT_TABS
+                  : influencer.tabs || defaultTabsForLang((influencer as any).language)
               }
               activeTab={activeTab}
               onTabChange={(id) => setActiveTab(id as TabId)}

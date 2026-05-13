@@ -3,6 +3,7 @@
 import { useRef, useState, useCallback } from 'react';
 import { MediaAttachButton } from './MediaAttachButton';
 import { MediaPreview } from './MediaPreview';
+import { getChatUiStrings, dirForLang } from '@/lib/i18n/chat-ui';
 
 interface ChatInputProps {
   value: string;
@@ -10,6 +11,10 @@ interface ChatInputProps {
   onSend: () => void;
   disabled?: boolean;
   placeholder?: string;
+  /** Account language ('he'/'en'). Drives placeholder + send aria-label +
+   *  disclaimer copy + textarea direction. Defaults to 'he' so existing
+   *  callers that don't pass this stay byte-identical. */
+  language?: string;
   /** Media handling */
   media?: {
     previewUrl: string | null;
@@ -31,12 +36,16 @@ export function ChatInput({
   onChange,
   onSend,
   disabled = false,
-  placeholder = 'משהו שבא לך לשאול?',
+  placeholder,
+  language,
   media,
   username,
   showDisclaimer = false,
   inputRef: externalRef,
 }: ChatInputProps) {
+  const ui = getChatUiStrings(language);
+  const dir = dirForLang(language);
+  const effectivePlaceholder = placeholder || ui.input.placeholder;
   const internalRef = useRef<HTMLTextAreaElement>(null);
   const textareaRef = externalRef || internalRef;
   const [isFocused, setIsFocused] = useState(false);
@@ -86,7 +95,7 @@ export function ChatInput({
           onClick={onSend}
           disabled={!canSend}
           className="send-btn"
-          aria-label="שלח הודעה"
+          aria-label={ui.input.send}
         >
           <span className="send-btn-icon" aria-hidden />
         </button>
@@ -100,10 +109,10 @@ export function ChatInput({
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           onInput={handleInput}
-          placeholder={placeholder}
+          placeholder={effectivePlaceholder}
           disabled={disabled}
           rows={1}
-          dir="rtl"
+          dir={dir}
         />
 
         {/* Media attach button (right side in RTL) */}
@@ -117,8 +126,8 @@ export function ChatInput({
 
       {/* Commercial content disclaimer */}
       {showDisclaimer && (
-        <p className="chat-input-disclaimer" dir="rtl">
-          העמוד עשוי לכלול תוכן שיווקי ושיתופי פעולה מסחריים
+        <p className="chat-input-disclaimer" dir={dir}>
+          {ui.input.disclaimer}
         </p>
       )}
     </div>

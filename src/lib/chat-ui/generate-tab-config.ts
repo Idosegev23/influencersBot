@@ -19,7 +19,7 @@ import { createClient } from '@/lib/supabase/server';
 interface TabConfig {
   id: string;
   label: string;
-  type: 'chat' | 'discover' | 'topics' | 'coupons' | 'support' | 'content_feed';
+  type: 'chat' | 'discover' | 'topics' | 'coupons' | 'support' | 'content_feed' | 'platform' | 'customers' | 'demo';
   topic?: string; // RAG topic filter for topics-type tabs
 }
 
@@ -76,7 +76,9 @@ const STATIC_LABELS = {
   // b2b_saas-specific
   features: L('יכולות', 'Features'),
   pricing: L('תמחור', 'Pricing'),
-  demo: L('דמו', 'Get demo'),
+  demo: L('דמו', 'Demo'),
+  platform: L('פלטפורמה', 'Platform'),
+  customers: L('לקוחות', 'Customers'),
 };
 
 // Support tab — only for influencer, brand, local_business, b2b_saas.
@@ -288,11 +290,31 @@ export async function generateTabConfig(accountId: string): Promise<TabGeneratio
   } else if (archetype === 'tech_creator') {
     tabs.push({ id: 'topics', label: STATIC_LABELS.reviews[lang], type: 'topics' });
   } else if (archetype === 'b2b_saas') {
-    // B2B SaaS: features tab (workspaces, modules, integrations).
-    // "Pricing" and "Demo" are intentionally NOT separate tabs — the chatbot
-    // handles those conversationally, and surfacing them as standalone tabs
-    // would compete with the visitor's reason to chat in the first place.
-    tabs.push({ id: 'topics', label: STATIC_LABELS.features[lang], type: 'topics' });
+    // B2B SaaS layout is a deliberate departure from the retail "Discover" /
+    // "Products" pattern. Three dedicated tab types because the content has
+    // structurally different shapes:
+    //   • Platform → 6 product workspaces (tiles fed by accounts.config.platform_workspaces)
+    //   • Customers → named case studies (tiles fed by accounts.config.case_studies)
+    //   • Demo → qualifying form that lands in support_requests with source='demo_request'
+    tabs.push({ id: 'platform', label: STATIC_LABELS.platform[lang], type: 'platform' });
+    tabs.push({ id: 'customers', label: STATIC_LABELS.customers[lang], type: 'customers' });
+    tabs.push({ id: 'demo', label: STATIC_LABELS.demo[lang], type: 'demo' });
+    // b2b_saas does NOT use the Hebrew "discover" content surface — return now
+    // so we don't fall through to the support / coupons branches below.
+    const subtitle = resolveLabel(SUBTITLE_TEMPLATES, lang, archetype, influencerType);
+    const header = resolveLabel(HEADER_LABELS, lang, archetype, influencerType);
+    const greet = generateGreeting(displayName, archetype, lang);
+    const tabsForB2B = tabs.filter((t) => t.id !== 'discover');
+    const next = {
+      ...config,
+      tabs: tabsForB2B,
+      chat_subtitle: subtitle,
+      header_label: header,
+      greeting_message: greet,
+    };
+    const { error: e2 } = await supabase.from('accounts').update({ config: next }).eq('id', accountId);
+    if (e2) throw new Error(`Failed to save config: ${e2.message}`);
+    return { tabs: tabsForB2B, chat_subtitle: subtitle, header_label: header, greeting_message: greet };
   }
   // media_news: NO separate content tab — updates live under גלו
 

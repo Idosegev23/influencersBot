@@ -301,7 +301,9 @@ export async function POST(req: NextRequest) {
           // Still processing
           controller.enqueue(encodeEvent({
             type: 'error',
-            message: 'הבקשה בעיבוד, נסה שוב בעוד רגע',
+            message: (influencer as any).language === 'en'
+              ? 'Your request is still processing. Please try again in a moment.'
+              : 'הבקשה בעיבוד, נסה שוב בעוד רגע',
             code: 'PENDING',
           }));
           controller.close();
