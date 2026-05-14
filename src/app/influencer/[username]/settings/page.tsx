@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { getInfluencerByUsername } from '@/lib/supabase';
 import type { Influencer } from '@/types';
+import { useDashboardLang } from '@/hooks/useDashboardLang';
+import { getDashboardStrings, dashboardDir } from '@/lib/i18n/dashboard';
 
 export default function SettingsPage({
   params,
@@ -23,6 +25,9 @@ export default function SettingsPage({
 }) {
   const resolvedParams = use(params);
   const username = resolvedParams.username;
+  const { lang } = useDashboardLang(username);
+  const t = getDashboardStrings(lang).settings;
+  const isEn = lang === 'en';
   const router = useRouter();
 
   const [influencer, setInfluencer] = useState<Influencer | null>(null);
@@ -195,13 +200,13 @@ export default function SettingsPage({
   if (!influencer) return null;
 
   return (
-    <div className="min-h-screen" dir="rtl" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
+    <div className="min-h-screen" dir={dashboardDir(lang)} style={{ background: 'transparent', color: 'var(--dash-text)' }}>
       <main className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-xl font-bold flex items-center gap-2">
             <Settings className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
-            הגדרות צ׳אט
+            {t.sectionChat}
           </h1>
           <button
             onClick={handleRegenerate}
@@ -214,14 +219,13 @@ export default function SettingsPage({
             ) : (
               <Sparkles className="w-4 h-4" />
             )}
-            {regenerating ? 'יוצר...' : 'צור הכל מחדש'}
+            {regenerating ? (isEn ? 'Generating…' : 'יוצר...') : (isEn ? 'Regenerate all' : 'צור הכל מחדש')}
           </button>
         </div>
 
         <p className="text-sm" style={{ color: 'var(--dash-text-3)' }}>
-          כאן תוכל/י לערוך את ההודעה הראשונה שהעוקבים רואים כשנכנסים לצ׳אט, ואת השאלות המוצעות.
-          <br />
-          טיפ: שימי הודעה על מבצע, השקה חדשה, או כל דבר שרלוונטי עכשיו!
+          {t.sectionChatHelp}
+          {!isEn && <><br />טיפ: שימי הודעה על מבצע, השקה חדשה, או כל דבר שרלוונטי עכשיו!</>}
         </p>
 
         {/* ──── Greeting Message ──── */}
@@ -229,12 +233,12 @@ export default function SettingsPage({
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold flex items-center gap-2">
               <MessageSquare className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
-              הודעת פתיחה
+              {t.labelGreeting}
             </h2>
           </div>
 
           <p className="text-sm mb-3" style={{ color: 'var(--dash-text-3)' }}>
-            ההודעה הראשונה שמופיעה כשפותחים את הצ׳אט
+            {t.greetingHelp}
           </p>
 
           <textarea
