@@ -35,17 +35,60 @@ import {
   Flame,
 } from 'lucide-react';
 
-const contentTypeLabels: Record<string, { label: string; icon: any; color: string }> = {
-  recipe: { label: 'מתכון', icon: ChefHat, color: 'text-orange-400' },
-  look: { label: 'לוק', icon: Shirt, color: 'text-pink-400' },
-  tip: { label: 'טיפ', icon: Lightbulb, color: 'text-yellow-400' },
-  workout: { label: 'אימון', icon: Dumbbell, color: 'text-green-400' },
-  review: { label: 'ביקורת', icon: Star, color: 'text-purple-400' },
-  tutorial: { label: 'מדריך', icon: FileText, color: 'text-blue-400' },
+const contentTypeLabels: Record<string, { label: string; labelEn: string; icon: any; color: string }> = {
+  recipe: { label: 'מתכון', labelEn: 'Recipe', icon: ChefHat, color: 'text-orange-400' },
+  look: { label: 'לוק', labelEn: 'Look', icon: Shirt, color: 'text-pink-400' },
+  tip: { label: 'טיפ', labelEn: 'Tip', icon: Lightbulb, color: 'text-yellow-400' },
+  workout: { label: 'אימון', labelEn: 'Workout', icon: Dumbbell, color: 'text-green-400' },
+  review: { label: 'ביקורת', labelEn: 'Review', icon: Star, color: 'text-purple-400' },
+  tutorial: { label: 'מדריך', labelEn: 'Tutorial', icon: FileText, color: 'text-blue-400' },
 };
 
-// ─── Archetype-specific tab config ───
-const ARCHETYPE_TABS: Record<string, { id: string; label: string; icon: any }[]> = {
+// ─── Archetype-specific tab config (per language) ───
+type TabSpec = { id: string; label: string; icon: any };
+const buildArchetypeTabs = (isEn: boolean): Record<string, TabSpec[]> => isEn ? {
+  influencer: [
+    { id: 'coupons', label: 'Promotions', icon: Tag },
+    { id: 'brands', label: 'Partnerships', icon: Store },
+    { id: 'content', label: 'Content', icon: FileText },
+    { id: 'settings', label: 'Chat settings', icon: Settings },
+  ],
+  brand: [
+    { id: 'coupons', label: 'Offers & promos', icon: Tag },
+    { id: 'products', label: 'Products', icon: Package },
+    { id: 'content', label: 'Content', icon: FileText },
+    { id: 'settings', label: 'Chat settings', icon: Settings },
+  ],
+  service_provider: [
+    { id: 'brands', label: 'Clients', icon: Users },
+    { id: 'content', label: 'Content', icon: FileText },
+    { id: 'settings', label: 'Chat settings', icon: Settings },
+  ],
+  government_ministry: [
+    { id: 'content', label: 'Content & publications', icon: FileText },
+    { id: 'settings', label: 'Chat settings', icon: Settings },
+  ],
+  media_news: [
+    { id: 'content', label: 'Content', icon: FileText },
+    { id: 'settings', label: 'Chat settings', icon: Settings },
+  ],
+  local_business: [
+    { id: 'coupons', label: 'Perks & promos', icon: Tag },
+    { id: 'products', label: 'Products', icon: Package },
+    { id: 'content', label: 'Content', icon: FileText },
+    { id: 'settings', label: 'Chat settings', icon: Settings },
+  ],
+  tech_creator: [
+    { id: 'coupons', label: 'Deals & promos', icon: Tag },
+    { id: 'content', label: 'Content', icon: FileText },
+    { id: 'settings', label: 'Chat settings', icon: Settings },
+  ],
+  b2b_saas: [
+    { id: 'products', label: 'Products', icon: Package },
+    { id: 'content', label: 'Content', icon: FileText },
+    { id: 'settings', label: 'Chat settings', icon: Settings },
+  ],
+} : {
   influencer: [
     { id: 'coupons', label: 'קופונים', icon: Tag },
     { id: 'brands', label: 'שיתופי פעולה', icon: Store },
@@ -84,7 +127,16 @@ const ARCHETYPE_TABS: Record<string, { id: string; label: string; icon: any }[]>
   ],
 };
 
-const ARCHETYPE_LABELS: Record<string, { brandsTitle: string; brandsEmpty: string; couponsTitle: string }> = {
+const buildArchetypeLabels = (isEn: boolean): Record<string, { brandsTitle: string; brandsEmpty: string; couponsTitle: string }> => isEn ? {
+  influencer: { brandsTitle: 'Partnerships', brandsEmpty: 'No partnerships yet', couponsTitle: 'Promotions' },
+  brand: { brandsTitle: 'Partners', brandsEmpty: 'No partners yet', couponsTitle: 'Offers & promos' },
+  service_provider: { brandsTitle: 'Clients', brandsEmpty: 'No clients yet', couponsTitle: 'Promotions' },
+  government_ministry: { brandsTitle: 'Units', brandsEmpty: 'No units yet', couponsTitle: '—' },
+  media_news: { brandsTitle: 'Partners', brandsEmpty: 'No partners yet', couponsTitle: 'Promotions' },
+  local_business: { brandsTitle: 'Partners', brandsEmpty: 'No partners yet', couponsTitle: 'Perks & promos' },
+  tech_creator: { brandsTitle: 'Partners', brandsEmpty: 'No partners yet', couponsTitle: 'Deals & promos' },
+  b2b_saas: { brandsTitle: 'Customers', brandsEmpty: 'No customers yet', couponsTitle: '—' },
+} : {
   influencer: { brandsTitle: 'שיתופי פעולה', brandsEmpty: 'אין שיתופי פעולה עדיין', couponsTitle: 'קופונים' },
   brand: { brandsTitle: 'שותפים', brandsEmpty: 'אין שותפים עדיין', couponsTitle: 'מבצעים וקופונים' },
   service_provider: { brandsTitle: 'לקוחות', brandsEmpty: 'אין לקוחות עדיין', couponsTitle: 'קופונים' },
@@ -161,8 +213,10 @@ export default function ManagePage({
       const arch = acct.archetype || 'influencer';
       setArchetype(arch);
 
-      // Set default tab based on archetype
-      const tabs = ARCHETYPE_TABS[arch] || ARCHETYPE_TABS.influencer;
+      // Set default tab based on archetype (HE bundle is fine here — only
+      // used to pick the FIRST tab id, label not shown).
+      const defaultTabs = buildArchetypeTabs(false);
+      const tabs = defaultTabs[arch] || defaultTabs.influencer;
       setActiveTab(tabs[0].id as TabType);
 
       // Load coupons (direct, not partnership-scoped)
@@ -319,12 +373,12 @@ export default function ManagePage({
         }),
       });
       if (res.ok) {
-        alert('הגדרות נשמרו!');
+        alert(isEn ? 'Settings saved!' : 'הגדרות נשמרו!');
       } else {
-        alert('שגיאה בשמירה');
+        alert(isEn ? 'Save failed' : 'שגיאה בשמירה');
       }
     } catch {
-      alert('שגיאה בשמירה');
+      alert(isEn ? 'Save failed' : 'שגיאה בשמירה');
     } finally {
       setSaving(false);
     }
@@ -384,10 +438,12 @@ export default function ManagePage({
     (c.title || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // ─── Resolve tabs ───
+  // ─── Resolve tabs (language-aware) ───
 
-  const tabs = ARCHETYPE_TABS[archetype] || ARCHETYPE_TABS.influencer;
-  const labels = ARCHETYPE_LABELS[archetype] || ARCHETYPE_LABELS.influencer;
+  const archetypeTabs = buildArchetypeTabs(isEn);
+  const archetypeLabels = buildArchetypeLabels(isEn);
+  const tabs = archetypeTabs[archetype] || archetypeTabs.influencer;
+  const labels = archetypeLabels[archetype] || archetypeLabels.influencer;
 
   const inputStyle = {
     background: 'rgba(255,255,255,0.03)',
@@ -416,7 +472,7 @@ export default function ManagePage({
     <div className="rounded-xl border p-3 sm:p-4 space-y-3" style={cardStyle}>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-2)' }}>קוד קופון</label>
+          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Promo code' : 'קוד קופון'}</label>
           <input
             type="text"
             value={couponForm.code || ''}
@@ -428,45 +484,45 @@ export default function ManagePage({
           />
         </div>
         <div>
-          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-2)' }}>מותג</label>
+          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Brand' : 'מותג'}</label>
           <input
             type="text"
             value={couponForm.brand_name || ''}
             onChange={e => setCouponForm(f => ({ ...f, brand_name: e.target.value }))}
             className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             style={inputStyle}
-            placeholder="שם המותג"
+            placeholder={isEn ? 'Brand name' : 'שם המותג'}
           />
         </div>
       </div>
 
       <div>
-        <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-2)' }}>תיאור ההנחה</label>
+        <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Discount description' : 'תיאור ההנחה'}</label>
         <input
           type="text"
           value={couponForm.description || ''}
           onChange={e => setCouponForm(f => ({ ...f, description: e.target.value }))}
           className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           style={inputStyle}
-          placeholder="לדוגמא: 20% הנחה על כל המוצרים"
+          placeholder={isEn ? 'e.g. 20% off all products' : 'לדוגמא: 20% הנחה על כל המוצרים'}
         />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-2)' }}>סוג הנחה</label>
+          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Discount type' : 'סוג הנחה'}</label>
           <select
             value={couponForm.discount_type || 'percentage'}
             onChange={e => setCouponForm(f => ({ ...f, discount_type: e.target.value }))}
             className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             style={inputStyle}
           >
-            <option value="percentage">אחוז (%)</option>
-            <option value="fixed">סכום קבוע (₪)</option>
+            <option value="percentage">{isEn ? 'Percentage (%)' : 'אחוז (%)'}</option>
+            <option value="fixed">{isEn ? 'Fixed amount ($)' : 'סכום קבוע (₪)'}</option>
           </select>
         </div>
         <div>
-          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-2)' }}>ערך הנחה</label>
+          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Discount value' : 'ערך הנחה'}</label>
           <input
             type="number"
             value={couponForm.discount_value || ''}
@@ -486,7 +542,7 @@ export default function ManagePage({
           className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm btn-primary disabled:opacity-50"
         >
           {savingCoupon ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-          שמור
+          {isEn ? 'Save' : 'שמור'}
         </button>
         <button
           onClick={onCancel}
@@ -494,14 +550,14 @@ export default function ManagePage({
           style={{ color: 'var(--dash-text-2)' }}
         >
           <X className="w-3.5 h-3.5" />
-          ביטול
+          {isEn ? 'Cancel' : 'ביטול'}
         </button>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen" dir="rtl" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
+    <div className="min-h-screen" dir={isEn ? 'ltr' : 'rtl'} style={{ background: 'transparent', color: 'var(--dash-text)', direction: isEn ? 'ltr' : 'rtl' }}>
       <main className="relative z-10 max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
         {/* Dynamic Tabs */}
         <div className="flex gap-2 mb-4 sm:mb-6 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
@@ -536,7 +592,7 @@ export default function ManagePage({
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="חיפוש..."
+              placeholder={isEn ? 'Search…' : 'חיפוש...'}
               className="w-full pr-10 pl-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
               style={inputStyle}
             />
@@ -569,8 +625,8 @@ export default function ManagePage({
             {filteredCoupons.length === 0 && !showAddCoupon ? (
               <div className="text-center py-16 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
                 <Tag className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--dash-text-3)' }} />
-                <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--dash-text)' }}>אין קופונים עדיין</h3>
-                <p className="mb-6" style={{ color: 'var(--dash-text-2)' }}>הוסיפו קופונים שהבוט יציג לעוקבים</p>
+                <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--dash-text)' }}>{isEn ? 'No promotions yet' : 'אין קופונים עדיין'}</h3>
+                <p className="mb-6" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Add promotions for the bot to share with visitors.' : 'הוסיפו קופונים שהבוט יציג לעוקבים'}</p>
               </div>
             ) : (
               <div className="space-y-3 mt-4">
@@ -789,8 +845,8 @@ export default function ManagePage({
             {filteredProducts.length === 0 ? (
               <div className="text-center py-20 rounded-2xl" style={{ background: 'rgba(255,255,255,0.02)' }}>
                 <Package className="w-20 h-20 mx-auto mb-4" style={{ color: 'var(--dash-text-3)', opacity: 0.4 }} />
-                <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--dash-text)' }}>אין מוצרים עדיין</h3>
-                <p style={{ color: 'var(--dash-text-2)' }}>הוסיפו מוצרים או הריצו סריקת מוצרים מהאתר</p>
+                <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--dash-text)' }}>{isEn ? 'No products yet' : 'אין מוצרים עדיין'}</h3>
+                <p style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Add products manually or run a product scan of the site.' : 'הוסיפו מוצרים או הריצו סריקת מוצרים מהאתר'}</p>
               </div>
             ) : (
               /* Group by product_line, then render sections */
@@ -1030,8 +1086,8 @@ export default function ManagePage({
             {filteredContent.length === 0 ? (
               <div className="text-center py-16 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
                 <FileText className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--dash-text-3)' }} />
-                <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--dash-text)' }}>אין תוכן עדיין</h3>
-                <p style={{ color: 'var(--dash-text-2)' }}>התוכן נסרק אוטומטית מהפוסטים שלך באינסטגרם</p>
+                <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--dash-text)' }}>{isEn ? 'No content yet' : 'אין תוכן עדיין'}</h3>
+                <p style={{ color: 'var(--dash-text-2)' }}>{isEn ? "Content is scraped automatically from your Instagram posts." : 'התוכן נסרק אוטומטית מהפוסטים שלך באינסטגרם'}</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1080,7 +1136,7 @@ export default function ManagePage({
                   onChange={e => setGreetingMessage(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   rows={4}
-                  placeholder="היי! אני הבוט של..."
+                  placeholder={isEn ? "Hi! I'm the bot for…" : 'היי! אני הבוט של...'}
                   style={inputStyle}
                 />
               </div>
@@ -1123,7 +1179,7 @@ export default function ManagePage({
                     </div>
                   ))}
                   {suggestedQuestions.length === 0 && (
-                    <p className="text-sm text-center py-4" style={{ color: 'var(--dash-text-2)' }}>אין שאלות מוצעות</p>
+                    <p className="text-sm text-center py-4" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'No suggested questions yet' : 'אין שאלות מוצעות'}</p>
                   )}
                 </div>
               </div>
@@ -1136,7 +1192,7 @@ export default function ManagePage({
                 {saving ? (
                   <><Loader2 className="w-5 h-5 animate-spin" />שומר...</>
                 ) : (
-                  <><Save className="w-5 h-5" />שמור הגדרות</>
+                  <><Save className="w-5 h-5" />{isEn ? 'Save settings' : 'שמור הגדרות'}</>
                 )}
               </button>
             </div>
