@@ -32,7 +32,10 @@ const LABEL_ICONS: Record<string, string> = {
   'Discover': 'nav/screen-play',
   'Platform': 'nav/bonus-alt',
   'Customers': 'mozarim',
-  'Demo': 'baaya',
+  // "Play a demo" semantics — the screen-with-play-button icon. Only
+  // appears for b2b_saas accounts (no clash with Discover, which uses
+  // the same icon but never coexists with Demo in one nav).
+  'Demo': 'nav/screen-play',
   'Features': 'nav/bonus-alt',
   'Products': 'mozarim',
   'Services': 'nav/bonus-alt',
@@ -56,7 +59,7 @@ const TAB_ICONS: Record<string, string> = {
   support: 'baaya',
   platform: 'nav/bonus-alt',
   customers: 'mozarim',
-  demo: 'baaya',
+  demo: 'nav/screen-play',
 };
 
 function getTabIconName(tab: TabItem): string {

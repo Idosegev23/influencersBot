@@ -152,18 +152,20 @@ export default function SupportTab({ accountId, brandColor = '#0c1013', language
 
   if (success) {
     return (
-      <div className="px-4 py-10 flex flex-col items-center text-center" style={{ direction: dir }}>
-        <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.3 }}
-          className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
-          style={{ background: `${brandColor}14`, color: brandColor }}
-        >
-          <CheckCircle2 className="w-8 h-8" />
-        </motion.div>
-        <h2 className="text-xl font-bold text-gray-900">{t.success}</h2>
-        <p className="text-sm text-gray-600 mt-2 max-w-sm">{t.successSub}</p>
+      <div className="px-4 py-10" style={{ direction: dir }}>
+        <div className="mx-auto max-w-[700px] flex flex-col items-center text-center">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.3 }}
+            className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
+            style={{ background: `${brandColor}14`, color: brandColor }}
+          >
+            <CheckCircle2 className="w-8 h-8" />
+          </motion.div>
+          <h2 className="text-xl font-bold text-gray-900">{t.success}</h2>
+          <p className="text-sm text-gray-600 mt-2 max-w-sm">{t.successSub}</p>
+        </div>
       </div>
     );
   }
@@ -172,31 +174,34 @@ export default function SupportTab({ accountId, brandColor = '#0c1013', language
   if (step === 'type') {
     return (
       <div className="px-4 py-6" style={{ direction: dir }}>
-        <div className="mb-4 px-3">
-          <h2 className="support-title">{t.headingType}</h2>
-          <p className="support-subtitle">{t.subheadingType}</p>
-        </div>
+        {/* 700px desktop container — matches coupons / support tabs */}
+        <div className="mx-auto max-w-[700px]">
+          <div className="mb-4 px-3">
+            <h2 className="support-title">{t.headingType}</h2>
+            <p className="support-subtitle">{t.subheadingType}</p>
+          </div>
 
-        <div className="flex flex-col gap-2">
-          {issues.map(({ id, label, subtitle, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => { setIssueType(id); setStep('form'); }}
-              className="support-card"
-            >
-              <div
-                className="support-card-icon-avatar"
-                style={{ background: `${brandColor}14`, color: brandColor }}
+          <div className="flex flex-col gap-2">
+            {issues.map(({ id, label, subtitle, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => { setIssueType(id); setStep('form'); }}
+                className="support-card"
               >
-                <Icon className="w-5 h-5" />
-              </div>
-              <div className="support-card-text">
-                <p className="support-card-title">{label}</p>
-                <p className="support-card-subtitle">{subtitle}</p>
-              </div>
-            </button>
-          ))}
+                <div
+                  className="support-card-icon-avatar"
+                  style={{ background: `${brandColor}14`, color: brandColor }}
+                >
+                  <Icon className="w-5 h-5" />
+                </div>
+                <div className="support-card-text">
+                  <p className="support-card-title">{label}</p>
+                  <p className="support-card-subtitle">{subtitle}</p>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -207,20 +212,21 @@ export default function SupportTab({ accountId, brandColor = '#0c1013', language
 
   return (
     <div className="px-4 py-6" style={{ direction: dir }}>
-      <div className="mb-4 px-3 flex items-start justify-between gap-3">
-        <div>
-          <h2 className="support-title">{t.headingForm}</h2>
-          <p className="support-subtitle">{t.subheadingForm}</p>
+      <div className="mx-auto max-w-[700px]">
+        <div className="mb-4 px-3 flex items-start justify-between gap-3">
+          <div>
+            <h2 className="support-title">{t.headingForm}</h2>
+            <p className="support-subtitle">{t.subheadingForm}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => { setStep('type'); setError(null); }}
+            className="support-back-btn"
+            aria-label={t.back}
+          >
+            <span className="support-back-icon" aria-hidden />
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => { setStep('type'); setError(null); }}
-          className="support-back-btn"
-          aria-label={t.back}
-        >
-          <span className="support-back-icon" aria-hidden />
-        </button>
-      </div>
 
       {/* Selected issue type pill (matches BrandSupportTab's selected-product-pill look) */}
       {selectedIssue && (
@@ -292,6 +298,7 @@ export default function SupportTab({ accountId, brandColor = '#0c1013', language
           {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : t.submit}
         </button>
       </form>
+      </div>
     </div>
   );
 }

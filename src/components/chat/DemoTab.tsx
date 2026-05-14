@@ -113,18 +113,20 @@ export default function DemoTab({ accountId, brandColor = '#0c1013', language }:
 
   if (success) {
     return (
-      <div className="px-4 py-10 flex flex-col items-center text-center" style={{ direction: dir }}>
-        <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.3 }}
-          className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
-          style={{ background: `${brandColor}14`, color: brandColor }}
-        >
-          <CheckCircle2 className="w-8 h-8" />
-        </motion.div>
-        <h2 className="text-xl font-bold text-gray-900">{t.success}</h2>
-        <p className="text-sm text-gray-600 mt-2 max-w-sm">{t.successSub}</p>
+      <div className="px-4 py-10" style={{ direction: dir }}>
+        <div className="mx-auto max-w-[700px] flex flex-col items-center text-center">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.3 }}
+            className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
+            style={{ background: `${brandColor}14`, color: brandColor }}
+          >
+            <CheckCircle2 className="w-8 h-8" />
+          </motion.div>
+          <h2 className="text-xl font-bold text-gray-900">{t.success}</h2>
+          <p className="text-sm text-gray-600 mt-2 max-w-sm">{t.successSub}</p>
+        </div>
       </div>
     );
   }
@@ -133,10 +135,13 @@ export default function DemoTab({ accountId, brandColor = '#0c1013', language }:
 
   return (
     <div className="px-4 py-6" style={{ direction: dir }}>
-      <div className="mb-4 px-3">
-        <h2 className="support-title">{t.heading}</h2>
-        <p className="support-subtitle">{t.subheading}</p>
-      </div>
+      {/* Same width container the existing coupons / problem tabs use, so the
+          form doesn't stretch to full screen on desktop. */}
+      <div className="mx-auto max-w-[700px]">
+        <div className="mb-4 px-3">
+          <h2 className="support-title">{t.heading}</h2>
+          <p className="support-subtitle">{t.subheading}</p>
+        </div>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-[6px]">
         <input
@@ -212,6 +217,7 @@ export default function DemoTab({ accountId, brandColor = '#0c1013', language }:
           {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : t.submit}
         </button>
       </form>
+      </div>
     </div>
   );
 }
