@@ -3,6 +3,7 @@
 import { useState, useEffect, use, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useDashboardLang } from '@/hooks/useDashboardLang';
 import Image from 'next/image';
 import {
   Plus,
@@ -112,6 +113,8 @@ export default function ManagePage({
 }) {
   const resolvedParams = use(params);
   const username = resolvedParams.username;
+  const { lang } = useDashboardLang(username);
+  const isEn = lang === 'en';
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
@@ -717,7 +720,7 @@ export default function ManagePage({
             {/* Header with stats */}
             <div className="flex items-center justify-between mb-4 sm:mb-6">
               <div>
-                <h2 className="text-lg sm:text-xl font-bold" style={{ color: 'var(--dash-text)' }}>קטלוג מוצרים</h2>
+                <h2 className="text-lg sm:text-xl font-bold" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Product catalog' : 'קטלוג מוצרים'}</h2>
                 <p className="text-sm mt-1" style={{ color: 'var(--dash-text-2)' }}>
                   {products.length} מוצרים{products.filter((p: any) => p.ai_profile?.whatItDoes).length > 0 && (
                     <span className="inline-flex items-center gap-1 mr-2">
@@ -1022,7 +1025,7 @@ export default function ManagePage({
         {/* ═══ CONTENT TAB ═══ */}
         {activeTab === 'content' && (
           <div>
-            <h2 className="text-xl font-bold mb-6" style={{ color: 'var(--dash-text)' }}>תוכן מפוסטים</h2>
+            <h2 className="text-xl font-bold mb-6" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Content from posts' : 'תוכן מפוסטים'}</h2>
 
             {filteredContent.length === 0 ? (
               <div className="text-center py-16 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
@@ -1065,7 +1068,7 @@ export default function ManagePage({
         {/* ═══ SETTINGS TAB ═══ */}
         {activeTab === 'settings' && (
           <div className="max-w-3xl mx-auto">
-            <h2 className="text-lg sm:text-xl font-bold mb-4 sm:mb-6" style={{ color: 'var(--dash-text)' }}>הגדרות צ׳אט</h2>
+            <h2 className="text-lg sm:text-xl font-bold mb-4 sm:mb-6" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Chat settings' : 'הגדרות צ׳אט'}</h2>
 
             <div className="space-y-4 sm:space-y-6">
               <div className="rounded-xl border p-4 sm:p-6" style={cardStyle}>

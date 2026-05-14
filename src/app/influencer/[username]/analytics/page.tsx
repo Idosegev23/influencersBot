@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { useDashboardLang } from '@/hooks/useDashboardLang';
 import {
   AreaChart,
   Area,
@@ -114,6 +115,8 @@ export default function AnalyticsPage({
 }) {
   const resolvedParams = use(params);
   const username = resolvedParams.username;
+  const { lang } = useDashboardLang(username);
+  const isEn = lang === 'en';
   const router = useRouter();
 
   const [influencer, setInfluencer] = useState<Influencer | null>(null);
@@ -778,7 +781,7 @@ export default function AnalyticsPage({
         {internalSummary && (
           <section className="max-w-6xl mx-auto px-4 sm:px-6 mt-10 space-y-6">
             <div>
-              <h2 className="text-xl font-bold" style={{ color: 'var(--dash-text)' }}>אנליטיקס פנימי</h2>
+              <h2 className="text-xl font-bold" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Internal analytics' : 'אנליטיקס פנימי'}</h2>
               <p className="text-sm mt-1" style={{ color: 'var(--dash-text-3)' }}>
                 נתונים שנאספים ישירות מהמערכת שלנו — חוצים adblockers ומקורות חיצוניים.
               </p>

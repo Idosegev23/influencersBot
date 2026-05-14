@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useDashboardLang } from '@/hooks/useDashboardLang';
 import {
   Users,
   ExternalLink,
@@ -243,6 +244,8 @@ export default function InfluencerDashboardPage({
 }) {
   const { username } = use(params);
   const router = useRouter();
+  const { lang } = useDashboardLang(username);
+  const isEn = lang === 'en';
 
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -403,7 +406,7 @@ export default function InfluencerDashboardPage({
         /* ── Leads View ── */
         <div className="space-y-3">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-lg font-bold" style={{ color: 'var(--dash-text)' }}>לידים ובריפים</h2>
+            <h2 className="text-lg font-bold" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Leads & briefs' : 'לידים ובריפים'}</h2>
           </div>
           {leads.map((lead: any) => {
             const statusConfig: Record<string, { label: string; color: string }> = {
@@ -616,7 +619,7 @@ export default function InfluencerDashboardPage({
             {/* Recent posts */}
             <Section>
               <div className="px-5 pt-5 pb-3 flex items-center justify-between relative z-10">
-                <h2 className="text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>פוסטים אחרונים</h2>
+                <h2 className="text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Recent posts' : 'פוסטים אחרונים'}</h2>
                 {Object.keys(instagram.postsByType).length > 0 && (
                   <div className="flex gap-2">
                     {Object.entries(instagram.postsByType).map(([type, count]) => (
@@ -811,7 +814,7 @@ export default function InfluencerDashboardPage({
             {/* Quick nav */}
             <Section>
               <div className="px-5 pt-5 pb-3 relative z-10">
-                <h2 className="text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>ניווט מהיר</h2>
+                <h2 className="text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Quick nav' : 'ניווט מהיר'}</h2>
               </div>
               <div className="px-5 pb-5 grid grid-cols-2 gap-2 relative z-10">
                 {[

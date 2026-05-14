@@ -49,13 +49,24 @@ export function useDashboardLang(username: string | null | undefined): {
     let cancelled = false;
     (async () => {
       try {
+        // Prefer the authenticated endpoint (also returns archetype + hasProducts);
+        // fall back to the public language-only endpoint when the operator
+        // isn't logged in yet (e.g. on /influencer/[username]/login).
+        let fetchedLang: Lang | null = null;
         const res = await fetch(`/api/influencer/nav-features?username=${username}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        const fetched: Lang = data?.language === 'en' ? 'en' : 'he';
-        if (cancelled) return;
-        if (fetched !== lang) setLang(fetched);
-        writeCached(username, fetched);
+        if (res.ok) {
+          const data = await res.json();
+          fetchedLang = data?.language === 'en' ? 'en' : 'he';
+        } else {
+          const pub = await fetch(`/api/account/language?username=${username}`);
+          if (pub.ok) {
+            const data = await pub.json();
+            fetchedLang = data?.language === 'en' ? 'en' : 'he';
+          }
+        }
+        if (cancelled || !fetchedLang) return;
+        if (fetchedLang !== lang) setLang(fetchedLang);
+        writeCached(username, fetchedLang);
       } catch { /* ignore */ }
       finally {
         if (!cancelled) setLoading(false);

@@ -4,6 +4,7 @@ import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronLeft, Loader2, Copy, Check, TrendingUp, Users, MessageSquare, Tag, MousePointerClick } from 'lucide-react';
+import { useDashboardLang } from '@/hooks/useDashboardLang';
 
 interface AttributionRow {
   slug: string;
@@ -31,6 +32,8 @@ interface AttributionData {
 
 export default function AttributionPage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = use(params);
+  const { lang } = useDashboardLang(username);
+  const isEn = lang === 'en';
   const router = useRouter();
 
   const [data, setData] = useState<AttributionData | null>(null);
@@ -86,7 +89,7 @@ export default function AttributionPage({ params }: { params: Promise<{ username
               <ChevronLeft className="w-4 h-4 ml-1" />
               חזרה לדשבורד
             </Link>
-            <h1 className="text-2xl font-bold text-gray-900">Attribution — לפי משפיענית</h1>
+            <h1 className="text-2xl font-bold text-gray-900">{isEn ? 'Attribution — by creator' : 'Attribution — לפי משפיענית'}</h1>
             <p className="text-sm text-gray-500 mt-1">
               ניתוח של תנועה, פניות והעתקות קופון לפי המקור שהביא את הלקוחה
             </p>
@@ -162,7 +165,7 @@ export default function AttributionPage({ params }: { params: Promise<{ username
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-purple-500" />
-                <h2 className="font-semibold text-gray-900">פירוט לפי מקור</h2>
+                <h2 className="font-semibold text-gray-900">{isEn ? 'Breakdown by source' : 'פירוט לפי מקור'}</h2>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">

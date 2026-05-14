@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useDashboardLang } from '@/hooks/useDashboardLang';
 import {
   Upload,
   FileText,
@@ -33,6 +34,8 @@ export default function DocumentsPage() {
   const params = useParams();
   const router = useRouter();
   const username = params.username as string;
+  const { lang } = useDashboardLang(username);
+  const isEn = lang === 'en';
 
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -132,7 +135,7 @@ export default function DocumentsPage() {
         {/* Header */}
         <div className="flex items-center justify-between animate-slide-up">
           <div>
-            <h1 className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>מאגר מסמכים</h1>
+            <h1 className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Documents' : 'מאגר מסמכים'}</h1>
             <p className="text-sm mt-1" style={{ color: 'var(--dash-text-2)' }}>
               העלה מסמכים למאגר המידע של הצ&#39;אטבוט
             </p>
@@ -158,7 +161,7 @@ export default function DocumentsPage() {
         >
           <div className="flex items-center gap-2">
             <Upload className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
-            <h2 className="font-semibold" style={{ color: 'var(--dash-text)' }}>העלאת מסמך למאגר</h2>
+            <h2 className="font-semibold" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Upload a document' : 'העלאת מסמך למאגר'}</h2>
           </div>
 
           <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>

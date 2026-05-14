@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import ScrapingProgress from '@/components/scraping/ScrapingProgress';
+import { useDashboardLang } from '@/hooks/useDashboardLang';
 
 // ============================================
 // Type Definitions
@@ -39,6 +40,8 @@ interface JobHistory {
 export default function ChatbotSettingsPage() {
   const params = useParams();
   const username = params.username as string;
+  const { lang } = useDashboardLang(username);
+  const isEn = lang === 'en';
 
   const [stats, setStats] = useState<Stats | null>(null);
   const [history, setHistory] = useState<JobHistory[]>([]);
@@ -204,7 +207,7 @@ export default function ChatbotSettingsPage() {
         {/* Header */}
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-4xl font-bold" style={{ color: 'var(--dash-text)' }}>הגדרות צ'אטבוט</h1>
+            <h1 className="text-4xl font-bold" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Chatbot Settings' : "הגדרות צ'אטבוט"}</h1>
             <p className="mt-2" style={{ color: 'var(--dash-text-2)' }}>ניהול הפרסונה והמידע של הצ'אטבוט שלך</p>
           </div>
           <button
@@ -317,7 +320,7 @@ export default function ChatbotSettingsPage() {
           className="rounded-xl border p-6"
           style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}
         >
-          <h2 className="text-2xl font-bold mb-4" style={{ color: 'var(--dash-text)' }}>בניית פרסונה</h2>
+          <h2 className="text-2xl font-bold mb-4" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Build persona' : 'בניית פרסונה'}</h2>
 
           {!showProgress ? (
             <div className="space-y-4">
@@ -364,7 +367,7 @@ export default function ChatbotSettingsPage() {
           className="rounded-xl border p-6"
           style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}
         >
-          <h2 className="text-2xl font-bold mb-4" style={{ color: 'var(--dash-text)' }}>היסטוריית סריקות</h2>
+          <h2 className="text-2xl font-bold mb-4" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Scan history' : 'היסטוריית סריקות'}</h2>
 
           {history.length === 0 ? (
             <p className="text-center py-8" style={{ color: 'var(--dash-text-3)' }}>
@@ -424,7 +427,7 @@ export default function ChatbotSettingsPage() {
           className="rounded-xl border p-6"
           style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}
         >
-          <h2 className="text-2xl font-bold mb-4" style={{ color: 'var(--dash-text)' }}>הטמעת Widget</h2>
+          <h2 className="text-2xl font-bold mb-4" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Widget embed' : 'הטמעת Widget'}</h2>
 
           <div className="space-y-4">
             <p style={{ color: 'var(--dash-text-2)' }}>

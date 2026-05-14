@@ -232,6 +232,22 @@ export async function POST(req: NextRequest) {
       const formatLine = (label: string, value: string | null | undefined) =>
         value ? `<tr><td style="padding:6px 12px 6px 0;color:#676767;font-size:13px;white-space:nowrap">${htmlEscape(label)}</td><td style="padding:6px 0;color:#0c1013;font-size:14px">${htmlEscape(value)}</td></tr>` : '';
 
+      // Dashboard deep-link — only for tickets (not demo requests; demo
+      // requests typically need email handling, not the support inbox).
+      // Base URL chain: NEXT_PUBLIC_APP_URL → VERCEL_URL → bestieai.co.il
+      // so it works in prod, preview, and local without env juggling.
+      const appBase = (process.env.NEXT_PUBLIC_APP_URL
+        || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '')
+        || 'https://bestieai.co.il').replace(/\/$/, '');
+      const accountUsername = (influencer as any)._rawConfig?.username
+        || (typeof username === 'string' ? username : null);
+      const ticketsLink = (source === 'support_ticket' && accountUsername)
+        ? `${appBase}/influencer/${accountUsername}/support`
+        : null;
+      const ctaBlock = ticketsLink
+        ? `<div style="margin:18px 0 4px"><a href="${htmlEscape(ticketsLink)}" style="display:inline-block;background:#0c1013;color:#fff;text-decoration:none;font-size:14px;font-weight:600;padding:10px 18px;border-radius:10px">Open ticket in dashboard →</a></div>`
+        : '';
+
       const html = `<!doctype html><html><body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif;background:#f4f5f7;margin:0;padding:24px;color:#0c1013">
   <div style="max-width:620px;margin:0 auto;background:#fff;border-radius:14px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
     <div style="font-size:12px;color:#676767;letter-spacing:0.08em;text-transform:uppercase;font-weight:600;margin-bottom:6px">${htmlEscape(sourceLabel)}</div>
@@ -249,6 +265,7 @@ export async function POST(req: NextRequest) {
       ${formatLine('Ticket ID', supportRequest.id)}
     </table>
     <div style="border-top:1px solid #f1e9fd;padding-top:16px;white-space:pre-wrap;font-size:14px;line-height:1.55;color:#0c1013">${htmlEscape(enhancedMessage)}</div>
+    ${ctaBlock}
   </div>
   <div style="max-width:620px;margin:12px auto 0;font-size:11px;color:#9ca3af;text-align:center">Sent by BestieAI on behalf of ${htmlEscape(influencer.display_name)}</div>
 </body></html>`;
@@ -258,6 +275,66 @@ export async function POST(req: NextRequest) {
           if (!r.success) console.warn('[Support] Email notify failed:', r.error);
         })
         .catch((e) => console.warn('[Support] Email notify threw:', e?.message || e));
+    }
+
+    // Customer confirmation email — sent only when the submitter gave us an
+    // email address (B2B SaaS demo + support forms always do; legacy retail
+    // brand-support flows usually don't). Acts as the "received, we're on it"
+    // acknowledgement the user explicitly asked for.
+    if (sanitizedEmail) {
+      const isEn = (influencer as any).language === 'en';
+      const isDemo = source === 'demo_request';
+      const subjectCust = isEn
+        ? (isDemo
+            ? `Thanks — we received your demo request`
+            : `We've received your request`)
+        : (isDemo
+            ? `קיבלנו את בקשת הדמו שלך`
+            : `קיבלנו את הפנייה שלך`);
+
+      const ticketCode = supportRequest.id.split('-')[0].toUpperCase();
+      const brandTitle = influencer.display_name;
+      const htmlEscapeC = (s: string) =>
+        s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+      const greeting = isEn
+        ? `Hi ${sanitizedName.split(' ')[0] || 'there'},`
+        : `שלום ${sanitizedName.split(' ')[0] || ''},`;
+      const body = isEn
+        ? (isDemo
+            ? `Thanks for requesting a demo of ${brandTitle}. We've logged your request and our team will reach out within one business day to schedule a time that works for you.`
+            : `Thanks for reaching out to ${brandTitle}. Your ticket is logged and our team is on it — we'll follow up by email shortly.`)
+        : (isDemo
+            ? `תודה על בקשת הדמו של ${brandTitle}. הבקשה נקלטה והצוות שלנו יחזור אליך תוך יום עסקים לתיאום זמן שמתאים לך.`
+            : `תודה שפנית אל ${brandTitle}. הפנייה נקלטה והצוות שלנו בטיפול — נחזור אליך במייל בקרוב.`);
+      const refLine = isEn
+        ? `Reference: ${ticketCode}`
+        : `מספר פנייה: ${ticketCode}`;
+      const summaryLabel = isEn ? 'Your message' : 'ההודעה שלך';
+      const footer = isEn
+        ? `If you didn't submit this request, you can safely ignore this email.`
+        : `אם לא הגשת את הפנייה הזו, אפשר להתעלם מהמייל הזה.`;
+
+      const htmlCust = `<!doctype html><html><body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif;background:#f4f5f7;margin:0;padding:24px;color:#0c1013;direction:${isEn ? 'ltr' : 'rtl'}">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:14px;padding:28px;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
+    <div style="font-size:13px;color:#676767;margin-bottom:12px">${htmlEscapeC(brandTitle)}</div>
+    <h1 style="font-size:22px;font-weight:700;margin:0 0 16px;color:#0c1013;line-height:1.3">${htmlEscapeC(subjectCust)}</h1>
+    <p style="font-size:15px;line-height:1.55;margin:0 0 12px">${htmlEscapeC(greeting)}</p>
+    <p style="font-size:15px;line-height:1.55;margin:0 0 16px">${htmlEscapeC(body)}</p>
+    <div style="font-size:13px;color:#676767;margin:0 0 20px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace">${htmlEscapeC(refLine)}</div>
+    <div style="border-top:1px solid #f1e9fd;padding-top:16px;margin-top:8px">
+      <div style="font-size:12px;color:#676767;letter-spacing:0.05em;text-transform:uppercase;font-weight:600;margin-bottom:8px">${htmlEscapeC(summaryLabel)}</div>
+      <div style="white-space:pre-wrap;font-size:14px;line-height:1.55;color:#0c1013">${htmlEscapeC(enhancedMessage)}</div>
+    </div>
+  </div>
+  <div style="max-width:560px;margin:12px auto 0;font-size:11px;color:#9ca3af;text-align:center">${htmlEscapeC(footer)}</div>
+</body></html>`;
+
+      sendEmail({ to: sanitizedEmail, subject: subjectCust, html: htmlCust })
+        .then((r) => {
+          if (!r.success) console.warn('[Support] Customer confirmation email failed:', r.error);
+        })
+        .catch((e) => console.warn('[Support] Customer confirmation email threw:', e?.message || e));
     }
 
     // Derive a short "issue type" from the first line of the message;

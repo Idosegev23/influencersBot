@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useDashboardLang } from '@/hooks/useDashboardLang';
 import {
   Bot,
   Instagram,
@@ -122,6 +123,8 @@ function Section({
 
 export default function MyBotPage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = use(params);
+  const { lang } = useDashboardLang(username);
+  const isEn = lang === 'en';
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
@@ -244,7 +247,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <Bot className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
-              הבוט שלי
+              {isEn ? 'My bot' : 'הבוט שלי'}
             </h1>
             {persona?.name && (
               <p className="text-sm mt-1" style={{ color: 'var(--dash-text-2)' }}>

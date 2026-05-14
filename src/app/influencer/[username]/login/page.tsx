@@ -2,17 +2,45 @@
 
 import { useState, use } from 'react';
 import { useRouter } from 'next/navigation';
+import { useDashboardLang } from '@/hooks/useDashboardLang';
+import { dashboardDir } from '@/lib/i18n/dashboard';
 
 export default function InfluencerLoginPage({
-  params
+  params,
 }: {
-  params: Promise<{ username: string }>
+  params: Promise<{ username: string }>;
 }) {
   const { username } = use(params);
+  const { lang } = useDashboardLang(username);
+  const isEn = lang === 'en';
+  const dir = dashboardDir(lang);
+
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  const t = isEn
+    ? {
+        backToChat: '← Back to chat',
+        title: 'Sign in to admin panel',
+        passwordLabel: 'Password',
+        passwordPlaceholder: 'Enter your password',
+        signingIn: 'Signing in…',
+        signIn: 'Sign in',
+        contactSupport: 'Trouble signing in? Contact support.',
+        defaultError: 'Sign in failed',
+      }
+    : {
+        backToChat: "← חזרה לצ'אט",
+        title: 'כניסה לפאנל ניהול',
+        passwordLabel: 'סיסמה',
+        passwordPlaceholder: 'הזן את הסיסמה שלך',
+        signingIn: 'מתחבר...',
+        signIn: 'התחבר',
+        contactSupport: 'יש בעיה? צור קשר עם התמיכה',
+        defaultError: 'שגיאה בהתחברות',
+      };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,31 +48,21 @@ export default function InfluencerLoginPage({
     setLoading(true);
 
     try {
-      console.log('[Login] Attempting login for:', username);
-
       const res = await fetch('/api/influencer/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username,
-          password
-        }),
+        body: JSON.stringify({ username, password }),
       });
 
       const data = await res.json();
-      console.log('[Login] Response status:', res.status);
-      console.log('[Login] Response data:', data);
 
       if (res.ok) {
-        console.log('[Login] Success! Redirecting to dashboard');
         router.push(`/influencer/${username}/dashboard`);
       } else {
-        console.error('[Login] Failed:', data.error);
-        setError(data.error || 'שגיאה בהתחברות');
+        setError(data.error || t.defaultError);
       }
-    } catch (err) {
-      console.error('[Login] Exception:', err);
-      setError('שגיאה בהתחברות');
+    } catch {
+      setError(t.defaultError);
     } finally {
       setLoading(false);
     }
@@ -53,8 +71,8 @@ export default function InfluencerLoginPage({
   return (
     <div
       className="min-h-screen flex items-center justify-center p-4"
-      dir="rtl"
-      style={{ background: 'var(--dash-bg)' }}
+      dir={dir}
+      style={{ background: 'var(--dash-bg)', direction: dir }}
     >
       <div style={{ width: '100%', maxWidth: '400px' }}>
         <button
@@ -62,7 +80,7 @@ export default function InfluencerLoginPage({
           className="inline-flex items-center gap-2 text-sm mb-6 cursor-pointer bg-transparent border-none p-0"
           style={{ color: 'var(--dash-text-2)' }}
         >
-          ← חזרה לצ'אט
+          {t.backToChat}
         </button>
 
         <div
@@ -80,7 +98,7 @@ export default function InfluencerLoginPage({
           </div>
 
           <h1 className="text-2xl font-bold text-center mb-2" style={{ color: 'var(--dash-text)' }}>
-            כניסה לפאנל ניהול
+            {t.title}
           </h1>
           <p className="text-sm text-center mb-6" style={{ color: 'var(--dash-text-2)' }}>
             @{username}
@@ -101,15 +119,16 @@ export default function InfluencerLoginPage({
             )}
 
             <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>
-              סיסמה
+              {t.passwordLabel}
             </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="הזן את הסיסמה שלך"
+              placeholder={t.passwordPlaceholder}
               disabled={loading}
               autoFocus
+              dir={dir}
               className="w-full px-4 py-3 rounded-xl text-sm mb-4 focus:outline-none focus:ring-2"
               style={{
                 background: 'var(--dash-bg)',
@@ -129,12 +148,12 @@ export default function InfluencerLoginPage({
                 fontFamily: 'inherit',
               }}
             >
-              {loading ? 'מתחבר...' : 'התחבר'}
+              {loading ? t.signingIn : t.signIn}
             </button>
           </form>
 
           <p className="text-xs text-center mt-4" style={{ color: 'var(--dash-text-3)' }}>
-            יש בעיה? צור קשר עם התמיכה
+            {t.contactSupport}
           </p>
         </div>
       </div>
