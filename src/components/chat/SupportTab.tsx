@@ -1,25 +1,23 @@
 'use client';
 
 /**
- * Support tab — for B2B SaaS accounts.
- * Existing-customer issue flow. Pairs with DemoTab visually (same SectionCard
- * primitive, same submit button style) but routes to support_requests with
- * `metadata.source='support_ticket'` so the inbox can separate bug reports
- * from new-lead demo requests.
+ * Support tab — B2B SaaS existing-customer ticket form.
  *
- * Issue types are deliberately B2B-flavoured: Bug, Integration, Billing,
- * Account, Feature request, Other — not the retail-shopping vocabulary the
- * BrandSupportTab uses for LA BEAUTÉ-style accounts.
+ * Same visual system as DemoTab and the existing BrandSupportTab: white
+ * `support-form-input` pills (60px), `support-form-textarea` (162px), full-pill
+ * `support-cta` button. The issue-type picker is built from `support-card`
+ * primitives — same component already used by BrandSupportTab's product
+ * selector, so the look stays consistent across all support flows in the app.
+ *
+ * Submission lands in `support_requests` with `metadata.source='support_ticket'`
+ * plus issue_type so the inbox can route bug / billing / integration tickets
+ * separately from new-lead demo requests (which use source='demo_request').
  */
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import {
-  Loader2, CheckCircle2, User, Briefcase, Bug, Plug, CreditCard,
-  UserCircle, Sparkles, MoreHorizontal, AlertCircle,
-} from 'lucide-react';
+import { Loader2, CheckCircle2, Bug, Plug, CreditCard, UserCircle, Sparkles, MoreHorizontal } from 'lucide-react';
 import { track } from '@/lib/analytics/track';
-import { SectionCard, Field } from './DemoTab';
 
 interface Props {
   accountId: string;
@@ -29,89 +27,84 @@ interface Props {
 
 type IssueId = 'bug' | 'integration' | 'billing' | 'account' | 'feature' | 'other';
 
-const ISSUES_EN: { id: IssueId; label: string; icon: typeof Bug }[] = [
-  { id: 'bug', label: 'Bug', icon: Bug },
-  { id: 'integration', label: 'Integration', icon: Plug },
-  { id: 'billing', label: 'Billing', icon: CreditCard },
-  { id: 'account', label: 'Account', icon: UserCircle },
-  { id: 'feature', label: 'Feature request', icon: Sparkles },
-  { id: 'other', label: 'Other', icon: MoreHorizontal },
+const ISSUES_EN: { id: IssueId; label: string; subtitle: string; icon: typeof Bug }[] = [
+  { id: 'bug', label: 'Bug', subtitle: 'Something’s not working', icon: Bug },
+  { id: 'integration', label: 'Integration', subtitle: 'Connecting another tool', icon: Plug },
+  { id: 'billing', label: 'Billing', subtitle: 'Invoices or payment', icon: CreditCard },
+  { id: 'account', label: 'Account', subtitle: 'Access, users, settings', icon: UserCircle },
+  { id: 'feature', label: 'Feature request', subtitle: 'Something you’d like us to build', icon: Sparkles },
+  { id: 'other', label: 'Other', subtitle: 'Anything else', icon: MoreHorizontal },
 ];
 
-const ISSUES_HE: { id: IssueId; label: string; icon: typeof Bug }[] = [
-  { id: 'bug', label: 'באג', icon: Bug },
-  { id: 'integration', label: 'אינטגרציה', icon: Plug },
-  { id: 'billing', label: 'חיוב', icon: CreditCard },
-  { id: 'account', label: 'חשבון', icon: UserCircle },
-  { id: 'feature', label: 'בקשת פיצ\'ר', icon: Sparkles },
-  { id: 'other', label: 'אחר', icon: MoreHorizontal },
+const ISSUES_HE: { id: IssueId; label: string; subtitle: string; icon: typeof Bug }[] = [
+  { id: 'bug', label: 'באג', subtitle: 'משהו לא עובד', icon: Bug },
+  { id: 'integration', label: 'אינטגרציה', subtitle: 'חיבור לכלי אחר', icon: Plug },
+  { id: 'billing', label: 'חיוב', subtitle: 'חשבוניות ותשלום', icon: CreditCard },
+  { id: 'account', label: 'חשבון', subtitle: 'הרשאות, משתמשים, הגדרות', icon: UserCircle },
+  { id: 'feature', label: 'בקשת פיצ\'ר', subtitle: 'משהו שתרצו שנפתח', icon: Sparkles },
+  { id: 'other', label: 'אחר', subtitle: 'כל דבר אחר', icon: MoreHorizontal },
 ];
+
+type Step = 'type' | 'form';
 
 export default function SupportTab({ accountId, brandColor = '#0c1013', language }: Props) {
   const isEn = (language || 'en').toLowerCase() === 'en';
   const dir: 'ltr' | 'rtl' = isEn ? 'ltr' : 'rtl';
   const issues = isEn ? ISSUES_EN : ISSUES_HE;
 
-  const [form, setForm] = useState({
-    name: '',
-    email: '',
-    company: '',
-    issueType: '' as IssueId | '',
-    subject: '',
-    description: '',
-  });
+  const [step, setStep] = useState<Step>('type');
+  const [issueType, setIssueType] = useState<IssueId | null>(null);
+  const [form, setForm] = useState({ name: '', email: '', company: '', subject: '', description: '' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   const t = isEn
     ? {
-        heading: 'Get help',
-        subheading: 'Tell us what’s going on — we’ll route it to the right person on our team.',
-        sectionAbout: 'Your details',
-        sectionIssue: 'What can we help with?',
-        sectionDescribe: 'Describe the issue',
+        headingType: 'Get help',
+        subheadingType: 'What can we help with?',
+        headingForm: 'Open a ticket',
+        subheadingForm: 'Fill in the details and we’ll get back to you shortly.',
         name: 'Full name',
         email: 'Work email',
         company: 'Company',
-        subject: 'Short summary',
-        subjectPlaceholder: 'e.g. Slack integration not posting campaign updates',
-        description: 'Details',
-        descriptionPlaceholder: 'Steps to reproduce, what you expected, anything you’ve already tried…',
+        subject: 'Short summary (optional)',
+        description: 'Describe the issue',
         submit: 'Submit ticket',
         submitting: 'Submitting…',
         success: 'Thanks — your ticket is in.',
         successSub: 'You’ll get an email confirmation, and our team will follow up shortly.',
-        required: 'Please fill in name, email, company, and issue type.',
+        required: 'Please fill in name, email, company, and description.',
         invalidEmail: 'That email doesn’t look valid.',
         genericError: 'Something went wrong submitting. Please try again.',
+        back: 'Back',
       }
     : {
-        heading: 'פתיחת פנייה',
-        subheading: 'תארו את הבעיה — ננתב לאדם הנכון בצוות.',
-        sectionAbout: 'הפרטים שלכם',
-        sectionIssue: 'במה אפשר לעזור?',
-        sectionDescribe: 'תיאור הבעיה',
+        headingType: 'פתיחת פנייה',
+        subheadingType: 'במה אפשר לעזור?',
+        headingForm: 'פנייה',
+        subheadingForm: 'מלאו את הפרטים ונחזור אליכם בקרוב.',
         name: 'שם מלא',
         email: 'אימייל עסקי',
         company: 'חברה',
-        subject: 'כותרת קצרה',
-        subjectPlaceholder: 'לדוגמה: אינטגרציית Slack לא שולחת עדכוני קמפיין',
-        description: 'פירוט',
-        descriptionPlaceholder: 'שלבים לשחזור, מה ציפיתם, מה כבר ניסיתם…',
+        subject: 'כותרת קצרה (אופציונלי)',
+        description: 'תיאור הבעיה',
         submit: 'שלחו פנייה',
         submitting: 'שולח…',
         success: 'תודה — הפנייה נקלטה.',
-        successSub: 'תקבלו אישור במייל, ונציג מהצוות יחזור אליכם בקרוב.',
-        required: 'נא למלא שם, מייל, חברה וסוג פנייה.',
+        successSub: 'תקבלו אישור במייל ונציג מהצוות יחזור אליכם בקרוב.',
+        required: 'נא למלא שם, מייל, חברה ופירוט.',
         invalidEmail: 'המייל לא נראה תקין.',
         genericError: 'אירעה שגיאה בשליחה. נסו שוב.',
+        back: 'חזרה',
       };
+
+  const selectedIssue = issues.find((i) => i.id === issueType);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!form.name.trim() || !form.email.trim() || !form.company.trim() || !form.issueType) {
+    if (!form.name.trim() || !form.email.trim() || !form.company.trim() || !form.description.trim()) {
       setError(t.required);
       return;
     }
@@ -121,15 +114,16 @@ export default function SupportTab({ accountId, brandColor = '#0c1013', language
     }
     setSubmitting(true);
     try {
-      try { track('support_form_submitted', { account_id: accountId, issue_type: form.issueType }); } catch { /* */ }
+      try { track('support_form_submitted', { account_id: accountId, issue_type: issueType || 'unspecified' }); } catch { /* */ }
       const message = [
         `Support ticket from ${form.name}`,
         `Email: ${form.email}`,
         `Company: ${form.company}`,
-        `Issue type: ${form.issueType}`,
+        issueType ? `Issue type: ${issueType}` : null,
         form.subject ? `Subject: ${form.subject}` : null,
-        form.description ? `\n${form.description}` : null,
-      ].filter(Boolean).join('\n');
+        '',
+        form.description,
+      ].filter((x) => x !== null).join('\n');
       const res = await fetch('/api/support', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -142,7 +136,7 @@ export default function SupportTab({ accountId, brandColor = '#0c1013', language
           metadata: {
             source: 'support_ticket',
             email: form.email,
-            issue_type: form.issueType,
+            issue_type: issueType,
             subject: form.subject || null,
           },
         }),
@@ -158,7 +152,7 @@ export default function SupportTab({ accountId, brandColor = '#0c1013', language
 
   if (success) {
     return (
-      <div className="px-4 py-10 flex flex-col items-center text-center">
+      <div className="px-4 py-10 flex flex-col items-center text-center" style={{ direction: dir }}>
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -174,74 +168,128 @@ export default function SupportTab({ accountId, brandColor = '#0c1013', language
     );
   }
 
+  // ---- STEP 1: pick an issue type ----
+  if (step === 'type') {
+    return (
+      <div className="px-4 py-6" style={{ direction: dir }}>
+        <div className="mb-4 px-3">
+          <h2 className="support-title">{t.headingType}</h2>
+          <p className="support-subtitle">{t.subheadingType}</p>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          {issues.map(({ id, label, subtitle, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => { setIssueType(id); setStep('form'); }}
+              className="support-card"
+            >
+              <div
+                className="support-card-icon-avatar"
+                style={{ background: `${brandColor}14`, color: brandColor }}
+              >
+                <Icon className="w-5 h-5" />
+              </div>
+              <div className="support-card-text">
+                <p className="support-card-title">{label}</p>
+                <p className="support-card-subtitle">{subtitle}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ---- STEP 2: form ----
+  const canSubmit = !submitting && form.name && form.email && form.company && form.description;
+
   return (
     <div className="px-4 py-6" style={{ direction: dir }}>
-      <div className="mb-5">
-        <h2 className="text-2xl font-bold" style={{ color: brandColor }}>{t.heading}</h2>
-        <p className="text-sm text-gray-600 mt-1">{t.subheading}</p>
+      <div className="mb-4 px-3 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="support-title">{t.headingForm}</h2>
+          <p className="support-subtitle">{t.subheadingForm}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => { setStep('type'); setError(null); }}
+          className="support-back-btn"
+          aria-label={t.back}
+        >
+          <span className="support-back-icon" aria-hidden />
+        </button>
       </div>
 
-      <form onSubmit={onSubmit} className="space-y-3">
-        {/* Section: Your details */}
-        <SectionCard brandColor={brandColor} icon={<User className="w-4 h-4" />} title={t.sectionAbout}>
-          <Field label={t.name} value={form.name} onChange={(v) => setForm({ ...form, name: v })} autoComplete="name" brandColor={brandColor} />
-          <Field label={t.email} value={form.email} onChange={(v) => setForm({ ...form, email: v })} type="email" autoComplete="email" brandColor={brandColor} />
-          <Field label={t.company} value={form.company} onChange={(v) => setForm({ ...form, company: v })} autoComplete="organization" brandColor={brandColor} />
-        </SectionCard>
-
-        {/* Section: Issue type picker */}
-        <SectionCard brandColor={brandColor} icon={<AlertCircle className="w-4 h-4" />} title={t.sectionIssue}>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {issues.map(({ id, label, icon: Icon }) => {
-              const active = form.issueType === id;
-              return (
-                <button
-                  type="button"
-                  key={id}
-                  onClick={() => setForm({ ...form, issueType: id })}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg border text-sm font-medium transition"
-                  style={
-                    active
-                      ? { background: brandColor, borderColor: brandColor, color: '#fff' }
-                      : { background: '#fff', borderColor: '#e5e7eb', color: '#374151' }
-                  }
-                >
-                  <Icon className="w-4 h-4 flex-shrink-0" />
-                  <span className="truncate">{label}</span>
-                </button>
-              );
-            })}
+      {/* Selected issue type pill (matches BrandSupportTab's selected-product-pill look) */}
+      {selectedIssue && (
+        <div
+          className="flex items-center gap-3 rounded-[18px] px-4 py-3 mb-3"
+          style={{ background: `${brandColor}12` }}
+        >
+          <div
+            className="w-9 h-9 rounded-[8px] flex items-center justify-center flex-shrink-0"
+            style={{ background: `${brandColor}1f`, color: brandColor }}
+          >
+            <selectedIssue.icon className="w-4 h-4" />
           </div>
-        </SectionCard>
+          <p className="text-[16px]" style={{ color: brandColor }}>{selectedIssue.label}</p>
+        </div>
+      )}
 
-        {/* Section: Describe */}
-        <SectionCard brandColor={brandColor} icon={<Bug className="w-4 h-4" />} title={t.sectionDescribe}>
-          <Field label={t.subject} value={form.subject} onChange={(v) => setForm({ ...form, subject: v })} brandColor={brandColor} />
-          <div>
-            <label className="block text-xs uppercase tracking-wide font-semibold text-gray-500 mb-1.5">{t.description}</label>
-            <textarea
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              rows={5}
-              placeholder={t.descriptionPlaceholder}
-              className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-gray-400 resize-none"
-            />
-          </div>
-        </SectionCard>
+      <form onSubmit={onSubmit} className="flex flex-col gap-[6px]">
+        <input
+          type="text"
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          placeholder={t.name}
+          autoComplete="name"
+          className="support-form-input"
+        />
+        <input
+          type="email"
+          value={form.email}
+          onChange={(e) => setForm({ ...form, email: e.target.value })}
+          placeholder={t.email}
+          autoComplete="email"
+          className="support-form-input"
+        />
+        <input
+          type="text"
+          value={form.company}
+          onChange={(e) => setForm({ ...form, company: e.target.value })}
+          placeholder={t.company}
+          autoComplete="organization"
+          className="support-form-input"
+        />
+        <input
+          type="text"
+          value={form.subject}
+          onChange={(e) => setForm({ ...form, subject: e.target.value })}
+          placeholder={t.subject}
+          className="support-form-input"
+        />
+        <textarea
+          value={form.description}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          placeholder={t.description}
+          className="support-form-textarea"
+        />
 
         {error && (
-          <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          <div className="text-[14px] text-[#b91c1c] bg-[#fee2e2] border border-[#fecaca] rounded-[14px] px-4 py-2.5 mt-1">
             {error}
           </div>
         )}
 
         <button
           type="submit"
-          disabled={submitting}
-          className="w-full py-3 rounded-xl text-white font-semibold disabled:opacity-50 flex items-center justify-center gap-2 mt-2"
-          style={{ background: brandColor }}
+          disabled={!canSubmit}
+          className={`support-cta mt-8 ${canSubmit ? 'support-cta--enabled' : 'support-cta--disabled'}`}
+          style={canSubmit ? { background: brandColor } : undefined}
         >
-          {submitting ? (<><Loader2 className="w-4 h-4 animate-spin" /> {t.submitting}</>) : t.submit}
+          {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : t.submit}
         </button>
       </form>
     </div>

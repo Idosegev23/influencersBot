@@ -2288,7 +2288,9 @@ h1, h2, h3, h4, h5, h6 {
   line-height: 22.4px;
   color: #0c1013;
   text-align: start;
-  direction: rtl;
+  /* Inherit direction from the surrounding tab — Hebrew accounts stay RTL,
+     English (IMAI) renders LTR without per-component overrides. */
+  direction: inherit;
   box-sizing: border-box;
 }
 
@@ -2310,7 +2312,7 @@ h1, h2, h3, h4, h5, h6 {
   line-height: 22.4px;
   color: #0c1013;
   text-align: start;
-  direction: rtl;
+  direction: inherit;
   resize: none;
   box-sizing: border-box;
 }
