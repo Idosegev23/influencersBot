@@ -40,6 +40,7 @@ const ServicesCatalogTab = dynamic(() => import('@/components/chat/ServicesCatal
 const PlatformTab = dynamic(() => import('@/components/chat/PlatformTab'), { ssr: false });
 const CustomersTab = dynamic(() => import('@/components/chat/CustomersTab'), { ssr: false });
 const DemoTab = dynamic(() => import('@/components/chat/DemoTab'), { ssr: false });
+const SupportTab = dynamic(() => import('@/components/chat/SupportTab'), { ssr: false });
 import { applyTheme, getGoogleFontsUrl } from '@/lib/theme';
 import { getProxiedImageUrl } from '@/lib/image-utils';
 import { BrandCards } from '@/components/chat/BrandCards';
@@ -2246,6 +2247,19 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
               </motion.div>
             ) : activeTab === 'support' ? (
               /* ============ SUPPORT TAB ============ */
+              // B2B SaaS first — distinct visual / form / metadata.source from
+              // the retail-flavoured BrandSupportTab. Tab type is the source
+              // of truth here, not archetype, because 'b2b_support' was added
+              // as a first-class type and shouldn't be probed via heuristics.
+              ((influencer as any).tabs || []).some((t: any) => t.id === 'support' && t.type === 'b2b_support') ? (
+              <motion.div key="b2b-support" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="problem-tab h-full overflow-y-auto">
+                <SupportTab
+                  accountId={influencer.id}
+                  brandColor={(influencer.theme as any)?.colors?.primary || '#0c1013'}
+                  language={(influencer as any).language || 'he'}
+                />
+              </motion.div>
+              ) :
               (influencer as any).archetype === 'brand' || (influencer as any).archetype === 'local_business' ? (
               /* --- Brand/Local: Smart product-aware support --- */
               <motion.div key="support-brand" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="problem-tab h-full">

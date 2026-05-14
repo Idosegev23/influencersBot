@@ -19,7 +19,7 @@ import { createClient } from '@/lib/supabase/server';
 interface TabConfig {
   id: string;
   label: string;
-  type: 'chat' | 'discover' | 'topics' | 'coupons' | 'support' | 'content_feed' | 'platform' | 'customers' | 'demo';
+  type: 'chat' | 'discover' | 'topics' | 'coupons' | 'support' | 'content_feed' | 'platform' | 'customers' | 'demo' | 'b2b_support';
   topic?: string; // RAG topic filter for topics-type tabs
 }
 
@@ -71,6 +71,9 @@ const STATIC_LABELS = {
   reviews: L('סקירות', 'Reviews'),
   support: L('בעיה במוצר', 'Get support'),
   contact: L('צרו קשר', 'Talk to us'),
+  // b2b-specific — "Support" alone reads as a docs link to enterprise buyers;
+  // "Get help" keeps the conversational tone of the rest of the surface.
+  b2bSupport: L('תמיכה', 'Get help'),
   defaultCoupons: L('קופונים', 'Promos'),
   fallback: L('גלו', 'Discover'),
   // b2b_saas-specific
@@ -299,6 +302,14 @@ export async function generateTabConfig(accountId: string): Promise<TabGeneratio
     tabs.push({ id: 'platform', label: STATIC_LABELS.platform[lang], type: 'platform' });
     tabs.push({ id: 'customers', label: STATIC_LABELS.customers[lang], type: 'customers' });
     tabs.push({ id: 'demo', label: STATIC_LABELS.demo[lang], type: 'demo' });
+    // B2B SaaS gets a dedicated Support tab in addition to Demo — Demo is for
+    // new-lead capture (sales), Support is for existing-customer issues
+    // (bugs, integration, billing). Both land in support_requests but with
+    // different metadata.source so the inbox can route appropriately.
+    // Uses a distinct type ('b2b_support') from the retail 'support' tab so
+    // we don't accidentally route IMAI visitors to the LA BEAUTÉ product
+    // tracking form.
+    tabs.push({ id: 'support', label: STATIC_LABELS.b2bSupport[lang], type: 'b2b_support' });
     // b2b_saas does NOT use the Hebrew "discover" content surface — return now
     // so we don't fall through to the support / coupons branches below.
     const subtitle = resolveLabel(SUBTITLE_TEMPLATES, lang, archetype, influencerType);

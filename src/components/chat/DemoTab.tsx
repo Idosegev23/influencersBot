@@ -2,19 +2,17 @@
 
 /**
  * Demo tab — for B2B SaaS accounts.
- * Lightweight qualification form. Submission lands in `support_requests` with
- * metadata.source='demo_request' so the existing support inbox handles it —
- * no parallel demo-bookings table. Sales team picks it up the same way they
- * pick up regular tickets.
  *
- * Fields are intentionally short: name, work email, company, team size, use
- * case. We deliberately do NOT ask for phone (cuts EU lead conversion in half)
- * or budget (premature for first contact).
+ * Visually mirrors SupportTab: each logical group of fields lives in its own
+ * tinted card so the form feels like a "ticket" rather than a flat lead form.
+ * Submission lands in `support_requests` with `metadata.source='demo_request'`
+ * so the existing support inbox picks it up alongside support tickets, just
+ * with a different lane.
  */
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Loader2, CheckCircle2 } from 'lucide-react';
+import { Loader2, CheckCircle2, User, Briefcase, MessageSquare } from 'lucide-react';
 import { track } from '@/lib/analytics/track';
 
 interface Props {
@@ -23,12 +21,11 @@ interface Props {
   language?: string;
 }
 
-const TEAM_SIZES_EN = ['1–10', '11–50', '51–200', '201–1000', '1000+'];
-const TEAM_SIZES_HE = ['1–10', '11–50', '51–200', '201–1000', '1000+'];
+const TEAM_SIZES = ['1–10', '11–50', '51–200', '201–1000', '1000+'];
 
 export default function DemoTab({ accountId, brandColor = '#0c1013', language }: Props) {
   const isEn = (language || 'en').toLowerCase() === 'en';
-  const sizes = isEn ? TEAM_SIZES_EN : TEAM_SIZES_HE;
+  const dir: 'ltr' | 'rtl' = isEn ? 'ltr' : 'rtl';
 
   const [form, setForm] = useState({ name: '', email: '', company: '', teamSize: '', useCase: '' });
   const [submitting, setSubmitting] = useState(false);
@@ -39,11 +36,15 @@ export default function DemoTab({ accountId, brandColor = '#0c1013', language }:
     ? {
         heading: 'Get a demo',
         subheading: 'Tell us a bit about you — our team will reach out within one business day.',
+        sectionAbout: 'About you',
+        sectionCompany: 'About your team',
+        sectionGoals: 'What you want to achieve',
         name: 'Full name',
         email: 'Work email',
         company: 'Company',
         teamSize: 'Team size',
-        useCase: 'What are you hoping to accomplish?',
+        useCase: 'Goals or use case',
+        useCasePlaceholder: 'e.g. launch our skincare line with 100 nano-creators in Q3, or replace our PR agency with an AI workflow…',
         submit: 'Request demo',
         submitting: 'Sending…',
         success: 'Thanks — your demo request is in.',
@@ -55,11 +56,15 @@ export default function DemoTab({ accountId, brandColor = '#0c1013', language }:
     : {
         heading: 'תיאום דמו',
         subheading: 'ספרו לנו מעט עליכם — נחזור אליכם תוך יום עסקים.',
+        sectionAbout: 'עליכם',
+        sectionCompany: 'על הצוות',
+        sectionGoals: 'מה תרצו להשיג',
         name: 'שם מלא',
         email: 'אימייל עסקי',
         company: 'חברה',
         teamSize: 'גודל צוות',
-        useCase: 'מה תרצו להשיג?',
+        useCase: 'מטרות / use case',
+        useCasePlaceholder: 'לדוגמה: השקת מותג טיפוח עם 100 nano-creators ברבעון הקרוב, או החלפת סוכנות PR בתהליך AI…',
         submit: 'בקשו דמו',
         submitting: 'שולח…',
         success: 'תודה — בקשת הדמו נקלטה.',
@@ -119,7 +124,7 @@ export default function DemoTab({ accountId, brandColor = '#0c1013', language }:
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.3 }}
           className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
-          style={{ background: `${brandColor}12`, color: brandColor }}
+          style={{ background: `${brandColor}14`, color: brandColor }}
         >
           <CheckCircle2 className="w-8 h-8" />
         </motion.div>
@@ -130,52 +135,68 @@ export default function DemoTab({ accountId, brandColor = '#0c1013', language }:
   }
 
   return (
-    <div className="px-4 py-6" style={{ direction: isEn ? 'ltr' : 'rtl' }}>
+    <div className="px-4 py-6" style={{ direction: dir }}>
       <div className="mb-5">
         <h2 className="text-2xl font-bold" style={{ color: brandColor }}>{t.heading}</h2>
         <p className="text-sm text-gray-600 mt-1">{t.subheading}</p>
       </div>
 
       <form onSubmit={onSubmit} className="space-y-3">
-        <Field label={t.name} value={form.name} onChange={(v) => setForm({ ...form, name: v })} autoComplete="name" />
-        <Field label={t.email} value={form.email} onChange={(v) => setForm({ ...form, email: v })} type="email" autoComplete="email" />
-        <Field label={t.company} value={form.company} onChange={(v) => setForm({ ...form, company: v })} autoComplete="organization" />
+        {/* Section: About you */}
+        <SectionCard brandColor={brandColor} icon={<User className="w-4 h-4" />} title={t.sectionAbout}>
+          <Field label={t.name} value={form.name} onChange={(v) => setForm({ ...form, name: v })} autoComplete="name" brandColor={brandColor} />
+          <Field label={t.email} value={form.email} onChange={(v) => setForm({ ...form, email: v })} type="email" autoComplete="email" brandColor={brandColor} />
+        </SectionCard>
 
-        <div>
-          <label className="block text-sm text-gray-700 mb-1">{t.teamSize}</label>
-          <div className="grid grid-cols-5 gap-1">
-            {sizes.map((s) => (
-              <button
-                type="button"
-                key={s}
-                onClick={() => setForm({ ...form, teamSize: s })}
-                className={`text-xs py-2 rounded-lg border transition ${
-                  form.teamSize === s ? 'text-white' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
-                }`}
-                style={form.teamSize === s ? { background: brandColor, borderColor: brandColor } : undefined}
-              >
-                {s}
-              </button>
-            ))}
+        {/* Section: Company */}
+        <SectionCard brandColor={brandColor} icon={<Briefcase className="w-4 h-4" />} title={t.sectionCompany}>
+          <Field label={t.company} value={form.company} onChange={(v) => setForm({ ...form, company: v })} autoComplete="organization" brandColor={brandColor} />
+          <div>
+            <label className="block text-xs uppercase tracking-wide font-semibold text-gray-500 mb-1.5">{t.teamSize}</label>
+            <div className="grid grid-cols-5 gap-1.5">
+              {TEAM_SIZES.map((s) => {
+                const active = form.teamSize === s;
+                return (
+                  <button
+                    type="button"
+                    key={s}
+                    onClick={() => setForm({ ...form, teamSize: s })}
+                    className="text-xs py-2 rounded-lg border transition font-medium"
+                    style={
+                      active
+                        ? { background: brandColor, borderColor: brandColor, color: '#fff' }
+                        : { background: '#fff', borderColor: '#e5e7eb', color: '#374151' }
+                    }
+                  >
+                    {s}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        </SectionCard>
 
-        <div>
-          <label className="block text-sm text-gray-700 mb-1">{t.useCase}</label>
+        {/* Section: Use case */}
+        <SectionCard brandColor={brandColor} icon={<MessageSquare className="w-4 h-4" />} title={t.sectionGoals}>
           <textarea
             value={form.useCase}
             onChange={(e) => setForm({ ...form, useCase: e.target.value })}
-            rows={3}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400 resize-none"
+            rows={4}
+            placeholder={t.useCasePlaceholder}
+            className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-gray-400 resize-none"
           />
-        </div>
+        </SectionCard>
 
-        {error && <div className="text-sm text-red-600">{error}</div>}
+        {error && (
+          <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            {error}
+          </div>
+        )}
 
         <button
           type="submit"
           disabled={submitting}
-          className="w-full py-3 rounded-xl text-white font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+          className="w-full py-3 rounded-xl text-white font-semibold disabled:opacity-50 flex items-center justify-center gap-2 mt-2"
           style={{ background: brandColor }}
         >
           {submitting ? (<><Loader2 className="w-4 h-4 animate-spin" /> {t.submitting}</>) : t.submit}
@@ -185,24 +206,55 @@ export default function DemoTab({ accountId, brandColor = '#0c1013', language }:
   );
 }
 
-function Field({
-  label, value, onChange, type = 'text', autoComplete,
+// --- Shared section + field primitives ---
+
+export function SectionCard({
+  brandColor, icon, title, children,
+}: {
+  brandColor: string;
+  icon: React.ReactNode;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="rounded-2xl p-4 border"
+      style={{ background: `${brandColor}0d`, borderColor: `${brandColor}1f` }}
+    >
+      <div className="flex items-center gap-2 mb-3">
+        <span
+          className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ background: `${brandColor}1a`, color: brandColor }}
+        >
+          {icon}
+        </span>
+        <span className="text-sm font-semibold" style={{ color: brandColor }}>{title}</span>
+      </div>
+      <div className="space-y-2.5">{children}</div>
+    </div>
+  );
+}
+
+export function Field({
+  label, value, onChange, type = 'text', autoComplete, brandColor,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   type?: string;
   autoComplete?: string;
+  brandColor?: string;
 }) {
   return (
     <div>
-      <label className="block text-sm text-gray-700 mb-1">{label}</label>
+      <label className="block text-xs uppercase tracking-wide font-semibold text-gray-500 mb-1.5">{label}</label>
       <input
         type={type}
         autoComplete={autoComplete}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400"
+        className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-gray-400"
+        style={brandColor ? { caretColor: brandColor } : undefined}
       />
     </div>
   );
