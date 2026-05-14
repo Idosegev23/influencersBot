@@ -213,7 +213,7 @@ function Section({ children, className = '' }: { children: React.ReactNode; clas
   );
 }
 
-function SectionHeader({ title, sub, href, linkText = 'הכל' }: {
+function SectionHeader({ title, sub, href, linkText }: {
   title: string;
   sub?: string;
   href?: string;
@@ -239,7 +239,7 @@ function SectionHeader({ title, sub, href, linkText = 'הכל' }: {
             e.currentTarget.style.background = 'transparent';
           }}
         >
-          {linkText} <ChevronLeft className="w-3 h-3" />
+          {linkText || 'הכל'} <ChevronLeft className="w-3 h-3" />
         </Link>
       )}
     </div>
@@ -365,7 +365,7 @@ export default function InfluencerDashboardPage({
             className={`pill ${copied ? 'pill-green' : 'pill-neutral'} text-xs transition-all duration-300 hover:scale-[1.02]`}
           >
             {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-            <span className="hidden sm:inline">{copied ? 'הועתק' : 'לינק'}</span>
+            <span className="hidden sm:inline">{isEn ? (copied ? 'Copied' : 'Link') : (copied ? 'הועתק' : 'לינק')}</span>
           </button>
           <a
             href={chatLink}
@@ -374,7 +374,7 @@ export default function InfluencerDashboardPage({
             className="pill pill-purple text-xs hidden sm:inline-flex transition-all duration-300 hover:scale-[1.02]"
           >
             <ExternalLink className="w-3.5 h-3.5" />
-            בוט
+            {isEn ? 'Bot' : 'בוט'}
           </a>
           <button
             onClick={logout}
@@ -420,7 +420,13 @@ export default function InfluencerDashboardPage({
             <h2 className="text-lg font-bold" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Leads & briefs' : 'לידים ובריפים'}</h2>
           </div>
           {leads.map((lead: any) => {
-            const statusConfig: Record<string, { label: string; color: string }> = {
+            const statusConfig: Record<string, { label: string; color: string }> = isEn ? {
+              new: { label: 'New', color: '#9334EB' },
+              contacted: { label: 'Contacted', color: '#2663EB' },
+              in_progress: { label: 'In progress', color: '#EA580C' },
+              closed: { label: 'Closed', color: '#16A34A' },
+              archived: { label: 'Archived', color: '#6b7280' },
+            } : {
               new: { label: 'חדש', color: '#9334EB' },
               contacted: { label: 'יצרנו קשר', color: '#2663EB' },
               in_progress: { label: 'בטיפול', color: '#EA580C' },
@@ -428,7 +434,7 @@ export default function InfluencerDashboardPage({
               archived: { label: 'ארכיון', color: '#6b7280' },
             };
             const st = statusConfig[lead.status] || statusConfig.new;
-            const date = new Date(lead.created_at).toLocaleDateString('he-IL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+            const date = new Date(lead.created_at).toLocaleDateString(isEn ? 'en-US' : 'he-IL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
             return (
               <Section key={lead.id}>
@@ -459,10 +465,10 @@ export default function InfluencerDashboardPage({
                       </div>
 
                       <div className="mt-3 space-y-1 text-xs" style={{ color: 'var(--dash-text-3)' }}>
-                        {lead.goal && <p><strong>מטרה:</strong> {lead.goal}</p>}
-                        {lead.budget_range && <p><strong>תקציב:</strong> {lead.budget_range}</p>}
-                        {lead.product_description && <p><strong>תיאור:</strong> {lead.product_description}</p>}
-                        {lead.notes && <p><strong>הערות:</strong> {lead.notes}</p>}
+                        {lead.goal && <p><strong>{isEn ? 'Goal:' : 'מטרה:'}</strong> {lead.goal}</p>}
+                        {lead.budget_range && <p><strong>{isEn ? 'Budget:' : 'תקציב:'}</strong> {lead.budget_range}</p>}
+                        {lead.product_description && <p><strong>{isEn ? 'Description:' : 'תיאור:'}</strong> {lead.product_description}</p>}
+                        {lead.notes && <p><strong>{isEn ? 'Notes:' : 'הערות:'}</strong> {lead.notes}</p>}
                       </div>
                     </div>
 
@@ -484,11 +490,11 @@ export default function InfluencerDashboardPage({
                         className="text-xs rounded-xl px-2.5 py-1 focus:outline-none"
                         style={{ background: 'var(--dash-surface)', color: 'var(--dash-text-2)', border: '1px solid var(--dash-glass-border)' }}
                       >
-                        <option value="new">חדש</option>
-                        <option value="contacted">יצרנו קשר</option>
-                        <option value="in_progress">בטיפול</option>
-                        <option value="closed">נסגר</option>
-                        <option value="archived">ארכיון</option>
+                        <option value="new">{isEn ? 'New' : 'חדש'}</option>
+                        <option value="contacted">{isEn ? 'Contacted' : 'יצרנו קשר'}</option>
+                        <option value="in_progress">{isEn ? 'In progress' : 'בטיפול'}</option>
+                        <option value="closed">{isEn ? 'Closed' : 'נסגר'}</option>
+                        <option value="archived">{isEn ? 'Archived' : 'ארכיון'}</option>
                       </select>
                       {lead.drive_file_url && (
                         <a
@@ -498,7 +504,7 @@ export default function InfluencerDashboardPage({
                           className="text-xs hover:underline"
                           style={{ color: 'var(--color-primary, #2663EB)' }}
                         >
-                          📄 צפה ב-Drive
+                          📄 {isEn ? 'View in Drive' : 'צפה ב-Drive'}
                         </a>
                       )}
                     </div>
@@ -514,18 +520,18 @@ export default function InfluencerDashboardPage({
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 stagger-children">
           {[
             {
-              label: 'עוקבים',
+              label: isEn ? 'Followers' : 'עוקבים',
               value: formatNumber(instagram.followers),
               delta: instagram.followersGrowth !== 0 ? instagram.followersGrowth : null,
               fill: 'fill-purple',
               icon: Users,
               iconColor: '#9334EB',
             },
-            { label: 'שיחות', value: formatNumber(chat.totalSessions), sub: `${formatNumber(chat.totalMessages)} הודעות`, fill: 'fill-blue', icon: MessageSquare, iconColor: '#2663EB' },
+            { label: isEn ? 'Conversations' : 'שיחות', value: formatNumber(chat.totalSessions), sub: `${formatNumber(chat.totalMessages)} ${isEn ? 'messages' : 'הודעות'}`, fill: 'fill-blue', icon: MessageSquare, iconColor: '#2663EB' },
             { label: isEn ? 'Partnerships' : 'שת״פים', value: partnerships.active, sub: partnerships.total > partnerships.active ? (isEn ? `of ${partnerships.total}` : `מתוך ${partnerships.total}`) : undefined, fill: 'fill-coral', icon: Heart, iconColor: '#EA580B' },
-            { label: 'קופונים', value: coupons.active, sub: coupons.totalCopies > 0 ? `${formatNumber(coupons.totalCopies)} העתקות` : undefined, fill: 'fill-green', icon: Copy, iconColor: '#17A34A' },
-            { label: 'אנגייג׳מנט', value: `${instagram.avgEngagement}%`, sub: instagram.totalLikes > 0 ? `${formatNumber(instagram.totalLikes)} לייקים` : undefined, fill: 'fill-pink', icon: Eye, iconColor: '#DB2877' },
-            { label: 'צפיות', value: formatNumber(instagram.totalViews), sub: instagram.scrapedPosts > 0 ? `${instagram.scrapedPosts} פוסטים` : undefined, fill: 'fill-amber', icon: Play, iconColor: '#CB8A04' },
+            { label: isEn ? 'Promotions' : 'קופונים', value: coupons.active, sub: coupons.totalCopies > 0 ? `${formatNumber(coupons.totalCopies)} ${isEn ? 'copies' : 'העתקות'}` : undefined, fill: 'fill-green', icon: Copy, iconColor: '#17A34A' },
+            { label: isEn ? 'Engagement' : 'אנגייג׳מנט', value: `${instagram.avgEngagement}%`, sub: instagram.totalLikes > 0 ? `${formatNumber(instagram.totalLikes)} ${isEn ? 'likes' : 'לייקים'}` : undefined, fill: 'fill-pink', icon: Eye, iconColor: '#DB2877' },
+            { label: isEn ? 'Views' : 'צפיות', value: formatNumber(instagram.totalViews), sub: instagram.scrapedPosts > 0 ? `${instagram.scrapedPosts} ${isEn ? 'posts' : 'פוסטים'}` : undefined, fill: 'fill-amber', icon: Play, iconColor: '#CB8A04' },
           ].map((m, i) => (
             <div key={i} className="metric-card text-center animate-slide-up" style={{ animationDelay: `${i * 0.05}s`, animationFillMode: 'both' }}>
               <div className={`w-8 h-8 rounded-xl mx-auto mb-2 flex items-center justify-center relative z-10 ${m.fill}`}>
@@ -558,10 +564,10 @@ export default function InfluencerDashboardPage({
               (influencer as any)._rawConfig.influencer_registry.length > 0 && (
               <Section>
                 <SectionHeader
-                  title="פילוח לפי משפיענית"
-                  sub="קליקים, סשנים, פניות"
+                  title={isEn ? 'By creator' : 'פילוח לפי משפיענית'}
+                  sub={isEn ? 'clicks, sessions, tickets' : 'קליקים, סשנים, פניות'}
                   href={`/influencer/${username}/attribution`}
-                  linkText="לדוח המלא"
+                  linkText={isEn ? 'Full report' : 'לדוח המלא'}
                 />
                 <div className="px-5 pb-5 relative z-10 grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {((influencer as any)._rawConfig.influencer_registry as Array<{ slug: string; display_name: string }>)
@@ -591,26 +597,33 @@ export default function InfluencerDashboardPage({
             {/* Support tickets quick view */}
             <Section>
               <SectionHeader
-                title="פניות תמיכה"
-                sub="לטיפול"
+                title={isEn ? 'Support tickets' : 'פניות תמיכה'}
+                sub={isEn ? 'open' : 'לטיפול'}
                 href={`/influencer/${username}/support`}
-                linkText="לכל הפניות"
+                linkText={isEn ? 'All tickets' : 'לכל הפניות'}
               />
               <div className="px-5 pb-5 relative z-10">
                 <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
-                  טופסי בעיה / סטטוס משלוח שהלקוחות פתחו דרך הבוט. לחיצה על "לכל הפניות" פותחת את הניהול המלא עם chip מקור לכל פנייה.
+                  {isEn
+                    ? 'Issue / shipment-status forms opened from the bot. Click "All tickets" for the full inbox with a source chip per ticket.'
+                    : 'טופסי בעיה / סטטוס משלוח שהלקוחות פתחו דרך הבוט. לחיצה על "לכל הפניות" פותחת את הניהול המלא עם chip מקור לכל פנייה.'}
                 </p>
               </div>
             </Section>
 
             {/* Chat activity */}
             <Section className="glow-border">
-              <SectionHeader title="פעילות בוט" sub="30 יום" href={`/influencer/${username}/analytics`} linkText="אנליטיקס" />
+              <SectionHeader
+                title={isEn ? 'Bot activity' : 'פעילות בוט'}
+                sub={isEn ? '30 days' : '30 יום'}
+                href={`/influencer/${username}/analytics`}
+                linkText={isEn ? 'Analytics' : 'אנליטיקס'}
+              />
               <div className="px-5 grid grid-cols-3 gap-4 pb-4 relative z-10">
                 {[
-                  { label: 'הודעות נכנסות', value: formatNumber(analytics.messagesReceived) },
-                  { label: 'תגובות', value: formatNumber(analytics.responsesSent) },
-                  { label: 'זמן תגובה', value: avgSec ? `${avgSec}s` : '—' },
+                  { label: isEn ? 'Inbound messages' : 'הודעות נכנסות', value: formatNumber(analytics.messagesReceived) },
+                  { label: isEn ? 'Replies' : 'תגובות', value: formatNumber(analytics.responsesSent) },
+                  { label: isEn ? 'Response time' : 'זמן תגובה', value: avgSec ? `${avgSec}s` : '—' },
                 ].map((s) => (
                   <div key={s.label}>
                     <p className="text-lg font-bold tabular-nums" style={{ color: 'var(--dash-text)' }}>{s.value}</p>
@@ -622,7 +635,7 @@ export default function InfluencerDashboardPage({
                 {analytics.dailyActivity.length > 0 ? (
                   <ActivityChart data={analytics.dailyActivity} />
                 ) : (
-                  <p className="text-xs text-center py-6" style={{ color: 'var(--dash-text-3)' }}>אין עדיין נתוני פעילות</p>
+                  <p className="text-xs text-center py-6" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'No activity data yet' : 'אין עדיין נתוני פעילות'}</p>
                 )}
               </div>
             </Section>
@@ -676,7 +689,7 @@ export default function InfluencerDashboardPage({
 
             {/* Recent chats */}
             <Section>
-              <SectionHeader title={isEn ? 'Recent conversations' : 'שיחות אחרונות'} href={`/influencer/${username}/conversations`} />
+              <SectionHeader title={isEn ? 'Recent conversations' : 'שיחות אחרונות'} href={`/influencer/${username}/conversations`} linkText={isEn ? 'All' : 'הכל'} />
               {chat.recentSessions.length > 0 ? (
                 <div className="relative z-10">
                   {chat.recentSessions.map((s, i) => (
@@ -694,7 +707,7 @@ export default function InfluencerDashboardPage({
                         >
                           <Users className="w-3.5 h-3.5" style={{ color: 'var(--dash-text-3)' }} />
                         </div>
-                        <span className="text-sm" style={{ color: 'var(--dash-text)' }}>{s.messageCount} הודעות</span>
+                        <span className="text-sm" style={{ color: 'var(--dash-text)' }}>{s.messageCount} {isEn ? 'messages' : 'הודעות'}</span>
                       </div>
                       <span className="text-[11px]" style={{ color: 'var(--dash-text-3)' }}>{formatRelativeTime(s.createdAt)}</span>
                       </div>
@@ -703,8 +716,8 @@ export default function InfluencerDashboardPage({
                 </div>
               ) : (
                 <div className="px-5 pb-5 text-center relative z-10">
-                  <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>אין עדיין שיחות</p>
-                  <p className="text-[11px] mt-1" style={{ color: 'var(--dash-text-3)' }}>שתפו את הלינק כדי להתחיל</p>
+                  <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'No conversations yet' : 'אין עדיין שיחות'}</p>
+                  <p className="text-[11px] mt-1" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Share your link to get started' : 'שתפו את הלינק כדי להתחיל'}</p>
                 </div>
               )}
             </Section>
@@ -724,7 +737,7 @@ export default function InfluencerDashboardPage({
                   </span>
                   {partnerships.pendingRevenue > 0 && (
                     <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
-                      + ₪{formatNumber(partnerships.pendingRevenue)} ממתין
+                      + {isEn ? '$' : '₪'}{formatNumber(partnerships.pendingRevenue)} {isEn ? 'pending' : 'ממתין'}
                     </span>
                   )}
                 </div>
@@ -744,7 +757,7 @@ export default function InfluencerDashboardPage({
                       <div className="min-w-0">
                         <p className="text-sm truncate font-medium" style={{ color: 'var(--dash-text)' }}>{p.brandName}</p>
                         <p className="text-[11px] font-medium" style={{ color: STATUS_COLOR[p.status] || 'var(--dash-text-3)' }}>
-                          {STATUS_LABEL[p.status] || p.status}
+                          {dashL(p.status, isEn)}
                         </p>
                       </div>
                       {p.contractAmount > 0 && (
@@ -758,12 +771,12 @@ export default function InfluencerDashboardPage({
                 </div>
               ) : (
                 <div className="px-5 pb-5 relative z-10">
-                  <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>אין עדיין שת"פים</p>
+                  <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'No partnerships yet' : 'אין עדיין שת"פים'}</p>
                   <Link
                     href={`/influencer/${username}/partnerships`}
                     className="pill pill-purple text-xs mt-2 inline-flex transition-all duration-300 hover:scale-[1.02]"
                   >
-                    + הוסף שת"פ
+                    + {isEn ? 'Add partnership' : 'הוסף שת"פ'}
                   </Link>
                 </div>
               )}
@@ -772,7 +785,7 @@ export default function InfluencerDashboardPage({
             {/* Coupons */}
             {coupons.list.length > 0 && (
               <Section>
-                <SectionHeader title="קופונים" href={`/influencer/${username}/coupons`} />
+                <SectionHeader title={isEn ? 'Promotions' : 'קופונים'} href={`/influencer/${username}/coupons`} linkText={isEn ? 'All' : 'הכל'} />
                 <div className="relative z-10">
                   {coupons.list.map((c, i) => (
                     <div key={c.id}>
