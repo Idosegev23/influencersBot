@@ -157,11 +157,11 @@ export default function ChatbotSettingsPage() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    alert('קוד הועתק ללוח!');
+    alert(isEn ? 'Code copied!' : 'קוד הועתק ללוח!');
   };
 
   const formatRelativeTime = (dateStr: string | null): string => {
-    if (!dateStr) return 'אף פעם';
+    if (!dateStr) return isEn ? 'Never' : 'אף פעם';
 
     const date = new Date(dateStr);
     const now = new Date();
@@ -169,9 +169,9 @@ export default function ChatbotSettingsPage() {
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffHours / 24);
 
-    if (diffDays > 0) return `לפני ${diffDays} ימים`;
-    if (diffHours > 0) return `לפני ${diffHours} שעות`;
-    return 'עכשיו';
+    if (diffDays > 0) return isEn ? `${diffDays}d ago` : `לפני ${diffDays} ימים`;
+    if (diffHours > 0) return isEn ? `${diffHours}h ago` : `לפני ${diffHours} שעות`;
+    return isEn ? 'just now' : 'עכשיו';
   };
 
   const formatDuration = (startedAt: string | null, completedAt: string | null): string => {
@@ -208,7 +208,7 @@ export default function ChatbotSettingsPage() {
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-4xl font-bold" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Chatbot Settings' : "הגדרות צ'אטבוט"}</h1>
-            <p className="mt-2" style={{ color: 'var(--dash-text-2)' }}>ניהול הפרסונה והמידע של הצ'אטבוט שלך</p>
+            <p className="mt-2" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Manage your chatbot persona and knowledge' : "ניהול הפרסונה והמידע של הצ'אטבוט שלך"}</p>
           </div>
           <button
             onClick={() => setShowLivePreview(true)}
@@ -216,7 +216,7 @@ export default function ChatbotSettingsPage() {
             style={{ backgroundColor: 'var(--color-primary)', color: '#fff' }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-            צפייה חיה
+            {isEn ? 'Live preview' : 'צפייה חיה'}
           </button>
         </div>
 
@@ -240,15 +240,15 @@ export default function ChatbotSettingsPage() {
                 </div>
                 <div>
                   <h2 className="text-xl font-bold" style={{ color: 'var(--dash-text)' }}>
-                    בוט DM באינסטגרם
+                    {isEn ? 'Instagram DM bot' : 'בוט DM באינסטגרם'}
                   </h2>
                   {igConnection.connected ? (
                     <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>
-                      מחובר ל-<span className="font-medium" style={{ color: 'var(--dash-text)' }}>@{igConnection.ig_username}</span>
+                      {isEn ? 'Connected to ' : 'מחובר ל-'}<span className="font-medium" style={{ color: 'var(--dash-text)' }}>@{igConnection.ig_username}</span>
                     </p>
                   ) : (
                     <p className="text-sm" style={{ color: 'var(--color-warning, #f59e0b)' }}>
-                      אין חיבור אינסטגרם פעיל
+                      {isEn ? 'No active Instagram connection' : 'אין חיבור אינסטגרם פעיל'}
                     </p>
                   )}
                 </div>
@@ -260,7 +260,7 @@ export default function ChatbotSettingsPage() {
                     className="text-sm font-medium"
                     style={{ color: dmBotEnabled ? 'var(--color-success, #22c55e)' : 'var(--dash-text-3)' }}
                   >
-                    {dmBotEnabled ? 'פעיל' : 'כבוי'}
+                    {isEn ? (dmBotEnabled ? 'On' : 'Off') : (dmBotEnabled ? 'פעיל' : 'כבוי')}
                   </span>
                   <button
                     onClick={toggleDmBot}
@@ -282,9 +282,13 @@ export default function ChatbotSettingsPage() {
 
             {igConnection.connected && dmBotEnabled !== null && (
               <p className="mt-3 text-xs" style={{ color: 'var(--dash-text-3)' }}>
-                {dmBotEnabled
-                  ? 'הבוט עונה אוטומטית על הודעות DM באינסטגרם. כבה כדי לענות ידנית.'
-                  : 'הבוט כבוי — הודעות DM לא ייענו אוטומטית.'}
+                {isEn
+                  ? (dmBotEnabled
+                      ? 'The bot auto-replies to Instagram DMs. Turn off to reply manually.'
+                      : 'The bot is off — DMs won’t be answered automatically.')
+                  : (dmBotEnabled
+                      ? 'הבוט עונה אוטומטית על הודעות DM באינסטגרם. כבה כדי לענות ידנית.'
+                      : 'הבוט כבוי — הודעות DM לא ייענו אוטומטית.')}
               </p>
             )}
           </div>
@@ -293,22 +297,22 @@ export default function ChatbotSettingsPage() {
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <StatCard
-            title="פוסטים בבסיס"
+            title={isEn ? 'Posts in KB' : 'פוסטים בבסיס'}
             value={stats?.totalPosts || 0}
             icon="📝"
           />
           <StatCard
-            title="תגובות נאספו"
+            title={isEn ? 'Comments collected' : 'תגובות נאספו'}
             value={stats?.totalComments || 0}
             icon="💬"
           />
           <StatCard
-            title="נושאים מזוהים"
+            title={isEn ? 'Detected topics' : 'נושאים מזוהים'}
             value={stats?.topicsCount || 0}
             icon="🏷️"
           />
           <StatCard
-            title="סריקה אחרונה"
+            title={isEn ? 'Last scan' : 'סריקה אחרונה'}
             value={formatRelativeTime(stats?.lastScrape || null)}
             icon="🕐"
             isText
@@ -329,13 +333,14 @@ export default function ChatbotSettingsPage() {
                 style={{ background: 'rgba(255,255,255,0.05)', borderColor: 'var(--color-info)' }}
               >
                 <p style={{ color: 'var(--dash-text)' }}>
-                  <strong>בניית פרסונה מאפס</strong> תארך כ-20-30 דקות ותעבור על 7 שלבים:
+                  <strong>{isEn ? 'Building persona from scratch' : 'בניית פרסונה מאפס'}</strong>{' '}
+                  {isEn ? 'takes 20–30 minutes and runs 7 stages:' : 'תארך כ-20-30 דקות ותעבור על 7 שלבים:'}
                 </p>
                 <ul className="list-disc list-inside mt-2 text-sm space-y-1" style={{ color: 'var(--dash-text-2)' }}>
-                  <li>סריקת 500 פוסטים אחרונים</li>
-                  <li>סריקת 7,500 תגובות מהפוסטים המובילים</li>
-                  <li>ניתוח פרופיל והאשטגים</li>
-                  <li>בניית מפת ידע מקצועית עם Gemini Pro</li>
+                  <li>{isEn ? 'Scrape 500 most-recent posts' : 'סריקת 500 פוסטים אחרונים'}</li>
+                  <li>{isEn ? 'Scrape 7,500 comments from top posts' : 'סריקת 7,500 תגובות מהפוסטים המובילים'}</li>
+                  <li>{isEn ? 'Profile and hashtag analysis' : 'ניתוח פרופיל והאשטגים'}</li>
+                  <li>{isEn ? 'Build professional knowledge map with Gemini Pro' : 'בניית מפת ידע מקצועית עם Gemini Pro'}</li>
                 </ul>
               </div>
 
@@ -343,11 +348,11 @@ export default function ChatbotSettingsPage() {
                 onClick={() => setShowProgress(true)}
                 className="w-full px-6 py-4 rounded-xl font-bold text-lg transition-all btn-primary"
               >
-                התחל בניית פרסונה מחדש
+                {isEn ? 'Rebuild persona' : 'התחל בניית פרסונה מחדש'}
               </button>
 
               <p className="text-sm text-center" style={{ color: 'var(--dash-text-3)' }}>
-                טיפ: עדכונים יומיים רצים אוטומטית בכל לילה ב-02:00
+                {isEn ? 'Tip: daily updates run automatically every night at 02:00.' : 'טיפ: עדכונים יומיים רצים אוטומטית בכל לילה ב-02:00'}
               </p>
             </div>
           ) : (
@@ -371,18 +376,18 @@ export default function ChatbotSettingsPage() {
 
           {history.length === 0 ? (
             <p className="text-center py-8" style={{ color: 'var(--dash-text-3)' }}>
-              אין עדיין היסטוריית סריקות. התחל בניית פרסונה ראשונה!
+              {isEn ? 'No scan history yet. Start your first persona build!' : 'אין עדיין היסטוריית סריקות. התחל בניית פרסונה ראשונה!'}
             </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr style={{ background: 'rgba(255,255,255,0.05)' }}>
-                    <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>תאריך</th>
-                    <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>סטטוס</th>
-                    <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>סוג</th>
-                    <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>משך</th>
-                    <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>תוצאות</th>
+                    <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Date' : 'תאריך'}</th>
+                    <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Status' : 'סטטוס'}</th>
+                    <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Type' : 'סוג'}</th>
+                    <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Duration' : 'משך'}</th>
+                    <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Results' : 'תוצאות'}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -393,7 +398,7 @@ export default function ChatbotSettingsPage() {
                       style={{ borderBottom: '1px solid var(--dash-glass-border)' }}
                     >
                       <td className="p-3 text-sm">
-                        {new Date(job.created_at).toLocaleDateString('he-IL', {
+                        {new Date(job.created_at).toLocaleDateString(isEn ? 'en-US' : 'he-IL', {
                           year: 'numeric',
                           month: 'short',
                           day: 'numeric',
@@ -405,14 +410,16 @@ export default function ChatbotSettingsPage() {
                         <StatusBadge status={job.status} />
                       </td>
                       <td className="p-3 text-sm" style={{ color: 'var(--dash-text-2)' }}>
-                        {job.job_type === 'full_rebuild' ? 'סריקה מלאה' : 'עדכון מהיר'}
+                        {isEn
+                          ? (job.job_type === 'full_rebuild' ? 'Full rebuild' : 'Quick update')
+                          : (job.job_type === 'full_rebuild' ? 'סריקה מלאה' : 'עדכון מהיר')}
                       </td>
                       <td className="p-3 text-sm" style={{ color: 'var(--dash-text-2)' }}>
                         {formatDuration(job.started_at, job.completed_at)}
                       </td>
                       <td className="p-3 text-sm" style={{ color: 'var(--dash-text-2)' }}>
-                        {job.total_posts_scraped > 0 && `${job.total_posts_scraped} פוסטים`}
-                        {job.total_comments_scraped > 0 && `, ${job.total_comments_scraped} תגובות`}
+                        {job.total_posts_scraped > 0 && `${job.total_posts_scraped} ${isEn ? 'posts' : 'פוסטים'}`}
+                        {job.total_comments_scraped > 0 && `, ${job.total_comments_scraped} ${isEn ? 'comments' : 'תגובות'}`}
                       </td>
                     </tr>
                   ))}
@@ -431,7 +438,9 @@ export default function ChatbotSettingsPage() {
 
           <div className="space-y-4">
             <p style={{ color: 'var(--dash-text-2)' }}>
-              העתק את הקוד הבא והטמע אותו באתר האישי שלך כדי להוסיף את הצ'אטבוט:
+              {isEn
+                ? 'Copy this snippet and embed it on your site to add the chatbot:'
+                : "העתק את הקוד הבא והטמע אותו באתר האישי שלך כדי להוסיף את הצ'אטבוט:"}
             </p>
 
             <div
@@ -442,7 +451,7 @@ export default function ChatbotSettingsPage() {
                 onClick={() => copyToClipboard(generateEmbedCode())}
                 className="absolute top-2 left-2 px-3 py-1 rounded text-xs font-sans transition-colors btn-primary"
               >
-                העתק
+                {isEn ? 'Copy' : 'העתק'}
               </button>
               <pre className="mt-8 overflow-x-auto">{generateEmbedCode()}</pre>
             </div>
@@ -452,7 +461,7 @@ export default function ChatbotSettingsPage() {
               style={{ background: 'rgba(255,255,255,0.05)', borderColor: 'var(--color-info)' }}
             >
               <p className="text-sm" style={{ color: 'var(--dash-text)' }}>
-                <strong>קישור ישיר:</strong>{' '}
+                <strong>{isEn ? 'Direct link:' : 'קישור ישיר:'}</strong>{' '}
                 <a
                   href={`/chat/${username}`}
                   target="_blank"
@@ -463,7 +472,9 @@ export default function ChatbotSettingsPage() {
                 </a>
               </p>
               <p className="text-xs mt-2" style={{ color: 'var(--dash-text-3)' }}>
-                שתף קישור זה עם העוקבים שלך בסטורי, בביו או בלינקים
+                {isEn
+                  ? 'Share this link in stories, your bio or in marketing.'
+                  : 'שתף קישור זה עם העוקבים שלך בסטורי, בביו או בלינקים'}
               </p>
             </div>
           </div>
@@ -483,7 +494,7 @@ export default function ChatbotSettingsPage() {
           >
             <div className="flex items-center justify-between w-[390px] mb-3 px-1">
               <span className="text-sm font-medium text-white/80">
-                צפייה חיה — כך העוקבים רואים את הצ׳אט
+                {isEn ? 'Live preview — how visitors see the chat' : 'צפייה חיה — כך העוקבים רואים את הצ׳אט'}
               </span>
               <div className="flex items-center gap-2">
                 <a
@@ -492,7 +503,7 @@ export default function ChatbotSettingsPage() {
                   rel="noopener noreferrer"
                   className="text-xs text-white/60 hover:text-white transition-colors underline"
                 >
-                  פתח בטאב חדש
+                  {isEn ? 'Open in new tab' : 'פתח בטאב חדש'}
                 </a>
                 <button
                   onClick={() => setShowLivePreview(false)}
@@ -514,12 +525,12 @@ export default function ChatbotSettingsPage() {
                 src={`/chat/${username}?preview=1&t=${Date.now()}`}
                 className="w-full border-0"
                 style={{ height: 'calc(100% - 30px)', borderRadius: '0 0 32px 32px', backgroundColor: '#f4f5f7' }}
-                title="תצוגה מקדימה חיה"
+                title={isEn ? 'Live preview' : 'תצוגה מקדימה חיה'}
               />
             </div>
 
             <p className="text-xs text-white/50 mt-3">
-              זה הצ׳אט כמו שהעוקבים שלך רואים אותו — נסו לשלוח הודעה
+              {isEn ? 'This is the chat as visitors see it — try sending a message.' : 'זה הצ׳אט כמו שהעוקבים שלך רואים אותו — נסו לשלוח הודעה'}
             </p>
           </div>
         </div>

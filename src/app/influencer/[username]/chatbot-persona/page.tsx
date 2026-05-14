@@ -261,16 +261,16 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm btn-primary disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-            סנכרון מאינסטגרם
+            {isEn ? 'Sync from Instagram' : 'סנכרון מאינסטגרם'}
           </button>
         </div>
 
         {/* ═══ STATS STRIP ═══ */}
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: 'פוסטים בבסיס', value: stats.totalPosts, icon: FileText },
-            { label: 'נושאים', value: stats.topicsCount, icon: Hash },
-            { label: 'סריקה אחרונה', value: stats.lastScrape ? new Date(stats.lastScrape).toLocaleDateString('he-IL') : 'טרם נסרק', icon: Calendar },
+            { label: isEn ? 'Posts in KB' : 'פוסטים בבסיס', value: stats.totalPosts, icon: FileText },
+            { label: isEn ? 'Topics' : 'נושאים', value: stats.topicsCount, icon: Hash },
+            { label: isEn ? 'Last scan' : 'סריקה אחרונה', value: stats.lastScrape ? new Date(stats.lastScrape).toLocaleDateString(isEn ? 'en-US' : 'he-IL') : (isEn ? 'Not yet' : 'טרם נסרק'), icon: Calendar },
           ].map((s, i) => (
             <div key={i} className="metric-card">
               <div className="flex items-center gap-1.5 mb-1">
@@ -291,16 +291,16 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
                 <Instagram className="w-5 h-5" style={{ color: igConnection.connected ? '#22c55e' : '#ef4444' }} />
               </div>
               <div>
-                <h3 className="font-semibold text-sm">חיבור אינסטגרם</h3>
+                <h3 className="font-semibold text-sm">{isEn ? 'Instagram connection' : 'חיבור אינסטגרם'}</h3>
                 {igConnection.connected ? (
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
-                    <span className="text-xs text-green-500">מחובר — @{igConnection.ig_username}</span>
+                    <span className="text-xs text-green-500">{isEn ? 'Connected — ' : 'מחובר — '}@{igConnection.ig_username}</span>
                   </div>
                 ) : (
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <XCircle className="w-3.5 h-3.5 text-red-400" />
-                    <span className="text-xs text-red-400">לא מחובר</span>
+                    <span className="text-xs text-red-400">{isEn ? 'Not connected' : 'לא מחובר'}</span>
                   </div>
                 )}
               </div>
@@ -309,7 +309,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
             {igConnection.connected ? (
               <div className="flex items-center gap-3">
                 <span className="text-xs" style={{ color: 'var(--dash-text-2)' }}>
-                  בוט DM
+                  {isEn ? 'DM bot' : 'בוט DM'}
                 </span>
                 <button onClick={handleToggleDM} disabled={dmLoading} className="transition-colors">
                   {dmLoading ? (
@@ -324,7 +324,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
             ) : (
               <button onClick={handleConnectIG} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm btn-primary">
                 <ExternalLink className="w-4 h-4" />
-                חבר אינסטגרם
+                {isEn ? 'Connect Instagram' : 'חבר אינסטגרם'}
               </button>
             )}
           </div>
@@ -334,13 +334,13 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
         {!persona ? (
           <div className="text-center py-16 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
             <Bot className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--dash-text-3)' }} />
-            <h3 className="text-xl font-semibold mb-2">אין פרסונה עדיין</h3>
-            <p className="mb-4" style={{ color: 'var(--dash-text-2)' }}>סנכרנו מאינסטגרם כדי לבנות את הפרסונה</p>
+            <h3 className="text-xl font-semibold mb-2">{isEn ? 'No persona yet' : 'אין פרסונה עדיין'}</h3>
+            <p className="mb-4" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Sync from Instagram to build the persona.' : 'סנכרנו מאינסטגרם כדי לבנות את הפרסונה'}</p>
           </div>
         ) : (
           <>
             {/* Voice & Style */}
-            <Section title="קול וסגנון" icon={MessageSquare} defaultOpen>
+            <Section title={isEn ? 'Voice & style' : 'קול וסגנון'} icon={MessageSquare} defaultOpen>
               <div className="space-y-4 pt-4">
                 {toneStr && (
                   <div>
@@ -431,7 +431,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
             </Section>
 
             {/* Knowledge Map */}
-            <Section title="מפת ידע" icon={Map}>
+            <Section title={isEn ? 'Knowledge map' : 'מפת ידע'} icon={Map}>
               <div className="space-y-4 pt-4">
                 {knowledgeMap?.coreTopics && knowledgeMap.coreTopics.length > 0 && (
                   <div>
@@ -481,7 +481,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
             </Section>
 
             {/* Bio & Interests */}
-            <Section title="אודות" icon={Brain}>
+            <Section title={isEn ? 'About' : 'אודות'} icon={Brain}>
               <div className="space-y-4 pt-4">
                 {persona.bio && (
                   <div>
@@ -514,7 +514,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
 
             {/* Greeting */}
             {persona.greeting_message && (
-              <Section title="הודעת פתיחה" icon={Sparkles}>
+              <Section title={isEn ? 'Welcome message' : 'הודעת פתיחה'} icon={Sparkles}>
                 <div className="pt-4">
                   <div className="rounded-lg p-4" style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid var(--dash-glass-border)' }}>
                     <p className="text-sm leading-relaxed">{persona.greeting_message}</p>
@@ -538,7 +538,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs btn-primary"
           >
             <ExternalLink className="w-3.5 h-3.5" />
-            פתח צ׳אט
+            {isEn ? 'Open chat' : 'פתח צ׳אט'}
           </a>
         </div>
       </main>
