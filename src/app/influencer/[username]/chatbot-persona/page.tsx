@@ -344,7 +344,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
               <div className="space-y-4 pt-4">
                 {toneStr && (
                   <div>
-                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>טון</label>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Tone' : 'טון'}</label>
                     <p className="text-sm">{toneStr}</p>
                   </div>
                 )}
@@ -352,25 +352,25 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
                 <div className="grid grid-cols-2 gap-4">
                   {persona.narrative_perspective && (
                     <div>
-                      <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>פרספקטיבה</label>
+                      <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Perspective' : 'פרספקטיבה'}</label>
                       <Badge>{persona.narrative_perspective}</Badge>
                     </div>
                   )}
                   {persona.emoji_usage && (
                     <div>
-                      <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>אימוג׳ים</label>
+                      <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Emojis' : 'אימוג׳ים'}</label>
                       <Badge>{persona.emoji_usage}</Badge>
                     </div>
                   )}
                   {persona.storytelling_mode && (
                     <div>
-                      <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>סיפור</label>
+                      <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Story style' : 'סיפור'}</label>
                       <Badge>{persona.storytelling_mode}</Badge>
                     </div>
                   )}
                   {persona.message_structure && (
                     <div>
-                      <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>מבנה</label>
+                      <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Structure' : 'מבנה'}</label>
                       <Badge>{persona.message_structure}</Badge>
                     </div>
                   )}
@@ -378,7 +378,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
 
                 {persona.sass_level !== null && persona.sass_level !== undefined && (
                   <div>
-                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>רמת חוצפה</label>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Sass level' : 'רמת חוצפה'}</label>
                     <div className="flex items-center gap-2">
                       <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--dash-glass-border)' }}>
                         <div className="h-full rounded-full" style={{ width: `${(persona.sass_level / 10) * 100}%`, background: 'var(--color-primary)' }} />
@@ -390,14 +390,14 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
 
                 {voiceRules?.language && (
                   <div>
-                    <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>שפה</label>
+                    <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Language' : 'שפה'}</label>
                     <p className="text-sm">{voiceRules.language}</p>
                   </div>
                 )}
 
                 {persona.common_phrases && persona.common_phrases.length > 0 && (
                   <div>
-                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>ביטויים אופייניים</label>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Signature phrases' : 'ביטויים אופייניים'}</label>
                     <div className="flex flex-wrap gap-1.5">
                       {persona.common_phrases.map((phrase, i) => (
                         <Badge key={i} color="var(--color-warning)">{phrase}</Badge>
@@ -408,7 +408,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
 
                 {voiceRules?.recurringPhrases && voiceRules.recurringPhrases.length > 0 && (
                   <div>
-                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>ביטויים חוזרים</label>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Recurring phrases' : 'ביטויים חוזרים'}</label>
                     <div className="flex flex-wrap gap-1.5">
                       {voiceRules.recurringPhrases.map((phrase, i) => (
                         <Badge key={i} color="var(--color-info)">{phrase}</Badge>
@@ -419,7 +419,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
 
                 {voiceRules?.avoidedWords && voiceRules.avoidedWords.length > 0 && (
                   <div>
-                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>מילים שנמנע מהן</label>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Avoided words' : 'מילים שנמנע מהן'}</label>
                     <div className="flex flex-wrap gap-1.5">
                       {voiceRules.avoidedWords.map((w, i) => (
                         <Badge key={i} color="var(--dash-negative)">{w}</Badge>
@@ -435,7 +435,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
               <div className="space-y-4 pt-4">
                 {knowledgeMap?.coreTopics && knowledgeMap.coreTopics.length > 0 && (
                   <div>
-                    <label className="text-xs font-medium block mb-2" style={{ color: 'var(--dash-text-2)' }}>נושאי ליבה</label>
+                    <label className="text-xs font-medium block mb-2" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Core topics' : 'נושאי ליבה'}</label>
                     <div className="space-y-2">
                       {knowledgeMap.coreTopics.map((topic, i) => (
                         <div key={i} className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--dash-glass-border)' }}>
@@ -455,7 +455,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
 
                 {knowledgeMap?.domains && knowledgeMap.domains.length > 0 && (
                   <div>
-                    <label className="text-xs font-medium block mb-2" style={{ color: 'var(--dash-text-2)' }}>תחומי מומחיות</label>
+                    <label className="text-xs font-medium block mb-2" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Areas of expertise' : 'תחומי מומחיות'}</label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                       {knowledgeMap.domains.map((d, i) => (
                         <div key={i} className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--dash-glass-border)' }}>
@@ -485,13 +485,13 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
               <div className="space-y-4 pt-4">
                 {persona.bio && (
                   <div>
-                    <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>ביו</label>
+                    <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Bio' : 'ביו'}</label>
                     <p className="text-sm">{persona.bio}</p>
                   </div>
                 )}
                 {persona.interests && persona.interests.length > 0 && (
                   <div>
-                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>תחומי עניין</label>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Interests' : 'תחומי עניין'}</label>
                     <div className="flex flex-wrap gap-1.5">
                       {persona.interests.map((interest, i) => (
                         <Badge key={i}>{interest}</Badge>
@@ -501,7 +501,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
                 )}
                 {persona.directives && persona.directives.length > 0 && (
                   <div>
-                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>הנחיות</label>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Directives' : 'הנחיות'}</label>
                     <ul className="space-y-1 text-sm" style={{ color: 'var(--dash-text-2)' }}>
                       {persona.directives.map((d, i) => (
                         <li key={i}>• {d}</li>
@@ -529,7 +529,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
         <div className="rounded-xl border p-4 flex items-center justify-between" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}>
           <div className="flex items-center gap-2">
             <Zap className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
-            <span className="text-sm font-medium">קישור לצ׳אט</span>
+            <span className="text-sm font-medium">{isEn ? 'Chat link' : 'קישור לצ׳אט'}</span>
           </div>
           <a
             href={`/chat/${username}`}
