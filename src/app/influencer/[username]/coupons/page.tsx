@@ -144,7 +144,7 @@ export default function CouponsPage({
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('למחוק את הקופון?')) return;
+    if (!confirm(isEn ? 'Delete this promotion?' : 'למחוק את הקופון?')) return;
     try {
       const res = await fetch(`/api/influencer/coupons?username=${username}&id=${id}`, { method: 'DELETE' });
       if (res.ok) {
@@ -237,11 +237,11 @@ export default function CouponsPage({
           <div className="glass-card rounded-2xl p-5 mb-6 animate-slide-up" style={{ border: '1px solid var(--color-primary)' }}>
             <h3 className="font-semibold mb-4 flex items-center gap-2">
               <Plus className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
-              קופון חדש
+              {isEn ? 'New promotion' : 'קופון חדש'}
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>קוד קופון *</label>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Promo code *' : 'קוד קופון *'}</label>
                 <input
                   className="input w-full py-2 px-3 text-sm"
                   value={newCoupon.code}
@@ -250,16 +250,16 @@ export default function CouponsPage({
                 />
               </div>
               <div>
-                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>מותג</label>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Brand' : 'מותג'}</label>
                 <input
                   className="input w-full py-2 px-3 text-sm"
                   value={newCoupon.brand_name}
                   onChange={e => setNewCoupon(p => ({ ...p, brand_name: e.target.value }))}
-                  placeholder="שם המותג"
+                  placeholder={isEn ? 'Brand name' : 'שם המותג'}
                 />
               </div>
               <div>
-                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>סוג הנחה</label>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Discount type' : 'סוג הנחה'}</label>
                 <select
                   className="input w-full py-2 px-3 text-sm"
                   value={newCoupon.discount_type}
@@ -271,7 +271,7 @@ export default function CouponsPage({
                 </select>
               </div>
               <div>
-                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>ערך הנחה</label>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Discount value' : 'ערך הנחה'}</label>
                 <input
                   type="number"
                   className="input w-full py-2 px-3 text-sm"
@@ -281,16 +281,16 @@ export default function CouponsPage({
                 />
               </div>
               <div className="sm:col-span-2">
-                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>תיאור</label>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Description' : 'תיאור'}</label>
                 <input
                   className="input w-full py-2 px-3 text-sm"
                   value={newCoupon.description}
                   onChange={e => setNewCoupon(p => ({ ...p, description: e.target.value }))}
-                  placeholder="תיאור הקופון..."
+                  placeholder={isEn ? 'Promo description…' : 'תיאור הקופון...'}
                 />
               </div>
               <div className="sm:col-span-2">
-                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>קישור מעקב</label>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Tracking URL' : 'קישור מעקב'}</label>
                 <input
                   className="input w-full py-2 px-3 text-sm"
                   value={newCoupon.tracking_url}
@@ -306,7 +306,7 @@ export default function CouponsPage({
                 className="px-4 py-2 rounded-xl text-sm"
                 style={{ color: 'var(--dash-text-2)' }}
               >
-                ביטול
+                {isEn ? 'Cancel' : 'ביטול'}
               </button>
               <button
                 onClick={handleAdd}
@@ -315,7 +315,7 @@ export default function CouponsPage({
                 style={{ background: 'var(--color-primary)', color: '#fff' }}
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                שמירה
+                {isEn ? 'Save' : 'שמירה'}
               </button>
             </div>
           </div>
@@ -356,7 +356,7 @@ export default function CouponsPage({
                     <div className="p-4">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>קוד</label>
+                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Code' : 'קוד'}</label>
                           <input
                             className="input w-full py-2 px-3 text-sm"
                             value={editForm.code || ''}
@@ -364,7 +364,7 @@ export default function CouponsPage({
                           />
                         </div>
                         <div>
-                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>מותג</label>
+                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Brand' : 'מותג'}</label>
                           <input
                             className="input w-full py-2 px-3 text-sm"
                             value={editForm.brand_name || ''}
@@ -372,7 +372,7 @@ export default function CouponsPage({
                           />
                         </div>
                         <div>
-                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>סוג הנחה</label>
+                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Discount type' : 'סוג הנחה'}</label>
                           <select
                             className="input w-full py-2 px-3 text-sm"
                             value={editForm.discount_type || 'percentage'}
@@ -384,7 +384,7 @@ export default function CouponsPage({
                           </select>
                         </div>
                         <div>
-                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>ערך</label>
+                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Value' : 'ערך'}</label>
                           <input
                             type="number"
                             className="input w-full py-2 px-3 text-sm"
@@ -393,7 +393,7 @@ export default function CouponsPage({
                           />
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>תיאור</label>
+                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Description' : 'תיאור'}</label>
                           <input
                             className="input w-full py-2 px-3 text-sm"
                             value={editForm.description || ''}
@@ -401,7 +401,7 @@ export default function CouponsPage({
                           />
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>קישור מעקב</label>
+                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Tracking URL' : 'קישור מעקב'}</label>
                           <input
                             className="input w-full py-2 px-3 text-sm"
                             value={editForm.tracking_url || ''}
@@ -416,7 +416,7 @@ export default function CouponsPage({
                           className="px-3 py-1.5 rounded-lg text-sm"
                           style={{ color: 'var(--dash-text-2)' }}
                         >
-                          ביטול
+                          {isEn ? 'Cancel' : 'ביטול'}
                         </button>
                         <button
                           onClick={() => handleSave(coupon.id)}
