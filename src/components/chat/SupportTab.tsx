@@ -21,6 +21,7 @@ import { track } from '@/lib/analytics/track';
 
 interface Props {
   accountId: string;
+  username: string;
   brandColor?: string;
   language?: string;
 }
@@ -47,7 +48,7 @@ const ISSUES_HE: { id: IssueId; label: string; subtitle: string; icon: typeof Bu
 
 type Step = 'type' | 'form';
 
-export default function SupportTab({ accountId, brandColor = '#0c1013', language }: Props) {
+export default function SupportTab({ accountId, username, brandColor = '#0c1013', language }: Props) {
   const isEn = (language || 'en').toLowerCase() === 'en';
   const dir: 'ltr' | 'rtl' = isEn ? 'ltr' : 'rtl';
   const issues = isEn ? ISSUES_EN : ISSUES_HE;
@@ -128,14 +129,15 @@ export default function SupportTab({ accountId, brandColor = '#0c1013', language
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          username,
           accountId,
           customerName: form.name,
+          customerEmail: form.email,
           customerPhone: null,
           message,
           brand: form.company,
+          source: 'support_ticket',
           metadata: {
-            source: 'support_ticket',
-            email: form.email,
             issue_type: issueType,
             subject: form.subject || null,
           },

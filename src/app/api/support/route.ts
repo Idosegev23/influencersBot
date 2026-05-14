@@ -9,14 +9,17 @@ import { checkInfluencerAuth } from '@/lib/auth/influencer-auth';
 import { emitServerConversion } from '@/lib/analytics/server-track';
 import { requireAdminAuth } from '@/lib/auth/admin-auth';
 import { autoAssignNewTicket } from '@/lib/support/auto-assign';
+import { sendEmail } from '@/lib/email';
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
-      username,
+      username,        // optional now — `accountId` is the new canonical path
+      accountId,       // B2B SaaS flows pass id directly (no username slug)
       customerName,
       customerPhone,
+      customerEmail,   // B2B SaaS: visitor's work email
       message,
       problem,
       brand,
@@ -24,15 +27,17 @@ export async function POST(req: NextRequest) {
       productId,
       sessionId,
       refSource: clientRefSource,
+      metadata: clientMetadata,  // form-flow extras (issue_type, team_size, subject, ...)
+      source: clientSource,      // overrides metadata.source if set
     } = body;
 
     // Support both old format (message) and new format (problem)
     const messageText = message || problem;
 
-    // Validate required fields
-    if (!username || !customerName || !messageText) {
+    // Validate: must have either username or accountId, plus name + message
+    if ((!username && !accountId) || !customerName || !messageText) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Missing required fields (need username or accountId + customerName + message)' },
         { status: 400 }
       );
     }
@@ -41,17 +46,38 @@ export async function POST(req: NextRequest) {
     const sanitizedName = sanitizeHtml(customerName);
     const sanitizedMessage = sanitizeHtml(messageText);
     const sanitizedPhone = customerPhone ? customerPhone.replace(/[^\d+]/g, '') : null;
+    const sanitizedEmail = (typeof customerEmail === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim()))
+      ? customerEmail.trim().toLowerCase()
+      : null;
     const sanitizedBrand = brand ? sanitizeHtml(brand) : null;
     const sanitizedOrderNumber = orderNumber ? sanitizeHtml(orderNumber) : null;
+    const source = (typeof clientSource === 'string' && clientSource)
+      || (clientMetadata && typeof clientMetadata.source === 'string' ? clientMetadata.source : null);
+    const metadata = (clientMetadata && typeof clientMetadata === 'object') ? clientMetadata : {};
 
-    console.log('[Support] Customer phone received:', customerPhone);
-    console.log('[Support] Sanitized phone:', sanitizedPhone);
+    console.log('[Support] Customer phone received:', customerPhone, '| email:', sanitizedEmail, '| source:', source);
 
-    // Get influencer
-    const influencer = await getInfluencerByUsername(username);
+    // Resolve influencer: prefer username (existing retail flow), fall back
+    // to accountId for B2B SaaS forms that don't pass a slug.
+    let influencer: any = null;
+    if (username) {
+      influencer = await getInfluencerByUsername(username);
+    }
+    if (!influencer && accountId) {
+      const { data } = await supabase.from('accounts').select('*').eq('id', accountId).single();
+      if (data) {
+        const cfg = (data.config as Record<string, any>) || {};
+        influencer = {
+          id: data.id,
+          display_name: cfg.display_name || cfg.username || data.id,
+          _rawConfig: cfg,
+          language: (data as any).language || 'he',
+        };
+      }
+    }
     if (!influencer) {
       return NextResponse.json(
-        { error: 'Influencer not found' },
+        { error: 'Account not found' },
         { status: 404 }
       );
     }
@@ -150,6 +176,7 @@ export async function POST(req: NextRequest) {
         account_id: influencer.id,
         customer_name: sanitizedName,
         customer_phone: sanitizedPhone,
+        customer_email: sanitizedEmail,
         message: enhancedMessage,
         brand: sanitizedBrand,
         order_number: sanitizedOrderNumber,
@@ -157,6 +184,8 @@ export async function POST(req: NextRequest) {
         session_id: sessionId || null,
         status: 'new',
         ref_source: refSource,
+        source,
+        metadata,
       })
       .select()
       .single();
@@ -173,6 +202,63 @@ export async function POST(req: NextRequest) {
     // configured. Best-effort: if there are no agents (legacy influencers),
     // the ticket stays unassigned. The act is recorded with actor='system'.
     void autoAssignNewTicket(supportRequest.id, influencer.id);
+
+    // Email notification — fire-and-forget. Sends via the existing Bestie
+    // Gmail service (lib/email.ts) when:
+    //   1. The account has `config.support_email` set (B2B SaaS path), AND
+    //   2. We can render a useful subject from the form context.
+    // Hebrew accounts that never set support_email keep the WhatsApp-only flow
+    // they have today — this branch is purely additive.
+    const accountCfg = (influencer as any)?._rawConfig || {};
+    const supportEmail: string | undefined = typeof accountCfg.support_email === 'string'
+      ? accountCfg.support_email.trim()
+      : undefined;
+    if (supportEmail) {
+      const sourceLabel = source === 'demo_request'
+        ? 'Demo request'
+        : source === 'support_ticket'
+          ? 'Support ticket'
+          : 'New request';
+      const subjectBits: string[] = [`[${influencer.display_name}] ${sourceLabel}`];
+      if (metadata && typeof metadata.subject === 'string' && metadata.subject) {
+        subjectBits.push('—', metadata.subject.slice(0, 120));
+      } else if (sanitizedBrand) {
+        subjectBits.push('—', sanitizedBrand);
+      }
+      const subject = subjectBits.join(' ');
+
+      const htmlEscape = (s: string) =>
+        s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      const formatLine = (label: string, value: string | null | undefined) =>
+        value ? `<tr><td style="padding:6px 12px 6px 0;color:#676767;font-size:13px;white-space:nowrap">${htmlEscape(label)}</td><td style="padding:6px 0;color:#0c1013;font-size:14px">${htmlEscape(value)}</td></tr>` : '';
+
+      const html = `<!doctype html><html><body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif;background:#f4f5f7;margin:0;padding:24px;color:#0c1013">
+  <div style="max-width:620px;margin:0 auto;background:#fff;border-radius:14px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
+    <div style="font-size:12px;color:#676767;letter-spacing:0.08em;text-transform:uppercase;font-weight:600;margin-bottom:6px">${htmlEscape(sourceLabel)}</div>
+    <h1 style="font-size:20px;font-weight:700;margin:0 0 16px;color:#0c1013">${htmlEscape(influencer.display_name)}</h1>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+      ${formatLine('From', sanitizedName)}
+      ${formatLine('Email', sanitizedEmail)}
+      ${formatLine('Phone', sanitizedPhone)}
+      ${formatLine('Company', sanitizedBrand)}
+      ${formatLine('Issue type', metadata?.issue_type)}
+      ${formatLine('Team size', metadata?.team_size)}
+      ${formatLine('Order #', sanitizedOrderNumber)}
+      ${formatLine('Source', source || 'unspecified')}
+      ${formatLine('Ref', refSource)}
+      ${formatLine('Ticket ID', supportRequest.id)}
+    </table>
+    <div style="border-top:1px solid #f1e9fd;padding-top:16px;white-space:pre-wrap;font-size:14px;line-height:1.55;color:#0c1013">${htmlEscape(enhancedMessage)}</div>
+  </div>
+  <div style="max-width:620px;margin:12px auto 0;font-size:11px;color:#9ca3af;text-align:center">Sent by BestieAI on behalf of ${htmlEscape(influencer.display_name)}</div>
+</body></html>`;
+
+      sendEmail({ to: supportEmail, subject, html })
+        .then((r) => {
+          if (!r.success) console.warn('[Support] Email notify failed:', r.error);
+        })
+        .catch((e) => console.warn('[Support] Email notify threw:', e?.message || e));
+    }
 
     // Derive a short "issue type" from the first line of the message;
     // the full text becomes the description. This matches the Meta

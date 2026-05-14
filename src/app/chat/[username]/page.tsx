@@ -2255,6 +2255,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
               <motion.div key="b2b-support" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="problem-tab h-full overflow-y-auto">
                 <SupportTab
                   accountId={influencer.id}
+                  username={username}
                   brandColor={(influencer.theme as any)?.colors?.primary || '#0c1013'}
                   language={(influencer as any).language || 'he'}
                 />
@@ -2767,6 +2768,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
               <DemoTab
                 key="demo"
                 accountId={influencer.id}
+                username={username}
                 brandColor={(influencer.theme as any)?.colors?.primary || '#0c1013'}
                 language={(influencer as any).language || 'he'}
               />

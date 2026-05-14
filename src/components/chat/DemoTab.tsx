@@ -20,13 +20,14 @@ import { track } from '@/lib/analytics/track';
 
 interface Props {
   accountId: string;
+  username: string;
   brandColor?: string;
   language?: string;
 }
 
 const TEAM_SIZES = ['1–10', '11–50', '51–200', '201–1000', '1000+'];
 
-export default function DemoTab({ accountId, brandColor = '#0c1013', language }: Props) {
+export default function DemoTab({ accountId, username, brandColor = '#0c1013', language }: Props) {
   const isEn = (language || 'en').toLowerCase() === 'en';
   const dir: 'ltr' | 'rtl' = isEn ? 'ltr' : 'rtl';
 
@@ -94,12 +95,15 @@ export default function DemoTab({ accountId, brandColor = '#0c1013', language }:
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          username,
           accountId,
           customerName: form.name,
+          customerEmail: form.email,
           customerPhone: null,
           message,
           brand: form.company,
-          metadata: { source: 'demo_request', email: form.email, team_size: form.teamSize },
+          source: 'demo_request',
+          metadata: { team_size: form.teamSize, use_case: form.useCase || null },
         }),
       });
       if (!res.ok) throw new Error('demo_request_failed');
