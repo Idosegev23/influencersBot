@@ -1388,8 +1388,11 @@ function TicketDetail({
         </div>
       </div>
 
-      {/* Customer notification (WhatsApp) */}
-      <div className="rounded-xl p-3"
+      {/* Customer notification (WhatsApp) — hidden entirely for English
+          accounts since they don't have WhatsApp templates approved (and
+          IMAI explicitly has features.whatsappEnabled=false). Email is the
+          channel for B2B SaaS; the WhatsApp template flow is retail-only. */}
+      {lang !== 'en' && <div className="rounded-xl p-3"
         style={{ background: 'rgba(136,63,226,0.1)', border: '1px solid rgba(136,63,226,0.25)' }}>
         <div className="text-xs mb-2 font-semibold" style={{ color: '#c084fc' }}>שליחת עדכון ללקוחה (WhatsApp)</div>
         <div className="flex flex-wrap gap-2">
@@ -1406,10 +1409,12 @@ function TicketDetail({
             עדכון אחרון נשלח ללקוחה: {formatRelative(ticket.last_customer_notified_at, lang)}
           </p>
         )}
-      </div>
+      </div>}
 
-      {/* Direct message — free-form text + image, only inside the 24h window */}
-      {ticket.customer_phone && (
+      {/* Direct message — free-form text + image, only inside the 24h window.
+          Also gated on lang !== 'en' since the freeform-message flow uses the
+          same Hebrew WhatsApp template path. */}
+      {lang !== 'en' && ticket.customer_phone && (
         <div className="rounded-xl p-3"
           style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)' }}>
           <div className="flex items-center justify-between mb-2 flex-wrap gap-2">

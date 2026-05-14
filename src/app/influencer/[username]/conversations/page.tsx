@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useDashboardLang } from '@/hooks/useDashboardLang';
 import {
   MessageCircle,
   Search,
@@ -53,6 +54,8 @@ export default function ConversationsPage({
 }) {
   const resolvedParams = use(params);
   const username = resolvedParams.username;
+  const { lang } = useDashboardLang(username);
+  const isEn = lang === 'en';
   const router = useRouter();
 
   const [influencer, setInfluencer] = useState<Influencer | null>(null);
@@ -245,10 +248,10 @@ export default function ConversationsPage({
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
             <MessageCircle className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
-            שיחות
+            {isEn ? 'Conversations' : 'שיחות'}
           </h1>
           <div className="text-sm" style={{ color: 'var(--dash-text-2)' }}>
-            {sessions.length} שיחות
+            {sessions.length} {isEn ? 'conversations' : 'שיחות'}
           </div>
         </div>
 
@@ -292,7 +295,7 @@ export default function ConversationsPage({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="חיפוש בשיחות..."
+            placeholder={isEn ? 'Search conversations…' : 'חיפוש בשיחות...'}
             className="input w-full pr-12 pl-4 py-3"
           />
           {searchQuery && (
@@ -458,7 +461,9 @@ export default function ConversationsPage({
                 <MessageCircle className="w-8 h-8" style={{ color: 'var(--color-primary)' }} />
               </div>
               <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--dash-text)' }}>
-                {searchQuery ? 'לא נמצאו תוצאות' : 'אין שיחות עדיין'}
+                {isEn
+                  ? (searchQuery ? 'No matching results' : 'No conversations yet')
+                  : (searchQuery ? 'לא נמצאו תוצאות' : 'אין שיחות עדיין')}
               </h3>
               <p style={{ color: 'var(--dash-text-2)' }}>
                 {searchQuery ? 'נסה לחפש מילים אחרות' : 'שיחות חדשות יופיעו כאן כשהמבקרים ישתמשו בבוט'}
@@ -479,7 +484,7 @@ export default function ConversationsPage({
               className="glass-subtle px-6 py-3 rounded-2xl transition-all duration-300 hover:glass-card"
               style={{ color: 'var(--dash-text)' }}
             >
-              טען עוד שיחות
+              {isEn ? 'Load more' : 'טען עוד שיחות'}
             </button>
           </div>
         )}

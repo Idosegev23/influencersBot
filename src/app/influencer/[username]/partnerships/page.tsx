@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
+import { useDashboardLang } from '@/hooks/useDashboardLang';
 import {
   Briefcase,
   Plus,
@@ -41,12 +42,12 @@ interface Partnership {
 }
 
 const STATUS_OPTIONS = [
-  { value: 'active', label: 'פעיל', color: '#17A34A' },
-  { value: 'in_progress', label: 'בביצוע', color: '#2663EB' },
-  { value: 'proposal', label: 'הצעה', color: '#CB8A04' },
-  { value: 'negotiation', label: 'משא ומתן', color: '#f97316' },
-  { value: 'completed', label: 'הושלם', color: '#a78bfa' },
-  { value: 'cancelled', label: 'בוטל', color: '#ef4444' },
+  { value: 'active', label: 'פעיל', label_en: 'Active', color: '#17A34A' },
+  { value: 'in_progress', label: 'בביצוע', label_en: 'In progress', color: '#2663EB' },
+  { value: 'proposal', label: 'הצעה', label_en: 'Proposal', color: '#CB8A04' },
+  { value: 'negotiation', label: 'משא ומתן', label_en: 'Negotiation', color: '#f97316' },
+  { value: 'completed', label: 'הושלם', label_en: 'Completed', color: '#a78bfa' },
+  { value: 'cancelled', label: 'בוטל', label_en: 'Cancelled', color: '#ef4444' },
 ];
 
 function getStatusConfig(status: string) {
@@ -60,6 +61,8 @@ export default function PartnershipsPage({
 }) {
   const resolvedParams = use(params);
   const username = resolvedParams.username;
+  const { lang } = useDashboardLang(username);
+  const isEn = lang === 'en';
   const router = useRouter();
 
   const [partnerships, setPartnerships] = useState<Partnership[]>([]);
@@ -82,7 +85,9 @@ export default function PartnershipsPage({
   });
 
   const isServiceProvider = archetype === 'service_provider';
-  const pageTitle = isServiceProvider ? 'לקוחות' : 'שיתופי פעולה';
+  const pageTitle = isEn
+    ? (isServiceProvider ? 'Clients' : 'Partnerships')
+    : (isServiceProvider ? 'לקוחות' : 'שיתופי פעולה');
   const itemLabel = isServiceProvider ? 'לקוח' : 'שת״פ';
   const PageIcon = isServiceProvider ? Users : Briefcase;
 

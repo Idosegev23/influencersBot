@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useDashboardLang } from '@/hooks/useDashboardLang';
 import {
   Plus,
   Save,
@@ -158,6 +159,8 @@ export default function BotContentPage({
 }) {
   const resolvedParams = use(params);
   const username = resolvedParams.username;
+  const { lang } = useDashboardLang(username);
+  const isEn = lang === 'en';
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { useDashboardLang } from '@/hooks/useDashboardLang';
 import {
   Sparkles,
   Search,
@@ -61,6 +62,8 @@ export default function ProductsPage({
   params: Promise<{ username: string }>;
 }) {
   const { username } = use(params);
+  const { lang } = useDashboardLang(username);
+  const isEn = lang === 'en';
   const router = useRouter();
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -132,12 +135,12 @@ export default function ProductsPage({
         <div className="flex items-center justify-between mb-3">
           <h1 className="text-xl font-bold flex items-center gap-2">
             <Sparkles className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
-            מוצרים ורכיבים
+            {isEn ? 'Products & ingredients' : 'מוצרים ורכיבים'}
           </h1>
           <div className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
-            {total != null ? `${total.toLocaleString('he-IL')} מוצרים` : ''}
+            {total != null ? `${total.toLocaleString(isEn ? 'en-US' : 'he-IL')} ${isEn ? 'products' : 'מוצרים'}` : ''}
             {facets && total != null && total !== facets.total
-              ? ` מתוך ${facets.total.toLocaleString('he-IL')}`
+              ? ` ${isEn ? 'of' : 'מתוך'} ${facets.total.toLocaleString(isEn ? 'en-US' : 'he-IL')}`
               : ''}
           </div>
         </div>
@@ -178,7 +181,7 @@ export default function ProductsPage({
             />
             <input
               className="input w-full py-2.5 pr-10 pl-3 text-sm"
-              placeholder="חיפוש לפי שם, מותג, רכיב…"
+              placeholder={isEn ? 'Search by name, brand, ingredient…' : 'חיפוש לפי שם, מותג, רכיב…'}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -306,7 +309,7 @@ export default function ProductsPage({
         {!loading && products.length === 0 && (
           <div className="text-center py-16" style={{ color: 'var(--dash-text-3)' }}>
             <Sparkles className="w-10 h-10 mx-auto mb-3 opacity-40" />
-            <p className="text-sm">לא נמצאו מוצרים תואמים</p>
+            <p className="text-sm">{isEn ? 'No matching products' : 'לא נמצאו מוצרים תואמים'}</p>
           </div>
         )}
 

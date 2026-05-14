@@ -101,11 +101,18 @@ import type { Influencer } from '@/types';
 
 type DateRange = '7d' | '14d' | '30d' | '90d';
 
-const dateRangeOptions: { value: DateRange; label: string }[] = [
+const dateRangeOptions_HE: { value: DateRange; label: string }[] = [
   { value: '7d', label: '7 ימים' },
   { value: '14d', label: '14 ימים' },
   { value: '30d', label: '30 יום' },
   { value: '90d', label: '90 יום' },
+];
+
+const dateRangeOptions_EN: { value: DateRange; label: string }[] = [
+  { value: '7d', label: '7 days' },
+  { value: '14d', label: '14 days' },
+  { value: '30d', label: '30 days' },
+  { value: '90d', label: '90 days' },
 ];
 
 export default function AnalyticsPage({
@@ -315,13 +322,13 @@ export default function AnalyticsPage({
   }));
 
   return (
-    <div className="min-h-screen" dir="rtl" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
+    <div className="min-h-screen" dir={isEn ? 'ltr' : 'rtl'} style={{ background: 'transparent', color: 'var(--dash-text)', direction: isEn ? 'ltr' : 'rtl' }}>
       {/* Sub-header with date range selector */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-2 animate-slide-up">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
             <BarChart3 className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
-            אנליטיקס
+            {isEn ? 'Analytics' : 'אנליטיקס'}
           </h1>
 
           {/* Date Range Selector */}
@@ -337,7 +344,7 @@ export default function AnalyticsPage({
                 color: 'var(--dash-text)',
               }}
             >
-              {dateRangeOptions.map(opt => (
+              {(isEn ? dateRangeOptions_EN : dateRangeOptions_HE).map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
@@ -353,7 +360,7 @@ export default function AnalyticsPage({
           {registry.length > 0 && (
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs whitespace-nowrap" style={{ color: 'var(--dash-text-3)' }}>
-                סינון לפי משפיענית:
+                {isEn ? 'Filter by creator:' : 'סינון לפי משפיענית:'}
               </span>
               <button
                 onClick={() => setRefFilter(null)}

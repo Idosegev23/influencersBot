@@ -192,6 +192,17 @@ const STATUS_LABEL: Record<string, string> = {
   lead: 'ליד',
 };
 
+const STATUS_LABEL_EN: Record<string, string> = {
+  active: 'Active',
+  proposal: 'Proposal',
+  contract: 'Contract',
+  negotiation: 'Negotiation',
+  completed: 'Completed',
+  lead: 'Lead',
+};
+
+const dashL = (s: string, isEn: boolean) => (isEn ? STATUS_LABEL_EN[s] || s : STATUS_LABEL[s] || s);
+
 // ─── Shared section wrapper ─────────────────────────
 
 function Section({ children, className = '' }: { children: React.ReactNode; className?: string }) {
@@ -306,7 +317,7 @@ export default function InfluencerDashboardPage({
           <div className="w-10 h-10 rounded-2xl flex items-center justify-center animate-pulse" style={{ background: 'var(--dash-surface)' }}>
             <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--dash-text-3)' }} />
           </div>
-          <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>טוען דשבורד...</p>
+          <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Loading dashboard…' : 'טוען דשבורד...'}</p>
         </div>
       </div>
     );
@@ -380,8 +391,8 @@ export default function InfluencerDashboardPage({
         <div className="max-w-6xl mx-auto px-4 sm:px-6 mt-3">
           <div className="flex gap-1 p-1 rounded-2xl" style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-glass-border)' }}>
             {[
-              { id: 'dashboard' as const, label: 'דשבורד', icon: '📊' },
-              { id: 'leads' as const, label: `לידים (${leads.length})`, icon: '👥' },
+              { id: 'dashboard' as const, label: isEn ? 'Dashboard' : 'דשבורד', icon: '📊' },
+              { id: 'leads' as const, label: `${isEn ? 'Leads' : 'לידים'} (${leads.length})`, icon: '👥' },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -511,7 +522,7 @@ export default function InfluencerDashboardPage({
               iconColor: '#9334EB',
             },
             { label: 'שיחות', value: formatNumber(chat.totalSessions), sub: `${formatNumber(chat.totalMessages)} הודעות`, fill: 'fill-blue', icon: MessageSquare, iconColor: '#2663EB' },
-            { label: 'שת״פים', value: partnerships.active, sub: partnerships.total > partnerships.active ? `מתוך ${partnerships.total}` : undefined, fill: 'fill-coral', icon: Heart, iconColor: '#EA580B' },
+            { label: isEn ? 'Partnerships' : 'שת״פים', value: partnerships.active, sub: partnerships.total > partnerships.active ? (isEn ? `of ${partnerships.total}` : `מתוך ${partnerships.total}`) : undefined, fill: 'fill-coral', icon: Heart, iconColor: '#EA580B' },
             { label: 'קופונים', value: coupons.active, sub: coupons.totalCopies > 0 ? `${formatNumber(coupons.totalCopies)} העתקות` : undefined, fill: 'fill-green', icon: Copy, iconColor: '#17A34A' },
             { label: 'אנגייג׳מנט', value: `${instagram.avgEngagement}%`, sub: instagram.totalLikes > 0 ? `${formatNumber(instagram.totalLikes)} לייקים` : undefined, fill: 'fill-pink', icon: Eye, iconColor: '#DB2877' },
             { label: 'צפיות', value: formatNumber(instagram.totalViews), sub: instagram.scrapedPosts > 0 ? `${instagram.scrapedPosts} פוסטים` : undefined, fill: 'fill-amber', icon: Play, iconColor: '#CB8A04' },
@@ -659,13 +670,13 @@ export default function InfluencerDashboardPage({
                   })}
                 </div>
               ) : (
-                <p className="px-5 pb-5 text-xs relative z-10" style={{ color: 'var(--dash-text-3)' }}>אין פוסטים נסרקים</p>
+                <p className="px-5 pb-5 text-xs relative z-10" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'No posts scanned yet' : 'אין פוסטים נסרקים'}</p>
               )}
             </Section>
 
             {/* Recent chats */}
             <Section>
-              <SectionHeader title="שיחות אחרונות" href={`/influencer/${username}/conversations`} />
+              <SectionHeader title={isEn ? 'Recent conversations' : 'שיחות אחרונות'} href={`/influencer/${username}/conversations`} />
               {chat.recentSessions.length > 0 ? (
                 <div className="relative z-10">
                   {chat.recentSessions.map((s, i) => (
@@ -704,7 +715,7 @@ export default function InfluencerDashboardPage({
 
             {/* Partnerships */}
             <Section>
-              <SectionHeader title="שת״פים" href={`/influencer/${username}/partnerships`} linkText="ניהול" />
+              <SectionHeader title={isEn ? 'Partnerships' : 'שת״פים'} href={`/influencer/${username}/partnerships`} linkText={isEn ? 'Manage' : 'ניהול'} />
 
               {partnerships.totalRevenue > 0 && (
                 <div className="mx-5 mb-3 flex items-baseline gap-3 relative z-10">
@@ -786,7 +797,7 @@ export default function InfluencerDashboardPage({
 
             {/* Bot status */}
             <Section>
-              <SectionHeader title="סטטוס הבוט" href={`/influencer/${username}/chatbot-persona`} linkText="הבוט שלי" />
+              <SectionHeader title={isEn ? 'Bot status' : 'סטטוס הבוט'} href={`/influencer/${username}/chatbot-persona`} linkText={isEn ? 'My bot' : 'הבוט שלי'} />
               <div className="px-5 pb-5 space-y-3 relative z-10">
                 {[
                   { label: 'מסמכים', value: formatNumber(botKnowledge.totalDocuments) },
@@ -818,12 +829,12 @@ export default function InfluencerDashboardPage({
               </div>
               <div className="px-5 pb-5 grid grid-cols-2 gap-2 relative z-10">
                 {[
-                  { href: 'partnerships', label: 'שת״פים', pill: 'pill-purple' },
-                  { href: 'coupons', label: 'קופונים', pill: 'pill-coral' },
-                  { href: 'conversations', label: 'שיחות', pill: 'pill-blue' },
-                  { href: 'chatbot-persona', label: 'הבוט שלי', pill: 'pill-teal' },
-                  { href: 'settings', label: 'הגדרות', pill: 'pill-neutral' },
-                  { href: 'share', label: 'QR + שיתוף', pill: 'pill-pink' },
+                  { href: 'partnerships', label: isEn ? 'Partnerships' : 'שת״פים', pill: 'pill-purple' },
+                  { href: 'coupons', label: isEn ? 'Promotions' : 'קופונים', pill: 'pill-coral' },
+                  { href: 'conversations', label: isEn ? 'Conversations' : 'שיחות', pill: 'pill-blue' },
+                  { href: 'chatbot-persona', label: isEn ? 'My bot' : 'הבוט שלי', pill: 'pill-teal' },
+                  { href: 'settings', label: isEn ? 'Settings' : 'הגדרות', pill: 'pill-neutral' },
+                  { href: 'share', label: isEn ? 'QR + share' : 'QR + שיתוף', pill: 'pill-pink' },
                 ].map((item) => (
                   <Link
                     key={item.href}

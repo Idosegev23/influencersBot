@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
+import { useDashboardLang } from '@/hooks/useDashboardLang';
 import {
   Tag,
   Plus,
@@ -56,6 +57,8 @@ export default function CouponsPage({
 }) {
   const resolvedParams = use(params);
   const username = resolvedParams.username;
+  const { lang } = useDashboardLang(username);
+  const isEn = lang === 'en';
   const router = useRouter();
 
   const [coupons, setCoupons] = useState<Coupon[]>([]);
@@ -203,7 +206,7 @@ export default function CouponsPage({
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-xl font-bold flex items-center gap-2">
             <Tag className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
-            קופונים
+            {isEn ? 'Promotions' : 'קופונים'}
           </h1>
           <button
             onClick={() => setIsAdding(true)}
@@ -211,7 +214,7 @@ export default function CouponsPage({
             style={{ background: 'var(--color-primary)', color: '#fff' }}
           >
             <Plus className="w-4 h-4" />
-            הוספת קופון
+            {isEn ? 'Add promotion' : 'הוספת קופון'}
           </button>
         </div>
 
@@ -324,8 +327,8 @@ export default function CouponsPage({
             <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-glass-border)' }}>
               <Tag className="w-8 h-8" style={{ color: 'var(--color-primary)' }} />
             </div>
-            <h3 className="text-lg font-semibold mb-2">אין קופונים עדיין</h3>
-            <p className="text-sm mb-4" style={{ color: 'var(--dash-text-2)' }}>הוסיפו קופונים כדי שהבוט ישתף אותם בשיחות</p>
+            <h3 className="text-lg font-semibold mb-2">{isEn ? 'No promotions yet' : 'אין קופונים עדיין'}</h3>
+            <p className="text-sm mb-4" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Add promotions so the bot can share them in conversations.' : 'הוסיפו קופונים כדי שהבוט ישתף אותם בשיחות'}</p>
             <button
               onClick={() => setIsAdding(true)}
               className="px-4 py-2 rounded-xl text-sm font-medium"
