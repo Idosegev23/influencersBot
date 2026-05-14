@@ -129,7 +129,7 @@ export default function DocumentsPage() {
   }
 
   return (
-    <div className="min-h-screen" dir="rtl" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
+    <div className="min-h-screen" dir={isEn ? 'ltr' : 'rtl'} style={{ background: 'transparent', color: 'var(--dash-text)', direction: isEn ? 'ltr' : 'rtl' }}>
       <div className="max-w-4xl mx-auto py-8 px-4 space-y-6">
 
         {/* Header */}
@@ -137,7 +137,7 @@ export default function DocumentsPage() {
           <div>
             <h1 className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Documents' : 'מאגר מסמכים'}</h1>
             <p className="text-sm mt-1" style={{ color: 'var(--dash-text-2)' }}>
-              העלה מסמכים למאגר המידע של הצ&#39;אטבוט
+              {isEn ? 'Upload documents to the chatbot knowledge base' : 'העלה מסמכים למאגר המידע של הצ\'אטבוט'}
             </p>
           </div>
           <Link
@@ -150,7 +150,7 @@ export default function DocumentsPage() {
             }}
           >
             <ArrowRight className="w-4 h-4" />
-            חזרה
+            {isEn ? 'Back' : 'חזרה'}
           </Link>
         </div>
 
@@ -165,7 +165,9 @@ export default function DocumentsPage() {
           </div>
 
           <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
-            המסמך ינותח אוטומטית, יפוצל לחלקים ויוזן למאגר הידע של הצ&#39;אטבוט. PDF, Word, Excel, תמונות (עד 10MB)
+            {isEn
+              ? 'The document is auto-analyzed, chunked, and added to the chatbot knowledge base. PDF, Word, Excel, images (up to 10MB).'
+              : 'המסמך ינותח אוטומטית, יפוצל לחלקים ויוזן למאגר הידע של הצ\'אטבוט. PDF, Word, Excel, תמונות (עד 10MB)'}
           </p>
 
           {/* File uploader */}
@@ -188,9 +190,9 @@ export default function DocumentsPage() {
             >
               <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--color-info)' }} />
               <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--color-info)' }}>מנתח ומאנדקס...</p>
+                <p className="text-sm font-medium" style={{ color: 'var(--color-info)' }}>{isEn ? 'Parsing and indexing…' : 'מנתח ומאנדקס...'}</p>
                 <p className="text-xs" style={{ color: 'var(--dash-text-2)' }}>
-                  המסמך עובר ניתוח AI, פיצול לחלקים, והזנה למאגר הידע
+                  {isEn ? 'The document is going through AI parsing, chunking, and ingestion into the knowledge base.' : 'המסמך עובר ניתוח AI, פיצול לחלקים, והזנה למאגר הידע'}
                 </p>
               </div>
             </div>
@@ -204,9 +206,9 @@ export default function DocumentsPage() {
             >
               <CheckCircle2 className="w-5 h-5" style={{ color: 'var(--dash-positive)' }} />
               <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--dash-positive)' }}>המסמך נוסף למאגר בהצלחה!</p>
+                <p className="text-sm font-medium" style={{ color: 'var(--dash-positive)' }}>{isEn ? 'Document added successfully!' : 'המסמך נוסף למאגר בהצלחה!'}</p>
                 <p className="text-xs" style={{ color: 'var(--dash-text-2)' }}>
-                  התוכן זמין לשליפה בצ&#39;אטבוט כבר עכשיו
+                  {isEn ? 'The content is now retrievable by the chatbot.' : 'התוכן זמין לשליפה בצ\'אטבוט כבר עכשיו'}
                 </p>
               </div>
             </div>
@@ -224,7 +226,7 @@ export default function DocumentsPage() {
                 className="mr-auto text-xs underline transition-all duration-300"
                 style={{ color: 'var(--dash-text-3)' }}
               >
-                סגור
+                {isEn ? 'Close' : 'סגור'}
               </button>
             </div>
           )}
@@ -235,11 +237,11 @@ export default function DocumentsPage() {
           <div className="grid grid-cols-2 gap-4 animate-slide-up">
             <div className="metric-card rounded-2xl p-4 text-center transition-all duration-300" style={{ borderColor: 'var(--dash-glass-border)' }}>
               <div className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>{stats.total}</div>
-              <div className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>מסמכים במאגר</div>
+              <div className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Documents' : 'מסמכים במאגר'}</div>
             </div>
             <div className="metric-card rounded-2xl p-4 text-center transition-all duration-300" style={{ borderColor: 'var(--dash-glass-border)' }}>
               <div className="text-2xl font-bold" style={{ color: 'var(--color-info)' }}>{stats.indexed}</div>
-              <div className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>מאונדקסים בצ&#39;אטבוט</div>
+              <div className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Indexed in chatbot' : 'מאונדקסים בצ\'אטבוט'}</div>
             </div>
           </div>
         )}
@@ -255,9 +257,9 @@ export default function DocumentsPage() {
         {documents.length === 0 ? (
           <div className="glass-card rounded-2xl p-12 text-center animate-fade-in" style={{ borderColor: 'var(--dash-glass-border)' }}>
             <FileText className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--dash-text-3)' }} />
-            <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>אין מסמכים במאגר עדיין</p>
+            <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'No documents yet' : 'אין מסמכים במאגר עדיין'}</p>
             <p className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>
-              העלה מסמך למעלה והמערכת תוסיף אותו אוטומטית
+              {isEn ? 'Upload a document above and we’ll add it automatically.' : 'העלה מסמך למעלה והמערכת תוסיף אותו אוטומטית'}
             </p>
           </div>
         ) : (
@@ -278,7 +280,7 @@ export default function DocumentsPage() {
                   </h3>
                   <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--dash-text-3)' }}>
                     <span>{(doc.file_size / 1024 / 1024).toFixed(1)} MB</span>
-                    <span>{new Date(doc.uploaded_at).toLocaleDateString('he-IL')}</span>
+                    <span>{new Date(doc.uploaded_at).toLocaleDateString(isEn ? 'en-US' : 'he-IL')}</span>
                   </div>
                 </div>
 
@@ -288,23 +290,23 @@ export default function DocumentsPage() {
                   {doc.rag_status === 'indexed' && (
                     <span className="pill pill-green flex items-center gap-1">
                       <Database className="w-3 h-3" />
-                      {doc.rag_chunks_count || 0} חלקים
+                      {doc.rag_chunks_count || 0} {isEn ? 'chunks' : 'חלקים'}
                     </span>
                   )}
                   {doc.rag_status === 'processing' && (
                     <span className="pill pill-blue flex items-center gap-1">
                       <Loader2 className="w-3 h-3 animate-spin" />
-                      מאנדקס
+                      {isEn ? 'Indexing' : 'מאנדקס'}
                     </span>
                   )}
                   {doc.rag_status === 'failed' && (
                     <span className="pill pill-red">
-                      נכשל
+                      {isEn ? 'Failed' : 'נכשל'}
                     </span>
                   )}
                   {doc.parsing_status === 'pending' && (
                     <span className="pill pill-amber">
-                      ממתין
+                      {isEn ? 'Pending' : 'ממתין'}
                     </span>
                   )}
                   {doc.parsing_status === 'processing' && (

@@ -246,11 +246,11 @@ export default function SettingsPage({
             rows={3}
             value={greetingMessage}
             onChange={(e) => setGreetingMessage(e.target.value)}
-            placeholder="היי! אני כאן לעזור לך עם כל שאלה..."
+            placeholder={isEn ? "Hi! I'm here to help with any question…" : 'היי! אני כאן לעזור לך עם כל שאלה...'}
           />
 
           <p className="text-xs mt-2" style={{ color: 'var(--dash-text-3)' }}>
-            {greetingMessage.length}/200 תווים
+            {greetingMessage.length}/200 {isEn ? 'chars' : 'תווים'}
           </p>
         </div>
 
@@ -263,7 +263,7 @@ export default function SettingsPage({
                 <path d="M12 7v2" />
                 <path d="M12 13h.01" />
               </svg>
-              שאלות מוצעות
+              {isEn ? 'Suggested questions' : 'שאלות מוצעות'}
             </h2>
             <span className="text-xs px-2 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--dash-text-3)' }}>
               {suggestedQuestions.length}/6
@@ -271,7 +271,9 @@ export default function SettingsPage({
           </div>
 
           <p className="text-sm mb-4" style={{ color: 'var(--dash-text-3)' }}>
-            הכפתורים שמופיעים מתחת להודעת הפתיחה — העוקבים לוחצים עליהם כדי להתחיל שיחה
+            {isEn
+              ? 'Quick-start chips shown under the welcome message — visitors tap them to begin a conversation.'
+              : 'הכפתורים שמופיעים מתחת להודעת הפתיחה — העוקבים לוחצים עליהם כדי להתחיל שיחה'}
           </p>
 
           {/* Questions list */}
@@ -285,7 +287,7 @@ export default function SettingsPage({
                 <button
                   className="opacity-0 group-hover:opacity-50 hover:!opacity-100 transition-opacity cursor-grab"
                   style={{ color: 'var(--dash-text-3)' }}
-                  title="הזז למעלה"
+                  title={isEn ? 'Move up' : 'הזז למעלה'}
                   onClick={() => moveQuestion(i, i - 1)}
                 >
                   <GripVertical className="w-4 h-4" />
@@ -307,7 +309,7 @@ export default function SettingsPage({
                   <span
                     className="flex-1 text-sm cursor-pointer hover:opacity-80 transition-opacity"
                     onClick={() => startEditing(i)}
-                    title="לחצי לעריכה"
+                    title={isEn ? 'Click to edit' : 'לחצי לעריכה'}
                   >
                     {q}
                   </span>
@@ -317,7 +319,7 @@ export default function SettingsPage({
                   onClick={() => removeQuestion(i)}
                   className="opacity-0 group-hover:opacity-50 hover:!opacity-100 transition-opacity"
                   style={{ color: 'var(--color-error, #ef4444)' }}
-                  title="מחק"
+                  title={isEn ? 'Delete' : 'מחק'}
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -332,7 +334,7 @@ export default function SettingsPage({
                 className="input flex-1 py-2.5 px-4 text-sm"
                 value={newQuestion}
                 onChange={(e) => setNewQuestion(e.target.value)}
-                placeholder="הוסיפי שאלה חדשה..."
+                placeholder={isEn ? 'Add a new question…' : 'הוסיפי שאלה חדשה...'}
                 onKeyDown={(e) => { if (e.key === 'Enter') addQuestion(); }}
               />
               <button
@@ -342,7 +344,7 @@ export default function SettingsPage({
                 style={{ background: 'var(--color-primary)', color: '#fff' }}
               >
                 <Plus className="w-4 h-4" />
-                הוסף
+                {isEn ? 'Add' : 'הוסף'}
               </button>
             </div>
           )}
@@ -355,7 +357,7 @@ export default function SettingsPage({
               <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
               <circle cx="12" cy="12" r="3" />
             </svg>
-            תצוגה מקדימה
+            {isEn ? 'Live preview' : 'תצוגה מקדימה'}
           </h2>
 
           <div
@@ -399,7 +401,9 @@ export default function SettingsPage({
 
             {!greetingMessage && suggestedQuestions.length === 0 && (
               <p className="text-center text-sm py-4" style={{ color: 'var(--dash-text-3)' }}>
-                הוסיפי הודעת פתיחה ושאלות מוצעות כדי לראות תצוגה מקדימה
+                {isEn
+                  ? 'Add a welcome message and suggested questions to see the preview here.'
+                  : 'הוסיפי הודעת פתיחה ושאלות מוצעות כדי לראות תצוגה מקדימה'}
               </p>
             )}
           </div>
@@ -420,7 +424,7 @@ export default function SettingsPage({
             ) : (
               <Save className="w-4 h-4" />
             )}
-            {saved ? 'נשמר!' : 'שמור שינויים'}
+            {isEn ? (saved ? 'Saved!' : 'Save changes') : (saved ? 'נשמר!' : 'שמור שינויים')}
           </button>
         </div>
       </main>

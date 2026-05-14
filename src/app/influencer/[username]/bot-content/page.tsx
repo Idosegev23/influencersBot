@@ -125,6 +125,15 @@ const statusLabels: Record<string, string> = {
   expired: 'פג תוקף',
 };
 
+const statusLabelsEn: Record<string, string> = {
+  active: 'Active',
+  proposal: 'Proposal',
+  negotiation: 'Negotiation',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+  expired: 'Expired',
+};
+
 const statusColors: Record<string, string> = {
   active: 'var(--dash-positive)',
   proposal: 'var(--color-info)',
@@ -141,6 +150,15 @@ const knowledgeTypeLabels: Record<string, string> = {
   coupon: 'קופון',
   active_partnership: 'שיתוף פעולה',
   manual: 'ידני',
+};
+
+const knowledgeTypeLabelsEn: Record<string, string> = {
+  faq: 'FAQ',
+  custom: 'Custom info',
+  product: 'Product',
+  coupon: 'Promotion',
+  active_partnership: 'Partnership',
+  manual: 'Manual',
 };
 
 function formatCurrency(amount: number): string {
@@ -387,8 +405,8 @@ export default function BotContentPage({
   return (
     <div
       className="min-h-screen"
-      dir="rtl"
-      style={{ background: 'transparent', color: 'var(--dash-text)' }}
+      dir={isEn ? 'ltr' : 'rtl'}
+      style={{ background: 'transparent', color: 'var(--dash-text)', direction: isEn ? 'ltr' : 'rtl' }}
     >
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
 
@@ -399,41 +417,41 @@ export default function BotContentPage({
             iconBg="rgba(168,85,247,0.15)"
             iconColor="var(--color-primary)"
             value={stats.partnerships.total}
-            label="שיתופי פעולה"
+            label={isEn ? 'Partnerships' : 'שיתופי פעולה'}
           />
           <StatCard
             icon={<Tag className="w-6 h-6" />}
             iconBg="rgba(34,197,94,0.15)"
             iconColor="var(--dash-positive)"
             value={stats.coupons.active}
-            label="קופונים פעילים"
+            label={isEn ? 'Active promotions' : 'קופונים פעילים'}
           />
           <StatCard
             icon={<Instagram className="w-6 h-6" />}
             iconBg="rgba(225,48,108,0.15)"
             iconColor="#E1306C"
             value={stats.instagram.totalPosts}
-            label="פוסטים"
+            label={isEn ? 'Posts' : 'פוסטים'}
           />
           <StatCard
             icon={<Database className="w-6 h-6" />}
             iconBg="rgba(59,130,246,0.15)"
             iconColor="var(--color-info)"
             value={`${stats.botKnowledge.totalDocuments} / ${stats.botKnowledge.totalChunks}`}
-            label="מסמכים / חלקים"
+            label={isEn ? 'Docs / chunks' : 'מסמכים / חלקים'}
           />
           <StatCard
             icon={<Lightbulb className="w-6 h-6" />}
             iconBg="rgba(250,204,21,0.15)"
             iconColor="#FACC15"
             value={coreTopics.length}
-            label="נושאי ידע"
+            label={isEn ? 'Knowledge topics' : 'נושאי ידע'}
           />
         </div>
 
         {/* ========== KNOWLEDGE TOPICS ========== */}
         <CollapsibleSection
-          title="נושאי ידע"
+          title={isEn ? 'Knowledge topics' : 'נושאי ידע'}
           count={coreTopics.length}
           icon={<Lightbulb className="w-5 h-5" style={{ color: '#FACC15' }} />}
           expanded={expandedSections.topics}
@@ -441,7 +459,7 @@ export default function BotContentPage({
         >
           {coreTopics.length === 0 ? (
             <p className="text-sm text-center py-8" style={{ color: 'var(--dash-text-2)' }}>
-              אין נושאי ידע. הבוט עדיין לא נסרק או שהפרסונה לא נבנתה.
+              {isEn ? 'No knowledge topics yet. The bot hasn’t been scraped or the persona isn’t built.' : 'אין נושאי ידע. הבוט עדיין לא נסרק או שהפרסונה לא נבנתה.'}
             </p>
           ) : (
             <div className="space-y-4">
@@ -495,7 +513,7 @@ export default function BotContentPage({
 
         {/* ========== COUPONS ========== */}
         <CollapsibleSection
-          title="קופונים"
+          title={isEn ? 'Promotions' : 'קופונים'}
           count={coupons.length}
           icon={<Tag className="w-5 h-5" style={{ color: 'var(--dash-positive)' }} />}
           expanded={expandedSections.coupons}
@@ -503,7 +521,7 @@ export default function BotContentPage({
         >
           {coupons.length === 0 ? (
             <p className="text-sm text-center py-8" style={{ color: 'var(--dash-text-2)' }}>
-              אין קופונים
+              {isEn ? 'No promotions' : 'אין קופונים'}
             </p>
           ) : (
             <div className="space-y-3">
@@ -543,16 +561,16 @@ export default function BotContentPage({
                             : 'var(--dash-negative)',
                         }}
                       >
-                        {coupon.isActive ? 'פעיל' : 'לא פעיל'}
+                        {isEn ? (coupon.isActive ? 'Active' : 'Inactive') : (coupon.isActive ? 'פעיל' : 'לא פעיל')}
                       </span>
                     </div>
 
                     {/* Discount info */}
                     {coupon.discountType && (
                       <p className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>
-                        {coupon.discountType === 'percentage' && `${coupon.discountValue}% הנחה`}
-                        {coupon.discountType === 'fixed' && `${formatCurrency(coupon.discountValue || 0)} הנחה`}
-                        {coupon.discountType === 'free_shipping' && 'משלוח חינם'}
+                        {coupon.discountType === 'percentage' && (isEn ? `${coupon.discountValue}% off` : `${coupon.discountValue}% הנחה`)}
+                        {coupon.discountType === 'fixed' && (isEn ? `${formatCurrency(coupon.discountValue || 0)} off` : `${formatCurrency(coupon.discountValue || 0)} הנחה`)}
+                        {coupon.discountType === 'free_shipping' && (isEn ? 'Free shipping' : 'משלוח חינם')}
                       </p>
                     )}
 
@@ -560,7 +578,7 @@ export default function BotContentPage({
                     <div className="flex items-center gap-4 mt-2">
                       <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--dash-text-3)' }}>
                         <Copy className="w-3 h-3" />
-                        {coupon.copyCount} העתקות
+                        {coupon.copyCount} {isEn ? 'copies' : 'העתקות'}
                       </span>
                     </div>
                   </div>
@@ -572,7 +590,7 @@ export default function BotContentPage({
 
         {/* ========== PARTNERSHIPS ========== */}
         <CollapsibleSection
-          title="שיתופי פעולה"
+          title={isEn ? 'Partnerships' : 'שיתופי פעולה'}
           count={partnerships.length}
           icon={<Handshake className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />}
           expanded={expandedSections.partnerships}
@@ -580,7 +598,7 @@ export default function BotContentPage({
         >
           {partnerships.length === 0 ? (
             <p className="text-sm text-center py-8" style={{ color: 'var(--dash-text-2)' }}>
-              אין שיתופי פעולה
+              {isEn ? 'No partnerships' : 'אין שיתופי פעולה'}
             </p>
           ) : (
             <div className="space-y-3">
@@ -604,7 +622,7 @@ export default function BotContentPage({
                           color: statusColors[p.status] || 'var(--dash-text-3)',
                         }}
                       >
-                        {statusLabels[p.status] || p.status}
+                        {(isEn ? statusLabelsEn : statusLabels)[p.status] || p.status}
                       </span>
                     </div>
 
@@ -629,7 +647,7 @@ export default function BotContentPage({
 
         {/* ========== CHAT CONFIG ========== */}
         <CollapsibleSection
-          title="הגדרות צ'אט"
+          title={isEn ? 'Chat settings' : "הגדרות צ'אט"}
           icon={<MessageSquare className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />}
           expanded={expandedSections.config}
           onToggle={() => toggleSection('config')}
@@ -637,7 +655,7 @@ export default function BotContentPage({
           {/* Greeting Message */}
           <div className="mb-6">
             <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>
-              הודעת ברכה
+              {isEn ? 'Greeting message' : 'הודעת ברכה'}
             </label>
             <textarea
               value={greetingMessage}
@@ -649,7 +667,7 @@ export default function BotContentPage({
                 color: 'var(--dash-text)',
               }}
               rows={3}
-              placeholder="היי! אני הבוט של..."
+              placeholder={isEn ? "Hi! I'm the assistant for…" : 'היי! אני הבוט של...'}
             />
           </div>
 
@@ -657,14 +675,14 @@ export default function BotContentPage({
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-medium" style={{ color: 'var(--dash-text-2)' }}>
-                שאלות מוצעות
+                {isEn ? 'Suggested questions' : 'שאלות מוצעות'}
               </label>
               <button
                 onClick={handleAddQuestion}
                 className="px-2 py-1 text-xs rounded transition-colors flex items-center gap-1 btn-primary"
               >
                 <Plus className="w-3 h-3" />
-                הוסף שאלה
+                {isEn ? 'Add question' : 'הוסף שאלה'}
               </button>
             </div>
             <div className="space-y-2">
@@ -680,7 +698,7 @@ export default function BotContentPage({
                       border: '1px solid var(--dash-glass-border)',
                       color: 'var(--dash-text)',
                     }}
-                    placeholder={`שאלה ${idx + 1}`}
+                    placeholder={isEn ? `Question ${idx + 1}` : `שאלה ${idx + 1}`}
                   />
                   <button
                     onClick={() => handleDeleteQuestion(idx)}
@@ -693,7 +711,7 @@ export default function BotContentPage({
               ))}
               {suggestedQuestions.length === 0 && (
                 <p className="text-sm text-center py-4" style={{ color: 'var(--dash-text-2)' }}>
-                  אין שאלות מוצעות
+                  {isEn ? 'No suggested questions yet' : 'אין שאלות מוצעות'}
                 </p>
               )}
             </div>
@@ -708,12 +726,12 @@ export default function BotContentPage({
             {saving ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                שומר...
+                {isEn ? 'Saving…' : 'שומר...'}
               </>
             ) : (
               <>
                 <Save className="w-5 h-5" />
-                שמור הגדרות
+                {isEn ? 'Save settings' : 'שמור הגדרות'}
               </>
             )}
           </button>
@@ -721,7 +739,7 @@ export default function BotContentPage({
 
         {/* ========== BOT KNOWLEDGE ========== */}
         <CollapsibleSection
-          title="ידע הבוט"
+          title={isEn ? 'Bot knowledge' : 'ידע הבוט'}
           icon={<BookOpen className="w-5 h-5" style={{ color: 'var(--color-info)' }} />}
           expanded={expandedSections.knowledge}
           onToggle={() => toggleSection('knowledge')}
@@ -735,7 +753,7 @@ export default function BotContentPage({
                 {stats.botKnowledge.totalDocuments}
               </p>
               <p className="text-xs" style={{ color: 'var(--dash-text-2)' }}>
-                מסמכים מעובדים
+                {isEn ? 'Processed docs' : 'מסמכים מעובדים'}
               </p>
             </div>
             <div
@@ -746,7 +764,7 @@ export default function BotContentPage({
                 {stats.botKnowledge.totalChunks}
               </p>
               <p className="text-xs" style={{ color: 'var(--dash-text-2)' }}>
-                חלקי ידע (chunks)
+                {isEn ? 'Knowledge chunks' : 'חלקי ידע (chunks)'}
               </p>
             </div>
           </div>
@@ -755,7 +773,7 @@ export default function BotContentPage({
           {Object.keys(stats.botKnowledge.docsByType).length > 0 && (
             <div className="mt-4">
               <p className="text-xs font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>
-                סוגי מסמכים:
+                {isEn ? 'Document types:' : 'סוגי מסמכים:'}
               </p>
               <div className="flex flex-wrap gap-2">
                 {Object.entries(stats.botKnowledge.docsByType).map(([type, count]) => (
@@ -776,21 +794,23 @@ export default function BotContentPage({
 
           <div className="flex items-center justify-between mt-4">
             <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
-              הבוט משתמש בכל המידע הזה כדי לענות על שאלות: פוסטים מאינסטגרם, מסמכים שהועלו, שיתופי פעולה, קופונים ועוד.
+              {isEn
+                ? 'The bot uses all of this to answer questions: Instagram posts, uploaded documents, partnerships, promotions and more.'
+                : 'הבוט משתמש בכל המידע הזה כדי לענות על שאלות: פוסטים מאינסטגרם, מסמכים שהועלו, שיתופי פעולה, קופונים ועוד.'}
             </p>
             <Link
               href={`/influencer/${username}/documents/upload`}
               className="shrink-0 px-4 py-2 text-sm rounded-xl font-medium transition-colors flex items-center gap-2 btn-primary"
             >
               <Upload className="w-4 h-4" />
-              העלאת מסמך
+              {isEn ? 'Upload doc' : 'העלאת מסמך'}
             </Link>
           </div>
         </CollapsibleSection>
 
         {/* ========== MANUAL KNOWLEDGE ========== */}
         <CollapsibleSection
-          title="הוספת תוכן ידני"
+          title={isEn ? 'Manual knowledge' : 'הוספת תוכן ידני'}
           count={knowledgeEntries.length}
           icon={<PenLine className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />}
           expanded={expandedSections.manualKnowledge}
@@ -804,7 +824,7 @@ export default function BotContentPage({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
               <div>
                 <label className="block text-xs font-medium mb-1" style={{ color: 'var(--dash-text-2)' }}>
-                  סוג
+                  {isEn ? 'Type' : 'סוג'}
                 </label>
                 <select
                   value={newEntry.knowledge_type}
@@ -816,15 +836,15 @@ export default function BotContentPage({
                     color: 'var(--dash-text)',
                   }}
                 >
-                  <option value="faq">שאלה נפוצה (FAQ)</option>
-                  <option value="custom">מידע כללי</option>
-                  <option value="product">מוצר</option>
-                  <option value="coupon">קופון</option>
+                  <option value="faq">{isEn ? 'FAQ' : 'שאלה נפוצה (FAQ)'}</option>
+                  <option value="custom">{isEn ? 'Custom info' : 'מידע כללי'}</option>
+                  <option value="product">{isEn ? 'Product' : 'מוצר'}</option>
+                  <option value="coupon">{isEn ? 'Promotion' : 'קופון'}</option>
                 </select>
               </div>
               <div>
                 <label className="block text-xs font-medium mb-1" style={{ color: 'var(--dash-text-2)' }}>
-                  כותרת
+                  {isEn ? 'Title' : 'כותרת'}
                 </label>
                 <input
                   type="text"
@@ -836,13 +856,13 @@ export default function BotContentPage({
                     border: '1px solid var(--dash-glass-border)',
                     color: 'var(--dash-text)',
                   }}
-                  placeholder="לדוגמה: מהן שעות הפעילות?"
+                  placeholder={isEn ? 'e.g. What are your business hours?' : 'לדוגמה: מהן שעות הפעילות?'}
                 />
               </div>
             </div>
             <div className="mb-3">
               <label className="block text-xs font-medium mb-1" style={{ color: 'var(--dash-text-2)' }}>
-                תוכן
+                {isEn ? 'Content' : 'תוכן'}
               </label>
               <textarea
                 value={newEntry.content}
@@ -854,7 +874,7 @@ export default function BotContentPage({
                   color: 'var(--dash-text)',
                 }}
                 rows={3}
-                placeholder="התשובה או המידע שהבוט ישתמש בו..."
+                placeholder={isEn ? 'The answer or info the bot should use…' : 'התשובה או המידע שהבוט ישתמש בו...'}
               />
             </div>
             <button
@@ -867,14 +887,16 @@ export default function BotContentPage({
               ) : (
                 <Plus className="w-4 h-4" />
               )}
-              הוסף לידע הבוט
+              {isEn ? 'Add to bot knowledge' : 'הוסף לידע הבוט'}
             </button>
           </div>
 
           {/* Existing entries list */}
           {knowledgeEntries.length === 0 ? (
             <p className="text-sm text-center py-6" style={{ color: 'var(--dash-text-2)' }}>
-              עדיין לא הוספת תוכן ידני. הבוט ישתמש רק במידע שנאסף אוטומטית.
+              {isEn
+                ? "No manual content yet. The bot will use only auto-collected information."
+                : 'עדיין לא הוספת תוכן ידני. הבוט ישתמש רק במידע שנאסף אוטומטית.'}
             </p>
           ) : (
             <div className="space-y-3">
@@ -896,7 +918,7 @@ export default function BotContentPage({
                           color: 'var(--color-primary)',
                         }}
                       >
-                        {knowledgeTypeLabels[entry.knowledge_type] || entry.knowledge_type}
+                        {(isEn ? knowledgeTypeLabelsEn : knowledgeTypeLabels)[entry.knowledge_type] || entry.knowledge_type}
                       </span>
                       {entry.source_type === 'manual' && (
                         <span
