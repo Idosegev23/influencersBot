@@ -370,7 +370,7 @@ export default function AnalyticsPage({
                   color: !refFilter ? '#fff' : 'var(--dash-text-2)',
                 }}
               >
-                הכל
+                {isEn ? 'All' : 'הכל'}
               </button>
               {registry.map((r) => {
                 const active = refFilter === r.slug.toLowerCase();
@@ -397,9 +397,9 @@ export default function AnalyticsPage({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder='חיפוש בתוך השיחות (לדוגמה "דולף", "החזר")'
+              placeholder={isEn ? 'Search conversations (e.g. "leak", "refund")' : 'חיפוש בתוך השיחות (לדוגמה "דולף", "החזר")'}
               className="flex-1 bg-transparent outline-none text-sm"
-              dir="rtl"
+              dir={isEn ? 'ltr' : 'rtl'}
               style={{ color: 'var(--dash-text)' }}
             />
             {search && (
@@ -408,13 +408,15 @@ export default function AnalyticsPage({
                 className="text-xs opacity-60 hover:opacity-100"
                 style={{ color: 'var(--dash-text-2)' }}
               >
-                נקה
+                {isEn ? 'Clear' : 'נקה'}
               </button>
             )}
           </div>
           {(refFilter || search.trim()) && summary && (
             <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
-              סינון פעיל — {summary.sessions.with_message} שיחות תואמות ב-{dateRange === '7d' ? '7 הימים' : dateRange === '14d' ? '14 הימים' : dateRange === '30d' ? '30 הימים' : '90 הימים'} האחרונים
+              {isEn
+                ? `Filter active — ${summary.sessions.with_message} matching conversations in the last ${dateRange === '7d' ? '7 days' : dateRange === '14d' ? '14 days' : dateRange === '30d' ? '30 days' : '90 days'}`
+                : `סינון פעיל — ${summary.sessions.with_message} שיחות תואמות ב-${dateRange === '7d' ? '7 הימים' : dateRange === '14d' ? '14 הימים' : dateRange === '30d' ? '30 הימים' : '90 הימים'} האחרונים`}
             </p>
           )}
         </div>
@@ -430,32 +432,40 @@ export default function AnalyticsPage({
               iconBg: 'rgba(6,182,212,0.15)',
               change: visitorsChange,
               value: formatNumber(summary.visits.unique),
-              label: 'מבקרים ייחודיים',
-              sub: `${formatNumber(summary.visits.total)} ביקורי דף בסך הכל`,
+              label: isEn ? 'Unique visitors' : 'מבקרים ייחודיים',
+              sub: isEn
+                ? `${formatNumber(summary.visits.total)} total page visits`
+                : `${formatNumber(summary.visits.total)} ביקורי דף בסך הכל`,
             },
             {
               icon: <MessageCircle className="w-6 h-6 text-blue-400" />,
               iconBg: 'rgba(59,130,246,0.15)',
               change: sessionsChange,
               value: formatNumber(summary.sessions.with_message),
-              label: 'שיחות בפועל',
-              sub: `מתוך ${formatNumber(summary.sessions.total)} פתיחות צ'אט`,
+              label: isEn ? 'Active conversations' : 'שיחות בפועל',
+              sub: isEn
+                ? `out of ${formatNumber(summary.sessions.total)} chat opens`
+                : `מתוך ${formatNumber(summary.sessions.total)} פתיחות צ'אט`,
             },
             {
               icon: <TrendingUp className="w-6 h-6 text-green-400" />,
               iconBg: 'rgba(34,197,94,0.15)',
               change: userMsgsChange,
               value: formatNumber(summary.messages.user),
-              label: 'הודעות מלקוחות',
-              sub: `ממוצע ${summary.avg_user_msgs_per_session} לשיחה`,
+              label: isEn ? 'Customer messages' : 'הודעות מלקוחות',
+              sub: isEn
+                ? `avg ${summary.avg_user_msgs_per_session} per conversation`
+                : `ממוצע ${summary.avg_user_msgs_per_session} לשיחה`,
             },
             {
               icon: <Copy className="w-6 h-6 text-purple-400" />,
               iconBg: 'rgba(168,85,247,0.15)',
               change: couponsChange,
               value: formatNumber(summary.conversions.coupon_copies),
-              label: 'קופונים הועתקו',
-              sub: `${formatNumber(summary.conversions.product_clicks)} קליקים על מוצרים`,
+              label: isEn ? 'Coupons copied' : 'קופונים הועתקו',
+              sub: isEn
+                ? `${formatNumber(summary.conversions.product_clicks)} product clicks`
+                : `${formatNumber(summary.conversions.product_clicks)} קליקים על מוצרים`,
             },
           ].map((card, i) => (
             <div
@@ -516,10 +526,12 @@ export default function AnalyticsPage({
             >
               <h3 className="text-lg font-semibold mb-1 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
                 <BarChart3 className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
-                על מה הלקוחות מדברים
+                {isEn ? 'What customers talk about' : 'על מה הלקוחות מדברים'}
               </h3>
               <p className="text-xs mb-5" style={{ color: 'var(--dash-text-3)' }}>
-                סיווג לפי ההודעה הראשונה בשיחה ({total} שיחות בטווח)
+                {isEn
+                  ? `Classified by first message in each conversation (${total} conversations in range)`
+                  : `סיווג לפי ההודעה הראשונה בשיחה (${total} שיחות בטווח)`}
               </p>
               <div className="space-y-3">
                 {entries.map(([topic, count]) => {
@@ -567,7 +579,7 @@ export default function AnalyticsPage({
           >
             <h3 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
               <TrendingUp className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
-              שיחות והודעות
+              {isEn ? 'Conversations & messages' : 'שיחות והודעות'}
             </h3>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
@@ -599,7 +611,7 @@ export default function AnalyticsPage({
                   <Area
                     type="monotone"
                     dataKey="sessions"
-                    name="שיחות"
+                    name={isEn ? 'Conversations' : 'שיחות'}
                     stroke="#9334EB"
                     fillOpacity={1}
                     fill="url(#colorSessions)"
@@ -607,7 +619,7 @@ export default function AnalyticsPage({
                   <Area
                     type="monotone"
                     dataKey="messages"
-                    name="הודעות"
+                    name={isEn ? 'Messages' : 'הודעות'}
                     stroke="#22c55e"
                     fillOpacity={1}
                     fill="url(#colorMessages)"
@@ -628,7 +640,7 @@ export default function AnalyticsPage({
           >
             <h3 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
               <Package className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
-              קופונים וקליקים
+              {isEn ? 'Coupons & clicks' : 'קופונים וקליקים'}
             </h3>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
@@ -647,8 +659,8 @@ export default function AnalyticsPage({
                     labelStyle={{ color: 'var(--dash-text)' }}
                   />
                   <Legend />
-                  <Bar dataKey="couponCopies" name="קופונים הועתקו" fill="#a855f7" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="productClicks" name="קליקים על מוצרים" fill="#f97316" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="couponCopies" name={isEn ? 'Coupons copied' : 'קופונים הועתקו'} fill="#a855f7" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="productClicks" name={isEn ? 'Product clicks' : 'קליקים על מוצרים'} fill="#f97316" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -666,7 +678,7 @@ export default function AnalyticsPage({
         >
           <h3 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
             <Package className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
-            מוצרים מובילים
+            {isEn ? 'Top products' : 'מוצרים מובילים'}
           </h3>
 
           {topProducts.length > 0 ? (
@@ -675,11 +687,11 @@ export default function AnalyticsPage({
                 <thead>
                   <tr className="text-sm" style={{ borderBottom: '1px solid var(--dash-glass-border)', color: 'var(--dash-text-2)' }}>
                     <th className="text-right py-3 px-4">#</th>
-                    <th className="text-right py-3 px-4">מוצר</th>
-                    <th className="text-right py-3 px-4">מותג</th>
-                    <th className="text-center py-3 px-4">קליקים</th>
-                    <th className="text-center py-3 px-4">קופונים הועתקו</th>
-                    <th className="text-center py-3 px-4">סה״כ פעילות</th>
+                    <th className="text-right py-3 px-4">{isEn ? 'Product' : 'מוצר'}</th>
+                    <th className="text-right py-3 px-4">{isEn ? 'Brand' : 'מותג'}</th>
+                    <th className="text-center py-3 px-4">{isEn ? 'Clicks' : 'קליקים'}</th>
+                    <th className="text-center py-3 px-4">{isEn ? 'Coupons copied' : 'קופונים הועתקו'}</th>
+                    <th className="text-center py-3 px-4">{isEn ? 'Total activity' : 'סה״כ פעילות'}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -730,7 +742,7 @@ export default function AnalyticsPage({
           ) : (
             <div className="text-center py-12">
               <Package className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--dash-text-3)' }} />
-              <p style={{ color: 'var(--dash-text-2)' }}>אין נתונים על מוצרים בתקופה זו</p>
+              <p style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'No product data in this range' : 'אין נתונים על מוצרים בתקופה זו'}</p>
             </div>
           )}
         </div>
@@ -746,7 +758,7 @@ export default function AnalyticsPage({
           >
             <div className="flex items-center gap-3 mb-2">
               <Users className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
-              <span style={{ color: 'var(--dash-text-2)' }}>מבקרים ייחודיים</span>
+              <span style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Unique visitors' : 'מבקרים ייחודיים'}</span>
             </div>
             <p className="text-3xl font-bold" style={{ color: 'var(--dash-text)' }}>{formatNumber(summary.visits.unique)}</p>
           </div>
@@ -760,7 +772,7 @@ export default function AnalyticsPage({
           >
             <div className="flex items-center gap-3 mb-2">
               <MessageCircle className="w-6 h-6" style={{ color: 'var(--dash-positive)' }} />
-              <span style={{ color: 'var(--dash-text-2)' }}>ממוצע הודעות לשיחה</span>
+              <span style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Avg messages per chat' : 'ממוצע הודעות לשיחה'}</span>
             </div>
             <p className="text-3xl font-bold" style={{ color: 'var(--dash-text)' }}>{summary.avg_user_msgs_per_session}</p>
           </div>
@@ -774,7 +786,7 @@ export default function AnalyticsPage({
           >
             <div className="flex items-center gap-3 mb-2">
               <TrendingUp className="w-6 h-6 text-orange-400" />
-              <span style={{ color: 'var(--dash-text-2)' }}>שיעור המרה</span>
+              <span style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Conversion rate' : 'שיעור המרה'}</span>
             </div>
             <p className="text-3xl font-bold" style={{ color: 'var(--dash-text)' }}>
               {summary.sessions.with_message > 0
