@@ -21,11 +21,12 @@ export async function GET(request: NextRequest) {
 
     const { data: account } = await supabase
       .from('accounts')
-      .select('config')
+      .select('config, language')
       .eq('id', auth.accountId)
       .single();
 
     const archetype = (account?.config as { archetype?: string } | null)?.archetype || null;
+    const language = (account as any)?.language || 'he';
 
     const { count } = await supabase
       .from('widget_products')
@@ -36,9 +37,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       archetype,
       hasProducts: (count ?? 0) > 0,
+      language,
     });
   } catch (error) {
     console.error('[nav-features] error:', error);
-    return NextResponse.json({ error: 'שגיאת שרת' }, { status: 500 });
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

@@ -17,29 +17,32 @@ import {
   Moon,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { getDashboardStrings, dashboardDir, type DashboardLang } from '@/lib/i18n/dashboard';
 
-// Tabs are gated by archetype + features. brandOnly tabs render only for archetypes
-// that act as commerce/brands; requiresProducts shows up only when a product catalog
-// has been ingested.
+// b2b_saas also gets the "brand-like" tabs (support, attribution) — IMAI needs
+// the support inbox in particular.
+const BRAND_LIKE_ARCHETYPES = new Set(['brand', 'local_business', 'b2b_saas']);
+
+type NavKey =
+  | 'dashboard' | 'analytics' | 'partnerships' | 'coupons' | 'products'
+  | 'conversations' | 'support' | 'attribution' | 'settings';
+
 const BASE_NAV_ITEMS: {
-  key: string;
-  label: string;
+  key: NavKey;
   icon: typeof LayoutDashboard;
   brandOnly?: boolean;
   requiresProducts?: boolean;
 }[] = [
-  { key: 'dashboard', label: 'דשבורד', icon: LayoutDashboard },
-  { key: 'analytics', label: 'אנליטיקס', icon: BarChart3 },
-  { key: 'partnerships', label: 'שת״פים', icon: Briefcase },
-  { key: 'coupons', label: 'קופונים', icon: Tag },
-  { key: 'products', label: 'מוצרים', icon: Sparkles, requiresProducts: true },
-  { key: 'conversations', label: 'שיחות', icon: MessageCircle },
-  { key: 'support', label: 'פניות תמיכה', icon: LifeBuoy, brandOnly: true },
-  { key: 'attribution', label: 'שיוך', icon: TrendingUp, brandOnly: true },
-  { key: 'settings', label: 'הגדרות', icon: Settings },
+  { key: 'dashboard', icon: LayoutDashboard },
+  { key: 'analytics', icon: BarChart3 },
+  { key: 'partnerships', icon: Briefcase },
+  { key: 'coupons', icon: Tag },
+  { key: 'products', icon: Sparkles, requiresProducts: true },
+  { key: 'conversations', icon: MessageCircle },
+  { key: 'support', icon: LifeBuoy, brandOnly: true },
+  { key: 'attribution', icon: TrendingUp, brandOnly: true },
+  { key: 'settings', icon: Settings },
 ];
-
-const BRAND_LIKE_ARCHETYPES = new Set(['brand', 'local_business']);
 
 export function NavigationMenu() {
   const params = useParams();
@@ -47,7 +50,11 @@ export function NavigationMenu() {
   const { theme, toggle } = useTheme();
   const username = params.username as string;
 
-  const [features, setFeatures] = useState<{ archetype: string | null; hasProducts: boolean } | null>(null);
+  const [features, setFeatures] = useState<{
+    archetype: string | null;
+    hasProducts: boolean;
+    language: DashboardLang;
+  } | null>(null);
   useEffect(() => {
     if (!username) return;
     let cancelled = false;
@@ -56,7 +63,11 @@ export function NavigationMenu() {
         const res = await fetch(`/api/influencer/nav-features?username=${username}`);
         if (!res.ok) return;
         const data = await res.json();
-        if (!cancelled) setFeatures({ archetype: data.archetype || null, hasProducts: !!data.hasProducts });
+        if (!cancelled) setFeatures({
+          archetype: data.archetype || null,
+          hasProducts: !!data.hasProducts,
+          language: data.language === 'en' ? 'en' : 'he',
+        });
       } catch {}
     })();
     return () => {
@@ -68,15 +79,18 @@ export function NavigationMenu() {
   // of missing tabs. Influencer-only adjustments apply once nav-features lands.
   const isBrandLike = features ? BRAND_LIKE_ARCHETYPES.has(features.archetype || '') : true;
   const hasProducts = features ? features.hasProducts : false;
+  const lang: DashboardLang = features?.language || 'he';
+  const t = getDashboardStrings(lang).nav;
+  const dir = dashboardDir(lang);
 
   const NAV_ITEMS = BASE_NAV_ITEMS.filter((item) => {
     if (item.brandOnly && !isBrandLike) return false;
     if (item.requiresProducts && !hasProducts) return false;
     return true;
-  });
+  }).map((item) => ({ ...item, label: t[item.key] }));
 
   return (
-    <>
+    <div dir={dir} style={{ direction: dir }}>
       {/* ── Desktop nav ── */}
       <nav className="sticky top-0 z-30 hidden sm:block glass-nav">
         <div className="max-w-6xl mx-auto px-6 h-12 flex items-center justify-between">
@@ -132,7 +146,7 @@ export function NavigationMenu() {
               e.currentTarget.style.background = 'transparent';
               e.currentTarget.style.color = 'var(--dash-text-3)';
             }}
-            title={theme === 'dark' ? 'מצב בהיר' : 'מצב כהה'}
+            title={theme === 'dark' ? t.themeLight : t.themeDark}
           >
             {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
@@ -175,10 +189,10 @@ export function NavigationMenu() {
             style={{ color: 'var(--dash-text-3)' }}
           >
             {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            <span className="text-[10px]">{theme === 'dark' ? 'בהיר' : 'כהה'}</span>
+            <span className="text-[10px]">{theme === 'dark' ? t.themeLightShort : t.themeDarkShort}</span>
           </button>
         </div>
       </div>
-    </>
+    </div>
   );
 }
