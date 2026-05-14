@@ -153,10 +153,11 @@ export default function ProductsPage({
           <div className="flex items-start gap-2 min-w-0">
             <Eye className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-primary)' }} />
             <div className="min-w-0">
-              <div className="text-sm font-medium">תצוגה מקדימה</div>
+              <div className="text-sm font-medium">{isEn ? 'Preview' : 'תצוגה מקדימה'}</div>
               <div className="text-[11px] mt-0.5" style={{ color: 'var(--dash-text-3)' }}>
-                זו התצוגה שהעוקבות רואות בצ׳אט. כאן את יכולה לעבור על הקטלוג, לסנן ולוודא שהכל
-                נראה כמו שצריך.
+                {isEn
+                  ? "This is what visitors see in the chat. Browse the catalog, filter, and verify everything looks right."
+                  : 'זו התצוגה שהעוקבות רואות בצ׳אט. כאן את יכולה לעבור על הקטלוג, לסנן ולוודא שהכל נראה כמו שצריך.'}
               </div>
             </div>
           </div>
@@ -168,7 +169,7 @@ export default function ProductsPage({
             style={{ background: 'var(--color-primary)', color: '#fff' }}
           >
             <ExternalLink className="w-3 h-3" />
-            פתחי בצ׳אט
+            {isEn ? 'Open in chat' : 'פתחי בצ׳אט'}
           </a>
         </div>
 
@@ -195,7 +196,7 @@ export default function ProductsPage({
             }}
           >
             <Filter className="w-4 h-4" />
-            סינון
+            {isEn ? 'Filter' : 'סינון'}
             {activeFiltersCount > 0 && (
               <span
                 className="text-[10px] px-1.5 rounded-full"
@@ -236,14 +237,14 @@ export default function ProductsPage({
           <div className="glass-card rounded-2xl p-4 mb-4 grid grid-cols-1 sm:grid-cols-3 gap-3 animate-slide-up">
             <div>
               <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>
-                קטגוריה
+                {isEn ? 'Category' : 'קטגוריה'}
               </label>
               <select
                 className="input w-full py-2 px-3 text-sm"
                 value={activeCategory || ''}
                 onChange={(e) => setActiveCategory(e.target.value || null)}
               >
-                <option value="">הכל ({facets.total})</option>
+                <option value="">{isEn ? 'All' : 'הכל'} ({facets.total})</option>
                 {facets.categories.map((c) => (
                   <option key={c.value} value={c.value}>
                     {c.value} ({c.count})
@@ -253,14 +254,14 @@ export default function ProductsPage({
             </div>
             <div>
               <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>
-                מותג
+                {isEn ? 'Brand' : 'מותג'}
               </label>
               <select
                 className="input w-full py-2 px-3 text-sm"
                 value={activeBrand || ''}
                 onChange={(e) => setActiveBrand(e.target.value || null)}
               >
-                <option value="">הכל</option>
+                <option value="">{isEn ? 'All' : 'הכל'}</option>
                 {facets.brands.map((b) => (
                   <option key={b.value} value={b.value}>
                     {b.value} ({b.count})
@@ -270,14 +271,14 @@ export default function ProductsPage({
             </div>
             <div>
               <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>
-                כל התגיות
+                {isEn ? 'All claims' : 'כל התגיות'}
               </label>
               <select
                 className="input w-full py-2 px-3 text-sm"
                 value={activeClaim || ''}
                 onChange={(e) => setActiveClaim(e.target.value || null)}
               >
-                <option value="">הכל</option>
+                <option value="">{isEn ? 'All' : 'הכל'}</option>
                 {facets.claims.map((c) => (
                   <option key={c.value} value={c.value}>
                     {c.value} ({c.count})
@@ -293,7 +294,7 @@ export default function ProductsPage({
                   style={{ color: 'var(--dash-text-3)' }}
                 >
                   <X className="w-3 h-3" />
-                  נקה את כל הסינונים
+                  {isEn ? 'Clear all filters' : 'נקה את כל הסינונים'}
                 </button>
               </div>
             )}
@@ -317,18 +318,18 @@ export default function ProductsPage({
         {!loading && products.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {products.map((p) => (
-              <ProductCard key={p.id} product={p} onClick={() => setSelected(p)} />
+              <ProductCard key={p.id} product={p} onClick={() => setSelected(p)} isEn={isEn} />
             ))}
           </div>
         )}
       </main>
 
-      {selected && <ProductDetailModal product={selected} onClose={() => setSelected(null)} />}
+      {selected && <ProductDetailModal product={selected} onClose={() => setSelected(null)} isEn={isEn} />}
     </div>
   );
 }
 
-function ProductCard({ product, onClick }: { product: Product; onClick: () => void }) {
+function ProductCard({ product, onClick, isEn }: { product: Product; onClick: () => void; isEn: boolean }) {
   const promoPercent = product.ai_profile?.promo_percent;
   return (
     <button
@@ -370,7 +371,7 @@ function ProductCard({ product, onClick }: { product: Product; onClick: () => vo
             className="text-[10px] px-2 py-0.5 rounded-full font-medium"
             style={{ background: 'var(--color-primary)', color: '#fff' }}
           >
-            {promoPercent}% הנחה
+            {promoPercent}% {isEn ? 'off' : 'הנחה'}
           </span>
         )}
       </div>
@@ -378,7 +379,7 @@ function ProductCard({ product, onClick }: { product: Product; onClick: () => vo
   );
 }
 
-function ProductDetailModal({ product, onClose }: { product: Product; onClose: () => void }) {
+function ProductDetailModal({ product, onClose, isEn }: { product: Product; onClose: () => void; isEn: boolean }) {
   const keyDetailed = product.ai_profile?.key_ingredients_detailed || [];
   const inci = product.ingredients || [];
   return (
@@ -447,7 +448,7 @@ function ProductDetailModal({ product, onClose }: { product: Product; onClose: (
                 style={{ color: 'var(--color-primary)' }}
               >
                 <ExternalLink className="w-3 h-3" />
-                לדף המוצר באתר
+                {isEn ? 'View product on site' : 'לדף המוצר באתר'}
               </a>
             )}
           </div>
@@ -500,7 +501,7 @@ function ProductDetailModal({ product, onClose }: { product: Product; onClose: (
             {product.usage && (
               <div>
                 <h3 className="text-xs font-semibold mb-2" style={{ color: 'var(--dash-text-2)' }}>
-                  אופן השימוש
+                  {isEn ? 'How to use' : 'אופן השימוש'}
                 </h3>
                 <p className="text-sm" style={{ color: 'var(--dash-text)' }}>{product.usage}</p>
               </div>
@@ -512,7 +513,7 @@ function ProductDetailModal({ product, onClose }: { product: Product; onClose: (
                   className="text-xs font-semibold cursor-pointer"
                   style={{ color: 'var(--dash-text-2)' }}
                 >
-                  רשימת רכיבים מלאה (INCI) — {inci.length}
+                  {isEn ? 'Full ingredient list (INCI)' : 'רשימת רכיבים מלאה (INCI)'} — {inci.length}
                 </summary>
                 <p className="text-xs mt-2 leading-relaxed" style={{ color: 'var(--dash-text-3)' }} dir="ltr">
                   {inci.join(', ')}
