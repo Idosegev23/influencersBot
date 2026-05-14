@@ -33,6 +33,8 @@ import {
 } from 'lucide-react';
 import { getInfluencerByUsername, supabase } from '@/lib/supabase';
 import type { Influencer } from '@/types';
+import { useDashboardLang } from '@/hooks/useDashboardLang';
+import { getDashboardStrings } from '@/lib/i18n/dashboard';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -107,7 +109,7 @@ interface HistoryEntry {
 /*  Status config                                                      */
 /* ------------------------------------------------------------------ */
 
-const STATUS_LABEL: Record<TicketStatus, string> = {
+const STATUS_LABEL_HE: Record<TicketStatus, string> = {
   new: 'חדש',
   in_progress: 'בטיפול',
   awaiting_customer: 'ממתין ללקוחה',
@@ -116,6 +118,20 @@ const STATUS_LABEL: Record<TicketStatus, string> = {
   closed: 'סגור',
   cancelled: 'בוטל',
 };
+
+const STATUS_LABEL_EN: Record<TicketStatus, string> = {
+  new: 'New',
+  in_progress: 'In progress',
+  awaiting_customer: 'Awaiting customer',
+  shipped: 'Shipped',
+  resolved: 'Resolved',
+  closed: 'Closed',
+  cancelled: 'Cancelled',
+};
+
+function statusLabel(s: TicketStatus, lang: 'he' | 'en'): string {
+  return (lang === 'en' ? STATUS_LABEL_EN : STATUS_LABEL_HE)[s];
+}
 
 const STATUS_COLOR: Record<TicketStatus, { dot: string; text: string; bg: string }> = {
   new:               { dot: '#3b82f6', text: '#1d4ed8', bg: '#dbeafe' },
@@ -152,16 +168,17 @@ function shortCode(uuid: string): string {
   return uuid.replace(/-/g, '').slice(0, 6).toUpperCase();
 }
 
-function formatRelative(iso: string): string {
+function formatRelative(iso: string, lang: 'he' | 'en' = 'he'): string {
   const diffMs = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diffMs / 60000);
-  if (m < 1) return 'עכשיו';
-  if (m < 60) return `לפני ${m} דק׳`;
+  const isEn = lang === 'en';
+  if (m < 1) return isEn ? 'just now' : 'עכשיו';
+  if (m < 60) return isEn ? `${m}m ago` : `לפני ${m} דק׳`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `לפני ${h} שעות`;
+  if (h < 24) return isEn ? `${h}h ago` : `לפני ${h} שעות`;
   const d = Math.floor(h / 24);
-  if (d < 7) return `לפני ${d} ימים`;
-  return new Date(iso).toLocaleDateString('he-IL');
+  if (d < 7) return isEn ? `${d}d ago` : `לפני ${d} ימים`;
+  return new Date(iso).toLocaleDateString(isEn ? 'en-US' : 'he-IL');
 }
 
 /* ------------------------------------------------------------------ */
@@ -175,6 +192,10 @@ export default function SupportPage({
 }) {
   const { username } = use(params);
   const router = useRouter();
+  // Account language for i18n. Pulled from /api/influencer/nav-features,
+  // cached in localStorage so subsequent renders are synchronous.
+  const { lang } = useDashboardLang(username);
+  const t = getDashboardStrings(lang).support;
 
   const [influencer, setInfluencer] = useState<Influencer | null>(null);
   const [agent, setAgent] = useState<{
@@ -449,9 +470,11 @@ export default function SupportPage({
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold">פניות תמיכה</h1>
+            <h1 className="text-2xl font-bold">{t.pageTitle}</h1>
             <p className="text-sm" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>
-              {counts.new || 0} חדשות · {counts.in_progress || 0} בטיפול · {counts.shipped || 0} במשלוח · סה״כ {counts.all || 0}
+              {lang === 'en'
+                ? `${counts.new || 0} new · ${counts.in_progress || 0} in progress · ${counts.shipped || 0} shipped · total ${counts.all || 0}`
+                : `${counts.new || 0} חדשות · ${counts.in_progress || 0} בטיפול · ${counts.shipped || 0} במשלוח · סה״כ ${counts.all || 0}`}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -585,9 +608,9 @@ export default function SupportPage({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="חיפוש לפי שם, מספר נייד, מספר הזמנה, או טקסט בפנייה..."
+              placeholder={t.searchPlaceholder}
               className="flex-1 bg-transparent outline-none text-sm"
-              dir="rtl"
+              dir={lang === 'en' ? 'ltr' : 'rtl'}
               style={{ color: 'var(--dash-text, #fff)' }}
             />
             {search && (
@@ -606,14 +629,14 @@ export default function SupportPage({
         {/* Filter pills */}
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
           {([
-            { key: 'all', label: 'הכל' },
-            { key: 'new', label: 'חדש' },
-            { key: 'in_progress', label: 'בטיפול' },
-            { key: 'awaiting_customer', label: 'ממתין ללקוחה' },
-            { key: 'shipped', label: 'יצא למשלוח' },
-            { key: 'resolved', label: 'טופל' },
-            { key: 'closed', label: 'סגור' },
-            { key: 'cancelled', label: 'בוטל' },
+            { key: 'all', label: t.filterAll },
+            { key: 'new', label: statusLabel('new', lang) },
+            { key: 'in_progress', label: statusLabel('in_progress', lang) },
+            { key: 'awaiting_customer', label: statusLabel('awaiting_customer', lang) },
+            { key: 'shipped', label: statusLabel('shipped', lang) },
+            { key: 'resolved', label: statusLabel('resolved', lang) },
+            { key: 'closed', label: statusLabel('closed', lang) },
+            { key: 'cancelled', label: statusLabel('cancelled', lang) },
           ] as const).map((tab) => {
             const active = filter === tab.key;
             const c = tab.key !== 'all' ? counts[tab.key as string] || 0 : counts.all || 0;
@@ -654,6 +677,7 @@ export default function SupportPage({
                 tickets={tickets}
                 selectedId={selectedId}
                 onSelect={setSelectedId}
+                lang={lang}
               />
               {/* Pagination — server returns 50 per page; without this
                   control the brand could only ever see the first page. */}
@@ -681,6 +705,7 @@ export default function SupportPage({
                   agent={agent}
                   onChange={() => fetchList(filter, search, page)}
                   onClose={() => setSelectedId(null)}
+                  lang={lang}
                 />
               ) : (
                 <div className="hidden lg:flex items-center justify-center p-12 rounded-2xl"
@@ -704,10 +729,12 @@ function TicketList({
   tickets,
   selectedId,
   onSelect,
+  lang,
 }: {
   tickets: Ticket[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  lang: 'he' | 'en';
 }) {
   return (
     <div className="space-y-2">
@@ -735,14 +762,14 @@ function TicketList({
                 style={{ background: c.bg, color: c.text }}
               >
                 <Icon className="w-3 h-3" />
-                {STATUS_LABEL[t.status]}
+                {statusLabel(t.status, lang)}
               </span>
             </div>
             <p className="text-sm line-clamp-2 mb-2" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>
               {t.message}
             </p>
             <div className="flex items-center justify-between text-[11px]" style={{ color: 'var(--dash-text-3, #6b7280)' }}>
-              <span>{formatRelative(t.created_at)}</span>
+              <span>{formatRelative(t.created_at, lang)}</span>
               {t.order_number && <span>#{t.order_number.replace(/^#+/, '')}</span>}
             </div>
           </button>
@@ -763,6 +790,7 @@ function TicketDetail({
   agent,
   onChange,
   onClose,
+  lang,
 }: {
   username: string;
   ticketId: string;
@@ -770,6 +798,7 @@ function TicketDetail({
   agent: { id: string; display_name: string; is_admin: boolean; account_id: string } | null;
   onChange: () => void;
   onClose: () => void;
+  lang: 'he' | 'en';
 }) {
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -1170,7 +1199,7 @@ function TicketDetail({
               style={{ background: c.bg, color: c.text }}
             >
               <Icon className="w-3.5 h-3.5" />
-              {STATUS_LABEL[ticket.status]}
+              {statusLabel(ticket.status, lang)}
             </span>
             <code className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.08)' }}>
               #{shortCode(ticket.id)}
@@ -1178,7 +1207,7 @@ function TicketDetail({
           </div>
           <h3 className="text-lg font-semibold">{ticket.customer_name}</h3>
           <p className="text-xs" style={{ color: 'var(--dash-text-3, #6b7280)' }}>
-            התקבלה {formatRelative(ticket.created_at)}
+            התקבלה {formatRelative(ticket.created_at, lang)}
           </p>
         </div>
         <button onClick={onClose} className="lg:hidden" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>
@@ -1213,9 +1242,9 @@ function TicketDetail({
           </span>
           <span className="opacity-70">
             {ticket.feedback_responded_at
-              ? `הגיב/ה ${formatRelative(ticket.feedback_responded_at)}`
+              ? `הגיב/ה ${formatRelative(ticket.feedback_responded_at, lang)}`
               : ticket.feedback_sent_at
-              ? `נשלח ${formatRelative(ticket.feedback_sent_at)}`
+              ? `נשלח ${formatRelative(ticket.feedback_sent_at, lang)}`
               : ''}
           </span>
         </div>
@@ -1335,7 +1364,7 @@ function TicketDetail({
       <div className="space-y-2">
         <div className="text-xs" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>שינוי סטטוס</div>
         <div className="flex flex-wrap gap-2">
-          {(Object.keys(STATUS_LABEL) as TicketStatus[]).map((s) => {
+          {(Object.keys(STATUS_LABEL_HE) as TicketStatus[]).map((s) => {
             const isCurrent = s === ticket.status;
             const SI = STATUS_ICON[s];
             return (
@@ -1351,7 +1380,7 @@ function TicketDetail({
                 }}
               >
                 <SI className="w-3.5 h-3.5" />
-                {STATUS_LABEL[s]}
+                {statusLabel(s, lang)}
                 {savingStatus === s && <Loader2 className="w-3 h-3 animate-spin" />}
               </button>
             );
@@ -1374,7 +1403,7 @@ function TicketDetail({
         )}
         {ticket.last_customer_notified_at && (
           <p className="text-[11px] mt-2 opacity-70">
-            עדכון אחרון נשלח ללקוחה: {formatRelative(ticket.last_customer_notified_at)}
+            עדכון אחרון נשלח ללקוחה: {formatRelative(ticket.last_customer_notified_at, lang)}
           </p>
         )}
       </div>
@@ -1392,7 +1421,7 @@ function TicketDetail({
               serviceWindow.withinWindow ? (
                 <span className="text-[11px] px-2 py-0.5 rounded-full"
                   style={{ background: 'rgba(34,197,94,0.2)', color: '#15803d' }}>
-                  ✓ חלון 24 שעות פתוח{serviceWindow.expiresAt ? ` · נסגר ${formatRelative(serviceWindow.expiresAt)}` : ''}
+                  ✓ חלון 24 שעות פתוח{serviceWindow.expiresAt ? ` · נסגר ${formatRelative(serviceWindow.expiresAt, lang)}` : ''}
                 </span>
               ) : (
                 <span className="text-[11px] px-2 py-0.5 rounded-full flex items-center gap-1"
@@ -1410,7 +1439,7 @@ function TicketDetail({
             <p className="text-[11px] mb-2" style={{ color: '#b45309' }}>
               הלקוחה לא הגיבה ב-24 שעות האחרונות — ההודעה תישלח כתבנית WhatsApp (עד 900 תווים).
               {serviceWindow.lastInboundAt && (
-                <> תגובה אחרונה ממנה: {formatRelative(serviceWindow.lastInboundAt)}.</>
+                <> תגובה אחרונה ממנה: {formatRelative(serviceWindow.lastInboundAt, lang)}.</>
               )}
             </p>
           )}
@@ -1623,7 +1652,7 @@ function TicketDetail({
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span style={{ color: 'var(--dash-text-2, #9ca3af)' }}>{historyLine(h)}</span>
+                      <span style={{ color: 'var(--dash-text-2, #9ca3af)' }}>{historyLine(h, lang)}</span>
                       {isCustomerReply && (
                         <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold"
                           style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e' }}>
@@ -1660,6 +1689,7 @@ function TicketDetail({
                         meta={h.routing_meta}
                         username={username}
                         onMoved={fetchTicket}
+                        lang={lang}
                       />
                     )}
                     {/* Brand notification body — cyan tint, exactly the
@@ -1727,7 +1757,7 @@ function TicketDetail({
                       </a>
                     )}
                     <div className="opacity-60 mt-0.5">
-                      {formatRelative(h.created_at)} · {h.actor || '—'}
+                      {formatRelative(h.created_at, lang)} · {h.actor || '—'}
                     </div>
                   </div>
                 </li>
@@ -2121,11 +2151,13 @@ function AmbiguityBanner({
   meta,
   username,
   onMoved,
+  lang,
 }: {
   historyId: string;
   meta: RoutingMeta;
   username: string;
   onMoved: () => void;
+  lang: 'he' | 'en';
 }) {
   const [moving, setMoving] = useState<string | null>(null);
   const handleMove = async (targetTicketId: string) => {
@@ -2173,7 +2205,7 @@ function AmbiguityBanner({
           >
             {moving === alt.ticket_id && <Loader2 className="w-3 h-3 animate-spin" />}
             <span>
-              {alt.brand || 'מותג'} · {alt.customer_name || 'לקוחה'} · {formatRelative(alt.last_outbound_at)}
+              {alt.brand || 'מותג'} · {alt.customer_name || 'לקוחה'} · {formatRelative(alt.last_outbound_at, lang)}
             </span>
           </button>
         ))}
@@ -2196,10 +2228,10 @@ function NotifyButton({ label, onClick, disabled }: { label: string; onClick: ()
   );
 }
 
-function historyLine(h: HistoryEntry): string {
+function historyLine(h: HistoryEntry, lang: 'he' | 'en' = 'he'): string {
   if (h.action === 'status_change') {
-    const fromLabel = h.from_status ? STATUS_LABEL[h.from_status as TicketStatus] || h.from_status : '?';
-    const toLabel = h.to_status ? STATUS_LABEL[h.to_status as TicketStatus] || h.to_status : '?';
+    const fromLabel = h.from_status ? statusLabel(h.from_status as TicketStatus, lang) || h.from_status : '?';
+    const toLabel = h.to_status ? statusLabel(h.to_status as TicketStatus, lang) || h.to_status : '?';
     return `סטטוס: ${fromLabel} → ${toLabel}${h.note ? ` · "${h.note}"` : ''}`;
   }
   if (h.action === 'note_added') return `הערה פנימית עודכנה`;
