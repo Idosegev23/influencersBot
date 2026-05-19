@@ -44,12 +44,16 @@ const MAX_REBALANCE_MOVES = 50;
 const MIN_GAP_TO_REBALANCE = 1;
 
 async function fetchAgentLoads(accountId: string): Promise<AgentLoad[]> {
+  // is_routable is independent of is_active — an agent can keep login access
+  // while being excluded from the auto-assign pool (e.g. a PM who handles
+  // existing tickets but shouldn't be on the rota for new ones).
   const { data: agents, error: aErr } = await supabase
     .from('support_agents')
     .select('id, first_name, last_name, is_admin')
     .eq('account_id', accountId)
     .eq('is_active', true)
-    .eq('is_admin', false);
+    .eq('is_admin', false)
+    .eq('is_routable', true);
 
   if (aErr || !agents || agents.length === 0) return [];
 
