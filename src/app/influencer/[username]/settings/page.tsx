@@ -12,6 +12,8 @@ import {
   X,
   Sparkles,
   GripVertical,
+  AlertTriangle,
+  Trash2,
 } from 'lucide-react';
 import { getInfluencerByUsername } from '@/lib/supabase';
 import type { Influencer } from '@/types';
@@ -40,6 +42,14 @@ export default function SettingsPage({
   const [newQuestion, setNewQuestion] = useState('');
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingText, setEditingText] = useState('');
+
+  // ── Account deletion request ──
+  const [deletionOpen, setDeletionOpen] = useState(false);
+  const [deletionReason, setDeletionReason] = useState('');
+  const [deletionEmail, setDeletionEmail] = useState('');
+  const [deletionSubmitting, setDeletionSubmitting] = useState(false);
+  const [deletionSubmitted, setDeletionSubmitted] = useState(false);
+  const [deletionError, setDeletionError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -187,6 +197,36 @@ export default function SettingsPage({
     const [item] = updated.splice(from, 1);
     updated.splice(to, 0, item);
     setSuggestedQuestions(updated);
+  }
+
+  async function submitDeletionRequest() {
+    setDeletionSubmitting(true);
+    setDeletionError(null);
+    try {
+      const res = await fetch(`/api/influencer/request-deletion?username=${encodeURIComponent(username)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reason: deletionReason.trim() || undefined,
+          contactEmail: deletionEmail.trim() || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data?.error || (isEn ? 'Could not submit request.' : 'לא הצלחנו לשלוח את הבקשה.'));
+      }
+      setDeletionSubmitted(true);
+    } catch (err: any) {
+      setDeletionError(err.message || (isEn ? 'Something went wrong.' : 'משהו השתבש.'));
+    } finally {
+      setDeletionSubmitting(false);
+    }
+  }
+
+  function closeDeletionDialog() {
+    if (deletionSubmitting) return;
+    setDeletionOpen(false);
+    // Keep submitted state so reopening shows "request already submitted" tone if needed.
   }
 
   if (loading) {
@@ -427,7 +467,156 @@ export default function SettingsPage({
             {isEn ? (saved ? 'Saved!' : 'Save changes') : (saved ? 'נשמר!' : 'שמור שינויים')}
           </button>
         </div>
+
+        {/* ──── Danger zone — account deletion ──── */}
+        <div
+          className="rounded-2xl p-6 mt-10"
+          style={{
+            background: 'rgba(239, 68, 68, 0.04)',
+            border: '1px solid rgba(239, 68, 68, 0.25)',
+          }}
+        >
+          <h2 className="font-semibold mb-2 flex items-center gap-2" style={{ color: '#ef4444' }}>
+            <AlertTriangle className="w-5 h-5" />
+            {isEn ? 'Danger zone' : 'אזור מסוכן'}
+          </h2>
+          <p className="text-sm mb-4" style={{ color: 'var(--dash-text-3)' }}>
+            {isEn
+              ? 'Request deletion of your account and disconnection of any linked Instagram. The Bestie team will review your request, confirm with you by email, and complete the deletion within 7 business days.'
+              : 'בקשה למחיקת החשבון שלך וניתוק החיבור לאינסטגרם. צוות Bestie יבחן את הבקשה, יחזור אליך במייל לאישור, וישלים את המחיקה תוך 7 ימי עסקים.'}
+          </p>
+          {deletionSubmitted ? (
+            <div
+              className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm"
+              style={{
+                background: 'rgba(34, 197, 94, 0.08)',
+                border: '1px solid rgba(34, 197, 94, 0.25)',
+                color: '#16a34a',
+              }}
+            >
+              <Check className="w-4 h-4" />
+              {isEn
+                ? 'Your deletion request was submitted. We will follow up by email.'
+                : 'בקשת המחיקה נשלחה. נחזור אליך במייל.'}
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                setDeletionError(null);
+                setDeletionOpen(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 hover:opacity-90"
+              style={{
+                background: 'transparent',
+                border: '1px solid #ef4444',
+                color: '#ef4444',
+              }}
+            >
+              <Trash2 className="w-4 h-4" />
+              {isEn ? 'Request account deletion' : 'בקשת מחיקת חשבון'}
+            </button>
+          )}
+        </div>
       </main>
+
+      {/* ──── Deletion confirmation modal ──── */}
+      {deletionOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center px-4"
+          style={{ background: 'rgba(0,0,0,0.55)' }}
+          onClick={closeDeletionDialog}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl p-6 shadow-2xl"
+            style={{
+              background: 'var(--dash-card, #fff)',
+              border: '1px solid var(--dash-glass-border, rgba(0,0,0,0.08))',
+              color: 'var(--dash-text)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold mb-2 flex items-center gap-2" style={{ color: '#ef4444' }}>
+              <AlertTriangle className="w-5 h-5" />
+              {isEn ? 'Confirm deletion request' : 'אישור בקשת מחיקה'}
+            </h3>
+            <p className="text-sm mb-4" style={{ color: 'var(--dash-text-3)' }}>
+              {isEn
+                ? 'This sends a request to the Bestie team. Your account stays active until our team confirms with you by email.'
+                : 'פעולה זו שולחת בקשה לצוות Bestie. החשבון שלך נשאר פעיל עד שהצוות מאשר איתך במייל.'}
+            </p>
+
+            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--dash-text-3)' }}>
+              {isEn ? 'Contact email (so we can confirm)' : 'אימייל ליצירת קשר (לאישור הבקשה)'}
+            </label>
+            <input
+              type="email"
+              className="input w-full py-2.5 px-3 text-sm mb-3"
+              value={deletionEmail}
+              onChange={(e) => setDeletionEmail(e.target.value)}
+              placeholder={isEn ? 'you@example.com' : 'you@example.com'}
+              disabled={deletionSubmitting}
+            />
+
+            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--dash-text-3)' }}>
+              {isEn ? 'Reason (optional)' : 'סיבה (לא חובה)'}
+            </label>
+            <textarea
+              className="input w-full py-2.5 px-3 text-sm mb-3"
+              rows={3}
+              value={deletionReason}
+              onChange={(e) => setDeletionReason(e.target.value)}
+              placeholder={
+                isEn
+                  ? 'Help us understand why you are leaving…'
+                  : 'נשמח לדעת למה אתה עוזב…'
+              }
+              maxLength={1000}
+              disabled={deletionSubmitting}
+            />
+
+            {deletionError && (
+              <div
+                className="text-sm mb-3 px-3 py-2 rounded-lg"
+                style={{
+                  background: 'rgba(239, 68, 68, 0.08)',
+                  border: '1px solid rgba(239, 68, 68, 0.25)',
+                  color: '#ef4444',
+                }}
+              >
+                {deletionError}
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end mt-2">
+              <button
+                onClick={closeDeletionDialog}
+                disabled={deletionSubmitting}
+                className="px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50"
+                style={{
+                  background: 'transparent',
+                  border: '1px solid var(--dash-glass-border, rgba(0,0,0,0.15))',
+                  color: 'var(--dash-text-2)',
+                }}
+              >
+                {isEn ? 'Cancel' : 'ביטול'}
+              </button>
+              <button
+                onClick={submitDeletionRequest}
+                disabled={deletionSubmitting}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50"
+                style={{ background: '#ef4444', color: '#fff' }}
+              >
+                {deletionSubmitting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+                {isEn ? 'Submit request' : 'שלח בקשה'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
