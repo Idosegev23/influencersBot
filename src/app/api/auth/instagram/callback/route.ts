@@ -50,9 +50,9 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // redirect_uri — MUST match exactly in Meta Developer Console + connect route
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://influencers-bot.vercel.app';
-    const redirectUri = `${appUrl}/api/auth/instagram/callback`;
+    // redirect_uri — MUST match exactly the URI sent in the connect route AND
+    // an entry in Meta's "Valid OAuth Redirect URIs" allowlist.
+    const redirectUri = `${req.nextUrl.origin}/api/auth/instagram/callback`;
 
     // 1. Exchange authorization code for short-lived access token
     console.log('[IG OAuth] Exchanging code for short-lived token...');

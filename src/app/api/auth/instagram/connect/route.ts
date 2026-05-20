@@ -28,9 +28,11 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // redirect_uri — MUST match exactly in Meta Developer Console + callback route
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://influencers-bot.vercel.app';
-  const redirectUri = `${appUrl}/api/auth/instagram/callback`;
+  // redirect_uri — MUST match exactly an entry in Meta App Dashboard's
+  // "Valid OAuth Redirect URIs" allowlist. Derive from the request origin so
+  // the URI matches whichever domain the user is browsing on (and avoids the
+  // trailing-newline bug in NEXT_PUBLIC_APP_URL on Vercel).
+  const redirectUri = `${req.nextUrl.origin}/api/auth/instagram/callback`;
 
   // State parameter — passed through OAuth flow and returned in callback
   // Contains the accountId so we can link the connection to the right account
