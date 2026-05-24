@@ -11,13 +11,12 @@ interface Message {
 }
 
 interface Meta {
-  embeddingMs?: number;
-  searchMs?: number;
-  retrievalMs?: number;
-  chunkCount?: number;
-  topSimilarity?: number | null;
   model?: string;
-  contextChars?: number;
+  note?: string;
+  ttftMs?: number | null;
+  streamMs?: number | null;
+  archetype?: string | null;
+  confidence?: number | null;
 }
 
 interface EngineState {
@@ -28,7 +27,10 @@ interface EngineState {
   finishedAt: number | null;
   meta: Meta | null;
   totalMs: number | null;
-  llmMs: number | null;
+  ttftMs: number | null;
+  streamMs: number | null;
+  archetype: string | null;
+  confidence: number | null;
   error: string | null;
   elapsedMs: number; // live clock
 }
@@ -44,7 +46,10 @@ function freshEngineState(): EngineState {
     finishedAt: null,
     meta: null,
     totalMs: null,
-    llmMs: null,
+    ttftMs: null,
+    streamMs: null,
+    archetype: null,
+    confidence: null,
     error: null,
     elapsedMs: 0,
   };
@@ -86,7 +91,10 @@ export default function AbTestPage({ params }: { params: Promise<{ token: string
       finishedAt: null,
       meta: null,
       totalMs: null,
-      llmMs: null,
+      ttftMs: null,
+      streamMs: null,
+      archetype: null,
+      confidence: null,
       error: null,
       elapsedMs: 0,
     }));
@@ -137,7 +145,10 @@ export default function AbTestPage({ params }: { params: Promise<{ token: string
               currentText: '',
               finishedAt,
               totalMs: data.totalMs,
-              llmMs: data.llmMs,
+              ttftMs: data.ttftMs ?? null,
+              streamMs: data.streamMs ?? null,
+              archetype: data.archetype ?? null,
+              confidence: data.confidence ?? null,
               elapsedMs: data.totalMs ?? (finishedAt - startedAt),
               messages: [...s.messages, { role: 'user', content: query }, { role: 'assistant', content: finalText }],
             }));
@@ -180,7 +191,7 @@ export default function AbTestPage({ params }: { params: Promise<{ token: string
       <header style={{ borderBottom: '1px solid #1f242d', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0f131b' }}>
         <div>
           <div style={{ fontSize: 16, fontWeight: 700 }}>LDRS · A/B Retrieval Bench</div>
-          <div style={{ fontSize: 12, color: '#8a92a4', marginTop: 2 }}>OpenAI text-embedding-3-large (2000d) vs Gemini Embedding 2 (3072d) · GPT-5.4 generator שמור משותף</div>
+          <div style={{ fontSize: 12, color: '#8a92a4', marginTop: 2 }}>Full SandwichBot pipeline — OpenAI (2000d) vs Gemini Embedding 2 (3072d) · GPT-5.4 generator משותף · זמני production אמיתיים</div>
         </div>
         <button onClick={reset} disabled={busy} style={btnGhost}>נקה שיחה</button>
       </header>
@@ -245,12 +256,15 @@ function Pane({ engine, label, state, paneRef }: { engine: Engine; label: string
 
 function MetaLine({ state }: { state: EngineState }) {
   const m = state.meta;
-  if (!m) return <div style={{ fontSize: 11, color: '#5a6479', marginTop: 4 }}>—</div>;
+  if (!m && !state.archetype) return <div style={{ fontSize: 11, color: '#5a6479', marginTop: 4 }}>—</div>;
+  const parts: string[] = [];
+  if (state.ttftMs != null) parts.push(`TTFT ${state.ttftMs}ms`);
+  if (state.streamMs != null) parts.push(`stream ${state.streamMs}ms`);
+  if (state.archetype) parts.push(`archetype: ${state.archetype}`);
+  if (state.confidence != null) parts.push(`conf ${state.confidence.toFixed(2)}`);
   return (
     <div style={{ fontSize: 11, color: '#8a92a4', marginTop: 4 }}>
-      embed {m.embeddingMs}ms · search {m.searchMs}ms · {m.chunkCount} chunks
-      {m.topSimilarity != null ? ` · top sim ${m.topSimilarity.toFixed(3)}` : ''}
-      {state.llmMs != null ? ` · llm ${state.llmMs}ms` : ''}
+      {parts.length > 0 ? parts.join(' · ') : 'full SandwichBot pipeline'}
     </div>
   );
 }

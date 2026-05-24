@@ -15,6 +15,20 @@ import OpenAI from 'openai';
 import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@/lib/supabase/server';
 import { generateEmbedding } from './embeddings';
+import { generateGeminiEmbedding } from './gemini-embeddings';
+import { getEmbeddingEngine } from './embedding-engine-context';
+
+// Engine-aware embedding helper. Production callers don't set an embedding
+// engine context → defaults to 'openai' → identical behaviour to before.
+// The internal /api/internal/ab-chat endpoint sets 'gemini' to drive the
+// shadow vector column.
+async function embedQuery(text: string): Promise<number[] | null> {
+  const engine = getEmbeddingEngine();
+  return engine === 'gemini' ? generateGeminiEmbedding(text) : generateEmbedding(text);
+}
+function matchRpcName(): 'match_document_chunks' | 'match_document_chunks_gemini' {
+  return getEmbeddingEngine() === 'gemini' ? 'match_document_chunks_gemini' : 'match_document_chunks';
+}
 import { rerankCandidates } from './rerank';
 import { getArchetypeConfig } from './archetypes';
 import { createLogger } from './logger';
@@ -465,7 +479,7 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
     ? `${query}\n\nContext: ${conversationSummary}`
     : query;
   pm?.mark('embed_start');
-  const baseEmbedding = await generateEmbedding(baseEnrichedQuery);
+  const baseEmbedding = await embedQuery(baseEnrichedQuery);
   pm?.measure('embeddingMs', 'embed_start');
 
   // If embedding timed out (null), skip vector search entirely — fall through to BM25 fallback
@@ -488,12 +502,12 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
   if (baseEmbedding) {
     // Step 3b: Vector search (threshold 0.3 — lower for Hebrew brand names)
     pm?.mark('rpc_start');
-    const cacheKey = `rag:vecs:${queryHash(accountId, baseEnrichedQuery)}`;
+    const cacheKey = `rag:vecs:${getEmbeddingEngine()}:${queryHash(accountId, baseEnrichedQuery)}`;
     const cachedVecResult = await cacheWrap<{ data: any[] | null; error: any }>(
       cacheKey,
       async () => {
         const res = await supabase
-          .rpc('match_document_chunks', {
+          .rpc(matchRpcName(), {
             p_account_id: accountId,
             p_embedding: JSON.stringify(baseEmbedding),
             p_match_count: 20,
@@ -533,13 +547,13 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
       const expandedEnriched = conversationSummary
         ? `${expandedQuery}\n\nContext: ${conversationSummary}`
         : expandedQuery;
-      const expandedEmbedding = await generateEmbedding(expandedEnriched);
+      const expandedEmbedding = await embedQuery(expandedEnriched);
       if (!expandedEmbedding) {
         log.warn('Expanded embedding timed out — skipping expansion search', {}, accountId);
       }
 
       const { data: expandedResults } = expandedEmbedding ? await supabase
-        .rpc('match_document_chunks', {
+        .rpc(matchRpcName(), {
           p_account_id: accountId,
           p_embedding: JSON.stringify(expandedEmbedding),
           p_match_count: 20,
@@ -578,7 +592,7 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
     pm?.set('thresholdUsed', '0.25_fallback');
     log.info('Zero results at 0.3 threshold, retrying at 0.25', {}, accountId);
     const { data: fallbackResults } = await supabase
-      .rpc('match_document_chunks', {
+      .rpc(matchRpcName(), {
         p_account_id: accountId,
         p_embedding: JSON.stringify(baseEmbedding),
         p_match_count: 20,
@@ -608,7 +622,7 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
       droppedEntityTypes: entityTypes,
     }, accountId);
     const { data: unfilteredResults } = await supabase
-      .rpc('match_document_chunks', {
+      .rpc(matchRpcName(), {
         p_account_id: accountId,
         p_embedding: JSON.stringify(baseEmbedding),
         p_match_count: 20,
@@ -726,7 +740,10 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
   // Anti-signals (podcast, Avi Zitan, interview) dampen the confidence so
   // queries clearly about other Itamar contexts don't force-rank conference.
   let ldrsConferenceConfidence = 0;
-  if (accountId === LDRS_ACCOUNT_ID && baseEmbedding) {
+  // Centroid prototypes are embedded with OpenAI text-embedding-3-large.
+  // Comparing them against a Gemini-embedded query is meaningless (different
+  // vector spaces), so skip the boost entirely under the gemini engine.
+  if (accountId === LDRS_ACCOUNT_ID && baseEmbedding && getEmbeddingEngine() === 'openai') {
     try {
       const centroid = await getLdrsConferenceCentroid();
       if (centroid) {

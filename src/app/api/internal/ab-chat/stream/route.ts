@@ -1,29 +1,35 @@
 /**
- * Internal A/B chat stream — compares OpenAI vs Gemini retrieval side-by-side
- * for the LDRS account. NOT used by any production code path.
+ * Internal A/B chat stream — runs LDRS through the FULL production SandwichBot
+ * pipeline twice, once with OpenAI embeddings (production default) and once
+ * with Gemini Embedding 2, so the latency comparison is authentic end-to-end
+ * (understanding → retrieval → reranking → personality wrap → GPT-5.4 stream).
  *
- * Auth: a shared static token is sent in the body and matched against
- * `AB_TEST_TOKEN` env (or the fallback constant below if unset). Returns 404
- * for missing/wrong token so the endpoint is invisible to crawlers.
+ * Engine selection is injected via the embedding-engine AsyncLocalStorage
+ * context — zero changes to any production call signatures.
+ *
+ * Auth: shared static token in the body matched against `AB_TEST_TOKEN`
+ * (fallback hardcoded). Wrong token → 404 so the endpoint is invisible.
  *
  * POST body: { token, engine: 'openai'|'gemini', message, history? }
  * Response: text/event-stream
- *   - event: meta    data: { engine, embeddingMs, searchMs, chunkCount, model, llmStartedAt }
+ *   - event: meta    data: { engine, model, retrievalEngineNote }
  *   - event: token   data: { text }
- *   - event: done    data: { totalMs, llmMs }
+ *   - event: done    data: { totalMs, archetype, confidence }
  *   - event: error   data: { message }
  */
 
 import { NextRequest } from 'next/server';
-import OpenAI from 'openai';
+import { processSandwichMessageWithMetadata } from '@/lib/chatbot/sandwichBot';
+import { buildPersonalityFromDB } from '@/lib/chatbot/personality-wrapper';
+import { withEmbeddingEngine, type EmbeddingEngine } from '@/lib/rag/embedding-engine-context';
 import { createClient } from '@/lib/supabase/server';
-import { abRetrieve, formatChunksForContext, type Engine } from '@/lib/chatbot/ab-test/retrieve';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 const LDRS_ACCOUNT_ID = 'de38eac6-d2fb-46a7-ac09-5ec860147ca0';
-const CHAT_MODEL = 'gpt-5.4';
+const LDRS_USERNAME = 'ldrs_group';
+const LDRS_DISPLAY = 'LDRS GROUP';
 const FALLBACK_TOKEN = '7pxsOdI8QSNl80TIx5sVVf-NUS_INnZk';
 
 function getToken(): string {
@@ -48,7 +54,7 @@ export async function POST(req: NextRequest) {
 
   if (body?.token !== getToken()) return notFound();
 
-  const engine: Engine = body?.engine === 'gemini' ? 'gemini' : 'openai';
+  const engine: EmbeddingEngine = body?.engine === 'gemini' ? 'gemini' : 'openai';
   const message = typeof body?.message === 'string' ? body.message.trim().slice(0, 4000) : '';
   if (!message) return new Response('Bad request', { status: 400 });
 
@@ -63,77 +69,53 @@ export async function POST(req: NextRequest) {
 
   const stream = new ReadableStream({
     async start(controller) {
+      let firstTokenAt: number | null = null;
       try {
-        // 1. Retrieve
-        const retrieval = await abRetrieve({
-          engine,
-          accountId: LDRS_ACCOUNT_ID,
-          query: message,
-          topK: 8,
-        });
-
-        // 2. Load persona (best-effort, same for both engines)
-        const supabase = await createClient();
-        const { data: persona } = await supabase
-          .from('chatbot_persona')
-          .select('name, tone, bio, description, greeting_message')
-          .eq('account_id', LDRS_ACCOUNT_ID)
-          .maybeSingle();
-        const { data: account } = await supabase
-          .from('accounts')
-          .select('config')
-          .eq('id', LDRS_ACCOUNT_ID)
-          .maybeSingle();
-        const displayName = (account?.config as any)?.display_name || 'LDRS GROUP';
-
-        // 3. Build prompt — identical structure for both engines
-        const contextBlock = formatChunksForContext(retrieval.chunks);
-        const systemPrompt = [
-          `You are the chatbot for ${displayName}.`,
-          persona?.name ? `Identity: ${persona.name}` : '',
-          persona?.tone ? `Tone: ${persona.tone}` : '',
-          persona?.bio ? `Bio: ${persona.bio}` : '',
-          '',
-          'Use ONLY the retrieved context below. If the context does not contain the answer, say honestly that you do not know rather than guessing.',
-          'Respond in the language of the user. Keep replies concise and conversational.',
-          '',
-          'RETRIEVED CONTEXT:',
-          contextBlock || '(no context returned for this query)',
-        ].filter(Boolean).join('\n');
-
-        const llmStartedAt = Date.now();
+        // Pre-load personality (same as production stream/route.ts does in parallel)
+        const personalityConfig = await buildPersonalityFromDB(LDRS_ACCOUNT_ID).catch(() => null);
 
         controller.enqueue(sse('meta', {
           engine,
-          embeddingMs: retrieval.embeddingMs,
-          searchMs: retrieval.searchMs,
-          chunkCount: retrieval.chunks.length,
-          topSimilarity: retrieval.chunks[0]?.similarity ?? null,
-          model: CHAT_MODEL,
-          contextChars: contextBlock.length,
-          retrievalMs: llmStartedAt - startTotal,
+          model: 'gpt-5.4',
+          note: engine === 'gemini'
+            ? 'Full SandwichBot pipeline with Gemini Embedding 2 (3072d) retrieval'
+            : 'Full SandwichBot pipeline with OpenAI text-embedding-3-large (2000d) retrieval',
         }));
 
-        // 4. Stream LLM response
-        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-        const completion = await openai.chat.completions.create({
-          model: CHAT_MODEL,
-          stream: true,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            ...history,
-            { role: 'user', content: message },
-          ],
-        });
+        // Run the entire SandwichBot pipeline under the chosen embedding engine.
+        // AsyncLocalStorage propagates the choice into retrieve.ts without any
+        // signature changes to production code.
+        const sandwichResult = await withEmbeddingEngine(engine, () =>
+          processSandwichMessageWithMetadata({
+            userMessage: message,
+            accountId: LDRS_ACCOUNT_ID,
+            username: LDRS_USERNAME,
+            influencerName: LDRS_DISPLAY,
+            conversationHistory: history,
+            personalityConfig: personalityConfig || undefined,
+            previousResponseId: null,
+            onToken: (token: string) => {
+              if (firstTokenAt === null) firstTokenAt = Date.now();
+              controller.enqueue(sse('token', { text: token }));
+            },
+          })
+        );
 
-        for await (const chunk of completion) {
-          const text = chunk.choices?.[0]?.delta?.content;
-          if (text) controller.enqueue(sse('token', { text }));
+        // Fallback: if streaming didn't fire (some paths return the full string),
+        // emit it as a single token chunk so the UI still renders something.
+        if (firstTokenAt === null && sandwichResult.response) {
+          firstTokenAt = Date.now();
+          controller.enqueue(sse('token', { text: sandwichResult.response }));
         }
 
-        const totalMs = Date.now() - startTotal;
-        const llmMs = Date.now() - llmStartedAt;
-        controller.enqueue(sse('done', { totalMs, llmMs }));
+        const doneAt = Date.now();
+        controller.enqueue(sse('done', {
+          totalMs: doneAt - startTotal,
+          ttftMs: firstTokenAt ? firstTokenAt - startTotal : null,
+          streamMs: firstTokenAt ? doneAt - firstTokenAt : null,
+          archetype: sandwichResult.metadata?.archetype || null,
+          confidence: sandwichResult.metadata?.confidence ?? null,
+        }));
         controller.close();
       } catch (err: any) {
         console.error('[ab-chat] stream error', err);
