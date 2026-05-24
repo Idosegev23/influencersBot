@@ -11,7 +11,30 @@ import { requireAdminAuth } from '@/lib/auth/admin-auth';
 import { autoAssignNewTicket } from '@/lib/support/auto-assign';
 import { sendEmail } from '@/lib/email';
 
+// ============================================
+// CORS — opens this route for cross-origin POSTs from embedded widgets.
+// Existing server-side / same-origin callers never send Origin so they are
+// unaffected. The route already validates accountId/username + sanitizes
+// every field, so allowing any origin doesn't expand the attack surface.
+// ============================================
+function corsHeadersFor(origin: string): Record<string, string> {
+  return {
+    'Access-Control-Allow-Origin': origin || '*',
+    'Access-Control-Allow-Methods': 'POST, GET, PATCH, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Max-Age': '86400',
+    Vary: 'Origin',
+  };
+}
+
+export async function OPTIONS(req: NextRequest) {
+  const origin = req.headers.get('origin') || '*';
+  return new Response(null, { status: 204, headers: corsHeadersFor(origin) });
+}
+
 export async function POST(req: NextRequest) {
+  const origin = req.headers.get('origin') || '';
+  const cors = corsHeadersFor(origin);
   try {
     const body = await req.json();
     const {
@@ -38,7 +61,7 @@ export async function POST(req: NextRequest) {
     if ((!username && !accountId) || !customerName || !messageText) {
       return NextResponse.json(
         { error: 'Missing required fields (need username or accountId + customerName + message)' },
-        { status: 400 }
+        { status: 400, headers: cors }
       );
     }
 
@@ -78,7 +101,7 @@ export async function POST(req: NextRequest) {
     if (!influencer) {
       return NextResponse.json(
         { error: 'Account not found' },
-        { status: 404 }
+        { status: 404, headers: cors }
       );
     }
 
@@ -194,7 +217,7 @@ export async function POST(req: NextRequest) {
       console.error('Database error:', dbError);
       return NextResponse.json(
         { error: 'Failed to create support request' },
-        { status: 500 }
+        { status: 500, headers: cors }
       );
     }
 
@@ -480,12 +503,12 @@ export async function POST(req: NextRequest) {
       requestId: supportRequest.id,
       whatsappSent,
       confirmationSent,
-    });
+    }, { headers: cors });
   } catch (error) {
     console.error('Support request error:', error);
     return NextResponse.json(
       { error: 'Failed to process support request' },
-      { status: 500 }
+      { status: 500, headers: cors }
     );
   }
 }

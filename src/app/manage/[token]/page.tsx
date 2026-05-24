@@ -113,6 +113,20 @@ export default function ManagePage() {
   // Design state
   const [welcomeMessage, setWelcomeMessage] = useState('');
   const [widgetPosition, setWidgetPosition] = useState<'bottom-right' | 'bottom-left'>('bottom-right');
+  // ---- Expanded widget settings — appearance, modules, integrations ----
+  const [primaryColor, setPrimaryColor] = useState('#0c1013');
+  const [darkMode, setDarkMode] = useState(false);
+  const [placeholderText, setPlaceholderText] = useState('');
+  const [brandNameOverride, setBrandNameOverride] = useState('');
+  const [supportEmail, setSupportEmail] = useState('');
+  const [modSupport, setModSupport] = useState(false);
+  const [modLeads, setModLeads] = useState(false);
+  const [modBookings, setModBookings] = useState(false);
+  const [supportCategories, setSupportCategories] = useState<string[]>(['order', 'product', 'return', 'other']);
+  const [shopifyDomain, setShopifyDomain] = useState('');
+  const [shopifyToken, setShopifyToken] = useState('');
+  const [shopifyEnabled, setShopifyEnabled] = useState(false);
+  const [shopifyHasToken, setShopifyHasToken] = useState(false);
 
   // Live preview state
   const [showLivePreview, setShowLivePreview] = useState(false);
@@ -164,6 +178,25 @@ export default function ManagePage() {
         setFaqItems(w.prompt?.faq || []);
         setWelcomeMessage(w.welcomeMessage || '');
         setWidgetPosition(w.position || 'bottom-right');
+        setPrimaryColor(w.primaryColor || '#0c1013');
+        setPlaceholderText(w.placeholder || '');
+        setBrandNameOverride(w.brandName || '');
+        const mods = w.modules || {};
+        setModSupport(mods.support?.enabled === true);
+        setModLeads(mods.leads?.enabled === true);
+        setModBookings(mods.bookings?.enabled === true);
+        if (Array.isArray(mods.support?.categories) && mods.support.categories.length) {
+          setSupportCategories(mods.support.categories);
+        }
+        setDarkMode(data.theme?.darkMode === true);
+        setSupportEmail(data.supportEmail || '');
+        const shop = data.integrations?.shopify || {};
+        setShopifyDomain(shop.shop_domain || '');
+        setShopifyEnabled(!!shop.enabled);
+        setShopifyHasToken(!!shop.has_token);
+        // Never pre-fill the token input — server doesn't return it. Empty input
+        // means "don't change"; the customer pastes a new value only on rotation.
+        setShopifyToken('');
         if (data.displayName) setDisplayName(data.displayName);
         if (data.domain) setDomain(data.domain);
       }
@@ -213,18 +246,45 @@ export default function ManagePage() {
     setSaving(true);
     setSaveMsg('');
     try {
+      // One PATCH writes appearance + modules + theme + support email +
+      // Shopify integration. Empty `admin_api_token` is sentinel for
+      // "leave existing token alone" — see /api/manage/settings.
       const res = await fetch('/api/manage/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           welcomeMessage,
           position: widgetPosition,
+          primaryColor,
+          placeholder: placeholderText,
+          brandName: brandNameOverride,
+          modules: {
+            support: { enabled: modSupport, categories: supportCategories },
+            leads: { enabled: modLeads },
+            bookings: { enabled: modBookings },
+          },
+          theme: { darkMode },
+          supportEmail,
+          integrations: {
+            shopify: {
+              shop_domain: shopifyDomain,
+              admin_api_token: shopifyToken, // empty = keep existing
+              enabled: shopifyEnabled,
+            },
+          },
         }),
       });
       const data = await res.json();
       if (data.success) {
         setSaveMsg('נשמר בהצלחה!');
+        if (data.integrations?.shopify?.has_token) setShopifyHasToken(true);
+        // Clear the token input after successful save — the server now has it,
+        // and re-displaying it would create a leak vector if the customer logs
+        // into manage panel on a shared machine.
+        if (shopifyToken) setShopifyToken('');
         setTimeout(() => setSaveMsg(''), 3000);
+      } else {
+        setSaveMsg('שגיאה בשמירה');
       }
     } catch {
       setSaveMsg('שגיאה בשמירה');
@@ -1252,65 +1312,230 @@ export default function ManagePage() {
             </div>
           )}
 
-          {/* Tab 6: Design */}
+          {/* Tab 6: Design — appearance + modules + integrations + embed code */}
           {activeTab === 'design' && (
             <div>
               <div className="mb-6 sm:mb-8">
                 <h1 className="text-2xl sm:text-4xl font-extrabold text-[#1e1b15] font-headline">הגדרות ווידג&apos;ט</h1>
-                <p className="text-[#655e51] mt-2">התאם את המראה וההתנהגות של הווידג&apos;ט</p>
+                <p className="text-[#655e51] mt-2">המראה, התכונות, ההטמעה — הכל במקום אחד.</p>
               </div>
 
               <div className="space-y-6">
+                {/* ============ Card 1: Appearance ============ */}
                 <div className="bg-white p-4 sm:p-8 rounded-xl" style={customShadow}>
-                  <div className="flex items-center gap-3 mb-4">
-                    <span className="material-symbols-outlined text-[#575a8c]" style={{ fontSize: 22 }}>chat_bubble</span>
+                  <div className="flex items-center gap-3 mb-5">
+                    <span className="material-symbols-outlined text-[#575a8c]" style={{ fontSize: 22 }}>palette</span>
                     <div>
-                      <h3 className="text-lg sm:text-xl font-bold text-[#1e1b15]">הודעת פתיחה</h3>
-                      <p className="text-sm text-[#655e51]">ההודעה שתופיע כשהווידג&apos;ט נפתח</p>
+                      <h3 className="text-lg sm:text-xl font-bold text-[#1e1b15]">מראה</h3>
+                      <p className="text-sm text-[#655e51]">צבע, טקסטים, מיקום ומצב כהה</p>
                     </div>
                   </div>
-                  <input
-                    value={welcomeMessage}
-                    onChange={e => setWelcomeMessage(e.target.value)}
-                    placeholder="שלום! איך אפשר לעזור?"
-                    className="w-full px-4 py-2.5 rounded-xl text-sm outline-none border border-[#c6c6c6]"
-                    style={{ backgroundColor: '#faf2e9' }}
-                  />
+
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-[#655e51] mb-1.5">צבע ראשי</label>
+                      <div className="flex items-center gap-2">
+                        <input type="color" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)}
+                          className="w-12 h-10 rounded-lg border border-[#c6c6c6] cursor-pointer" />
+                        <input type="text" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)}
+                          placeholder="#0c1013"
+                          className="flex-1 px-3 py-2 rounded-xl text-sm outline-none border border-[#c6c6c6] font-mono"
+                          style={{ backgroundColor: '#faf2e9' }} />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-[#655e51] mb-1.5">מצב צבע</label>
+                      <div className="flex gap-2">
+                        <button onClick={() => setDarkMode(false)}
+                          className={`flex-1 px-3 py-2.5 rounded-xl text-sm font-medium border-2 transition-all ${!darkMode ? 'border-[#e1e0ff] bg-[#e1e0ff]/30 text-[#575a8c]' : 'border-[#c6c6c6] text-[#655e51] bg-white'}`}>בהיר</button>
+                        <button onClick={() => setDarkMode(true)}
+                          className={`flex-1 px-3 py-2.5 rounded-xl text-sm font-medium border-2 transition-all ${darkMode ? 'border-[#e1e0ff] bg-[#e1e0ff]/30 text-[#575a8c]' : 'border-[#c6c6c6] text-[#655e51] bg-white'}`}>כהה</button>
+                      </div>
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-[#655e51] mb-1.5">הודעת פתיחה</label>
+                      <input value={welcomeMessage} onChange={e => setWelcomeMessage(e.target.value)}
+                        placeholder="שלום! איך אפשר לעזור?"
+                        className="w-full px-4 py-2.5 rounded-xl text-sm outline-none border border-[#c6c6c6]"
+                        style={{ backgroundColor: '#faf2e9' }} />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-[#655e51] mb-1.5">טקסט בקלט</label>
+                      <input value={placeholderText} onChange={e => setPlaceholderText(e.target.value)}
+                        placeholder="כתבו הודעה..."
+                        className="w-full px-4 py-2.5 rounded-xl text-sm outline-none border border-[#c6c6c6]"
+                        style={{ backgroundColor: '#faf2e9' }} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-[#655e51] mb-1.5">שם המותג בכותרת</label>
+                      <input value={brandNameOverride} onChange={e => setBrandNameOverride(e.target.value)}
+                        placeholder={displayName}
+                        className="w-full px-4 py-2.5 rounded-xl text-sm outline-none border border-[#c6c6c6]"
+                        style={{ backgroundColor: '#faf2e9' }} />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-[#655e51] mb-1.5">מיקום ווידג&apos;ט</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        {[
+                          { value: 'bottom-right' as const, label: 'ימין למטה' },
+                          { value: 'bottom-left' as const, label: 'שמאל למטה' },
+                        ].map(opt => (
+                          <button key={opt.value} onClick={() => setWidgetPosition(opt.value)}
+                            className={`p-3 rounded-xl border-2 text-sm font-medium transition-all ${widgetPosition === opt.value ? 'border-[#e1e0ff] bg-[#e1e0ff]/30 text-[#575a8c]' : 'border-[#c6c6c6] text-[#655e51] bg-white'}`}>
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
+                {/* ============ Card 2: Modules ============ */}
                 <div className="bg-white p-4 sm:p-8 rounded-xl" style={customShadow}>
-                  <div className="flex items-center gap-3 mb-4">
-                    <span className="material-symbols-outlined text-[#006c4e]" style={{ fontSize: 22 }}>dock_to_bottom</span>
-                    <h3 className="text-lg sm:text-xl font-bold text-[#1e1b15]">מיקום ווידג&apos;ט</h3>
+                  <div className="flex items-center gap-3 mb-5">
+                    <span className="material-symbols-outlined text-[#006c4e]" style={{ fontSize: 22 }}>toggle_on</span>
+                    <div>
+                      <h3 className="text-lg sm:text-xl font-bold text-[#1e1b15]">מודולים</h3>
+                      <p className="text-sm text-[#655e51]">מה הווידג&apos;ט יכול לעשות בנוסף לצ&apos;אט</p>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+
+                  <div className="space-y-3">
                     {[
-                      { value: 'bottom-right' as const, label: 'ימין למטה' },
-                      { value: 'bottom-left' as const, label: 'שמאל למטה' },
-                    ].map(opt => (
-                      <button
-                        key={opt.value}
-                        onClick={() => setWidgetPosition(opt.value)}
-                        className={`p-3 rounded-xl border-2 text-sm font-medium transition-all ${
-                          widgetPosition === opt.value
-                            ? 'border-[#e1e0ff] bg-[#e1e0ff]/30 text-[#575a8c]'
-                            : 'border-[#c6c6c6] text-[#655e51] hover:border-[#e1e0ff] bg-white'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
+                      { state: modSupport, set: setModSupport, label: 'תמיכה', desc: 'טופס פתיחת פנייה inline + העלאת תמונה + escalation לאדם' },
+                      { state: modLeads, set: setModLeads, label: 'לידים', desc: 'הבוט מציע טופס לידים כשמזהה כוונת רכישה גבוהה' },
+                      { state: modBookings, set: setModBookings, label: 'תיאום פגישות/דמו', desc: 'טופס תיאום עם גודל צוות + זמן מועדף' },
+                    ].map((m, i) => (
+                      <div key={i} className="flex items-start justify-between gap-3 p-3 rounded-xl border border-[#c6c6c6]">
+                        <div className="flex-1">
+                          <div className="font-semibold text-sm text-[#1e1b15]">{m.label}</div>
+                          <div className="text-xs text-[#655e51] mt-0.5">{m.desc}</div>
+                        </div>
+                        <button onClick={() => m.set(!m.state)}
+                          className={`relative w-12 h-7 rounded-full transition-colors flex-shrink-0 ${m.state ? 'bg-[#006c4e]' : 'bg-[#c6c6c6]'}`}>
+                          <span className={`absolute top-0.5 ${m.state ? 'right-0.5' : 'right-[22px]'} w-6 h-6 rounded-full bg-white shadow transition-all`} />
+                        </button>
+                      </div>
                     ))}
                   </div>
+
+                  {modSupport && (
+                    <div className="mt-5 pt-5 border-t border-[#c6c6c6]">
+                      <label className="block text-xs font-semibold text-[#655e51] mb-1.5">מייל לקבלת פניות תמיכה</label>
+                      <input type="email" value={supportEmail} onChange={e => setSupportEmail(e.target.value)}
+                        placeholder="support@example.com"
+                        className="w-full px-4 py-2.5 rounded-xl text-sm outline-none border border-[#c6c6c6]"
+                        style={{ backgroundColor: '#faf2e9' }} />
+                      <p className="text-xs text-[#655e51] mt-1.5">לכל פנייה שמוגשת מהווידג&apos;ט נשלח מייל ליעד הזה. אם ריק — הפניות מתעדות רק במערכת.</p>
+
+                      <label className="block text-xs font-semibold text-[#655e51] mt-4 mb-1.5">קטגוריות פנייה</label>
+                      <input type="text" value={supportCategories.join(', ')}
+                        onChange={e => setSupportCategories(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                        placeholder="order, product, return, other"
+                        className="w-full px-4 py-2.5 rounded-xl text-sm outline-none border border-[#c6c6c6] font-mono"
+                        style={{ backgroundColor: '#faf2e9' }} />
+                      <p className="text-xs text-[#655e51] mt-1.5">הקטגוריות שיופיעו ב-dropdown של טופס התמיכה (מופרדות בפסיק).</p>
+                    </div>
+                  )}
                 </div>
 
-                <button
-                  onClick={saveDesignSettings}
-                  disabled={saving}
-                  className="px-8 py-3 rounded-full font-medium text-[#1e1b15] disabled:opacity-50 transition-all hover:brightness-95"
-                  style={{ backgroundColor: '#65fcc4' }}
-                >
-                  {saving ? 'שומר...' : 'שמור הגדרות'}
-                </button>
+                {/* ============ Card 3: Shopify Integration ============ */}
+                <div className="bg-white p-4 sm:p-8 rounded-xl" style={customShadow}>
+                  <div className="flex items-center gap-3 mb-5">
+                    <span className="material-symbols-outlined text-[#575a8c]" style={{ fontSize: 22 }}>local_shipping</span>
+                    <div>
+                      <h3 className="text-lg sm:text-xl font-bold text-[#1e1b15]">אינטגרציה — Shopify</h3>
+                      <p className="text-sm text-[#655e51]">מאפשר מעקב חי אחרי הזמנות בתוך הווידג&apos;ט</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-[#655e51] mb-1.5">דומיין החנות (Shopify)</label>
+                      <input value={shopifyDomain} onChange={e => setShopifyDomain(e.target.value)}
+                        placeholder="mystore.myshopify.com"
+                        className="w-full px-4 py-2.5 rounded-xl text-sm outline-none border border-[#c6c6c6] font-mono"
+                        style={{ backgroundColor: '#faf2e9' }} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-[#655e51] mb-1.5">
+                        Admin API Token {shopifyHasToken && <span className="text-[#006c4e]">(מוגדר — השאר ריק אם לא משנים)</span>}
+                      </label>
+                      <input type="password" value={shopifyToken} onChange={e => setShopifyToken(e.target.value)}
+                        placeholder={shopifyHasToken ? '••••••••••••' : 'shpat_...'}
+                        autoComplete="new-password"
+                        className="w-full px-4 py-2.5 rounded-xl text-sm outline-none border border-[#c6c6c6] font-mono"
+                        style={{ backgroundColor: '#faf2e9' }} />
+                      <p className="text-xs text-[#655e51] mt-1.5">צור Admin API access token עם הרשאת read_orders. נשמר מוצפן בשרת — לא חוזר חזרה למסך הזה.</p>
+                    </div>
+                    <div className="flex items-center justify-between p-3 rounded-xl border border-[#c6c6c6]">
+                      <div>
+                        <div className="font-semibold text-sm text-[#1e1b15]">הפעלת מעקב הזמנות</div>
+                        <div className="text-xs text-[#655e51] mt-0.5">כאשר דלוק והבוט מזהה שאלה על הזמנה — מציע טופס בדיקה חי.</div>
+                      </div>
+                      <button onClick={() => setShopifyEnabled(!shopifyEnabled)} disabled={!shopifyHasToken && !shopifyToken}
+                        className={`relative w-12 h-7 rounded-full transition-colors flex-shrink-0 disabled:opacity-50 ${shopifyEnabled ? 'bg-[#006c4e]' : 'bg-[#c6c6c6]'}`}>
+                        <span className={`absolute top-0.5 ${shopifyEnabled ? 'right-0.5' : 'right-[22px]'} w-6 h-6 rounded-full bg-white shadow transition-all`} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ============ Card 4: Embed Code ============ */}
+                <div className="bg-white p-4 sm:p-8 rounded-xl" style={customShadow}>
+                  <div className="flex items-center gap-3 mb-5">
+                    <span className="material-symbols-outlined text-[#575a8c]" style={{ fontSize: 22 }}>code</span>
+                    <div>
+                      <h3 className="text-lg sm:text-xl font-bold text-[#1e1b15]">קוד הטמעה</h3>
+                      <p className="text-sm text-[#655e51]">הדבק לפני סגירת ה-&lt;/body&gt; של האתר</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <div className="text-xs font-semibold text-[#655e51] mb-1.5">תגית הסקריפט</div>
+                      <div className="bg-[#1e1b15] text-[#fafafa] rounded-xl p-4 font-mono text-xs overflow-x-auto whitespace-pre-wrap break-all">
+{`<!-- bestieAI Widget -->
+<script src="${typeof window !== 'undefined' ? window.location.origin : ''}/widget.js" data-account-id="${accountId}"></script>`}
+                      </div>
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(`<!-- bestieAI Widget -->\n<script src="${window.location.origin}/widget.js" data-account-id="${accountId}"></script>`); setSaveMsg('הקוד הועתק!'); setTimeout(() => setSaveMsg(''), 2000); }}
+                        className="mt-2 px-4 py-2 rounded-full text-sm font-medium bg-[#e1e0ff] text-[#575a8c] hover:bg-[#d4d3ff]">
+                        העתק קוד הטמעה
+                      </button>
+                    </div>
+
+                    <details className="mt-4 pt-4 border-t border-[#c6c6c6]">
+                      <summary className="cursor-pointer text-sm font-semibold text-[#1e1b15]">תוסף: האזנה לאירוע "החל קופון" (אופציונלי)</summary>
+                      <p className="text-xs text-[#655e51] mt-2 mb-2">הוסף לאתר אם רוצה שהווידג&apos;ט יחיל קופונים אוטומטית בעגלת Shopify/WooCommerce שלך:</p>
+                      <div className="bg-[#1e1b15] text-[#fafafa] rounded-xl p-4 font-mono text-xs overflow-x-auto whitespace-pre-wrap">
+{`<script>
+window.addEventListener('message', function (e) {
+  if (e.data && e.data.type === 'bestieai:apply_coupon') {
+    // Adapt: fetch('/cart/discounts/' + e.data.code, {method: 'POST'}) for Shopify
+    console.log('Apply coupon:', e.data.code);
+  }
+});
+</script>`}
+                      </div>
+                    </details>
+                  </div>
+                </div>
+
+                {/* ---- Save bar ---- */}
+                <div className="flex items-center gap-4 sticky bottom-4">
+                  <button
+                    onClick={saveDesignSettings}
+                    disabled={saving}
+                    className="px-8 py-3 rounded-full font-medium text-[#1e1b15] disabled:opacity-50 transition-all hover:brightness-95"
+                    style={{ backgroundColor: '#65fcc4' }}>
+                    {saving ? 'שומר...' : 'שמור את כל ההגדרות'}
+                  </button>
+                  {saveMsg && <span className="text-sm text-[#006c4e] font-medium">{saveMsg}</span>}
+                </div>
               </div>
             </div>
           )}

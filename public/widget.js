@@ -42,6 +42,51 @@
   var lastTopic = null;
   try { lastTopic = localStorage.getItem('ibot_last_topic_' + ACCOUNT_ID); } catch (e) { /* */ }
 
+  // ---- View state (Phase: concierge) ----
+  // The widget is no longer a chat-only surface. `view` switches the panel
+  // between chat, the inline support-ticket form, and the post-submit
+  // confirmation. Other modes (leads, bookings) will follow the same pattern.
+  var view = 'chat'; // 'chat' | 'support_form' | 'support_success' | 'lead_form' | 'lead_success' | 'book_demo_form' | 'book_demo_success'
+  var modules = { support: { enabled: false }, leads: { enabled: false }, bookings: { enabled: false } };
+  var supportForm = { name: '', email: '', phone: '', orderNumber: '', category: '', message: '', urgent: false, attachment: null, attachmentUploading: false, error: null, submitting: false };
+  var leadForm = { name: '', email: '', phone: '', interest: '', error: null, submitting: false };
+  var bookDemoForm = { name: '', email: '', company: '', teamSize: '', message: '', preferredTime: '', error: null, submitting: false };
+  var orderForm = { orderNumber: '', email: '', error: null, submitting: false, result: null };
+  var lastTicketRef = null;
+  // Per-bot-message ratings keyed by message index. Used by the chat renderer
+  // to show 👍/👎 state without re-fetching from the server.
+  var ratings = {};
+  // Transient toast — short message that fades after a few seconds.
+  // Used for "Coupon copied", "Transcript sent", etc.
+  var toastText = null;
+  var toastTimer = null;
+  // Returning-visitor signal — persisted across sessions. Used to personalize
+  // the welcome message and skip the generic "how can I help?" when we know
+  // they were interested in something specific last visit.
+  var hasVisitedBefore = false;
+  try { hasVisitedBefore = !!localStorage.getItem('ibot_visited_' + ACCOUNT_ID); } catch (e) { /* */ }
+  try { localStorage.setItem('ibot_visited_' + ACCOUNT_ID, '1'); } catch (e) { /* */ }
+  // Proactive open trigger — fired at most ONCE per visitor per 24h to avoid
+  // becoming annoying. Tracked separately from sessionId so it survives
+  // tab-close/return-tomorrow patterns.
+  var proactiveLastFired = 0;
+  try {
+    var pf = localStorage.getItem('ibot_proactive_' + ACCOUNT_ID);
+    if (pf) proactiveLastFired = parseInt(pf, 10) || 0;
+  } catch (e) { /* */ }
+  // Bot-initiated action card (rendered inline in chat). Set when the model
+  // emits an <<ACTION>> envelope proposing e.g. opening the support form
+  // prefilled with the topic/category it inferred.
+  var pendingAction = null;
+  // Voice input state — Web Speech API listening session. `isListening` drives
+  // the mic button's pulsing animation; `voiceRecognizer` holds the active SR.
+  var isListening = false;
+  var voiceRecognizer = null;
+  // Page context — extracted from the embedding page DOM once at boot. Passed
+  // to the chat endpoint on every turn so the bot can answer in-context
+  // ("I see you're looking at X — about that...") instead of generically.
+  var pageContext = null;
+
   // ============================================
   // Locales — every visible string + layout direction lives here.
   // New languages: add another entry; widget picks via `language` from config
@@ -63,6 +108,102 @@
       badge: { SALE: 'מבצע', NEW: 'חדש', DEFAULT: 'מומלץ' },
       errorMessage: 'שגיאה בעיבוד הבקשה.',
       connectionError: 'שגיאה בחיבור. נסו שוב.',
+      support: {
+        openLink: 'פתיחת פנייה',
+        backToChat: '← חזרה לצ׳אט',
+        title: 'פנייה לתמיכה',
+        subtitle: 'נחזור אליך במייל בהקדם.',
+        nameLabel: 'שם מלא',
+        namePlaceholder: 'איך לפנות אליך?',
+        emailLabel: 'אימייל',
+        emailPlaceholder: 'name@example.com',
+        phoneLabel: 'טלפון (אופציונלי)',
+        phonePlaceholder: '050-1234567',
+        orderLabel: 'מספר הזמנה (אופציונלי)',
+        orderPlaceholder: 'אם רלוונטי',
+        categoryLabel: 'נושא הפנייה',
+        messageLabel: 'איך נוכל לעזור?',
+        messagePlaceholder: 'תאר/י את הבעיה או הבקשה...',
+        submit: 'שליחת פנייה',
+        submitting: 'שולח...',
+        required: 'שדה חובה',
+        invalidEmail: 'אימייל לא תקין',
+        successTitle: 'הפנייה נשלחה ✓',
+        successBody: 'קיבלנו את הפנייה שלך. נחזור אליך בהקדם.',
+        successRef: 'מספר פנייה: ',
+        successBack: 'חזרה לצ׳אט',
+        submitError: 'שגיאה בשליחה. נסו שוב.',
+        categories: {
+          order: 'בעיה בהזמנה',
+          product: 'שאלה על מוצר',
+          return: 'החזרה / החלפה',
+          shipping: 'משלוח',
+          other: 'אחר',
+        },
+        actionPrompt: 'רוצה לפתוח פנייה?',
+        actionOpen: 'פתיחת טופס',
+        actionDismiss: 'לא תודה',
+        couponCopied: 'הקופון הועתק: ',
+        humanLink: 'דבר/י עם נציג',
+        humanBadge: 'סומן כדחוף — נחזור אליך מהר',
+        humanTitle: 'בקשה דחופה',
+        humanSubtitle: 'נחזור אליך בהקדם.',
+        ratingPositive: 'תודה על הפידבק!',
+        ratingNegative: 'תודה — נשתפר.',
+        transcriptLink: 'שלח/י לי את השיחה',
+        transcriptSent: 'נשלח למייל ✓',
+      },
+      order: {
+        title: 'מעקב הזמנה',
+        subtitle: 'מספר הזמנה + מייל שאיתו הזמנת.',
+        orderNumberLabel: 'מספר הזמנה',
+        orderNumberPlaceholder: 'למשל 12345',
+        emailLabel: 'מייל ההזמנה',
+        emailPlaceholder: 'name@example.com',
+        submit: 'בדיקת סטטוס',
+        searching: 'מחפש...',
+        notFound: 'לא נמצאה הזמנה תואמת. בדוק את המספר והמייל.',
+        statusLabel: 'סטטוס:',
+        placedLabel: 'הוזמנה:',
+        itemsLabel: 'פריטים:',
+        trackingLabel: 'מספר מעקב:',
+        trackUrlLabel: 'מעקב חי',
+        unavailable: 'מעקב הזמנות לא זמין באתר הזה כרגע.',
+        actionPrompt: 'רוצה לבדוק את סטטוס ההזמנה?',
+        actionOpen: 'בדיקת סטטוס',
+      },
+      lead: {
+        title: 'תיצרו איתי קשר',
+        subtitle: 'נחזור אליך תוך יום עסקים.',
+        nameLabel: 'שם',
+        emailLabel: 'אימייל',
+        phoneLabel: 'טלפון (אופציונלי)',
+        interestLabel: 'מה מעניין אותך?',
+        interestPlaceholder: 'במה אפשר לעזור...',
+        submit: 'שלח/י פרטים',
+        successTitle: 'תודה ✓',
+        successBody: 'קיבלנו את הפרטים — הצוות יחזור אליך בהקדם.',
+        actionPrompt: 'רוצה שניצור איתך קשר?',
+        actionOpen: 'שלח/י פרטים',
+      },
+      bookDemo: {
+        title: 'תיאום דמו',
+        subtitle: 'נחזור לתאם תוך יום עסקים.',
+        nameLabel: 'שם מלא',
+        emailLabel: 'אימייל עבודה',
+        companyLabel: 'חברה',
+        teamSizeLabel: 'גודל צוות',
+        teamSizes: ['1-5', '6-20', '21-50', '51-200', '200+'],
+        messageLabel: 'מה תרצה לראות בדמו? (אופציונלי)',
+        messagePlaceholder: 'איזה use case הכי מעניין אותך...',
+        preferredTimeLabel: 'שעה מועדפת לחזרה (אופציונלי)',
+        preferredTimes: ['בוקר (9-12)', 'צהריים (12-15)', 'אחה"צ (15-18)', 'ערב (18-21)', 'גמיש'],
+        submit: 'בקש/י דמו',
+        successTitle: 'הבקשה נקלטה ✓',
+        successBody: 'הצוות יחזור אליך לתיאום תוך יום עסקים.',
+        actionPrompt: 'רוצה לתאם דמו?',
+        actionOpen: 'תיאום דמו',
+      },
     },
     en: {
       dir: 'ltr',
@@ -79,6 +220,102 @@
       badge: { SALE: 'SALE', NEW: 'NEW', DEFAULT: 'PICK' },
       errorMessage: 'Something went wrong processing your request.',
       connectionError: 'Connection error. Please try again.',
+      support: {
+        openLink: 'Get support',
+        backToChat: '← Back to chat',
+        title: 'Contact support',
+        subtitle: "We'll get back to you by email shortly.",
+        nameLabel: 'Full name',
+        namePlaceholder: 'How should we address you?',
+        emailLabel: 'Email',
+        emailPlaceholder: 'name@example.com',
+        phoneLabel: 'Phone (optional)',
+        phonePlaceholder: '+1 555 0100',
+        orderLabel: 'Order number (optional)',
+        orderPlaceholder: 'If applicable',
+        categoryLabel: 'Topic',
+        messageLabel: 'How can we help?',
+        messagePlaceholder: 'Describe your issue or request...',
+        submit: 'Send request',
+        submitting: 'Sending...',
+        required: 'Required',
+        invalidEmail: 'Invalid email',
+        successTitle: 'Request received ✓',
+        successBody: "We've got your request. We'll be in touch shortly.",
+        successRef: 'Reference: ',
+        successBack: 'Back to chat',
+        submitError: 'Could not send. Please try again.',
+        categories: {
+          order: 'Order issue',
+          product: 'Product question',
+          return: 'Return / exchange',
+          shipping: 'Shipping',
+          other: 'Other',
+        },
+        actionPrompt: 'Want to open a support request?',
+        actionOpen: 'Open form',
+        actionDismiss: 'Not now',
+        couponCopied: 'Coupon copied: ',
+        humanLink: 'Talk to a human',
+        humanBadge: 'Marked urgent — we\'ll respond quickly',
+        humanTitle: 'Urgent request',
+        humanSubtitle: "We'll get back to you as soon as possible.",
+        ratingPositive: 'Thanks for the feedback!',
+        ratingNegative: 'Thanks — we\'ll improve.',
+        transcriptLink: 'Email me this chat',
+        transcriptSent: 'Sent to your email ✓',
+      },
+      order: {
+        title: 'Order tracking',
+        subtitle: 'Enter your order number and email used at checkout.',
+        orderNumberLabel: 'Order number',
+        orderNumberPlaceholder: 'e.g. 12345',
+        emailLabel: 'Order email',
+        emailPlaceholder: 'name@example.com',
+        submit: 'Check status',
+        searching: 'Searching...',
+        notFound: "We couldn't find a matching order. Check the number and email.",
+        statusLabel: 'Status:',
+        placedLabel: 'Placed:',
+        itemsLabel: 'Items:',
+        trackingLabel: 'Tracking:',
+        trackUrlLabel: 'Live tracking',
+        unavailable: 'Order tracking is not available on this site right now.',
+        actionPrompt: 'Want to check your order status?',
+        actionOpen: 'Check status',
+      },
+      lead: {
+        title: 'Get in touch',
+        subtitle: "We'll get back within one business day.",
+        nameLabel: 'Name',
+        emailLabel: 'Email',
+        phoneLabel: 'Phone (optional)',
+        interestLabel: 'What are you interested in?',
+        interestPlaceholder: 'Tell us a bit about what you need...',
+        submit: 'Send my info',
+        successTitle: 'Thanks ✓',
+        successBody: "Got your details — we'll be in touch shortly.",
+        actionPrompt: 'Want us to reach out?',
+        actionOpen: 'Share details',
+      },
+      bookDemo: {
+        title: 'Book a demo',
+        subtitle: "We'll reach out within one business day to schedule.",
+        nameLabel: 'Full name',
+        emailLabel: 'Work email',
+        companyLabel: 'Company',
+        teamSizeLabel: 'Team size',
+        teamSizes: ['1-5', '6-20', '21-50', '51-200', '200+'],
+        messageLabel: 'What would you like to see? (optional)',
+        messagePlaceholder: 'Which use case interests you most...',
+        preferredTimeLabel: 'Preferred callback time (optional)',
+        preferredTimes: ['Morning (9-12)', 'Midday (12-15)', 'Afternoon (15-18)', 'Evening (18-21)', 'Flexible'],
+        submit: 'Request demo',
+        successTitle: 'Request received ✓',
+        successBody: "We'll reach out within one business day to schedule.",
+        actionPrompt: 'Want to book a demo?',
+        actionOpen: 'Book demo',
+      },
     },
   };
   var locale = LOCALES.he; // overwritten once /api/widget/config responds
@@ -91,7 +328,36 @@
     brandName: locale.brandName,
     profilePic: null,
     primaryColor: '#0c1013',
+    darkMode: false,
   };
+
+  // ---- Theme palette ----
+  // Single source of truth for surface/text/border colors. Every render
+  // function reads `theme()` instead of hardcoding hex values, so flipping
+  // darkMode flips the whole widget without touching individual blocks.
+  function theme() {
+    var d = config.darkMode;
+    return {
+      panelBg: d ? '#0f1115' : '#f4f5f7',
+      surface: d ? '#1a1d23' : '#ffffff',
+      surfaceAlt: d ? '#23272e' : '#f3f4f6',
+      textPrimary: d ? '#f1f5f9' : '#111111',
+      textSecondary: d ? '#94a3b8' : '#4b5563',
+      textMuted: d ? '#64748b' : '#6b7280',
+      border: d ? '#2a2f37' : '#e5e7eb',
+      inputBg: d ? '#1a1d23' : '#ffffff',
+      inputBorder: d ? '#2a2f37' : '#e5e7eb',
+      labelText: d ? '#cbd5e1' : '#374151',
+      // Per-message bubble colors
+      botBubbleBg: d ? '#1f232a' : '#ffffff',
+      botBubbleText: d ? '#f1f5f9' : '#000000',
+      errorBg: d ? '#3f1d1d' : '#fef2f2',
+      errorBorder: d ? '#7f1d1d' : '#fecaca',
+      errorText: d ? '#fca5a5' : '#b91c1c',
+      successBg: d ? '#14532d' : '#dcfce7',
+      successText: d ? '#86efac' : '#15803d',
+    };
+  }
 
   // ============================================
   // Analytics — queue events and ship them to bestieAI's own /api/analytics/widget
@@ -293,13 +559,37 @@
       fontLinkEl.href = 'https://fonts.googleapis.com/css2?family=' + locale.googleFont + '&display=swap';
       document.head.appendChild(fontLinkEl);
     }
+    // CSS variables drive light/dark mode. Each render fn uses var(--ibot-*)
+    // in its inline styles, so flipping darkMode = repainting the whole widget
+    // without re-rendering individual blocks.
+    var t = theme();
+    var vars =
+      '#ibot-widget-container{' +
+      '--ibot-surface:' + t.surface + ';' +
+      '--ibot-surface-alt:' + t.surfaceAlt + ';' +
+      '--ibot-panel-bg:' + t.panelBg + ';' +
+      '--ibot-text-primary:' + t.textPrimary + ';' +
+      '--ibot-text-secondary:' + t.textSecondary + ';' +
+      '--ibot-text-muted:' + t.textMuted + ';' +
+      '--ibot-label-text:' + t.labelText + ';' +
+      '--ibot-border:' + t.border + ';' +
+      '--ibot-input-bg:' + t.inputBg + ';' +
+      '--ibot-bot-bubble-bg:' + t.botBubbleBg + ';' +
+      '--ibot-bot-bubble-text:' + t.botBubbleText + ';' +
+      '--ibot-error-bg:' + t.errorBg + ';' +
+      '--ibot-error-border:' + t.errorBorder + ';' +
+      '--ibot-error-text:' + t.errorText + ';' +
+      '--ibot-success-bg:' + t.successBg + ';' +
+      '--ibot-success-text:' + t.successText + ';' +
+      '}';
     styleEl.textContent =
+      vars +
       '@keyframes ibot-slide-up{from{opacity:0;transform:translateY(20px) scale(0.95);}to{opacity:1;transform:translateY(0) scale(1);}}' +
       '@keyframes ibot-bounce{0%,80%,100%{transform:translateY(0);}40%{transform:translateY(-5px);}}' +
       '@keyframes ibot-msg-in{from{opacity:0;transform:translateX(10px);}to{opacity:1;transform:translateX(0);}}' +
       '@keyframes ibot-fade-in{from{opacity:0;}to{opacity:1;}}' +
       '#ibot-widget-container *{box-sizing:border-box;font-family:"' + locale.font + '",system-ui,-apple-system,sans-serif;}' +
-      '#ibot-widget-container input:focus{outline:none;}' +
+      '#ibot-widget-container input:focus,#ibot-widget-container textarea:focus,#ibot-widget-container select:focus{outline:none;}' +
       '#ibot-widget-container ::-webkit-scrollbar{width:4px;}' +
       '#ibot-widget-container ::-webkit-scrollbar-track{background:transparent;}' +
       '#ibot-widget-container ::-webkit-scrollbar-thumb{background:rgba(150,150,150,0.3);border-radius:4px;}';
@@ -326,15 +616,29 @@
       if (data.theme) {
         config.position = data.theme.position || config.position;
         if (data.theme.primaryColor) config.primaryColor = data.theme.primaryColor;
+        config.darkMode = data.theme.darkMode === true;
       }
       if (data.welcomeMessage) config.welcomeMessage = data.welcomeMessage;
       if (data.placeholder) config.placeholder = data.placeholder;
       if (data.brandName) config.brandName = data.brandName;
       if (data.profilePic) config.profilePic = data.profilePic;
       if (data.analyticsToken) ANALYTICS_TOKEN = data.analyticsToken;
+      // Module toggles drive which affordances the widget surfaces (Support
+      // link in header, lead capture, etc). Defaults are all-off; the server
+      // sets `enabled: true` per module only when the account owner opted in.
+      if (data.modules && typeof data.modules === 'object') {
+        modules = {
+          support: {
+            enabled: !!(data.modules.support && data.modules.support.enabled),
+            categories: (data.modules.support && data.modules.support.categories) || ['order','product','return','other'],
+          },
+          leads: { enabled: !!(data.modules.leads && data.modules.leads.enabled) },
+          bookings: { enabled: !!(data.modules.bookings && data.modules.bookings.enabled) },
+        };
+      }
       updateContainerPosition();
       messages = [{ role: 'assistant', content: config.welcomeMessage }];
-      widgetTrack('widget_loaded', {});
+      widgetTrack('widget_loaded', { modules: modules });
       // Fire chip fetch in parallel — non-blocking; widget renders without chips
       // first, chips populate when ready (≈400ms on cache miss).
       fetchChips('initial');
@@ -380,9 +684,17 @@
   function render() {
     if (!isOpen) {
       renderClosed();
-    } else {
-      renderOpen();
+      return;
     }
+    if (view === 'support_form') { renderSupportForm(); return; }
+    if (view === 'support_success') { renderSupportSuccess(); return; }
+    if (view === 'lead_form') { renderLeadForm(); return; }
+    if (view === 'lead_success') { renderGenericSuccess(locale.lead); return; }
+    if (view === 'book_demo_form') { renderBookDemoForm(); return; }
+    if (view === 'book_demo_success') { renderGenericSuccess(locale.bookDemo); return; }
+    if (view === 'order_form') { renderOrderForm(); return; }
+    if (view === 'order_result') { renderOrderResult(); return; }
+    renderOpen();
   }
 
   // ---- Closed state: blob only ----
@@ -435,7 +747,7 @@
           '<div style="width:20px;height:20px;flex-shrink:0;">' +
           avatarHtml(20) + '</div>' +
           '<div style="padding:9px 12px;border-radius:30px;font-size:16px;' +
-          'background:#fff;color:#000;display:flex;gap:4px;align-items:center;">' +
+          'background:var(--ibot-surface);color:#000;display:flex;gap:4px;align-items:center;">' +
           indicatorContent +
           '</div></div></div>';
         continue;
@@ -450,17 +762,32 @@
           formatMessage(m.content, true) +
           '</div></div>';
       } else {
-        // Bot bubble: white, rounded-30px, left-aligned (flex-end in RTL) with small avatar
+        // Bot bubble — palette-aware. Rating row (👍👎) only on the LAST bot
+        // turn so historical messages stay clean; vanishes once visitor rates.
+        var showRating = isLast && !isLoading && mi > 0 && !ratings[mi];
+        var ratingRow = showRating
+          ? ('<div style="display:flex;gap:4px;margin-top:6px;padding-' + (locale.dir === 'rtl' ? 'right' : 'left') + ':28px;">' +
+             '<button onclick="window.__ibotRate(' + mi + ',\'up\')" title="טוב" style="background:transparent;border:1px solid var(--ibot-border);border-radius:999px;width:26px;height:26px;cursor:pointer;color:var(--ibot-text-muted);font-size:13px;display:flex;align-items:center;justify-content:center;font-family:inherit;">👍</button>' +
+             '<button onclick="window.__ibotRate(' + mi + ',\'down\')" title="לא" style="background:transparent;border:1px solid var(--ibot-border);border-radius:999px;width:26px;height:26px;cursor:pointer;color:var(--ibot-text-muted);font-size:13px;display:flex;align-items:center;justify-content:center;font-family:inherit;">👎</button>' +
+             '</div>')
+          : '';
         msgsHtml +=
-          '<div style="display:flex;justify-content:flex-end;margin-bottom:12px;animation:ibot-msg-in 0.3s ease-out;">' +
+          '<div style="display:flex;flex-direction:column;align-items:flex-end;margin-bottom:12px;animation:ibot-msg-in 0.3s ease-out;">' +
           '<div style="display:flex;align-items:flex-end;gap:8px;max-width:85%;">' +
           '<div style="width:20px;height:20px;flex-shrink:0;">' +
           avatarHtml(20) + '</div>' +
           '<div style="padding:9px 12px;border-radius:30px;font-size:16px;line-height:1.5;' +
-          'background:#fff;color:#000;word-break:break-word;">' +
+          'background:var(--ibot-bot-bubble-bg);color:var(--ibot-bot-bubble-text);word-break:break-word;">' +
           formatMessage(m.content, false) +
-          '</div></div></div>';
+          '</div></div>' + ratingRow + '</div>';
       }
+    }
+
+    // Bot-initiated action card — rendered after the latest bot message when
+    // the model proposed an action (e.g. "open support form prefilled with X").
+    // Visitor confirms → we open the form with the bot's prefill; dismisses → card disappears.
+    if (pendingAction) {
+      msgsHtml += renderActionCard(pendingAction, pc);
     }
 
     var isMobile = window.innerWidth < 640;
@@ -468,19 +795,19 @@
     // Panel dimensions per Figma
     var panelStyle = isMobile
       ? 'position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;border-radius:0;'
-      : 'width:370px;height:min(520px, calc(100vh - 140px));border-radius:18px;';
+      : 'width:370px;height:min(520px, calc(100vh - 140px));border-radius:18px;position:relative;';
 
     container.innerHTML =
       // Main panel
       '<div id="ibot-panel" style="' + panelStyle +
-      'background:#f4f5f7;' +
+      'background:var(--ibot-panel-bg);' +
       'display:flex;flex-direction:column;overflow:hidden;' +
       'box-shadow:0 8px 40px rgba(0,0,0,0.15);' +
       'animation:ibot-slide-up 0.35s cubic-bezier(0.34,1.56,0.64,1);">' +
 
       // ---- Dark header (81px) ----
       '<div style="display:flex;align-items:center;gap:10px;padding:0 16px;height:81px;flex-shrink:0;' +
-      'background:' + pc + ';color:#fff;' +
+      'background:' + pc + ';color:#fff;position:relative;z-index:2;' +
       (isMobile ? '' : 'border-radius:18px 18px 0 0;') + '">' +
       // Avatar (52px)
       '<div style="width:52px;height:52px;flex-shrink:0;">' +
@@ -492,13 +819,29 @@
       '<span style="width:10px;height:10px;border-radius:50%;background:#22c55e;flex-shrink:0;"></span>' +
       '<span style="font-size:16px;white-space:nowrap;">' + escapeHtml(locale.status) + '</span>' +
       '</div></div>' +
-      // Mobile: close button in header
+      // Header right-side controls — Support (when enabled) + Mobile close
+      (modules.support.enabled
+        ? '<button id="ibot-open-support" title="' + escapeHtml(locale.support.openLink) + '" ' +
+          'style="background:rgba(255,255,255,0.12);border:none;color:#fff;cursor:pointer;' +
+          'border-radius:999px;display:flex;align-items:center;gap:6px;font-family:inherit;' +
+          (isMobile ? 'width:36px;height:36px;justify-content:center;padding:0;' : 'height:34px;padding:0 12px;font-size:13px;font-weight:500;') +
+          'transition:background 0.2s;flex-shrink:0;">' +
+          // Help icon (question-circle)
+          '<svg width="' + (isMobile ? 18 : 14) + '" height="' + (isMobile ? 18 : 14) + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+          '<circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line>' +
+          '</svg>' +
+          (isMobile ? '' : '<span>' + escapeHtml(locale.support.openLink) + '</span>') +
+          '</button>'
+        : '') +
       (isMobile
         ? '<button id="ibot-close-mobile" style="background:rgba(255,255,255,0.15);border:none;color:#fff;cursor:pointer;' +
           'width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;' +
-          'font-size:20px;transition:background 0.2s;">&times;</button>'
+          'font-size:20px;transition:background 0.2s;flex-shrink:0;">&times;</button>'
         : '') +
       '</div>' +
+
+      // ---- Toast overlay (transient confirmations) ----
+      renderToastHtml(pc) +
 
       // ---- Messages area (padding matches header 16px) ----
       '<div id="ibot-messages" style="flex:1;overflow-y:auto;padding:12px 16px;direction:' + locale.dir + ';">' +
@@ -510,22 +853,44 @@
         ? renderChipsRow(chips, pc)
         : '') +
 
+      // ---- Footer actions row — visible only after first user turn so it
+      // doesn't compete with the smart chips on cold start. Each link is
+      // module-gated: human handoff only when support is on, transcript only
+      // when there's a conversation worth sending.
+      (messages.some(function (mm) { return mm.role === 'user'; })
+        ? '<div style="padding:0 16px 4px;display:flex;gap:14px;justify-content:center;flex-shrink:0;flex-wrap:wrap;">' +
+          (modules.support.enabled
+            ? '<button onclick="window.__ibotHuman()" style="background:transparent;border:none;color:var(--ibot-text-muted);cursor:pointer;font-size:11.5px;text-decoration:underline;text-underline-offset:2px;font-family:inherit;padding:0;">' + escapeHtml(locale.support.humanLink) + '</button>'
+            : '') +
+          '<button onclick="window.__ibotTranscript()" style="background:transparent;border:none;color:var(--ibot-text-muted);cursor:pointer;font-size:11.5px;text-decoration:underline;text-underline-offset:2px;font-family:inherit;padding:0;">' + escapeHtml(locale.support.transcriptLink) + '</button>' +
+          '</div>'
+        : '') +
+
       // ---- Input area (centered, same 16px side padding as header) ----
       '<div style="padding:8px 16px 14px;flex-shrink:0;">' +
-      '<div style="display:flex;align-items:center;gap:16px;background:#fff;border-radius:18px;' +
+      '<div style="display:flex;align-items:center;gap:8px;background:var(--ibot-surface);border-radius:18px;' +
       'padding:8px 8px 8px 10px;height:60px;box-shadow:4px 6px 23px rgba(0,0,0,0.1);overflow:hidden;">' +
       // Send button (left side in RTL)
       '<button id="ibot-send" style="width:38px;height:38px;background:' + pc + ';color:#fff;border:none;' +
       'border-radius:60px;cursor:pointer;display:flex;align-items:center;justify-content:center;' +
       'flex-shrink:0;transition:transform 0.2s,opacity 0.2s;' +
       (isLoading ? 'opacity:0.5;pointer-events:none;' : '') + '">' +
-      // Up-arrow SVG (send icon)
       '<svg width="14" height="16" viewBox="0 0 14 16" fill="none" xmlns="http://www.w3.org/2000/svg">' +
       '<path d="M7 1L1 7M7 1L13 7M7 1V15" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
       '</button>' +
+      // Voice input (Web Speech API). Hidden when API unavailable so users
+      // on unsupported browsers don't see a dead button. Tap-to-talk model.
+      (hasVoiceSupport()
+        ? '<button id="ibot-mic" title="Voice input" style="width:34px;height:34px;background:var(--ibot-surface-alt);border:1px solid var(--ibot-border);color:var(--ibot-text-muted);' +
+          'border-radius:60px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;' +
+          (isListening ? 'background:' + pc + ';color:#fff;animation:ibot-bounce 1.5s ease-in-out infinite;' : '') + '">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line>' +
+          '</svg></button>'
+        : '') +
       // Input field
       '<input id="ibot-input" type="text" placeholder="' + escapeHtml(config.placeholder) + '" ' +
-      'style="flex:1;border:none;outline:none;font-size:16px;color:' + pc + ';background:transparent;' +
+      'style="flex:1;border:none;outline:none;font-size:16px;color:var(--ibot-text-primary);background:transparent;' +
       'direction:' + locale.dir + ';font-family:inherit;text-align:' + (locale.dir === 'rtl' ? 'right' : 'left') + ';min-width:0;" />' +
       '</div></div>' +
 
@@ -569,6 +934,21 @@
       closeMobileEl.onmouseout = function () { this.style.background = 'rgba(255,255,255,0.15)'; };
     }
 
+    var supportBtn = document.getElementById('ibot-open-support');
+    if (supportBtn) {
+      supportBtn.onclick = function () {
+        widgetTrack('widget_support_opened', { from: 'header' });
+        openSupportForm(null);
+      };
+      supportBtn.onmouseover = function () { this.style.background = 'rgba(255,255,255,0.22)'; };
+      supportBtn.onmouseout = function () { this.style.background = 'rgba(255,255,255,0.12)'; };
+    }
+
+    var micBtn = document.getElementById('ibot-mic');
+    if (micBtn) {
+      micBtn.onclick = toggleVoiceInput;
+    }
+
     var inputEl = document.getElementById('ibot-input');
     var sendEl = document.getElementById('ibot-send');
 
@@ -597,6 +977,15 @@
     widgetTrack('widget_message_sent', { length: text.length, msg_index: messages.length - 2 });
     render();
 
+    // Re-extract page context each turn — pages within a SPA can change without
+    // a reload (cart/product transitions). Cheap (<2ms) for the sync part; the
+    // async Shopify /cart.js refresh is fire-and-forget so it doesn't add
+    // latency to this turn (it lands in time for the next one).
+    pageContext = extractPageContext();
+    if (typeof isLikelyShopify === 'function' && isLikelyShopify()) {
+      extractPageContextAsync().then(function (enriched) { pageContext = enriched; });
+    }
+
     fetch(BASE_URL + '/api/widget/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -604,6 +993,9 @@
         message: text,
         accountId: ACCOUNT_ID,
         sessionId: sessionId,
+        anonId: ANON_ID,
+        pageContext: pageContext,
+        modules: { support: !!modules.support.enabled, leads: !!modules.leads.enabled, bookings: !!modules.bookings.enabled },
       }),
     })
       .then(function (res) {
@@ -686,6 +1078,17 @@
                     });
                     render();
                   }
+                } else if (event.type === 'action' && event.action) {
+                  // Concierge action — the bot inferred the visitor wants to do
+                  // something the widget can actually carry out (open a support
+                  // ticket, capture a lead, etc). Render an inline confirmation
+                  // card; one click confirms with the prefill the bot proposed.
+                  pendingAction = event.action;
+                  widgetTrack('widget_action_proposed', {
+                    type: event.action.type || null,
+                    has_prefill: !!event.action.prefill,
+                  });
+                  render();
                 } else if (event.type === 'error') {
                   messages[messages.length - 1].content = event.message || locale.errorMessage;
                   isLoading = false;
@@ -742,7 +1145,7 @@
       if (!label) continue;
       pills +=
         '<button onclick="window.__ibotChipClick(' + i + ')" ' +
-        'style="background:#fff;border:1px solid #e5e7eb;color:#111;cursor:pointer;' +
+        'style="background:var(--ibot-surface);border:1px solid var(--ibot-border);color:var(--ibot-text-primary);cursor:pointer;' +
         'border-radius:999px;padding:7px 12px;font-size:13px;line-height:1.2;' +
         'white-space:nowrap;flex-shrink:0;font-family:inherit;transition:transform 0.15s,border-color 0.15s;" ' +
         'onmouseover="this.style.transform=\'translateY(-1px)\';this.style.borderColor=\'' + pc + '\';" ' +
@@ -768,7 +1171,7 @@
       var p = products[i] || {};
       var price = p.price != null ? locale.currencyPrefix + p.price : '';
       var orig = p.originalPrice && p.originalPrice > p.price
-        ? '<span style="color:#9ca3af;text-decoration:line-through;font-size:12px;margin-right:6px;">' + locale.currencyPrefix + p.originalPrice + '</span>'
+        ? '<span style="color:var(--ibot-text-muted);text-decoration:line-through;font-size:12px;margin-right:6px;">' + locale.currencyPrefix + p.originalPrice + '</span>'
         : '';
       var badge = '';
       if (p.badge) {
@@ -781,16 +1184,16 @@
       }
       var img = p.image
         ? '<img src="' + escapeHtml(p.image) + '" alt="' + escapeHtml(p.name || '') + '" ' +
-          'style="width:100%;height:120px;object-fit:cover;border-radius:10px 10px 0 0;background:#f3f4f6;" ' +
+          'style="width:100%;height:120px;object-fit:cover;border-radius:10px 10px 0 0;background:var(--ibot-surface-alt);" ' +
           'onerror="this.style.display=\'none\';this.parentNode.style.background=\'#f3f4f6\';this.parentNode.style.height=\'120px\';" />'
-        : '<div style="width:100%;height:120px;background:#f3f4f6;border-radius:10px 10px 0 0;"></div>';
+        : '<div style="width:100%;height:120px;background:var(--ibot-surface-alt);border-radius:10px 10px 0 0;"></div>';
       var recFor = p.recommendedFor
-        ? '<div style="font-size:11px;color:#6b7280;margin-bottom:4px;">' + escapeHtml(locale.recommendedFor) + escapeHtml(p.recommendedFor) + '</div>'
+        ? '<div style="font-size:11px;color:var(--ibot-text-muted);margin-bottom:4px;">' + escapeHtml(locale.recommendedFor) + escapeHtml(p.recommendedFor) + '</div>'
         : '';
       var sp = p.socialProof || {};
       var spLine = '';
       if (sp.rating || sp.review_count) {
-        spLine += '<div style="font-size:11px;color:#6b7280;display:flex;align-items:center;gap:3px;margin-top:4px;">';
+        spLine += '<div style="font-size:11px;color:var(--ibot-text-muted);display:flex;align-items:center;gap:3px;margin-top:4px;">';
         if (sp.rating) spLine += '<span style="color:#f59e0b;">★</span><span>' + sp.rating + '</span>';
         if (sp.review_count) spLine += '<span>(' + sp.review_count + ')</span>';
         spLine += '</div>';
@@ -800,7 +1203,7 @@
         : '';
       var safeId = escapeHtml(p.id || '');
       cardsHtml +=
-        '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;' +
+        '<div style="background:var(--ibot-surface);border:1px solid var(--ibot-border);border-radius:12px;overflow:hidden;' +
         'flex-shrink:0;width:' + cardWidth + ';display:flex;flex-direction:column;position:relative;' +
         'box-shadow:0 1px 3px rgba(0,0,0,0.04);transition:transform 0.15s,box-shadow 0.15s;cursor:pointer;" ' +
         'onmouseover="this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'0 4px 12px rgba(0,0,0,0.08)\';" ' +
@@ -808,12 +1211,12 @@
         'onclick="window.__ibotCardClick(\'' + safeId + '\',' + i + ')">' +
         img + badge +
         '<div style="padding:10px 12px 12px;display:flex;flex-direction:column;flex:1;">' +
-        '<div style="font-weight:600;font-size:14px;line-height:1.3;color:#111;margin-bottom:4px;' +
+        '<div style="font-weight:600;font-size:14px;line-height:1.3;color:var(--ibot-text-primary);margin-bottom:4px;' +
         'display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' +
         escapeHtml(p.name || '') + '</div>' +
         recFor +
         '<div style="margin-top:auto;display:flex;align-items:center;flex-wrap:wrap;">' +
-        '<span style="font-weight:700;font-size:15px;color:#111;">' + price + '</span>' +
+        '<span style="font-weight:700;font-size:15px;color:var(--ibot-text-primary);">' + price + '</span>' +
         orig +
         '</div>' +
         spLine + purchase +
@@ -900,7 +1303,1124 @@
     }
   }
 
-  // Initial render + analytics: announce widget is on the page
-  widgetTrack('widget_loaded', {});
+  // ============================================
+  // Page Context — what the visitor is looking at, extracted from the
+  // embedding site. Reads schema.org JSON-LD (Product, Article, FAQPage),
+  // OpenGraph meta, dataLayer (GTM ecommerce), and structural cues (h1,
+  // breadcrumb). Cheap, ~1ms. Re-extracted before every chat turn.
+  // ============================================
+  function extractPageContext() {
+    var ctx = {
+      url: location.href,
+      path: location.pathname,
+      title: document.title || '',
+      h1: null,
+      lang: document.documentElement.lang || null,
+      product: null, // {name, price, currency, image, sku, brand, availability}
+      article: null, // {title, author, section}
+      breadcrumb: null,
+      cart: null,    // {item_count, total}
+    };
+    try {
+      var h1El = document.querySelector('h1');
+      if (h1El) ctx.h1 = (h1El.textContent || '').trim().slice(0, 200);
+    } catch (e) { /* */ }
+
+    // ---- OpenGraph fallback (most sites have these) ----
+    function metaContent(prop) {
+      try {
+        var el = document.querySelector('meta[property="' + prop + '"]') ||
+                 document.querySelector('meta[name="' + prop + '"]');
+        return el ? (el.getAttribute('content') || '').trim() : null;
+      } catch (e) { return null; }
+    }
+    var ogType = (metaContent('og:type') || '').toLowerCase();
+    var ogTitle = metaContent('og:title');
+    var ogImage = metaContent('og:image');
+    var ogPrice = metaContent('product:price:amount') || metaContent('og:price:amount');
+    var ogCurr  = metaContent('product:price:currency') || metaContent('og:price:currency');
+    if (ogType === 'product' && ogTitle) {
+      ctx.product = {
+        name: ogTitle,
+        image: ogImage || null,
+        price: ogPrice ? parseFloat(ogPrice) : null,
+        currency: ogCurr || null,
+        source: 'og',
+      };
+    }
+    if (ogType === 'article' && ogTitle) {
+      ctx.article = { title: ogTitle, author: metaContent('article:author'), section: metaContent('article:section') };
+    }
+
+    // ---- JSON-LD (schema.org) — preferred, more structured ----
+    try {
+      var scripts = document.querySelectorAll('script[type="application/ld+json"]');
+      for (var si = 0; si < scripts.length && si < 8; si++) {
+        var raw = scripts[si].textContent || '';
+        if (!raw.trim()) continue;
+        var parsed;
+        try { parsed = JSON.parse(raw); } catch (e) { continue; }
+        var arr = Array.isArray(parsed) ? parsed : (parsed['@graph'] || [parsed]);
+        for (var ai = 0; ai < arr.length; ai++) {
+          var node = arr[ai] || {};
+          var t = node['@type'] || '';
+          var typeStr = Array.isArray(t) ? t.join(',').toLowerCase() : String(t).toLowerCase();
+          if (typeStr.indexOf('product') !== -1) {
+            var offers = node.offers && (Array.isArray(node.offers) ? node.offers[0] : node.offers) || {};
+            ctx.product = {
+              name: node.name || ctx.product?.name || ogTitle || null,
+              image: (Array.isArray(node.image) ? node.image[0] : node.image) || ogImage || null,
+              price: offers.price ? parseFloat(offers.price) : (ogPrice ? parseFloat(ogPrice) : null),
+              currency: offers.priceCurrency || ogCurr || null,
+              sku: node.sku || null,
+              brand: (node.brand && (node.brand.name || node.brand)) || null,
+              availability: offers.availability ? String(offers.availability).split('/').pop() : null,
+              source: 'jsonld',
+            };
+          } else if (typeStr.indexOf('breadcrumb') !== -1 && Array.isArray(node.itemListElement)) {
+            ctx.breadcrumb = node.itemListElement.map(function (it) {
+              return (it && it.name) || (it && it.item && it.item.name) || '';
+            }).filter(Boolean).slice(0, 6);
+          } else if (typeStr.indexOf('article') !== -1 && !ctx.article) {
+            ctx.article = {
+              title: node.headline || node.name || ogTitle || null,
+              author: (node.author && (node.author.name || node.author)) || null,
+              section: node.articleSection || null,
+            };
+          }
+        }
+      }
+    } catch (e) { /* malformed JSON-LD — skip */ }
+
+    // ---- dataLayer (GTM e-commerce) — cart, product context ----
+    try {
+      if (Array.isArray(window.dataLayer)) {
+        for (var di = window.dataLayer.length - 1; di >= 0 && di > window.dataLayer.length - 20; di--) {
+          var ev = window.dataLayer[di] || {};
+          var ec = ev.ecommerce || (ev[0] && ev[0].ecommerce);
+          if (ec && ec.cart && !ctx.cart) {
+            ctx.cart = { item_count: ec.cart.items ? ec.cart.items.length : null, total: ec.cart.value || null };
+          }
+        }
+      }
+    } catch (e) { /* */ }
+
+    return ctx;
+  }
+
+  // ============================================
+  // Support form — view + submit + success states.
+  // ============================================
+  function openSupportForm(prefill) {
+    prefill = prefill || {};
+    supportForm = {
+      name: prefill.name || supportForm.name || '',
+      email: prefill.email || supportForm.email || '',
+      phone: prefill.phone || supportForm.phone || '',
+      orderNumber: prefill.orderNumber || prefill.order_number || '',
+      category: prefill.category || (modules.support.categories && modules.support.categories[0]) || 'other',
+      message: prefill.message || '',
+      error: null,
+      submitting: false,
+    };
+    pendingAction = null; // dismiss any inline action card
+    view = 'support_form';
+    render();
+  }
+
+  function closeSupportForm() {
+    view = 'chat';
+    render();
+  }
+
+  function readSupportInputs() {
+    supportForm.name = (document.getElementById('ibot-sf-name') || {}).value || '';
+    supportForm.email = (document.getElementById('ibot-sf-email') || {}).value || '';
+    supportForm.phone = (document.getElementById('ibot-sf-phone') || {}).value || '';
+    supportForm.orderNumber = (document.getElementById('ibot-sf-order') || {}).value || '';
+    supportForm.category = (document.getElementById('ibot-sf-category') || {}).value || supportForm.category;
+    supportForm.message = (document.getElementById('ibot-sf-message') || {}).value || '';
+  }
+
+  function validateSupportForm() {
+    var s = locale.support;
+    if (!supportForm.name.trim()) return s.nameLabel + ': ' + s.required;
+    if (!supportForm.email.trim()) return s.emailLabel + ': ' + s.required;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportForm.email.trim())) return s.invalidEmail;
+    if (!supportForm.message.trim()) return s.messageLabel + ': ' + s.required;
+    return null;
+  }
+
+  function submitSupportTicket() {
+    readSupportInputs();
+    var err = validateSupportForm();
+    if (err) {
+      supportForm.error = err;
+      render();
+      return;
+    }
+    supportForm.submitting = true;
+    supportForm.error = null;
+    render();
+
+    // Build a context-rich message: visitor's text + page context tail so the
+    // brand reading the ticket knows which page they were on.
+    var pc = pageContext || extractPageContext();
+    var contextLines = [];
+    if (pc.product && pc.product.name) contextLines.push('Product: ' + pc.product.name + (pc.product.price ? ' (' + (pc.product.currency || '') + pc.product.price + ')' : ''));
+    if (pc.url) contextLines.push('Page: ' + pc.url);
+    var fullMessage = supportForm.message.trim();
+    if (contextLines.length) fullMessage += '\n\n---\n' + contextLines.join('\n');
+
+    var body = {
+      accountId: ACCOUNT_ID,
+      customerName: supportForm.name.trim(),
+      customerEmail: supportForm.email.trim(),
+      customerPhone: supportForm.phone.trim() || null,
+      orderNumber: supportForm.orderNumber.trim() || null,
+      message: fullMessage + (supportForm.attachment ? '\n\nAttachment: ' + supportForm.attachment.url : ''),
+      sessionId: sessionId || null,
+      source: supportForm.urgent ? 'widget_support_urgent' : 'widget_support',
+      refSource: pc.url || null,
+      metadata: {
+        widget_version: '4.1',
+        category: supportForm.category,
+        priority: supportForm.urgent ? 'urgent' : 'normal',
+        page_url: pc.url || null,
+        page_title: pc.title || null,
+        product_name: (pc.product && pc.product.name) || null,
+        product_sku: (pc.product && pc.product.sku) || null,
+        attachment_url: supportForm.attachment ? supportForm.attachment.url : null,
+        attachment_filename: supportForm.attachment ? supportForm.attachment.filename : null,
+      },
+    };
+
+    widgetTrack('widget_support_submitted', { category: supportForm.category, urgent: !!supportForm.urgent, has_attachment: !!supportForm.attachment });
+
+    fetch(BASE_URL + '/api/support', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+      .then(function (r) { return r.ok ? r.json() : r.json().then(function (j) { throw new Error(j.error || 'submit failed'); }); })
+      .then(function (data) {
+        supportForm.submitting = false;
+        lastTicketRef = (data && data.requestId) ? String(data.requestId).split('-')[0].toUpperCase() : null;
+        view = 'support_success';
+        widgetTrack('widget_support_success', { ref: lastTicketRef });
+        render();
+      })
+      .catch(function (e) {
+        supportForm.submitting = false;
+        supportForm.error = locale.support.submitError;
+        widgetTrack('widget_support_failed', { error: String(e && e.message || e).slice(0, 200) });
+        render();
+      });
+  }
+
+  function renderSupportForm() {
+    var pc = config.primaryColor;
+    var s = locale.support;
+    var isMobile = window.innerWidth < 640;
+    var panelStyle = isMobile
+      ? 'position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;border-radius:0;'
+      : 'width:370px;height:min(560px, calc(100vh - 140px));border-radius:18px;position:relative;';
+
+    var categories = (modules.support.categories || ['order','product','return','other']).map(function (key) {
+      var label = (s.categories && s.categories[key]) || key;
+      var sel = supportForm.category === key ? ' selected' : '';
+      return '<option value="' + escapeHtml(key) + '"' + sel + '>' + escapeHtml(label) + '</option>';
+    }).join('');
+
+    function field(id, label, value, type, placeholder, required) {
+      var asterisk = required ? ' <span style="color:#dc2626;">*</span>' : '';
+      return '<div style="margin-bottom:12px;">' +
+        '<label for="' + id + '" style="display:block;font-size:12px;font-weight:600;color:var(--ibot-label-text);margin-bottom:4px;">' + escapeHtml(label) + asterisk + '</label>' +
+        '<input id="' + id + '" type="' + (type || 'text') + '" value="' + escapeHtml(value || '') + '" placeholder="' + escapeHtml(placeholder || '') + '" ' +
+        'style="width:100%;border:1px solid var(--ibot-border);border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;background:var(--ibot-input-bg);color:var(--ibot-text-primary);direction:' + locale.dir + ';" />' +
+        '</div>';
+    }
+
+    container.innerHTML =
+      '<div id="ibot-panel" style="' + panelStyle +
+      'background:var(--ibot-panel-bg);display:flex;flex-direction:column;overflow:hidden;' +
+      'box-shadow:0 8px 40px rgba(0,0,0,0.15);animation:ibot-slide-up 0.3s ease-out;">' +
+      // Header (compact: back arrow + title)
+      '<div style="display:flex;align-items:center;gap:10px;padding:14px 16px;flex-shrink:0;' +
+      'background:' + pc + ';color:#fff;' + (isMobile ? '' : 'border-radius:18px 18px 0 0;') + '">' +
+      '<button id="ibot-sf-back" style="background:rgba(255,255,255,0.12);border:none;color:#fff;cursor:pointer;' +
+      'border-radius:999px;padding:6px 10px;font-size:13px;font-family:inherit;">' + escapeHtml(s.backToChat) + '</button>' +
+      '<div style="flex:1;min-width:0;">' +
+      '<div style="font-weight:700;font-size:17px;">' + escapeHtml(s.title) + '</div>' +
+      '<div style="font-size:12px;opacity:0.85;">' + escapeHtml(s.subtitle) + '</div>' +
+      '</div></div>' +
+      // Form body
+      '<div style="flex:1;overflow-y:auto;padding:16px;direction:' + locale.dir + ';">' +
+      // Urgent banner — shown when this is a human-handoff variant of the form
+      (supportForm.urgent
+        ? '<div style="background:' + pc + '15;border:1px solid ' + pc + '40;color:' + pc + ';border-radius:10px;padding:10px 14px;font-size:13px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px;">' +
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>' +
+          escapeHtml(s.humanBadge) + '</div>'
+        : '') +
+      field('ibot-sf-name', s.nameLabel, supportForm.name, 'text', s.namePlaceholder, true) +
+      field('ibot-sf-email', s.emailLabel, supportForm.email, 'email', s.emailPlaceholder, true) +
+      field('ibot-sf-phone', s.phoneLabel, supportForm.phone, 'tel', s.phonePlaceholder, false) +
+      field('ibot-sf-order', s.orderLabel, supportForm.orderNumber, 'text', s.orderPlaceholder, false) +
+      // Category dropdown
+      '<div style="margin-bottom:12px;">' +
+      '<label for="ibot-sf-category" style="display:block;font-size:12px;font-weight:600;color:var(--ibot-label-text);margin-bottom:4px;">' + escapeHtml(s.categoryLabel) + '</label>' +
+      '<select id="ibot-sf-category" style="width:100%;border:1px solid var(--ibot-border);border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;background:var(--ibot-input-bg);color:var(--ibot-text-primary);direction:' + locale.dir + ';">' +
+      categories + '</select>' +
+      '</div>' +
+      // Message textarea
+      '<div style="margin-bottom:12px;">' +
+      '<label for="ibot-sf-message" style="display:block;font-size:12px;font-weight:600;color:var(--ibot-label-text);margin-bottom:4px;">' + escapeHtml(s.messageLabel) + ' <span style="color:#dc2626;">*</span></label>' +
+      '<textarea id="ibot-sf-message" rows="4" placeholder="' + escapeHtml(s.messagePlaceholder) + '" ' +
+      'style="width:100%;border:1px solid var(--ibot-border);border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;background:var(--ibot-input-bg);color:var(--ibot-text-primary);resize:vertical;min-height:90px;direction:' + locale.dir + ';">' + escapeHtml(supportForm.message) + '</textarea>' +
+      '</div>' +
+      // Attachment (photo / pdf) — opens native file picker; uploads on selection
+      '<div style="margin-bottom:12px;">' +
+      '<label style="display:block;font-size:12px;font-weight:600;color:var(--ibot-label-text);margin-bottom:4px;">' + (locale.dir === 'rtl' ? 'תמונה / קובץ (אופציונלי)' : 'Photo / file (optional)') + '</label>' +
+      '<input type="file" id="ibot-sf-file" accept="image/*,application/pdf" ' +
+      'style="width:100%;border:1px dashed var(--ibot-border);border-radius:10px;padding:10px 12px;font-size:13px;font-family:inherit;background:var(--ibot-input-bg);color:var(--ibot-text-secondary);direction:' + locale.dir + ';" />' +
+      (supportForm.attachmentUploading
+        ? '<div style="font-size:12px;color:var(--ibot-text-muted);margin-top:4px;">' + (locale.dir === 'rtl' ? 'מעלה...' : 'Uploading...') + '</div>'
+        : supportForm.attachment
+        ? '<div style="font-size:12px;color:var(--ibot-success-text);margin-top:4px;">✓ ' + escapeHtml(supportForm.attachment.filename || 'attached') + '</div>'
+        : '') +
+      '</div>' +
+      // Error
+      (supportForm.error
+        ? '<div style="background:var(--ibot-error-bg);border:1px solid var(--ibot-error-border);color:var(--ibot-error-text);border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px;">' + escapeHtml(supportForm.error) + '</div>'
+        : '') +
+      '</div>' +
+      // Submit
+      '<div style="padding:12px 16px 16px;flex-shrink:0;border-top:1px solid var(--ibot-border);background:var(--ibot-surface);">' +
+      '<button id="ibot-sf-submit"' + (supportForm.submitting ? ' disabled' : '') + ' ' +
+      'style="width:100%;background:' + pc + ';color:#fff;border:none;border-radius:12px;padding:13px;font-size:15px;font-weight:600;cursor:' + (supportForm.submitting ? 'wait' : 'pointer') + ';font-family:inherit;opacity:' + (supportForm.submitting ? '0.7' : '1') + ';transition:transform 0.15s;">' +
+      escapeHtml(supportForm.submitting ? s.submitting : s.submit) + '</button>' +
+      '</div>' +
+      '</div>' +
+      // Desktop close-pill below the panel (mirrors chat view)
+      (isMobile ? '' :
+        '<div style="display:flex;justify-content:flex-end;margin-top:12px;">' +
+        '<button id="ibot-close" style="width:60px;height:60px;border-radius:50%;border:none;cursor:pointer;' +
+        'background:' + pc + ';color:#fff;display:flex;align-items:center;justify-content:center;' +
+        'box-shadow:0 2px 32px rgba(0,0,0,0.16),0 1px 6px rgba(0,0,0,0.06);">' +
+        '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
+        '<polyline points="6 9 12 15 18 9"></polyline></svg></button></div>');
+
+    var back = document.getElementById('ibot-sf-back');
+    if (back) back.onclick = closeSupportForm;
+    var sub = document.getElementById('ibot-sf-submit');
+    if (sub) sub.onclick = submitSupportTicket;
+    var closeBtn = document.getElementById('ibot-close');
+    if (closeBtn) closeBtn.onclick = function () { isOpen = false; view = 'chat'; render(); };
+    // File picker — uploads on selection so the visitor sees ✓ before submitting.
+    var fileInput = document.getElementById('ibot-sf-file');
+    if (fileInput) {
+      fileInput.onchange = function (e) {
+        var f = e.target.files && e.target.files[0];
+        if (!f) return;
+        supportForm.attachmentUploading = true; supportForm.attachment = null;
+        render();
+        var fd = new FormData();
+        fd.append('accountId', ACCOUNT_ID);
+        fd.append('file', f);
+        fetch(BASE_URL + '/api/widget/upload', { method: 'POST', body: fd })
+          .then(function (r) { return r.ok ? r.json() : r.json().then(function (j) { throw new Error(j.error || 'upload failed'); }); })
+          .then(function (data) {
+            supportForm.attachmentUploading = false;
+            supportForm.attachment = { url: data.url, filename: data.filename, contentType: data.contentType };
+            widgetTrack('widget_support_attached', { content_type: data.contentType });
+            render();
+          })
+          .catch(function (err) {
+            supportForm.attachmentUploading = false;
+            supportForm.error = String(err && err.message || err).slice(0, 200);
+            render();
+          });
+      };
+    }
+  }
+
+  function renderSupportSuccess() {
+    var pc = config.primaryColor;
+    var s = locale.support;
+    var isMobile = window.innerWidth < 640;
+    var panelStyle = isMobile
+      ? 'position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;border-radius:0;'
+      : 'width:370px;height:min(520px, calc(100vh - 140px));border-radius:18px;position:relative;';
+
+    container.innerHTML =
+      '<div id="ibot-panel" style="' + panelStyle +
+      'background:var(--ibot-panel-bg);display:flex;flex-direction:column;overflow:hidden;' +
+      'box-shadow:0 8px 40px rgba(0,0,0,0.15);animation:ibot-slide-up 0.3s ease-out;">' +
+      '<div style="display:flex;align-items:center;gap:10px;padding:14px 16px;flex-shrink:0;' +
+      'background:' + pc + ';color:#fff;' + (isMobile ? '' : 'border-radius:18px 18px 0 0;') + '">' +
+      '<div style="font-weight:700;font-size:17px;">' + escapeHtml(s.title) + '</div>' +
+      '</div>' +
+      '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;">' +
+      '<div style="width:64px;height:64px;border-radius:50%;background:var(--ibot-success-bg);color:var(--ibot-success-text);display:flex;align-items:center;justify-content:center;margin-bottom:18px;">' +
+      '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>' +
+      '<div style="font-size:18px;font-weight:700;color:var(--ibot-text-primary);margin-bottom:8px;">' + escapeHtml(s.successTitle) + '</div>' +
+      '<div style="font-size:14px;color:var(--ibot-text-secondary);margin-bottom:16px;line-height:1.5;max-width:280px;">' + escapeHtml(s.successBody) + '</div>' +
+      (lastTicketRef ? '<div style="font-size:13px;color:var(--ibot-text-muted);font-family:ui-monospace,monospace;margin-bottom:24px;">' + escapeHtml(s.successRef + lastTicketRef) + '</div>' : '') +
+      '<button id="ibot-ss-back" style="background:' + pc + ';color:#fff;border:none;border-radius:12px;padding:11px 22px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">' + escapeHtml(s.successBack) + '</button>' +
+      '</div></div>' +
+      (isMobile ? '' :
+        '<div style="display:flex;justify-content:flex-end;margin-top:12px;">' +
+        '<button id="ibot-close" style="width:60px;height:60px;border-radius:50%;border:none;cursor:pointer;' +
+        'background:' + pc + ';color:#fff;display:flex;align-items:center;justify-content:center;' +
+        'box-shadow:0 2px 32px rgba(0,0,0,0.16),0 1px 6px rgba(0,0,0,0.06);">' +
+        '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
+        '<polyline points="6 9 12 15 18 9"></polyline></svg></button></div>');
+
+    var back = document.getElementById('ibot-ss-back');
+    if (back) back.onclick = closeSupportForm;
+    var closeBtn = document.getElementById('ibot-close');
+    if (closeBtn) closeBtn.onclick = function () { isOpen = false; view = 'chat'; render(); };
+  }
+
+  // Inline action card — rendered inside the chat after the bot proposes
+  // a concierge action via <<ACTION>>. One click opens the prefilled flow.
+  function renderActionCard(action, pc) {
+    if (!action || !action.type) return '';
+    var s = locale.support;
+    var label = action.label || s.actionPrompt;
+    var open = s.actionOpen;
+    var dismiss = s.actionDismiss;
+    return (
+      '<div style="display:flex;justify-content:flex-end;margin-bottom:12px;animation:ibot-msg-in 0.3s ease-out;">' +
+      '<div style="background:var(--ibot-surface);border:1px solid var(--ibot-border);border-radius:14px;padding:12px 14px;max-width:85%;box-shadow:0 1px 3px rgba(0,0,0,0.04);">' +
+      '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;">' +
+      '<div style="width:32px;height:32px;border-radius:50%;background:' + pc + '14;color:' + pc + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>' +
+      '</div>' +
+      '<div style="font-size:14px;color:var(--ibot-text-primary);line-height:1.4;">' + escapeHtml(label) + '</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;">' +
+      '<button onclick="window.__ibotActionConfirm()" style="background:' + pc + ';color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;flex:1;">' + escapeHtml(open) + '</button>' +
+      '<button onclick="window.__ibotActionDismiss()" style="background:transparent;color:var(--ibot-text-muted);border:1px solid var(--ibot-border);border-radius:10px;padding:8px 14px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;">' + escapeHtml(dismiss) + '</button>' +
+      '</div></div></div>'
+    );
+  }
+
+  window.__ibotActionConfirm = function () {
+    if (!pendingAction) return;
+    var act = pendingAction;
+    widgetTrack('widget_action_confirmed', { type: act.type || null });
+    if (act.type === 'open_support') {
+      openSupportForm(act.prefill || {});
+    } else if (act.type === 'capture_lead') {
+      openLeadForm(act.prefill || {});
+    } else if (act.type === 'book_demo') {
+      openBookDemoForm(act.prefill || {});
+    } else if (act.type === 'track_order') {
+      openOrderForm(act.prefill || {});
+    } else if (act.type === 'apply_coupon' && act.prefill && act.prefill.code) {
+      // Two-pronged coupon flow:
+      //   1) postMessage to host site for programmatic cart application
+      //      (sites that wired the listener — apply at checkout silently).
+      //   2) Copy code to visitor's clipboard + toast confirmation —
+      //      universal fallback for sites that didn't wire the listener.
+      var code = String(act.prefill.code).trim();
+      try { window.parent.postMessage({ type: 'bestieai:apply_coupon', code: code }, '*'); } catch (e) { /* */ }
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(code).catch(function () { /* */ });
+        }
+      } catch (e) { /* */ }
+      showToast(locale.support.couponCopied + code);
+      pendingAction = null;
+      render();
+    } else {
+      pendingAction = null;
+      render();
+    }
+  };
+  window.__ibotActionDismiss = function () {
+    widgetTrack('widget_action_dismissed', { type: pendingAction && pendingAction.type || null });
+    pendingAction = null;
+    render();
+  };
+
+  // ============================================
+  // Toast — transient one-line notification at top of chat panel.
+  // Auto-fades after 3s. Used for "Coupon copied", "Transcript sent", "Rating recorded".
+  // ============================================
+  function showToast(text) {
+    toastText = String(text || '');
+    if (toastTimer) { clearTimeout(toastTimer); }
+    render();
+    toastTimer = setTimeout(function () {
+      toastText = null;
+      toastTimer = null;
+      render();
+    }, 3000);
+  }
+
+  function renderToastHtml(pc) {
+    if (!toastText) return '';
+    return (
+      '<div style="position:absolute;top:90px;left:16px;right:16px;z-index:5;' +
+      'background:' + pc + ';color:#fff;border-radius:10px;padding:9px 14px;' +
+      'font-size:13px;font-weight:500;text-align:center;' +
+      'box-shadow:0 4px 12px rgba(0,0,0,0.15);animation:ibot-fade-in 0.3s ease-out;">' +
+      escapeHtml(toastText) + '</div>'
+    );
+  }
+
+  // ============================================
+  // Human handoff — opens the support form pre-flagged urgent.
+  // The form renders a banner so the visitor sees their request is prioritized;
+  // the ticket carries metadata.priority='urgent' so the admin queue can route
+  // it through whatever escalation path the brand has wired (WhatsApp, on-call rotation).
+  // ============================================
+  function openHumanRequest() {
+    widgetTrack('widget_human_handoff_opened', {});
+    supportForm = {
+      name: supportForm.name || '', email: supportForm.email || '', phone: supportForm.phone || '',
+      orderNumber: '', category: 'other', message: supportForm.message || '',
+      urgent: true, attachment: null, attachmentUploading: false,
+      error: null, submitting: false,
+    };
+    pendingAction = null;
+    view = 'support_form';
+    render();
+  }
+
+  // ============================================
+  // Email transcript — POSTs the chat_messages to the backend, which emails
+  // them to the visitor's address. Visitor enters their email inline.
+  // ============================================
+  function requestEmailTranscript() {
+    var email = window.prompt(locale.dir === 'rtl' ? 'מייל לשליחת התמלול:' : 'Email to send transcript to:', supportForm.email || leadForm.email || '');
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return;
+    widgetTrack('widget_transcript_requested', {});
+    fetch(BASE_URL + '/api/widget/transcript', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId: ACCOUNT_ID, sessionId: sessionId, email: email.trim() }),
+    })
+      .then(function (r) { if (!r.ok) throw new Error('transcript failed'); })
+      .then(function () { showToast(locale.support.transcriptSent); })
+      .catch(function () { showToast(locale.support.submitError); });
+  }
+
+  // ============================================
+  // Conversation rating — 👍/👎 on each bot turn.
+  // Stored client-side in `ratings` (msgIdx → 'up'|'down') so renderer shows
+  // selected state; POSTed to backend for aggregation/analytics.
+  // ============================================
+  function rateMessage(msgIdx, rating) {
+    if (ratings[msgIdx]) return; // one rating per message
+    ratings[msgIdx] = rating;
+    var msg = messages[msgIdx] || {};
+    widgetTrack('widget_message_rated', { rating: rating, msg_index: msgIdx });
+    fetch(BASE_URL + '/api/widget/feedback', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accountId: ACCOUNT_ID,
+        sessionId: sessionId,
+        msgIndex: msgIdx,
+        rating: rating,
+        messageContent: (msg.content || '').slice(0, 500),
+      }),
+    }).catch(function () { /* fire-and-forget */ });
+    showToast(rating === 'up' ? locale.support.ratingPositive : locale.support.ratingNegative);
+    render();
+  }
+  window.__ibotRate = function (idx, r) { rateMessage(idx, r); };
+  window.__ibotHuman = function () { openHumanRequest(); };
+  window.__ibotTranscript = function () { requestEmailTranscript(); };
+
+  // ============================================
+  // Voice input — Web Speech API. Tap mic → listen → drop transcript into
+  // the input. Explicit Send keeps visitor in control (no auto-submit).
+  // ============================================
+  function hasVoiceSupport() {
+    return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  }
+  function toggleVoiceInput() {
+    if (isListening && voiceRecognizer) {
+      try { voiceRecognizer.stop(); } catch (e) { /* */ }
+      return;
+    }
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return;
+    var recog = new SR();
+    recog.lang = config.language === 'en' ? 'en-US' : 'he-IL';
+    recog.interimResults = false;
+    recog.continuous = false;
+    recog.onstart = function () { isListening = true; widgetTrack('widget_voice_started', {}); render(); };
+    recog.onresult = function (e) {
+      var transcript = '';
+      for (var i = 0; i < e.results.length; i++) transcript += e.results[i][0].transcript;
+      var inp = document.getElementById('ibot-input');
+      if (inp) { inp.value = (inp.value ? inp.value + ' ' : '') + transcript.trim(); inp.focus(); }
+      widgetTrack('widget_voice_result', { length: transcript.length });
+    };
+    recog.onerror = function (e) { widgetTrack('widget_voice_error', { error: String(e.error || 'unknown') }); };
+    recog.onend = function () { isListening = false; voiceRecognizer = null; render(); };
+    voiceRecognizer = recog;
+    try { recog.start(); } catch (e) { isListening = false; voiceRecognizer = null; }
+  }
+
+  // ============================================
+  // Generic form shell — reused by Support, Lead, and Book-demo forms.
+  // Keeps the chrome (header with back arrow, scrollable body, sticky submit,
+  // desktop close-pill) consistent across all three flows so the visitor's
+  // muscle memory transfers between them.
+  // ============================================
+  function formShell(opts) {
+    var pc = config.primaryColor;
+    var isMobile = window.innerWidth < 640;
+    var panelStyle = isMobile
+      ? 'position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;border-radius:0;'
+      : 'width:370px;height:min(560px, calc(100vh - 140px));border-radius:18px;position:relative;';
+
+    return (
+      '<div id="ibot-panel" style="' + panelStyle +
+      'background:var(--ibot-panel-bg);display:flex;flex-direction:column;overflow:hidden;' +
+      'box-shadow:0 8px 40px rgba(0,0,0,0.15);animation:ibot-slide-up 0.3s ease-out;">' +
+      // Header
+      '<div style="display:flex;align-items:center;gap:10px;padding:14px 16px;flex-shrink:0;' +
+      'background:' + pc + ';color:#fff;' + (isMobile ? '' : 'border-radius:18px 18px 0 0;') + '">' +
+      '<button id="ibot-form-back" style="background:rgba(255,255,255,0.12);border:none;color:#fff;cursor:pointer;' +
+      'border-radius:999px;padding:6px 10px;font-size:13px;font-family:inherit;">' + escapeHtml(locale.support.backToChat) + '</button>' +
+      '<div style="flex:1;min-width:0;">' +
+      '<div style="font-weight:700;font-size:17px;">' + escapeHtml(opts.title) + '</div>' +
+      '<div style="font-size:12px;opacity:0.85;">' + escapeHtml(opts.subtitle) + '</div>' +
+      '</div></div>' +
+      // Body
+      '<div style="flex:1;overflow-y:auto;padding:16px;direction:' + locale.dir + ';">' +
+      opts.fieldsHtml +
+      (opts.error ? '<div style="background:var(--ibot-error-bg);border:1px solid var(--ibot-error-border);color:var(--ibot-error-text);border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px;">' + escapeHtml(opts.error) + '</div>' : '') +
+      '</div>' +
+      // Submit
+      '<div style="padding:12px 16px 16px;flex-shrink:0;border-top:1px solid var(--ibot-border);background:var(--ibot-surface);">' +
+      '<button id="ibot-form-submit"' + (opts.submitting ? ' disabled' : '') + ' ' +
+      'style="width:100%;background:' + pc + ';color:#fff;border:none;border-radius:12px;padding:13px;font-size:15px;font-weight:600;cursor:' + (opts.submitting ? 'wait' : 'pointer') + ';font-family:inherit;opacity:' + (opts.submitting ? '0.7' : '1') + ';">' +
+      escapeHtml(opts.submitting ? locale.support.submitting : opts.submitLabel) + '</button>' +
+      '</div></div>' +
+      (isMobile ? '' :
+        '<div style="display:flex;justify-content:flex-end;margin-top:12px;">' +
+        '<button id="ibot-close" style="width:60px;height:60px;border-radius:50%;border:none;cursor:pointer;' +
+        'background:' + pc + ';color:#fff;display:flex;align-items:center;justify-content:center;' +
+        'box-shadow:0 2px 32px rgba(0,0,0,0.16),0 1px 6px rgba(0,0,0,0.06);">' +
+        '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
+        '<polyline points="6 9 12 15 18 9"></polyline></svg></button></div>')
+    );
+  }
+
+  // Shared field builders — extracted from renderSupportForm so all three
+  // forms get the same look without duplicated 50-line HTML strings.
+  function inputFieldHtml(id, label, value, type, placeholder, required) {
+    var asterisk = required ? ' <span style="color:#dc2626;">*</span>' : '';
+    return '<div style="margin-bottom:12px;">' +
+      '<label for="' + id + '" style="display:block;font-size:12px;font-weight:600;color:var(--ibot-label-text);margin-bottom:4px;">' + escapeHtml(label) + asterisk + '</label>' +
+      '<input id="' + id + '" type="' + (type || 'text') + '" value="' + escapeHtml(value || '') + '" placeholder="' + escapeHtml(placeholder || '') + '" ' +
+      'style="width:100%;border:1px solid var(--ibot-border);border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;background:var(--ibot-input-bg);color:var(--ibot-text-primary);direction:' + locale.dir + ';" />' +
+      '</div>';
+  }
+  function textareaFieldHtml(id, label, value, placeholder, required, rows) {
+    var asterisk = required ? ' <span style="color:#dc2626;">*</span>' : '';
+    return '<div style="margin-bottom:12px;">' +
+      '<label for="' + id + '" style="display:block;font-size:12px;font-weight:600;color:var(--ibot-label-text);margin-bottom:4px;">' + escapeHtml(label) + asterisk + '</label>' +
+      '<textarea id="' + id + '" rows="' + (rows || 4) + '" placeholder="' + escapeHtml(placeholder || '') + '" ' +
+      'style="width:100%;border:1px solid var(--ibot-border);border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;background:var(--ibot-input-bg);color:var(--ibot-text-primary);resize:vertical;min-height:90px;direction:' + locale.dir + ';">' + escapeHtml(value || '') + '</textarea>' +
+      '</div>';
+  }
+  function selectFieldHtml(id, label, value, options, required) {
+    var asterisk = required ? ' <span style="color:#dc2626;">*</span>' : '';
+    var opts = options.map(function (opt) {
+      var key = typeof opt === 'string' ? opt : opt.value;
+      var lbl = typeof opt === 'string' ? opt : opt.label;
+      var sel = value === key ? ' selected' : '';
+      return '<option value="' + escapeHtml(key) + '"' + sel + '>' + escapeHtml(lbl) + '</option>';
+    }).join('');
+    return '<div style="margin-bottom:12px;">' +
+      '<label for="' + id + '" style="display:block;font-size:12px;font-weight:600;color:var(--ibot-label-text);margin-bottom:4px;">' + escapeHtml(label) + asterisk + '</label>' +
+      '<select id="' + id + '" style="width:100%;border:1px solid var(--ibot-border);border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;background:var(--ibot-input-bg);color:var(--ibot-text-primary);direction:' + locale.dir + ';">' +
+      opts + '</select>' +
+      '</div>';
+  }
+
+  function bindFormShell() {
+    var back = document.getElementById('ibot-form-back');
+    if (back) back.onclick = function () { view = 'chat'; render(); };
+    var closeBtn = document.getElementById('ibot-close');
+    if (closeBtn) closeBtn.onclick = function () { isOpen = false; view = 'chat'; render(); };
+  }
+
+  // ============================================
+  // Lead capture form
+  // ============================================
+  function openLeadForm(prefill) {
+    prefill = prefill || {};
+    leadForm = {
+      name: prefill.name || leadForm.name || '',
+      email: prefill.email || leadForm.email || '',
+      phone: prefill.phone || leadForm.phone || '',
+      interest: prefill.interest || prefill.message || '',
+      error: null, submitting: false,
+    };
+    pendingAction = null;
+    view = 'lead_form';
+    widgetTrack('widget_lead_opened', { has_prefill: Object.keys(prefill).length > 0 });
+    render();
+  }
+
+  function submitLeadTicket() {
+    leadForm.name = (document.getElementById('ibot-lf-name') || {}).value || '';
+    leadForm.email = (document.getElementById('ibot-lf-email') || {}).value || '';
+    leadForm.phone = (document.getElementById('ibot-lf-phone') || {}).value || '';
+    leadForm.interest = (document.getElementById('ibot-lf-interest') || {}).value || '';
+
+    var s = locale.support; // shared validation strings
+    if (!leadForm.name.trim()) { leadForm.error = locale.lead.nameLabel + ': ' + s.required; render(); return; }
+    if (!leadForm.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(leadForm.email.trim())) { leadForm.error = s.invalidEmail; render(); return; }
+    leadForm.submitting = true; leadForm.error = null; render();
+
+    // Leads ride the same support_requests table as tickets — one inbox, one
+    // notification flow. The `source` field segments them in the admin queue.
+    var pc = pageContext || extractPageContext();
+    var msg = leadForm.interest.trim() || '(no message)';
+    if (pc.product?.name) msg += '\n\nViewing: ' + pc.product.name;
+    if (pc.url) msg += '\nPage: ' + pc.url;
+
+    fetch(BASE_URL + '/api/support', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accountId: ACCOUNT_ID,
+        customerName: leadForm.name.trim(),
+        customerEmail: leadForm.email.trim(),
+        customerPhone: leadForm.phone.trim() || null,
+        message: msg,
+        sessionId: sessionId || null,
+        source: 'widget_lead',
+        refSource: pc.url || null,
+        metadata: { widget_version: '4.1', page_url: pc.url || null, product_name: pc.product?.name || null },
+      }),
+    })
+      .then(function (r) { return r.ok ? r.json() : r.json().then(function (j) { throw new Error(j.error || 'submit failed'); }); })
+      .then(function () {
+        leadForm.submitting = false;
+        view = 'lead_success';
+        widgetTrack('widget_lead_success', {});
+        render();
+      })
+      .catch(function (e) {
+        leadForm.submitting = false;
+        leadForm.error = locale.support.submitError;
+        widgetTrack('widget_lead_failed', { error: String(e && e.message || e).slice(0, 200) });
+        render();
+      });
+  }
+
+  function renderLeadForm() {
+    var L = locale.lead;
+    var fieldsHtml =
+      inputFieldHtml('ibot-lf-name', L.nameLabel, leadForm.name, 'text', '', true) +
+      inputFieldHtml('ibot-lf-email', L.emailLabel, leadForm.email, 'email', '', true) +
+      inputFieldHtml('ibot-lf-phone', L.phoneLabel, leadForm.phone, 'tel', '', false) +
+      textareaFieldHtml('ibot-lf-interest', L.interestLabel, leadForm.interest, L.interestPlaceholder, false, 3);
+    container.innerHTML = formShell({
+      title: L.title, subtitle: L.subtitle, fieldsHtml: fieldsHtml,
+      submitLabel: L.submit, submitting: leadForm.submitting, error: leadForm.error,
+    });
+    bindFormShell();
+    var sub = document.getElementById('ibot-form-submit');
+    if (sub) sub.onclick = submitLeadTicket;
+  }
+
+  // ============================================
+  // Book demo form
+  // ============================================
+  function openBookDemoForm(prefill) {
+    prefill = prefill || {};
+    bookDemoForm = {
+      name: prefill.name || bookDemoForm.name || '',
+      email: prefill.email || bookDemoForm.email || '',
+      company: prefill.company || bookDemoForm.company || '',
+      teamSize: prefill.team_size || prefill.teamSize || (locale.bookDemo.teamSizes && locale.bookDemo.teamSizes[0]) || '',
+      message: prefill.message || '',
+      error: null, submitting: false,
+    };
+    pendingAction = null;
+    view = 'book_demo_form';
+    widgetTrack('widget_book_demo_opened', { has_prefill: Object.keys(prefill).length > 0 });
+    render();
+  }
+
+  function submitBookDemo() {
+    bookDemoForm.name = (document.getElementById('ibot-bd-name') || {}).value || '';
+    bookDemoForm.email = (document.getElementById('ibot-bd-email') || {}).value || '';
+    bookDemoForm.company = (document.getElementById('ibot-bd-company') || {}).value || '';
+    bookDemoForm.teamSize = (document.getElementById('ibot-bd-team') || {}).value || bookDemoForm.teamSize;
+    bookDemoForm.preferredTime = (document.getElementById('ibot-bd-time') || {}).value || '';
+    bookDemoForm.message = (document.getElementById('ibot-bd-message') || {}).value || '';
+
+    var s = locale.support;
+    if (!bookDemoForm.name.trim()) { bookDemoForm.error = locale.bookDemo.nameLabel + ': ' + s.required; render(); return; }
+    if (!bookDemoForm.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bookDemoForm.email.trim())) { bookDemoForm.error = s.invalidEmail; render(); return; }
+    if (!bookDemoForm.company.trim()) { bookDemoForm.error = locale.bookDemo.companyLabel + ': ' + s.required; render(); return; }
+    bookDemoForm.submitting = true; bookDemoForm.error = null; render();
+
+    var pc = pageContext || extractPageContext();
+    var msg = (bookDemoForm.message.trim() || '(no message)') +
+      '\n\nCompany: ' + bookDemoForm.company.trim() +
+      '\nTeam size: ' + bookDemoForm.teamSize +
+      (bookDemoForm.preferredTime ? '\nPreferred time: ' + bookDemoForm.preferredTime : '') +
+      (pc.url ? '\nPage: ' + pc.url : '');
+
+    fetch(BASE_URL + '/api/support', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accountId: ACCOUNT_ID,
+        customerName: bookDemoForm.name.trim(),
+        customerEmail: bookDemoForm.email.trim(),
+        brand: bookDemoForm.company.trim(),
+        message: msg,
+        sessionId: sessionId || null,
+        source: 'widget_book_demo',
+        refSource: pc.url || null,
+        metadata: { widget_version: '4.1', team_size: bookDemoForm.teamSize, preferred_time: bookDemoForm.preferredTime || null, page_url: pc.url || null },
+      }),
+    })
+      .then(function (r) { return r.ok ? r.json() : r.json().then(function (j) { throw new Error(j.error || 'submit failed'); }); })
+      .then(function () {
+        bookDemoForm.submitting = false;
+        view = 'book_demo_success';
+        widgetTrack('widget_book_demo_success', {});
+        render();
+      })
+      .catch(function (e) {
+        bookDemoForm.submitting = false;
+        bookDemoForm.error = locale.support.submitError;
+        widgetTrack('widget_book_demo_failed', { error: String(e && e.message || e).slice(0, 200) });
+        render();
+      });
+  }
+
+  function renderBookDemoForm() {
+    var B = locale.bookDemo;
+    var fieldsHtml =
+      inputFieldHtml('ibot-bd-name', B.nameLabel, bookDemoForm.name, 'text', '', true) +
+      inputFieldHtml('ibot-bd-email', B.emailLabel, bookDemoForm.email, 'email', '', true) +
+      inputFieldHtml('ibot-bd-company', B.companyLabel, bookDemoForm.company, 'text', '', true) +
+      selectFieldHtml('ibot-bd-team', B.teamSizeLabel, bookDemoForm.teamSize, B.teamSizes, true) +
+      selectFieldHtml('ibot-bd-time', B.preferredTimeLabel, bookDemoForm.preferredTime, [{value:'', label: locale.dir === 'rtl' ? '— ללא העדפה —' : '— No preference —'}].concat(B.preferredTimes.map(function(t){return {value: t, label: t};})), false) +
+      textareaFieldHtml('ibot-bd-message', B.messageLabel, bookDemoForm.message, B.messagePlaceholder, false, 3);
+    container.innerHTML = formShell({
+      title: B.title, subtitle: B.subtitle, fieldsHtml: fieldsHtml,
+      submitLabel: B.submit, submitting: bookDemoForm.submitting, error: bookDemoForm.error,
+    });
+    bindFormShell();
+    var sub = document.getElementById('ibot-form-submit');
+    if (sub) sub.onclick = submitBookDemo;
+  }
+
+  // ============================================
+  // Order tracking — calls /api/widget/order-lookup which talks to Shopify
+  // server-side (account's Admin API token never reaches the client).
+  // Two views: form (2 fields) → result (status card with tracking links).
+  // ============================================
+  function openOrderForm(prefill) {
+    prefill = prefill || {};
+    orderForm = {
+      orderNumber: prefill.orderNumber || prefill.order_number || orderForm.orderNumber || '',
+      email: prefill.email || orderForm.email || supportForm.email || '',
+      error: null, submitting: false, result: null,
+    };
+    pendingAction = null;
+    view = 'order_form';
+    widgetTrack('widget_order_lookup_opened', { has_prefill: Object.keys(prefill).length > 0 });
+    render();
+  }
+
+  function submitOrderLookup() {
+    orderForm.orderNumber = (document.getElementById('ibot-of-num') || {}).value || '';
+    orderForm.email = (document.getElementById('ibot-of-email') || {}).value || '';
+    var s = locale.support, O = locale.order;
+    if (!orderForm.orderNumber.trim()) { orderForm.error = O.orderNumberLabel + ': ' + s.required; render(); return; }
+    if (!orderForm.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(orderForm.email.trim())) { orderForm.error = s.invalidEmail; render(); return; }
+    orderForm.submitting = true; orderForm.error = null; render();
+
+    fetch(BASE_URL + '/api/widget/order-lookup', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accountId: ACCOUNT_ID,
+        orderNumber: orderForm.orderNumber.trim(),
+        email: orderForm.email.trim(),
+      }),
+    })
+      .then(function (r) {
+        if (r.status === 503) return r.json().then(function (j) { throw new Error(j.code === 'integration_missing' ? '__missing__' : (j.error || 'failed')); });
+        return r.ok ? r.json() : r.json().then(function (j) { throw new Error(j.error || 'failed'); });
+      })
+      .then(function (data) {
+        orderForm.submitting = false;
+        orderForm.result = data || { found: false };
+        view = 'order_result';
+        widgetTrack('widget_order_lookup_result', { found: !!data?.found });
+        render();
+      })
+      .catch(function (err) {
+        orderForm.submitting = false;
+        var m = String(err && err.message || err);
+        orderForm.error = m === '__missing__' ? locale.order.unavailable : locale.support.submitError;
+        widgetTrack('widget_order_lookup_failed', { error: m.slice(0, 80) });
+        render();
+      });
+  }
+
+  function renderOrderForm() {
+    var O = locale.order;
+    var fieldsHtml =
+      inputFieldHtml('ibot-of-num', O.orderNumberLabel, orderForm.orderNumber, 'text', O.orderNumberPlaceholder, true) +
+      inputFieldHtml('ibot-of-email', O.emailLabel, orderForm.email, 'email', O.emailPlaceholder, true);
+    container.innerHTML = formShell({
+      title: O.title, subtitle: O.subtitle, fieldsHtml: fieldsHtml,
+      submitLabel: O.submit, submitting: orderForm.submitting, error: orderForm.error,
+    });
+    bindFormShell();
+    var sub = document.getElementById('ibot-form-submit');
+    if (sub) sub.onclick = submitOrderLookup;
+  }
+
+  function renderOrderResult() {
+    var pc = config.primaryColor;
+    var O = locale.order;
+    var isMobile = window.innerWidth < 640;
+    var panelStyle = isMobile
+      ? 'position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;border-radius:0;'
+      : 'width:370px;height:min(560px, calc(100vh - 140px));border-radius:18px;position:relative;';
+    var r = orderForm.result || { found: false };
+
+    var statusCard = r.found
+      ? '<div style="background:var(--ibot-surface);border:1px solid var(--ibot-border);border-radius:14px;padding:16px;margin-bottom:14px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+        '<div style="font-weight:700;font-size:16px;color:var(--ibot-text-primary);">' + escapeHtml(r.orderNumber || '') + '</div>' +
+        (r.total ? '<div style="font-size:14px;color:var(--ibot-text-muted);">' + escapeHtml(r.total) + '</div>' : '') +
+        '</div>' +
+        '<div style="display:inline-block;background:' + pc + '15;color:' + pc + ';padding:5px 12px;border-radius:999px;font-size:12px;font-weight:600;margin-bottom:10px;">' + escapeHtml(r.status || '') + '</div>' +
+        (r.placedAt ? '<div style="font-size:12px;color:var(--ibot-text-muted);margin-bottom:8px;">' + escapeHtml(O.placedLabel + ' ' + new Date(r.placedAt).toLocaleDateString()) + '</div>' : '') +
+        (r.itemSummary ? '<div style="font-size:13px;color:var(--ibot-text-secondary);margin-bottom:10px;"><strong>' + escapeHtml(O.itemsLabel) + '</strong> ' + escapeHtml(r.itemSummary) + '</div>' : '') +
+        (Array.isArray(r.trackingNumbers) && r.trackingNumbers.length
+          ? '<div style="font-size:12px;color:var(--ibot-text-muted);margin-bottom:8px;font-family:ui-monospace,monospace;"><strong style="font-family:inherit;">' + escapeHtml(O.trackingLabel) + '</strong> ' + escapeHtml(r.trackingNumbers.join(', ')) + '</div>'
+          : '') +
+        (Array.isArray(r.trackingUrls) && r.trackingUrls.length
+          ? r.trackingUrls.map(function (u) {
+            return '<a href="' + escapeHtml(u) + '" target="_blank" rel="noopener" style="display:inline-block;background:' + pc + ';color:#fff;padding:9px 16px;border-radius:10px;font-size:13px;font-weight:600;text-decoration:none;margin-top:6px;">' + escapeHtml(O.trackUrlLabel) + ' →</a>';
+          }).join(' ')
+          : '') +
+        '</div>'
+      : '<div style="background:var(--ibot-surface);border:1px solid var(--ibot-border);border-radius:12px;padding:16px;color:var(--ibot-text-secondary);font-size:14px;text-align:center;">' + escapeHtml(O.notFound) + '</div>';
+
+    container.innerHTML =
+      '<div id="ibot-panel" style="' + panelStyle +
+      'background:var(--ibot-panel-bg);display:flex;flex-direction:column;overflow:hidden;' +
+      'box-shadow:0 8px 40px rgba(0,0,0,0.15);animation:ibot-slide-up 0.3s ease-out;">' +
+      '<div style="display:flex;align-items:center;gap:10px;padding:14px 16px;flex-shrink:0;background:' + pc + ';color:#fff;' + (isMobile ? '' : 'border-radius:18px 18px 0 0;') + '">' +
+      '<button id="ibot-form-back" style="background:rgba(255,255,255,0.12);border:none;color:#fff;cursor:pointer;border-radius:999px;padding:6px 10px;font-size:13px;font-family:inherit;">' + escapeHtml(locale.support.backToChat) + '</button>' +
+      '<div style="flex:1;font-weight:700;font-size:17px;">' + escapeHtml(O.title) + '</div>' +
+      '</div>' +
+      '<div style="flex:1;overflow-y:auto;padding:16px;direction:' + locale.dir + ';">' + statusCard + '</div>' +
+      '</div>' +
+      (isMobile ? '' :
+        '<div style="display:flex;justify-content:flex-end;margin-top:12px;">' +
+        '<button id="ibot-close" style="width:60px;height:60px;border-radius:50%;border:none;cursor:pointer;background:' + pc + ';color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 32px rgba(0,0,0,0.16),0 1px 6px rgba(0,0,0,0.06);">' +
+        '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button></div>');
+    bindFormShell();
+  }
+
+  // ============================================
+  // Generic success view — shared between lead + book-demo flows.
+  // Support has its own (renderSupportSuccess) because it surfaces the ticket ref.
+  // ============================================
+  function renderGenericSuccess(L) {
+    var pc = config.primaryColor;
+    var isMobile = window.innerWidth < 640;
+    var panelStyle = isMobile
+      ? 'position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;border-radius:0;'
+      : 'width:370px;height:min(520px, calc(100vh - 140px));border-radius:18px;position:relative;';
+    container.innerHTML =
+      '<div id="ibot-panel" style="' + panelStyle +
+      'background:var(--ibot-panel-bg);display:flex;flex-direction:column;overflow:hidden;' +
+      'box-shadow:0 8px 40px rgba(0,0,0,0.15);animation:ibot-slide-up 0.3s ease-out;">' +
+      '<div style="display:flex;align-items:center;gap:10px;padding:14px 16px;flex-shrink:0;background:' + pc + ';color:#fff;' + (isMobile ? '' : 'border-radius:18px 18px 0 0;') + '">' +
+      '<div style="font-weight:700;font-size:17px;">' + escapeHtml(L.title) + '</div></div>' +
+      '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;">' +
+      '<div style="width:64px;height:64px;border-radius:50%;background:var(--ibot-success-bg);color:var(--ibot-success-text);display:flex;align-items:center;justify-content:center;margin-bottom:18px;">' +
+      '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>' +
+      '<div style="font-size:18px;font-weight:700;color:var(--ibot-text-primary);margin-bottom:8px;">' + escapeHtml(L.successTitle) + '</div>' +
+      '<div style="font-size:14px;color:var(--ibot-text-secondary);margin-bottom:24px;line-height:1.5;max-width:280px;">' + escapeHtml(L.successBody) + '</div>' +
+      '<button id="ibot-gs-back" style="background:' + pc + ';color:#fff;border:none;border-radius:12px;padding:11px 22px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">' + escapeHtml(locale.support.successBack) + '</button>' +
+      '</div></div>' +
+      (isMobile ? '' :
+        '<div style="display:flex;justify-content:flex-end;margin-top:12px;">' +
+        '<button id="ibot-close" style="width:60px;height:60px;border-radius:50%;border:none;cursor:pointer;background:' + pc + ';color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 32px rgba(0,0,0,0.16),0 1px 6px rgba(0,0,0,0.06);">' +
+        '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button></div>');
+    var back = document.getElementById('ibot-gs-back');
+    if (back) back.onclick = function () { view = 'chat'; render(); };
+    var closeBtn = document.getElementById('ibot-close');
+    if (closeBtn) closeBtn.onclick = function () { isOpen = false; view = 'chat'; render(); };
+  }
+
+  // ============================================
+  // Shopify cart adapter — fetches /cart.js when the page looks like a
+  // Shopify store. Merges into pageContext.cart so the bot/admin can see
+  // what's in the visitor's cart even without GTM dataLayer wiring.
+  //
+  // Shopify exposes /cart.js as same-origin JSON on every storefront page.
+  // We trigger detection only when likely signals are present so we don't
+  // fire a request on every site.
+  // ============================================
+  function isLikelyShopify() {
+    try {
+      if (window.Shopify && typeof window.Shopify === 'object') return true;
+      // Shopify CDN reference in any meta/link is a strong signal.
+      var links = document.querySelectorAll('link[href*="cdn.shopify.com"], script[src*="cdn.shopify.com"]');
+      if (links.length) return true;
+      var gen = document.querySelector('meta[name="generator"]');
+      if (gen && (gen.getAttribute('content') || '').toLowerCase().indexOf('shopify') !== -1) return true;
+    } catch (e) { /* */ }
+    return false;
+  }
+
+  var _shopifyCartCache = null;
+  var _shopifyCartTs = 0;
+  function fetchShopifyCart() {
+    // 30-second cache — cart changes slowly relative to chat turns; cheap to refresh.
+    if (Date.now() - _shopifyCartTs < 30000 && _shopifyCartCache) {
+      return Promise.resolve(_shopifyCartCache);
+    }
+    return fetch('/cart.js', { credentials: 'include' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (!data) return null;
+        _shopifyCartCache = {
+          item_count: data.item_count || 0,
+          total: data.total_price != null ? data.total_price / 100 : null,
+          currency: data.currency || null,
+          items: (data.items || []).slice(0, 5).map(function (it) {
+            return { title: it.product_title || it.title, qty: it.quantity, price: it.price != null ? it.price / 100 : null };
+          }),
+          source: 'shopify',
+        };
+        _shopifyCartTs = Date.now();
+        return _shopifyCartCache;
+      })
+      .catch(function () { return null; });
+  }
+
+  // Wrap the existing extractPageContext to enrich with Shopify cart when applicable.
+  // Async because of /cart.js fetch — sendMessage awaits when Shopify is detected.
+  var _baseExtractPageContext = extractPageContext;
+  function extractPageContextAsync() {
+    var ctx = _baseExtractPageContext();
+    if (!isLikelyShopify()) return Promise.resolve(ctx);
+    return fetchShopifyCart().then(function (cart) {
+      if (cart) ctx.cart = cart; // Shopify wins over dataLayer guess
+      return ctx;
+    });
+  }
+
+  // ============================================
+  // Smart greeting — personalize welcome when we know something about the
+  // visitor. Three layers:
+  //   1) Returning visitor with lastTopic → "still thinking about X?"
+  //   2) First-time visitor on a product page → reference the product
+  //   3) Default brand welcome message
+  // Falls back to the original welcomeMessage if no signal is strong enough.
+  // ============================================
+  function buildSmartGreeting(defaultMsg) {
+    var isEn = config.language === 'en';
+    var ctx = pageContext || _baseExtractPageContext();
+    var product = ctx && ctx.product && ctx.product.name;
+
+    if (hasVisitedBefore && lastTopic) {
+      return isEn
+        ? 'Welcome back! Still thinking about ' + lastTopic + '? Happy to pick up where we left off ✨'
+        : 'ברוך/ה הבא/ה בחזרה! עוד חושב/ת על ' + lastTopic + '? אשמח להמשיך מאיפה שעצרנו ✨';
+    }
+    if (product) {
+      return isEn
+        ? 'Hi! I see you\'re checking out "' + product + '" — want help deciding if it\'s right for you? ✨'
+        : 'היי! ראיתי שאת/ה מסתכל/ת על "' + product + '" — רוצה עזרה להחליט אם זה מתאים? ✨';
+    }
+    return defaultMsg;
+  }
+
+  // ============================================
+  // Proactive triggers — open the widget unprompted in two scenarios:
+  //   A) Exit-intent (desktop only): mouse leaves the top of the viewport.
+  //      Highest-converting pattern for last-chance offers without being
+  //      mid-flow disruptive.
+  //   B) 30s dwell on a product page with no scroll past first viewport:
+  //      visitor is stuck — chat is faster than scrolling reviews.
+  //
+  // Frequency cap: at most once per visitor per 24h, regardless of trigger.
+  // ============================================
+  var PROACTIVE_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+  function canFireProactive() {
+    if (isOpen) return false; // visitor already engaged
+    if (Date.now() - proactiveLastFired < PROACTIVE_COOLDOWN_MS) return false;
+    return true;
+  }
+  function fireProactive(reason) {
+    if (!canFireProactive()) return;
+    proactiveLastFired = Date.now();
+    try { localStorage.setItem('ibot_proactive_' + ACCOUNT_ID, String(proactiveLastFired)); } catch (e) { /* */ }
+    widgetTrack('widget_proactive_opened', { reason: reason });
+    isOpen = true;
+    render();
+  }
+
+  function armProactiveTriggers() {
+    var isMobile = window.innerWidth < 640;
+
+    // Exit-intent: desktop only, mouse exits top of viewport
+    if (!isMobile) {
+      var exitHandler = function (e) {
+        // e.clientY < 5 = mouse near top edge; e.relatedTarget null = leaving window
+        if (e.clientY <= 5 && !e.relatedTarget) {
+          fireProactive('exit_intent');
+        }
+      };
+      document.addEventListener('mouseleave', exitHandler);
+    }
+
+    // 30s on a product page with low scroll → assume stuck
+    var ctx = pageContext || _baseExtractPageContext();
+    if (ctx && ctx.product && ctx.product.name) {
+      setTimeout(function () {
+        // If they've scrolled past 1.5 viewports, they're engaging — leave them alone.
+        if (window.scrollY > window.innerHeight * 1.5) return;
+        fireProactive('product_dwell_30s');
+      }, 30000);
+    }
+  }
+
+  // ============================================
+  // Boot
+  // ============================================
+  pageContext = _baseExtractPageContext();
+  // Defer Shopify enrichment — non-blocking, fills cart context if applicable.
+  if (isLikelyShopify()) {
+    extractPageContextAsync().then(function (enriched) { pageContext = enriched; });
+  }
+  // Apply smart greeting after config loads — the welcomeMessage will have
+  // been set from /api/widget/config; wrap it with personalization.
+  setTimeout(function () {
+    if (messages.length === 1 && messages[0].role === 'assistant') {
+      messages[0].content = buildSmartGreeting(messages[0].content);
+      if (isOpen) render();
+    }
+  }, 500);
+  armProactiveTriggers();
   render();
 })();

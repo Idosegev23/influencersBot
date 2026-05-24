@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { message, accountId, sessionId } = body;
+    const { message, accountId, sessionId, pageContext, modules: clientModules, anonId } = body;
 
     if (!message || !accountId) {
       return new Response(
@@ -174,6 +174,9 @@ export async function POST(req: NextRequest) {
             accountId,
             message,
             sessionId,
+            pageContext: pageContext || null,
+            modules: clientModules || undefined,
+            anonId: typeof anonId === 'string' ? anonId : undefined,
             onToken: (token) => {
               controller.enqueue(encodeEvent({ type: 'delta', text: token }));
             },
@@ -190,6 +193,21 @@ export async function POST(req: NextRequest) {
                 objection: result.intent.objection,
                 topic: result.intent.topic,
                 confidence: result.intent.confidence,
+              }),
+            );
+          }
+
+          // Phase concierge: emit parsed action envelope. The client renders
+          // an inline confirmation card; one click runs the prefilled flow.
+          if (result.action) {
+            controller.enqueue(
+              encodeEvent({
+                type: 'action',
+                action: {
+                  type: result.action.type,
+                  label: result.action.label || null,
+                  prefill: result.action.prefill || null,
+                },
               }),
             );
           }

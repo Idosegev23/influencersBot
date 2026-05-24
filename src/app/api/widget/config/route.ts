@@ -62,6 +62,30 @@ export async function GET(req: NextRequest) {
       console.warn('[Widget Config] could not sign analytics token:', err);
     }
 
+    // Resolve module toggles. Defaults are all-off so legacy accounts behave
+    // exactly as before. To enable: set
+    //   config.widget.modules.support.enabled = true
+    // (etc) and optionally `config.support_email` for ticket notifications.
+    const rawModules = (widgetConfig.modules || {}) as Record<string, any>;
+    const supportMod = rawModules.support || {};
+    const leadsMod = rawModules.leads || {};
+    const bookingsMod = rawModules.bookings || {};
+    const modules = {
+      support: {
+        enabled: supportMod.enabled === true,
+        categories: Array.isArray(supportMod.categories) && supportMod.categories.length
+          ? supportMod.categories
+          : ['order', 'product', 'return', 'other'],
+      },
+      leads: {
+        enabled: leadsMod.enabled === true,
+        trigger: leadsMod.trigger || 'manual',
+      },
+      bookings: {
+        enabled: bookingsMod.enabled === true,
+      },
+    };
+
     return NextResponse.json(
       {
         language,
@@ -77,6 +101,7 @@ export async function GET(req: NextRequest) {
         placeholder: widgetConfig.placeholder || fb.placeholder,
         domain: widgetConfig.domain || config.username || '',
         analyticsToken,
+        modules,
       },
       { headers: corsHeaders },
     );

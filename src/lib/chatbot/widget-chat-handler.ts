@@ -18,6 +18,16 @@ import {
   buildObjectionBlock,
   type IntentEnvelope,
 } from './widget-objections';
+import {
+  stripAction,
+  buildActionsBlock,
+  buildPageContextBlock,
+  buildReturningVisitorBlock,
+  type WidgetAction,
+  type WidgetModulesFlags,
+  type PageContext,
+  type ReturningVisitor,
+} from './widget-actions';
 
 // ============================================
 // Type Definitions
@@ -27,6 +37,17 @@ export interface WidgetChatParams {
   accountId: string;
   message: string;
   sessionId?: string;
+  // Phase: concierge — page DOM context (schema.org / og / dataLayer) extracted
+  // by the widget on each turn so the bot can reference what the visitor is
+  // looking at. Optional — null when extraction failed or page is empty.
+  pageContext?: PageContext | null;
+  // Per-account module toggles, forwarded by the client. The handler also
+  // re-reads them from the account config as the source of truth — the client
+  // copy is only used to keep the prompt block honest when modules flip mid-session.
+  modules?: Partial<WidgetModulesFlags>;
+  // Anonymous visitor ID (random, stored in widget localStorage). Lets us link
+  // sessions across visits without PII — used for returning-visitor recognition.
+  anonId?: string;
   onToken?: (token: string) => void;
 }
 
@@ -39,6 +60,8 @@ export interface WidgetChatResult {
   // Phase 2: parsed <<INTENT>> envelope from this turn's response. null when
   // the model didn't emit one (e.g. error path, malformed envelope).
   intent: IntentEnvelope | null;
+  // Phase concierge: parsed <<ACTION>> envelope. null when no action was proposed.
+  action: WidgetAction | null;
 }
 
 // ============================================
@@ -72,7 +95,14 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
       id: sessionId,
       account_id: accountId,
       message_count: 0,
+      // anon_id ties this session to prior sessions from the same browser
+      // so returning-visitor recognition can find them.
+      anon_id: params.anonId || null,
     });
+  } else if (params.anonId && !session.anon_id) {
+    // Backfill anon_id on sessions created before this field existed,
+    // so future returning-visitor lookups have something to match on.
+    await supabase.from('chat_sessions').update({ anon_id: params.anonId }).eq('id', sessionId);
   }
 
   // 2. Load account info + conversation history + last-turn intent in parallel
@@ -149,13 +179,72 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
   let fullText = '';
   let responseId: string | null = null;
 
-  // Merge recommendation + objection blocks into widgetConfig for prompt injection.
-  // Objection block is null unless prior turn flagged hesitation — additive guidance.
+  // Merge recommendation + objection + concierge blocks into widgetConfig for
+  // prompt injection. Each block is null/omitted unless its precondition is
+  // met (prior-turn hesitation, enabled modules, extracted page context) —
+  // so the prompt only grows when there's actually new guidance to inject.
   const objectionBlock = buildObjectionBlock(config.widget || null, lastIntentRow || null);
+
+  // Source of truth for modules = account config. The client-passed `modules`
+  // is a hint that lets us trace mismatches but never overrides the DB.
+  const accountModules = (config.widget?.modules || {}) as Record<string, any>;
+  // Order tracking is implicit — opted in when the account has a Shopify
+  // integration configured. The handler doesn't expose the token; only the
+  // boolean flag flows into the actions prompt.
+  const shopifyEnabled = !!(config?.integrations?.shopify?.enabled
+    && config?.integrations?.shopify?.shop_domain
+    && config?.integrations?.shopify?.admin_api_token);
+  const moduleFlags: WidgetModulesFlags = {
+    support: accountModules.support?.enabled === true,
+    leads: accountModules.leads?.enabled === true,
+    bookings: accountModules.bookings?.enabled === true,
+    orderTracking: shopifyEnabled,
+  };
+  const lang: 'he' | 'en' = (accountResult?.language === 'en') ? 'en' : 'he';
+  const actionsBlock = buildActionsBlock(moduleFlags, lang);
+  const pageContextBlock = buildPageContextBlock(params.pageContext || null, lang);
+
+  // Returning-visitor recognition — look up the most recent chat_lead for
+  // any session this anonId has been on. Skips when no anonId or no prior lead.
+  // Single round-trip via inner-join-like query.
+  let returningVisitor: ReturningVisitor | null = null;
+  if (params.anonId) {
+    const { data: priorSessions } = await supabase
+      .from('chat_sessions')
+      .select('id, lead_id, rolling_summary')
+      .eq('account_id', accountId)
+      .eq('anon_id', params.anonId)
+      .neq('id', sessionId)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    const leadId = priorSessions?.find((s: any) => s.lead_id)?.lead_id;
+    if (leadId) {
+      const { data: lead } = await supabase
+        .from('chat_leads')
+        .select('first_name')
+        .eq('id', leadId)
+        .single();
+      if (lead?.first_name) {
+        returningVisitor = {
+          firstName: lead.first_name,
+          // Use the most recent rolling_summary as "last topic" hint —
+          // it's an LLM-generated 1-2 sentence summary so it reads naturally.
+          lastTopic: priorSessions?.[0]?.rolling_summary?.slice(0, 80) || null,
+          visitCount: (priorSessions?.length || 0) + 1,
+        };
+      }
+    }
+  }
+  const returningVisitorBlock = buildReturningVisitorBlock(returningVisitor, lang);
+
   const widgetConfigWithRecs = {
     ...(config.widget || {}),
     _recommendationBlock: recommendationBlock,
     ...(objectionBlock ? { _objectionBlock: objectionBlock } : {}),
+    ...(actionsBlock ? { _actionsBlock: actionsBlock } : {}),
+    ...(pageContextBlock ? { _pageContextBlock: pageContextBlock } : {}),
+    ...(returningVisitorBlock ? { _returningVisitorBlock: returningVisitorBlock } : {}),
   };
 
   try {
@@ -204,6 +293,12 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
   const { cleanText, intent: turnIntent } = stripIntent(fullText);
   fullText = cleanText;
 
+  // Phase concierge: extract <<ACTION>> envelope. Runs AFTER stripIntent so
+  // both envelopes can coexist in any order. turnAction ships to the client
+  // for inline-card rendering; never persisted (visitor must confirm each time).
+  const { cleanText: cleanText2, action: turnAction } = stripAction(fullText);
+  fullText = cleanText2;
+
   // 6. Save messages + update session state (parallel)
   const msgCount = (session?.message_count || 0) + 2;
   await Promise.all([
@@ -242,6 +337,7 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
     sessionId: sessionId!,
     products: recommendedProducts,
     intent: turnIntent || null,
+    action: turnAction || null,
   };
 }
 
