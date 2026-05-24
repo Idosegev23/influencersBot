@@ -48,6 +48,11 @@ export interface WidgetChatParams {
   // Anonymous visitor ID (random, stored in widget localStorage). Lets us link
   // sessions across visits without PII — used for returning-visitor recognition.
   anonId?: string;
+  // Locale the widget rendered the welcome in. Defensive fallback so the
+  // error message respects the visitor's language even if the account fetch
+  // races / fails (the client already knows the language because /api/widget/config
+  // returned it earlier in this session).
+  language?: 'he' | 'en';
   onToken?: (token: string) => void;
 }
 
@@ -281,10 +286,26 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
       hasSummary: !!session?.rolling_summary,
     });
   } catch (error: any) {
-    console.error('[WidgetChat] SandwichBot error:', error.message);
-    fullText = (accountResult?.language === 'en')
-      ? "Sorry, I couldn't process that. Please try again."
-      : 'מצטער, לא הצלחתי לעבד את הבקשה. נסו שוב.';
+    // Log with enough context to diagnose intermittent prod failures
+    // (cold-start timeouts, model timeouts, RAG hiccups). The message gets
+    // swallowed otherwise because we always return a friendly fallback.
+    console.error('[WidgetChat] SandwichBot error:', {
+      message: error?.message,
+      name: error?.name,
+      accountId,
+      sessionId,
+      hasAccount: !!accountResult,
+      accountLang: accountResult?.language,
+      stack: error?.stack?.split('\n').slice(0, 3).join(' | '),
+    });
+    // Language fallback chain: explicit param from widget > account row > 'he'.
+    // The widget already has the language from /api/widget/config; passing it
+    // through means we don't lose the visitor's language when the account
+    // fetch races/fails or some unrelated field mutation throws.
+    const errLang = params.language || (accountResult?.language === 'en' ? 'en' : 'he');
+    fullText = errLang === 'en'
+      ? "Sorry, I hit a hiccup processing that. Please try again."
+      : 'מצטער, נתקלתי בבעיה. נסו שוב.';
   }
 
   // Phase 2: extract <<INTENT>> envelope from the (already suggestion-stripped)

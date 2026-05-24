@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { message, accountId, sessionId, pageContext, modules: clientModules, anonId } = body;
+    const { message, accountId, sessionId, pageContext, modules: clientModules, anonId, language } = body;
 
     if (!message || !accountId) {
       return new Response(
@@ -177,6 +177,7 @@ export async function POST(req: NextRequest) {
             pageContext: pageContext || null,
             modules: clientModules || undefined,
             anonId: typeof anonId === 'string' ? anonId : undefined,
+            language: language === 'en' ? 'en' : (language === 'he' ? 'he' : undefined),
             onToken: (token) => {
               controller.enqueue(encodeEvent({ type: 'delta', text: token }));
             },

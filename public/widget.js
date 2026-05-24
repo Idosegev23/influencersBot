@@ -994,6 +994,7 @@
         accountId: ACCOUNT_ID,
         sessionId: sessionId,
         anonId: ANON_ID,
+        language: config.language,
         pageContext: pageContext,
         modules: { support: !!modules.support.enabled, leads: !!modules.leads.enabled, bookings: !!modules.bookings.enabled },
       }),
