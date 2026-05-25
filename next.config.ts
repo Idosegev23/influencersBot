@@ -63,11 +63,39 @@ const nextConfig: NextConfig = {
           : h,
       );
 
+    // Permissive CSP for the preview proxy ONLY — the proxied HTML is the
+    // customer's actual site and loads scripts/CSS/fonts/images from many
+    // third-party CDNs (Shopify, Cloudflare, Google Fonts, …). Locking it to
+    // 'self' would break visual rendering. This iframe is shown ONLY inside
+    // our admin panel to authenticated admins.
+    const previewProxyHeaders = headersWithoutFrame.map((h) =>
+      h.key === 'Content-Security-Policy'
+        ? {
+          ...h,
+          value:
+            "default-src * data: blob: 'unsafe-inline' 'unsafe-eval'; " +
+            "script-src * 'unsafe-inline' 'unsafe-eval'; " +
+            "style-src * 'unsafe-inline'; " +
+            "img-src * data: blob:; " +
+            "font-src * data:; " +
+            "connect-src *; " +
+            "frame-ancestors *;",
+        }
+        : h,
+    );
+
     return [
       {
         // Widget + proxy routes: allow iframe embedding
         source: '/api/widget/:path*',
         headers: headersWithoutFrame,
+      },
+      {
+        // Preview proxy override: must come AFTER /api/widget/:path* so its
+        // permissive CSP replaces the restrictive one (Next.js applies all
+        // matching rules in order; later headers with same key win).
+        source: '/api/widget/preview/:path*',
+        headers: previewProxyHeaders,
       },
       {
         source: '/api/admin/proxy',
