@@ -26,10 +26,22 @@ const FETCH_TIMEOUT_MS = 12000;
 // Browsers refuse to render pages with these headers in an iframe. We
 // proxy the customer's site, so we get to decide what headers to send back.
 // X-Frame-Options + frame-ancestors directives are filtered out below.
+//
+// Critical also: encoding/length headers must NOT pass through. Node's fetch
+// transparently decompresses gzip/brotli responses before we touch them, so
+// forwarding the upstream's `Content-Encoding: gzip` would tell the browser
+// to decompress plain text → ERR_CONTENT_DECODING_FAILED → blank iframe.
+// Same for Content-Length (now stale after we mutate the HTML body) and
+// Transfer-Encoding (chunked metadata we shouldn't echo).
 function isBlockingHeader(name: string): boolean {
   const lower = name.toLowerCase();
-  return lower === 'x-frame-options' || lower === 'content-security-policy'
-    || lower === 'content-security-policy-report-only' || lower === 'permissions-policy';
+  return lower === 'x-frame-options'
+    || lower === 'content-security-policy'
+    || lower === 'content-security-policy-report-only'
+    || lower === 'permissions-policy'
+    || lower === 'content-encoding'
+    || lower === 'content-length'
+    || lower === 'transfer-encoding';
 }
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ accountId: string }> }) {
