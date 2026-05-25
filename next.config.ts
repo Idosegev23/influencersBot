@@ -96,6 +96,17 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // Widget JS — must revalidate every load. We ship behavior changes
+        // frequently and the script lives on third-party customer sites where
+        // we have no other invalidation lever. Browsers send conditional
+        // requests (If-Modified-Since) on every page load; CDN responds 304
+        // when unchanged so this isn't actually expensive.
+        source: '/widget.js',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' },
+        ],
+      },
+      {
         // Fonts
         source: '/fonts/:path*',
         headers: [
