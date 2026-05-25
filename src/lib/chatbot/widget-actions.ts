@@ -124,8 +124,8 @@ export function buildActionsBlock(modules: WidgetModulesFlags, language: 'he' | 
   // question better than continuing the conversation (e.g. visitor asks "how
   // much does X cost" and there's a pricing page).
   lines.push(isEn
-    ? `• navigate — propose when a specific page on this site would directly answer the visitor's question (pricing, contact, catalog, a specific product, docs). Prefill: { url: "https://full-url" OR "/relative-path", label?: "short context label" }. Use URLs from the KNOWN PAGES block below, the page context, or links the visitor mentioned; don't invent URLs. Don't propose for general questions — only when there's a clear destination page.`
-    : `• navigate — הציע/י כשעמוד ספציפי באתר ייתן תשובה ישירה לשאלת המבקר/ת (מחירים, צור קשר, קטלוג, מוצר ספציפי, מסמכים). Prefill: { url: "https://full-url" או "/relative-path", label?: "תיאור קצר" }. השתמש/י ב-URLs מבלוק KNOWN PAGES למטה, מההקשר של העמוד, או מהודעת המבקר/ת; אל תמציא/י URL. אל תציע/י לשאלות כלליות — רק כשיש יעד ברור.`);
+    ? `• navigate — propose when a specific page on this site would directly answer the visitor's question (pricing, contact, catalog, a specific product, docs). Prefill: { url: "https://full-url" OR "/relative-path", label?: "short context label" }. Use URLs from the KNOWN PAGES block below, the page context, or links the visitor mentioned; don't invent URLs. ALWAYS emit a navigate action when the visitor asks "where can I find X", "how do I get to Y", "show me Z", "take me to W" and X/Y/Z/W maps to a KNOWN PAGE — don't just describe the destination in text, propose the action so they can click through.`
+    : `• navigate — הציע/י כשעמוד ספציפי באתר ייתן תשובה ישירה לשאלת המבקר/ת (מחירים, צור קשר, קטלוג, מוצר ספציפי, מסמכים). Prefill: { url: "https://full-url" או "/relative-path", label?: "תיאור קצר" }. השתמש/י ב-URLs מבלוק KNOWN PAGES למטה, מההקשר של העמוד, או מהודעת המבקר/ת; אל תמציא/י URL. **חובה** להוציא navigate action כשהמבקר/ת שואל/ת "איפה X", "איך מגיעים ל-Y", "תראה/י לי את Z", "קח/י אותי ל-W" וזה מתאים לעמוד ב-KNOWN PAGES — אל תתאר/י את היעד בטקסט בלבד, הציע/י action שאפשר ללחוץ.`);
 
   const header = isEn
     ? `🎯 CONCIERGE ACTIONS — you can propose ONE inline action per turn when appropriate.`
@@ -278,6 +278,68 @@ export function buildNavigationLinksBlock(links: NavigationLink[] | null | undef
     .map((l) => `• ${l.label} → ${l.url}${l.description ? ` (${l.description})` : ''}`)
     .join('\n');
   return `${header}\n${list}`;
+}
+
+/**
+ * Auto-derive navigation links from the account's scraped `documents`.
+ * Most customers won't manually curate the list — but we already crawl their
+ * site for RAG, so we have every URL + title for free. Pick top-level pages
+ * (path depth ≤ 2) and filter out product-detail / dynamic-pattern pages
+ * that wouldn't make useful navigation suggestions.
+ *
+ * Returns up to 15 links, deduped by URL path. Empty array when the account
+ * has no website documents (e.g. IMAI scraped via different pipeline).
+ */
+export function deriveNavigationLinksFromDocs(
+  docs: Array<{ title?: string | null; metadata?: any }>,
+): NavigationLink[] {
+  if (!Array.isArray(docs)) return [];
+
+  type Candidate = NavigationLink & { _depth: number; _len: number };
+  const candidates: Candidate[] = [];
+  const seen = new Set<string>();
+
+  for (const d of docs) {
+    const url = d?.metadata?.url;
+    if (!url || typeof url !== 'string') continue;
+
+    let path: string;
+    try {
+      const u = new URL(url);
+      path = u.pathname.replace(/\/$/, '') || '/';
+    } catch { continue; }
+
+    const segments = path.split('/').filter(Boolean);
+    // Keep root + 1-2 segment paths only — anything deeper is usually a
+    // product detail or article, not a navigation target.
+    if (segments.length > 2) continue;
+    // Skip obvious dynamic / detail patterns
+    const last = segments[segments.length - 1] || '';
+    if (/^\d+$/.test(last)) continue;                      // /products/12345
+    if (/^[0-9a-f]{8,}$/i.test(last)) continue;            // hash slugs
+    if (/^(product|p|item|sku|page)$/i.test(segments[0] || '')) continue; // /product/...
+    if (/\.(jpg|png|pdf|webp|svg)$/i.test(last)) continue;  // file URLs
+    // Skip percent-encoded Hebrew/Cyrillic slugs — those are product names
+    // baked into the URL and don't make readable navigation targets.
+    if (/%[0-9a-f]{2}/i.test(path)) continue;
+
+    // Clean label — strip common "Page | Brand" / "Page - Brand" suffixes
+    let label = (d.title || '').toString().trim();
+    label = label.split(' | ')[0].split(' – ')[0].split(' — ')[0].split(' - ')[0].trim();
+    if (!label || label.length < 2) label = last || 'Home';
+    if (label.length > 50) label = label.slice(0, 50);
+
+    const dedupKey = path;
+    if (seen.has(dedupKey)) continue;
+    seen.add(dedupKey);
+    candidates.push({ label, url: path, _depth: segments.length, _len: path.length });
+  }
+
+  // Prefer shortest, shallowest paths — root → 1-segment → 2-segment.
+  // Within the same depth, shorter path wins.
+  candidates.sort((a, b) => a._depth - b._depth || a._len - b._len);
+
+  return candidates.slice(0, 15).map(({ label, url }) => ({ label, url }));
 }
 
 export function buildReturningVisitorBlock(visitor: ReturningVisitor | null, language: 'he' | 'en'): string | null {

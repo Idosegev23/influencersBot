@@ -24,6 +24,7 @@ import {
   buildPageContextBlock,
   buildReturningVisitorBlock,
   buildNavigationLinksBlock,
+  deriveNavigationLinksFromDocs,
   type WidgetAction,
   type WidgetModulesFlags,
   type PageContext,
@@ -245,13 +246,50 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
   }
   const returningVisitorBlock = buildReturningVisitorBlock(returningVisitor, lang);
 
-  // Navigation links — curated by the account owner via /manage/[token].
-  // Gives the bot specific URLs to propose `navigate` actions to (catalog,
-  // pricing, contact, etc). Without this the bot can't navigate anywhere
-  // because it's instructed never to invent URLs.
-  const navigationLinks: NavigationLink[] = Array.isArray((config.widget as any)?.navigation_links)
+  // Navigation links — two layers:
+  //   1) Manual list curated by the account owner via /manage/[token].
+  //   2) Auto-derived from the account's scraped `documents` — every account
+  //      that runs through our website-scraping pipeline has top-level pages
+  //      with titles + URLs sitting in `documents.metadata.url`. We surface
+  //      the top-level subset (path depth ≤ 2, excluding product details) so
+  //      the bot can offer `navigate` actions without needing manual setup.
+  // Manual list wins when set; auto fills the gap otherwise. We supplement
+  // manual with auto-derived links that don't conflict, capped overall.
+  const manualNavLinks: NavigationLink[] = Array.isArray((config.widget as any)?.navigation_links)
     ? (config.widget as any).navigation_links
     : [];
+
+  let navigationLinks: NavigationLink[] = manualNavLinks;
+  // Skip the doc-derived lookup when manual list is already healthy (5+ items)
+  // — saves a query per chat turn. Otherwise auto-detect and merge.
+  if (manualNavLinks.length < 5) {
+    // Aggressive server-side filtering so the small result set contains
+    // mostly top-level pages. Excludes product detail pages, deep nested
+    // category sub-pages, paginated lists, and content article patterns.
+    // Without these, accounts with 1000s of product/category pages (Tambour)
+    // would return only deep pages and crowd out /contact, /faq, /about, etc.
+    const { data: navDocs } = await supabase
+      .from('documents')
+      .select('title, metadata')
+      .eq('account_id', accountId)
+      .eq('entity_type', 'website')
+      .not('metadata->>url', 'ilike', '%/product/%')
+      .not('metadata->>url', 'ilike', '%/products/%')
+      .not('metadata->>url', 'ilike', '%/professionals/%')
+      .not('metadata->>url', 'ilike', '%/inspiration/%')
+      .not('metadata->>url', 'ilike', '%/blog/%')
+      .not('metadata->>url', 'ilike', '%/category/%')
+      .not('metadata->>url', 'ilike', '%/tag/%')
+      .not('metadata->>url', 'ilike', '%/page/%')
+      .not('metadata->>url', 'ilike', '%/post/%')
+      .not('metadata->>url', 'ilike', '%/article/%')
+      .limit(1000);
+    const autoLinks = deriveNavigationLinksFromDocs(navDocs || []);
+    // Merge: manual paths take priority; auto fills the rest up to 15 total.
+    const seen = new Set(manualNavLinks.map((l) => l.url));
+    const supplement = autoLinks.filter((l) => !seen.has(l.url));
+    navigationLinks = [...manualNavLinks, ...supplement].slice(0, 15);
+  }
   const navigationLinksBlock = buildNavigationLinksBlock(navigationLinks, lang);
 
   const widgetConfigWithRecs = {
