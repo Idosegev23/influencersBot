@@ -5,12 +5,36 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 
 interface WidgetConfig {
+  language?: 'he' | 'en';
   theme: { primaryColor: string };
   brandName: string;
   profilePic: string | null;
   welcomeMessage: string;
+  placeholder?: string;
   domain: string;
 }
+
+// Locale strings for the admin preview surface. Mirrors the same keys in
+// public/widget.js's LOCALES table — anything visible in the preview that
+// the production widget also shows in i18n form must have an entry here.
+const PREVIEW_LOCALE = {
+  he: {
+    dir: 'rtl' as const,
+    font: '"Heebo", system-ui, sans-serif',
+    textAlign: 'right' as const,
+    status: 'זמין',
+    placeholder: 'כתבו הודעה...',
+    connectionError: 'שגיאה בחיבור. נסו שוב.',
+  },
+  en: {
+    dir: 'ltr' as const,
+    font: '"Inter", system-ui, sans-serif',
+    textAlign: 'left' as const,
+    status: 'Online',
+    placeholder: 'Type a message...',
+    connectionError: 'Connection error. Please try again.',
+  },
+} as const;
 
 export default function WebsitePreviewPage() {
   const params = useParams();
@@ -337,6 +361,9 @@ function WidgetPreview({ accountId, config }: { accountId: string; config: Widge
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const pc = config.theme.primaryColor || '#0c1013';
+  // Resolve locale from the account language returned by /api/widget/config.
+  // Defaults to Hebrew to preserve existing preview behavior for he accounts.
+  const loc = PREVIEW_LOCALE[config.language === 'en' ? 'en' : 'he'];
 
   useEffect(() => {
     if (!document.getElementById('wp-styles')) {
@@ -425,14 +452,14 @@ function WidgetPreview({ accountId, config }: { accountId: string; config: Widge
       } else {
         setMessages((m) => {
           const updated = [...m];
-          updated[updated.length - 1] = { role: 'assistant', content: 'מצטער, לא הצלחתי לעבד את הבקשה.' };
+          updated[updated.length - 1] = { role: 'assistant', content: loc.connectionError };
           return updated;
         });
       }
     } catch {
       setMessages((m) => {
         const updated = [...m];
-        updated[updated.length - 1] = { role: 'assistant', content: 'שגיאה בחיבור. נסו שוב.' };
+        updated[updated.length - 1] = { role: 'assistant', content: loc.connectionError };
         return updated;
       });
     } finally {
@@ -467,7 +494,7 @@ function WidgetPreview({ accountId, config }: { accountId: string; config: Widge
 
   // ---- Open state: Figma panel 432x724, rounded-18, bg #f4f5f7 ----
   return (
-    <div style={{ fontFamily: '"Heebo", system-ui, sans-serif', direction: 'rtl' }}>
+    <div style={{ fontFamily: loc.font, direction: loc.dir }}>
       {/* Main panel */}
       <div
         style={{
@@ -489,7 +516,7 @@ function WidgetPreview({ accountId, config }: { accountId: string; config: Widge
             <div style={{ fontWeight: 700, fontSize: 23, lineHeight: 'normal', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{config.brandName}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
               <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
-              <span style={{ fontSize: 16, whiteSpace: 'nowrap' }}>זמין</span>
+              <span style={{ fontSize: 16, whiteSpace: 'nowrap' }}>{loc.status}</span>
             </div>
           </div>
         </div>
@@ -580,12 +607,12 @@ function WidgetPreview({ accountId, config }: { accountId: string; config: Widge
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              placeholder="כתבו הודעה..."
+              placeholder={config.placeholder || loc.placeholder}
               disabled={isLoading}
               autoFocus
               style={{
                 flex: 1, border: 'none', outline: 'none', fontSize: 16, color: pc,
-                background: 'transparent', direction: 'rtl', fontFamily: 'inherit', textAlign: 'right', minWidth: 0,
+                background: 'transparent', direction: loc.dir, fontFamily: 'inherit', textAlign: loc.textAlign, minWidth: 0,
               }}
             />
           </div>
