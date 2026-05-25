@@ -1311,13 +1311,23 @@
           'onerror="this.style.display=\'none\'" ' +
           'onclick="window.open(\'' + src + '\',\'_blank\')" /></div>';
       });
-      // Markdown links (with product click tracking for /product/ URLs)
+      // Markdown links (with product click tracking for /product/ URLs).
+      // Resolve relative URLs against document.baseURI — in the customer's
+      // site that's their own origin; in our admin preview iframe it's the
+      // customer's URL via the <base href> injection we add server-side.
+      // Without this, `[צור קשר](/contact)` would resolve to OUR origin
+      // inside the preview iframe → 404.
       safe = safe.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function (_, t, u) {
-        var isProductLink = u.indexOf('/product') !== -1;
+        var href = u;
+        try {
+          // new URL() resolves relative against baseURI; absolute URLs pass through.
+          href = new URL(u, document.baseURI).href;
+        } catch (e) { /* malformed — fall back to raw */ }
+        var isProductLink = href.indexOf('/product') !== -1;
         var trackAttr = isProductLink
           ? ' onclick="(function(e){try{fetch((window.IBOT_HOST||\'\')+\'/api/widget/recommendations/click\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({accountId:\'' + config.accountId + '\',productId:null})}).catch(function(){});}catch(x){}})()"'
           : '';
-        return '<a href="' + u + '" target="_blank" rel="noopener"' + trackAttr +
+        return '<a href="' + escapeHtml(href) + '" target="_blank" rel="noopener"' + trackAttr +
           ' style="color:' + linkColor + ';text-decoration:underline;' +
           'text-underline-offset:2px;font-weight:500;">' + t + '</a>';
       });

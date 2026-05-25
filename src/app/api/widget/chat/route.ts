@@ -217,8 +217,35 @@ export async function POST(req: NextRequest) {
           }
 
           // Send structured product cards (widget v4) before done.
-          // Empty products array → still emit, so client can clear stale cards.
-          const cards = (result.products || []).map((p) => toCardDTO(p, loc));
+          // Suppress on non-buying intents — when the visitor is asking about
+          // contact info, asking for support, or navigating around the site,
+          // surfacing product cards adds noise and erodes trust ("I asked
+          // for the contact page, why are you showing me random products?").
+          const SUPPRESS_CARDS_FOR = new Set(['support', 'navigating']);
+          const stage = result.intent?.stage || '';
+          // Reject products whose URL clearly points at a category/listing
+          // instead of a detail page. Some account scrapers (Tambour's case)
+          // captured category URLs when the product was found inside a list
+          // view — clicking would land the visitor on a generic shelf, not
+          // the specific item, which feels broken.
+          const isValidProductUrl = (u: string | null | undefined): boolean => {
+            if (!u || typeof u !== 'string') return false;
+            const lower = u.toLowerCase();
+            if (/\/page\/\d+/.test(lower)) return false;        // /shop/.../page/3
+            if (/\/category\//.test(lower)) return false;
+            if (/\/shop\/?[^/]*\/?$/.test(lower)) return false; // /shop or /shop/section root
+            // Most e-com platforms use /product/<slug> or /products/<slug>
+            // — accept those. Also accept anything that's clearly a long slug.
+            if (/\/(product|products|p|item)\//.test(lower)) return true;
+            // Fallback: last path segment looks like a slug (≥5 chars, has letters)
+            const last = lower.replace(/\/+$/, '').split('/').pop() || '';
+            return last.length >= 5 && /[a-z֐-׿]/i.test(last);
+          };
+          const cards = SUPPRESS_CARDS_FOR.has(stage)
+            ? []
+            : (result.products || [])
+                .filter((p) => isValidProductUrl(p.productUrl))
+                .map((p) => toCardDTO(p, loc));
           const layout = result.intent?.stage === 'comparing' ? 'compare' : 'stack';
           controller.enqueue(
             encodeEvent({
