@@ -646,6 +646,21 @@
       // Fire chip fetch in parallel — non-blocking; widget renders without chips
       // first, chips populate when ready (≈400ms on cache miss).
       fetchChips('initial');
+      // Restore prior conversation when sessionId is known. Covers: visitor
+      // closes widget then reopens, page reload, returning visit, and the
+      // support-form-then-back-to-chat path. Welcome is shown until history
+      // arrives so the panel never flashes empty.
+      if (sessionId) {
+        fetch(BASE_URL + '/api/widget/session/' + encodeURIComponent(sessionId) + '?accountId=' + ACCOUNT_ID)
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (data) {
+            if (data && Array.isArray(data.messages) && data.messages.length) {
+              messages = data.messages;
+              if (isOpen) render();
+            }
+          })
+          .catch(function () { /* fail silently — keep welcome */ });
+      }
       render();
     })
     .catch(function () {
@@ -1062,22 +1077,12 @@
                     .replace(/<<ACTION>>[\s\S]*/g, '')
                     .trim();
                   messages[messages.length - 1].content = displayText;
-                  // Surgical DOM update — replace just the streaming bubble's
-                  // inner HTML instead of rebuilding the whole panel on every
-                  // token. Full render() is reserved for structural changes
-                  // (typing indicator → first text, cards arriving, intent/action
-                  // events). Falls back to render() when the bubble isn't in DOM
-                  // yet (first token after thinking indicator).
-                  var streamingEl = document.getElementById('ibot-streaming-bubble');
-                  if (streamingEl && !thinkingText) {
-                    streamingEl.innerHTML = formatMessage(displayText, false);
-                    var msgsScroll = document.getElementById('ibot-messages');
-                    if (msgsScroll) msgsScroll.scrollTop = msgsScroll.scrollHeight;
-                  } else {
-                    // First token after thinking dots — swap to text bubble via full render.
-                    thinkingText = null;
-                    render();
-                  }
+                  // Throttle the actual DOM write to one paint per frame via
+                  // requestAnimationFrame. Without this, fast LLMs stream
+                  // 50+ tokens/sec → each token triggered an innerHTML rewrite
+                  // → visible flicker even with the streaming-bubble surgical
+                  // update. Coalescing to ~60fps gives a smooth typewriter feel.
+                  scheduleStreamPaint();
                 } else if (event.type === 'intent') {
                   // Phase 2: persist last topic for next-page-load chip relevance.
                   // Track for analytics. Layout is already encoded in the cards event.
@@ -1164,25 +1169,31 @@
   }
 
   // ---- Smart chips row (above input) ----
+  // Cap at 3 chips with wrap. Earlier we used overflow-x:auto which felt
+  // broken in the 370px panel — a chip got cut off and visitors didn't
+  // realize there was more behind a horizontal scroll. Wrap + cap keeps
+  // everything visible in the small surface.
   function renderChipsRow(items, pc) {
     var pills = '';
-    for (var i = 0; i < items.length; i++) {
+    var rendered = 0;
+    for (var i = 0; i < items.length && rendered < 3; i++) {
       var label = String(items[i] || '').trim();
       if (!label) continue;
+      // Truncate long chips so two per row stays plausible
+      if (label.length > 22) label = label.slice(0, 21) + '…';
       pills +=
         '<button onclick="window.__ibotChipClick(' + i + ')" ' +
         'style="background:var(--ibot-surface);border:1px solid var(--ibot-border);color:var(--ibot-text-primary);cursor:pointer;' +
-        'border-radius:999px;padding:7px 12px;font-size:13px;line-height:1.2;' +
-        'white-space:nowrap;flex-shrink:0;font-family:inherit;transition:transform 0.15s,border-color 0.15s;" ' +
+        'border-radius:999px;padding:6px 11px;font-size:12.5px;line-height:1.2;' +
+        'font-family:inherit;transition:transform 0.15s,border-color 0.15s;max-width:100%;" ' +
         'onmouseover="this.style.transform=\'translateY(-1px)\';this.style.borderColor=\'' + pc + '\';" ' +
-        'onmouseout="this.style.transform=\'\';this.style.borderColor=\'#e5e7eb\';">' +
+        'onmouseout="this.style.transform=\'\';this.style.borderColor=\'var(--ibot-border)\';">' +
         escapeHtml(label) + '</button>';
+      rendered++;
     }
     if (!pills) return '';
     return (
-      '<div style="padding:0 16px 4px;display:flex;gap:6px;overflow-x:auto;direction:' + locale.dir + ';flex-shrink:0;' +
-      '-webkit-overflow-scrolling:touch;scrollbar-width:none;" ' +
-      'onwheel="if(this.scrollWidth>this.clientWidth){this.scrollLeft+=event.deltaY;event.preventDefault();}">' +
+      '<div style="padding:4px 16px;display:flex;flex-wrap:wrap;gap:6px;direction:' + locale.dir + ';flex-shrink:0;">' +
       pills +
       '</div>'
     );
@@ -1814,6 +1825,32 @@
     pendingAction = null;
     render();
   };
+
+  // ============================================
+  // Stream paint scheduler — coalesces streaming-token updates to one paint
+  // per animation frame. The model can stream 50+ tokens/sec; rewriting the
+  // bubble innerHTML on each one caused visible flicker even with surgical
+  // updates. RAF naturally batches to 60fps and respects browser paint timing.
+  // ============================================
+  var _streamRAF = null;
+  function scheduleStreamPaint() {
+    if (_streamRAF) return;
+    _streamRAF = requestAnimationFrame(function () {
+      _streamRAF = null;
+      var msg = messages[messages.length - 1];
+      if (!msg || msg.role !== 'assistant') return;
+      var streamingEl = document.getElementById('ibot-streaming-bubble');
+      if (streamingEl && !thinkingText) {
+        streamingEl.innerHTML = formatMessage(msg.content, false);
+        var msgsScroll = document.getElementById('ibot-messages');
+        if (msgsScroll) msgsScroll.scrollTop = msgsScroll.scrollHeight;
+      } else {
+        // First paint after thinking dots — full render to swap dot bubble for text bubble.
+        thinkingText = null;
+        render();
+      }
+    });
+  }
 
   // ============================================
   // Toast — transient one-line notification at top of chat panel.
