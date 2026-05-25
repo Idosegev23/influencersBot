@@ -152,6 +152,8 @@
         ratingNegative: 'תודה — נשתפר.',
         transcriptLink: 'שלח/י לי את השיחה',
         transcriptSent: 'נשלח למייל ✓',
+        navigatePrompt: 'רוצה שאקח אותך לעמוד הזה?',
+        navigateOpen: 'בואו נעבור',
       },
       order: {
         title: 'מעקב הזמנה',
@@ -264,6 +266,8 @@
         ratingNegative: 'Thanks — we\'ll improve.',
         transcriptLink: 'Email me this chat',
         transcriptSent: 'Sent to your email ✓',
+        navigatePrompt: 'Want me to take you there?',
+        navigateOpen: 'Go to page',
       },
       order: {
         title: 'Order tracking',
@@ -1623,6 +1627,10 @@
       fileInput.onchange = function (e) {
         var f = e.target.files && e.target.files[0];
         if (!f) return;
+        // Snapshot current input values BEFORE re-rendering — otherwise the
+        // new DOM is rebuilt from supportForm state (which doesn't know what
+        // the visitor just typed), wiping their work on every upload tick.
+        readSupportInputs();
         supportForm.attachmentUploading = true; supportForm.attachment = null;
         render();
         var fd = new FormData();
@@ -1688,8 +1696,19 @@
   function renderActionCard(action, pc) {
     if (!action || !action.type) return '';
     var s = locale.support;
-    var label = action.label || s.actionPrompt;
-    var open = s.actionOpen;
+    // Type-specific defaults so each action card has a sensible button label
+    // when the model didn't supply a custom one. Bot's `label` always wins.
+    var defaultsByType = {
+      open_support: { prompt: s.actionPrompt, open: s.actionOpen },
+      capture_lead: { prompt: locale.lead.actionPrompt, open: locale.lead.actionOpen },
+      book_demo: { prompt: locale.bookDemo.actionPrompt, open: locale.bookDemo.actionOpen },
+      track_order: { prompt: locale.order.actionPrompt, open: locale.order.actionOpen },
+      navigate: { prompt: s.navigatePrompt, open: s.navigateOpen },
+      apply_coupon: { prompt: s.actionPrompt, open: s.actionOpen },
+    };
+    var d = defaultsByType[action.type] || defaultsByType.open_support;
+    var label = action.label || d.prompt;
+    var open = d.open;
     var dismiss = s.actionDismiss;
     return (
       '<div style="display:flex;justify-content:flex-end;margin-bottom:12px;animation:ibot-msg-in 0.3s ease-out;">' +
@@ -1719,6 +1738,25 @@
       openBookDemoForm(act.prefill || {});
     } else if (act.type === 'track_order') {
       openOrderForm(act.prefill || {});
+    } else if (act.type === 'navigate' && act.prefill && act.prefill.url) {
+      // Navigation flow: widget.js runs in the customer's page (or our preview
+      // proxy iframe — both same-origin to the iframe). Navigating top-level
+      // takes the visitor to the target page. window.top guards against being
+      // sandboxed somewhere we can't navigate.
+      var navUrl = String(act.prefill.url);
+      widgetTrack('widget_navigate_confirmed', { url: navUrl.slice(0, 200) });
+      try {
+        if (window.top && window.top !== window) {
+          window.top.location.href = navUrl;
+        } else {
+          window.location.href = navUrl;
+        }
+      } catch (e) {
+        // Cross-origin top frame — fall back to opening in a new tab.
+        window.open(navUrl, '_blank', 'noopener');
+      }
+      pendingAction = null;
+      render();
     } else if (act.type === 'apply_coupon' && act.prefill && act.prefill.code) {
       // Two-pronged coupon flow:
       //   1) postMessage to host site for programmatic cart application

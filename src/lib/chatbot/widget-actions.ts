@@ -16,7 +16,7 @@
  * Bestie blast radius: zero. Imported only from `widget-chat-handler.ts`.
  */
 
-export type WidgetActionType = 'open_support' | 'capture_lead' | 'book_demo' | 'apply_coupon' | 'track_order';
+export type WidgetActionType = 'open_support' | 'capture_lead' | 'book_demo' | 'apply_coupon' | 'track_order' | 'navigate';
 
 export interface WidgetAction {
   type: WidgetActionType;
@@ -62,7 +62,7 @@ export function stripAction(text: string): { cleanText: string; action: WidgetAc
     const parsed = JSON.parse(match[1].trim());
     if (parsed && typeof parsed.type === 'string') {
       const t = parsed.type as WidgetActionType;
-      const allowed: WidgetActionType[] = ['open_support', 'capture_lead', 'book_demo', 'apply_coupon', 'track_order'];
+      const allowed: WidgetActionType[] = ['open_support', 'capture_lead', 'book_demo', 'apply_coupon', 'track_order', 'navigate'];
       if (allowed.includes(t)) {
         action = {
           type: t,
@@ -119,6 +119,13 @@ export function buildActionsBlock(modules: WidgetModulesFlags, language: 'he' | 
       ? `• track_order — propose when visitor asks "where is my order", "tracking", "when will it arrive", or mentions a specific order number. Prefill: { orderNumber?, email? } only if they actually told you these values. Don't propose for general FAQ about shipping policy — only when they want STATUS of their own order.`
       : `• track_order — הציע/י כשהלקוח/ה שואל/ת "איפה ההזמנה שלי", "מעקב", "מתי יגיע", או מזכיר/ה מספר הזמנה ספציפי. Prefill: { orderNumber?, email? } רק אם נמסרו ערכים אמיתיים. אל תציע/י לשאלות כלליות על מדיניות משלוח — רק כשרוצים סטטוס של ההזמנה שלהם.`);
   }
+  // Navigate is ALWAYS available — it's a navigation hint, not a feature module.
+  // The bot uses it when a specific page on this site would clearly answer the
+  // question better than continuing the conversation (e.g. visitor asks "how
+  // much does X cost" and there's a pricing page).
+  lines.push(isEn
+    ? `• navigate — propose when a specific page on this site would directly answer the visitor's question (pricing, contact, a specific product, docs). Prefill: { url: "https://full-url" OR "/relative-path", label?: "short context label" }. Use the URL from page context or the visitor's message; don't invent URLs. Don't propose for general questions — only when there's a clear destination page.`
+    : `• navigate — הציע/י כשעמוד ספציפי באתר ייתן תשובה ישירה לשאלת המבקר/ת (מחירים, צור קשר, מוצר ספציפי, מסמכים). Prefill: { url: "https://full-url" או "/relative-path", label?: "תיאור קצר" }. השתמש/י ב-URL מההקשר של העמוד או מהודעת המבקר/ת; אל תמציא/י URL. אל תציע/י לשאלות כלליות — רק כשיש יעד ברור.`);
 
   const header = isEn
     ? `🎯 CONCIERGE ACTIONS — you can propose ONE inline action per turn when appropriate.`

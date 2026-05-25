@@ -9,7 +9,7 @@ import { checkInfluencerAuth } from '@/lib/auth/influencer-auth';
 import { emitServerConversion } from '@/lib/analytics/server-track';
 import { requireAdminAuth } from '@/lib/auth/admin-auth';
 import { autoAssignNewTicket } from '@/lib/support/auto-assign';
-import { sendEmail } from '@/lib/email';
+import { sendEmail, sendEmailWithAttachments } from '@/lib/email';
 
 // ============================================
 // CORS — opens this route for cross-origin POSTs from embedded widgets.
@@ -293,7 +293,46 @@ export async function POST(req: NextRequest) {
   <div style="max-width:620px;margin:12px auto 0;font-size:11px;color:#9ca3af;text-align:center">Sent by BestieAI on behalf of ${htmlEscape(influencer.display_name)}</div>
 </body></html>`;
 
-      sendEmail({ to: supportEmail, subject, html })
+      // Attachment handling — if the widget uploaded a file with the ticket,
+      // download it server-side and attach to the email as a real MIME part.
+      // Falls back to the URL-only email when the attachment can't be fetched
+      // (storage hiccup, file removed) so the ticket still goes out.
+      const attachmentUrl: string | undefined = typeof metadata?.attachment_url === 'string'
+        ? metadata.attachment_url
+        : undefined;
+      const attachmentFilename: string | undefined = typeof metadata?.attachment_filename === 'string'
+        ? metadata.attachment_filename
+        : undefined;
+
+      const dispatchEmail = async () => {
+        if (attachmentUrl) {
+          try {
+            const fileRes = await Promise.race([
+              fetch(attachmentUrl),
+              new Promise<Response>((_, reject) =>
+                setTimeout(() => reject(new Error('attachment fetch timeout')), 8000),
+              ),
+            ]);
+            if (fileRes.ok) {
+              const buf = Buffer.from(await fileRes.arrayBuffer());
+              const mimeType = fileRes.headers.get('content-type') || 'application/octet-stream';
+              const filename = attachmentFilename
+                || decodeURIComponent(attachmentUrl.split('/').pop() || 'attachment');
+              return sendEmailWithAttachments({
+                to: supportEmail,
+                subject,
+                html,
+                attachments: [{ filename, content: buf, mimeType }],
+              });
+            }
+            console.warn('[Support] Attachment fetch non-OK:', fileRes.status, '— falling back to link-only email');
+          } catch (e: any) {
+            console.warn('[Support] Attachment fetch failed:', e?.message || e, '— falling back to link-only email');
+          }
+        }
+        return sendEmail({ to: supportEmail, subject, html });
+      };
+      dispatchEmail()
         .then((r) => {
           if (!r.success) console.warn('[Support] Email notify failed:', r.error);
         })
