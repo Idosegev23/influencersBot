@@ -31,8 +31,11 @@ function isOriginAllowed(origin: string, accountDomain?: string): boolean {
     const url = new URL(origin);
     // Always allow localhost / dev
     if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') return true;
-    // Allow our own domain
-    if (url.hostname.endsWith('.vercel.app') || url.hostname.endsWith('bestieai.co.il')) return true;
+    // Allow our own domains (including the admin preview iframe which
+    // proxies the customer site under bestie.* subdomains).
+    if (url.hostname.endsWith('.vercel.app')
+      || url.hostname.endsWith('bestieai.co.il')
+      || url.hostname.endsWith('ldrsgroup.com')) return true;
     // Allow the account's registered domain
     if (accountDomain && url.hostname.endsWith(accountDomain.replace(/^www\./, ''))) return true;
   } catch { /* invalid URL */ }
