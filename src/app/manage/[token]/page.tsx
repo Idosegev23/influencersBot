@@ -127,6 +127,10 @@ export default function ManagePage() {
   const [shopifyToken, setShopifyToken] = useState('');
   const [shopifyEnabled, setShopifyEnabled] = useState(false);
   const [shopifyHasToken, setShopifyHasToken] = useState(false);
+  // Navigation links — pages the bot can offer to navigate visitors to
+  // (catalog, contact, pricing, etc). Without these the bot can't propose
+  // navigate actions because it's instructed never to invent URLs.
+  const [navLinks, setNavLinks] = useState<{ label: string; url: string }[]>([]);
 
   // Live preview state
   const [showLivePreview, setShowLivePreview] = useState(false);
@@ -197,6 +201,7 @@ export default function ManagePage() {
         // Never pre-fill the token input — server doesn't return it. Empty input
         // means "don't change"; the customer pastes a new value only on rotation.
         setShopifyToken('');
+        setNavLinks(Array.isArray(w.navigation_links) ? w.navigation_links : []);
         if (data.displayName) setDisplayName(data.displayName);
         if (data.domain) setDomain(data.domain);
       }
@@ -263,6 +268,7 @@ export default function ManagePage() {
             leads: { enabled: modLeads },
             bookings: { enabled: modBookings },
           },
+          navigation_links: navLinks.filter((l) => l.label.trim() && l.url.trim()),
           theme: { darkMode },
           supportEmail,
           integrations: {
@@ -1442,7 +1448,56 @@ export default function ManagePage() {
                   )}
                 </div>
 
-                {/* ============ Card 3: Shopify Integration ============ */}
+                {/* ============ Card 3: Navigation links — pages the bot can offer to take visitors to ============ */}
+                <div className="bg-white p-4 sm:p-8 rounded-xl" style={customShadow}>
+                  <div className="flex items-center gap-3 mb-5">
+                    <span className="material-symbols-outlined text-[#575a8c]" style={{ fontSize: 22 }}>link</span>
+                    <div>
+                      <h3 className="text-lg sm:text-xl font-bold text-[#1e1b15]">קיצורי ניווט לבוט</h3>
+                      <p className="text-sm text-[#655e51]">דפים שהבוט יכול להציע להוביל אליהם (קטלוג, מחירים, צור קשר). בלי זה הבוט לא יציע ניווט כי הוא מנוע מלהמציא URLs.</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {navLinks.map((link, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={link.label}
+                          onChange={(e) => setNavLinks((prev) => prev.map((l, idx) => idx === i ? { ...l, label: e.target.value } : l))}
+                          placeholder="קטלוג"
+                          className="w-32 px-3 py-2 rounded-xl text-sm outline-none border border-[#c6c6c6]"
+                          style={{ backgroundColor: '#faf2e9' }}
+                        />
+                        <input
+                          type="text"
+                          value={link.url}
+                          onChange={(e) => setNavLinks((prev) => prev.map((l, idx) => idx === i ? { ...l, url: e.target.value } : l))}
+                          placeholder="/catalog או https://..."
+                          dir="ltr"
+                          className="flex-1 px-3 py-2 rounded-xl text-sm outline-none border border-[#c6c6c6] font-mono"
+                          style={{ backgroundColor: '#faf2e9' }}
+                        />
+                        <button
+                          onClick={() => setNavLinks((prev) => prev.filter((_, idx) => idx !== i))}
+                          className="w-9 h-9 rounded-full border border-[#c6c6c6] text-[#655e51] hover:text-red-600 hover:border-red-300 flex items-center justify-center"
+                          title="מחק"
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => setNavLinks((prev) => [...prev, { label: '', url: '' }])}
+                      className="mt-1 px-3 py-2 rounded-full text-sm font-medium bg-[#e1e0ff] text-[#575a8c] hover:bg-[#d4d3ff] flex items-center gap-1.5"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add</span>
+                      הוסף עמוד
+                    </button>
+                  </div>
+                </div>
+
+                {/* ============ Card 4: Shopify Integration ============ */}
                 <div className="bg-white p-4 sm:p-8 rounded-xl" style={customShadow}>
                   <div className="flex items-center gap-3 mb-5">
                     <span className="material-symbols-outlined text-[#575a8c]" style={{ fontSize: 22 }}>local_shipping</span>

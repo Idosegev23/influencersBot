@@ -124,8 +124,8 @@ export function buildActionsBlock(modules: WidgetModulesFlags, language: 'he' | 
   // question better than continuing the conversation (e.g. visitor asks "how
   // much does X cost" and there's a pricing page).
   lines.push(isEn
-    ? `• navigate — propose when a specific page on this site would directly answer the visitor's question (pricing, contact, a specific product, docs). Prefill: { url: "https://full-url" OR "/relative-path", label?: "short context label" }. Use the URL from page context or the visitor's message; don't invent URLs. Don't propose for general questions — only when there's a clear destination page.`
-    : `• navigate — הציע/י כשעמוד ספציפי באתר ייתן תשובה ישירה לשאלת המבקר/ת (מחירים, צור קשר, מוצר ספציפי, מסמכים). Prefill: { url: "https://full-url" או "/relative-path", label?: "תיאור קצר" }. השתמש/י ב-URL מההקשר של העמוד או מהודעת המבקר/ת; אל תמציא/י URL. אל תציע/י לשאלות כלליות — רק כשיש יעד ברור.`);
+    ? `• navigate — propose when a specific page on this site would directly answer the visitor's question (pricing, contact, catalog, a specific product, docs). Prefill: { url: "https://full-url" OR "/relative-path", label?: "short context label" }. Use URLs from the KNOWN PAGES block below, the page context, or links the visitor mentioned; don't invent URLs. Don't propose for general questions — only when there's a clear destination page.`
+    : `• navigate — הציע/י כשעמוד ספציפי באתר ייתן תשובה ישירה לשאלת המבקר/ת (מחירים, צור קשר, קטלוג, מוצר ספציפי, מסמכים). Prefill: { url: "https://full-url" או "/relative-path", label?: "תיאור קצר" }. השתמש/י ב-URLs מבלוק KNOWN PAGES למטה, מההקשר של העמוד, או מהודעת המבקר/ת; אל תמציא/י URL. אל תציע/י לשאלות כלליות — רק כשיש יעד ברור.`);
 
   const header = isEn
     ? `🎯 CONCIERGE ACTIONS — you can propose ONE inline action per turn when appropriate.`
@@ -250,6 +250,34 @@ export interface ReturningVisitor {
   firstName?: string | null;
   lastTopic?: string | null;
   visitCount?: number;
+}
+
+/**
+ * Navigation links — curated list of important pages the bot should know about
+ * so it can offer `navigate` actions confidently. Without this, the model is
+ * instructed never to invent URLs, so it can't propose taking the visitor
+ * anywhere except pages it sees in page context or the visitor's message.
+ *
+ * Each entry: { label: "Catalog", url: "/catalog" } or absolute URL.
+ */
+export interface NavigationLink {
+  label: string;
+  url: string;
+  description?: string; // optional one-line hint when to suggest this page
+}
+
+export function buildNavigationLinksBlock(links: NavigationLink[] | null | undefined, language: 'he' | 'en'): string | null {
+  if (!Array.isArray(links) || !links.length) return null;
+  const isEn = language === 'en';
+  const header = isEn
+    ? `🔗 KNOWN PAGES ON THIS SITE — when a visitor's question maps to one of these, propose a navigate action with the matching URL:`
+    : `🔗 עמודים ידועים באתר — כשהשאלה של המבקר/ת מתאימה לאחד מהם, הציע/י navigate action עם ה-URL המתאים:`;
+  const list = links
+    .filter((l) => l && typeof l.label === 'string' && typeof l.url === 'string')
+    .slice(0, 20)
+    .map((l) => `• ${l.label} → ${l.url}${l.description ? ` (${l.description})` : ''}`)
+    .join('\n');
+  return `${header}\n${list}`;
 }
 
 export function buildReturningVisitorBlock(visitor: ReturningVisitor | null, language: 'he' | 'en'): string | null {

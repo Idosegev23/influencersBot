@@ -779,6 +779,7 @@ ${input.mode === 'widget' && input.widgetConfig?._pageContextBlock ? `\n${input.
 ${input.mode === 'widget' && input.widgetConfig?._recommendationBlock ? `\n${input.widgetConfig._recommendationBlock}\n` : ''}
 ${input.mode === 'widget' && input.widgetConfig?._objectionBlock ? `\n${input.widgetConfig._objectionBlock}\n` : ''}
 ${input.mode === 'widget' && input.widgetConfig?._actionsBlock ? `\n${input.widgetConfig._actionsBlock}\n` : ''}
+${input.mode === 'widget' && input.widgetConfig?._navigationLinksBlock ? `\n${input.widgetConfig._navigationLinksBlock}\n` : ''}
 ${input.mode === 'widget' ? `\n🔀 PRODUCT COMPARISON — when the visitor explicitly mentions or asks about TWO specific products, recommend exactly those two (not more) and set stage:"comparing" in <<INTENT>>. The UI will render them side-by-side automatically. For single-product asks or broader browsing, stick to stack layout.\n` : ''}
 💬 סגנון שיחה — פרסונלי ומכוון:
 • **שאלות רחבות** ("יש לך מתכון לפסטה?"): רמוז/י שיש לך כמה אפשרויות ותשאל/י שאלה מכוונת — "שמנת או עגבניות? משהו מהיר ליומיום או לאירוח?" — כדי לתת בדיוק מה שצריך.

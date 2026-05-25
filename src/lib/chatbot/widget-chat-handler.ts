@@ -23,10 +23,12 @@ import {
   buildActionsBlock,
   buildPageContextBlock,
   buildReturningVisitorBlock,
+  buildNavigationLinksBlock,
   type WidgetAction,
   type WidgetModulesFlags,
   type PageContext,
   type ReturningVisitor,
+  type NavigationLink,
 } from './widget-actions';
 
 // ============================================
@@ -243,6 +245,15 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
   }
   const returningVisitorBlock = buildReturningVisitorBlock(returningVisitor, lang);
 
+  // Navigation links — curated by the account owner via /manage/[token].
+  // Gives the bot specific URLs to propose `navigate` actions to (catalog,
+  // pricing, contact, etc). Without this the bot can't navigate anywhere
+  // because it's instructed never to invent URLs.
+  const navigationLinks: NavigationLink[] = Array.isArray((config.widget as any)?.navigation_links)
+    ? (config.widget as any).navigation_links
+    : [];
+  const navigationLinksBlock = buildNavigationLinksBlock(navigationLinks, lang);
+
   const widgetConfigWithRecs = {
     ...(config.widget || {}),
     _recommendationBlock: recommendationBlock,
@@ -250,6 +261,7 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
     ...(actionsBlock ? { _actionsBlock: actionsBlock } : {}),
     ...(pageContextBlock ? { _pageContextBlock: pageContextBlock } : {}),
     ...(returningVisitorBlock ? { _returningVisitorBlock: returningVisitorBlock } : {}),
+    ...(navigationLinksBlock ? { _navigationLinksBlock: navigationLinksBlock } : {}),
   };
 
   try {

@@ -775,12 +775,16 @@
              '<button onclick="window.__ibotRate(' + mi + ',\'down\')" title="לא" style="background:transparent;border:1px solid var(--ibot-border);border-radius:999px;width:26px;height:26px;cursor:pointer;color:var(--ibot-text-muted);font-size:13px;display:flex;align-items:center;justify-content:center;font-family:inherit;">👎</button>' +
              '</div>')
           : '';
+        // Mark the actively-streaming bubble so delta events can update its
+        // text directly without re-rendering the whole panel (which caused
+        // visible flicker, scroll jumps, and input focus loss on every token).
+        var streamingId = isLast && isLoading ? ' id="ibot-streaming-bubble"' : '';
         msgsHtml +=
           '<div style="display:flex;flex-direction:column;align-items:flex-end;margin-bottom:12px;animation:ibot-msg-in 0.3s ease-out;">' +
           '<div style="display:flex;align-items:flex-end;gap:8px;max-width:85%;">' +
           '<div style="width:20px;height:20px;flex-shrink:0;">' +
           avatarHtml(20) + '</div>' +
-          '<div style="padding:9px 12px;border-radius:30px;font-size:16px;line-height:1.5;' +
+          '<div' + streamingId + ' style="padding:9px 12px;border-radius:30px;font-size:16px;line-height:1.5;' +
           'background:var(--ibot-bot-bubble-bg);color:var(--ibot-bot-bubble-text);word-break:break-word;">' +
           formatMessage(m.content, false) +
           '</div></div>' + ratingRow + '</div>';
@@ -1048,7 +1052,6 @@
                   thinkingText = event.text;
                   render();
                 } else if (event.type === 'delta' && event.text) {
-                  thinkingText = null;
                   fullText += event.text;
                   // Strip all three envelope types while streaming so partial
                   // tokens never flash on screen (incl. <<ACTION>> which arrives
@@ -1059,7 +1062,22 @@
                     .replace(/<<ACTION>>[\s\S]*/g, '')
                     .trim();
                   messages[messages.length - 1].content = displayText;
-                  render();
+                  // Surgical DOM update — replace just the streaming bubble's
+                  // inner HTML instead of rebuilding the whole panel on every
+                  // token. Full render() is reserved for structural changes
+                  // (typing indicator → first text, cards arriving, intent/action
+                  // events). Falls back to render() when the bubble isn't in DOM
+                  // yet (first token after thinking indicator).
+                  var streamingEl = document.getElementById('ibot-streaming-bubble');
+                  if (streamingEl && !thinkingText) {
+                    streamingEl.innerHTML = formatMessage(displayText, false);
+                    var msgsScroll = document.getElementById('ibot-messages');
+                    if (msgsScroll) msgsScroll.scrollTop = msgsScroll.scrollHeight;
+                  } else {
+                    // First token after thinking dots — swap to text bubble via full render.
+                    thinkingText = null;
+                    render();
+                  }
                 } else if (event.type === 'intent') {
                   // Phase 2: persist last topic for next-page-load chip relevance.
                   // Track for analytics. Layout is already encoded in the cards event.
