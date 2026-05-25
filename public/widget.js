@@ -1017,6 +1017,7 @@
               var clean = fullText
                 .replace(/<<SUGGESTIONS>>[\s\S]*?<<\/SUGGESTIONS>>/g, '')
                 .replace(/<<INTENT>>[\s\S]*?<<\/INTENT>>/g, '')
+                .replace(/<<ACTION>>[\s\S]*?<<\/ACTION>>/g, '')
                 .trim();
               // Find the bot text message (cards messages may have been pushed
               // after it; walk backwards to the first assistant text node).
@@ -1049,11 +1050,13 @@
                 } else if (event.type === 'delta' && event.text) {
                   thinkingText = null;
                   fullText += event.text;
-                  // Strip both <<SUGGESTIONS>> and <<INTENT>> while streaming
-                  // so partial envelope tokens never flash on screen.
+                  // Strip all three envelope types while streaming so partial
+                  // tokens never flash on screen (incl. <<ACTION>> which arrives
+                  // mid-stream before the server can finalize the action event).
                   var displayText = fullText
                     .replace(/<<SUGGESTIONS>>[\s\S]*/g, '')
                     .replace(/<<INTENT>>[\s\S]*/g, '')
+                    .replace(/<<ACTION>>[\s\S]*/g, '')
                     .trim();
                   messages[messages.length - 1].content = displayText;
                   render();
