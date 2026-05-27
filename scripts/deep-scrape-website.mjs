@@ -313,6 +313,18 @@ async function scrapePage(url) {
     $('.cookie-banner, .popup, #cookie-consent, .cookie-notice').remove();
     $('nav, footer, header').remove();
 
+    // Inline-preserve hyperlinks so coupon/affiliate URLs survive .text() extraction.
+    // Critical for coupon-curator sites where the href IS the data (amzn.to/, reutbuy.me/, etc.).
+    $('a[href]').each((_, el) => {
+      const $a = $(el);
+      let href = ($a.attr('href') || '').trim();
+      const anchorText = $a.text().trim();
+      if (!href || !anchorText) return;
+      if (href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+      if (href.startsWith('/')) href = `${SITE_URL}${href}`;
+      $a.replaceWith(`${anchorText} (${href})`);
+    });
+
     // --- Metadata ---
     const title = $('title').text().trim() || $('h1').first().text().trim() || '';
     const description =

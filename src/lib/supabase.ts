@@ -544,6 +544,8 @@ export interface Brand {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  discount_value: number | null;
+  discount_type: string | null;
 }
 
 /**
@@ -561,7 +563,7 @@ export async function getBrandsByInfluencer(influencerId: string): Promise<Brand
   const partnershipBrandsNested = await Promise.all(partnerships.map(async (p) => {
     const { data: coupons } = await supabase
       .from('coupons')
-      .select('id, code, description')
+      .select('id, code, description, discount_value, discount_type, tracking_url, brand_link')
       .eq('partnership_id', p.id)
       .eq('is_active', true);
 
@@ -573,7 +575,7 @@ export async function getBrandsByInfluencer(influencerId: string): Promise<Brand
         brand_name: p.brand_name,
         description: c.description || p.brief,
         coupon_code: c.code,
-        link: p.link,
+        link: c.tracking_url || c.brand_link || p.link,
         short_link: p.short_link,
         category: p.category,
         whatsapp_phone: p.whatsapp_phone,
@@ -581,6 +583,8 @@ export async function getBrandsByInfluencer(influencerId: string): Promise<Brand
         is_active: p.is_active || false,
         created_at: p.created_at,
         updated_at: p.updated_at,
+        discount_value: c.discount_value ? Number(c.discount_value) : null,
+        discount_type: c.discount_type || null,
       }));
     }
 
@@ -599,6 +603,8 @@ export async function getBrandsByInfluencer(influencerId: string): Promise<Brand
       is_active: p.is_active || false,
       created_at: p.created_at,
       updated_at: p.updated_at,
+      discount_value: null,
+      discount_type: null,
     }];
   }));
   const partnershipBrands = partnershipBrandsNested.flat();
@@ -631,6 +637,8 @@ export async function getBrandsByInfluencer(influencerId: string): Promise<Brand
     is_active: c.is_active || false,
     created_at: c.created_at,
     updated_at: c.updated_at,
+    discount_value: c.discount_value ? Number(c.discount_value) : null,
+    discount_type: c.discount_type || null,
   }));
 
   // 4. Combine all brands - show ALL partnerships, with or without coupons

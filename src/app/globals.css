@@ -2553,6 +2553,175 @@ h1, h2, h3, h4, h5, h6 {
   color: rgba(103, 103, 103, 0.6);
 }
 
+/* ── Coupon Card v3 — large card with 2 full-width actions (copy + visit) ── */
+.coupons-grid-v3 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  width: 100%;
+}
+@media (min-width: 768px) {
+  .coupons-grid-v3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.coupon-card-v3 {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #fff;
+  border-radius: 20px;
+  padding: 14px 14px 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.04);
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+}
+.coupon-card-v3:hover {
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.06), 0 8px 20px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+.coupon-card-v3__head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.coupon-card-v3__avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: #f4f5f7;
+}
+.coupon-card-v3__avatar--letter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Heebo', sans-serif;
+  font-weight: 600;
+  font-size: 18px;
+  color: #0c1013;
+  background: #f1e9fd;
+}
+
+.coupon-card-v3__head-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+.coupon-card-v3__title {
+  font-family: 'Heebo', sans-serif;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 22px;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+.coupon-card-v3__subtitle {
+  font-family: 'Heebo', sans-serif;
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 18px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 2px 0 0;
+}
+.coupon-card-v3__badge {
+  flex-shrink: 0;
+  background: rgba(34, 197, 94, 0.15);
+  color: #16a34a;
+  font-family: 'Heebo', sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1;
+  padding: 6px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.coupon-card-v3__actions {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+.coupon-card-v3__btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 11px 14px;
+  border-radius: 14px;
+  font-family: 'Heebo', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 0.12s ease, background 0.15s ease, border-color 0.15s ease;
+  min-width: 0;
+}
+.coupon-card-v3__btn:active {
+  transform: scale(0.98);
+}
+.coupon-card-v3__btn-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+.coupon-card-v3__btn-icon {
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.coupon-card-v3__btn--code {
+  background: rgba(34, 197, 94, 0.12);
+  color: #15803d;
+}
+.coupon-card-v3__btn--code:hover {
+  background: rgba(34, 197, 94, 0.2);
+}
+.coupon-card-v3__btn--code.is-copied {
+  background: rgba(34, 197, 94, 0.25);
+  color: #15803d;
+}
+.coupon-card-v3__btn--link {
+  background: #0f172a;
+  color: #ffffff;
+}
+.coupon-card-v3__btn--link:hover {
+  background: #1e293b;
+}
+
+.coupons-section-title {
+  font-family: 'Heebo', sans-serif;
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 24px;
+  color: #0f172a;
+  margin: 0;
+}
+.coupons-section-subtitle {
+  font-family: 'Heebo', sans-serif;
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 18px;
+  color: #64748b;
+  margin: 2px 0 0;
+}
+
 /* ── Problem Type Grid (Figma 403:1953) ── */
 .selected-product-pill {
   background: rgba(241, 233, 253, 0.8);

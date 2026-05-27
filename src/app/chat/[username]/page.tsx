@@ -2134,23 +2134,6 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
               >
                 <div className="px-4 py-6">
                   <div className={`mx-auto coupons-flow-container ${isMobile ? 'max-w-2xl' : 'max-w-[700px]'}`}>
-                    <div className="mb-4 px-3">
-                      <h2 className="support-title">קופונים</h2>
-                      <p className="support-subtitle">הנחות בלעדיות בשבילכם</p>
-                    </div>
-
-                    {/* Search by brand */}
-                    <div className="support-search mb-3">
-                      <input
-                        type="text"
-                        value={couponSearch}
-                        onChange={e => setCouponSearch(e.target.value)}
-                        placeholder="חיפוש לפי מותג"
-                        dir="rtl"
-                      />
-                      <span className="support-search-icon" aria-hidden />
-                    </div>
-
                     {(() => {
                       const q = couponSearch.trim().toLowerCase();
                       const matches = (b: typeof brands[number]) =>
@@ -2162,7 +2145,6 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                       // Attribution-aware filter: when the visitor came in via
                       // ?ref=<slug> (an influencer link), only show that
                       // influencer's coupon — not the other influencers'.
-                      // Direct visits (no ref) see all coupons as before.
                       const ref = (refSourceRef.current || '').toLowerCase();
                       const registry = ((influencer as any)?._rawConfig?.influencer_registry || []) as Array<{ slug: string; coupon_code?: string }>;
                       const refSlugs = new Set(registry.map((it) => (it.slug || '').toLowerCase()));
@@ -2175,68 +2157,132 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                       const isInfluencerCoupon = (b: typeof brands[number]) => {
                         const code = (b.coupon_code || '').toLowerCase();
                         if (!code) return false;
-                        // a coupon is "an influencer coupon" if its code matches
-                        // any registered slug or coupon_code in the registry
-                        return refSlugs.has(code)
-                          || [...slugCouponMap.values()].includes(code);
+                        return refSlugs.has(code) || [...slugCouponMap.values()].includes(code);
                       };
                       const visibleByRef = (b: typeof brands[number]) => {
-                        if (!ref) return true;             // direct visit — show all
-                        if (!isInfluencerCoupon(b)) return true; // non-influencer coupon → always show
-                        // Influencer coupon: show only if it's THIS ref's coupon
+                        if (!ref) return true;
+                        if (!isInfluencerCoupon(b)) return true;
                         const myCode = slugCouponMap.get(ref) || ref;
                         return (b.coupon_code || '').toLowerCase() === myCode;
                       };
                       const active = brands.filter(b => b.coupon_code && matches(b) && visibleByRef(b));
-                      const partnerships = brands.filter(b => !b.coupon_code && matches(b));
+                      const recommendations = brands.filter(b => !b.coupon_code && b.link && matches(b));
+
+                      const formatDiscount = (b: typeof brands[number]) => {
+                        if (!b.discount_value || b.discount_value === 0) return null;
+                        if (b.discount_type === 'percentage') return `${b.discount_value}% הנחה`;
+                        if (b.discount_type === 'fixed') return `₪${b.discount_value} הנחה`;
+                        return null;
+                      };
+
+                      const renderCard = (brand: typeof brands[number]) => {
+                        const letter = (brand.brand_name || '').trim().charAt(0).toUpperCase();
+                        const isCopied = copiedCode === brand.id;
+                        const discount = formatDiscount(brand);
+                        return (
+                          <div key={brand.id} className="coupon-card-v3">
+                            <div className="coupon-card-v3__head">
+                              {brand.image_url ? (
+                                <img
+                                  src={getProxiedImageUrl(brand.image_url)}
+                                  alt={brand.brand_name}
+                                  className="coupon-card-v3__avatar"
+                                />
+                              ) : (
+                                <div className="coupon-card-v3__avatar coupon-card-v3__avatar--letter">
+                                  {letter}
+                                </div>
+                              )}
+                              <div className="coupon-card-v3__head-text">
+                                <p className="coupon-card-v3__title">{brand.brand_name}</p>
+                                {(brand.category || brand.description) && (
+                                  <p className="coupon-card-v3__subtitle">
+                                    {[brand.category, brand.description].filter(Boolean).join(' • ')}
+                                  </p>
+                                )}
+                              </div>
+                              {discount && (
+                                <span className="coupon-card-v3__badge">{discount}</span>
+                              )}
+                            </div>
+                            <div className="coupon-card-v3__actions">
+                              {brand.coupon_code && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyCode(brand.coupon_code!, brand.id)}
+                                  className={`coupon-card-v3__btn coupon-card-v3__btn--code${isCopied ? ' is-copied' : ''}`}
+                                  title="העתק קוד"
+                                >
+                                  <span className="coupon-card-v3__btn-label">
+                                    {isCopied ? '✓ הועתק!' : brand.coupon_code}
+                                  </span>
+                                  {!isCopied && <span className="coupon-card-v3__btn-icon" aria-hidden>📋</span>}
+                                </button>
+                              )}
+                              {brand.link && (
+                                <a
+                                  href={brand.link}
+                                  target="_blank"
+                                  rel="noopener noreferrer nofollow sponsored"
+                                  onClick={() => trackEvent('link_opened', { brandName: brand.brand_name, link: brand.link! })}
+                                  className="coupon-card-v3__btn coupon-card-v3__btn--link"
+                                  title="פתח את האתר"
+                                >
+                                  <span className="coupon-card-v3__btn-label">לאתר</span>
+                                  <span className="coupon-card-v3__btn-icon" aria-hidden>↗</span>
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      };
 
                       return (
                         <>
+                          <div className="mb-4 px-3">
+                            <h2 className="support-title">קופונים</h2>
+                            <p className="support-subtitle">
+                              {active.length > 0 || recommendations.length > 0
+                                ? `${active.length} קופונים פעילים${recommendations.length > 0 ? ` · ${recommendations.length} המלצות` : ''}`
+                                : 'הנחות בלעדיות בשבילכם'}
+                            </p>
+                          </div>
+
+                          {/* Search by brand */}
+                          <div className="support-search mb-4">
+                            <input
+                              type="text"
+                              value={couponSearch}
+                              onChange={e => setCouponSearch(e.target.value)}
+                              placeholder="חיפוש לפי מותג או קוד"
+                              dir="rtl"
+                            />
+                            <span className="support-search-icon" aria-hidden />
+                          </div>
+
                           {/* Active coupons */}
                           {active.length > 0 && (
-                            <div className={isMobile ? 'flex flex-col gap-2' : 'coupons-grid'}>
-                              {active.map((brand) => {
-                                const letter = (brand.brand_name || '').trim().charAt(0).toUpperCase();
-                                const isCopied = copiedCode === brand.id;
-                                return (
-                                  <div key={brand.id} className="coupon-card-v2">
-                                    <div className="flex gap-3 items-center min-w-0 flex-1">
-                                      {brand.image_url ? (
-                                        <img
-                                          src={getProxiedImageUrl(brand.image_url)}
-                                          alt={brand.brand_name}
-                                          className="w-10 h-10 rounded-xl object-cover flex-shrink-0"
-                                        />
-                                      ) : (
-                                        <div className="support-letter-avatar" style={{ background: '#f4f5f7', color: '#0c1013' }}>
-                                          {letter}
-                                        </div>
-                                      )}
-                                      <div className="flex flex-col min-w-0 flex-1 overflow-hidden">
-                                        <p className="coupon-card-title">{brand.brand_name}</p>
-                                        {brand.description && (
-                                          <p className="coupon-card-subtitle">{brand.description}</p>
-                                        )}
-                                      </div>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleCopyCode(brand.coupon_code!, brand.id)}
-                                      className={`coupon-code-chip${isCopied ? ' copied' : ''}`}
-                                    >
-                                      {isCopied ? '✓ הועתק!' : brand.coupon_code}
-                                    </button>
-                                  </div>
-                                );
-                              })}
+                            <div className="coupons-grid-v3">
+                              {active.map(renderCard)}
                             </div>
                           )}
 
-                          {/* Partnerships section removed — only show actual coupons */}
+                          {/* Recommendations (no code, just affiliate link) */}
+                          {recommendations.length > 0 && (
+                            <>
+                              <div className="mt-6 mb-3 px-3">
+                                <h3 className="coupons-section-title">המלצות שלי</h3>
+                                <p className="coupons-section-subtitle">מוצרים שווים שאני אוהבת — לחיצה פותחת באתר</p>
+                              </div>
+                              <div className="coupons-grid-v3">
+                                {recommendations.map(renderCard)}
+                              </div>
+                            </>
+                          )}
 
-                          {active.length === 0 && (
+                          {active.length === 0 && recommendations.length === 0 && (
                             <p className="text-center text-sm mt-8" style={{ color: '#999' }}>
-                              {q ? 'לא נמצאו קופונים התואמים לחיפוש' : 'אין קופונים כרגע'}
+                              {q ? 'לא נמצאו תוצאות התואמות לחיפוש' : 'אין קופונים כרגע'}
                             </p>
                           )}
                         </>
