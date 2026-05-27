@@ -2224,11 +2224,22 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                   href={brand.link}
                                   target="_blank"
                                   rel="noopener noreferrer nofollow sponsored"
-                                  onClick={() => trackEvent('link_opened', { brandName: brand.brand_name, link: brand.link! })}
+                                  onClick={() => {
+                                    // Auto-copy the code so the user lands at the
+                                    // affiliate checkout with it already in their
+                                    // clipboard — one click less than "copy then visit".
+                                    if (brand.coupon_code) {
+                                      handleCopyCode(brand.coupon_code, brand.id);
+                                      trackEvent('coupon_copied', { brandName: brand.brand_name, couponCode: brand.coupon_code });
+                                    }
+                                    trackEvent('link_opened', { brandName: brand.brand_name, link: brand.link!, autoCopied: !!brand.coupon_code });
+                                  }}
                                   className="coupon-card-v3__btn coupon-card-v3__btn--link"
-                                  title="פתח את האתר"
+                                  title={brand.coupon_code ? 'מעתיק את הקוד ופותח את האתר' : 'פתח את האתר'}
                                 >
-                                  <span className="coupon-card-v3__btn-label">לאתר</span>
+                                  <span className="coupon-card-v3__btn-label">
+                                    {brand.coupon_code ? 'העתק וצא לאתר' : 'לאתר'}
+                                  </span>
                                   <span className="coupon-card-v3__btn-icon" aria-hidden>↗</span>
                                 </a>
                               )}
