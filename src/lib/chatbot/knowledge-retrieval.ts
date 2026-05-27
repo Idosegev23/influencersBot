@@ -276,6 +276,8 @@ export async function retrieveKnowledge(
     ragWebsites = ragKnowledge.websites;
     // Merge RAG partnerships with direct DB partnerships
     partnerships.push(...ragKnowledge.partnerships);
+    // Merge RAG knowledge_base chunks into manualKnowledge so they reach the prompt
+    manualKnowledge.push(...ragKnowledge.manualKnowledge);
   } else {
     posts = results.posts || [];
     transcriptions = results.transcriptions || [];
@@ -539,12 +541,14 @@ function mapRAGSourcesToKnowledge(sources: RetrievedSource[]): {
   highlights: InstagramHighlight[];
   partnerships: Partnership[];
   websites: WebsiteContent[];
+  manualKnowledge: ManualKnowledgeEntry[];
 } {
   const posts: InstagramPost[] = [];
   const transcriptions: VideoTranscription[] = [];
   const highlights: InstagramHighlight[] = [];
   const partnerships: Partnership[] = [];
   const websites: WebsiteContent[] = [];
+  const manualKnowledge: ManualKnowledgeEntry[] = [];
 
   for (const source of sources) {
     switch (source.entityType) {
@@ -601,10 +605,18 @@ function mapRAGSourcesToKnowledge(sources: RetrievedSource[]): {
           description: source.excerpt,
         });
         break;
+      case 'knowledge_base':
+        manualKnowledge.push({
+          id: source.documentId,
+          knowledge_type: (source.metadata.knowledgeType as string) || 'knowledge_base',
+          title: source.title,
+          content: source.excerpt,
+        });
+        break;
     }
   }
 
-  return { posts, transcriptions, highlights, partnerships, websites };
+  return { posts, transcriptions, highlights, partnerships, websites, manualKnowledge };
 }
 
 function extractKeywordsFromMessage(message: string): string[] {
