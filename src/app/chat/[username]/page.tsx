@@ -2230,7 +2230,14 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                       };
 
                       const renderCard = (brand: typeof brands[number]) => {
-                        const letter = (brand.brand_name || '').trim().charAt(0).toUpperCase();
+                        // brand.description is the product name (mapped from
+                        // partnerships.brief). brand.brand_name is the store
+                        // (אמזון UK / אליאקספרס / וואלה שופס). For an
+                        // aggregator influencer, the product matters more
+                        // than the store — promote it to the title.
+                        const productName = brand.description || brand.brand_name;
+                        const storeLine = [brand.brand_name, brand.category].filter(Boolean).join(' • ');
+                        const letter = (productName || '').trim().charAt(0).toUpperCase();
                         const isCopied = copiedCode === brand.id;
                         const discount = formatDiscount(brand);
                         const dateLabel = formatDate(brand.last_seen_at);
@@ -2240,20 +2247,19 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                               {brand.image_url ? (
                                 <img
                                   src={getProxiedImageUrl(brand.image_url)}
-                                  alt={brand.brand_name}
-                                  className="coupon-card-v3__avatar"
+                                  alt={productName}
+                                  className="coupon-card-v3__avatar coupon-card-v3__avatar--product"
+                                  loading="lazy"
                                 />
                               ) : (
-                                <div className="coupon-card-v3__avatar coupon-card-v3__avatar--letter">
+                                <div className="coupon-card-v3__avatar coupon-card-v3__avatar--product coupon-card-v3__avatar--letter">
                                   {letter}
                                 </div>
                               )}
                               <div className="coupon-card-v3__head-text">
-                                <p className="coupon-card-v3__title">{brand.brand_name}</p>
-                                {(brand.category || brand.description) && (
-                                  <p className="coupon-card-v3__subtitle">
-                                    {[brand.category, brand.description].filter(Boolean).join(' • ')}
-                                  </p>
+                                <p className="coupon-card-v3__title">{productName}</p>
+                                {storeLine && (
+                                  <p className="coupon-card-v3__subtitle">{storeLine}</p>
                                 )}
                               </div>
                               {discount && (

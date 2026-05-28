@@ -580,7 +580,7 @@ export async function getBrandsByInfluencer(influencerId: string): Promise<Brand
         short_link: p.short_link,
         category: p.category,
         whatsapp_phone: p.whatsapp_phone,
-        image_url: p.brand_logo_url || null,
+        image_url: (p as any).image_url || p.brand_logo_url || null,
         is_active: p.is_active || false,
         created_at: p.created_at,
         updated_at: p.updated_at,
@@ -601,7 +601,9 @@ export async function getBrandsByInfluencer(influencerId: string): Promise<Brand
       short_link: p.short_link,
       category: p.category,
       whatsapp_phone: p.whatsapp_phone,
-      image_url: p.brand_logo_url || null,
+      // Prefer the per-product image (scraped from the recommendation page);
+      // fall back to the brand logo if we only have brand-level data.
+      image_url: (p as any).image_url || p.brand_logo_url || null,
       is_active: p.is_active || false,
       created_at: p.created_at,
       updated_at: p.updated_at,
