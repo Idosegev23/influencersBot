@@ -355,11 +355,18 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [supportForm, setSupportForm] = useState({ name: '', phone: '', message: '' });
   const [supportLoading, setSupportLoading] = useState(false);
   const [supportSuccess, setSupportSuccess] = useState(false);
-  const [problemStep, setProblemStep] = useState<'brands' | 'form' | 'success'>('brands');
+  const [problemStep, setProblemStep] = useState<'brands' | 'product_picker' | 'form' | 'success'>('brands');
   const [problemBrand, setProblemBrand] = useState<Brand | null>(null);
   const [problemForm, setProblemForm] = useState({ name: '', phone: '', order: '', details: '' });
   const [problemLoading, setProblemLoading] = useState(false);
   const [problemError, setProblemError] = useState<string | null>(null);
+  // Product picker state — used when a support_categories entry has
+  // action: 'product_picker' (aggregator influencers with hundreds of items).
+  // Search-first UX: empty state shows nothing; results appear as the user types.
+  const [pickerProducts, setPickerProducts] = useState<Array<{ id: string; name: string; name_he?: string | null; image_url?: string | null; brand?: string | null; product_url?: string | null }>>([]);
+  const [pickerLoaded, setPickerLoaded] = useState(false);
+  const [pickerQuery, setPickerQuery] = useState('');
+  const [pickerSelectedProduct, setPickerSelectedProduct] = useState<{ id: string; name: string; image_url?: string | null; product_url?: string | null } | null>(null);
   const [supportState, setSupportState] = useState<SupportState | null>(null);
   const [currentTraceId, setCurrentTraceId] = useState<string | null>(null);
   const [currentDecisionId, setCurrentDecisionId] = useState<string | null>(null);
@@ -402,11 +409,21 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
         description?: string;
         icon?: string;
         // 'link' = clicking opens action_url directly (e.g. credit-card signup);
+        // 'product_picker' = opens search-first product picker before the form
+        //   (use for aggregator influencers with hundreds of partnerships);
         // 'form' (default) = opens the problem-form flow.
-        action?: 'form' | 'link';
+        action?: 'form' | 'link' | 'product_picker';
         action_url?: string;
       }>
     | undefined;
+
+  // SVG icon (mask-image) by category id — emojis in config.icon are
+  // ignored for display; the id determines the visual.
+  const SUPPORT_CATEGORY_ICON: Record<string, string> = {
+    product_issue: 'baaya_motzar',
+    cc_signup: 'bonus-alt',
+    cc_issue: 'problem-payment',
+  };
   const supportCategoryById = useMemo(() => {
     const m = new Map<string, NonNullable<typeof supportCategoryOverride>[number]>();
     for (const c of supportCategoryOverride || []) m.set(c.id, c);
@@ -431,7 +448,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       return supportCategoryOverride.map((c) => ({
         id: c.id,
         influencer_id: influencer?.id || '',
-        brand_name: c.icon ? `${c.icon} ${c.label}` : c.label,
+        brand_name: c.label,
         description: c.description || null,
         coupon_code: null,
         link: null,
@@ -473,8 +490,41 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       setProblemBrand(null);
       setProblemForm({ name: '', phone: '', order: '', details: '' });
       setProblemError(null);
+      setPickerQuery('');
+      setPickerSelectedProduct(null);
     }
   }, [activeTab]);
+
+  // Lazy-load picker products on first entry to the picker step.
+  // We pull the full catalogue once and filter client-side — keeps the
+  // typing experience instant. For 700+ items the payload is still small.
+  useEffect(() => {
+    if (problemStep !== 'product_picker' || pickerLoaded || !influencer?.id) return;
+    let cancelled = false;
+    fetch(`/api/influencer/content/products?accountId=${encodeURIComponent(influencer.id)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        setPickerProducts(Array.isArray(data?.products) ? data.products : []);
+        setPickerLoaded(true);
+      })
+      .catch(() => {
+        if (!cancelled) setPickerLoaded(true);
+      });
+    return () => { cancelled = true; };
+  }, [problemStep, pickerLoaded, influencer?.id]);
+
+  const pickerResults = useMemo(() => {
+    const q = pickerQuery.trim().toLowerCase();
+    if (q.length < 2) return [];
+    return pickerProducts
+      .filter((p) => {
+        const name = (p.name_he || p.name || '').toLowerCase();
+        const brand = (p.brand || '').toLowerCase();
+        return name.includes(q) || brand.includes(q);
+      })
+      .slice(0, 10);
+  }, [pickerProducts, pickerQuery]);
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -673,13 +723,6 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       is_conference: isConferenceMode,
     });
 
-    // Pair: end the session (and flush analytics) when the page unmounts
-    // via SPA navigation. visibilitychange/pagehide already covered by
-    // startSessionTracker for browser-level tear-down.
-    return () => {
-      endSessionTracker('manual');
-    };
-
     // Preload discovery categories for the empty state (skip for media_news — uses hot topics instead)
     fetch(`/api/discovery/categories?username=${encodeURIComponent(username)}`)
       .then(res => res.ok ? res.json() : null)
@@ -715,6 +758,13 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       const stored = localStorage.getItem(`chat_lead_${username}`);
       if (stored) setLeadInfo(JSON.parse(stored));
     } catch {}
+
+    // Pair: end the session (and flush analytics) when the page unmounts
+    // via SPA navigation. visibilitychange/pagehide already covered by
+    // startSessionTracker for browser-level tear-down.
+    return () => {
+      endSessionTracker('manual');
+    };
   }, [username]);
 
   // ── analytics: keep context current for every track() call ──
@@ -1430,6 +1480,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
           customerPhone: problemForm.phone,
           orderNumber: problemForm.order || null,
           problem: problemForm.details,
+          productId: pickerSelectedProduct?.id || null,
           sessionId: sessionId || null,
           refSource: refSourceRef.current || null,
         }),
@@ -1440,6 +1491,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
         source: 'problem_form',
         brand: problemBrand.brand_name,
         has_order: !!problemForm.order,
+        product_id: pickerSelectedProduct?.id || null,
       });
       setProblemStep('success');
     } catch (err) {
@@ -1455,6 +1507,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     setProblemForm({ name: '', phone: '', order: '', details: '' });
     setProblemError(null);
     setProblemLoading(false);
+    setPickerQuery('');
+    setPickerSelectedProduct(null);
   };
 
   if (loading) {
@@ -2534,6 +2588,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             {uniqueBrands.map((brand) => {
                               const cat = supportCategoryById.get(brand.id);
                               const isLink = cat?.action === 'link' && cat?.action_url;
+                              const iconName = SUPPORT_CATEGORY_ICON[brand.id];
                               const commonInner = (
                                 <>
                                   {brand.image_url ? (
@@ -2542,6 +2597,17 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                       alt={brand.brand_name}
                                       className="w-10 h-10 rounded-xl object-cover flex-shrink-0"
                                     />
+                                  ) : iconName ? (
+                                    <div className="support-card-icon-avatar">
+                                      <span
+                                        className="support-icon"
+                                        style={{
+                                          WebkitMaskImage: `url('/icons/categories/${iconName}.svg')`,
+                                          maskImage: `url('/icons/categories/${iconName}.svg')`,
+                                        }}
+                                        aria-hidden
+                                      />
+                                    </div>
                                   ) : (
                                     <div className="support-letter-avatar">
                                       {brand.brand_name.charAt(0).toUpperCase()}
@@ -2574,7 +2640,13 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                   key={brand.id}
                                   onClick={() => {
                                     setProblemBrand(brand);
-                                    setProblemStep('form');
+                                    if (cat?.action === 'product_picker') {
+                                      setPickerQuery('');
+                                      setPickerSelectedProduct(null);
+                                      setProblemStep('product_picker');
+                                    } else {
+                                      setProblemStep('form');
+                                    }
                                   }}
                                   className="support-card"
                                 >
@@ -2582,6 +2654,116 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                 </button>
                               );
                             })}
+                          </div>
+                        </motion.div>
+                      )}
+
+                      {/* ---- STEP 1b: Product picker (search-first) ---- */}
+                      {problemStep === 'product_picker' && problemBrand && (
+                        <motion.div
+                          key="problem-picker"
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -20 }}
+                        >
+                          <div className="mb-4 px-3 flex items-start justify-between">
+                            <div>
+                              <h2 className="support-title">באיזה מוצר?</h2>
+                              <p className="support-subtitle">חפשו את שם המוצר או המותג</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setProblemStep('brands');
+                                setProblemBrand(null);
+                                setPickerQuery('');
+                                setPickerSelectedProduct(null);
+                              }}
+                              className="support-back-btn"
+                              aria-label="חזרה"
+                            >
+                              <span className="support-back-icon" aria-hidden />
+                            </button>
+                          </div>
+
+                          <div className="px-3 mb-3 relative">
+                            <input
+                              type="text"
+                              value={pickerQuery}
+                              onChange={(e) => setPickerQuery(e.target.value)}
+                              placeholder="לדוגמה: מקציף סבון, אמזון, בלנדר..."
+                              className="support-form-input w-full"
+                              autoFocus
+                            />
+                            <span className="support-search-icon" aria-hidden />
+                          </div>
+
+                          <div className={isMobile ? 'flex flex-col gap-2' : 'support-brand-grid'}>
+                            {pickerQuery.trim().length < 2 ? (
+                              <p className="text-center text-sm py-8" style={{ color: '#999' }}>
+                                {pickerLoaded ? 'התחילו להקליד כדי לחפש מוצר' : 'טוען מוצרים...'}
+                              </p>
+                            ) : pickerResults.length === 0 ? (
+                              <button
+                                onClick={() => {
+                                  setPickerSelectedProduct(null);
+                                  setProblemStep('form');
+                                }}
+                                className="support-card"
+                              >
+                                <div className="support-card-icon-avatar">
+                                  <span
+                                    className="support-icon"
+                                    style={{
+                                      WebkitMaskImage: "url('/icons/categories/product.svg')",
+                                      maskImage: "url('/icons/categories/product.svg')",
+                                    }}
+                                    aria-hidden
+                                  />
+                                </div>
+                                <div className="support-card-text">
+                                  <p className="support-card-title">לא מצאתי? המשיכו בלי לבחור מוצר</p>
+                                  <p className="support-card-subtitle">תוכלו לתאר את הבעיה בכל מקרה</p>
+                                </div>
+                              </button>
+                            ) : (
+                              pickerResults.map((p) => {
+                                const name = p.name_he || p.name;
+                                return (
+                                  <button
+                                    key={p.id}
+                                    onClick={() => {
+                                      setPickerSelectedProduct({
+                                        id: p.id,
+                                        name,
+                                        image_url: p.image_url || null,
+                                        product_url: p.product_url || null,
+                                      });
+                                      setProblemStep('form');
+                                    }}
+                                    className="support-card"
+                                  >
+                                    {p.image_url ? (
+                                      <img
+                                        src={getProxiedImageUrl(p.image_url)}
+                                        alt={name}
+                                        className="w-10 h-10 rounded-xl object-cover flex-shrink-0"
+                                      />
+                                    ) : (
+                                      <div className="support-letter-avatar">
+                                        {name.charAt(0).toUpperCase()}
+                                      </div>
+                                    )}
+                                    <div className="support-card-text">
+                                      <p className="support-card-title">{name}</p>
+                                      {p.brand && (
+                                        <p className="support-card-subtitle">{p.brand}</p>
+                                      )}
+                                    </div>
+                                  </button>
+                                );
+                              })
+                            )}
                           </div>
                         </motion.div>
                       )}
@@ -2602,10 +2784,16 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             <button
                               type="button"
                               onClick={() => {
-                                setProblemStep('brands');
-                                setProblemBrand(null);
-                                setProblemForm({ name: '', phone: '', order: '', details: '' });
-                                setProblemError(null);
+                                const cameFromPicker = supportCategoryById.get(problemBrand.id)?.action === 'product_picker';
+                                if (cameFromPicker) {
+                                  setPickerSelectedProduct(null);
+                                  setProblemStep('product_picker');
+                                } else {
+                                  setProblemStep('brands');
+                                  setProblemBrand(null);
+                                  setProblemForm({ name: '', phone: '', order: '', details: '' });
+                                  setProblemError(null);
+                                }
                               }}
                               className="support-back-btn"
                               aria-label="חזרה"
@@ -2625,6 +2813,20 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                               )}
                               <span className="flex-1 text-right">{problemBrand.brand_name}</span>
                             </div>
+
+                            {/* Selected product pill — shown when user picked
+                                a specific product via the search-first picker */}
+                            {pickerSelectedProduct && (
+                              <div className="support-brand-pill">
+                                {pickerSelectedProduct.image_url && (
+                                  <img
+                                    src={getProxiedImageUrl(pickerSelectedProduct.image_url)}
+                                    alt={pickerSelectedProduct.name}
+                                  />
+                                )}
+                                <span className="flex-1 text-right">{pickerSelectedProduct.name}</span>
+                              </div>
+                            )}
 
                             {/* Form fields — pill inputs (Figma 471:8076) */}
                             <div className={isMobile ? 'flex flex-col gap-3' : 'support-form-row'}>
