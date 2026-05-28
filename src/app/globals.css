@@ -2722,6 +2722,145 @@ h1, h2, h3, h4, h5, h6 {
   margin: 2px 0 0;
 }
 
+/* ── Filter bar (search + sort) ── */
+.coupons-filterbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 8px 4px;
+  border-radius: 12px;
+}
+.coupons-filterbar__search {
+  flex: 1;
+  position: relative;
+}
+.coupons-filterbar__search input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  font-family: 'Heebo', sans-serif;
+  font-size: 15px;
+  color: #0f172a;
+  outline: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.coupons-filterbar__search input:focus {
+  border-color: #0f172a;
+  background: #fff;
+}
+.coupons-filterbar__search input::-webkit-search-cancel-button { display: none; }
+.coupons-filterbar__clear {
+  position: absolute;
+  inset-inline-start: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.coupons-filterbar__clear:hover { background: #cbd5e1; }
+.coupons-filterbar__sort {
+  flex-shrink: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  font-family: 'Heebo', sans-serif;
+  font-size: 14px;
+  color: #0f172a;
+  font-weight: 500;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path fill='%2364748b' d='M2 4l4 4 4-4z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: left 12px center;
+  padding-inline-start: 32px;
+}
+
+/* ── Category chips (horizontal scroll on mobile) ── */
+.coupons-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 0 -16px 4px;
+  padding: 4px 16px 10px;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+.coupons-chips::-webkit-scrollbar { display: none; }
+.coupons-chip {
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #475569;
+  font-family: 'Heebo', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.coupons-chip:hover {
+  background: #f1f5f9;
+}
+.coupons-chip.is-active {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #fff;
+}
+.coupons-chip__count {
+  background: rgba(15, 23, 42, 0.08);
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 2px 7px;
+  line-height: 1.4;
+}
+.coupons-chip.is-active .coupons-chip__count {
+  background: rgba(255, 255, 255, 0.2);
+  color: #f8fafc;
+}
+
+/* ── Date badge on card ── */
+.coupon-card-v3 {
+  position: relative;
+}
+.coupon-card-v3__date {
+  display: block;
+  margin: 4px 2px 0;
+  font-family: 'Heebo', sans-serif;
+  font-size: 11px;
+  color: #94a3b8;
+  text-align: start;
+  letter-spacing: 0.2px;
+}
+
 /* ── Problem Type Grid (Figma 403:1953) ── */
 .selected-product-pill {
   background: rgba(241, 233, 253, 0.8);

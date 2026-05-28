@@ -344,6 +344,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [couponSearch, setCouponSearch] = useState('');
+  const [couponCategory, setCouponCategory] = useState<string>(''); // '' = all
+  const [couponSort, setCouponSort] = useState<'newest' | 'oldest' | 'discount' | 'name'>('newest');
   const [tapCount, setTapCount] = useState(0);
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [supportBrand, setSupportBrand] = useState<string>('');
@@ -2135,16 +2137,22 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 <div className="px-4 py-6">
                   <div className={`mx-auto coupons-flow-container ${isMobile ? 'max-w-2xl' : 'max-w-[700px]'}`}>
                     {(() => {
+                      // Smart, multi-token search: every whitespace-separated
+                      // token must appear in at least one searchable field.
                       const q = couponSearch.trim().toLowerCase();
-                      const matches = (b: typeof brands[number]) =>
-                        !q ||
-                        b.brand_name?.toLowerCase().includes(q) ||
-                        (b.description || '').toLowerCase().includes(q) ||
-                        (b.coupon_code || '').toLowerCase().includes(q);
+                      const tokens = q ? q.split(/\s+/).filter(Boolean) : [];
+                      const matches = (b: typeof brands[number]) => {
+                        if (!tokens.length) return true;
+                        const hay = [
+                          b.brand_name,
+                          b.description,
+                          b.coupon_code,
+                          b.category,
+                        ].filter(Boolean).join(' ').toLowerCase();
+                        return tokens.every((t) => hay.includes(t));
+                      };
 
-                      // Attribution-aware filter: when the visitor came in via
-                      // ?ref=<slug> (an influencer link), only show that
-                      // influencer's coupon — not the other influencers'.
+                      // Attribution-aware filter (ref tracking).
                       const ref = (refSourceRef.current || '').toLowerCase();
                       const registry = ((influencer as any)?._rawConfig?.influencer_registry || []) as Array<{ slug: string; coupon_code?: string }>;
                       const refSlugs = new Set(registry.map((it) => (it.slug || '').toLowerCase()));
@@ -2165,20 +2173,67 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         const myCode = slugCouponMap.get(ref) || ref;
                         return (b.coupon_code || '').toLowerCase() === myCode;
                       };
-                      const active = brands.filter(b => b.coupon_code && matches(b) && visibleByRef(b));
-                      const recommendations = brands.filter(b => !b.coupon_code && b.link && matches(b));
+
+                      // Category filter
+                      const inCategory = (b: typeof brands[number]) =>
+                        !couponCategory || b.category === couponCategory;
+
+                      // Sorter
+                      const sortFn = (a: typeof brands[number], b: typeof brands[number]) => {
+                        if (couponSort === 'newest' || couponSort === 'oldest') {
+                          const aD = a.last_seen_at || '';
+                          const bD = b.last_seen_at || '';
+                          if (aD === bD) return 0;
+                          if (couponSort === 'newest') {
+                            if (!aD) return 1;
+                            if (!bD) return -1;
+                            return bD.localeCompare(aD);
+                          }
+                          if (!aD) return 1;
+                          if (!bD) return -1;
+                          return aD.localeCompare(bD);
+                        }
+                        if (couponSort === 'discount') {
+                          return (b.discount_value || 0) - (a.discount_value || 0);
+                        }
+                        return (a.brand_name || '').localeCompare(b.brand_name || '', 'he');
+                      };
+
+                      const visible = brands.filter(b => matches(b) && visibleByRef(b) && inCategory(b));
+                      const active = visible.filter(b => b.coupon_code).sort(sortFn);
+                      const recommendations = visible.filter(b => !b.coupon_code && b.link).sort(sortFn);
+
+                      // All categories (for the chip row) — built from full set, sorted by usage
+                      const categoryCounts = new Map<string, number>();
+                      for (const b of brands) {
+                        if (!b.category) continue;
+                        categoryCounts.set(b.category, (categoryCounts.get(b.category) || 0) + 1);
+                      }
+                      const sortedCats = [...categoryCounts.entries()]
+                        .sort((a, b) => b[1] - a[1])
+                        .slice(0, 20);
 
                       const formatDiscount = (b: typeof brands[number]) => {
                         if (!b.discount_value || b.discount_value === 0) return null;
-                        if (b.discount_type === 'percentage') return `${b.discount_value}% הנחה`;
-                        if (b.discount_type === 'fixed') return `₪${b.discount_value} הנחה`;
+                        if (b.discount_type === 'percentage') return `${b.discount_value}%`;
+                        if (b.discount_type === 'fixed') return `₪${b.discount_value}`;
                         return null;
+                      };
+
+                      const formatDate = (iso: string | null) => {
+                        if (!iso) return null;
+                        const [y, m] = iso.split('-');
+                        if (!y || !m) return null;
+                        const months = ['ינו׳','פבר׳','מרץ','אפר׳','מאי','יוני','יולי','אוג׳','ספט׳','אוק׳','נוב׳','דצמ׳'];
+                        const monthIdx = parseInt(m, 10) - 1;
+                        return `${months[monthIdx] || m} ${y}`;
                       };
 
                       const renderCard = (brand: typeof brands[number]) => {
                         const letter = (brand.brand_name || '').trim().charAt(0).toUpperCase();
                         const isCopied = copiedCode === brand.id;
                         const discount = formatDiscount(brand);
+                        const dateLabel = formatDate(brand.last_seen_at);
                         return (
                           <div key={brand.id} className="coupon-card-v3">
                             <div className="coupon-card-v3__head">
@@ -2225,9 +2280,6 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                   target="_blank"
                                   rel="noopener noreferrer nofollow sponsored"
                                   onClick={() => {
-                                    // Auto-copy the code so the user lands at the
-                                    // affiliate checkout with it already in their
-                                    // clipboard — one click less than "copy then visit".
                                     if (brand.coupon_code) {
                                       handleCopyCode(brand.coupon_code, brand.id);
                                       trackEvent('coupon_copied', { brandName: brand.brand_name, couponCode: brand.coupon_code });
@@ -2244,46 +2296,98 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                 </a>
                               )}
                             </div>
+                            {dateLabel && (
+                              <span className="coupon-card-v3__date" title={brand.last_seen_at || ''}>עודכן {dateLabel}</span>
+                            )}
                           </div>
                         );
                       };
 
                       return (
                         <>
-                          <div className="mb-4 px-3">
+                          <div className="mb-3 px-3">
                             <h2 className="support-title">קופונים</h2>
                             <p className="support-subtitle">
-                              {active.length > 0 || recommendations.length > 0
-                                ? `${active.length} קופונים פעילים${recommendations.length > 0 ? ` · ${recommendations.length} המלצות` : ''}`
-                                : 'הנחות בלעדיות בשבילכם'}
+                              {active.length} קופונים · {recommendations.length} המלצות
                             </p>
                           </div>
 
-                          {/* Search by brand */}
-                          <div className="support-search mb-4">
-                            <input
-                              type="text"
-                              value={couponSearch}
-                              onChange={e => setCouponSearch(e.target.value)}
-                              placeholder="חיפוש לפי מותג או קוד"
-                              dir="rtl"
-                            />
-                            <span className="support-search-icon" aria-hidden />
+                          {/* Sticky filter bar: search + sort */}
+                          <div className="coupons-filterbar">
+                            <div className="coupons-filterbar__search">
+                              <input
+                                type="search"
+                                value={couponSearch}
+                                onChange={e => setCouponSearch(e.target.value)}
+                                placeholder="חיפוש לפי מותג, קוד או קטגוריה"
+                                dir="rtl"
+                                inputMode="search"
+                              />
+                              {couponSearch && (
+                                <button
+                                  type="button"
+                                  onClick={() => setCouponSearch('')}
+                                  className="coupons-filterbar__clear"
+                                  aria-label="נקה חיפוש"
+                                >×</button>
+                              )}
+                            </div>
+                            <select
+                              className="coupons-filterbar__sort"
+                              value={couponSort}
+                              onChange={e => setCouponSort(e.target.value as any)}
+                              aria-label="מיון"
+                            >
+                              <option value="newest">חדש ראשון</option>
+                              <option value="oldest">ישן ראשון</option>
+                              <option value="discount">% הנחה</option>
+                              <option value="name">א-ת</option>
+                            </select>
                           </div>
 
-                          {/* Active coupons */}
-                          {active.length > 0 && (
-                            <div className="coupons-grid-v3">
-                              {active.map(renderCard)}
+                          {/* Category chips */}
+                          {sortedCats.length > 0 && (
+                            <div className="coupons-chips" role="tablist" aria-label="קטגוריות">
+                              <button
+                                type="button"
+                                onClick={() => setCouponCategory('')}
+                                className={`coupons-chip${!couponCategory ? ' is-active' : ''}`}
+                              >
+                                הכל
+                                <span className="coupons-chip__count">{brands.filter(b => b.coupon_code || b.link).length}</span>
+                              </button>
+                              {sortedCats.map(([cat, count]) => (
+                                <button
+                                  key={cat}
+                                  type="button"
+                                  onClick={() => setCouponCategory(cat === couponCategory ? '' : cat)}
+                                  className={`coupons-chip${couponCategory === cat ? ' is-active' : ''}`}
+                                >
+                                  {cat}
+                                  <span className="coupons-chip__count">{count}</span>
+                                </button>
+                              ))}
                             </div>
                           )}
 
-                          {/* Recommendations (no code, just affiliate link) */}
+                          {/* Active coupons */}
+                          {active.length > 0 && (
+                            <>
+                              <div className="mt-4 mb-2 px-3">
+                                <h3 className="coupons-section-title">קופונים פעילים</h3>
+                              </div>
+                              <div className="coupons-grid-v3">
+                                {active.map(renderCard)}
+                              </div>
+                            </>
+                          )}
+
+                          {/* Recommendations */}
                           {recommendations.length > 0 && (
                             <>
-                              <div className="mt-6 mb-3 px-3">
+                              <div className="mt-6 mb-2 px-3">
                                 <h3 className="coupons-section-title">המלצות שלי</h3>
-                                <p className="coupons-section-subtitle">מוצרים שווים שאני אוהבת — לחיצה פותחת באתר</p>
+                                <p className="coupons-section-subtitle">מוצרים שווים — לחיצה פותחת באתר</p>
                               </div>
                               <div className="coupons-grid-v3">
                                 {recommendations.map(renderCard)}
@@ -2293,7 +2397,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
 
                           {active.length === 0 && recommendations.length === 0 && (
                             <p className="text-center text-sm mt-8" style={{ color: '#999' }}>
-                              {q ? 'לא נמצאו תוצאות התואמות לחיפוש' : 'אין קופונים כרגע'}
+                              {q || couponCategory ? 'לא נמצאו תוצאות התואמות לסינון' : 'אין קופונים כרגע'}
                             </p>
                           )}
                         </>

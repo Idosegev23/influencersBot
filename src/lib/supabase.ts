@@ -546,6 +546,7 @@ export interface Brand {
   updated_at: string;
   discount_value: number | null;
   discount_type: string | null;
+  last_seen_at: string | null; // YYYY-MM-DD — from website's "עדכון אחרון" or partnership.start_date
 }
 
 /**
@@ -585,6 +586,7 @@ export async function getBrandsByInfluencer(influencerId: string): Promise<Brand
         updated_at: p.updated_at,
         discount_value: c.discount_value ? Number(c.discount_value) : null,
         discount_type: c.discount_type || null,
+        last_seen_at: (p as any).start_date || null,
       }));
     }
 
@@ -605,6 +607,7 @@ export async function getBrandsByInfluencer(influencerId: string): Promise<Brand
       updated_at: p.updated_at,
       discount_value: null,
       discount_type: null,
+      last_seen_at: (p as any).start_date || null,
     }];
   }));
   const partnershipBrands = partnershipBrandsNested.flat();
@@ -639,6 +642,7 @@ export async function getBrandsByInfluencer(influencerId: string): Promise<Brand
     updated_at: c.updated_at,
     discount_value: c.discount_value ? Number(c.discount_value) : null,
     discount_type: c.discount_type || null,
+    last_seen_at: null,
   }));
 
   // 4. Combine all brands - show ALL partnerships, with or without coupons
