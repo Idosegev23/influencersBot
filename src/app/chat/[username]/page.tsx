@@ -390,16 +390,59 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const streamingMessageIdRef = useRef<string | null>(null);
 
   // Unique brands for problem tab (deduplicate by brand_name, keep first with logo)
-  const uniqueBrands = useMemo(() => {
+  // Support-tab card source. By default we dedup the influencer's brands,
+  // but accounts can override with config.support_categories — used by
+  // aggregator influencers (like reutlev) where the partnership list is
+  // 700+ products and brand-cards make no sense; the audience needs 3 fixed
+  // categories (Product issue / CC signup / CC issue) instead.
+  const supportCategoryOverride = (influencer as any)?._rawConfig?.support_categories as
+    | Array<{ id: string; label: string; description?: string; icon?: string }>
+    | undefined;
+
+  // Reject obvious garbage that leaked into partnerships.brand_name during
+  // extraction (numeric-only, URL fragments, percent signs, single letters).
+  const looksLikeRealBrand = (s: string | null | undefined) => {
+    if (!s) return false;
+    const t = s.trim();
+    if (t.length < 3) return false;
+    if (/^\d+$/.test(t)) return false;
+    if (t.includes('%')) return false;
+    if (/^d7%/i.test(t)) return false;
+    if (/-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+/.test(t)) return false;
+    return true;
+  };
+
+  const uniqueBrands = useMemo<Brand[]>(() => {
+    if (Array.isArray(supportCategoryOverride) && supportCategoryOverride.length > 0) {
+      return supportCategoryOverride.map((c) => ({
+        id: c.id,
+        influencer_id: influencer?.id || '',
+        brand_name: c.icon ? `${c.icon} ${c.label}` : c.label,
+        description: c.description || null,
+        coupon_code: null,
+        link: null,
+        short_link: null,
+        category: null,
+        whatsapp_phone: null,
+        image_url: null,
+        is_active: true,
+        created_at: '',
+        updated_at: '',
+        discount_value: null,
+        discount_type: null,
+        last_seen_at: null,
+      }));
+    }
     const seen = new Map<string, Brand>();
     for (const b of brands) {
+      if (!looksLikeRealBrand(b.brand_name)) continue;
       const existing = seen.get(b.brand_name);
       if (!existing || (!existing.image_url && b.image_url)) {
         seen.set(b.brand_name, b);
       }
     }
     return Array.from(seen.values());
-  }, [brands]);
+  }, [brands, supportCategoryOverride, influencer?.id]);
 
   // Detect mobile viewport
   useEffect(() => {
@@ -2457,7 +2500,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 <div className="px-4 py-6">
                   <div className={`mx-auto support-flow-container ${isMobile ? 'max-w-2xl' : 'max-w-[700px]'}`}>
                     <AnimatePresence mode="wait">
-                      {/* ---- STEP 1: Brand Selection ---- */}
+                      {/* ---- STEP 1: Brand / Category Selection ---- */}
                       {problemStep === 'brands' && (
                         <motion.div
                           key="problem-brands"
@@ -2466,8 +2509,12 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           exit={{ opacity: 0, x: -20 }}
                         >
                           <div className="mb-4 px-3">
-                            <h2 className="support-title">פתיחת פנייה</h2>
-                            <p className="support-subtitle">בחרו את המותג שיש לכם בעיה איתו</p>
+                            <h2 className="support-title">
+                              {supportCategoryOverride ? 'במה אפשר לעזור?' : 'פתיחת פנייה'}
+                            </h2>
+                            <p className="support-subtitle">
+                              {supportCategoryOverride ? 'בחרו את הנושא' : 'בחרו את המותג שיש לכם בעיה איתו'}
+                            </p>
                           </div>
                           <div className={isMobile ? 'flex flex-col gap-2' : 'support-brand-grid'}>
                             {uniqueBrands.map((brand) => (
@@ -2492,6 +2539,9 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                 )}
                                 <div className="support-card-text">
                                   <p className="support-card-title">{brand.brand_name}</p>
+                                  {brand.description && (
+                                    <p className="support-card-subtitle">{brand.description}</p>
+                                  )}
                                 </div>
                               </button>
                             ))}
