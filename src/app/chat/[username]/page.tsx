@@ -396,8 +396,22 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   // 700+ products and brand-cards make no sense; the audience needs 3 fixed
   // categories (Product issue / CC signup / CC issue) instead.
   const supportCategoryOverride = (influencer as any)?._rawConfig?.support_categories as
-    | Array<{ id: string; label: string; description?: string; icon?: string }>
+    | Array<{
+        id: string;
+        label: string;
+        description?: string;
+        icon?: string;
+        // 'link' = clicking opens action_url directly (e.g. credit-card signup);
+        // 'form' (default) = opens the problem-form flow.
+        action?: 'form' | 'link';
+        action_url?: string;
+      }>
     | undefined;
+  const supportCategoryById = useMemo(() => {
+    const m = new Map<string, NonNullable<typeof supportCategoryOverride>[number]>();
+    for (const c of supportCategoryOverride || []) m.set(c.id, c);
+    return m;
+  }, [supportCategoryOverride]);
 
   // Reject obvious garbage that leaked into partnerships.brand_name during
   // extraction (numeric-only, URL fragments, percent signs, single letters).
@@ -2517,34 +2531,57 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             </p>
                           </div>
                           <div className={isMobile ? 'flex flex-col gap-2' : 'support-brand-grid'}>
-                            {uniqueBrands.map((brand) => (
-                              <button
-                                key={brand.id}
-                                onClick={() => {
-                                  setProblemBrand(brand);
-                                  setProblemStep('form');
-                                }}
-                                className="support-card"
-                              >
-                                {brand.image_url ? (
-                                  <img
-                                    src={getProxiedImageUrl(brand.image_url)}
-                                    alt={brand.brand_name}
-                                    className="w-10 h-10 rounded-xl object-cover flex-shrink-0"
-                                  />
-                                ) : (
-                                  <div className="support-letter-avatar">
-                                    {brand.brand_name.charAt(0).toUpperCase()}
-                                  </div>
-                                )}
-                                <div className="support-card-text">
-                                  <p className="support-card-title">{brand.brand_name}</p>
-                                  {brand.description && (
-                                    <p className="support-card-subtitle">{brand.description}</p>
+                            {uniqueBrands.map((brand) => {
+                              const cat = supportCategoryById.get(brand.id);
+                              const isLink = cat?.action === 'link' && cat?.action_url;
+                              const commonInner = (
+                                <>
+                                  {brand.image_url ? (
+                                    <img
+                                      src={getProxiedImageUrl(brand.image_url)}
+                                      alt={brand.brand_name}
+                                      className="w-10 h-10 rounded-xl object-cover flex-shrink-0"
+                                    />
+                                  ) : (
+                                    <div className="support-letter-avatar">
+                                      {brand.brand_name.charAt(0).toUpperCase()}
+                                    </div>
                                   )}
-                                </div>
-                              </button>
-                            ))}
+                                  <div className="support-card-text">
+                                    <p className="support-card-title">{brand.brand_name}</p>
+                                    {brand.description && (
+                                      <p className="support-card-subtitle">{brand.description}</p>
+                                    )}
+                                  </div>
+                                  {isLink && (
+                                    <span className="support-card-arrow" aria-hidden>↗</span>
+                                  )}
+                                </>
+                              );
+                              return isLink ? (
+                                <a
+                                  key={brand.id}
+                                  href={cat!.action_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer nofollow"
+                                  onClick={() => trackEvent('support_link_opened', { category_id: cat!.id, url: cat!.action_url! })}
+                                  className="support-card"
+                                >
+                                  {commonInner}
+                                </a>
+                              ) : (
+                                <button
+                                  key={brand.id}
+                                  onClick={() => {
+                                    setProblemBrand(brand);
+                                    setProblemStep('form');
+                                  }}
+                                  className="support-card"
+                                >
+                                  {commonInner}
+                                </button>
+                              );
+                            })}
                           </div>
                         </motion.div>
                       )}
