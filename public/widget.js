@@ -532,7 +532,7 @@
       }).catch(function () { /* */ });
     } catch (e) { /* */ }
     if (product.productUrl) {
-      window.open(product.productUrl, '_blank', 'noopener');
+      window.open(bestieTag(product.productUrl, 'card'), '_blank', 'noopener');
     }
   }
 
@@ -1168,6 +1168,25 @@
       .replace(/"/g, '&quot;');
   }
 
+  // Stamp Bestie attribution onto outbound store/product links so the click
+  // shows up as source "bestie" in the merchant's analytics (Shopify, GA4…).
+  // Only tags absolute http(s) URLs and never overrides utm_* the merchant set.
+  // `content` distinguishes the surface (card vs inline). Returns the URL
+  // unchanged on any parse failure — attribution must never break a click.
+  function bestieTag(url, content) {
+    if (!url) return url;
+    try {
+      var u = new URL(url, document.baseURI);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') return url;
+      if (!u.searchParams.has('utm_source')) u.searchParams.set('utm_source', 'bestie');
+      if (!u.searchParams.has('utm_medium')) u.searchParams.set('utm_medium', 'chat');
+      if (content && !u.searchParams.has('utm_content')) u.searchParams.set('utm_content', content);
+      return u.href;
+    } catch (e) {
+      return url;
+    }
+  }
+
   // ---- Smart chips row (above input) ----
   // Cap at 3 chips with wrap. Earlier we used overflow-x:auto which felt
   // broken in the 370px panel — a chip got cut off and visitors didn't
@@ -1335,6 +1354,7 @@
           href = new URL(u, document.baseURI).href;
         } catch (e) { /* malformed — fall back to raw */ }
         var isProductLink = href.indexOf('/product') !== -1;
+        if (isProductLink) href = bestieTag(href, 'inline');
         var trackAttr = isProductLink
           ? ' onclick="(function(e){try{fetch((window.IBOT_HOST||\'\')+\'/api/widget/recommendations/click\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({accountId:\'' + config.accountId + '\',productId:null})}).catch(function(){});}catch(x){}})()"'
           : '';
