@@ -10,7 +10,10 @@ export interface CouponValidity {
 
 /** In-memory predicate. Used for filtering already-fetched coupon objects. */
 export function isCouponValid(coupon: CouponValidity, now: Date = new Date()): boolean {
-  if (coupon.is_active === false) return false;
+  // Explicit false or null is invalid (matches the SQL `is_active = true`,
+  // which excludes NULL). Absent field (undefined) stays valid — those
+  // objects came from a source that already filtered is_active upstream.
+  if (coupon.is_active === false || coupon.is_active === null) return false;
   if (coupon.start_date && new Date(coupon.start_date) > now) return false;
   if (coupon.end_date && new Date(coupon.end_date) < now) return false;
   return true;
