@@ -15,6 +15,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
+import { applyActiveCouponFilter } from '@/lib/coupons/active-filter';
 
 interface TabConfig {
   id: string;
@@ -259,10 +260,12 @@ export async function generateTabConfig(accountId: string): Promise<TabGeneratio
   const lang: Lang = (account.language === 'en') ? 'en' : 'he';
 
   // Check coupons
-  const { count: couponCount } = await supabase
-    .from('coupons')
-    .select('id', { count: 'exact', head: true })
-    .eq('account_id', accountId);
+  const { count: couponCount } = await applyActiveCouponFilter(
+    supabase
+      .from('coupons')
+      .select('id', { count: 'exact', head: true })
+      .eq('account_id', accountId)
+  );
 
   // Get entity types from RAG chunks (for coupon detection)
   const { data: etData } = await supabase

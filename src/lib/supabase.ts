@@ -1,4 +1,5 @@
 import { createClient as createSupabaseClient, SupabaseClient } from '@supabase/supabase-js';
+import { applyActiveCouponFilter } from '@/lib/coupons/active-filter';
 import type {
   Influencer,
   Post,
@@ -562,11 +563,12 @@ export async function getBrandsByInfluencer(influencerId: string): Promise<Brand
   
   // 2. For each partnership, create one row PER coupon
   const partnershipBrandsNested = await Promise.all(partnerships.map(async (p) => {
-    const { data: coupons } = await supabase
-      .from('coupons')
-      .select('id, code, description, discount_value, discount_type, tracking_url, brand_link')
-      .eq('partnership_id', p.id)
-      .eq('is_active', true);
+    const { data: coupons } = await applyActiveCouponFilter(
+      supabase
+        .from('coupons')
+        .select('id, code, description, discount_value, discount_type, tracking_url, brand_link')
+        .eq('partnership_id', p.id)
+    );
 
     // If partnership has coupons, create a separate brand row for each coupon
     if (coupons && coupons.length > 0) {
@@ -615,12 +617,13 @@ export async function getBrandsByInfluencer(influencerId: string): Promise<Brand
   const partnershipBrands = partnershipBrandsNested.flat();
 
   // 2. Get standalone coupons (without partnership)
-  const { data: standaloneCoupons, error: couponsError } = await supabase
-    .from('coupons')
-    .select('*')
-    .in('account_id', accountIds)
-    .is('partnership_id', null)
-    .eq('is_active', true)
+  const { data: standaloneCoupons, error: couponsError } = await applyActiveCouponFilter(
+    supabase
+      .from('coupons')
+      .select('*')
+      .in('account_id', accountIds)
+      .is('partnership_id', null)
+  )
     .order('created_at', { ascending: false });
 
   if (couponsError) {
