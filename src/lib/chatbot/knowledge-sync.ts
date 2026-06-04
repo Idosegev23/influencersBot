@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase';
+import { applyActiveCouponFilter } from '@/lib/coupons/active-filter';
 
 /**
  * Sync knowledge base from all sources
@@ -58,17 +59,18 @@ async function syncCouponsToKnowledge(accountId: string) {
   const supabase = createClient();
 
   // Get all active coupons for this account
-  const { data: coupons, error: couponsError } = await supabase
-    .from('coupons')
-    .select(`
-      *,
-      partnership:partnerships(
-        brand_name,
-        campaign_name
-      )
-    `)
-    .eq('account_id', accountId)
-    .eq('is_active', true);
+  const { data: coupons, error: couponsError } = await applyActiveCouponFilter(
+    supabase
+      .from('coupons')
+      .select(`
+        *,
+        partnership:partnerships(
+          brand_name,
+          campaign_name
+        )
+      `)
+      .eq('account_id', accountId)
+  );
 
   if (couponsError) {
     console.error('Failed to fetch coupons:', couponsError);

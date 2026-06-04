@@ -6,6 +6,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
+import { applyActiveCouponFilter } from '@/lib/coupons/active-filter';
 
 // ============================================
 // Types
@@ -96,11 +97,12 @@ export async function searchContentByQuery(
   const isCouponQuery = couponKeywords.some(k => queryLower.includes(k));
 
   if (isCouponQuery) {
-    const { data: coupons } = await supabase
-      .from('coupons')
-      .select('id, code, description, discount_type, discount_value, is_active, created_at')
-      .eq('account_id', accountId)
-      .eq('is_active', true);
+    const { data: coupons } = await applyActiveCouponFilter(
+      supabase
+        .from('coupons')
+        .select('id, code, description, discount_type, discount_value, is_active, created_at')
+        .eq('account_id', accountId)
+    );
 
     if (coupons && coupons.length > 0) {
       metadata.push(...coupons.map(c => ({
@@ -116,12 +118,12 @@ export async function searchContentByQuery(
 
   // Always load coupons as context even for non-coupon queries (they're small)
   if (!isCouponQuery) {
-    const { data: coupons } = await supabase
-      .from('coupons')
-      .select('id, code, description, discount_type, discount_value, is_active, created_at')
-      .eq('account_id', accountId)
-      .eq('is_active', true)
-      .limit(10);
+    const { data: coupons } = await applyActiveCouponFilter(
+      supabase
+        .from('coupons')
+        .select('id, code, description, discount_type, discount_value, is_active, created_at')
+        .eq('account_id', accountId)
+    ).limit(10);
 
     if (coupons && coupons.length > 0) {
       metadata.push(...coupons.map(c => ({

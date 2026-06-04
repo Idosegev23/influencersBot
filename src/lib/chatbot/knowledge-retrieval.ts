@@ -8,6 +8,7 @@ import { retrieveContext } from '@/lib/rag';
 import type { RetrievedSource } from '@/lib/rag';
 import type { ArchetypeType } from './archetypes/types';
 import { getMetrics } from '@/lib/metrics/pipeline-metrics';
+import { applyActiveCouponFilter } from '@/lib/coupons/active-filter';
 
 // ============================================
 // Type Definitions
@@ -959,11 +960,12 @@ async function fetchRelevantCoupons(
       // Fallback: Try simple query without partnerships
       console.warn('⚠️ RPC failed, trying fallback query:', couponsError);
       
-      const { data: fallbackData, error: fallbackError } = await supabase
-        .from('coupons')
-        .select('id, code, brand_name, description, discount_type, discount_value, partnership_id, start_date, end_date')
-        .eq('account_id', accountId)
-        .eq('is_active', true)
+      const { data: fallbackData, error: fallbackError } = await applyActiveCouponFilter(
+        supabase
+          .from('coupons')
+          .select('id, code, brand_name, description, discount_type, discount_value, partnership_id, start_date, end_date')
+          .eq('account_id', accountId)
+      )
         .order('created_at', { ascending: false })
         .limit(100);
       
