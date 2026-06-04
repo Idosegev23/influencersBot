@@ -117,7 +117,7 @@ export async function syncCommerceData(accountId: string): Promise<{
         description: c.description || null,
         discount_type: discountType,
         discount_value: discountValue,
-        is_active: true,
+        is_active: false, // draft — persona-extracted coupons must be activated by a human (no expiry known → would never expire if active)
       };
     });
 
@@ -134,7 +134,7 @@ export async function syncCommerceData(accountId: string): Promise<{
 
   console.log(`[Commerce Sync] ✅ Synced for ${accountId}:`);
   console.log(`  - ${partnershipsCreated} partnerships created (from ${brands.length} brands)`);
-  console.log(`  - ${couponsCreated} coupons created (from ${coupons.length} extracted)`);
+  console.log(`  - ${couponsCreated} coupons created as DRAFTS (from ${coupons.length} extracted; activate manually)`);
 
   return { partnershipsCreated, couponsCreated };
 }
