@@ -22,6 +22,7 @@ import {
   type IGMessagingEvent,
   type GenericTemplateElement,
 } from './client';
+import { applyActiveCouponFilter } from '@/lib/coupons/active-filter';
 
 // ============================================
 // Types
@@ -546,13 +547,12 @@ async function buildCouponCards(
   accountId: string,
 ): Promise<GenericTemplateElement[]> {
   // Fetch active coupons with partnership info
-  const { data: coupons } = await supabase
-    .from('coupons')
-    .select('code, description, discount_type, discount_value, tracking_url, partnership_id')
-    .eq('account_id', accountId)
-    .eq('is_active', true)
-    .or('end_date.is.null,end_date.gte.' + new Date().toISOString())
-    .limit(5);
+  const { data: coupons } = await applyActiveCouponFilter(
+    supabase
+      .from('coupons')
+      .select('code, description, discount_type, discount_value, tracking_url, partnership_id')
+      .eq('account_id', accountId)
+  ).limit(5);
 
   if (!coupons?.length) return [];
 

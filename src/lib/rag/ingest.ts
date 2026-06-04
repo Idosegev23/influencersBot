@@ -398,35 +398,6 @@ async function ingestEntityType(
       break;
     }
 
-    case 'coupon': {
-      const { data: coupons } = await supabase
-        .from('coupons')
-        .select('id, code, description, brand_name, brand_category, discount_type, discount_value, currency, start_date, end_date, brand_link')
-        .eq('account_id', accountId)
-        .eq('is_active', true);
-
-      if (coupons) {
-        for (const c of coupons) {
-          const text = buildCouponText(c);
-          await ingestDocument({
-            accountId,
-            entityType: 'coupon',
-            sourceId: c.id,
-            title: `Coupon: ${c.code} (${c.brand_name || 'Unknown brand'})`,
-            text,
-            metadata: {
-              code: c.code,
-              brandName: c.brand_name,
-              discountType: c.discount_type,
-              discountValue: c.discount_value,
-            },
-          });
-          count++;
-        }
-      }
-      break;
-    }
-
     case 'knowledge_base': {
       const { data: kbs } = await supabase
         .from('chatbot_knowledge_base')
@@ -565,31 +536,11 @@ function buildPartnershipText(p: {
   if (p.status) parts.push(`Status: ${p.status}`);
   if (p.brief) parts.push(`Brief: ${p.brief}`);
   if (p.contract_scope) parts.push(`Scope: ${p.contract_scope}`);
-  if (p.coupon_code) parts.push(`Coupon code: ${p.coupon_code}`);
   if (p.link) parts.push(`Link: ${p.link}`);
   if (p.notes) parts.push(`Notes: ${p.notes}`);
   if (p.deliverables && Array.isArray(p.deliverables) && p.deliverables.length > 0) {
     parts.push('Deliverables: ' + JSON.stringify(p.deliverables));
   }
-  return parts.join('\n');
-}
-
-function buildCouponText(c: {
-  code: string;
-  description?: string | null;
-  brand_name?: string | null;
-  brand_category?: string | null;
-  discount_type: string;
-  discount_value: number;
-  currency?: string | null;
-  brand_link?: string | null;
-}): string {
-  const parts = [`Coupon code: ${c.code}`];
-  if (c.brand_name) parts.push(`Brand: ${c.brand_name}`);
-  if (c.brand_category) parts.push(`Category: ${c.brand_category}`);
-  parts.push(`Discount: ${c.discount_value}${c.discount_type === 'percentage' ? '%' : ` ${c.currency || 'ILS'}`} (${c.discount_type})`);
-  if (c.description) parts.push(`Description: ${c.description}`);
-  if (c.brand_link) parts.push(`Link: ${c.brand_link}`);
   return parts.join('\n');
 }
 

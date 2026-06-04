@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await supabase
       .from('coupons')
-      .select('id, code, brand_name, description, discount_type, discount_value, is_active, partnership_id, created_at')
+      .select('id, code, brand_name, description, discount_type, discount_value, is_active, end_date, partnership_id, created_at')
       .eq('account_id', auth.accountId)
       .order('brand_name', { ascending: true });
 

@@ -26,6 +26,7 @@ interface Coupon {
   discount_type: string;
   discount_value: number;
   is_active: boolean;
+  end_date: string | null;
   partnership_id: string | null;
   copy_count: number | null;
   usage_count: number | null;
@@ -48,6 +49,10 @@ function formatDiscount(type: string, value: number): string {
   if (type === 'free_shipping') return 'משלוח חינם';
   if (type === 'bogo') return '1+1';
   return value ? `${value}` : '—';
+}
+
+function isExpired(c: { end_date: string | null }): boolean {
+  return !!c.end_date && new Date(c.end_date) < new Date();
 }
 
 export default function CouponsPage({
@@ -448,6 +453,13 @@ export default function CouponsPage({
                             {copiedId === coupon.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                             {coupon.code}
                           </button>
+
+                          {/* Expired badge */}
+                          {isExpired(coupon) && (
+                            <span className="ml-2 rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                              {isEn ? 'Expired' : 'פג תוקף'}
+                            </span>
+                          )}
 
                           {/* Brand name */}
                           {coupon.brand_name && (
