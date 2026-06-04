@@ -13,6 +13,8 @@ import {
   type KnowledgeBase,
 } from './knowledge-retrieval';
 import { supabase } from '@/lib/supabase';
+import { scrubTermsFromKB } from '@/lib/coupons/kb-scrub';
+import { getAllCouponCodes } from '@/lib/coupons/active-filter';
 
 // Fallback suggestions per archetype when LLM omits <<SUGGESTIONS>>
 const ARCHETYPE_FALLBACK_SUGGESTIONS: Record<string, string> = {
@@ -239,42 +241,30 @@ export class SandwichBot {
     if (input.bannedTerms && input.bannedTerms.length > 0) {
       const terms = input.bannedTerms.filter((t) => (t || '').trim().length >= 2);
       if (terms.length > 0) {
-        // Sort longest-first so "אורטל אמר" is matched before "אורטל" etc.
-        terms.sort((a, b) => b.length - a.length);
-        const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const re = new RegExp(`(${terms.map(escapeRe).join('|')})`, 'gi');
-        const scrub = (s: any): any =>
-          typeof s === 'string' ? s.replace(re, '███') : s;
-        const scrubObj = (o: any): any => {
-          if (!o || typeof o !== 'object') return o;
-          const out: any = Array.isArray(o) ? [] : {};
-          for (const k of Object.keys(o)) {
-            const v = (o as any)[k];
-            if (typeof v === 'string') out[k] = scrub(v);
-            else if (Array.isArray(v)) out[k] = v.map((it) => (typeof it === 'string' ? scrub(it) : scrubObj(it)));
-            else if (v && typeof v === 'object') out[k] = scrubObj(v);
-            else out[k] = v;
-          }
-          return out;
-        };
-        const scrubbed = scrubObj(knowledgeBase) as KnowledgeBase;
-        // Drop any KB items that became almost-entirely-redacted noise
-        // (e.g. a post whose caption was 90% banned terms — keeping it
-        // would just feed the LLM "███ ███ ███" which is worse than
-        // just removing the row).
-        const tooMuchRedaction = (s: any) => {
-          if (typeof s !== 'string' || s.length === 0) return false;
-          const blocks = (s.match(/███/g) || []).length;
-          return blocks * 3 / s.length > 0.4;
-        };
-        if (Array.isArray(scrubbed.posts)) {
-          scrubbed.posts = scrubbed.posts.filter(
-            (p: any) => !tooMuchRedaction(p?.caption),
-          );
-        }
-        knowledgeBase = scrubbed;
+        knowledgeBase = scrubTermsFromKB(knowledgeBase, terms);
         console.log(`   🛡  Input redaction: scrubbed ${terms.length} banned terms across KB`);
       }
+    }
+
+    // Coupon validity scrub: strip any coupon code that exists for this account
+    // but is NOT currently valid (expired / deactivated / future) from EVERY KB
+    // text field before the LLM sees it. Valid codes live in knowledgeBase.coupons
+    // (already date-filtered) and are left intact. Covers post captions, website
+    // promo terms, highlights, etc. (RAG free-text leaks).
+    try {
+      const validCodes = new Set(
+        (knowledgeBase.coupons || [])
+          .map((c: any) => (c.code || '').toLowerCase())
+          .filter(Boolean)
+      );
+      const allCodes = await getAllCouponCodes(supabase, input.accountId);
+      const invalidCodes = allCodes.filter((code) => !validCodes.has(code.toLowerCase()));
+      if (invalidCodes.length > 0) {
+        knowledgeBase = scrubTermsFromKB(knowledgeBase, invalidCodes);
+        console.log(`   🛡  Coupon scrub: removed ${invalidCodes.length} invalid coupon code(s) from KB`);
+      }
+    } catch (err) {
+      console.error('[SandwichBot] coupon scrub failed (non-fatal):', err);
     }
 
     // If media_news account and "what's new?" intent, inject hot topics
