@@ -7,6 +7,7 @@
  */
 
 import type { KnowledgeBase } from '@/lib/chatbot/knowledge-retrieval';
+import { isCouponValid } from '@/lib/coupons/active-filter';
 
 // ============================================
 // Config
@@ -123,17 +124,13 @@ export function compactKnowledgeContext(
   let context = '';
 
   // 1. Coupons (never truncated, never deduped — they're small and critical)
-  if (kb.coupons?.length > 0) {
-    const now = new Date();
-    const activeCoupons = kb.coupons.filter(c => {
-      if (c.end_date) {
-        return new Date(c.end_date) >= now;
-      }
-      return true;
-    });
-    const expiredCount = kb.coupons.length - activeCoupons.length;
+  const now = new Date();
+  const activeCoupons = (kb.coupons || []).filter(c => isCouponValid(c as any, now));
+  // No valid coupon → say nothing about discounts at all (omit the whole section).
+  if (activeCoupons.length > 0) {
+    const expiredCount = (kb.coupons?.length || 0) - activeCoupons.length;
 
-    let section = `\n💰 **קופונים זמינים (${activeCoupons.length}) - CRITICAL: שמות המותגים יכולים להיות באנגלית או בעברית:**\n`;
+    let section = `\n💰 **קופונים זמינים (${activeCoupons.length}) - CRITICAL: השתמש אך ורק בקודים שברשימה הזו, אל תמציא קוד ואל תזכיר קוד שאינו כאן. שמות המותגים יכולים להיות באנגלית או בעברית:**\n`;
     activeCoupons.forEach((c, i) => {
       section += `${i + 1}. מותג: ${c.brand || c.code}`;
       if (c.discount && !c.discount.includes('לחץ על הקישור')) {
