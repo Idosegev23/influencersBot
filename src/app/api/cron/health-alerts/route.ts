@@ -27,15 +27,21 @@ async function shouldSendAlert(alertKey: string): Promise<boolean> {
   return !lastSent;
 }
 
-async function markAlertSent(alertKey: string): Promise<void> {
+async function markAlertSent(alertKey: string, cooldownSeconds = ALERT_COOLDOWN_SECONDS): Promise<void> {
   if (isRedisAvailable()) {
-    await redisSet(`alert:cooldown:${alertKey}`, Date.now(), ALERT_COOLDOWN_SECONDS);
+    await redisSet(`alert:cooldown:${alertKey}`, Date.now(), cooldownSeconds);
   }
 }
 
+// db-slow is mostly cold-connection noise (the query itself runs in <1ms;
+// the measured ms is the fresh-Lambda DNS+TLS+pooler handshake). Keep a
+// once-a-day ceiling so a genuine sustained slowdown still pages, without
+// the every-hour spam. Real outages (redis-down) keep the 1h default.
+const DB_SLOW_COOLDOWN_SECONDS = 86400;
+
 // ── Thresholds ──
 const THRESHOLDS = {
-  dbLatencyMs: 1000,
+  dbLatencyMs: 3000,
   chatSessionsPerHour: 500,
   redisCommandsPerDay: 8000,
   messagesPerHour: 2000,
@@ -101,7 +107,7 @@ export async function GET(req: NextRequest) {
         details: `Query: SELECT count(*) FROM accounts\nLatency: ${dbLatency}ms`,
         adminEmails: ADMIN_EMAILS,
       });
-      await markAlertSent('db-slow');
+      await markAlertSent('db-slow', DB_SLOW_COOLDOWN_SECONDS);
       alerts.push('db-slow');
     }
   }
