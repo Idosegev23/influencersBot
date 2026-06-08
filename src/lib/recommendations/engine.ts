@@ -455,9 +455,12 @@ function buildPromptBlock(products: ProductRecommendation[]): string {
 
   for (let i = 0; i < products.length; i++) {
     const p = products[i];
+    // Use explicit labels for sale prices, NOT markdown strikethrough — the LLM
+    // misreads "~~₪129~~ ₪38" and sometimes reports the struck-through original
+    // as the current price. Payable price first, original clearly labelled.
     const priceStr = p.price
       ? (p.isOnSale && p.originalPrice
-        ? `~~₪${p.originalPrice}~~ ₪${p.price}`
+        ? `₪${p.price} (מבצע! מחיר מקורי ₪${p.originalPrice})`
         : `₪${p.price}`)
       : '';
     // Prefer the Hebrew name so a he-IL bot can bind the price to the product the
@@ -473,6 +476,7 @@ function buildPromptBlock(products: ProductRecommendation[]): string {
 
   lines.push('');
   lines.push('כשאתה ממליץ על מוצרים, שלב אותם בצורה טבעית בתשובה. הסבר למה המוצר מתאים. אם הלקוח לא שאל על מוצרים — אל תדחוף, אבל אם יש הזדמנות טבעית — הצע.');
+  lines.push('חשוב: ציין תמיד את המחיר בדיוק כפי שמופיע למעלה. כשמצוין "מחיר מקורי" — המחיר לתשלום הוא המחיר הנמוך שלפניו; אל תציג את המחיר המקורי כמחיר הנוכחי, ולעולם אל תמציא מחיר.');
 
   return lines.join('\n');
 }
