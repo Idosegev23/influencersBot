@@ -110,6 +110,7 @@ export async function GET() {
         chunksCount: chunksCount || 0,
         productsCount: productsCount || 0,
         supportEmail: account.config?.support_email || null,
+        supportWhatsappPhone: account.config?.support_whatsapp_phone || null,
         primaryColor: widgetConfig.primaryColor || '#6366f1',
         profilePic: account.config?.profile_pic_url || null,
         managementToken: widgetConfig.managementToken || null,
@@ -124,12 +125,14 @@ export async function GET() {
 }
 
 /**
- * PATCH /api/admin/websites - Toggle widget enabled state or per-module
- * enabled state on an account. Body shape:
- *   { accountId, enabled?: boolean, module?: 'support'|'leads'|'bookings', moduleEnabled?: boolean }
+ * PATCH /api/admin/websites - Mutate one widget setting on an account. Body is
+ * exactly ONE of:
+ *   { accountId, enabled: boolean }                                   // master on/off
+ *   { accountId, module: 'support'|'leads'|'bookings', moduleEnabled } // module toggle
+ *   { accountId, contact: { supportEmail?, supportWhatsappPhone? } }   // support routing
  *
- * Each call mutates exactly one flag. Multi-flag updates = multiple calls so
- * the UI can show optimistic per-toggle feedback without coupling them.
+ * Toggles stay single-flag so the UI shows optimistic per-toggle feedback.
+ * The contact form saves both fields together (one Save button).
  */
 export async function PATCH(request: NextRequest) {
   const denied = await requireAdminAuth();
@@ -137,7 +140,7 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { accountId, enabled, module: moduleName, moduleEnabled } = body || {};
+    const { accountId, enabled, module: moduleName, moduleEnabled, contact } = body || {};
 
     if (!accountId) {
       return NextResponse.json({ error: 'accountId required' }, { status: 400 });
@@ -147,9 +150,11 @@ export async function PATCH(request: NextRequest) {
     // we never silently drop one of them.
     const isMasterToggle = typeof enabled === 'boolean';
     const isModuleToggle = typeof moduleName === 'string' && typeof moduleEnabled === 'boolean';
-    if (isMasterToggle === isModuleToggle) {
+    const isContactUpdate = contact != null && typeof contact === 'object';
+    const mutationCount = [isMasterToggle, isModuleToggle, isContactUpdate].filter(Boolean).length;
+    if (mutationCount !== 1) {
       return NextResponse.json(
-        { error: 'Provide either {enabled} or {module, moduleEnabled} — not both, not neither' },
+        { error: 'Provide exactly one of {enabled} | {module, moduleEnabled} | {contact}' },
         { status: 400 },
       );
     }
@@ -176,10 +181,24 @@ export async function PATCH(request: NextRequest) {
     config.widget = config.widget || {};
     if (isMasterToggle) {
       config.widget.enabled = enabled;
-    } else {
+    } else if (isModuleToggle) {
       config.widget.modules = config.widget.modules || {};
       config.widget.modules[moduleName] = config.widget.modules[moduleName] || {};
       config.widget.modules[moduleName].enabled = moduleEnabled;
+    } else {
+      // Contact routing — read by /api/support for email + WhatsApp notification.
+      // Stored at top-level config (not under widget) to match where it's read.
+      if ('supportEmail' in contact) {
+        const email = typeof contact.supportEmail === 'string' ? contact.supportEmail.trim() : '';
+        config.support_email = email || null;
+      }
+      if ('supportWhatsappPhone' in contact) {
+        // Keep digits and a leading +; drop spaces, dashes, parens.
+        const raw = typeof contact.supportWhatsappPhone === 'string' ? contact.supportWhatsappPhone.trim() : '';
+        const digits = raw.replace(/\D/g, '');
+        const normalized = digits ? (raw.startsWith('+') ? '+' : '') + digits : '';
+        config.support_whatsapp_phone = normalized || null;
+      }
     }
 
     const { error: updateErr } = await supabase
@@ -197,6 +216,8 @@ export async function PATCH(request: NextRequest) {
         leads: { enabled: config.widget.modules?.leads?.enabled === true },
         bookings: { enabled: config.widget.modules?.bookings?.enabled === true },
       },
+      supportEmail: config.support_email || null,
+      supportWhatsappPhone: config.support_whatsapp_phone || null,
     });
   } catch (error: any) {
     console.error('[Admin Websites] PATCH error:', error);
