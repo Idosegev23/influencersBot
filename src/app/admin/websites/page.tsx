@@ -17,6 +17,9 @@ import {
   LifeBuoy,
   UserPlus,
   CalendarClock,
+  Mail,
+  Phone,
+  Save,
 } from 'lucide-react';
 
 import { PageHeader } from '@/components/admin/PageHeader';
@@ -45,6 +48,7 @@ interface WebsiteAccount {
   chunksCount: number;
   productsCount: number;
   supportEmail: string | null;
+  supportWhatsappPhone: string | null;
   primaryColor: string;
   profilePic: string | null;
   managementToken: string | null;
@@ -118,6 +122,43 @@ export default function WebsitesPage() {
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error('PATCH failed');
+    } catch (err) {
+      console.error(err);
+      setWebsites(prev);
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  // Save support routing (email + WhatsApp phone) for an account. One Save
+  // button persists both fields together via the {contact} PATCH branch.
+  const handleSaveContact = async (
+    website: WebsiteAccount,
+    supportEmail: string,
+    supportWhatsappPhone: string,
+  ) => {
+    const key = website.id + ':contact';
+    setSavingKey(key);
+    const prev = websites;
+    try {
+      const res = await fetch('/api/admin/websites', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId: website.id,
+          contact: { supportEmail, supportWhatsappPhone },
+        }),
+      });
+      if (!res.ok) throw new Error('PATCH failed');
+      const data = await res.json();
+      // Sync to the server-normalized values (e.g. stripped phone formatting).
+      setWebsites((list) =>
+        list.map((w) =>
+          w.id === website.id
+            ? { ...w, supportEmail: data.supportEmail ?? null, supportWhatsappPhone: data.supportWhatsappPhone ?? null }
+            : w,
+        ),
+      );
     } catch (err) {
       console.error(err);
       setWebsites(prev);
@@ -236,6 +277,7 @@ export default function WebsitesPage() {
               onDemoLink={() => handleDemoLink(w)}
               onCopySnippet={() => handleCopySnippet(w)}
               onToggle={(field, next) => handleToggle(w, field, next)}
+              onSaveContact={(email, phone) => handleSaveContact(w, email, phone)}
               savingKey={savingKey}
               copied={copiedId === w.id}
               demoCopied={copiedDemoId === w.id}
@@ -312,6 +354,7 @@ function WebsiteCard({
   onDemoLink,
   onCopySnippet,
   onToggle,
+  onSaveContact,
   savingKey,
   copied,
   demoCopied,
@@ -323,6 +366,7 @@ function WebsiteCard({
   onDemoLink: () => void;
   onCopySnippet: () => void;
   onToggle: (field: ToggleField, next: boolean) => void;
+  onSaveContact: (supportEmail: string, supportWhatsappPhone: string) => void;
   savingKey: string | null;
   copied: boolean;
   demoCopied: boolean;
@@ -332,6 +376,19 @@ function WebsiteCard({
   const saving = (field: ToggleField) => savingKey === website.id + ':' + field;
   const hasProducts = website.productsCount > 0;
   const hasKnowledge = website.chunksCount > 0;
+
+  // Support routing inputs — local state, synced when the saved props change
+  // (e.g. after the server normalizes the phone). Dirty-check gates the Save
+  // button so we never PATCH an unchanged pair.
+  const [contactEmail, setContactEmail] = useState(website.supportEmail || '');
+  const [contactPhone, setContactPhone] = useState(website.supportWhatsappPhone || '');
+  useEffect(() => {
+    setContactEmail(website.supportEmail || '');
+    setContactPhone(website.supportWhatsappPhone || '');
+  }, [website.supportEmail, website.supportWhatsappPhone]);
+  const contactSaving = savingKey === website.id + ':contact';
+  const contactDirty =
+    contactEmail !== (website.supportEmail || '') || contactPhone !== (website.supportWhatsappPhone || '');
 
   return (
     <Card hover>
@@ -412,6 +469,53 @@ function WebsiteCard({
               icon={CalendarClock}
               saving={saving('bookings')}
             />
+          </div>
+        )}
+
+        {/* ---- Support routing (only when the support module is on) ---- */}
+        {website.enabled && website.modules.support.enabled && (
+          <div className="flex flex-col gap-2 pt-2 border-t border-[color:var(--line)]">
+            <span className="text-[11px] font-medium text-[color:var(--ink-500)]">
+              פניות תמיכה — לאן להעביר
+            </span>
+            <div className="relative">
+              <Mail className="absolute top-1/2 -translate-y-1/2 start-2.5 w-3.5 h-3.5 text-[color:var(--ink-400)] pointer-events-none" />
+              <Input
+                type="email"
+                dir="ltr"
+                value={contactEmail}
+                onChange={(e) => setContactEmail(e.target.value)}
+                placeholder="support@brand.com"
+                className="ps-8 text-[12px]"
+              />
+            </div>
+            <div className="relative">
+              <Phone className="absolute top-1/2 -translate-y-1/2 start-2.5 w-3.5 h-3.5 text-[color:var(--ink-400)] pointer-events-none" />
+              <Input
+                type="tel"
+                dir="ltr"
+                value={contactPhone}
+                onChange={(e) => setContactPhone(e.target.value)}
+                placeholder="WhatsApp — 9725XXXXXXXX"
+                className="ps-8 text-[12px]"
+              />
+            </div>
+            <Button
+              onClick={() => onSaveContact(contactEmail, contactPhone)}
+              disabled={!contactDirty || contactSaving}
+              variant="outline"
+              size="sm"
+              className="w-full justify-center"
+            >
+              {contactSaving ? (
+                <>שומר…</>
+              ) : (
+                <>
+                  <Save className="w-3.5 h-3.5" />
+                  שמור פרטי תמיכה
+                </>
+              )}
+            </Button>
           </div>
         )}
 

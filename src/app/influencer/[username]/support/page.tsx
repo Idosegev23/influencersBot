@@ -263,7 +263,9 @@ export default function SupportPage({
           const authRes = await fetch(`/api/influencer/auth?username=${username}`);
           const authData = await authRes.json();
           if (!authData.authenticated) {
-            router.push(`/influencer/${username}`);
+            // Argania has a dedicated branded login; everyone else falls back
+            // to the generic influencer landing.
+            router.push(username === 'argania_group' ? '/argania/login' : `/influencer/${username}`);
             return;
           }
         }
