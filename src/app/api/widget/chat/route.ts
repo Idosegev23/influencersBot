@@ -98,7 +98,7 @@ function resolveLocale(language: string | null | undefined) {
 function toCardDTO(p: ProductRecommendation, loc: ReturnType<typeof resolveLocale>) {
   return {
     id: p.id,
-    name: p.name,
+    name: p.nameHe || p.name, // Hebrew display name for he-IL brands; English fallback
     image: p.imageUrl,
     price: p.price,
     originalPrice: p.originalPrice,

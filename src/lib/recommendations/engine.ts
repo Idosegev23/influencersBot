@@ -46,6 +46,7 @@ export type ProductBadge = 'SALE' | 'BESTSELLER' | 'NEW' | null;
 export interface ProductRecommendation {
   id: string;
   name: string;
+  nameHe?: string | null; // Hebrew display name — preferred for he-IL prompt + cards
   description: string;
   price: number | null;
   originalPrice: number | null;
@@ -404,6 +405,7 @@ function formatRecommendation(
   return {
     id: product.id,
     name: product.name,
+    nameHe: product.name_he || null,
     description: aiWhy,
     price,
     originalPrice,
@@ -458,7 +460,10 @@ function buildPromptBlock(products: ProductRecommendation[]): string {
         ? `~~₪${p.originalPrice}~~ ₪${p.price}`
         : `₪${p.price}`)
       : '';
-    lines.push(`${i + 1}. **${p.name}** ${p.volume ? `(${p.volume})` : ''} — ${priceStr}`);
+    // Prefer the Hebrew name so a he-IL bot can bind the price to the product the
+    // customer actually named (e.g. "בגד גוף סבא"); the English name alone left
+    // the model unable to match and it would invent a price.
+    lines.push(`${i + 1}. **${p.nameHe || p.name}** ${p.volume ? `(${p.volume})` : ''} — ${priceStr}`);
     lines.push(`   ${p.description}`);
     lines.push(`   קישור: ${p.productUrl}`);
     if (p.imageUrl) {
