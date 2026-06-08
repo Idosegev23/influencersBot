@@ -20,6 +20,7 @@ import {
   Mail,
   Phone,
   Save,
+  Send,
 } from 'lucide-react';
 
 import { PageHeader } from '@/components/admin/PageHeader';
@@ -63,6 +64,7 @@ export default function WebsitesPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedDemoId, setCopiedDemoId] = useState<string | null>(null);
   const [copiedSnippetId, setCopiedSnippetId] = useState<string | null>(null);
+  const [copiedInstallId, setCopiedInstallId] = useState<string | null>(null);
   const [generatingTokenId, setGeneratingTokenId] = useState<string | null>(null);
   // Per-card per-field "saving" indicator so each toggle has its own optimistic state.
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -208,6 +210,18 @@ export default function WebsitesPage() {
     setTimeout(() => setCopiedSnippetId(null), 2000);
   };
 
+  // Personalized install-guide link to send the client — points at the public
+  // /install page prefilled with their account id + brand name, so the client
+  // gets a friendly step-by-step page (Shopify/WordPress/Wix/…) instead of a
+  // bare <script> tag. The /install page derives the widget src from its own
+  // origin, so this link is always domain-correct.
+  const handleCopyInstallLink = (website: WebsiteAccount) => {
+    const url = `${window.location.origin}/install?id=${website.id}&name=${encodeURIComponent(website.displayName)}`;
+    navigator.clipboard.writeText(url);
+    setCopiedInstallId(website.id);
+    setTimeout(() => setCopiedInstallId(null), 2000);
+  };
+
   return (
     <>
       <PageHeader
@@ -276,12 +290,14 @@ export default function WebsitesPage() {
               onManageLink={() => handleManageLink(w)}
               onDemoLink={() => handleDemoLink(w)}
               onCopySnippet={() => handleCopySnippet(w)}
+              onInstallLink={() => handleCopyInstallLink(w)}
               onToggle={(field, next) => handleToggle(w, field, next)}
               onSaveContact={(email, phone) => handleSaveContact(w, email, phone)}
               savingKey={savingKey}
               copied={copiedId === w.id}
               demoCopied={copiedDemoId === w.id}
               snippetCopied={copiedSnippetId === w.id}
+              installCopied={copiedInstallId === w.id}
               generating={generatingTokenId === w.id}
             />
           ))}
@@ -353,24 +369,28 @@ function WebsiteCard({
   onManageLink,
   onDemoLink,
   onCopySnippet,
+  onInstallLink,
   onToggle,
   onSaveContact,
   savingKey,
   copied,
   demoCopied,
   snippetCopied,
+  installCopied,
   generating,
 }: {
   website: WebsiteAccount;
   onManageLink: () => void;
   onDemoLink: () => void;
   onCopySnippet: () => void;
+  onInstallLink: () => void;
   onToggle: (field: ToggleField, next: boolean) => void;
   onSaveContact: (supportEmail: string, supportWhatsappPhone: string) => void;
   savingKey: string | null;
   copied: boolean;
   demoCopied: boolean;
   snippetCopied: boolean;
+  installCopied: boolean;
   generating: boolean;
 }) {
   const saving = (field: ToggleField) => savingKey === website.id + ':' + field;
@@ -565,6 +585,27 @@ function WebsiteCard({
             <>
               <Code className="w-3.5 h-3.5" />
               העתק קוד הטמעה
+            </>
+          )}
+        </Button>
+
+        {/* ---- Client-facing install guide link — friendly step-by-step page ---- */}
+        <Button
+          onClick={onInstallLink}
+          variant="outline"
+          size="sm"
+          className="w-full justify-center"
+          title="העתק קישור למדריך התקנה מותאם ושלח ללקוח"
+        >
+          {installCopied ? (
+            <>
+              <Check className="w-3.5 h-3.5" />
+              הקישור הועתק
+            </>
+          ) : (
+            <>
+              <Send className="w-3.5 h-3.5" />
+              קישור התקנה ללקוח
             </>
           )}
         </Button>
