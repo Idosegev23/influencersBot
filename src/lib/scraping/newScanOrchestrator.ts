@@ -20,6 +20,11 @@ export interface NewScanConfig {
   maxWebsitePages: number;
   samplesPerHighlight: number;
   transcribeReels: boolean;
+  // Fire content-processing (persona + RAG + chat/tab config) in the background
+  // at the end of the scan. Default true. Set false when the caller runs
+  // processAccountContent() itself (e.g. setup-account.ts) so the two don't run
+  // concurrently and race on accounts.config.
+  processContentInBackground: boolean;
   incremental: boolean;         // Skip unchanged highlights, comments on old posts, etc.
   websiteCacheDays: number;     // Skip websites crawled within N days
 }
@@ -61,6 +66,7 @@ export const DEFAULT_SCAN_CONFIG: NewScanConfig = {
   maxWebsitePages: 10,
   samplesPerHighlight: 999,
   transcribeReels: true,
+  processContentInBackground: true,
   incremental: false,       // Full scan by default (initial onboarding)
   websiteCacheDays: 7,
 };
@@ -522,17 +528,24 @@ export class NewScanOrchestrator {
       // STEP 11: Process Content & Build Persona 🎬 (Background)
       // ==========================================
       report('processing', 'running', 96, 'מתזמן עיבוד תוכן...');
-      
-      // ⚡ Start processing in background (don't wait!)
-      console.log(`\n[Step 11/11] Starting content processing in background...`);
-      
-      // Fire and forget - let it run after scan completes
-      startProcessingInBackground(accountId, jobId, config.transcribeReels).catch(err => {
-        console.error(`[Step 11/11] Background processing error:`, err.message);
-      });
-      
-      report('processing', 'completed', 99, '✓ עיבוד מתוזמן ברקע');
-      console.log(`[Step 11/11] ✓ Processing scheduled - will continue in background`);
+
+      // Content processing is normally fired in the background here. Callers that
+      // run processAccountContent() themselves (e.g. setup-account.ts) pass
+      // processContentInBackground:false so we DON'T also fire it — two concurrent
+      // runs would race on accounts.config and silently wipe identity fields
+      // (username/display_name/archetype/website_url) on brand onboards.
+      if (fullConfig.processContentInBackground !== false) {
+        // ⚡ Fire and forget - let it run after scan completes
+        console.log(`\n[Step 11/11] Starting content processing in background...`);
+        startProcessingInBackground(accountId, jobId, fullConfig.transcribeReels).catch(err => {
+          console.error(`[Step 11/11] Background processing error:`, err.message);
+        });
+        report('processing', 'completed', 99, '✓ עיבוד מתוזמן ברקע');
+        console.log(`[Step 11/11] ✓ Processing scheduled - will continue in background`);
+      } else {
+        report('processing', 'completed', 99, '⏭️ עיבוד תוכן יבוצע ע"י הקורא');
+        console.log(`\n[Step 11/11] ⏭️ Background processing skipped (caller runs processAccountContent itself)`);
+      }
 
       // ==========================================
       // Done

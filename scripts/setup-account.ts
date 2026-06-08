@@ -176,7 +176,11 @@ async function stepInstagramScan(ctx: SetupContext): Promise<void> {
     account_id: ctx.accountId,
     priority: 100,
     requested_by: 'script:setup-account',
-    config: DEFAULT_SCAN_CONFIG,
+    // processContentInBackground:false — we run processAccountContent() ourselves
+    // below (and await it). Without this the scan ALSO fires it in the background,
+    // and the two concurrent runs race on accounts.config, wiping identity fields
+    // (username/display_name/archetype/website_url). See content processing below.
+    config: { ...DEFAULT_SCAN_CONFIG, processContentInBackground: false },
   });
   console.log(`   Job ID: ${job.id}`);
 
@@ -268,7 +272,10 @@ async function stepProductExtraction(ctx: SetupContext): Promise<void> {
   try {
     execSync(
       `npx tsx --tsconfig tsconfig.json scripts/extract-products-from-rag.ts ${ctx.accountId}`,
-      { cwd: process.cwd(), stdio: 'inherit', timeout: 10 * 60 * 1000 }
+      // 30 min — extract-products-from-rag.ts accumulates all batches in memory
+      // and only persists at the very end, so a kill mid-run loses everything.
+      // 10 min was too short for moderate catalogs (e.g. 22+ batches) → 0 products.
+      { cwd: process.cwd(), stdio: 'inherit', timeout: 30 * 60 * 1000 }
     );
   } catch (err: any) {
     console.log(`   ⚠️ חילוץ מוצרים נכשל: ${err.message}`);
@@ -280,7 +287,10 @@ async function stepProductExtraction(ctx: SetupContext): Promise<void> {
   try {
     execSync(
       `npx tsx --tsconfig tsconfig.json scripts/enrich-products.ts ${ctx.accountId}`,
-      { cwd: process.cwd(), stdio: 'inherit', timeout: 10 * 60 * 1000 }
+      // 30 min — extract-products-from-rag.ts accumulates all batches in memory
+      // and only persists at the very end, so a kill mid-run loses everything.
+      // 10 min was too short for moderate catalogs (e.g. 22+ batches) → 0 products.
+      { cwd: process.cwd(), stdio: 'inherit', timeout: 30 * 60 * 1000 }
     );
   } catch (err: any) {
     console.log(`   ⚠️ העשרת מוצרים נכשלה: ${err.message}`);
@@ -427,6 +437,18 @@ async function stepVerify(ctx: SetupContext): Promise<void> {
 
   const tabs = (account?.config as any)?.tabs;
   console.log(`   ${tabs ? '✅' : '⚠️'} טאבים: ${tabs ? tabs.length + ' tabs' : 'לא מוגדר'}`);
+
+  // Check identity fields survived — guards against the config-wipe race where
+  // concurrent content-processing dropped username/display_name/archetype and the
+  // chat page fell back to influencer defaults + a UUID greeting.
+  const cfg = (account?.config as any) || {};
+  const missingIdentity = ['username', 'display_name'].filter((k) => !cfg[k]);
+  if (missingIdentity.length) {
+    console.log(`   ❌ זהות חסרה ב-config: ${missingIdentity.join(', ')} — ייתכן config-wipe; הרץ scripts/repair-account-config.ts`);
+    issues++;
+  } else {
+    console.log(`   ✅ זהות: ${cfg.display_name} (@${cfg.username})${cfg.archetype ? ' · ' + cfg.archetype : ''}`);
+  }
 
   // Check website products (if relevant)
   if (ctx.websiteUrl) {
