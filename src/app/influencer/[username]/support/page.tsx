@@ -263,9 +263,13 @@ export default function SupportPage({
           const authRes = await fetch(`/api/influencer/auth?username=${username}`);
           const authData = await authRes.json();
           if (!authData.authenticated) {
-            // Argania has a dedicated branded login; everyone else falls back
-            // to the generic influencer landing.
-            router.push(username === 'argania_group' ? '/argania/login' : `/influencer/${username}`);
+            // Argania + Studio Pasha have dedicated branded logins; everyone
+            // else falls back to the generic influencer landing.
+            const brandedLogin: Record<string, string> = {
+              argania_group: '/argania/login',
+              studiopasha_fashion: '/studiopasha/login',
+            };
+            router.push(brandedLogin[username] || `/influencer/${username}`);
             return;
           }
         }

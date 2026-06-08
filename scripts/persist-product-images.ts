@@ -45,6 +45,20 @@ function jaccard(a: string, b: string): number {
   return inter / union;
 }
 
+// Canonical key for matching a scraped page URL to a product URL across
+// percent-encoding / protocol / www / trailing-slash differences.
+function urlKey(u: string): string {
+  if (!u) return '';
+  let s = u;
+  try { s = decodeURIComponent(u); } catch { /* keep raw if malformed */ }
+  return s
+    .replace(/^https?:\/\//i, '')
+    .replace(/^www\./i, '')
+    .replace(/[?#].*$/, '')
+    .replace(/\/+$/, '')
+    .toLowerCase();
+}
+
 interface ProductPage {
   url: string;
   name: string;
@@ -55,6 +69,7 @@ interface WidgetProduct {
   id: string;
   name: string;
   name_he: string;
+  product_url: string | null;
 }
 
 function pickExt(contentType: string | null, urlExt: string | null): string {
@@ -92,12 +107,13 @@ async function downloadImage(url: string): Promise<{ buffer: Buffer; contentType
 async function main() {
   console.log(`🖼️  Persisting product images for account ${accountId}\n`);
 
-  // Load product pages
+  // Load product pages. Shopify uses /products/<slug>; QuickShop (e.g. Argania,
+  // Studio Pasha) uses singular /product/<slug> — accept both.
   const { data: pagesRaw, error: pagesErr } = await supabase
     .from('instagram_bio_websites')
-    .select('url, image_urls, extracted_data')
+    .select('url, page_title, image_urls, extracted_data')
     .eq('account_id', accountId)
-    .like('url', '%/products/%');
+    .or('url.ilike.%/product/%,url.ilike.%/products/%');
 
   if (pagesErr) {
     console.error(`Failed to load pages: ${pagesErr.message}`);
@@ -107,17 +123,24 @@ async function main() {
   const pages: ProductPage[] = (pagesRaw || [])
     .map((p: any) => ({
       url: p.url,
-      name: p.extracted_data?.name || '',
+      // QuickShop leaves extracted_data.name empty; the human name lives in
+      // page_title as "<name> | <brand>". Shopify fills extracted_data.name.
+      name: p.extracted_data?.name || (p.page_title ? String(p.page_title).split('|')[0].trim() : ''),
       image: (p.image_urls || []).find((u: string) => u && !u.includes('butterfly-button')) || '',
     }))
-    .filter((p) => p.name && p.image);
+    .filter((p) => p.image && (p.name || p.url));
+
+  // Index by canonical URL so an extractor-supplied product_url maps straight
+  // to its scraped page without fuzzy guessing.
+  const pageByUrl = new Map<string, ProductPage>();
+  for (const p of pages) if (p.url) pageByUrl.set(urlKey(p.url), p);
 
   console.log(`📄 Loaded ${pages.length} product pages with images`);
 
   // Load widget_products
   const { data: products, error: prodErr } = await supabase
     .from('widget_products')
-    .select('id, name, name_he')
+    .select('id, name, name_he, product_url')
     .eq('account_id', accountId);
 
   if (prodErr) {
@@ -134,17 +157,24 @@ async function main() {
   for (const product of products as WidgetProduct[]) {
     const productLabel = product.name_he || product.name;
 
-    // Find best matching page
-    let bestPage: ProductPage | null = null;
-    let bestScore = 0;
-    for (const page of pages) {
-      const score = Math.max(
-        jaccard(productLabel, page.name),
-        jaccard(product.name, page.name),
-      );
-      if (score > bestScore) {
-        bestScore = score;
-        bestPage = page;
+    // 1) Deterministic: the extractor usually already stored the canonical
+    //    /product/<slug> URL — match it straight to the scraped page.
+    let bestPage: ProductPage | null = product.product_url
+      ? pageByUrl.get(urlKey(product.product_url)) || null
+      : null;
+    let bestScore = bestPage ? 1 : 0;
+
+    // 2) Fallback: fuzzy name match against the page name.
+    if (!bestPage) {
+      for (const page of pages) {
+        const score = Math.max(
+          jaccard(productLabel, page.name),
+          jaccard(product.name, page.name),
+        );
+        if (score > bestScore) {
+          bestScore = score;
+          bestPage = page;
+        }
       }
     }
 
