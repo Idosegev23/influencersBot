@@ -153,8 +153,12 @@ export async function getRecommendations(req: RecommendationRequest): Promise<Re
 function detectBestStrategy(context: string, currentProductId?: string): RecommendationStrategy {
   const lower = context.toLowerCase();
 
-  // Budget signals
-  if (/מחיר|זול|משתלם|תקציב|הנחה|מבצע|כמה עולה/.test(lower)) {
+  // Budget BROWSE signals ("what's cheap / on sale / within budget") → cheapest
+  // items. Deliberately excludes "מחיר"/"כמה עולה": those are price LOOKUPs for a
+  // *named* product ("כמה עולה חליפת זיו?"), which must go through need_based so
+  // the product is actually found — otherwise we return the cheapest unrelated
+  // items and the model can't state (or invents) the price.
+  if (/זול|משתלם|תקציב|הנחה|מבצע/.test(lower)) {
     return 'budget';
   }
 
