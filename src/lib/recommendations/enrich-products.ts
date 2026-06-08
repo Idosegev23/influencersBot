@@ -6,7 +6,11 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
-import { generateEmbedding } from '@/lib/rag/embeddings';
+// Product vectors go into the vector(1536) widget_products.embedding column and
+// are queried by the recommendation engine with the same model. Use the shared
+// product-space embedder (text-embedding-3-small, 1536) — NOT generateEmbedding,
+// which is 2000-d (text-embedding-3-large) and would be rejected by the column.
+import { generateProductEmbedding } from '@/lib/rag/embeddings';
 
 async function getGeminiModel() {
   const { getGeminiClient, MODELS } = await import('@/lib/ai/google-client');
@@ -242,7 +246,7 @@ export async function enrichAllProducts(accountId: string): Promise<EnrichmentRe
       const embText = buildEmbeddingText(product);
       if (!embText || embText.length < 10) continue;
 
-      const embedding = await generateEmbedding(embText);
+      const embedding = await generateProductEmbedding(embText);
       if (!embedding) continue; // timeout — skip this product
       const { error: embErr } = await supabase
         .from('widget_products')

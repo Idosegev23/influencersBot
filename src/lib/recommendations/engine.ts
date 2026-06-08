@@ -11,7 +11,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
-import { generateEmbedding } from '@/lib/rag/embeddings';
+import { generateProductEmbedding } from '@/lib/rag/embeddings';
 
 // ============================================
 // Types
@@ -186,10 +186,12 @@ async function scoreNeedBased(products: any[], context: string): Promise<ScoredP
   const lower = context.toLowerCase();
   const scored: ScoredProduct[] = [];
 
-  // Try embedding-based similarity first
+  // Try embedding-based similarity first. MUST use the product-space embedder
+  // (1536-d, text-embedding-3-small) — the same model that wrote the product
+  // vectors — or cosine similarity compares mismatched spaces and scores 0.
   let queryEmbedding: number[] | null = null;
   try {
-    queryEmbedding = await generateEmbedding(context);
+    queryEmbedding = await generateProductEmbedding(context);
   } catch {
     // Fallback to keyword matching only
   }
@@ -247,10 +249,15 @@ async function scoreNeedBased(products: any[], context: string): Promise<ScoredP
       }
     }
 
-    // 6. Embedding similarity (if available)
+    // 6. Embedding similarity (if available). pgvector returns the embedding as
+    //    a JSON string over PostgREST, so parse it to number[] before scoring —
+    //    cosineSimilarity on a raw string compares character length and scores 0.
     if (queryEmbedding && product.embedding) {
       try {
-        const similarity = cosineSimilarity(queryEmbedding, product.embedding);
+        const productVec: number[] = typeof product.embedding === 'string'
+          ? JSON.parse(product.embedding)
+          : product.embedding;
+        const similarity = cosineSimilarity(queryEmbedding, productVec);
         score += Math.round(similarity * 30); // 0-30 points
       } catch {
         // Skip embedding scoring for this product

@@ -83,6 +83,36 @@ export async function generateEmbedding(text: string): Promise<number[] | null> 
   }
 }
 
+// ── Product-space embeddings ──────────────────────────────────────────────
+// `widget_products.embedding` is a vector(1536) column (migration 036) written
+// by enrich-products.ts with text-embedding-3-small (native 1536 dims). The
+// recommendation engine MUST embed its query with this SAME model so cosine
+// similarity compares the same vector space. Do NOT use generateEmbedding()
+// for product queries — that's the 2000-d text-embedding-3-large model used for
+// RAG document search; mixing the two makes every similarity silently 0.
+const PRODUCT_EMBEDDING_MODEL = 'text-embedding-3-small'; // native 1536 dims
+
+/**
+ * Embed a text into the product vector space (1536-d, text-embedding-3-small).
+ * Used both to write product vectors (enrich-products.ts) and to embed the
+ * recommendation query (recommendations/engine.ts). Returns null on failure so
+ * callers can fall back to keyword scoring.
+ */
+export async function generateProductEmbedding(text: string): Promise<number[] | null> {
+  try {
+    const res = await getClient().embeddings.create(
+      { model: PRODUCT_EMBEDDING_MODEL, input: text.slice(0, 8000) },
+      { timeout: EMBEDDING_TIMEOUT_MS },
+    );
+    return res.data?.[0]?.embedding ?? null;
+  } catch (err) {
+    log.warn('Product embedding failed — caller should fall back', {
+      err: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}
+
 /**
  * Generate embeddings for multiple texts (batched, with timeout).
  */

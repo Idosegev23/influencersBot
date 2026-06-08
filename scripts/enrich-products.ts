@@ -66,10 +66,14 @@ async function enrichProduct(product: any): Promise<any | null> {
 }
 
 // ─── Embedding ───
+// MUST stay aligned with generateProductEmbedding() in src/lib/rag/embeddings.ts
+// (same model + native 1536 dims). The recommendation engine embeds its query
+// with that shared helper; if this writer ever diverges (e.g. to 3-large/2000),
+// cosine similarity compares mismatched vector spaces and silently scores 0.
 async function generateEmbedding(text: string): Promise<number[] | null> {
   try {
     const resp = await openai.embeddings.create({
-      model: 'text-embedding-3-small',
+      model: 'text-embedding-3-small', // native 1536 — matches vector(1536) column
       input: text.slice(0, 8000),
     });
     return resp.data[0].embedding;
