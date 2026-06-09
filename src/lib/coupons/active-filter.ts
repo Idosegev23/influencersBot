@@ -50,3 +50,17 @@ export async function getAllCouponCodes(supabase: any, accountId: string): Promi
   const { data } = await supabase.from('coupons').select('code').eq('account_id', accountId);
   return (data || []).map((r: any) => r.code).filter(Boolean);
 }
+
+/**
+ * Codes that are valid RIGHT NOW, read straight from the live DB (is_active +
+ * date window). This is the authoritative allowlist — unlike deriving "valid"
+ * from a retrieved knowledge base, it can't be fooled by a cached/stale KB that
+ * still carries a since-deactivated coupon. Use it as the source of truth when
+ * scrubbing/dropping invalid coupons before the LLM sees them.
+ */
+export async function getValidCouponCodes(supabase: any, accountId: string): Promise<string[]> {
+  const { data } = await applyActiveCouponFilter(
+    supabase.from('coupons').select('code').eq('account_id', accountId)
+  );
+  return (data || []).map((r: any) => r.code).filter(Boolean);
+}

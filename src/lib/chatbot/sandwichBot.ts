@@ -14,7 +14,7 @@ import {
 } from './knowledge-retrieval';
 import { supabase } from '@/lib/supabase';
 import { scrubTermsFromKB } from '@/lib/coupons/kb-scrub';
-import { getAllCouponCodes } from '@/lib/coupons/active-filter';
+import { getAllCouponCodes, getValidCouponCodes } from '@/lib/coupons/active-filter';
 
 // Fallback suggestions per archetype when LLM omits <<SUGGESTIONS>>
 const ARCHETYPE_FALLBACK_SUGGESTIONS: Record<string, string> = {
@@ -252,16 +252,39 @@ export class SandwichBot {
     // (already date-filtered) and are left intact. Covers post captions, website
     // promo terms, highlights, etc. (RAG free-text leaks).
     try {
-      const validCodes = new Set(
-        (knowledgeBase.coupons || [])
-          .map((c: any) => (c.code || '').toLowerCase())
-          .filter(Boolean)
-      );
-      const allCodes = await getAllCouponCodes(supabase, input.accountId);
+      // Validity source of truth = the LIVE DB, not knowledgeBase.coupons. A
+      // cached/stale retrieval can still carry a since-deactivated coupon; if we
+      // trusted the KB we'd treat that code as valid and render a phantom offer.
+      const [validCodesArr, allCodes] = await Promise.all([
+        getValidCouponCodes(supabase, input.accountId),
+        getAllCouponCodes(supabase, input.accountId),
+      ]);
+      const validCodes = new Set(validCodesArr.map((c) => c.toLowerCase()));
+      const allCodesLower = new Set(allCodes.map((c) => c.toLowerCase()));
       const invalidCodes = allCodes.filter((code) => !validCodes.has(code.toLowerCase()));
+
+      // Drop coupon OBJECTS the live DB knows are invalid (a deactivated/expired
+      // code a cached KB still carries) so the structured coupon block can't say
+      // "there's a coupon ███". Codes unknown to the coupons table (e.g.
+      // partnership-only codes) are left untouched — we can't prove them invalid.
+      if (knowledgeBase.coupons?.length) {
+        const before = knowledgeBase.coupons.length;
+        knowledgeBase = {
+          ...knowledgeBase,
+          coupons: knowledgeBase.coupons.filter((c: any) => {
+            const code = (c.code || '').toLowerCase();
+            if (!code || !allCodesLower.has(code)) return true; // unknown → trust
+            return validCodes.has(code); // known code → keep only if live-valid
+          }),
+        };
+        if (knowledgeBase.coupons.length !== before) {
+          console.log(`   🛡  Coupon drop: ${before} → ${knowledgeBase.coupons.length} (stale/invalid objects removed)`);
+        }
+      }
+
       if (invalidCodes.length > 0) {
         knowledgeBase = scrubTermsFromKB(knowledgeBase, invalidCodes);
-        console.log(`   🛡  Coupon scrub: removed ${invalidCodes.length} invalid coupon code(s) from KB`);
+        console.log(`   🛡  Coupon scrub: removed ${invalidCodes.length} invalid coupon code(s) from KB text`);
       }
     } catch (err) {
       console.error('[SandwichBot] coupon scrub failed (non-fatal):', err);
