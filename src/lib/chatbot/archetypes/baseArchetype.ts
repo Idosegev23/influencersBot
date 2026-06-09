@@ -526,6 +526,15 @@ export abstract class BaseArchetype {
       );
     }
 
+    // Step 2.5: Anti-fabrication guard (ALWAYS on). The coupons archetype injects
+    // "how to answer" templates like "יש קוד מיוחד! {code}…", which prime the model
+    // to offer a coupon even when none were retrieved — it then invents a code that
+    // the redaction gate masks to ███, leaving the bot asserting a phantom coupon.
+    // Hard rule: only state coupons present in this turn's knowledge context.
+    sections.push(
+      `\n🚫 קופונים/הנחות/מבצעים — חוק ברזל: ציין/י אך ורק קוד קופון, אחוז הנחה או מבצע שמופיע במפורש בהקשר הידע שקיבלת בהודעה זו. אם אין אף קופון פעיל בהקשר — אמור/אמרי בפשטות שאין כרגע קוד הנחה פעיל באתר. לעולם אל תמציא/י, תנחש/י, תשלים/י או תרמז/י על קוד או אחוז הנחה שאינו מופיע בהקשר — גם אם נראה שהיה כזה בעבר או שנשאלת עליו ישירות.`
+    );
+
     // Step 4: Conversation deepening based on rolling summary / recurring topics
     if (input.conversationTopics?.length) {
       sections.push(
