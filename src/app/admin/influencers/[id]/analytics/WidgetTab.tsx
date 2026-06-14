@@ -23,7 +23,12 @@ interface WidgetSummary {
   };
   productCount: number;
   sessionCount: number;
-  engagement: { active: boolean; events: Array<{ type: string; count: number }> };
+  engagement: {
+    active: boolean;
+    reconstructed?: boolean;
+    realtimeCount?: number;
+    events: Array<{ type: string; count: number }>;
+  };
   conversions: {
     enabled: boolean;
     totalOrders: number;
@@ -219,14 +224,22 @@ export default function WidgetTab({
         <h2 className="text-sm font-semibold mb-3">💬 פעילות בווידג'ט</h2>
         <Card className="p-4">
           {data?.engagement.events.length ? (
-            <ul className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1.5 text-xs">
-              {data.engagement.events.map((e) => (
-                <li key={e.type} className="flex justify-between gap-2">
-                  <span className="truncate">{EVENT_LABELS[e.type] || e.type}</span>
-                  <span className="text-gray-500 font-mono">{e.count}</span>
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1.5 text-xs">
+                {data.engagement.events.map((e) => (
+                  <li key={e.type} className="flex justify-between gap-2">
+                    <span className="truncate">{EVENT_LABELS[e.type] || e.type}</span>
+                    <span className="text-gray-500 font-mono">{e.count}</span>
+                  </li>
+                ))}
+              </ul>
+              {data.engagement.reconstructed && (
+                <p className="text-[11px] text-gray-400 mt-3 pt-2 border-t">
+                  כולל שחזור היסטורי מתוך השיחות וההודעות (פתיחות והודעות), מהתקופה שבה אנליטיקס הווידג'ט לא נרשם.
+                  אירועים בזמן אמת (כולל קליקים על מוצרים) יצטברו לאחר תיקון ה-secret והפריסה.
+                </p>
+              )}
+            </>
           ) : (
             <p className="text-xs text-gray-400">אין אירועי engagement בתקופה זו.</p>
           )}

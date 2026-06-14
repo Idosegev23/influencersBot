@@ -78,21 +78,29 @@ export async function GET(req: NextRequest) {
     .gte('created_at', since);
 
   // ---- Widget engagement events (mode='widget') ----
+  // Some history is reconstructed from chat_sessions/chat_messages (tagged
+  // metadata.source='backfill_reconstructed'). "active" means the live
+  // pipeline is producing events — judge that ONLY from organic rows, so the
+  // banner stays accurate even after a backfill.
   const { data: wEvents } = await supabase
     .from('events')
-    .select('type')
+    .select('type, metadata')
     .eq('account_id', accountId)
     .eq('mode', 'widget')
     .gte('created_at', since)
     .limit(10000);
   const eventCounts: Record<string, number> = {};
+  let realtimeCount = 0;
+  let reconstructedCount = 0;
   for (const e of (wEvents || []) as any[]) {
     eventCounts[e.type] = (eventCounts[e.type] || 0) + 1;
+    if (e?.metadata?.source === 'backfill_reconstructed') reconstructedCount++;
+    else realtimeCount++;
   }
   const engagementEvents = Object.entries(eventCounts)
     .map(([type, count]) => ({ type, count }))
     .sort((a, b) => b.count - a.count);
-  const widgetPipelineActive = (wEvents || []).length > 0;
+  const widgetPipelineActive = realtimeCount > 0;
 
   // ---- Conversions (table may not exist yet) ----
   let conversions = {
@@ -138,7 +146,12 @@ export async function GET(req: NextRequest) {
     recommendations: { totalRecs, totalClicks, ctr, strategyBreakdown, topProducts },
     productCount: productCount || 0,
     sessionCount: sessionCount || 0,
-    engagement: { active: widgetPipelineActive, events: engagementEvents },
+    engagement: {
+      active: widgetPipelineActive,
+      reconstructed: reconstructedCount > 0,
+      realtimeCount,
+      events: engagementEvents,
+    },
     conversions,
   });
 }
