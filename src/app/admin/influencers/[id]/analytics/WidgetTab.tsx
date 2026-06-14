@@ -14,6 +14,7 @@ import StoreIntegrationForm from './StoreIntegrationForm';
 
 interface WidgetSummary {
   days: number;
+  analyticsConfigured?: boolean;
   recommendations: {
     totalRecs: number;
     totalClicks: number;
@@ -104,12 +105,20 @@ export default function WidgetTab({
 
   return (
     <div className="space-y-6">
-      {/* Pipeline health banner */}
-      {data && !data.engagement.active && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-900">
-          <strong>אנליטיקס הווידג'ט לא פעיל.</strong> לא התקבלו אירועי engagement מהווידג'ט בתקופה זו.
-          סביר ש-<code className="text-xs">ANALYTICS_WIDGET_SECRET</code> חסר בסביבת הפרודקשן (הטוקן חוזר null
-          ולכן הווידג'ט לא שולח). נתוני ההמלצות והשיחות למטה מגיעים ממקור אחר וכן מעודכנים.
+      {/* Pipeline health banner. Distinguishes a real misconfiguration
+          (secret missing → token can't be signed) from the normal
+          "deployed, just waiting for live traffic" state. */}
+      {data && data.analyticsConfigured === false && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-900">
+          <strong>אנליטיקס הווידג'ט מושבת.</strong> לא ניתן לחתום טוקן —{' '}
+          <code className="text-xs">ANALYTICS_WIDGET_SECRET</code> חסר בסביבת הפרודקשן, ולכן הווידג'ט לא שולח אירועים.
+          יש להגדיר את המשתנה ולפרוס מחדש.
+        </div>
+      )}
+      {data && data.analyticsConfigured !== false && !data.engagement.active && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-900">
+          <strong>ממתין לתנועה חיה.</strong> השליחה מהווידג'ט פעילה, אך עדיין לא נקלטו אירועי engagement
+          בזמן-אמת בתקופה זו — הם יצטברו כאן ככל שגולשים יתקשרו עם הווידג'ט. המספרים למטה (כולל שחזור היסטורי) מעודכנים.
         </div>
       )}
 

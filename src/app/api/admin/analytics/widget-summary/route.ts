@@ -16,6 +16,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireAdminAuth } from '@/lib/auth/admin-auth';
+import { signWidgetToken } from '@/lib/analytics/widget-token';
 
 export const runtime = 'nodejs';
 
@@ -107,8 +108,15 @@ export async function GET(req: NextRequest) {
     /* widget_conversions not migrated yet — leave disabled */
   }
 
+  // Is widget analytics actually wired? It can send only if the server can
+  // sign a token (ANALYTICS_WIDGET_SECRET / fallback present). Lets the UI
+  // tell a real misconfig apart from "deployed, just no live traffic yet".
+  let analyticsConfigured = false;
+  try { analyticsConfigured = !!signWidgetToken(accountId); } catch { analyticsConfigured = false; }
+
   return NextResponse.json({
     days,
+    analyticsConfigured,
     recommendations: { totalRecs, totalClicks, ctr, strategyBreakdown, topProducts },
     productCount: productCount || 0,
     sessionCount: sessionCount || 0,
