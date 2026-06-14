@@ -32,74 +32,40 @@ export async function GET(req: NextRequest) {
 
   const supabase = await createClient();
 
-  // ---- Recommendations (windowed) ----
-  const { data: recs } = await supabase
-    .from('widget_recommendations')
-    .select('product_name, strategy, was_clicked, created_at')
-    .eq('account_id', accountId)
-    .gte('created_at', since)
-    .order('created_at', { ascending: false })
-    .limit(5000);
+  // ---- Recommendations + engagement + counts via SQL aggregation ----
+  // Aggregate in Postgres (RPC) instead of fetching rows and counting in JS:
+  // PostgREST caps every row fetch at 1000, which made high-volume accounts
+  // "stop counting" at 1000. The RPC counts the full set, no cap.
+  const { data: agg, error: aggErr } = await supabase.rpc('widget_analytics_summary', {
+    p_account_id: accountId,
+    p_since: since,
+  });
+  if (aggErr) {
+    console.error('[admin/analytics/widget-summary] rpc error:', aggErr.message);
+    return NextResponse.json({ error: 'aggregation_failed' }, { status: 500 });
+  }
+  const a: any = agg || {};
 
-  const recRows = recs || [];
-  const totalRecs = recRows.length;
-  const totalClicks = recRows.filter((r: any) => r.was_clicked).length;
+  const totalRecs = Number(a.rec_total) || 0;
+  const totalClicks = Number(a.rec_clicks) || 0;
   const ctr = totalRecs ? Number(((totalClicks / totalRecs) * 100).toFixed(1)) : 0;
+  const topProducts = (a.rec_by_product || []) as Array<{ name: string; count: number; clicks: number }>;
+  const strategyBreakdown = ((a.rec_by_strategy || []) as Array<{ strategy: string; count: number; clicks: number }>)
+    .map((s) => ({
+      strategy: s.strategy,
+      count: s.count,
+      clicks: s.clicks,
+      ctr: s.count ? Number(((s.clicks / s.count) * 100).toFixed(1)) : 0,
+    }));
+  const productCount = Number(a.product_count) || 0;
+  const sessionCount = Number(a.session_count) || 0;
 
-  const strategyStats: Record<string, { count: number; clicks: number }> = {};
-  const productStats: Record<string, { name: string; count: number; clicks: number }> = {};
-  for (const r of recRows as any[]) {
-    const s = r.strategy || 'unknown';
-    (strategyStats[s] ||= { count: 0, clicks: 0 }).count++;
-    if (r.was_clicked) strategyStats[s].clicks++;
-    const p = r.product_name || 'unknown';
-    (productStats[p] ||= { name: p, count: 0, clicks: 0 }).count++;
-    if (r.was_clicked) productStats[p].clicks++;
-  }
-  const topProducts = Object.values(productStats).sort((a, b) => b.count - a.count).slice(0, 15);
-  const strategyBreakdown = Object.entries(strategyStats).map(([strategy, s]) => ({
-    strategy,
-    count: s.count,
-    clicks: s.clicks,
-    ctr: s.count ? Number(((s.clicks / s.count) * 100).toFixed(1)) : 0,
-  })).sort((a, b) => b.count - a.count);
-
-  // ---- Catalog size ----
-  const { count: productCount } = await supabase
-    .from('widget_products')
-    .select('id', { count: 'exact', head: true })
-    .eq('account_id', accountId);
-
-  // ---- Sessions in window ----
-  const { count: sessionCount } = await supabase
-    .from('chat_sessions')
-    .select('id', { count: 'exact', head: true })
-    .eq('account_id', accountId)
-    .gte('created_at', since);
-
-  // ---- Widget engagement events (mode='widget') ----
-  // Some history is reconstructed from chat_sessions/chat_messages (tagged
-  // metadata.source='backfill_reconstructed'). "active" means the live
-  // pipeline is producing events — judge that ONLY from organic rows, so the
-  // banner stays accurate even after a backfill.
-  const { data: wEvents } = await supabase
-    .from('events')
-    .select('type, metadata')
-    .eq('account_id', accountId)
-    .eq('mode', 'widget')
-    .gte('created_at', since)
-    .limit(10000);
-  const eventCounts: Record<string, number> = {};
-  let realtimeCount = 0;
-  let reconstructedCount = 0;
-  for (const e of (wEvents || []) as any[]) {
-    eventCounts[e.type] = (eventCounts[e.type] || 0) + 1;
-    if (e?.metadata?.source === 'backfill_reconstructed') reconstructedCount++;
-    else realtimeCount++;
-  }
-  const engagementEvents = Object.entries(eventCounts)
-    .map(([type, count]) => ({ type, count }))
-    .sort((a, b) => b.count - a.count);
+  // Engagement: "active" = the live pipeline is producing organic events.
+  // The RPC splits each type into total count vs realtime (non-backfill) count.
+  const engRows = (a.engagement || []) as Array<{ type: string; count: number; realtime: number }>;
+  const engagementEvents = engRows.map((e) => ({ type: e.type, count: e.count }));
+  const realtimeCount = engRows.reduce((sum, e) => sum + (Number(e.realtime) || 0), 0);
+  const reconstructedCount = engRows.reduce((sum, e) => sum + ((Number(e.count) || 0) - (Number(e.realtime) || 0)), 0);
   const widgetPipelineActive = realtimeCount > 0;
 
   // ---- Conversions (table may not exist yet) ----
