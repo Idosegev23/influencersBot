@@ -64,13 +64,51 @@ export const EVENT_CATALOG: Record<string, EventDef> = {
   coupon_redeemed_clicked: { category: 'conversion', surface: 'chat' },
   product_clicked: { category: 'engagement', surface: 'chat' },
 
-  // Widget
+  // Widget — lifecycle & engagement
   widget_loaded: { category: 'session', surface: 'widget' },
   widget_opened: { category: 'engagement', surface: 'widget' },
   widget_closed: { category: 'engagement', surface: 'widget' },
+  widget_proactive_opened: { category: 'engagement', surface: 'widget' },
   widget_message_sent: { category: 'engagement', surface: 'widget' },
   widget_message_received: { category: 'engagement', surface: 'widget' },
+  widget_message_rated: { category: 'engagement', surface: 'widget' },
+  widget_chip_clicked: { category: 'engagement', surface: 'widget' },
+  widget_intent_classified: { category: 'engagement', surface: 'widget' },
+  // Widget — product cards (the actual names widget.js emits; were being
+  // dropped because only the chat-surface product_card_clicked existed)
+  widget_product_click: { category: 'engagement', surface: 'widget' },
+  // Widget — bot-proposed actions
+  widget_action_proposed: { category: 'engagement', surface: 'widget' },
+  widget_action_confirmed: { category: 'engagement', surface: 'widget' },
+  widget_action_dismissed: { category: 'engagement', surface: 'widget' },
+  widget_navigate_confirmed: { category: 'navigation', surface: 'widget' },
+  // Widget — support module
+  widget_support_opened: { category: 'engagement', surface: 'widget' },
+  widget_support_submitted: { category: 'conversion', surface: 'widget' },
+  widget_support_success: { category: 'conversion', surface: 'widget' },
+  widget_support_failed: { category: 'system', surface: 'widget' },
+  widget_support_attached: { category: 'engagement', surface: 'widget' },
+  widget_human_handoff_opened: { category: 'engagement', surface: 'widget' },
+  // Widget — leads module
   widget_lead_submitted: { category: 'conversion', surface: 'widget' },
+  widget_lead_opened: { category: 'engagement', surface: 'widget' },
+  widget_lead_success: { category: 'conversion', surface: 'widget' },
+  widget_lead_failed: { category: 'system', surface: 'widget' },
+  // Widget — bookings / demo
+  widget_book_demo_opened: { category: 'engagement', surface: 'widget' },
+  widget_book_demo_success: { category: 'conversion', surface: 'widget' },
+  widget_book_demo_failed: { category: 'system', surface: 'widget' },
+  // Widget — order lookup
+  widget_order_lookup_opened: { category: 'engagement', surface: 'widget' },
+  widget_order_lookup_result: { category: 'engagement', surface: 'widget' },
+  widget_order_lookup_failed: { category: 'system', surface: 'widget' },
+  // Widget — transcript & voice
+  widget_transcript_requested: { category: 'engagement', surface: 'widget' },
+  widget_voice_started: { category: 'engagement', surface: 'widget' },
+  widget_voice_result: { category: 'engagement', surface: 'widget' },
+  widget_voice_error: { category: 'system', surface: 'widget' },
+  // Widget — purchase conversion (detected on client-site thank-you page)
+  widget_conversion_detected: { category: 'conversion', surface: 'widget' },
 
   // Exit tracking
   external_link_clicked: { category: 'exit', surface: 'shared' },
