@@ -29,6 +29,8 @@ export async function GET() {
       display_name: cfg.display_name || cfg.username || a.id.slice(0, 8),
       type: a.type,
       status: a.status,
+      has_widget: !!cfg.widget || cfg.archetype === 'brand',
+      widget_domain: cfg.widget?.domain || cfg.username || null,
     };
   });
 

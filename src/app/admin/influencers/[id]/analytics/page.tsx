@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useMemo, useState } from 'react';
+import { use, useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -16,6 +16,7 @@ import {
 } from 'recharts';
 import { KpiCard } from '@/components/admin/KpiCard';
 import { Card } from '@/components/ui/card';
+import WidgetTab from './WidgetTab';
 
 interface AccountListItem {
   id: string;
@@ -23,6 +24,8 @@ interface AccountListItem {
   display_name: string;
   type: string;
   status: string;
+  has_widget?: boolean;
+  widget_domain?: string | null;
 }
 
 type Range = '7' | '14' | '30' | '90';
@@ -106,6 +109,7 @@ export default function AdminAnalyticsPage({ params }: { params: Promise<{ id: s
   const { id } = use(params);
   const router = useRouter();
   const [range, setRange] = useState<Range>('30');
+  const [tab, setTab] = useState<'overview' | 'widget'>('overview');
   const [data, setData] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -214,6 +218,17 @@ export default function AdminAnalyticsPage({ params }: { params: Promise<{ id: s
 
         {error && <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm">{error}</div>}
 
+        {currentAccount?.has_widget && (
+          <div className="flex gap-2 border-b border-gray-200">
+            <TabButton active={tab === 'overview'} onClick={() => setTab('overview')}>סקירה כללית</TabButton>
+            <TabButton active={tab === 'widget'} onClick={() => setTab('widget')}>ווידג׳ט</TabButton>
+          </div>
+        )}
+
+        {tab === 'widget' && currentAccount?.has_widget ? (
+          <WidgetTab accountId={id} days={Number(range)} domain={currentAccount?.widget_domain || null} />
+        ) : (
+        <>
         {data?.anomalies?.length ? (
           <section className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
             <div className="font-semibold text-amber-900 text-sm mb-2">
@@ -405,8 +420,23 @@ export default function AdminAnalyticsPage({ params }: { params: Promise<{ id: s
             </div>
           </Card>
         </section>
+        </>
+        )}
       </div>
     </main>
+  );
+}
+
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-4 py-2 text-sm font-medium -mb-px border-b-2 ${
+        active ? 'border-black text-black' : 'border-transparent text-gray-500 hover:text-gray-800'
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
