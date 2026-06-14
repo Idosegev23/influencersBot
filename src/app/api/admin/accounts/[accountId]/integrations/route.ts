@@ -32,17 +32,17 @@ function maskToken(t: unknown): string | null {
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ accountId: string }> }
 ) {
   const denied = await requireAdminAuth();
   if (denied) return denied;
 
-  const { id } = await params;
+  const { accountId } = await params;
   const supabase = await createClient();
   const { data: account, error } = await supabase
     .from('accounts')
     .select('config')
-    .eq('id', id)
+    .eq('id', accountId)
     .single();
 
   if (error || !account) {
@@ -64,12 +64,12 @@ export async function GET(
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ accountId: string }> }
 ) {
   const denied = await requireAdminAuth();
   if (denied) return denied;
 
-  const { id } = await params;
+  const { accountId } = await params;
   let body: any;
   try {
     body = await req.json();
@@ -87,7 +87,7 @@ export async function PUT(
   const { data: account, error: readErr } = await supabase
     .from('accounts')
     .select('config')
-    .eq('id', id)
+    .eq('id', accountId)
     .single();
   if (readErr || !account) {
     return NextResponse.json({ error: 'account not found' }, { status: 404 });
@@ -116,7 +116,7 @@ export async function PUT(
   const { error: writeErr } = await supabase
     .from('accounts')
     .update({ config: updatedConfig })
-    .eq('id', id);
+    .eq('id', accountId);
   if (writeErr) {
     return NextResponse.json({ error: writeErr.message }, { status: 500 });
   }
