@@ -762,7 +762,7 @@
         newChatBtnHtml() +
         '<div style="position:absolute;top:12px;left:14px;z-index:6;display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.85);padding:3px 8px;border-radius:999px;font-size:11.5px;color:#15803d;">' +
         '<span style="width:7px;height:7px;border-radius:50%;background:#22c55e;"></span>' + escapeHtml(locale.status) + '</div>' +
-        '<div style="height:128px;' + coverBg + '"></div>' +
+        '<div style="height:112px;' + coverBg + '"></div>' +
         '<div style="width:84px;height:84px;margin:-42px auto 0;border-radius:50%;border:4px solid var(--ibot-panel-bg);overflow:hidden;position:relative;z-index:2;box-shadow:0 4px 14px rgba(0,0,0,0.12);">' + avatarHtml(84) + '</div>' +
         '<div style="text-align:center;font-weight:800;font-size:20px;color:var(--ibot-text-primary);margin:9px 12px 2px;">' + escapeHtml(config.brandName) + '</div>' +
         socialRowHtml() +
@@ -920,7 +920,7 @@
     // Panel dimensions per Figma
     var panelStyle = isMobile
       ? 'position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;border-radius:0;'
-      : 'width:370px;height:min(520px, calc(100vh - 140px));border-radius:18px;position:relative;';
+      : 'width:400px;height:min(680px, calc(100vh - 80px));border-radius:18px;position:relative;';
 
     container.innerHTML =
       // Main panel
@@ -1794,7 +1794,7 @@
     var isMobile = window.innerWidth < 640;
     var panelStyle = isMobile
       ? 'position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;border-radius:0;'
-      : 'width:370px;height:min(520px, calc(100vh - 140px));border-radius:18px;position:relative;';
+      : 'width:400px;height:min(680px, calc(100vh - 80px));border-radius:18px;position:relative;';
 
     container.innerHTML =
       '<div id="ibot-panel" style="' + panelStyle +
@@ -2446,7 +2446,7 @@
     var isMobile = window.innerWidth < 640;
     var panelStyle = isMobile
       ? 'position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;border-radius:0;'
-      : 'width:370px;height:min(520px, calc(100vh - 140px));border-radius:18px;position:relative;';
+      : 'width:400px;height:min(680px, calc(100vh - 80px));border-radius:18px;position:relative;';
     container.innerHTML =
       '<div id="ibot-panel" style="' + panelStyle +
       'background:var(--ibot-panel-bg);display:flex;flex-direction:column;overflow:hidden;' +
