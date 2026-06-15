@@ -331,6 +331,8 @@
     position: 'bottom-right',
     brandName: locale.brandName,
     profilePic: null,
+    coverImage: null,
+    socialLinks: [],
     primaryColor: '#0c1013',
     darkMode: false,
   };
@@ -626,6 +628,8 @@
       if (data.placeholder) config.placeholder = data.placeholder;
       if (data.brandName) config.brandName = data.brandName;
       if (data.profilePic) config.profilePic = data.profilePic;
+      if (data.coverImage) config.coverImage = data.coverImage;
+      if (Array.isArray(data.socialLinks)) config.socialLinks = data.socialLinks;
       if (data.analyticsToken) ANALYTICS_TOKEN = data.analyticsToken;
       // Module toggles drive which affordances the widget surfaces (Support
       // link in header, lead capture, etc). Defaults are all-off; the server
@@ -695,6 +699,104 @@
     return '<iframe src="' + BASE_URL + '/blob-animation.html" ' +
       'style="width:100%;height:100%;border:none;border-radius:50%;pointer-events:none;" title="Bot"></iframe>';
   }
+
+  // ============================================
+  // Header / social / footer helpers (v4.2 redesign)
+  // ============================================
+
+  // Tiny bilingual label helper (avoids editing every LOCALES object).
+  function wlbl(he, en) { return config.language === 'en' ? en : he; }
+
+  function socialIconSvg(platform) {
+    var p = (platform || '').toLowerCase();
+    var a = 'width="17" height="17" viewBox="0 0 24 24" fill="currentColor"';
+    if (p === 'instagram') return '<svg ' + a + '><path d="M12 2.2c3.2 0 3.58 0 4.85.07 1.17.05 1.8.25 2.23.41.56.22.96.48 1.38.9.42.42.68.82.9 1.38.16.43.36 1.06.41 2.23.07 1.27.07 1.65.07 4.85s0 3.58-.07 4.85c-.05 1.17-.25 1.8-.41 2.23-.22.56-.48.96-.9 1.38-.42.42-.82.68-1.38.9-.43.16-1.06.36-2.23.41-1.27.07-1.65.07-4.85.07s-3.58 0-4.85-.07c-1.17-.05-1.8-.25-2.23-.41a3.7 3.7 0 0 1-1.38-.9 3.7 3.7 0 0 1-.9-1.38c-.16-.43-.36-1.06-.41-2.23C2.21 15.58 2.2 15.2 2.2 12s0-3.58.07-4.85c.05-1.17.25-1.8.41-2.23.22-.56.48-.96.9-1.38.42-.42.82-.68 1.38-.9.43-.16 1.06-.36 2.23-.41C8.42 2.21 8.8 2.2 12 2.2zm0 4.86A4.94 4.94 0 1 0 16.94 12 4.94 4.94 0 0 0 12 7.06zm0 8.14A3.2 3.2 0 1 1 15.2 12 3.2 3.2 0 0 1 12 15.2zm5.13-8.34a1.15 1.15 0 1 0 1.15 1.15 1.15 1.15 0 0 0-1.15-1.15z"/></svg>';
+    if (p === 'facebook') return '<svg ' + a + '><path d="M22 12a10 10 0 1 0-11.56 9.88v-6.99H7.9V12h2.54V9.8c0-2.5 1.49-3.89 3.78-3.89 1.09 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.77-1.63 1.56V12h2.78l-.44 2.89h-2.34v6.99A10 10 0 0 0 22 12z"/></svg>';
+    if (p === 'tiktok') return '<svg ' + a + '><path d="M16.6 5.82A4.28 4.28 0 0 1 15.54 3h-3.1v12.4a2.6 2.6 0 1 1-2.6-2.6c.27 0 .53.04.78.12V9.86a5.74 5.74 0 1 0 4.98 5.68V9.4a7.3 7.3 0 0 0 4.27 1.37V7.66a4.28 4.28 0 0 1-3.27-1.84z"/></svg>';
+    if (p === 'youtube') return '<svg ' + a + '><path d="M23 12s0-3.2-.4-4.74a2.5 2.5 0 0 0-1.77-1.77C19.3 5.3 12 5.3 12 5.3s-7.3 0-8.83.4A2.5 2.5 0 0 0 1.4 7.46 26 26 0 0 0 1 12a26 26 0 0 0 .4 4.54 2.5 2.5 0 0 0 1.77 1.77c1.53.4 8.83.4 8.83.4s7.3 0 8.83-.4a2.5 2.5 0 0 0 1.77-1.77C23 15.2 23 12 23 12zM9.75 15.5v-7l6 3.5z"/></svg>';
+    return '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.5 2.5 15.5 0 18M12 3c-2.5 2.5-2.5 15.5 0 18"/></svg>';
+  }
+
+  function socialRowHtml() {
+    var links = Array.isArray(config.socialLinks) ? config.socialLinks : [];
+    var items = '';
+    for (var i = 0; i < links.length; i++) {
+      var l = links[i];
+      if (!l || !l.url) continue;
+      items += '<a href="' + escapeHtml(l.url) + '" target="_blank" rel="noopener noreferrer" aria-label="' + escapeHtml(l.platform || 'link') + '" ' +
+        'style="width:34px;height:34px;border-radius:50%;background:var(--ibot-surface);border:1px solid var(--ibot-border);' +
+        'display:flex;align-items:center;justify-content:center;color:var(--ibot-text-primary);text-decoration:none;flex-shrink:0;">' +
+        socialIconSvg(l.platform) + '</a>';
+    }
+    if (!items) return '';
+    return '<div style="display:flex;justify-content:center;gap:13px;padding:6px 0 12px;">' + items + '</div>';
+  }
+
+  // Small "new conversation" pill (welcome state, absolute top-right).
+  function newChatBtnHtml() {
+    return '<button onclick="window.__ibotNewChat()" title="' + escapeHtml(wlbl('שיחה חדשה','New chat')) + '" ' +
+      'style="position:absolute;top:10px;right:12px;z-index:6;background:rgba(255,255,255,0.92);border:1px solid var(--ibot-border);' +
+      'color:#333;border-radius:999px;cursor:pointer;display:flex;align-items:center;gap:5px;font-family:inherit;font-size:12px;padding:5px 10px;line-height:1;">' +
+      '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v5h-5"/></svg>' +
+      '<span>' + escapeHtml(wlbl('שיחה חדשה','New chat')) + '</span></button>';
+  }
+
+  function poweredByFooterHtml() {
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:2px 16px 10px;flex-shrink:0;font-size:10.5px;color:var(--ibot-text-muted);">' +
+      '<span style="display:flex;align-items:center;gap:5px;">' + escapeHtml(wlbl('מבוסס על','Powered by')) +
+      ' <img src="' + BASE_URL + '/brand/bestie-icon.svg" alt="Bestie" style="width:14px;height:14px;border-radius:4px;" onerror="this.style.display=\'none\'"/>' +
+      ' <b style="color:var(--ibot-text-muted);font-weight:700;">Bestie</b></span>' +
+      '<span>' + escapeHtml(wlbl('AI עלול לטעות','AI can make mistakes')) + '</span></div>';
+  }
+
+  // Header: rich cover+logo on the welcome screen, compact bar once chatting.
+  function headerHtml(pc, isMobile) {
+    var hasUser = messages.some(function (mm) { return mm.role === 'user'; });
+    var radius = isMobile ? '' : 'border-radius:18px 18px 0 0;';
+    if (!hasUser) {
+      var coverUrl = config.coverImage ? String(config.coverImage).replace(/['"]/g, '') : '';
+      var coverBg = coverUrl
+        ? "background:linear-gradient(180deg,rgba(0,0,0,0.05),var(--ibot-panel-bg)),url('" + coverUrl + "') center/cover;"
+        : 'background:linear-gradient(135deg,' + pc + ',var(--ibot-panel-bg));';
+      return '<div style="position:relative;flex-shrink:0;' + radius + 'overflow:hidden;">' +
+        newChatBtnHtml() +
+        '<div style="position:absolute;top:12px;left:14px;z-index:6;display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.85);padding:3px 8px;border-radius:999px;font-size:11.5px;color:#15803d;">' +
+        '<span style="width:7px;height:7px;border-radius:50%;background:#22c55e;"></span>' + escapeHtml(locale.status) + '</div>' +
+        '<div style="height:128px;' + coverBg + '"></div>' +
+        '<div style="width:84px;height:84px;margin:-42px auto 0;border-radius:50%;border:4px solid var(--ibot-panel-bg);overflow:hidden;position:relative;z-index:2;box-shadow:0 4px 14px rgba(0,0,0,0.12);">' + avatarHtml(84) + '</div>' +
+        '<div style="text-align:center;font-weight:800;font-size:20px;color:var(--ibot-text-primary);margin:9px 12px 2px;">' + escapeHtml(config.brandName) + '</div>' +
+        socialRowHtml() +
+        (isMobile ? '<button id="ibot-close-mobile" style="position:absolute;top:10px;left:54px;background:rgba(0,0,0,0.32);border:none;color:#fff;cursor:pointer;width:30px;height:30px;border-radius:50%;font-size:18px;display:flex;align-items:center;justify-content:center;z-index:6;">&times;</button>' : '') +
+        '</div>';
+    }
+    return '<div style="display:flex;align-items:center;gap:10px;padding:0 12px;height:62px;flex-shrink:0;position:relative;z-index:2;' +
+      'background:var(--ibot-surface);border-bottom:1px solid var(--ibot-border);' + radius + '">' +
+      '<div style="width:40px;height:40px;flex-shrink:0;border-radius:50%;overflow:hidden;">' + avatarHtml(40) + '</div>' +
+      '<div style="flex:1;min-width:0;">' +
+      '<div style="font-weight:700;font-size:16px;color:var(--ibot-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(config.brandName) + '</div>' +
+      '<div style="display:flex;align-items:center;gap:4px;margin-top:1px;"><span style="width:7px;height:7px;border-radius:50%;background:#22c55e;"></span><span style="font-size:11.5px;color:#15803d;">' + escapeHtml(locale.status) + '</span></div>' +
+      '</div>' +
+      '<button onclick="window.__ibotNewChat()" title="' + escapeHtml(wlbl('שיחה חדשה','New chat')) + '" style="background:transparent;border:none;color:var(--ibot-text-muted);cursor:pointer;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
+      '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v5h-5"/></svg></button>' +
+      (modules.support.enabled ? '<button id="ibot-open-support" title="' + escapeHtml(locale.support.openLink) + '" style="background:transparent;border:none;color:var(--ibot-text-muted);cursor:pointer;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></button>' : '') +
+      (isMobile ? '<button id="ibot-close-mobile" style="background:transparent;border:none;color:var(--ibot-text-muted);cursor:pointer;width:34px;height:34px;font-size:22px;flex-shrink:0;line-height:1;">&times;</button>' : '') +
+      '</div>';
+  }
+
+  // New-conversation reset (confirm → clear session + history).
+  window.__ibotNewChat = function () {
+    var ok = window.confirm(wlbl('להתחיל שיחה חדשה? ההיסטוריה הנוכחית תימחק.', 'Start a new chat? Your current history will be cleared.'));
+    if (!ok) return;
+    try { localStorage.removeItem('ibot_widget_' + ACCOUNT_ID); } catch (e) { /* */ }
+    sessionId = null;
+    messages = [{ role: 'assistant', content: config.welcomeMessage }];
+    chips = [];
+    ratings = {};
+    pendingAction = null;
+    view = 'chat';
+    fetchChips('initial');
+    render();
+  };
 
   // ============================================
   // Render
@@ -828,40 +930,8 @@
       'box-shadow:0 8px 40px rgba(0,0,0,0.15);' +
       'animation:ibot-slide-up 0.35s cubic-bezier(0.34,1.56,0.64,1);">' +
 
-      // ---- Dark header (81px) ----
-      '<div style="display:flex;align-items:center;gap:10px;padding:0 16px;height:81px;flex-shrink:0;' +
-      'background:' + pc + ';color:#fff;position:relative;z-index:2;' +
-      (isMobile ? '' : 'border-radius:18px 18px 0 0;') + '">' +
-      // Avatar (52px)
-      '<div style="width:52px;height:52px;flex-shrink:0;">' +
-      avatarHtml(52) + '</div>' +
-      // Title + status (no wrap)
-      '<div style="flex:1;min-width:0;">' +
-      '<div style="font-weight:700;font-size:23px;line-height:normal;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(config.brandName) + '</div>' +
-      '<div style="display:flex;align-items:center;gap:4px;margin-top:2px;">' +
-      '<span style="width:10px;height:10px;border-radius:50%;background:#22c55e;flex-shrink:0;"></span>' +
-      '<span style="font-size:16px;white-space:nowrap;">' + escapeHtml(locale.status) + '</span>' +
-      '</div></div>' +
-      // Header right-side controls — Support (when enabled) + Mobile close
-      (modules.support.enabled
-        ? '<button id="ibot-open-support" title="' + escapeHtml(locale.support.openLink) + '" ' +
-          'style="background:rgba(255,255,255,0.12);border:none;color:#fff;cursor:pointer;' +
-          'border-radius:999px;display:flex;align-items:center;gap:6px;font-family:inherit;' +
-          (isMobile ? 'width:36px;height:36px;justify-content:center;padding:0;' : 'height:34px;padding:0 12px;font-size:13px;font-weight:500;') +
-          'transition:background 0.2s;flex-shrink:0;">' +
-          // Help icon (question-circle)
-          '<svg width="' + (isMobile ? 18 : 14) + '" height="' + (isMobile ? 18 : 14) + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-          '<circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line>' +
-          '</svg>' +
-          (isMobile ? '' : '<span>' + escapeHtml(locale.support.openLink) + '</span>') +
-          '</button>'
-        : '') +
-      (isMobile
-        ? '<button id="ibot-close-mobile" style="background:rgba(255,255,255,0.15);border:none;color:#fff;cursor:pointer;' +
-          'width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;' +
-          'font-size:20px;transition:background 0.2s;flex-shrink:0;">&times;</button>'
-        : '') +
-      '</div>' +
+      // ---- Header (v4.2: cover+logo on welcome, compact bar in chat) ----
+      headerHtml(pc, isMobile) +
 
       // ---- Toast overlay (transient confirmations) ----
       renderToastHtml(pc) +
@@ -916,6 +986,9 @@
       'style="flex:1;border:none;outline:none;font-size:16px;color:var(--ibot-text-primary);background:transparent;' +
       'direction:' + locale.dir + ';font-family:inherit;text-align:' + (locale.dir === 'rtl' ? 'right' : 'left') + ';min-width:0;" />' +
       '</div></div>' +
+
+      // ---- Powered by Bestie footer ----
+      poweredByFooterHtml() +
 
       '</div>' +
 
