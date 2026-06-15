@@ -97,8 +97,6 @@ export async function GET(req: NextRequest) {
         },
         brandName: config.display_name || config.username || '',
         profilePic: config.profile_pic_url || null,
-        coverImage: widgetConfig.coverImage || null,
-        socialLinks: Array.isArray(widgetConfig.socialLinks) ? widgetConfig.socialLinks : [],
         welcomeMessage: widgetConfig.welcomeMessage || fb.welcome,
         placeholder: widgetConfig.placeholder || fb.placeholder,
         domain: widgetConfig.domain || config.username || '',
