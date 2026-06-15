@@ -333,6 +333,7 @@
     profilePic: null,
     coverImage: null,
     socialLinks: [],
+    enabled: true,
     primaryColor: '#0c1013',
     darkMode: false,
   };
@@ -630,6 +631,9 @@
       if (data.profilePic) config.profilePic = data.profilePic;
       if (data.coverImage) config.coverImage = data.coverImage;
       if (Array.isArray(data.socialLinks)) config.socialLinks = data.socialLinks;
+      // Master on/off from the admin toggle. Default ON: only an explicit
+      // false hides the widget, so accounts that never set it are unaffected.
+      config.enabled = data.enabled !== false;
       if (data.analyticsToken) ANALYTICS_TOKEN = data.analyticsToken;
       // Module toggles drive which affordances the widget surfaces (Support
       // link in header, lead capture, etc). Defaults are all-off; the server
@@ -803,6 +807,8 @@
   // ============================================
 
   function render() {
+    // Master switch (admin toggle): when disabled, render nothing at all.
+    if (config.enabled === false) { try { container.innerHTML = ''; } catch (e) { /* */ } return; }
     if (!isOpen) {
       renderClosed();
       return;

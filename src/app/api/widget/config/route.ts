@@ -99,6 +99,7 @@ export async function GET(req: NextRequest) {
         profilePic: config.profile_pic_url || null,
         coverImage: widgetConfig.coverImage || null,
         socialLinks: Array.isArray(widgetConfig.socialLinks) ? widgetConfig.socialLinks : [],
+        enabled: widgetConfig.enabled !== false,
         welcomeMessage: widgetConfig.welcomeMessage || fb.welcome,
         placeholder: widgetConfig.placeholder || fb.placeholder,
         domain: widgetConfig.domain || config.username || '',
