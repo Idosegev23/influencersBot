@@ -6,16 +6,21 @@
 
 ## Outcome
 
-A merchant installs a free **Besti for WooCommerce** plugin from WordPress.org, clicks
-**"Connect to Besti,"** and their store is wired to Besti automatically:
+This is **sales-led, not self-serve**. We create and configure the account first (as we do
+today — scanning social + website). When the account is a WooCommerce store, we flag it as such
+and hand the client a **Besti for WooCommerce** connector plugin. The client installs it and the
+store wires up to Besti automatically:
 
 - The widget appears on the storefront (no manual code paste).
 - The store's products sync into the bot's catalog (`widget_products`) — the bot recommends
-  real products with real prices/sale state.
+  real products with real prices/sale state, in **both the website widget and the main/hosted
+  chat**.
 - The order-lookup form in the widget works against real WooCommerce orders.
 - The catalog stays live: product edits in the store reflect in the bot within seconds.
 
-All AI processing and billing stay in Besti's cloud. The plugin is a thin connector.
+The plugin is **inert for anyone who isn't a provisioned customer** — it only connects to an
+account we created and flagged as a Woo store (see "Onboarding model" below). All AI processing
+and billing stay in Besti's cloud. The plugin is a thin connector.
 
 ## Locked decisions
 
@@ -26,7 +31,9 @@ All AI processing and billing stay in Besti's cloud. The plugin is a thin connec
 | Product source | WC REST API sync replaces the scraper for Woo merchants | Single source of truth, live; scraper no longer used for Woo accounts |
 | Enrichment timing | Batch on sync; webhooks mark products dirty; nightly cron re-enriches dirty only | AI profile/embedding for a webhook-edited product is refreshed by the next nightly run |
 | Async execution | Upstash QStash durable queue for slow work (initial full sync + webhook event processing) | New infra (QStash) added; leverages existing Upstash account |
-| Distribution | WordPress.org first + self-hosted `.zip`; Woo Marketplace deferred | Avoids QIT / Billing API; fastest path to live |
+| Onboarding | Sales-led + account-gated: we create + flag the account; plugin is inert otherwise | Revenue protected by account gating, not by restricting the download |
+| Product surfaces | Synced products feed **both** the website widget **and** the main/hosted chat | New work: wire the recommendation engine into the main chat path (today it's widget-only) |
+| Distribution | Self-hosted `.zip` handed to clients first (sales-led); WP.org optional later | Gating protects revenue regardless of channel; fastest path to live, no review queue |
 
 ## Scope decomposition (why this cycle stops where it does)
 
@@ -35,6 +42,35 @@ repo), a PHP WordPress plugin, a Shopify Remix app, and a Wix app. That is too l
 spec. This cycle covers the first coherent shippable outcome — "Besti is an official
 WooCommerce app" — which is Phase 0 + Phase 1. Phase 2 (Shopify) and Phase 3 (Wix) reuse the
 same commerce core and get their own spec → plan → implementation cycles.
+
+## Onboarding model (sales-led, account-gated)
+
+The plugin is a key with no lock of its own — the lock lives in Besti. A non-customer who
+installs it gets nothing. Concretely:
+
+1. **We create the account** in Besti and scan everything (social + website) — exactly as today.
+   The initial scan may already populate `widget_products` from the scraper.
+2. **We flag the account as a WooCommerce store** in the admin. This admin action **mints a
+   connect link** for that account (account-scoped, signed; see `connect-token.ts`).
+3. **We hand the client the connector plugin + their connect link.** The client installs the
+   plugin and pastes the link.
+4. **The plugin calls `POST /api/connect/register`.** The backend accepts the connection only if
+   **both** gating conditions hold:
+   - the account exists and was created by us, **and**
+   - it is flagged as a WooCommerce store (the flag from step 2) with a valid, unexpired
+     connect token.
+   If either fails, register returns a clean rejection and the plugin stays inert — nothing
+   syncs, no widget data is touched.
+5. On success, the WooCommerce REST keys are stored and the initial sync is enqueued.
+
+**Why a connect link and not a bare Account ID:** an Account ID is a UUID that can leak. Without
+a signed token, anyone holding a client's Account ID could register a fake store and poison that
+account's catalog. The connect link is the same single copy-paste for the client but closes that
+hole. The admin "flag as Woo store" step is what generates the link.
+
+**Distribution follows from this:** because gating (not download restriction) protects revenue,
+we ship a self-hosted `.zip` to clients first. Public WP.org listing is optional and additive
+later (for inbound leads + a "verified" badge); it does not change the gating.
 
 ## Architecture
 
@@ -71,9 +107,11 @@ Shared commerce core under `src/lib/commerce/`:
 New API routes under `src/app/api/connect/`:
 
 - **`POST /api/connect/register`** — a plugin/app registers a store's credentials. Body:
-  `{ account_id, platform, shop_domain, credentials, connect_token }`. Validates the
-  connect_token, rate-limits, merges via `integrations.ts`, then enqueues an initial full-sync
-  job to QStash. CORS enabled, `runtime = 'nodejs'`. Never logs credentials.
+  `{ account_id, platform, shop_domain, credentials, connect_token }`. Enforces **both gating
+  conditions** (account exists + flagged for this platform) and validates the connect_token;
+  rate-limits; merges via `integrations.ts`; then enqueues an initial full-sync job to QStash.
+  On any gating/token failure returns a clean rejection so the plugin stays inert. CORS enabled,
+  `runtime = 'nodejs'`. Never logs credentials.
 - **`POST /api/connect/webhooks/[platform]`** — verifies the provider signature, enqueues the
   event to QStash, returns 200 fast. 401 on bad signature.
 - **`POST /api/connect/sync-worker`** — the QStash worker. Verifies the QStash signature, then
@@ -81,8 +119,9 @@ New API routes under `src/app/api/connect/`:
   bust order cache). Idempotent and resumable.
 - **`POST /api/connect/data-deletion`** + a public privacy page — marketplace requirement;
   reusable for Meta later.
-- Admin "generate connect link" action — mints a connect_token for an account (extends the
-  integrations admin surface / `StoreIntegrationForm.tsx`).
+- Admin "flag as WooCommerce store + generate connect link" action — sets the platform flag on
+  the account and mints a connect_token/link for it (extends the integrations admin surface /
+  `StoreIntegrationForm.tsx`). This flag is gating condition #2 enforced by register.
 - New cron route — nightly enrichment of dirty products.
 
 ### WooCommerce provider (`src/lib/woocommerce/`)
@@ -98,13 +137,32 @@ New API routes under `src/app/api/connect/`:
   `order.updated`).
 - Registered in `registry.ts` under `'woocommerce'`.
 
+### Main-chat product wiring (new — products in both surfaces)
+
+Today `widget_products` only reaches the **widget** chat: `widget-chat-handler.ts` calls
+`getRecommendations()` (`src/lib/recommendations/engine.ts`) and emits product cards. The **main
+chat** (`src/app/api/chat/stream/route.ts` → `sandwich-bot-hybrid.ts`) never queries
+`widget_products` — it surfaces a separate "brands" system from partnerships/coupons.
+
+To put synced products in the main/hosted chat too, wire the **existing** recommendation engine
+into the main chat path:
+
+- Reuse `getRecommendations({ accountId, ... })` — do **not** fork the engine.
+- Trigger it for accounts that have a product catalog (e.g. brand/Woo accounts), so the main chat
+  can recommend real products and emit the same product-card stream event the widget uses.
+- Keep the existing "brands"/partnership cards working; products are additive, not a replacement.
+- Gate behind the account having products so influencer-only accounts are unaffected.
+
+This is the one net-new feature beyond the doc's Phase 0/1; everything else is connector + sync.
+
 ### Side B — WordPress plugin (`/wordpress-plugin/besti-for-woocommerce/`, PHP)
 
 A thin, GPLv2+ connector. All AI stays in Besti's cloud.
 
-- **Settings page** under the WooCommerce menu: Account ID field + "Connect to Besti" button +
-  a disable-widget toggle. `current_user_can('manage_woocommerce')`, nonce on every form,
-  sanitize input / escape output.
+- **Settings page** under the WooCommerce menu: a **connect-link** field (the client pastes the
+  signed link we gave them; the plugin extracts account_id + connect_token from it) + "Connect to
+  Besti" button + a disable-widget toggle. `current_user_can('manage_woocommerce')`, nonce on
+  every form, sanitize input / escape output.
 - **Widget injection** on `wp_footer` (frontend only):
   `<script src="https://bestie.ldrsgroup.com/widget.js" data-account-id="{ID}"></script>`.
 - **Connect handshake**: trigger WooCommerce key provisioning via `/wc-auth/v1/authorize`
@@ -132,6 +190,9 @@ A thin, GPLv2+ connector. All AI stays in Besti's cloud.
    embedding via `generateProductEmbedding`), then clears the dirty flag.
 5. **Order-lookup (live)** — widget `orderForm` → `/api/widget/order-lookup` → registry resolves
    the account's provider → `lookupWooOrder` → sanitized DTO back to the widget.
+6. **Product recommendations (both surfaces)** — the synced `widget_products` feed
+   `getRecommendations()`, which now serves **both** the widget chat (existing) and the
+   main/hosted chat (new wiring above). Same engine, same product cards, two surfaces.
 
 ## Schema migration
 
@@ -147,7 +208,8 @@ RLS stays intact. Existing rows are backfilled with `source_platform = 'scraper'
 
 ## Error handling
 
-- **Register**: 401 on bad/expired connect_token; rate-limited; never log credentials; mask any
+- **Register**: rejects when either gating condition fails (account missing / not flagged for
+  the platform) and on bad/expired connect_token; rate-limited; never log credentials; mask any
   credential echoed in a response.
 - **Webhooks**: 401 on bad signature; log platform + event type only (no PII); upserts are
   idempotent.
@@ -159,11 +221,14 @@ RLS stays intact. Existing rows are backfilled with `source_platform = 'scraper'
 
 ## Testing
 
-- **Unit**: connect-token mint/verify; `integrations.ts` merge helper; Woo order-lookup
+- **Unit**: connect-token mint/verify; register gating (account-missing + not-flagged both
+  rejected; happy path accepted); `integrations.ts` merge helper; Woo order-lookup
   (found / not-found / wrong-email, mocked WC response); Woo webhook signature verify; product
   mapping → `widget_products`; sync idempotency (re-run = no dupes).
 - **Regression**: existing Shopify order-lookup behavior unchanged after it is wrapped in the
-  `CommerceProvider` interface (add a regression test).
+  `CommerceProvider` interface (add a regression test); existing widget product recommendations
+  unchanged after the engine is also wired into the main chat; influencer-only accounts (no
+  catalog) see no product cards in the main chat.
 - **Plugin**: installs clean on a fresh WP + Woo; connects; widget appears; products sync;
   order-lookup works; Plugin Check passes with zero errors.
 - **Per CLAUDE.md, after each chunk**: `npm run type-check` (separate — the build ignores TS
@@ -188,6 +253,8 @@ RLS stays intact. Existing rows are backfilled with `source_platform = 'scraper'
 
 ## Distribution / submission (human steps, tracked here)
 
-- Ship a self-hosted `.zip` from bestie.ldrsgroup.com immediately after the plugin connects
-  end-to-end, while the WP.org review queue clears.
-- A `SUBMISSION.md` checklist documents the human WP.org steps (account, SVN, review wait).
+- **Primary channel: self-hosted `.zip`** from bestie.ldrsgroup.com, handed to clients we've
+  provisioned. This is the live distribution path for the sales-led model — no review queue.
+- **WP.org is optional / later** (inbound leads + "verified" badge). If pursued, a `SUBMISSION.md`
+  checklist documents the human steps (account, SVN, Plugin Check, review wait). Gating is
+  unchanged either way, so a public download cannot use the service without a provisioned account.
