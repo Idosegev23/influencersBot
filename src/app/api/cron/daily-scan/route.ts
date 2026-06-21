@@ -76,6 +76,8 @@ export async function GET(req: NextRequest) {
 
     // Build account list: prefer persona.instagram_username, fallback to config.username
     const accounts = (activeAccounts || [])
+      // Skip CRM-only clients (agency-CRM entities have no chatbot — never scan them)
+      .filter(a => (a.config as any)?.crmOnly !== true)
       .map(a => ({
         id: a.id,
         instagram_username:

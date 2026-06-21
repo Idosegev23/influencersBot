@@ -7,6 +7,7 @@ import { Zap, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AdminLogin() {
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -32,18 +33,19 @@ export default function AdminLogin() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/admin', {
+      // Unified login: admin (reserved username) + agents (Supabase Auth).
+      const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ username, password }),
       });
 
       const data = await res.json();
 
       if (res.ok) {
-        router.push('/admin/dashboard');
+        router.push(data.redirect || '/admin/dashboard');
       } else {
-        setError(data.error || 'סיסמה שגויה');
+        setError(data.error || 'שם משתמש או סיסמה שגויים');
       }
     } catch {
       setError('שגיאה בהתחברות');
@@ -85,11 +87,23 @@ export default function AdminLogin() {
         {/* Card */}
         <div className="admin-card p-6 sm:p-8">
           <div className="text-center mb-6">
-            <h1 className="text-xl font-bold mb-1" style={{ color: '#ede9f8' }}>פאנל ניהול</h1>
+            <h1 className="text-xl font-bold mb-1" style={{ color: '#ede9f8' }}>כניסה למערכת</h1>
             <p className="text-sm" style={{ color: 'rgba(237, 233, 248, 0.35)' }}>bestieAI</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="admin-input text-center text-lg"
+                placeholder="שם משתמש"
+                autoComplete="username"
+                required
+                autoFocus
+              />
+            </div>
             <div>
               <input
                 type="password"
@@ -97,8 +111,8 @@ export default function AdminLogin() {
                 onChange={(e) => setPassword(e.target.value)}
                 className="admin-input text-center text-lg tracking-widest"
                 placeholder="סיסמה"
+                autoComplete="current-password"
                 required
-                autoFocus
               />
             </div>
 

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import {
   LayoutDashboard,
   Users,
+  Briefcase,
   Globe,
   Activity,
   BarChart3,
@@ -59,6 +60,12 @@ const NAV: NavGroup[] = [
         label: 'חשבונות',
         icon: Users,
         match: (p) => p.startsWith('/admin/accounts') || p.startsWith('/admin/influencers'),
+      },
+      {
+        href: '/admin/agents',
+        label: 'סוכנים',
+        icon: Briefcase,
+        match: (p) => p.startsWith('/admin/agents'),
       },
       {
         href: '/admin/websites',
