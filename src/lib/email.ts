@@ -31,6 +31,11 @@ function getServiceAccountCredentials(): { client_email: string; private_key: st
   }
 }
 
+/** Exposed for the agency-CRM Gmail inbox poller (needs gmail.readonly). */
+export function getGoogleServiceAccount(): { client_email: string; private_key: string } | null {
+  return getServiceAccountCredentials();
+}
+
 function isConfigured(): boolean {
   return !!(getServiceAccountCredentials() && SEND_FROM);
 }

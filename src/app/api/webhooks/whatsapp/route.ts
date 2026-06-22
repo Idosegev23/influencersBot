@@ -26,6 +26,8 @@ import { verifyWhatsAppSignature } from '@/lib/whatsapp-cloud/signature';
 import { createClient } from '@/lib/supabase';
 import { isItamarSender, processItamarReply } from '@/lib/handoff/process-itamar-reply';
 import { routeInboundToTicket } from '@/lib/support/route-inbound';
+import { toWaId, downloadMedia, sendText } from '@/lib/whatsapp-cloud/client';
+import { ingestQuote } from '@/lib/crm/quote-ingest';
 
 export const runtime = 'nodejs';          // need crypto + Buffer
 export const dynamic = 'force-dynamic';   // never cache
@@ -239,11 +241,23 @@ async function processWebhook(payload: any): Promise<void> {
           .update({ unread_count: (convo.unread_count ?? 0) + 1 })
           .eq('id', convo.id);
 
-        // Route this inbound to a support ticket if we can identify
-        // one. Skips the Itamar handoff sender — that flow has its own
-        // routing above. Best-effort: errors are swallowed because the
-        // raw message is already persisted in whatsapp_messages.
+        // Agency-CRM: if the sender is a registered agent, treat the inbound as
+        // a forwarded price-quote (AI parse → quote → tailored reply) and SKIP
+        // support routing — an agent's WhatsApp is not a customer thread.
+        let handledAsAgent = false;
         if (!isItamarSender(waId)) {
+          try {
+            handledAsAgent = await maybeHandleAgentQuote({ waId, msg, textBody });
+          } catch (err) {
+            console.error('[whatsapp webhook] agent quote ingest failed', err);
+          }
+        }
+
+        // Route this inbound to a support ticket if we can identify
+        // one. Skips the Itamar handoff sender and agent senders — those
+        // flows have their own handling above. Best-effort: errors are
+        // swallowed because the raw message is already persisted.
+        if (!isItamarSender(waId) && !handledAsAgent) {
           try {
             await routeInboundToTicket({
               waId,
@@ -302,4 +316,65 @@ function normaliseType(t: string): string {
     'template','system',
   ]);
   return allowed.has(t) ? t : 'unknown';
+}
+
+/**
+ * Agency-CRM: if the WhatsApp sender is a registered agent, ingest the message
+ * as a forwarded quote (download any PDF/image, AI-parse, create the quote) and
+ * reply with a tailored ack. Returns true if the sender was an agent (so the
+ * caller skips support routing).
+ */
+async function maybeHandleAgentQuote(args: {
+  waId: string;
+  msg: any;
+  textBody: string | null;
+}): Promise<boolean> {
+  const supabase = createClient();
+  const { data: agent } = await supabase
+    .from('users')
+    .select('id, role, status')
+    .eq('whatsapp', toWaId(args.waId))
+    .maybeSingle();
+  if (!agent || (agent as any).role !== 'agent' || (agent as any).status !== 'active') {
+    return false; // not an agent → let support routing handle it
+  }
+
+  // Download an attachment if present (forwarded quote as PDF/image).
+  const attachments: { filename: string; mime: string; bytes: Uint8Array }[] = [];
+  const type: string = args.msg.type;
+  const mediaId: string | undefined = args.msg?.[type]?.id;
+  if (mediaId && (type === 'document' || type === 'image')) {
+    try {
+      const dl = await downloadMedia(mediaId);
+      if (dl) {
+        const mime = dl.mimeType || args.msg[type]?.mime_type || 'application/octet-stream';
+        const ext = mime.split('/')[1] || 'bin';
+        attachments.push({
+          filename: args.msg[type]?.filename || `${type}.${ext}`,
+          mime,
+          bytes: new Uint8Array(dl.bytes),
+        });
+      }
+    } catch (e) {
+      console.warn('[agent quote] media download failed', e);
+    }
+  }
+
+  const result = await ingestQuote({
+    channel: 'whatsapp',
+    sender: args.waId,
+    providerMessageId: args.msg.id,
+    rawText: args.textBody,
+    attachments,
+  });
+
+  // Reply within the 24h service window (the agent just messaged us).
+  if (result.ackText) {
+    try {
+      await sendText({ to: args.waId, body: result.ackText, contextMessageId: args.msg.id });
+    } catch (e) {
+      console.warn('[agent quote] reply failed', e);
+    }
+  }
+  return true;
 }
