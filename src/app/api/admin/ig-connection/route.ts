@@ -15,6 +15,8 @@ export async function GET(req: NextRequest) {
     .from('ig_graph_connections')
     .select('ig_username, ig_name, ig_profile_pic, ig_followers_count, is_active, connected_at')
     .eq('account_id', accountId)
+    .order('connected_at', { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (error) {

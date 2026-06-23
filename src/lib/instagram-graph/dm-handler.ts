@@ -355,7 +355,9 @@ async function getAccessTokenForAccount(
     .select('access_token')
     .eq('account_id', accountId)
     .eq('is_active', true)
-    .single();
+    .order('connected_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   return data?.access_token || process.env.INSTAGRAM_ACCESS_TOKEN || null;
 }

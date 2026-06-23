@@ -182,7 +182,9 @@ export async function GET(req: NextRequest) {
     .select('ig_business_account_id, ig_username, is_active')
     .eq('account_id', accountId)
     .eq('is_active', true)
-    .single();
+    .order('connected_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   const dmBotEnabled = accountData?.config?.dm_bot_enabled !== false; // default true
 

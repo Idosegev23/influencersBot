@@ -106,6 +106,17 @@ export async function GET(req: NextRequest) {
             .from('ig_graph_connections')
             .update({ account_id: stateData.accountId })
             .eq('ig_business_account_id', igbaId);
+
+          // Enforce one active connection per account. A reconnect can produce a
+          // different ig_business_account_id (e.g. Instagram Login vs. older flow),
+          // leaving two `is_active=true` rows — which breaks every account-scoped
+          // `.single()` read (the connection indicator, admin panel, DM token lookup).
+          await supabase
+            .from('ig_graph_connections')
+            .update({ is_active: false })
+            .eq('account_id', stateData.accountId)
+            .eq('is_active', true)
+            .neq('ig_business_account_id', igbaId);
         }
       } catch {
         // State parsing failed — not critical

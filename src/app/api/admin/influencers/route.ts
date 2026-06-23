@@ -44,7 +44,7 @@ export async function GET() {
         supabase.from('instagram_posts').select('*', { count: 'exact', head: true }).eq('account_id', account.id),
         supabase.from('instagram_transcriptions').select('*', { count: 'exact', head: true }).eq('account_id', account.id).eq('processing_status', 'completed'),
         supabase.from('coupons').select('*', { count: 'exact', head: true }).eq('account_id', account.id).eq('is_active', true),
-        supabase.from('ig_graph_connections').select('ig_username, is_active, connected_at, token_expires_at').eq('account_id', account.id).maybeSingle()
+        supabase.from('ig_graph_connections').select('ig_username, is_active, connected_at, token_expires_at').eq('account_id', account.id).order('connected_at', { ascending: false }).limit(1).maybeSingle()
       ]);
 
       return {
