@@ -283,15 +283,19 @@ async function resolveAccountFromIGId(
   supabase: any,
   igAccountId: string,
 ): Promise<string | null> {
-  // Check ig_graph_connections table first
-  const { data: connection } = await supabase
+  // Route by business id to the owning account — regardless of is_active.
+  // A reconnect can change the active id (Instagram Login can yield a new
+  // ig_business_account_id), and older ids still belong to the same account.
+  // Inbound DMs must resolve for ANY known id, else messages silently drop.
+  const { data: connections } = await supabase
     .from('ig_graph_connections')
-    .select('account_id')
+    .select('account_id, is_active')
     .eq('ig_business_account_id', igAccountId)
-    .eq('is_active', true)
-    .single();
+    .order('is_active', { ascending: false })
+    .order('connected_at', { ascending: false })
+    .limit(1);
 
-  if (connection?.account_id) return connection.account_id;
+  if (connections?.[0]?.account_id) return connections[0].account_id;
 
   // Fallback: if there's only one active account, use it
   const { data: accounts } = await supabase
