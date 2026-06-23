@@ -54,6 +54,10 @@
       "schedule": "*/30 * * * *"
     },
     {
+      "path": "/api/cron/ig-connection-health",
+      "schedule": "30 4 * * *"
+    },
+    {
       "path": "/api/cron/daily-support-report",
       "schedule": "0 19 * * *"
     },

@@ -297,6 +297,17 @@ async function resolveAccountFromIGId(
 
   if (connections?.[0]?.account_id) return connections[0].account_id;
 
+  // Match any known id for this account (token user_id / me.id / legacy IGBA).
+  // Reconnects can change which id Meta sends; known_ig_ids covers them all.
+  const { data: byKnown } = await supabase
+    .from('ig_graph_connections')
+    .select('account_id')
+    .contains('known_ig_ids', [igAccountId])
+    .order('is_active', { ascending: false })
+    .limit(1);
+
+  if (byKnown?.[0]?.account_id) return byKnown[0].account_id;
+
   // Fallback: if there's only one active account, use it
   const { data: accounts } = await supabase
     .from('accounts')
@@ -308,6 +319,20 @@ async function resolveAccountFromIGId(
   if (accounts?.length === 1) {
     return accounts[0].id;
   }
+
+  // Unresolvable — record it instead of dropping the DM silently, so the
+  // ig-connection-health cron can surface it to admins.
+  await supabase
+    .from('ig_webhook_issues')
+    .insert({
+      ig_account_id: igAccountId,
+      issue_type: 'unresolved_account',
+      detail: { note: 'inbound DM webhook id matched no connection' },
+    })
+    .then(
+      () => {},
+      () => {},
+    );
 
   return null;
 }

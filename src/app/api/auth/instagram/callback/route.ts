@@ -70,11 +70,16 @@ export async function GET(req: NextRequest) {
     // IMPORTANT: Use user_id from token exchange (IGBA ID) — this matches webhook entry.id
     // The /me endpoint returns a different app-scoped user ID
     const igbaId = shortLivedToken.user_id || igAccount.ig_id;
-    console.log('[IG OAuth] Saving connection to database...', { igbaId, meId: igAccount.ig_id });
+    // All ids this account may appear under in webhooks — routing matches any.
+    const knownIgIds = Array.from(
+      new Set([igbaId, igAccount.ig_id, igAccount.ig_user_id].filter(Boolean)),
+    );
+    console.log('[IG OAuth] Saving connection to database...', { igbaId, meId: igAccount.ig_id, knownIgIds });
     const supabase = await createClient();
 
     const connectionData = {
       ig_business_account_id: igbaId,
+      known_ig_ids: knownIgIds,
       ig_username: igAccount.username,
       ig_name: igAccount.name,
       ig_profile_pic: igAccount.profile_picture_url,
@@ -214,13 +219,16 @@ async function exchangeLongLivedToken(shortLivedToken: string): Promise<LongLive
  */
 async function getIGBusinessAccount(accessToken: string): Promise<{
   ig_id: string;
+  ig_user_id: string;
   username: string;
   name: string;
   profile_picture_url: string;
   followers_count: number;
 }> {
-  // Get user's IG account info
-  const fields = 'id,username,name,profile_picture_url,followers_count,media_count';
+  // Get user's IG account info. We capture BOTH `id` (app-scoped) and `user_id`
+  // (legacy IGBA) — Meta's DM webhook entry.id can be any of the account's ids,
+  // so we store them all (known_ig_ids) to route inbound DMs reliably.
+  const fields = 'id,username,name,profile_picture_url,followers_count,media_count,user_id';
   const response = await fetch(
     `https://graph.instagram.com/me?fields=${fields}&access_token=${accessToken}`,
   );
@@ -233,6 +241,7 @@ async function getIGBusinessAccount(accessToken: string): Promise<{
   const data = await response.json();
   return {
     ig_id: data.id,
+    ig_user_id: data.user_id || '',
     username: data.username || '',
     name: data.name || '',
     profile_picture_url: data.profile_picture_url || '',
