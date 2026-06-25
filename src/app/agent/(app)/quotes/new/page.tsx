@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Check, Copy, ArrowRight } from 'lucide-react';
+import { Loader2, Check, Copy, ArrowRight, Upload, Sparkles } from 'lucide-react';
 import { PageHeader } from '@/components/admin/PageHeader';
 
 interface Client {
@@ -17,6 +17,8 @@ export default function NewQuotePage() {
   const [error, setError] = useState('');
   const [result, setResult] = useState<{ signUrl: string; title: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [parsing, setParsing] = useState(false);
+  const [parseMsg, setParseMsg] = useState('');
   const [form, setForm] = useState({
     account_id: '',
     brand_name: '',
@@ -36,6 +38,40 @@ export default function NewQuotePage() {
       .then((d) => setClients(d.clients || []))
       .catch(() => {});
   }, []);
+
+  const importFile = async (file: File | null) => {
+    if (!file) return;
+    setParsing(true);
+    setParseMsg('');
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/agent/quotes/parse', { method: 'POST', body: fd });
+      const d = await res.json();
+      if (res.ok) {
+        const f = d.fields || {};
+        setForm((prev) => ({
+          ...prev,
+          brand_name: f.brandName && f.brandName !== 'מותג' ? f.brandName : prev.brand_name,
+          campaign_name: f.campaignName || prev.campaign_name,
+          amount: f.amount != null ? String(f.amount) : prev.amount,
+          currency: f.currency || prev.currency,
+          valid_until: f.validUntil || prev.valid_until,
+          deliverables: Array.isArray(f.deliverables) && f.deliverables.length ? f.deliverables.join('\n') : prev.deliverables,
+          terms: f.terms || prev.terms,
+          brand_contact_name: f.brandContactName || prev.brand_contact_name,
+          brand_contact_email: f.brandContactEmail || prev.brand_contact_email,
+        }));
+        setParseMsg(`✓ מולא מהקובץ (ביטחון ${Math.round((d.confidence || 0) * 100)}%) — בדוק/י את השדות`);
+      } else {
+        setParseMsg(d.error || 'ניתוח נכשל');
+      }
+    } catch {
+      setParseMsg('שגיאה בניתוח הקובץ');
+    } finally {
+      setParsing(false);
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,6 +133,20 @@ export default function NewQuotePage() {
   return (
     <div dir="rtl" className="max-w-2xl">
       <PageHeader eyebrow="חדש" title="הצעת מחיר חדשה" description="צור הצעה, שלח לחתימה — חתימה הופכת אותה להסכם." />
+
+      <div className="mb-4 p-4 rounded-xl border border-dashed border-[color:var(--brand)]/40 bg-[color:var(--brand)]/5">
+        <label className="flex items-center gap-3 cursor-pointer">
+          {parsing ? <Loader2 className="w-5 h-5 animate-spin text-[color:var(--brand)]" /> : <Sparkles className="w-5 h-5 text-[color:var(--brand)]" />}
+          <div className="flex-1">
+            <div className="text-[13px] font-medium text-[color:var(--ink-900)]">ייבוא הצעה מקובץ (PDF/תמונה)</div>
+            <div className="text-[12px] text-[color:var(--ink-500)]">ה-AI ימלא את השדות אוטומטית — רק להעלות</div>
+          </div>
+          <span className="ui-btn ui-btn-sm ui-btn-outline gap-1.5"><Upload className="w-3.5 h-3.5" />העלאה</span>
+          <input type="file" accept="application/pdf,image/*" className="hidden" disabled={parsing} onChange={(e) => importFile(e.target.files?.[0] || null)} />
+        </label>
+        {parseMsg && <p className="text-[12px] text-[color:var(--ink-600)] mt-2">{parseMsg}</p>}
+      </div>
+
       <form onSubmit={submit} className="grid gap-4">
         <label className="block">
           <span className="block text-[12px] text-[color:var(--ink-600)] mb-1.5">לקוח / משפיען *</span>

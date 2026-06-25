@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Loader2, Plus, FileText, ExternalLink, Copy, Check } from 'lucide-react';
+import { Loader2, Plus, FileText, ExternalLink, Copy, Check, X, RotateCw } from 'lucide-react';
 
 interface Quote {
   id: string;
@@ -27,19 +27,43 @@ export default function QuotesPage() {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = () =>
     fetch('/api/agent/quotes')
       .then((r) => r.json())
       .then((d) => setQuotes(d.quotes || []))
       .catch(() => {})
       .finally(() => setLoading(false));
+
+  useEffect(() => {
+    load();
   }, []);
 
   const copyLink = (token: string, id: string) => {
     navigator.clipboard.writeText(`${window.location.origin}/sign/${token}`);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const act = async (id: string, action: 'cancel' | 'resend') => {
+    if (action === 'cancel' && !confirm('לבטל את ההצעה?')) return;
+    setBusyId(id);
+    try {
+      const res = await fetch(`/api/agent/quotes/${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      const d = await res.json();
+      if (res.ok && action === 'resend' && d.signUrl) {
+        navigator.clipboard.writeText(d.signUrl);
+        alert('קישור חתימה חדש נוצר והועתק');
+      }
+      await load();
+    } finally {
+      setBusyId(null);
+    }
   };
 
   return (
@@ -84,12 +108,30 @@ export default function QuotesPage() {
                     <td className="p-3 text-[color:var(--ink-600)]">{q.signer_name || '—'}</td>
                     <td className="p-3">
                       <div className="flex items-center gap-1.5 justify-end">
-                        <button onClick={() => copyLink(q.token, q.id)} className="ui-btn ui-btn-sm ui-btn-ghost" title="העתק קישור">
-                          {copiedId === q.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                        </button>
-                        <a href={`/sign/${q.token}`} target="_blank" rel="noopener noreferrer" className="ui-btn ui-btn-sm ui-btn-ghost" title="פתח">
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </a>
+                        {busyId === q.id && <Loader2 className="w-3.5 h-3.5 animate-spin text-[color:var(--ink-400)]" />}
+                        {(q.status === 'expired' || q.status === 'cancelled') && (
+                          <button onClick={() => act(q.id, 'resend')} className="ui-btn ui-btn-sm ui-btn-ghost" title="שלח קישור חדש">
+                            <RotateCw className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {(q.status === 'pending' || q.status === 'opened') && (
+                          <>
+                            <button onClick={() => copyLink(q.token, q.id)} className="ui-btn ui-btn-sm ui-btn-ghost" title="העתק קישור">
+                              {copiedId === q.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                            </button>
+                            <a href={`/sign/${q.token}`} target="_blank" rel="noopener noreferrer" className="ui-btn ui-btn-sm ui-btn-ghost" title="פתח">
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                            <button onClick={() => act(q.id, 'cancel')} className="ui-btn ui-btn-sm ui-btn-ghost" title="בטל">
+                              <X className="w-3.5 h-3.5 text-[color:var(--danger)]" />
+                            </button>
+                          </>
+                        )}
+                        {q.status === 'signed' && (
+                          <a href={`/sign/${q.token}`} target="_blank" rel="noopener noreferrer" className="ui-btn ui-btn-sm ui-btn-ghost" title="צפה">
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        )}
                       </div>
                     </td>
                   </tr>

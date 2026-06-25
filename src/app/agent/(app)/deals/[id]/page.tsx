@@ -17,6 +17,7 @@ const PURPLE = '#883fe2';
 export default function DealDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [d, setD] = useState<Detail | null>(null);
+  const [docs, setDocs] = useState<{ id: string; filename: string; document_type: string; url: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [newBeat, setNewBeat] = useState({ title: '', due_date: '' });
@@ -27,8 +28,14 @@ export default function DealDetail({ params }: { params: Promise<{ id: string }>
     const res = await fetch(`/api/agent/partnerships/${id}`);
     const data = await res.json();
     setD(data);
+    fetch(`/api/agent/documents?partnershipId=${id}`)
+      .then((r) => r.json())
+      .then((dd) => setDocs(dd.documents || []))
+      .catch(() => {});
     setLoading(false);
   }, [id]);
+
+  const DOC_LABEL: Record<string, string> = { quote: 'הצעת מחיר', contract: 'הסכם חתום', invoice: 'חשבונית', brief: 'בריף', receipt: 'קבלה', other: 'מסמך' };
 
   useEffect(() => { load(); }, [load]);
 
@@ -148,6 +155,21 @@ export default function DealDetail({ params }: { params: Promise<{ id: string }>
           </div>
         )}
       </Section>
+
+      {/* Documents */}
+      {docs.length > 0 && (
+        <Section title="מסמכים">
+          <div className="space-y-1.5">
+            {docs.map((doc) => (
+              <a key={doc.id} href={doc.url} target="_blank" rel="noopener noreferrer"
+                className="flex items-center justify-between p-2 rounded-lg hover:bg-[color:var(--ink-100)] text-[13px]">
+                <span className="text-[color:var(--ink-800)]">{DOC_LABEL[doc.document_type] || doc.document_type}</span>
+                <span className="text-[color:var(--brand)] flex items-center gap-1"><ExternalLink className="w-3.5 h-3.5" />צפייה</span>
+              </a>
+            ))}
+          </div>
+        </Section>
+      )}
 
       {/* Plan vs actual */}
       <Section title="תכנון מול ביצוע">

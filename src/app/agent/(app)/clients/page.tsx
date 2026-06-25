@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2, Plus, Phone, Mail, Users } from 'lucide-react';
+import { Loader2, Plus, Phone, Mail, Users, Pencil, Trash2, Save, X } from 'lucide-react';
 
 interface Client {
   id: string;
@@ -20,6 +20,9 @@ export default function AgentClientsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState({ display_name: '', phone: '', email: '' });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ display_name: '', phone: '', email: '' });
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -67,6 +70,37 @@ export default function AgentClientsPage() {
     }
   };
 
+  const startEdit = (c: Client) => {
+    setEditingId(c.id);
+    setEditForm({ display_name: c.display_name, phone: c.phone || '', email: c.email || '' });
+  };
+
+  const saveEdit = async (id: string) => {
+    setBusyId(id);
+    try {
+      await fetch(`/api/agent/clients/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editForm),
+      });
+      setEditingId(null);
+      await load();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const deleteClient = async (id: string) => {
+    if (!confirm('להסיר את הלקוח? (לקוח CRM ללא עסקאות יימחק)')) return;
+    setBusyId(id);
+    try {
+      await fetch(`/api/agent/clients/${id}`, { method: 'DELETE' });
+      await load();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <div dir="rtl">
       <div className="flex items-center justify-between mb-6">
@@ -105,20 +139,40 @@ export default function AgentClientsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {clients.map((c) => (
             <div key={c.id} className="p-4 rounded-xl border border-[color:var(--line)] bg-[color:var(--surface-0)]">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[color:var(--brand)]/20 to-[color:var(--accent)]/20 flex items-center justify-center text-[color:var(--ink-800)] font-semibold">
-                  {c.display_name.charAt(0)}
+              {editingId === c.id ? (
+                <div className="space-y-2">
+                  <input className="ui-input" value={editForm.display_name} onChange={(e) => setEditForm({ ...editForm, display_name: e.target.value })} placeholder="שם" />
+                  <input className="ui-input" dir="ltr" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} placeholder="טלפון" />
+                  <input className="ui-input" dir="ltr" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} placeholder="אימייל" />
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => saveEdit(c.id)} disabled={busyId === c.id} className="ui-btn ui-btn-sm ui-btn-solid gap-1.5">
+                      {busyId === c.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}שמור
+                    </button>
+                    <button onClick={() => setEditingId(null)} className="ui-btn ui-btn-sm ui-btn-ghost gap-1.5"><X className="w-3.5 h-3.5" />ביטול</button>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <div className="font-semibold text-[color:var(--ink-900)] truncate">{c.display_name}</div>
-                  <div className="text-[11px] text-[color:var(--ink-500)]">{c.crmOnly ? 'לקוח CRM' : 'חשבון בסטי'}</div>
-                </div>
-              </div>
-              {(c.phone || c.email) && (
-                <div className="mt-3 space-y-1 text-[12px] text-[color:var(--ink-600)]" dir="ltr">
-                  {c.phone && <div className="flex items-center gap-1.5 justify-end"><span>{c.phone}</span><Phone className="w-3.5 h-3.5" /></div>}
-                  {c.email && <div className="flex items-center gap-1.5 justify-end"><span className="truncate">{c.email}</span><Mail className="w-3.5 h-3.5" /></div>}
-                </div>
+              ) : (
+                <>
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[color:var(--brand)]/20 to-[color:var(--accent)]/20 flex items-center justify-center text-[color:var(--ink-800)] font-semibold shrink-0">
+                      {c.display_name.charAt(0)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-[color:var(--ink-900)] truncate">{c.display_name}</div>
+                      <div className="text-[11px] text-[color:var(--ink-500)]">{c.crmOnly ? 'לקוח CRM' : 'חשבון בסטי'}</div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => startEdit(c)} className="ui-btn ui-btn-sm ui-btn-ghost" title="עריכה"><Pencil className="w-3.5 h-3.5" /></button>
+                      {c.crmOnly && <button onClick={() => deleteClient(c.id)} className="ui-btn ui-btn-sm ui-btn-ghost" title="מחיקה"><Trash2 className="w-3.5 h-3.5 text-[color:var(--danger)]" /></button>}
+                    </div>
+                  </div>
+                  {(c.phone || c.email) && (
+                    <div className="mt-3 space-y-1 text-[12px] text-[color:var(--ink-600)]" dir="ltr">
+                      {c.phone && <div className="flex items-center gap-1.5 justify-end"><span>{c.phone}</span><Phone className="w-3.5 h-3.5" /></div>}
+                      {c.email && <div className="flex items-center gap-1.5 justify-end"><span className="truncate">{c.email}</span><Mail className="w-3.5 h-3.5" /></div>}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           ))}

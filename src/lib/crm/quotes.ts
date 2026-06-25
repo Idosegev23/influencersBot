@@ -13,11 +13,9 @@ import { generateQuotePdf } from '@/lib/crm/pdf';
 const BUCKET = 'partnership-documents';
 
 export function appBaseUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_APP_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '') ||
-    'https://bestieai.co.il'
-  ).replace(/\/$/, '');
+  // Public signing / invoice-upload links must use the stable custom domain
+  // (NOT the per-deployment VERCEL_URL, which changes and breaks 30-day links).
+  return (process.env.NEXT_PUBLIC_APP_URL || 'https://bestie.ldrsgroup.com').replace(/\/$/, '');
 }
 
 export function signUrlFor(token: string): string {
@@ -168,6 +166,54 @@ export async function uploadSignedPdf(token: string, bytes: Uint8Array): Promise
     .upload(path, Buffer.from(bytes), { contentType: 'application/pdf', upsert: true });
   if (error) throw new Error(`signed upload failed: ${error.message}`);
   return path;
+}
+
+/** Cancel a quote (and its deal) before signing. */
+export async function cancelQuote(sigId: string, agentId: string) {
+  const { data: sig } = await supabaseAdmin
+    .from('signature_requests')
+    .select('id, agent_id, partnership_id, status')
+    .eq('id', sigId)
+    .maybeSingle();
+  if (!sig || sig.agent_id !== agentId) throw new Error('הצעה לא נמצאה');
+  if (sig.status === 'signed') throw new Error('לא ניתן לבטל הצעה חתומה');
+  await supabaseAdmin.from('signature_requests').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('id', sigId);
+  if (sig.partnership_id) {
+    await supabaseAdmin.from('partnerships').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('id', sig.partnership_id);
+  }
+  return { ok: true };
+}
+
+/** Re-issue a fresh signing link (new token + 30d expiry) for the same deal. */
+export async function resendQuote(sigId: string, agentId: string): Promise<{ token: string; signUrl: string }> {
+  const { data: sig } = await supabaseAdmin.from('signature_requests').select('*').eq('id', sigId).maybeSingle();
+  if (!sig || sig.agent_id !== agentId) throw new Error('הצעה לא נמצאה');
+  if (sig.status === 'signed') throw new Error('ההצעה כבר נחתמה');
+
+  const token = randomBytes(18).toString('base64url');
+  const { data: fresh, error } = await supabaseAdmin
+    .from('signature_requests')
+    .insert({
+      token,
+      partnership_id: sig.partnership_id,
+      account_id: sig.account_id,
+      agent_id: agentId,
+      title: sig.title,
+      status: 'pending',
+      document_storage_path: sig.document_storage_path,
+      signer_name: sig.signer_name,
+      signer_email: sig.signer_email,
+    })
+    .select('token')
+    .single();
+  if (error || !fresh) throw new Error(error?.message || 'failed');
+
+  await supabaseAdmin.from('signature_requests').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('id', sigId);
+  // ensure the deal is back to proposal
+  if (sig.partnership_id) {
+    await supabaseAdmin.from('partnerships').update({ status: 'proposal', updated_at: new Date().toISOString() }).eq('id', sig.partnership_id);
+  }
+  return { token: fresh.token, signUrl: signUrlFor(fresh.token) };
 }
 
 export async function listAgentQuotes(agentId: string) {
