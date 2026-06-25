@@ -21,7 +21,10 @@ export const runtime = 'nodejs';
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
 
-const INBOX = process.env.CRM_INBOX_EMAIL?.trim();
+// The Bestie inbox to read. Defaults to the same mailbox we already send from
+// (GMAIL_SEND_FROM), so if the service account can impersonate it for sending,
+// adding the gmail.readonly delegation scope is the only step needed.
+const INBOX = process.env.CRM_INBOX_EMAIL?.trim() || process.env.GMAIL_SEND_FROM?.trim();
 
 function verifyCronSecret(req: NextRequest): boolean {
   const authHeader = req.headers.get('authorization');
