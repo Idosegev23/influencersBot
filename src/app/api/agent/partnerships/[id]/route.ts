@@ -6,7 +6,7 @@
 import { NextResponse } from 'next/server';
 import { requireAgentApi, type AgentSession } from '@/lib/auth/agent-session';
 import { supabase as supabaseAdmin } from '@/lib/supabase';
-import { requestInvoice, markInvoicePaid } from '@/lib/crm/invoices';
+import { requestInvoice, markInvoicePaid, cancelInvoice, getOpenInvoiceUploadUrl } from '@/lib/crm/invoices';
 import { notifyAgent } from '@/lib/crm/notify';
 
 async function loadOwned(id: string, agent: AgentSession) {
@@ -101,6 +101,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const r = await markInvoicePaid(invId, agent.id);
         if (!r.ok) return NextResponse.json({ error: 'לא ניתן לסמן כשולם' }, { status: 400 });
         return NextResponse.json({ success: true });
+      }
+      case 'cancel_invoice': {
+        const r = await cancelInvoice(id, agent.id);
+        if (!r.ok) return NextResponse.json({ error: 'לא ניתן לבטל את החשבונית' }, { status: 400 });
+        return NextResponse.json({ success: true });
+      }
+      case 'resend_invoice_upload_link': {
+        const url = await getOpenInvoiceUploadUrl(id, agent.id);
+        if (!url) return NextResponse.json({ error: 'אין חשבונית פתוחה' }, { status: 400 });
+        await notifyAgent(agent.id, {
+          subject: `📄 קישור העלאת חשבונית — ${res.partnership.brand_name}`,
+          text: `קישור להעלאת חשבונית: ${url}`,
+        });
+        return NextResponse.json({ success: true, uploadUrl: url });
       }
       case 'set_payment_route': {
         const invId = String(body?.invoice_id ?? '');

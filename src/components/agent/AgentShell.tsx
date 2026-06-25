@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Users, FileText, LogOut, Menu, X, Sparkles, ChevronLeft, LayoutDashboard, Briefcase, Inbox } from 'lucide-react';
+import { Users, FileText, LogOut, Menu, X, Sparkles, ChevronLeft, LayoutDashboard, Briefcase, Inbox, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type NavItem = {
@@ -150,14 +150,15 @@ export default function AgentShell({
               <div className="text-[10.5px] text-[color:var(--ink-500)] truncate">סוכן</div>
             </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="w-full ui-btn ui-btn-sm ui-btn-ghost focus-ring mt-1 justify-center"
-            aria-label="יציאה"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span className="text-[12px]">יציאה</span>
-          </button>
+          <div className="flex items-center gap-1 mt-1">
+            <Link href="/agent/settings" className="flex-1 ui-btn ui-btn-sm ui-btn-ghost focus-ring justify-center" onClick={closeMobile}>
+              <Settings className="w-3.5 h-3.5" />
+              <span className="text-[12px]">הגדרות</span>
+            </Link>
+            <button onClick={handleLogout} className="ui-btn ui-btn-sm ui-btn-ghost focus-ring" aria-label="יציאה" title="יציאה">
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       </aside>
 

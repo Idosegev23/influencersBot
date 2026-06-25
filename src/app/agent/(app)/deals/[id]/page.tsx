@@ -144,10 +144,16 @@ export default function DealDetail({ params }: { params: Promise<{ id: string }>
             } />
             <Row label="מסלול" value={inv.payment_route === 'direct_from_brand' ? 'ישירות מהמותג' : 'דרך הסוכנות'} />
             {inv.status === 'draft' && inv.upload_token && (
-              <div className="flex items-center gap-2">
-                <input readOnly className="ui-input flex-1 text-[12px]" dir="ltr" value={`${typeof window !== 'undefined' ? window.location.origin : ''}/invoice/${inv.upload_token}`} />
-                <a href={`/invoice/${inv.upload_token}`} target="_blank" rel="noopener noreferrer" className="ui-btn ui-btn-sm ui-btn-outline">קישור העלאה ↗</a>
-              </div>
+              <>
+                <div className="flex items-center gap-2">
+                  <input readOnly className="ui-input flex-1 text-[12px]" dir="ltr" value={`${typeof window !== 'undefined' ? window.location.origin : ''}/invoice/${inv.upload_token}`} />
+                  <a href={`/invoice/${inv.upload_token}`} target="_blank" rel="noopener noreferrer" className="ui-btn ui-btn-sm ui-btn-outline">קישור העלאה ↗</a>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button disabled={busy} onClick={() => act({ action: 'resend_invoice_upload_link' })} className="ui-btn ui-btn-sm ui-btn-ghost">שלח לי שוב את הקישור</button>
+                  <button disabled={busy} onClick={() => { if (confirm('לבטל את בקשת החשבונית?')) act({ action: 'cancel_invoice' }); }} className="ui-btn ui-btn-sm ui-btn-ghost text-[color:var(--danger)]">בטל בקשה</button>
+                </div>
+              </>
             )}
             {inv.status !== 'paid' && inv.status !== 'draft' && (
               <button disabled={busy} onClick={() => act({ action: 'mark_paid', invoice_id: inv.id })} className="ui-btn ui-btn-solid">סמן כשולם</button>

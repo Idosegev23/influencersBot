@@ -131,6 +131,34 @@ export async function uploadInvoiceFile(
   return { ok: true };
 }
 
+/** The open (awaiting-upload) invoice's public upload URL, if any. */
+export async function getOpenInvoiceUploadUrl(partnershipId: string, agentId: string): Promise<string | null> {
+  const { data: inv } = await supabaseAdmin
+    .from('invoices')
+    .select('agent_id, upload_token, status')
+    .eq('partnership_id', partnershipId)
+    .eq('status', 'draft')
+    .maybeSingle();
+  if (!inv || inv.agent_id !== agentId || !inv.upload_token) return null;
+  return invoiceUploadUrl(inv.upload_token);
+}
+
+/** Unwind an invoice request (the agent marked "done" prematurely). */
+export async function cancelInvoice(partnershipId: string, agentId: string): Promise<{ ok: boolean }> {
+  const { data: inv } = await supabaseAdmin
+    .from('invoices')
+    .select('id, agent_id, status')
+    .eq('partnership_id', partnershipId)
+    .neq('status', 'cancelled')
+    .maybeSingle();
+  if (!inv || inv.agent_id !== agentId) return { ok: false };
+  if (inv.status === 'paid') return { ok: false };
+  const nowIso = new Date().toISOString();
+  await supabaseAdmin.from('invoices').update({ status: 'cancelled', updated_at: nowIso }).eq('id', inv.id);
+  await supabaseAdmin.from('partnerships').update({ activity_completed_at: null, updated_at: nowIso }).eq('id', partnershipId);
+  return { ok: true };
+}
+
 export async function markInvoicePaid(invoiceId: string, agentId: string): Promise<{ ok: boolean }> {
   const { data: inv } = await supabaseAdmin
     .from('invoices')
