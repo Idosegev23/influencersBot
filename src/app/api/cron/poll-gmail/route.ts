@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
   try {
     const list = await gmail.users.messages.list({
       userId: 'me',
-      q: 'newer_than:2d -in:chats category:primary',
+      q: 'newer_than:2d -in:chats',
       maxResults: 25,
     });
     const messages = list.data.messages || [];

@@ -73,7 +73,7 @@ async function matchInfluencer(managedIds: string[], phones: string[]) {
   return null;
 }
 
-function deliverablesToStrings(d: any): string[] {
+export function deliverablesToStrings(d: any): string[] {
   if (!Array.isArray(d)) return [];
   return d
     .map((x) =>
@@ -82,6 +82,22 @@ function deliverablesToStrings(d: any): string[] {
         : [x?.quantity, x?.type, x?.platform, x?.description].filter(Boolean).join(' · ')
     )
     .filter(Boolean);
+}
+
+/** Map AI parsed_data → the common createQuote fields (reused by ingest + inbox convert). */
+export function parsedToQuoteFields(parsed: any) {
+  return {
+    brandName: parsed?.brandName || 'מותג',
+    campaignName: parsed?.campaignName || null,
+    amount: typeof parsed?.totalAmount === 'number' ? parsed.totalAmount : null,
+    currency: parsed?.currency || 'ILS',
+    validUntil: parsed?.timeline?.endDate || null,
+    deliverables: deliverablesToStrings(parsed?.deliverables),
+    terms: Array.isArray(parsed?.specialTerms) ? parsed.specialTerms.join('\n') : parsed?.specialTerms || null,
+    brandContactName: parsed?.contactPerson?.name || null,
+    brandContactEmail: parsed?.contactPerson?.email || null,
+    brandContactPhone: parsed?.contactPerson?.phone || null,
+  };
 }
 
 export async function ingestQuote(input: IngestInput): Promise<IngestResult> {
