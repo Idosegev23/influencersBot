@@ -288,6 +288,11 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const initialTab = (searchParams.get('tab') as TabId) || 'chat';
   const sourceParam = searchParams.get('source');
   const isConferenceMode = sourceParam === 'conf';
+  // Deep-link prefill for the support tab: e.g. ?tab=support&problem=coupon&coupon=NOA
+  // opens the inquiry form straight at the problem step with the type + coupon
+  // already locked in, so the visitor only fills name/phone/details and sends.
+  const supportProblemParam = searchParams.get('problem');
+  const supportCouponParam = searchParams.get('coupon');
 
   // Attribution: read ?ref= once on mount, persist to localStorage so a
   // refresh / deep-link doesn't lose attribution. localStorage takes
@@ -2549,6 +2554,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   isMobile={isMobile}
                   coupons={brands.map(b => ({ brand_name: b.brand_name, coupon_code: b.coupon_code, description: b.description, category: b.category }))}
                   initialDetails={supportPrefill?.details}
+                  initialProblemType={supportProblemParam}
+                  initialCouponCode={supportCouponParam}
                   enableShipmentTracking={(influencer as any)?._rawConfig?.shipment_provider?.enabled === true}
                   initialMode={supportInitialMode}
                   sessionId={sessionId}

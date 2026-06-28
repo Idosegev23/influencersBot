@@ -36,6 +36,10 @@ interface BrandSupportTabProps {
   isMobile: boolean;
   coupons?: Coupon[];
   initialDetails?: string;
+  /** Deep-link prefill: pre-select a problem type (e.g. 'coupon') from a URL param. */
+  initialProblemType?: string | null;
+  /** Deep-link prefill: pre-select a coupon by its code (e.g. 'NOA') from a URL param. */
+  initialCouponCode?: string | null;
   enableShipmentTracking?: boolean;
   initialMode?: 'support' | 'tracking';
   sessionId?: string | null;
@@ -110,8 +114,17 @@ function iconFor(cat: string): string {
 /* ------------------------------------------------------------------ */
 
 export default function BrandSupportTab({
-  accountId, username, brandName, isMobile, coupons = [], initialDetails, enableShipmentTracking, initialMode, sessionId, refSource,
+  accountId, username, brandName, isMobile, coupons = [], initialDetails, initialProblemType, initialCouponCode, enableShipmentTracking, initialMode, sessionId, refSource,
 }: BrandSupportTabProps) {
+  // Deep-link prefill: if the URL named a valid problem type (e.g. ?problem=coupon)
+  // we skip the product + type pickers and drop the visitor straight on the form
+  // with the type locked in. Validated against PROBLEM_TYPES so a junk param falls
+  // back to the normal flow.
+  const deepLinkType = useMemo<ProblemTypeId | null>(() => {
+    const v = (initialProblemType || '').toLowerCase().trim();
+    return PROBLEM_TYPES.some(t => t.id === v) ? (v as ProblemTypeId) : null;
+  }, [initialProblemType]);
+
   // mode: 'support' = problem report flow (default), 'tracking' = order status lookup
   const [mode, setMode] = useState<'support' | 'tracking'>(initialMode || 'support');
 
@@ -121,7 +134,7 @@ export default function BrandSupportTab({
     if (initialMode && initialMode !== mode) setMode(initialMode);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialMode]);
-  const [step, setStep] = useState<'product' | 'type' | 'form' | 'success'>('product');
+  const [step, setStep] = useState<'product' | 'type' | 'form' | 'success'>(deepLinkType ? 'form' : 'product');
 
   // Tracking sub-flow. The customer enters ONE number — we try it as
   // an order_number first (most common case — they have it from the
@@ -186,8 +199,18 @@ export default function BrandSupportTab({
 
   // Selected state
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [selectedType, setSelectedType] = useState<ProblemTypeId | null>(null);
-  const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null);
+  const [selectedType, setSelectedType] = useState<ProblemTypeId | null>(deepLinkType);
+  // Deep-link prefill: pre-select the coupon named in the URL (?coupon=NOA). Prefer
+  // the real coupon row (carries description/discount); if the brand doesn't expose
+  // that code in its list, synthesize a minimal one from the URL so the form still
+  // shows "🎟️ NOA" and the submitted ticket is tagged with the code. Computed once
+  // at mount — by the time the support tab renders the brand coupons are loaded.
+  const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(() => {
+    const code = (initialCouponCode || '').trim();
+    if (!code) return null;
+    const match = coupons.find(c => (c.coupon_code || '').toLowerCase() === code.toLowerCase());
+    return match || { brand_name: brandName, coupon_code: code.toUpperCase(), description: null, category: null };
+  });
 
   // Form (seed details from a chat-redirect prefill if provided)
   const [form, setForm] = useState({ name: '', phone: '', order: '', details: initialDetails || '' });
