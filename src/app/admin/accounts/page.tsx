@@ -12,6 +12,7 @@ import {
   ExternalLink,
   ListChecks,
   MoreHorizontal,
+  FlaskConical,
 } from 'lucide-react';
 import type { Influencer } from '@/types';
 import { formatNumber } from '@/lib/utils';
@@ -27,10 +28,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 type AccountFilter = 'all' | 'creator' | 'brand';
 type SortKey = 'recent' | 'followers' | 'name';
+type AccountRow = Influencer & { is_demo?: boolean };
 
 export default function AccountsPage() {
   const router = useRouter();
-  const [influencers, setInfluencers] = useState<Influencer[]>([]);
+  const [influencers, setInfluencers] = useState<AccountRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<AccountFilter>('all');
   const [query, setQuery] = useState('');
@@ -91,6 +93,28 @@ export default function AccountsPage() {
       brand: influencers.filter((i) => i.type === 'brand').length,
     };
   }, [influencers]);
+
+  const handleToggleDemo = async (influencer: AccountRow) => {
+    const next = !influencer.is_demo;
+    // Optimistic update
+    setInfluencers((prev) =>
+      prev.map((i) => (i.id === influencer.id ? { ...i, is_demo: next } : i)),
+    );
+    try {
+      const res = await fetch(`/api/admin/accounts/${influencer.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isDemo: next }),
+      });
+      if (!res.ok) throw new Error('failed');
+    } catch {
+      // Revert on failure
+      setInfluencers((prev) =>
+        prev.map((i) => (i.id === influencer.id ? { ...i, is_demo: !next } : i)),
+      );
+      alert('שגיאה בעדכון סטטוס דמו');
+    }
+  };
 
   const handleDelete = async (influencer: Influencer) => {
     const confirmed = window.confirm(
@@ -207,7 +231,13 @@ export default function AccountsPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {filtered.map((i) => (
-            <AccountCard key={i.id} influencer={i} progress={checklistProgress[i.id]} onDelete={() => handleDelete(i)} />
+            <AccountCard
+              key={i.id}
+              influencer={i}
+              progress={checklistProgress[i.id]}
+              onDelete={() => handleDelete(i)}
+              onToggleDemo={() => handleToggleDemo(i)}
+            />
           ))}
         </div>
       )}
@@ -243,10 +273,12 @@ function AccountCard({
   influencer,
   progress,
   onDelete,
+  onToggleDemo,
 }: {
-  influencer: Influencer;
+  influencer: AccountRow;
   progress?: { total: number; completed: number };
   onDelete: () => void;
+  onToggleDemo: () => void;
 }) {
   const pct = progress ? Math.round((progress.completed / progress.total) * 100) : null;
   const isDone = pct === 100;
@@ -283,6 +315,7 @@ function AccountCard({
                 <Badge variant="neutral">לא פעיל</Badge>
               )}
               {influencer.type === 'brand' && <Badge variant="accent">מותג</Badge>}
+              {influencer.is_demo && <Badge variant="warning">Demo</Badge>}
               <span className="text-[10.5px] text-[color:var(--ink-400)] ms-0.5 tabular-nums">
                 {formatNumber(influencer.followers_count)} עוקבים
               </span>
@@ -340,6 +373,21 @@ function AccountCard({
             <ExternalLink className="w-3.5 h-3.5" />
             צפייה
           </a>
+          <button
+            onClick={onToggleDemo}
+            className={
+              'ui-btn ui-btn-icon-sm focus-ring ' +
+              (influencer.is_demo ? 'ui-btn-primary' : 'ui-btn-ghost')
+            }
+            aria-label={influencer.is_demo ? 'בטל דמו' : 'סמן כדמו'}
+            title={
+              influencer.is_demo
+                ? 'דמו — לא נסרק אוטומטית. לחץ לביטול (יחזור לסריקה יומית)'
+                : 'סמן כדמו — יוחרג מהסריקה היומית האוטומטית'
+            }
+          >
+            <FlaskConical className="w-3.5 h-3.5" />
+          </button>
           <button
             onClick={onDelete}
             className="ui-btn ui-btn-icon-sm ui-btn-danger focus-ring"

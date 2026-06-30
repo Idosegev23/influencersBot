@@ -85,6 +85,7 @@ export async function GET() {
         
         // Account info
         is_active: account.status === 'active',
+        is_demo: config.isDemo === true,
         plan: account.plan || 'free',
         type: account.type,
         created_at: account.created_at,

@@ -78,6 +78,8 @@ export async function GET(req: NextRequest) {
     const accounts = (activeAccounts || [])
       // Skip CRM-only clients (agency-CRM entities have no chatbot — never scan them)
       .filter(a => (a.config as any)?.crmOnly !== true)
+      // Skip demo accounts — scanned manually only, never on the daily cron
+      .filter(a => (a.config as any)?.isDemo !== true)
       .map(a => ({
         id: a.id,
         instagram_username:

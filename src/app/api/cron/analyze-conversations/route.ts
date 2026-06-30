@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
     // Get all active accounts
     const { data: accounts, error: accountsError } = await supabase
       .from('accounts')
-      .select('id, instagram_username')
+      .select('id, instagram_username, config')
       .eq('status', 'active');
 
     if (accountsError) {
@@ -46,6 +46,9 @@ export async function GET(req: NextRequest) {
     const results = [];
 
     for (const account of accounts) {
+      // Skip demo accounts — they are not scanned/analyzed automatically
+      if ((account.config as any)?.isDemo === true) continue;
+
       try {
         console.log(`[Cron] Analyzing conversations for @${account.instagram_username}...`);
         

@@ -41,10 +41,15 @@ export async function PATCH(
 
     // Merge new config into existing
     const currentConfig = account.config || {};
-    const updatedConfig = {
+    const updatedConfig: Record<string, any> = {
       ...currentConfig,
       widget: { ...(currentConfig.widget || {}), ...(body.widget || {}) },
     };
+
+    // Demo flag — when set, the account is excluded from all automatic scan/AI crons
+    if (typeof body.isDemo === 'boolean') {
+      updatedConfig.isDemo = body.isDemo;
+    }
 
     const { error: updateError } = await supabase
       .from('accounts')

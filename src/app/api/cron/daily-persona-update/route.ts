@@ -56,10 +56,28 @@ export async function GET(request: Request) {
 
     console.log(`[Daily Update] Found ${accounts.length} accounts to check`);
 
+    // Load demo account IDs — demos are scanned manually only, never on the daily cron
+    const { data: demoAccounts } = await supabase
+      .from('accounts')
+      .select('id')
+      .eq('config->>isDemo', 'true');
+    const demoIds = new Set((demoAccounts || []).map((a: any) => a.id));
+
     // 3. עדכון כל account
     for (const account of accounts) {
       const accountStartTime = Date.now();
       const username = account.instagram_username || account.username;
+
+      // Skip demo accounts entirely
+      if (demoIds.has(account.id)) {
+        results.push({
+          accountId: account.id,
+          username,
+          status: 'skipped',
+          reason: 'חשבון דמו',
+        });
+        continue;
+      }
 
       try {
         console.log(`[Daily Update] Checking @${username}...`);
