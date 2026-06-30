@@ -10,6 +10,7 @@
 import { randomUUID } from 'crypto';
 import { createClient } from '@/lib/supabase/server';
 import { processSandwichMessageWithMetadata } from './sandwichBot';
+import { runEscalationCheck } from '@/engines/escalation/dispatch';
 import { buildPersonalityFromDB } from './personality-wrapper';
 import { updateRollingSummary, shouldUpdateSummary } from './conversation-memory';
 import { getRecommendations, type ProductRecommendation } from '@/lib/recommendations/engine';
@@ -402,6 +403,14 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
       [...conversationHistory, { role: 'user', content: message }, { role: 'assistant', content: fullText }],
     ).catch(err => console.error('[WidgetChat] Summary update failed:', err));
   }
+
+  // Escalation check — fire-and-forget; does not block the widget response.
+  runEscalationCheck({
+    accountId,
+    sessionId: sessionId!,
+    userMessage: message,
+    source: 'widget',
+  }).catch((e: any) => console.error('[escalation] widget hook failed:', e?.message || e));
 
   return {
     response: fullText,

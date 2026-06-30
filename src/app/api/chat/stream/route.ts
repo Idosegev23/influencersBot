@@ -44,6 +44,7 @@ import {
 } from '@/engines';
 
 import { understandMessageFast } from '@/engines/understanding';
+import { runEscalationCheck } from '@/engines/escalation/dispatch';
 import { 
   decide, 
   getUIDirectivesSummary, 
@@ -1317,6 +1318,14 @@ export async function POST(req: NextRequest) {
         // === SAVE & CLEANUP (runs after response via after()) ===
         // after() keeps the Lambda alive so DB writes complete reliably
         after(async () => {
+          // Escalation check — off the hot path; never blocks the response.
+          runEscalationCheck({
+            accountId,
+            sessionId: currentSessionId,
+            userMessage: displayMessage,
+            source: 'chat',
+          }).catch((e: any) => console.error('[escalation] chat hook failed:', e?.message || e));
+
           try {
             await Promise.all([
               saveChatMessage(currentSessionId, 'user', displayMessage),

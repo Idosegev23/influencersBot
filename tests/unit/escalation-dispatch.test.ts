@@ -58,7 +58,7 @@ describe('runEscalationCheck', () => {
   });
 
   it('sends email + writes a record on a legal threat', async () => {
-    const sendEmail = vi.fn(async () => ({ success: true }));
+    const sendEmail = vi.fn(async (_opts: any) => ({ success: true }));
     const sb = makeSupabase({ config: { escalation: { recipients: [{ name: 'Y', email: 'y@x.com' }] }, brandName: 'LA BEAUTÉ' } });
     const out = await runEscalationCheck(input, { supabase: sb as any, sendEmail: sendEmail as any });
     expect(out.escalated).toBe(true);
