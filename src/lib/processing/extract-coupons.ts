@@ -193,6 +193,19 @@ export async function extractCouponsFromContent(accountId: string): Promise<Extr
     errors: [],
   };
 
+  // Gate: accounts can opt out of coupon programs entirely (brands that don't
+  // run coupons). Without this, the daily scan re-extracts coupon codes from
+  // IG captions/transcriptions and re-creates rows we intentionally purged.
+  const { data: gateAcct } = await supabase
+    .from('accounts')
+    .select('config')
+    .eq('id', accountId)
+    .single();
+  if ((gateAcct?.config as any)?.coupons_disabled === true) {
+    console.log(`[Coupon Extractor] coupons_disabled for ${accountId} — skipping extraction`);
+    return result;
+  }
+
   // 1. Load all transcriptions
   const { data: transcriptions, error: txError } = await supabase
     .from('instagram_transcriptions')

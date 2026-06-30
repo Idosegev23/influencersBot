@@ -303,6 +303,17 @@ async function saveCouponCodes(
 ) {
   if (!coupons?.length) return;
 
+  // Gate: skip accounts that opted out of coupon programs (coupons_disabled).
+  const { data: gateAcct } = await supabase
+    .from('accounts')
+    .select('config')
+    .eq('id', accountId)
+    .single();
+  if ((gateAcct?.config as any)?.coupons_disabled === true) {
+    console.log(`[Knowledge Ingest] coupons_disabled for ${accountId} — skipping coupon save`);
+    return;
+  }
+
   try {
     for (const coupon of coupons) {
       if (!coupon.code) continue;
