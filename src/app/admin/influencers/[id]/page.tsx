@@ -2,6 +2,7 @@
 
 import { use, useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import EscalationContactsForm from './EscalationContactsForm';
 
 interface AdminDocument {
   id: string;
@@ -772,6 +773,8 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
           מחק חשבון
         </button>
       </div>
+
+      <EscalationContactsForm accountId={id} />
     </div>
   );
 }
