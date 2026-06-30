@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { requireAdminAuth } from '@/lib/auth/admin-auth';
+
+export const runtime = 'nodejs';
 
 type Params = { params: Promise<{ accountId: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
+  const denied = await requireAdminAuth();
+  if (denied) return denied;
+
   const { accountId } = await params;
   const supabase = await createClient();
   const { data: account, error } = await supabase
@@ -17,6 +23,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
 }
 
 export async function PUT(req: NextRequest, { params }: Params) {
+  const denied = await requireAdminAuth();
+  if (denied) return denied;
+
   const { accountId } = await params;
   const body = await req.json().catch(() => ({}));
   const supabase = await createClient();
