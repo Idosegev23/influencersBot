@@ -31,5 +31,9 @@
       "Bash(which gifsicle:*)",
       "Bash(npx shadcn@latest *)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "shadcn",
+    "supabase"
+  ]
 }

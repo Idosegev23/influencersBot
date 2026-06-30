@@ -52,3 +52,6 @@ Instagram_DM_Comparison.pdf
 
 # Local scraper caches (contain raw catalog dumps — multi-MB, regenerated on demand)
 scripts/.dekel-cache/
+
+# Besty sales/brand decks — AI slides, screenshots, PDFs (heavy, local-only; never deploy to Vercel)
+/besty-deck/
