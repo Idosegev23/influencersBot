@@ -20,6 +20,10 @@ const MAKE_WEBHOOK_URL =
 
 const LDRS_ACCOUNT_ID = 'de38eac6-d2fb-46a7-ac09-5ec860147ca0';
 
+// Leads always go here. Pinned in code so a stray env var can't redirect them.
+const LEAD_OWNER_EMAIL = 'roei@ldrsgroup.com';
+const LEAD_OWNER_NAME = 'רועי';
+
 const CONFERENCE = {
   name: 'כנס החדשנות - איגוד השיווק הישראלי',
   date: '2026-04-30',
@@ -164,8 +168,8 @@ export async function POST(req: NextRequest) {
         locale: locale || 'he-IL',
       },
       assigned_to: {
-        email: process.env.CONFERENCE_LEAD_OWNER_EMAIL || 'roei@ldrsgroup.com',
-        name: process.env.CONFERENCE_LEAD_OWNER_NAME || 'רועי',
+        email: LEAD_OWNER_EMAIL,
+        name: LEAD_OWNER_NAME,
       },
       consent: {
         given: !!consentGiven,
@@ -182,9 +186,7 @@ export async function POST(req: NextRequest) {
     const _test_to = body._test_to as string | undefined;
     const isValidTestOverride =
       typeof _test_to === 'string' && /^[\w.+-]+@ldrsgroup\.com$/i.test(_test_to);
-    const ownerEmail = isValidTestOverride
-      ? _test_to
-      : process.env.CONFERENCE_LEAD_OWNER_EMAIL || 'roei@ldrsgroup.com';
+    const ownerEmail = isValidTestOverride ? _test_to : LEAD_OWNER_EMAIL;
 
     const emailContent = buildConferenceLeadEmail({
       fullName,
@@ -257,7 +259,7 @@ export async function POST(req: NextRequest) {
             fullName,
             preferredProduct: preferredProduct || null,
             phone: phone || null,
-            ownerName: process.env.CONFERENCE_LEAD_OWNER_NAME || 'רועי',
+            ownerName: LEAD_OWNER_NAME,
             ownerEmail: ownerEmail,
           });
           const ok = await sendBriefEmail({
