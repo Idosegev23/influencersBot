@@ -15,6 +15,7 @@ const FALLBACK_COLOR = '#1a1a1a';
 
 export default function StudioPashaLoginPage() {
   const router = useRouter();
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [checking, setChecking] = useState(true);
@@ -73,8 +74,8 @@ export default function StudioPashaLoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!password) {
-      setError('יש להזין סיסמה');
+    if (!username || !password) {
+      setError('יש להזין שם משתמש וסיסמה');
       return;
     }
     setSubmitting(true);
@@ -82,7 +83,7 @@ export default function StudioPashaLoginPage() {
       const res = await fetch('/api/influencer/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: ACCOUNT_USERNAME, password }),
+        body: JSON.stringify({ username: username.trim(), password }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
@@ -143,13 +144,31 @@ export default function StudioPashaLoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs mb-1.5" style={{ color: '#6b7280' }}>
+              שם משתמש
+            </label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoFocus
+              autoComplete="username"
+              className="w-full text-sm p-3 rounded-xl outline-none focus:ring-2"
+              style={{
+                background: '#f9fafb',
+                color: '#111',
+                border: '1px solid rgba(0,0,0,0.1)',
+                ['--tw-ring-color' as any]: brand.color + '55',
+              }}
+            />
+          </div>
+          <div>
+            <label className="block text-xs mb-1.5" style={{ color: '#6b7280' }}>
               סיסמה
             </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              autoFocus
               autoComplete="current-password"
               className="w-full text-sm p-3 rounded-xl outline-none focus:ring-2"
               style={{

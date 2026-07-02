@@ -72,6 +72,22 @@ export async function POST(req: NextRequest) {
       influencer = await getInfluencerBySubdomain(identifier);
     }
 
+    // Custom per-account login handle (security_config.login_username) — lets a
+    // brand sign in with a friendly username (e.g. "argania1") instead of the
+    // internal account slug. Resolve it to the account, then reuse the normal
+    // slug-based mapping/cookie below.
+    if (!influencer) {
+      const { createClient } = await import('@/lib/supabase/server');
+      const sb = await createClient();
+      const { data: acc } = await sb
+        .from('accounts')
+        .select('config')
+        .eq('security_config->>login_username', identifier.toLowerCase())
+        .maybeSingle();
+      const slug = (acc?.config as any)?.username;
+      if (slug) influencer = await getInfluencerByUsername(slug);
+    }
+
     if (!influencer) {
       return NextResponse.json(
         { error: 'Influencer not found' },
