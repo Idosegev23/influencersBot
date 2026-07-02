@@ -229,10 +229,15 @@ export default function SupportPage({
     let cancelled = false;
     (async () => {
       try {
-        // For accounts that enforce per-agent login (LA BEAUTÉ today), the
-        // agent session is the *only* accepted auth — the legacy influencer
-        // cookie can't bypass attribution.
-        const enforceAgentLogin = username === 'labeaute.israel';
+        // Accounts that enforce per-agent login: the agent session is the *only*
+        // accepted auth — the legacy influencer cookie can't bypass attribution.
+        // Each has a dedicated branded login page.
+        const brandedLogin: Record<string, string> = {
+          'labeaute.israel': '/labeaute/login',
+          argania_group: '/argania/login',
+          studiopasha_fashion: '/studiopasha/login',
+        };
+        const enforceAgentLogin = username === 'labeaute.israel' || username === 'argania_group';
 
         const agentRes = await fetch(`/api/agent/me?accountUsername=${username}`, { cache: 'no-store' });
         const agentData = await agentRes.json();
@@ -256,19 +261,13 @@ export default function SupportPage({
             }
           }
         } else if (enforceAgentLogin) {
-          router.push('/labeaute/login');
+          router.push(brandedLogin[username] || '/labeaute/login');
           return;
         } else {
           // Other accounts: allow legacy influencer cookie.
           const authRes = await fetch(`/api/influencer/auth?username=${username}`);
           const authData = await authRes.json();
           if (!authData.authenticated) {
-            // Argania + Studio Pasha have dedicated branded logins; everyone
-            // else falls back to the generic influencer landing.
-            const brandedLogin: Record<string, string> = {
-              argania_group: '/argania/login',
-              studiopasha_fashion: '/studiopasha/login',
-            };
             router.push(brandedLogin[username] || `/influencer/${username}`);
             return;
           }

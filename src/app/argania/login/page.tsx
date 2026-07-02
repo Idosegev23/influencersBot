@@ -14,7 +14,8 @@ const FALLBACK_COLOR = '#2d5016';
 
 export default function ArganiaLoginPage() {
   const router = useRouter();
-  const [username, setUsername] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [checking, setChecking] = useState(true);
@@ -53,7 +54,7 @@ export default function ArganiaLoginPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/influencer/auth?username=${ACCOUNT_USERNAME}`, { cache: 'no-store' });
+        const res = await fetch(`/api/agent/me?accountUsername=${ACCOUNT_USERNAME}`, { cache: 'no-store' });
         const data = await res.json();
         if (!cancelled && data.authenticated) {
           router.replace(SUPPORT_PATH);
@@ -73,20 +74,25 @@ export default function ArganiaLoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!username || !password) {
-      setError('יש להזין שם משתמש וסיסמה');
+    if (!firstName.trim() || !lastName.trim() || !password) {
+      setError('יש למלא את כל השדות');
       return;
     }
     setSubmitting(true);
     try {
-      const res = await fetch('/api/influencer/auth', {
+      const res = await fetch('/api/agent/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username.trim(), password }),
+        body: JSON.stringify({
+          accountUsername: ACCOUNT_USERNAME,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          password,
+        }),
       });
       const data = await res.json();
-      if (!res.ok || !data.success) {
-        setError('סיסמה שגויה');
+      if (!res.ok || !data.ok) {
+        setError('שם או סיסמה שגויים');
         setSubmitting(false);
         return;
       }
@@ -143,14 +149,32 @@ export default function ArganiaLoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs mb-1.5" style={{ color: '#6b7280' }}>
-              שם משתמש
+              שם פרטי
             </label>
             <input
               type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
               autoFocus
-              autoComplete="username"
+              autoComplete="given-name"
+              className="w-full text-sm p-3 rounded-xl outline-none focus:ring-2"
+              style={{
+                background: '#f9fafb',
+                color: '#111',
+                border: '1px solid rgba(0,0,0,0.1)',
+                ['--tw-ring-color' as any]: brand.color + '55',
+              }}
+            />
+          </div>
+          <div>
+            <label className="block text-xs mb-1.5" style={{ color: '#6b7280' }}>
+              שם משפחה
+            </label>
+            <input
+              type="text"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              autoComplete="family-name"
               className="w-full text-sm p-3 rounded-xl outline-none focus:ring-2"
               style={{
                 background: '#f9fafb',
