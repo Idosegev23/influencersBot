@@ -3,15 +3,40 @@
  * Track when a user clicks a product recommendation in the widget.
  */
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
-export async function POST(request: Request) {
+// ============================================
+// CORS Headers
+// ============================================
+
+function getCorsHeaders(origin: string): Record<string, string> {
+  return {
+    'Access-Control-Allow-Origin': origin || '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Max-Age': '86400',
+  };
+}
+
+// ============================================
+// OPTIONS — CORS Preflight
+// ============================================
+
+export async function OPTIONS(req: NextRequest) {
+  const origin = req.headers.get('origin') || '*';
+  return new Response(null, { status: 204, headers: getCorsHeaders(origin) });
+}
+
+export async function POST(request: NextRequest) {
+  const origin = request.headers.get('origin') || '*';
+  const corsHeaders = getCorsHeaders(origin);
+
   try {
     const { recommendationId, productId, accountId } = await request.json();
 
     if (!productId || !accountId) {
-      return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+      return NextResponse.json({ error: 'Missing fields' }, { status: 400, headers: corsHeaders });
     }
 
     const supabase = await createClient();
@@ -42,9 +67,9 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true }, { headers: corsHeaders });
   } catch (error: any) {
     console.error('[RecommendationClick] Error:', error);
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal error' }, { status: 500, headers: corsHeaders });
   }
 }
