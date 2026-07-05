@@ -116,7 +116,7 @@ export default function WidgetTab({
       {data && data.analyticsConfigured !== false && !data.engagement.active && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-900">
           <strong>ממתין לתנועה חיה.</strong> השליחה מהווידג'ט פעילה, אך עדיין לא נקלטו אירועי engagement
-          בזמן-אמת בתקופה זו — הם יצטברו כאן ככל שגולשים יתקשרו עם הווידג'ט. המספרים למטה (כולל שחזור היסטורי) מעודכנים.
+          בזמן-אמת בתקופה זו — הם יצטברו כאן ככל שגולשים יתקשרו עם הווידג'ט.
         </div>
       )}
 
