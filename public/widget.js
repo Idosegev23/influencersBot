@@ -546,6 +546,12 @@
       if (products[i].id === id) { onCardClick(products[i], position); return; }
     }
   };
+  // Inline product links carry no product id (they come from free-text markdown),
+  // so we record a generic click instead of calling the attribution endpoint with
+  // a null id (which 400s). Card clicks remain the attributed path.
+  window.__ibotInlineProductClick = function (href) {
+    widgetTrack('widget_product_click', { surface: 'inline_link', href: href || null });
+  };
   window.__ibotChipClick = function (idx) {
     if (chips[idx]) onChipClick(chips[idx], idx, 'initial');
   };
@@ -1435,7 +1441,7 @@
         var isProductLink = href.indexOf('/product') !== -1;
         if (isProductLink) href = bestieTag(href, 'inline');
         var trackAttr = isProductLink
-          ? ' onclick="(function(e){try{fetch((window.IBOT_HOST||\'\')+\'/api/widget/recommendations/click\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({accountId:\'' + config.accountId + '\',productId:null})}).catch(function(){});}catch(x){}})()"'
+          ? ' onclick="try{window.__ibotInlineProductClick&&window.__ibotInlineProductClick(this.href)}catch(e){}"'
           : '';
         return '<a href="' + escapeHtml(href) + '" target="_blank" rel="noopener"' + trackAttr +
           ' style="color:' + linkColor + ';text-decoration:underline;' +
