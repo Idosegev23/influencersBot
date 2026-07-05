@@ -26,8 +26,6 @@ interface WidgetSummary {
   sessionCount: number;
   engagement: {
     active: boolean;
-    reconstructed?: boolean;
-    realtimeCount?: number;
     events: Array<{ type: string; count: number }>;
   };
   conversions: {
@@ -242,12 +240,6 @@ export default function WidgetTab({
                   </li>
                 ))}
               </ul>
-              {data.engagement.reconstructed && (
-                <p className="text-[11px] text-gray-400 mt-3 pt-2 border-t">
-                  כולל שחזור היסטורי מתוך השיחות וההודעות (פתיחות והודעות), מהתקופה שבה אנליטיקס הווידג'ט לא נרשם.
-                  אירועים בזמן אמת (כולל קליקים על מוצרים) יצטברו לאחר תיקון ה-secret והפריסה.
-                </p>
-              )}
             </>
           ) : (
             <p className="text-xs text-gray-400">אין אירועי engagement בתקופה זו.</p>

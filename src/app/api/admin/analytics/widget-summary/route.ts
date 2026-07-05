@@ -61,13 +61,10 @@ export async function GET(req: NextRequest) {
   const productCount = Number(a.product_count) || 0;
   const sessionCount = Number(a.session_count) || 0;
 
-  // Engagement: "active" = the live pipeline is producing organic events.
-  // The RPC splits each type into total count vs realtime (non-backfill) count.
-  const engRows = (a.engagement || []) as Array<{ type: string; count: number; realtime: number }>;
+  // Engagement: organic per-type counts (backfill purged; no reconstructed split).
+  const engRows = (a.engagement || []) as Array<{ type: string; count: number }>;
   const engagementEvents = engRows.map((e) => ({ type: e.type, count: e.count }));
-  const realtimeCount = engRows.reduce((sum, e) => sum + (Number(e.realtime) || 0), 0);
-  const reconstructedCount = engRows.reduce((sum, e) => sum + ((Number(e.count) || 0) - (Number(e.realtime) || 0)), 0);
-  const widgetPipelineActive = realtimeCount > 0;
+  const widgetPipelineActive = engagementEvents.some((e) => e.count > 0);
 
   // ---- Conversions (table may not exist yet) ----
   let conversions = {
@@ -122,8 +119,6 @@ export async function GET(req: NextRequest) {
     sessionCount: sessionCount || 0,
     engagement: {
       active: widgetPipelineActive,
-      reconstructed: reconstructedCount > 0,
-      realtimeCount,
       events: engagementEvents,
     },
     conversions,
