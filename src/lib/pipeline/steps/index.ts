@@ -1,6 +1,7 @@
 import type { PipelineStep, StepContext } from '../types';
 import { createAccountStep } from './create-account';
 import { igScanStep } from './ig-scan';
+import { transcribeStep } from './transcribe';
 
 export type StepResult =
   | { status: 'advance' }
@@ -13,7 +14,7 @@ const notImplemented: StepHandler = async () => ({ status: 'advance' }); // repl
 export const STEP_HANDLERS: Record<PipelineStep, StepHandler> = {
   'create-account': createAccountStep,
   'ig-scan': igScanStep,
-  'transcribe': notImplemented,
+  'transcribe': transcribeStep,
   'site-discover': notImplemented,
   'site-crawl': notImplemented,
   'rag-ingest': notImplemented,
