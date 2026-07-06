@@ -47,10 +47,16 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ sessionId: 
       return NextResponse.json({ messages: [] }, { headers });
     }
 
+    // Display window: only the last 7 days are restored into the widget.
+    // Full history stays in chat_messages untouched — this is a UI cutoff,
+    // not retention. Without it a returning visitor sees months-old
+    // scrollback from every visit the account ever had with them.
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const { data: rows } = await supabase
       .from('chat_messages')
       .select('role, content, created_at')
       .eq('session_id', sessionId)
+      .gte('created_at', sevenDaysAgo)
       .order('created_at', { ascending: true })
       .limit(40);
 

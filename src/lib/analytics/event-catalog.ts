@@ -69,6 +69,7 @@ export const EVENT_CATALOG: Record<string, EventDef> = {
   widget_opened: { category: 'engagement', surface: 'widget' },
   widget_closed: { category: 'engagement', surface: 'widget' },
   widget_proactive_opened: { category: 'engagement', surface: 'widget' },
+  widget_new_chat_clicked: { category: 'engagement', surface: 'widget' },
   widget_message_sent: { category: 'engagement', surface: 'widget' },
   widget_message_received: { category: 'engagement', surface: 'widget' },
   widget_message_rated: { category: 'engagement', surface: 'widget' },

@@ -936,7 +936,12 @@
     for (var i = 0; i < links.length; i++) {
       var l = links[i];
       if (!l || !l.url) continue;
+      // Skip the website link — the widget already lives on the site, so a
+      // "go to website" icon is dead weight on the welcome screen.
+      var plat = (l.platform || '').toLowerCase();
+      if (plat === 'website' || plat === 'web' || plat === 'site' || plat === 'globe') continue;
       items += '<a href="' + escapeHtml(l.url) + '" target="_blank" rel="noopener noreferrer" aria-label="' + escapeHtml(l.platform || 'link') + '" ' +
+        'onclick="window.__ibotSocialClick(\'' + escapeHtml(plat) + '\')" ' +
         'style="width:34px;height:34px;border-radius:50%;background:var(--ibot-surface);border:1px solid var(--ibot-border);' +
         'display:flex;align-items:center;justify-content:center;color:var(--ibot-text-primary);text-decoration:none;flex-shrink:0;">' +
         socialIconSvg(l.platform) + '</a>';
@@ -945,12 +950,26 @@
     return '<div style="display:flex;justify-content:center;gap:13px;padding:6px 0 12px;">' + items + '</div>';
   }
 
+  // Social icon exit tracking — reuses the catalog's external_link_clicked
+  // so these clicks roll into the "יציאות" analytics like other exits.
+  window.__ibotSocialClick = function (platform) {
+    widgetTrack('external_link_clicked', { platform: platform, from: 'widget_social_row' });
+  };
+
+  // "New conversation" icon: chat bubble with a plus — not the refresh
+  // arrow, which read as "reload" instead of "start fresh".
+  function newChatIconSvg(size) {
+    return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>' +
+      '<line x1="12" y1="8.5" x2="12" y2="14.5"/><line x1="9" y1="11.5" x2="15" y2="11.5"/></svg>';
+  }
+
   // Small "new conversation" pill (welcome state, absolute top-right).
   function newChatBtnHtml() {
     return '<button onclick="window.__ibotNewChat()" title="' + escapeHtml(wlbl('שיחה חדשה','New chat')) + '" ' +
       'style="position:absolute;top:10px;right:12px;z-index:6;background:rgba(255,255,255,0.92);border:1px solid var(--ibot-border);' +
       'color:#333;border-radius:999px;cursor:pointer;display:flex;align-items:center;gap:5px;font-family:inherit;font-size:12px;padding:5px 10px;line-height:1;">' +
-      '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v5h-5"/></svg>' +
+      newChatIconSvg(13) +
       '<span>' + escapeHtml(wlbl('שיחה חדשה','New chat')) + '</span></button>';
   }
 
@@ -968,9 +987,11 @@
     var radius = isMobile ? '' : 'border-radius:18px 18px 0 0;';
     if (!hasUser) {
       var coverUrl = config.coverImage ? String(config.coverImage).replace(/['"]/g, '') : '';
+      // No cover image → plain panel background (white in light mode), not a
+      // gradient — accounts without a cover shouldn't get a random color wash.
       var coverBg = coverUrl
         ? "background-color:var(--ibot-surface);background-image:url('" + coverUrl + "');background-size:cover;background-position:center;"
-        : 'background:linear-gradient(135deg,' + pc + ',var(--ibot-panel-bg));';
+        : 'background:var(--ibot-panel-bg);';
       return '<div style="position:relative;flex-shrink:0;' + radius + 'overflow:hidden;">' +
         newChatBtnHtml() +
         '<div style="position:absolute;top:12px;left:14px;z-index:6;display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.85);padding:3px 8px;border-radius:999px;font-size:11.5px;color:#15803d;">' +
@@ -990,7 +1011,7 @@
       '<div style="display:flex;align-items:center;gap:4px;margin-top:1px;"><span style="width:7px;height:7px;border-radius:50%;background:#22c55e;"></span><span style="font-size:11.5px;color:#15803d;">' + escapeHtml(locale.status) + '</span></div>' +
       '</div>' +
       '<button onclick="window.__ibotNewChat()" title="' + escapeHtml(wlbl('שיחה חדשה','New chat')) + '" style="background:transparent;border:none;color:var(--ibot-text-muted);cursor:pointer;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
-      '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v5h-5"/></svg></button>' +
+      newChatIconSvg(17) + '</button>' +
       (modules.support.enabled ? '<button id="ibot-open-support" title="' + escapeHtml(locale.support.openLink) + '" style="background:transparent;border:none;color:var(--ibot-text-muted);cursor:pointer;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></button>' : '') +
       (isMobile ? '<button id="ibot-close-mobile" style="background:transparent;border:none;color:var(--ibot-text-muted);cursor:pointer;width:34px;height:34px;font-size:22px;flex-shrink:0;line-height:1;">&times;</button>' : '') +
       '</div>';
@@ -998,8 +1019,10 @@
 
   // New-conversation reset (confirm → clear session + history).
   window.__ibotNewChat = function () {
-    var ok = window.confirm(wlbl('להתחיל שיחה חדשה? ההיסטוריה הנוכחית תימחק.', 'Start a new chat? Your current history will be cleared.'));
-    if (!ok) return;
+    // No confirm prompt — starting a new chat is a one-tap action. The prior
+    // conversation stays in the DB (visual history restores it on return),
+    // so there is nothing to warn about losing.
+    widgetTrack('widget_new_chat_clicked', { msg_count: messages.length });
     try { localStorage.removeItem('ibot_widget_' + ACCOUNT_ID); } catch (e) { /* */ }
     sessionId = null;
     messages = [{ role: 'assistant', content: config.welcomeMessage }];
@@ -1491,15 +1514,16 @@
   function renderChipsRow(items, pc) {
     var pills = '';
     var rendered = 0;
-    for (var i = 0; i < items.length && rendered < 3; i++) {
+    for (var i = 0; i < items.length && rendered < 4; i++) {
       var label = String(items[i] || '').trim();
       if (!label) continue;
-      // Truncate long chips so two per row stays plausible
-      if (label.length > 22) label = label.slice(0, 21) + '…';
+      // Full question always shown — a chip cut to "מה מומלץ לשי…" doesn't
+      // tell the visitor what they're about to ask. Long labels wrap to a
+      // second line instead of truncating.
       pills +=
         '<button onclick="window.__ibotChipClick(' + i + ')" ' +
         'style="background:var(--ibot-surface);border:1px solid var(--ibot-border);color:var(--ibot-text-primary);cursor:pointer;' +
-        'border-radius:999px;padding:6px 11px;font-size:12.5px;line-height:1.2;' +
+        'border-radius:999px;padding:6px 11px;font-size:12.5px;line-height:1.3;white-space:normal;text-align:center;' +
         'font-family:inherit;transition:transform 0.15s,border-color 0.15s;max-width:100%;" ' +
         'onmouseover="this.style.transform=\'translateY(-1px)\';this.style.borderColor=\'' + pc + '\';" ' +
         'onmouseout="this.style.transform=\'\';this.style.borderColor=\'var(--ibot-border)\';">' +

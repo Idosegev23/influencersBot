@@ -26,6 +26,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { cacheGet, cacheSet } from '@/lib/cache';
+import { containsCouponContent } from '@/lib/coupons/coupon-content-filter';
 import OpenAI from 'openai';
 
 // Same model as the widget chat (baseArchetype.CHAT_MODEL). Cache absorbs the
@@ -108,6 +109,7 @@ interface ChipsContext {
   mode: 'initial' | 'follow_up';
   lastUserMsg?: string | null;
   lastBotMsg?: string | null;
+  noCoupons?: boolean;
 }
 
 async function generateChips(ctx: ChipsContext): Promise<string[] | null> {
@@ -119,13 +121,18 @@ async function generateChips(ctx: ChipsContext): Promise<string[] | null> {
   // (`document.documentElement.lang` || 'he'). Anything we don't have a
   // dedicated prompt for falls back to Hebrew to preserve existing behavior.
   const chipLang = (ctx.lang || 'he').toLowerCase().startsWith('en') ? 'en' : 'he';
-  const instructions = chipLang === 'en'
+  const noCouponsRule = ctx.noCoupons
+    ? (chipLang === 'en'
+        ? ' NEVER generate chips about coupons, discount codes, or promo codes — this brand has none.'
+        : ' לעולם אל תייצר צ\'יפים על קופונים, קודי הנחה או קודי קידום — למותג הזה אין כאלה.')
+    : '';
+  const instructions = (chipLang === 'en'
     ? (ctx.mode === 'follow_up'
         ? `Generate ${targetCount} short English chips for follow-up conversation on a commercial website chat. Each chip is a short question/request (max 6 words) the visitor would tap right after the bot's reply. Aim for precise relevance to the conversation context.`
         : `Generate ${targetCount} short English chips as conversation starters for a brand website chat. Each chip is a question (max 6 words) an anonymous visitor would tap to start a chat. They must feel native to the brand and the page type the visitor is on.`)
     : (ctx.mode === 'follow_up'
         ? `אתה מייצר ${targetCount} צ'יפסים קצרים בעברית להמשך שיחה בצ'אט באתר מסחרי. כל צ'יפ הוא שאלה/בקשה קצרה (עד 6 מילים) שהמבקר/ת היה/יתה מקליק/ה עכשיו אחרי תשובת הבוט. תכוון/י לדיוק על הקשר השיחה.`
-        : `אתה מייצר ${targetCount} צ'יפסים קצרים בעברית בתור שאלות פתיחה לצ'אט באתר מותג. כל צ'יפ הוא שאלה (עד 6 מילים) שלקוח/ה אנונימי/ת היה/יתה מקליק/ה כדי להתחיל שיחה. הם צריכים להרגיש native למותג ולסוג העמוד שהמבקר/ת רואה.`);
+        : `אתה מייצר ${targetCount} צ'יפסים קצרים בעברית בתור שאלות פתיחה לצ'אט באתר מותג. כל צ'יפ הוא שאלה (עד 6 מילים) שלקוח/ה אנונימי/ת היה/יתה מקליק/ה כדי להתחיל שיחה. הם צריכים להרגיש native למותג ולסוג העמוד שהמבקר/ת רואה.`)) + noCouponsRule;
 
   const input =
     ctx.mode === 'follow_up'
@@ -240,6 +247,13 @@ export async function POST(req: NextRequest) {
   // from <html lang> which the embedding site may not set correctly.
   const effectiveLang = account?.language || lang || 'he';
 
+  // coupons_disabled accounts must never SUGGEST coupon questions either —
+  // a "יש קופון?" chip invites the exact answer the chat gate blocks.
+  // Applied to every source: overrides, cache, LLM output, and defaults.
+  const couponsDisabled = config.coupons_disabled === true;
+  const stripCouponChips = (arr: string[]): string[] =>
+    couponsDisabled ? arr.filter((c) => !containsCouponContent(c)) : arr;
+
   // Disabled by store owner
   if (widgetConfig.chips_enabled === false) {
     return NextResponse.json<ChipsResponse>(
@@ -252,7 +266,7 @@ export async function POST(req: NextRequest) {
   const overrides = widgetConfig.chips_overrides as Record<string, string[]> | undefined;
   if (overrides && Array.isArray(overrides[pagePattern]) && overrides[pagePattern].length) {
     return NextResponse.json<ChipsResponse>(
-      { chips: overrides[pagePattern].slice(0, MAX_CHIPS), cached: false, source: 'override' },
+      { chips: stripCouponChips(overrides[pagePattern]).slice(0, MAX_CHIPS), cached: false, source: 'override' },
       { headers: corsHeaders },
     );
   }
@@ -263,7 +277,7 @@ export async function POST(req: NextRequest) {
     const hit = cacheGet<string[]>(cacheKey);
     if (hit?.value && hit.value.length) {
       return NextResponse.json<ChipsResponse>(
-        { chips: hit.value, cached: true, source: 'cache' },
+        { chips: stripCouponChips(hit.value), cached: true, source: 'cache' },
         { headers: corsHeaders },
       );
     }
@@ -293,26 +307,32 @@ export async function POST(req: NextRequest) {
     mode,
     lastUserMsg: body.lastUserMsg,
     lastBotMsg: body.lastBotMsg,
+    noCoupons: couponsDisabled,
   });
 
   if (generated && generated.length) {
-    if (mode === 'initial') {
-      cacheSet(cacheKey, generated, {
-        ttlMs: CHIPS_CACHE_TTL_MS,
-        tags: [`account:${accountId}`, `widget-chips`],
-      });
+    const cleanGenerated = stripCouponChips(generated);
+    if (cleanGenerated.length) {
+      if (mode === 'initial') {
+        cacheSet(cacheKey, cleanGenerated, {
+          ttlMs: CHIPS_CACHE_TTL_MS,
+          tags: [`account:${accountId}`, `widget-chips`],
+        });
+      }
+      return NextResponse.json<ChipsResponse>(
+        { chips: cleanGenerated, cached: false, source: 'llm' },
+        { headers: corsHeaders },
+      );
     }
-    return NextResponse.json<ChipsResponse>(
-      { chips: generated, cached: false, source: 'llm' },
-      { headers: corsHeaders },
-    );
   }
 
   // 6. Fallback chain: config.suggested_questions → hardcoded defaults
   const dbSuggestions = Array.isArray(config.suggested_questions)
     ? config.suggested_questions.filter((s: any) => typeof s === 'string' && s.trim())
     : [];
-  const fallback = dbSuggestions.length ? dbSuggestions.slice(0, MAX_CHIPS) : DEFAULT_CHIPS[pagePattern];
+  const fallback = stripCouponChips(
+    dbSuggestions.length ? dbSuggestions.slice(0, MAX_CHIPS) : DEFAULT_CHIPS[pagePattern]
+  );
 
   return NextResponse.json<ChipsResponse>(
     { chips: fallback, cached: false, source: 'fallback' },
