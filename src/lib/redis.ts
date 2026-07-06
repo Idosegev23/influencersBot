@@ -292,6 +292,30 @@ export async function redisLLen(key: string): Promise<number> {
   }
 }
 
+export async function redisLRange(key: string, start: number, stop: number): Promise<string[]> {
+  const client = getClient();
+  if (!client) return [];
+  try {
+    const res = await client.lrange(key, start, stop);
+    return (res || []).map((x: unknown) => (typeof x === 'string' ? x : JSON.stringify(x)));
+  } catch (err) {
+    console.error('[Redis] LRANGE error:', err);
+    return [];
+  }
+}
+
+export async function redisLTrim(key: string, start: number, stop: number): Promise<boolean> {
+  const client = getClient();
+  if (!client) return false;
+  try {
+    await client.ltrim(key, start, stop);
+    return true;
+  } catch (err) {
+    console.error('[Redis] LTRIM error:', err);
+    return false;
+  }
+}
+
 // ============================================
 // Health Check
 // ============================================
