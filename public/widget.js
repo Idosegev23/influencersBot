@@ -457,6 +457,14 @@
       attribution: WIDGET_ATTRIBUTION,
     };
     for (var k in params) enriched[k] = params[k];
+    // Dual-write funnel events into the new /api/widget/events pipeline too
+    // (transition period — see Behavioral Events block below). MUST run before
+    // the EVENT_QUEUE batch early-return below, else a funnel event landing on
+    // the MAX_BATCH boundary would skip the new pipeline. The old
+    // /api/analytics/widget send is left untouched.
+    try {
+      if (BEHAVIOR_FUNNEL_TYPES[eventName]) behaviorTrack(eventName, enriched);
+    } catch (e) { /* never break the host page */ }
     EVENT_QUEUE.push({ name: eventName, ts: Date.now(), payload: enriched });
     if (EVENT_QUEUE.length >= MAX_BATCH) {
       flushAnalytics();
@@ -465,12 +473,6 @@
     if (!FLUSH_TIMER) {
       FLUSH_TIMER = setTimeout(flushAnalytics, FLUSH_INTERVAL_MS);
     }
-    // Dual-write funnel events into the new /api/widget/events pipeline too
-    // (transition period — see Behavioral Events block below). The old
-    // /api/analytics/widget send above is left untouched.
-    try {
-      if (BEHAVIOR_FUNNEL_TYPES[eventName]) behaviorTrack(eventName, enriched);
-    } catch (e) { /* never break the host page */ }
   }
 
   // Flush on tab hide / page unload so we don't lose tail events.
