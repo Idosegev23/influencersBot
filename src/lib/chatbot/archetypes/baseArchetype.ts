@@ -789,7 +789,10 @@ ${input.mode === 'widget' && input.accountContext.accountArchetype === 'b2b_saas
 • stage: איפה הלקוח/ה במסע הקנייה כרגע.
 • objection: אם הלקוח/ה מהסס/ת — סוג ההתנגדות. אחרת "none".
 • topic: נושא מרכזי (לדוגמה "שמפו לשיער יבש").
-🚫 אל תכתוב את התג בתוך הטקסט הנראה. הוא נחתך לפני שמציגים. 🚫 אל תוסיף הסברים לפניו או אחריו.` : ''}
+🚫 אל תכתוב את התג בתוך הטקסט הנראה. הוא נחתך לפני שמציגים. 🚫 אל תוסיף הסברים לפניו או אחריו.
+
+🛍️ תג מוצרים — חובה בסוף כל תשובה שבה הצגת/המלצת מוצרים (אחרי תג ה-<<INTENT>>):
+בסוף כל תשובה שבה הצגת/המלצת על מוצרים, הוסף/י שורה נפרדת עם המיקומים (המספרים) של המוצרים שבאמת הצגת מתוך "🛍️ מוצרים מומלצים" — בדיוק בפורמט הזה: <<PRODUCTS>>1,3<</PRODUCTS>> (רק המספרים, מופרדים בפסיק). אם לא הצגת אף מוצר לרכישה — <<PRODUCTS>><</PRODUCTS>>. חשוב: מותר להציג/להמליץ לרכישה אך ורק מוצרים מתוך הרשימה הממוספרת הזו. אל תמליץ/תציג כמוצר לרכישה שום מוצר שמופיע רק בתוכן/בידע אבל לא ברשימה. את שאר המידע מהידע אפשר לתת כתשובה, אבל לא כהמלצת מוצר לרכישה.` : ''}
 ${input.mode === 'widget' && input.widgetConfig?.prompt ? this.buildAdditiveWidgetPrompt(input.widgetConfig.prompt) : ''}
 ${input.mode === 'widget' && input.widgetConfig?._returningVisitorBlock ? `\n${input.widgetConfig._returningVisitorBlock}\n` : ''}
 ${input.mode === 'widget' && input.widgetConfig?._pageContextBlock ? `\n${input.widgetConfig._pageContextBlock}\n` : ''}
