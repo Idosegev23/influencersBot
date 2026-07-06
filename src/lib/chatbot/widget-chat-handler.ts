@@ -375,16 +375,21 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
   // Approach C: the model ends its reply with <<PRODUCTS>>1,3<</PRODUCTS>> —
   // the positions (1-indexed) of the products it actually featured, from the
   // numbered recommendation block. Resolve them so the CARDS are exactly what
-  // the bot talked about. Missing/empty/all-invalid → fall back to the engine
-  // top-3 (no regression).
-  const { cleanText: cleanText3, positions: featuredPositions } = stripProducts(fullText);
+  // the bot talked about.
+  //  - positions present  → cards = exactly those products.
+  //  - envelope present but EMPTY → the model deliberately featured nothing
+  //    (e.g. a clarifying turn), so show NO cards — don't fall back to engine
+  //    top-N, which would surface products the prose never mentioned.
+  //  - envelope ABSENT (model didn't comply) → fall back to engine top-3.
+  const { cleanText: cleanText3, positions: featuredPositions, present: productsPresent } = stripProducts(fullText);
   fullText = cleanText3;
   if (featuredPositions.length > 0) {
     const picked = featuredPositions
       .map((pos) => recommendedProducts[pos - 1])
       .filter((p): p is ProductRecommendation => !!p);
-    if (picked.length > 0) recommendedProducts = picked;
-    else recommendedProducts = recommendedProducts.slice(0, 3);
+    recommendedProducts = picked.length > 0 ? picked : recommendedProducts.slice(0, 3);
+  } else if (productsPresent) {
+    recommendedProducts = [];
   } else {
     recommendedProducts = recommendedProducts.slice(0, 3);
   }

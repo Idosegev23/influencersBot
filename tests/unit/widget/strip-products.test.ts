@@ -11,13 +11,19 @@ describe('stripProducts', () => {
     const { positions } = stripProducts('x <<PRODUCTS>> 2 , 2, foo, 5 <</PRODUCTS>>');
     expect(positions).toEqual([2, 5]);
   });
-  it('no envelope → empty positions, text unchanged', () => {
-    const { cleanText, positions } = stripProducts('just a reply');
+  it('no envelope → empty positions, not present, text unchanged', () => {
+    const { cleanText, positions, present } = stripProducts('just a reply');
     expect(positions).toEqual([]);
+    expect(present).toBe(false);
     expect(cleanText).toBe('just a reply');
   });
-  it('empty envelope → empty positions', () => {
-    const { positions } = stripProducts('hi <<PRODUCTS>><</PRODUCTS>>');
+  it('empty envelope → empty positions but PRESENT (deliberate no-cards)', () => {
+    const { positions, present } = stripProducts('hi <<PRODUCTS>><</PRODUCTS>>');
     expect(positions).toEqual([]);
+    expect(present).toBe(true);
+  });
+  it('populated envelope → present true', () => {
+    const { present } = stripProducts('x<<PRODUCTS>>1<</PRODUCTS>>');
+    expect(present).toBe(true);
   });
 });

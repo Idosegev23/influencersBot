@@ -129,10 +129,14 @@ export function stripIntent(text: string): { cleanText: string; intent: IntentEn
  */
 const PRODUCTS_RE = /<<PRODUCTS>>([\s\S]*?)<<\/PRODUCTS>>/;
 
-export function stripProducts(text: string): { cleanText: string; positions: number[] } {
-  if (!text) return { cleanText: text || '', positions: [] };
+export function stripProducts(text: string): { cleanText: string; positions: number[]; present: boolean } {
+  if (!text) return { cleanText: text || '', positions: [], present: false };
   const match = text.match(PRODUCTS_RE);
-  if (!match) return { cleanText: text, positions: [] };
+  // `present` distinguishes an empty envelope (`<<PRODUCTS>><</PRODUCTS>>` — the
+  // model deliberately featured NO products this turn, e.g. a clarifying reply)
+  // from an absent one (model didn't emit the envelope at all). The handler
+  // shows no cards for the former, and falls back to the engine top-N for the latter.
+  if (!match) return { cleanText: text, positions: [], present: false };
   const seen = new Set<number>();
   const positions: number[] = [];
   for (const tok of match[1].split(/[,\s]+/)) {
@@ -140,5 +144,5 @@ export function stripProducts(text: string): { cleanText: string; positions: num
     if (Number.isInteger(n) && n > 0 && !seen.has(n)) { seen.add(n); positions.push(n); }
   }
   const cleanText = text.replace(PRODUCTS_RE, '').replace(/\n\s*\n\s*$/, '').trim();
-  return { cleanText, positions };
+  return { cleanText, positions, present: true };
 }
