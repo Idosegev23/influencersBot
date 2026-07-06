@@ -36,7 +36,15 @@ export function normalizeWidgetEvents(
     if (!e || typeof e.type !== 'string' || !WIDGET_EVENT_TYPES.has(e.type)) { rejected++; continue; }
     const payload = e.payload && typeof e.payload === 'object' ? e.payload : {};
     if (Buffer.byteLength(JSON.stringify(payload), 'utf8') > 4096) { rejected++; continue; }
-    const ts = typeof e.ts === 'number' && Number.isFinite(e.ts) ? new Date(e.ts).toISOString() : new Date().toISOString();
+    // Clamp untrusted client clocks to a sane window. A skewed device (wrong
+    // year) would otherwise route to a far-off partition; the DEFAULT partition
+    // keeps that lossless, but clamping keeps timestamps meaningful and prevents
+    // future-dated rows from landing in DEFAULT (which would block creating that
+    // month's real partition later).
+    const nowMs = Date.now();
+    const clientTs = typeof e.ts === 'number' && Number.isFinite(e.ts) ? e.ts : nowMs;
+    const inWindow = clientTs >= nowMs - 90 * 86400000 && clientTs <= nowMs + 3600000;
+    const ts = new Date(inWindow ? clientTs : nowMs).toISOString();
     rows.push({
       account_id: accountId, anon_id: anon, session_id: session,
       event_uid: typeof e.uid === 'string' ? e.uid.slice(0, 64) : null,

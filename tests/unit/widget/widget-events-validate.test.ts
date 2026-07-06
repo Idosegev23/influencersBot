@@ -24,4 +24,16 @@ describe('normalizeWidgetEvents', () => {
     const { rows } = normalizeWidgetEvents({ events: evs }, ACC);
     expect(rows.length).toBe(50);
   });
+  it('clamps a clock-skewed future ts to ~now (poison-pill guard)', () => {
+    const future = Date.now() + 5 * 365 * 86400000; // ~5 years ahead
+    const { rows } = normalizeWidgetEvents({ events: [{ type: 'page_view', ts: future }] }, ACC);
+    const createdMs = new Date(rows[0].created_at).getTime();
+    expect(createdMs).toBeLessThanOrEqual(Date.now() + 3600000);
+    expect(createdMs).toBeGreaterThan(Date.now() - 60000);
+  });
+  it('keeps an in-window recent ts as-is', () => {
+    const recent = Date.now() - 2 * 60000; // 2 min ago
+    const { rows } = normalizeWidgetEvents({ events: [{ type: 'click', ts: recent }] }, ACC);
+    expect(new Date(rows[0].created_at).getTime()).toBe(recent);
+  });
 });
