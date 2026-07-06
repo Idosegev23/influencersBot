@@ -1356,6 +1356,7 @@
                 .replace(/<<SUGGESTIONS>>[\s\S]*?<<\/SUGGESTIONS>>/g, '')
                 .replace(/<<INTENT>>[\s\S]*?<<\/INTENT>>/g, '')
                 .replace(/<<ACTION>>[\s\S]*?<<\/ACTION>>/g, '')
+                .replace(/<<PRODUCTS>>[\s\S]*?<<\/PRODUCTS>>/g, '')
                 .trim();
               // Find the bot text message (cards messages may have been pushed
               // after it; walk backwards to the first assistant text node).
@@ -1394,6 +1395,7 @@
                     .replace(/<<SUGGESTIONS>>[\s\S]*/g, '')
                     .replace(/<<INTENT>>[\s\S]*/g, '')
                     .replace(/<<ACTION>>[\s\S]*/g, '')
+                    .replace(/<<PRODUCTS>>[\s\S]*/g, '')
                     .trim();
                   messages[messages.length - 1].content = displayText;
                   // Throttle the actual DOM write to one paint per frame via
