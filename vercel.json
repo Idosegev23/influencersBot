@@ -80,6 +80,18 @@
     {
       "path": "/api/cron/expire-coupons",
       "schedule": "30 2 * * *"
+    },
+    {
+      "path": "/api/cron/widget-events-drain",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/widget-rollup",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/widget-partitions",
+      "schedule": "0 3 * * *"
     }
   ]
 }
