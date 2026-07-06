@@ -117,6 +117,10 @@ export default function ManagePage() {
   const [primaryColor, setPrimaryColor] = useState('#0c1013');
   const [darkMode, setDarkMode] = useState(false);
   const [placeholderText, setPlaceholderText] = useState('');
+  // Widget welcome-screen cover image. Uploaded/removed via its own endpoint
+  // (persists straight to config.widget.coverImage); empty = white header.
+  const [coverImage, setCoverImage] = useState('');
+  const [coverUploading, setCoverUploading] = useState(false);
   const [brandNameOverride, setBrandNameOverride] = useState('');
   const [supportEmail, setSupportEmail] = useState('');
   const [modSupport, setModSupport] = useState(false);
@@ -185,6 +189,7 @@ export default function ManagePage() {
         setPrimaryColor(w.primaryColor || '#0c1013');
         setPlaceholderText(w.placeholder || '');
         setBrandNameOverride(w.brandName || '');
+        setCoverImage(w.coverImage || '');
         const mods = w.modules || {};
         setModSupport(mods.support?.enabled === true);
         setModLeads(mods.leads?.enabled === true);
@@ -244,6 +249,45 @@ export default function ManagePage() {
       setSaveMsg('שגיאה בשמירה');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const uploadCoverImage = async (file: File) => {
+    setCoverUploading(true);
+    setSaveMsg('');
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/manage/upload-cover', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (data.success && data.url) {
+        setCoverImage(data.url);
+        setSaveMsg('תמונת הכיסוי הועלתה!');
+      } else {
+        setSaveMsg(data.error || 'שגיאה בהעלאת התמונה');
+      }
+    } catch {
+      setSaveMsg('שגיאה בהעלאת התמונה');
+    } finally {
+      setCoverUploading(false);
+      setTimeout(() => setSaveMsg(''), 3000);
+    }
+  };
+
+  const removeCoverImage = async () => {
+    setCoverUploading(true);
+    try {
+      const res = await fetch('/api/manage/upload-cover', { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        setCoverImage('');
+        setSaveMsg('תמונת הכיסוי הוסרה — הרקע יהיה לבן');
+      }
+    } catch {
+      setSaveMsg('שגיאה בהסרת התמונה');
+    } finally {
+      setCoverUploading(false);
+      setTimeout(() => setSaveMsg(''), 3000);
     }
   };
 
@@ -1365,6 +1409,30 @@ export default function ManagePage() {
                         placeholder="שלום! איך אפשר לעזור?"
                         className="w-full px-4 py-2.5 rounded-xl text-sm outline-none border border-[#c6c6c6]"
                         style={{ backgroundColor: '#faf2e9' }} />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-[#655e51] mb-1.5">תמונת כיסוי (מסך פתיחה)</label>
+                      {coverImage ? (
+                        <div className="relative rounded-xl overflow-hidden border border-[#c6c6c6]" style={{ height: 112 }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={coverImage} alt="תמונת כיסוי" className="w-full h-full object-cover" />
+                          <button onClick={removeCoverImage} disabled={coverUploading}
+                            className="absolute top-2 left-2 bg-white/90 border border-[#c6c6c6] rounded-full px-3 py-1 text-xs font-semibold text-[#b3261e] hover:bg-white transition-colors">
+                            הסר תמונה
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-[#c6c6c6] cursor-pointer hover:border-[#575a8c] transition-colors py-6"
+                          style={{ backgroundColor: '#faf2e9' }}>
+                          <span className="material-symbols-outlined text-[#655e51]" style={{ fontSize: 26 }}>add_photo_alternate</span>
+                          <span className="text-sm font-medium text-[#655e51]">{coverUploading ? 'מעלה...' : 'העלאת תמונת כיסוי'}</span>
+                          <span className="text-xs text-[#655e51]">JPG / PNG / WebP עד 5MB · מומלץ רוחב 800px</span>
+                          <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" disabled={coverUploading}
+                            onChange={e => { const f = e.target.files?.[0]; if (f) uploadCoverImage(f); e.target.value = ''; }} />
+                        </label>
+                      )}
+                      <p className="text-xs text-[#655e51] mt-1.5">מוצגת בראש הווידג&apos;ט במסך הפתיחה. בלי תמונה — הרקע יישאר לבן ונקי.</p>
                     </div>
 
                     <div>
