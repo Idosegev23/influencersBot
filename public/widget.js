@@ -465,6 +465,12 @@
     if (!FLUSH_TIMER) {
       FLUSH_TIMER = setTimeout(flushAnalytics, FLUSH_INTERVAL_MS);
     }
+    // Dual-write funnel events into the new /api/widget/events pipeline too
+    // (transition period — see Behavioral Events block below). The old
+    // /api/analytics/widget send above is left untouched.
+    try {
+      if (BEHAVIOR_FUNNEL_TYPES[eventName]) behaviorTrack(eventName, enriched);
+    } catch (e) { /* never break the host page */ }
   }
 
   // Flush on tab hide / page unload so we don't lose tail events.
@@ -472,6 +478,186 @@
     if (document.visibilityState === 'hidden') flushAnalytics();
   });
   window.addEventListener('pagehide', flushAnalytics);
+
+  // ============================================
+  // Behavioral Events — richer client telemetry (page views, scroll depth,
+  // time on page, exit intent, clicks, product/cart snapshots) shipped to
+  // the dedicated /api/widget/events ingest pipeline (Redis buffer → drain
+  // cron → widget_events table). Runs alongside the funnel-event queue
+  // above; during the transition, funnel events (widget_loaded/opened/
+  // closed/message_sent/message_received) are dual-written into both
+  // pipelines from widgetTrack() below.
+  // ============================================
+
+  var BEHAVIOR_QUEUE = [];
+  var BEHAVIOR_FLUSH_TIMER = null;
+  var BEHAVIOR_FLUSH_INTERVAL_MS = 3000;
+  var BEHAVIOR_MAX_BATCH = 25;
+  var BEHAVIOR_UID_COUNTER = 0;
+  // Overridden from /api/widget/config `sampling.click` when the server
+  // provides one; defaults to tracking every click.
+  var CLICK_SAMPLE_RATE = 1.0;
+  // Funnel event names (already whitelisted server-side) that should also
+  // flow into the new events pipeline — see widgetTrack() below.
+  var BEHAVIOR_FUNNEL_TYPES = {
+    widget_loaded: 1,
+    widget_opened: 1,
+    widget_closed: 1,
+    widget_message_sent: 1,
+    widget_message_received: 1,
+  };
+
+  function flushBehavior() {
+    if (BEHAVIOR_FLUSH_TIMER) { clearTimeout(BEHAVIOR_FLUSH_TIMER); BEHAVIOR_FLUSH_TIMER = null; }
+    if (!ANALYTICS_TOKEN || BEHAVIOR_QUEUE.length === 0) return;
+    var events = BEHAVIOR_QUEUE.splice(0, BEHAVIOR_QUEUE.length);
+    var body = JSON.stringify({
+      accountId: ACCOUNT_ID,
+      token: ANALYTICS_TOKEN,
+      anonId: ANON_ID,
+      sessionId: sessionId || null,
+      events: events,
+    });
+    var url = BASE_URL + '/api/widget/events';
+    try {
+      if (navigator && typeof navigator.sendBeacon === 'function') {
+        var blob = new Blob([body], { type: 'application/json' });
+        if (navigator.sendBeacon(url, blob)) return;
+      }
+    } catch (e) { /* fall through */ }
+    try {
+      fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: body,
+        keepalive: true,
+        mode: 'cors',
+      }).catch(function () { /* fire-and-forget */ });
+    } catch (e) { /* fire-and-forget */ }
+  }
+
+  function behaviorTrack(type, payload) {
+    try {
+      if (!type) return;
+      var uid = ANON_ID + '_' + Date.now() + '_' + (BEHAVIOR_UID_COUNTER++);
+      BEHAVIOR_QUEUE.push({
+        type: type,
+        uid: uid,
+        path: location.pathname,
+        payload: payload || {},
+        ts: Date.now(),
+      });
+      if (BEHAVIOR_QUEUE.length >= BEHAVIOR_MAX_BATCH) {
+        flushBehavior();
+        return;
+      }
+      if (!BEHAVIOR_FLUSH_TIMER) {
+        BEHAVIOR_FLUSH_TIMER = setTimeout(flushBehavior, BEHAVIOR_FLUSH_INTERVAL_MS);
+      }
+    } catch (e) { /* never break the host page */ }
+  }
+
+  // ---- page_view — fired once at boot (see Boot section) ----
+  function trackPageView() {
+    try {
+      var referrerHost = '';
+      try { if (document.referrer) referrerHost = new URL(document.referrer).host; } catch (e2) { /* */ }
+      behaviorTrack('page_view', { title: document.title || '', referrer_host: referrerHost || null });
+    } catch (e) { /* */ }
+  }
+
+  // ---- scroll_depth — throttled sampling of max scroll %, final value on pagehide ----
+  var SCROLL_MAX_PCT = 0;
+  var SCROLL_LAST_SAMPLE_AT = 0;
+  var SCROLL_SAMPLE_INTERVAL_MS = 1000;
+  function sampleScrollDepth() {
+    try {
+      var doc = document.documentElement;
+      var scrollable = (doc ? doc.scrollHeight : 0) - (window.innerHeight || 0);
+      var scrollTop = window.scrollY || (doc && doc.scrollTop) || 0;
+      var pct = scrollable > 0 ? Math.min(100, Math.max(0, Math.round((scrollTop / scrollable) * 100))) : 0;
+      if (pct > SCROLL_MAX_PCT) SCROLL_MAX_PCT = pct;
+    } catch (e) { /* */ }
+  }
+  try {
+    if (window.addEventListener) {
+      window.addEventListener('scroll', function () {
+        try {
+          var now = Date.now();
+          if (now - SCROLL_LAST_SAMPLE_AT < SCROLL_SAMPLE_INTERVAL_MS) return;
+          SCROLL_LAST_SAMPLE_AT = now;
+          sampleScrollDepth();
+        } catch (e) { /* */ }
+      }, { passive: true });
+    }
+  } catch (e) { /* */ }
+
+  // ---- time_on_page — accumulate visible ms only (pauses while tab hidden), emit on pagehide ----
+  var TIME_ON_PAGE_MS = 0;
+  var TIME_ON_PAGE_SEGMENT_START = Date.now();
+  var TIME_ON_PAGE_VISIBLE = typeof document.visibilityState === 'undefined' || document.visibilityState !== 'hidden';
+  function accumulateVisibleTime() {
+    try {
+      if (TIME_ON_PAGE_VISIBLE) {
+        TIME_ON_PAGE_MS += Date.now() - TIME_ON_PAGE_SEGMENT_START;
+      }
+    } catch (e) { /* */ }
+  }
+
+  // ---- exit_intent — mouseout above the viewport top, once per pageview ----
+  var EXIT_INTENT_FIRED = false;
+  try {
+    document.addEventListener('mouseout', function (e) {
+      try {
+        if (EXIT_INTENT_FIRED || !e) return;
+        if (e.clientY <= 0) {
+          EXIT_INTENT_FIRED = true;
+          behaviorTrack('exit_intent', {});
+        }
+      } catch (err) { /* */ }
+    });
+  } catch (e) { /* */ }
+
+  // ---- click — delegated, sampled, never reads input values ----
+  try {
+    document.addEventListener('click', function (e) {
+      try {
+        if (CLICK_SAMPLE_RATE < 1 && Math.random() > CLICK_SAMPLE_RATE) return;
+        var el = e && e.target;
+        if (!el || el.nodeType !== 1) return;
+        behaviorTrack('click', {
+          tag: el.tagName || null,
+          text: ((el.textContent || '') + '').trim().slice(0, 80),
+          href: el.href || null,
+        });
+      } catch (err) { /* */ }
+    }, true);
+  } catch (e) { /* */ }
+
+  // ---- visibility tracking (pauses/resumes time_on_page) + flush on hide ----
+  document.addEventListener('visibilitychange', function () {
+    try {
+      if (document.visibilityState === 'hidden') {
+        accumulateVisibleTime();
+        TIME_ON_PAGE_VISIBLE = false;
+        flushBehavior();
+      } else {
+        TIME_ON_PAGE_VISIBLE = true;
+        TIME_ON_PAGE_SEGMENT_START = Date.now();
+      }
+    } catch (e) { /* */ }
+  });
+
+  // ---- final scroll_depth + time_on_page emission on unload, then flush ----
+  window.addEventListener('pagehide', function () {
+    try {
+      sampleScrollDepth();
+      behaviorTrack('scroll_depth', { pct: SCROLL_MAX_PCT });
+      accumulateVisibleTime();
+      behaviorTrack('time_on_page', { ms: TIME_ON_PAGE_MS });
+    } catch (e) { /* */ }
+    flushBehavior();
+  });
 
   // ============================================
   // Smart Chips (Phase 1: page-aware + history-aware)
@@ -641,6 +827,12 @@
       // false hides the widget, so accounts that never set it are unaffected.
       config.enabled = data.enabled !== false;
       if (data.analyticsToken) ANALYTICS_TOKEN = data.analyticsToken;
+      // Optional server-side sampling knob for the high-volume `click`
+      // collector; absent on most accounts, which keeps the 1.0 default.
+      if (data.sampling && typeof data.sampling.click === 'number') CLICK_SAMPLE_RATE = data.sampling.click;
+      // Token just arrived — flush anything queued by boot-time collectors
+      // (page_view/product_view/cart_state) that fired before config loaded.
+      try { flushBehavior(); } catch (e) { /* */ }
       // Module toggles drive which affordances the widget surfaces (Support
       // link in header, lead capture, etc). Defaults are all-off; the server
       // sets `enabled: true` per module only when the account owner opted in.
@@ -2625,6 +2817,25 @@
   if (isLikelyShopify()) {
     extractPageContextAsync().then(function (enriched) { pageContext = enriched; });
   }
+  // Behavioral collectors that fire once at load, from the synchronous page
+  // context (Shopify cart enrichment above is out of scope here — Phase C
+  // covers live cart tracking; this is a passive load-time snapshot only).
+  trackPageView();
+  try {
+    if (pageContext && pageContext.product && pageContext.product.name) {
+      behaviorTrack('product_view', {
+        product_name: pageContext.product.name,
+        price: pageContext.product.price != null ? pageContext.product.price : null,
+        sku: pageContext.product.sku || null,
+      });
+    }
+    if (pageContext && pageContext.cart) {
+      behaviorTrack('cart_state', {
+        item_count: pageContext.cart.item_count != null ? pageContext.cart.item_count : null,
+        value: pageContext.cart.total != null ? pageContext.cart.total : null,
+      });
+    }
+  } catch (e) { /* */ }
   // Apply smart greeting after config loads — the welcomeMessage will have
   // been set from /api/widget/config; wrap it with personalization.
   setTimeout(function () {
