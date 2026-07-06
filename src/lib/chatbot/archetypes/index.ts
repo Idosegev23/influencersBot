@@ -122,6 +122,7 @@ export async function processWithArchetype(
       influencerName: string;
       accountArchetype?: string;
       language?: string;
+      couponsDisabled?: boolean;
     };
     onToken?: (token: string) => void;
     modelTier?: 'nano' | 'standard' | 'full';

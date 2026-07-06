@@ -15,6 +15,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { scrubTermsFromKB } from '@/lib/coupons/kb-scrub';
 import { getAllCouponCodes, getValidCouponCodes } from '@/lib/coupons/active-filter';
+import { stripCouponContentFromKB } from '@/lib/coupons/coupon-content-filter';
 
 // Fallback suggestions per archetype when LLM omits <<SUGGESTIONS>>
 const ARCHETYPE_FALLBACK_SUGGESTIONS: Record<string, string> = {
@@ -108,6 +109,7 @@ export class SandwichBot {
     // ==========================================
     let accountArchetype: string | undefined;
     let accountLanguage: string | undefined;
+    let couponsDisabled = false;
     try {
       const { data: acctRow } = await supabase
         .from('accounts')
@@ -116,6 +118,7 @@ export class SandwichBot {
         .single();
       accountArchetype = (acctRow?.config as any)?.archetype;
       accountLanguage = acctRow?.language || undefined;
+      couponsDisabled = (acctRow?.config as any)?.coupons_disabled === true;
     } catch {}
 
     // ==========================================
@@ -219,6 +222,20 @@ export class SandwichBot {
         knowledgeQuery,
         input.rollingSummary
       );
+    }
+
+    // coupons_disabled gate — accounts that opted out of coupon programs
+    // entirely (Argania / LA BEAUTÉ / Studio Pasha). Their coupons table is
+    // empty, so the invalid-code scrub below can't help; codes live only in
+    // scraped content (reel transcriptions, captions, OCR). Drop every
+    // coupon-bearing KB item BEFORE the LLM sees anything. Runs on cached
+    // KBs too — the suggestion cache predates this gate.
+    if (couponsDisabled) {
+      const { kb: cleanKB, dropped } = stripCouponContentFromKB(knowledgeBase);
+      knowledgeBase = cleanKB;
+      if (dropped > 0) {
+        console.log(`   🛡  coupons_disabled: dropped ${dropped} coupon-bearing KB item(s)`);
+      }
     }
 
     // Attribution scoping: post-filter coupons in the KB so the LLM
@@ -372,6 +389,7 @@ export class SandwichBot {
           influencerName: input.influencerName,
           accountArchetype,
           language: accountLanguage,
+          couponsDisabled,
         },
         onToken: input.onToken,
         modelTier: input.modelTier,
@@ -380,7 +398,7 @@ export class SandwichBot {
         mode: input.mode,
         widgetConfig: input.widgetConfig,
         suggestedClarifications: input.suggestedClarifications,
-        activeCoupons: input.activeCoupons,
+        activeCoupons: couponsDisabled ? undefined : input.activeCoupons,
         conversationTopics: input.conversationTopics,
       }
     );

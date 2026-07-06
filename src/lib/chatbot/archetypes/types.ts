@@ -102,6 +102,7 @@ export interface ArchetypeInput {
     influencerName: string;
     accountArchetype?: string; // 'media_news' etc.
     language?: string; // ISO code from accounts.language ('he' default, 'en' for international SaaS like IMAI)
+    couponsDisabled?: boolean; // accounts.config.coupons_disabled — coupon mentions are forbidden entirely
   };
   onToken?: (token: string) => void; // Real-time streaming callback
   modelTier?: 'nano' | 'standard' | 'full'; // From decision engine modelStrategy

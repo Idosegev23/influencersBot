@@ -17,6 +17,7 @@ import { generateEmbeddings } from './embeddings';
 import { createLogger } from './logger';
 import { getArchetypeConfig } from './archetypes';
 import { classifyChunkTopics } from './enrich';
+import { containsCouponContent } from '@/lib/coupons/coupon-content-filter';
 import type {
   EntityType,
   IngestInput,
@@ -25,6 +26,25 @@ import type {
 } from './types';
 
 const log = createLogger('ingest');
+
+// coupons_disabled lookup, memoized per process — ingestAllForAccount calls
+// ingestDocument once per post/transcription, so a naive per-call SELECT
+// would add hundreds of round-trips to a full scan.
+const couponsDisabledCache = new Map<string, boolean>();
+async function isCouponsDisabled(
+  supabase: ReturnType<typeof createClient>,
+  accountId: string
+): Promise<boolean> {
+  if (couponsDisabledCache.has(accountId)) return couponsDisabledCache.get(accountId)!;
+  const { data } = await supabase
+    .from('accounts')
+    .select('config')
+    .eq('id', accountId)
+    .single();
+  const disabled = (data?.config as any)?.coupons_disabled === true;
+  couponsDisabledCache.set(accountId, disabled);
+  return disabled;
+}
 
 // ============================================
 // Single Document Ingestion
@@ -51,9 +71,28 @@ export async function ingestDocument(input: IngestInput): Promise<IngestResult> 
 
   // 2. Chunk — semantic chunking for website/transcription, token-based for structured content
   const useSemanticChunking = entityType === 'website' || entityType === 'transcription';
-  const chunks = useSemanticChunking
+  let chunks = useSemanticChunking
     ? chunkTextSemantic(normalized)
     : chunkText(normalized);
+
+  // coupons_disabled gate: never ingest coupon-bearing chunks for accounts
+  // that opted out of coupon programs. Without this, every daily scan
+  // re-creates the exact chunks the purge removed (influencer reels with
+  // "קוד einav" etc.) and the chat-time filter is the only line of defense.
+  if (chunks.length > 0 && (await isCouponsDisabled(supabase, accountId))) {
+    const before = chunks.length;
+    chunks = chunks.filter(c => !containsCouponContent(c.text));
+    if (chunks.length !== before) {
+      log.info('coupons_disabled: skipped coupon-bearing chunks', {
+        skipped: before - chunks.length,
+        kept: chunks.length,
+      }, accountId);
+    }
+    if (chunks.length === 0) {
+      return { documentId: '', chunksCreated: 0, totalTokens: 0, durationMs: Date.now() - startMs };
+    }
+  }
+
   const totalTokens = chunks.reduce((sum, c) => sum + c.tokenCount, 0);
 
   log.info('Chunked document', {

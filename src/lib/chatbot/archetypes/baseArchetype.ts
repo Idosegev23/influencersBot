@@ -517,7 +517,15 @@ export abstract class BaseArchetype {
     }
 
     // Step 2+3: Active coupons for proactive mention in response + suggestions
-    if (input.activeCoupons?.length) {
+    if (input.accountContext?.couponsDisabled) {
+      // coupons_disabled account: the KB is already stripped of coupon
+      // content upstream (sandwichBot), but the model can still "remember"
+      // codes from earlier turns in the chained conversation — so the rule
+      // has to be absolute, not context-conditional.
+      sections.push(
+        `\n🚫 קופונים — חוק ברזל לחשבון הזה: למותג אין ולא יהיו קודי קופון או קודי הנחה. אסור להזכיר, לאשר, להשלים או לרמוז על קוד קופון/הנחה בשום מצב — גם אם קוד כזה מופיע בתוכן שקיבלת, בהיסטוריית השיחה, או שהלקוח/ה שואל/ת עליו ישירות. אם שואלים על קופון — השב/י בפשטות שאין קודי הנחה, והפנה/י למבצעים הרשמיים שמופיעים באתר (אם יש כאלה בהקשר הידע).`
+      );
+    } else if (input.activeCoupons?.length) {
       const couponList = input.activeCoupons.slice(0, 5).map(c =>
         `• ${c.brand_name}: קוד ${c.coupon_code}${c.description ? ` (${c.description})` : ''}`
       ).join('\n');
