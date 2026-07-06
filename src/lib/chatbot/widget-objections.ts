@@ -121,3 +121,24 @@ export function stripIntent(text: string): { cleanText: string; intent: IntentEn
   const cleanText = text.replace(INTENT_RE, '').replace(/\n\s*\n\s*$/, '').trim();
   return { cleanText, intent };
 }
+
+/**
+ * Strip the <<PRODUCTS>>1,3<</PRODUCTS>> envelope (Approach C). The numbers are
+ * 1-indexed positions into the recommendation block the model was shown; the
+ * handler resolves them to the actual products so cards == what the bot featured.
+ */
+const PRODUCTS_RE = /<<PRODUCTS>>([\s\S]*?)<<\/PRODUCTS>>/;
+
+export function stripProducts(text: string): { cleanText: string; positions: number[] } {
+  if (!text) return { cleanText: text || '', positions: [] };
+  const match = text.match(PRODUCTS_RE);
+  if (!match) return { cleanText: text, positions: [] };
+  const seen = new Set<number>();
+  const positions: number[] = [];
+  for (const tok of match[1].split(/[,\s]+/)) {
+    const n = parseInt(tok, 10);
+    if (Number.isInteger(n) && n > 0 && !seen.has(n)) { seen.add(n); positions.push(n); }
+  }
+  const cleanText = text.replace(PRODUCTS_RE, '').replace(/\n\s*\n\s*$/, '').trim();
+  return { cleanText, positions };
+}
