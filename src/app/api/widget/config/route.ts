@@ -96,7 +96,7 @@ export async function GET(req: NextRequest) {
           position: widgetConfig.position || 'bottom-right',
         },
         brandName: config.display_name || config.username || '',
-        profilePic: config.profile_pic_url || null,
+        profilePic: config.profile_pic_url || config.avatar_url || config.logo_url || widgetConfig.profilePic || null,
         coverImage: widgetConfig.coverImage || null,
         socialLinks: Array.isArray(widgetConfig.socialLinks) ? widgetConfig.socialLinks : [],
         enabled: widgetConfig.enabled !== false,
