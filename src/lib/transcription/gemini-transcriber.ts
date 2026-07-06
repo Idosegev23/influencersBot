@@ -226,7 +226,7 @@ export async function transcribeVideo(
     // ⚡ CRITICAL: Use media_resolution_high for TEXT-HEAVY videos (OCR)
     const response = await callGeminiWithRetry(
       genAI,
-      'gemini-3-flash-preview', // ⚡ Gemini 3 Flash Preview (1M context, cheap!)
+      'gemini-3.5-flash', // ⚡ Gemini 3 Flash Preview (1M context, cheap!)
       [
         {
           parts: [
@@ -398,7 +398,7 @@ export async function transcribeImage(
 
     const response = await callGeminiWithRetry(
       genAI,
-      'gemini-3-flash-preview',
+      'gemini-3.5-flash',
       [
         {
           parts: [
@@ -484,7 +484,7 @@ export async function saveTranscription(
         video_duration: input.video_duration,
         processing_status: 'failed',
         error_message: output.error,
-        gemini_model_used: 'gemini-3-flash-preview',
+        gemini_model_used: 'gemini-3.5-flash',
       }, {
         onConflict: 'source_type,source_id',
       })
@@ -512,7 +512,7 @@ export async function saveTranscription(
       language: output.transcription.language,
       on_screen_text: output.transcription.on_screen_text,
       speakers: output.transcription.speakers,
-      gemini_model_used: 'gemini-3-flash-preview',
+      gemini_model_used: 'gemini-3.5-flash',
       processing_status: 'completed',
       tokens_used: output.tokens_used,
       processing_cost: output.processing_cost,

@@ -13,8 +13,8 @@ const openai = new OpenAI({
 // Models configuration
 export const AI_MODELS = {
   PERSONA_BUILDER: 'gpt-5.2-pro',               // 🚀 GPT-5.2 Pro for DEEP persona building (quality, depth, reasoning)
-  CHAT_RESPONSES: 'gemini-3-flash-preview',     // For real-time chat (speed, cost) - 3.1-flash (non-lite) not yet released
-  ANALYSIS: 'gemini-3-flash-preview',           // For quick analysis
+  CHAT_RESPONSES: 'gemini-3.5-flash',     // For real-time chat (speed, cost) - 3.1-flash (non-lite) not yet released
+  ANALYSIS: 'gemini-3.5-flash',           // For quick analysis
 } as const;
 
 /**

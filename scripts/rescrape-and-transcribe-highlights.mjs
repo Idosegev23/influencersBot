@@ -195,7 +195,7 @@ async function transcribeVideo(videoUrl, retries = 2) {
 
   // Call Gemini
   const genAI = new GoogleGenerativeAI(GEMINI_KEY);
-  const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
 
   const result = await model.generateContent({
     contents: [{
@@ -302,7 +302,7 @@ async function transcribePendingVideos() {
               processing_status: 'completed',
               processed_at: new Date().toISOString(),
               tokens_used: result.tokens_used,
-              gemini_model_used: 'gemini-2.0-flash',
+              gemini_model_used: 'gemini-3.5-flash',
             });
         }
 

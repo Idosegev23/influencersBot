@@ -31,7 +31,7 @@ async function classifyTopicsWithLLM(
   const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
   const response = await genai.models.generateContent({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-3.5-flash',
     contents: `Classify each text into exactly ONE topic.
 
 Topics: food, beauty, fashion, home, health, tech, lifestyle, business, coupon

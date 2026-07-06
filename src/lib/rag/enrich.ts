@@ -549,7 +549,7 @@ Texts:
 ${texts.map((t, i) => `[${i}] ${t.substring(0, 500)}`).join('\n\n')}`;
 
   const response = await genai.models.generateContent({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-3.5-flash',
     contents: prompt,
     config: {
       temperature: 0.3,
@@ -620,7 +620,7 @@ Chunks:
 ${chunks.map((c, i) => `[${i}] (${c.entityType}) ${c.text.substring(0, 400)}`).join('\n\n')}`;
 
   const response = await genai.models.generateContent({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-3.5-flash',
     contents: prompt,
     config: {
       temperature: 0.4,
@@ -757,7 +757,7 @@ async function classifyTopicsWithLLM(
   const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
   const response = await genai.models.generateContent({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-3.5-flash',
     contents: `Classify each text into exactly ONE topic.
 
 Topics: food, beauty, fashion, home, health, tech, lifestyle, business, coupon

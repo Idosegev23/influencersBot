@@ -358,7 +358,7 @@ async function main() {
         const excerpts = chunkData.map((c: any) => c.chunk_text.substring(0, 300)).join('\n---\n');
 
         const response = await genai.models.generateContent({
-          model: 'gemini-2.0-flash',
+          model: 'gemini-3.5-flash',
           contents: `אתה כתב חדשות בידור. כתוב תקציר של משפט אחד עד שניים בעברית על הנושא "${topic.topic_name}".
 הנושא מסוג: ${topic.topic_type}
 ערוצים שכיסו: ${accountNames.join(', ')}

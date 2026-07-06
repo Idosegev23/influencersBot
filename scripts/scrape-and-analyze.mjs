@@ -168,7 +168,7 @@ ${JSON.stringify(contentData, null, 2)}
 
   // Gemini 3 Pro with HIGH thinking level
   const response = await genAI.models.generateContent({
-    model: 'gemini-3-pro-preview',
+    model: 'gemini-3.1-pro-preview',
     contents: prompt,
     config: {
       thinkingConfig: {

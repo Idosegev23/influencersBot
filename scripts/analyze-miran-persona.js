@@ -48,7 +48,7 @@ async function main() {
   console.log('🤖 מריץ ניתוח Gemini...\n');
 
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
 
   const prompt = `נתח את התוכן של מירן בוזגלו והחזר Persona מדויקת **בעברית**.
 

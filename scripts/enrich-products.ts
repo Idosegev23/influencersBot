@@ -18,7 +18,7 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY!;
 const OPENAI_KEY = process.env.OPENAI_API_KEY!;
-const MODEL = 'gemini-3-flash-preview';
+const MODEL = 'gemini-3.5-flash';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const gemini = new GoogleGenAI({ apiKey: GEMINI_KEY });

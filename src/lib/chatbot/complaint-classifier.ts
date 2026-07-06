@@ -12,7 +12,7 @@
 
 import { GoogleGenAI } from '@google/genai';
 
-const MODEL = 'gemini-3-flash-preview';
+const MODEL = 'gemini-3.5-flash';
 const TIMEOUT_MS = 4000;
 
 let _client: GoogleGenAI | null = null;

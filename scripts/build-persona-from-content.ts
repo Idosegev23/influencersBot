@@ -26,7 +26,7 @@ async function analyzeInfluencerContent(
   transcriptions: any[],
   partnerships: any[]
 ): Promise<PersonaAnalysis> {
-  const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
 
   const prompt = `נתח את התוכן של המשפיענית והחזר Persona מדויקת.
 

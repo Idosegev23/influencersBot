@@ -31,7 +31,7 @@ export async function extractEntitiesBatch(
   const genai = new GoogleGenAI({ apiKey });
 
   const response = await genai.models.generateContent({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-3.5-flash',
     contents: `Extract named entities from these Hebrew news/entertainment texts.
 
 For each text, return a JSON array of objects with "name" and "type" fields.
