@@ -887,7 +887,9 @@
 
   function updateContainerPosition() {
     container.style.cssText = 'position:fixed;z-index:2147483647;' +
-      (config.position === 'bottom-left' ? 'bottom:24px;left:24px;' : 'bottom:24px;right:24px;') +
+      (config.position === 'bottom-left'
+        ? 'bottom:calc(20px + env(safe-area-inset-bottom));left:20px;'
+        : 'bottom:calc(20px + env(safe-area-inset-bottom));right:20px;') +
       'font-family:"' + locale.font + '",system-ui,sans-serif;direction:' + locale.dir + ';';
   }
 
@@ -896,12 +898,19 @@
   // ============================================
 
   function avatarHtml(size) {
-    if (config.profilePic) {
-      return '<img src="' + escapeHtml(config.profilePic) + '" alt="' + escapeHtml(config.brandName) + '" ' +
-        'style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />';
+    // Brand image (logo / profile) — NOT the old animated blob iframe, which was
+    // heavy and unfriendly on mobile. Falls back to the cover image, then a
+    // branded monogram; the blob is gone entirely.
+    var img = config.profilePic || config.coverImage;
+    if (img) {
+      return '<img src="' + escapeHtml(img) + '" alt="' + escapeHtml(config.brandName) + '" ' +
+        'style="width:100%;height:100%;object-fit:cover;border-radius:50%;" ' +
+        'onerror="this.style.display=\'none\';this.parentNode.style.background=\'' + config.primaryColor + '\';" />';
     }
-    return '<iframe src="' + BASE_URL + '/blob-animation.html" ' +
-      'style="width:100%;height:100%;border:none;border-radius:50%;pointer-events:none;" title="Bot"></iframe>';
+    var letter = escapeHtml(((config.brandName || '?').trim().charAt(0) || '?').toUpperCase());
+    return '<div style="width:100%;height:100%;border-radius:50%;background:' + config.primaryColor + ';' +
+      'color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-family:inherit;' +
+      'font-size:' + Math.round((size || 40) * 0.45) + 'px;line-height:1;">' + letter + '</div>';
   }
 
   // ============================================
@@ -1007,6 +1016,14 @@
   // ============================================
 
   function render() {
+    // Mobile: lock the host page's scroll while the chat is open (it's a
+    // full-screen takeover on phones) so the site doesn't scroll behind it and
+    // feel "stuck". Restored the moment the widget closes.
+    try {
+      var lockScroll = isOpen && window.innerWidth < 640 && config.enabled !== false;
+      document.documentElement.style.overflow = lockScroll ? 'hidden' : '';
+      document.body.style.overflow = lockScroll ? 'hidden' : '';
+    } catch (e) { /* */ }
     // Master switch (admin toggle): when disabled, render nothing at all.
     if (config.enabled === false) { try { container.innerHTML = ''; } catch (e) { /* */ } return; }
     if (!isOpen) {
