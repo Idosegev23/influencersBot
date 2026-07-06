@@ -253,6 +253,46 @@ export async function redisDelByPattern(pattern: string): Promise<number> {
 }
 
 // ============================================
+// List Buffer Operations (widget event ingest)
+// ============================================
+
+export async function redisRPush(key: string, items: string[]): Promise<number> {
+  const client = getClient();
+  if (!client || items.length === 0) return 0;
+  try {
+    return await client.rpush(key, ...items);
+  } catch (err) {
+    console.error('[Redis] RPUSH error:', err);
+    return 0;
+  }
+}
+
+export async function redisLPopCount(key: string, count: number): Promise<string[]> {
+  const client = getClient();
+  if (!client || count <= 0) return [];
+  try {
+    const res = await client.lpop(key, count);
+    if (!res) return [];
+    return (Array.isArray(res) ? res : [res]).map((x) =>
+      typeof x === 'string' ? x : JSON.stringify(x));
+  } catch (err) {
+    console.error('[Redis] LPOP error:', err);
+    return [];
+  }
+}
+
+export async function redisLLen(key: string): Promise<number> {
+  const client = getClient();
+  if (!client) return 0;
+  try {
+    return await client.llen(key);
+  } catch (err) {
+    console.error('[Redis] LLEN error:', err);
+    return 0;
+  }
+}
+
+// ============================================
 // Health Check
 // ============================================
 
