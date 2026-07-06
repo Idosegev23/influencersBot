@@ -4,6 +4,10 @@ import { igScanStep } from './ig-scan';
 import { transcribeStep } from './transcribe';
 import { siteDiscoverStep } from './site-discover';
 import { siteCrawlStep } from './site-crawl';
+import { ragIngestStep } from './rag-ingest';
+import { productExtractStep } from './product-extract';
+import { personaBuildStep } from './persona-build';
+import { finalizeStep } from './finalize';
 
 export type StepResult =
   | { status: 'advance' }
@@ -11,16 +15,14 @@ export type StepResult =
   | { status: 'failed'; error: string };
 export type StepHandler = (ctx: StepContext) => Promise<StepResult>;
 
-const notImplemented: StepHandler = async () => ({ status: 'advance' }); // replaced in Tasks 8-14
-
 export const STEP_HANDLERS: Record<PipelineStep, StepHandler> = {
   'create-account': createAccountStep,
   'ig-scan': igScanStep,
   'transcribe': transcribeStep,
   'site-discover': siteDiscoverStep,
   'site-crawl': siteCrawlStep,
-  'rag-ingest': notImplemented,
-  'product-extract': notImplemented,
-  'persona-build': notImplemented,
-  'finalize': notImplemented,
+  'rag-ingest': ragIngestStep,
+  'product-extract': productExtractStep,
+  'persona-build': personaBuildStep,
+  'finalize': finalizeStep,
 };
