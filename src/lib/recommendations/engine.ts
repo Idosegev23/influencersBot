@@ -13,6 +13,20 @@
 import { createClient } from '@/lib/supabase/server';
 import { generateProductEmbedding } from '@/lib/rag/embeddings';
 
+// Card-eligibility: reject category/listing/pagination URLs so a recommended
+// product is always a real detail page the visitor can click. Applied to the
+// candidate list here so every product the model can feature is card-eligible.
+export function isValidProductUrl(u: string | null | undefined): boolean {
+  if (!u || typeof u !== 'string') return false;
+  const lower = u.toLowerCase();
+  if (/\/page\/\d+/.test(lower)) return false;
+  if (/\/category\//.test(lower)) return false;
+  if (/\/shop\/?[^/]*\/?$/.test(lower)) return false;
+  if (/\/(product|products|p|item)\//.test(lower)) return true;
+  const last = lower.replace(/\/+$/, '').split('/').pop() || '';
+  return last.length >= 5 && /[a-z֐-׿]/i.test(last);
+}
+
 // ============================================
 // Types
 // ============================================
@@ -85,12 +99,16 @@ export async function getRecommendations(req: RecommendationRequest): Promise<Re
   const supabase = await createClient();
 
   // 1. Load all available products for the account
-  const { data: allProducts } = await supabase
+  let { data: allProducts } = await supabase
     .from('widget_products')
     .select('*')
     .eq('account_id', req.accountId)
     .eq('is_available', true)
     .order('priority', { ascending: false });
+
+  // Only recommend products that are card-eligible (real detail page), so the
+  // model can never feature a product whose card would be dropped downstream.
+  allProducts = (allProducts || []).filter((p: any) => isValidProductUrl(p.product_url));
 
   if (!allProducts?.length) {
     return { products: [], strategy: 'auto', promptBlock: '' };
@@ -208,9 +226,20 @@ async function scoreNeedBased(products: any[], context: string): Promise<ScoredP
     // 1. Keyword matching on conversationTriggers (highest weight)
     const triggers = product.ai_profile?.conversationTriggers || [];
     for (const trigger of triggers) {
-      if (lower.includes(trigger.toLowerCase())) {
-        score += 25;
+      const t = trigger.toLowerCase();
+      if (lower.includes(t)) {
+        score += 25;                       // full phrase present (rare for short queries)
         matchedTriggers.push(trigger);
+      } else {
+        // Token overlap: short need-queries ("שיער יבש") never contain a whole
+        // trigger sentence, so credit shared meaningful words instead.
+        const words = t.split(/[^a-z֐-׿0-9]+/i).filter((w: string) => w.length >= 3);
+        let hits = 0;
+        for (const w of words) if (lower.includes(w)) hits++;
+        if (hits > 0) {
+          score += Math.min(18, hits * 6);
+          if (hits >= 2) matchedTriggers.push(trigger);
+        }
       }
     }
 
