@@ -35,7 +35,7 @@ export function normalizeWidgetEvents(
   for (const e of events) {
     if (!e || typeof e.type !== 'string' || !WIDGET_EVENT_TYPES.has(e.type)) { rejected++; continue; }
     const payload = e.payload && typeof e.payload === 'object' ? e.payload : {};
-    if (JSON.stringify(payload).length > 4096) { rejected++; continue; }
+    if (Buffer.byteLength(JSON.stringify(payload), 'utf8') > 4096) { rejected++; continue; }
     const ts = typeof e.ts === 'number' && Number.isFinite(e.ts) ? new Date(e.ts).toISOString() : new Date().toISOString();
     rows.push({
       account_id: accountId, anon_id: anon, session_id: session,
