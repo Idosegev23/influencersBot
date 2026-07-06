@@ -16,6 +16,7 @@ import { updateRollingSummary, shouldUpdateSummary } from './conversation-memory
 import { getRecommendations, type ProductRecommendation } from '@/lib/recommendations/engine';
 import {
   stripIntent,
+  stripProducts,
   buildObjectionBlock,
   type IntentEnvelope,
 } from './widget-objections';
@@ -174,7 +175,7 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
       accountId,
       sessionId,
       conversationContext: message,
-      maxResults: 3,
+      maxResults: 8,
       strategy: 'auto',
     });
     recommendationBlock = recResult.promptBlock;
@@ -370,6 +371,23 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
   // for inline-card rendering; never persisted (visitor must confirm each time).
   const { cleanText: cleanText2, action: turnAction } = stripAction(fullText);
   fullText = cleanText2;
+
+  // Approach C: the model ends its reply with <<PRODUCTS>>1,3<</PRODUCTS>> —
+  // the positions (1-indexed) of the products it actually featured, from the
+  // numbered recommendation block. Resolve them so the CARDS are exactly what
+  // the bot talked about. Missing/empty/all-invalid → fall back to the engine
+  // top-3 (no regression).
+  const { cleanText: cleanText3, positions: featuredPositions } = stripProducts(fullText);
+  fullText = cleanText3;
+  if (featuredPositions.length > 0) {
+    const picked = featuredPositions
+      .map((pos) => recommendedProducts[pos - 1])
+      .filter((p): p is ProductRecommendation => !!p);
+    if (picked.length > 0) recommendedProducts = picked;
+    else recommendedProducts = recommendedProducts.slice(0, 3);
+  } else {
+    recommendedProducts = recommendedProducts.slice(0, 3);
+  }
 
   // 6. Save messages + update session state (parallel)
   const msgCount = (session?.message_count || 0) + 2;
