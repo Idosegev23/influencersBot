@@ -2,21 +2,20 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 
 export default function AddAccountPage() {
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [websiteUrl, setWebsiteUrl] = useState('');
+  const [isDemo, setIsDemo] = useState(true);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [postsLimit, setPostsLimit] = useState('');
+  const [transcribe, setTranscribe] = useState(true);
+  const [maxPages, setMaxPages] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Result after creation
-  const [accountId, setAccountId] = useState<string | null>(null);
-  const [existed, setExisted] = useState(false);
-  const [copiedId, setCopiedId] = useState(false);
-  const [copiedLink, setCopiedLink] = useState(false);
 
   useEffect(() => {
     fetch('/api/admin')
@@ -28,16 +27,6 @@ export default function AddAccountPage() {
       .catch(() => router.push('/admin'));
   }, [router]);
 
-  const igConnectLink = accountId
-    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/api/auth/instagram/connect?accountId=${accountId}`
-    : '';
-
-  function copyToClipboard(text: string, type: 'id' | 'link') {
-    navigator.clipboard.writeText(text);
-    if (type === 'id') { setCopiedId(true); setTimeout(() => setCopiedId(false), 2000); }
-    else { setCopiedLink(true); setTimeout(() => setCopiedLink(false), 2000); }
-  }
-
   async function handleCreate() {
     const trimmed = username.trim().replace(/^@/, '');
     if (!trimmed) { setError('יש להזין username'); return; }
@@ -46,6 +35,7 @@ export default function AddAccountPage() {
     setError(null);
 
     try {
+      // 1. Create (or find) the account row
       const res = await fetch('/api/admin/accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -58,10 +48,7 @@ export default function AddAccountPage() {
         return;
       }
 
-      setAccountId(data.accountId);
-      setExisted(!!data.existed);
-
-      // Update display name if provided
+      // 2. Update display name if provided (new accounts only)
       if (displayName.trim() && !data.existed) {
         await fetch(`/api/admin/accounts/${data.accountId}`, {
           method: 'PATCH',
@@ -69,6 +56,30 @@ export default function AddAccountPage() {
           body: JSON.stringify({ config: { display_name: displayName.trim() } }),
         }).catch(() => {});
       }
+
+      // 3. Kick off the scan pipeline
+      const startRes = await fetch('/api/pipeline/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: trimmed,
+          accountId: data.accountId,
+          websiteUrl: websiteUrl.trim() || undefined,
+          isDemo,
+          transcribe,
+          maxPages: maxPages ? Number(maxPages) : null,
+          postsLimit: postsLimit ? Number(postsLimit) : undefined,
+        }),
+      });
+
+      const startData = await startRes.json();
+      if (!startRes.ok || !startData.jobId) {
+        setError(startData.error || 'שגיאה בהפעלת הסריקה');
+        return;
+      }
+
+      // 4. Navigate to the live progress board
+      router.push(`/admin/scan/${startData.jobId}`);
     } catch {
       setError('שגיאת רשת');
     } finally {
@@ -86,142 +97,148 @@ export default function AddAccountPage() {
 
   return (
     <div className="max-w-lg mx-auto">
-      {!accountId ? (
-        /* ── Step 1: Account Creation Form ── */
-        <div className="neon-card p-5 sm:p-10">
-          <div className="flex flex-col items-center text-center mb-6 sm:mb-8">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center mb-4 sm:mb-6" style={{ background: '#DCFCE8' }}>
-              <span className="material-symbols-outlined text-[36px] sm:text-[48px]" style={{ color: '#9334EB' }}>person_add</span>
-            </div>
-            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight mb-2" style={{ color: '#1f2937' }}>הוספת חשבון חדש</h1>
-            <p className="text-sm" style={{ color: '#4b5563' }}>הזן את פרטי החשבון החדש כדי להתחיל בניהול</p>
+      <div className="neon-card p-5 sm:p-10">
+        <div className="flex flex-col items-center text-center mb-6 sm:mb-8">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center mb-4 sm:mb-6" style={{ background: '#DCFCE8' }}>
+            <span className="material-symbols-outlined text-[36px] sm:text-[48px]" style={{ color: '#9334EB' }}>person_add</span>
+          </div>
+          <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight mb-2" style={{ color: '#1f2937' }}>הוספת חשבון חדש</h1>
+          <p className="text-sm" style={{ color: '#4b5563' }}>הזן את פרטי החשבון וההפעלה תתחיל סריקה מלאה אוטומטית</p>
+        </div>
+
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <label className="block text-sm font-semibold mr-2" style={{ color: '#1f2937' }}>
+              שם משתמש
+            </label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="@username"
+              className="neon-input w-full"
+              style={{ direction: 'ltr' }}
+              autoFocus
+            />
           </div>
 
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold mr-2" style={{ color: '#1f2937' }}>
-                שם משתמש
-              </label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-                placeholder="@username"
-                className="neon-input w-full"
-                style={{ direction: 'ltr' }}
-                autoFocus
-              />
-            </div>
+          <div className="space-y-2">
+            <label className="block text-sm font-semibold mr-2" style={{ color: '#1f2937' }}>
+              שם תצוגה
+            </label>
+            <input
+              type="text"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="הזן שם מלא"
+              className="neon-input w-full"
+            />
+          </div>
 
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold mr-2" style={{ color: '#1f2937' }}>
-                שם תצוגה
-              </label>
-              <input
-                type="text"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-                placeholder="הזן שם מלא"
-                className="neon-input w-full"
-              />
-            </div>
+          <div className="space-y-2">
+            <label className="block text-sm font-semibold mr-2" style={{ color: '#1f2937' }}>
+              כתובת אתר <span className="font-normal" style={{ color: '#817a6c' }}>(אופציונלי)</span>
+            </label>
+            <input
+              type="text"
+              value={websiteUrl}
+              onChange={(e) => setWebsiteUrl(e.target.value)}
+              placeholder="https://example.com"
+              className="neon-input w-full"
+              style={{ direction: 'ltr' }}
+            />
+          </div>
 
-            {error && (
-              <div className="text-sm p-3 rounded-xl" style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.06)', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
-                {error}
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={isDemo}
+              onChange={(e) => setIsDemo(e.target.checked)}
+              className="w-5 h-5"
+            />
+            <span className="text-sm font-semibold" style={{ color: '#1f2937' }}>חשבון דמו</span>
+          </label>
+
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced((v) => !v)}
+              className="flex items-center gap-1 text-sm font-semibold"
+              style={{ color: '#9334EB' }}
+            >
+              <span className="material-symbols-outlined text-[18px]">{showAdvanced ? 'expand_less' : 'expand_more'}</span>
+              הגדרות מתקדמות
+            </button>
+
+            {showAdvanced && (
+              <div className="space-y-5 mt-4 p-4 rounded-xl" style={{ background: '#f3f4f6' }}>
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold mr-2" style={{ color: '#1f2937' }}>
+                    מספר פוסטים לסריקה
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={postsLimit}
+                    onChange={(e) => setPostsLimit(e.target.value)}
+                    placeholder="ברירת מחדל"
+                    className="neon-input w-full"
+                    style={{ direction: 'ltr' }}
+                  />
+                </div>
+
+                <label className="flex items-center gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={transcribe}
+                    onChange={(e) => setTranscribe(e.target.checked)}
+                    className="w-5 h-5"
+                  />
+                  <span className="text-sm font-semibold" style={{ color: '#1f2937' }}>תמלול וידאו</span>
+                </label>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold mr-2" style={{ color: '#1f2937' }}>
+                    מספר עמודי אתר מקסימלי <span className="font-normal" style={{ color: '#817a6c' }}>(ריק = ללא הגבלה)</span>
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={maxPages}
+                    onChange={(e) => setMaxPages(e.target.value)}
+                    placeholder="ללא הגבלה"
+                    className="neon-input w-full"
+                    style={{ direction: 'ltr' }}
+                  />
+                </div>
               </div>
             )}
-
-            <div className="pt-4">
-              <button
-                onClick={handleCreate}
-                disabled={isLoading || !username.trim()}
-                className="neon-pill neon-pill-primary w-full flex items-center justify-center gap-3 py-4 font-bold text-base disabled:opacity-50"
-              >
-                {isLoading ? (
-                  <>
-                    <span>יוצר חשבון...</span>
-                    <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  </>
-                ) : (
-                  <span>צור חשבון</span>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : (
-        /* ── Step 2: Success — show ID + OAuth link ── */
-        <div className="neon-card p-5 sm:p-10" style={{ borderRight: '3px solid #9334EB' }}>
-          <div className="flex items-center gap-4 sm:gap-6 mb-6 sm:mb-8">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(23, 163, 74, 0.15)' }}>
-              <span className="material-symbols-outlined text-[24px] sm:text-[32px] font-bold" style={{ color: '#9334EB', fontVariationSettings: "'FILL' 1" }}>check</span>
-            </div>
-            <div>
-              <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight" style={{ color: '#1f2937' }}>
-                {existed ? 'חשבון קיים נמצא' : 'החשבון נוצר בהצלחה!'}
-              </h2>
-              <p className="font-bold" style={{ color: '#9334EB' }}>
-                @{username.trim().replace(/^@/, '')}
-              </p>
-            </div>
           </div>
 
-          <div className="space-y-4 mb-10">
-            {/* Account ID row */}
-            <div className="flex items-center justify-between p-3 sm:p-5 rounded-xl" style={{ background: '#f3f4f6' }}>
-              <div className="flex flex-col min-w-0">
-                <span className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: '#817a6c' }}>מזהה חשבון</span>
-                <span className="font-mono font-medium text-sm sm:text-base truncate" style={{ color: '#1f2937' }}>{accountId.slice(0, 12)}...</span>
-              </div>
-              <button
-                onClick={() => copyToClipboard(accountId, 'id')}
-                className="p-2 rounded-full transition-colors"
-                style={{ background: '#fff', color: copiedId ? '#9334EB' : '#DC2627' }}
-              >
-                <span className="material-symbols-outlined text-[20px]">{copiedId ? 'check' : 'content_copy'}</span>
-              </button>
+          {error && (
+            <div className="text-sm p-3 rounded-xl" style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.06)', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
+              {error}
             </div>
+          )}
 
-            {/* IG Connect link row */}
-            <div className="flex items-center justify-between p-3 sm:p-5 rounded-xl gap-2" style={{ background: '#f3f4f6' }}>
-              <div className="flex flex-col min-w-0">
-                <span className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: '#817a6c' }}>חיבור IG</span>
-                <span className="font-medium text-sm sm:text-base truncate" style={{ color: '#1f2937' }}>{igConnectLink.slice(0, 35)}...</span>
-              </div>
-              <button
-                onClick={() => copyToClipboard(igConnectLink, 'link')}
-                className="px-4 py-1.5 rounded-full text-xs font-bold transition-colors flex-shrink-0"
-                style={{ background: copiedLink ? 'rgba(23, 163, 74, 0.15)' : 'rgba(147, 52, 235, 0.2)', color: copiedLink ? '#1f2937' : '#1f2937' }}
-              >
-                {copiedLink ? 'הועתק!' : 'העתק לינק'}
-              </button>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Link
-              href={`/admin/influencers/${accountId}`}
-              className="neon-pill neon-pill-secondary flex-1 py-4 font-bold text-center"
-            >
-              צפה בחשבון
-            </Link>
+          <div className="pt-4">
             <button
-              onClick={() => {
-                setAccountId(null);
-                setUsername('');
-                setDisplayName('');
-                setExisted(false);
-              }}
-              className="neon-pill neon-pill-outline flex-1 py-4 font-bold text-center"
+              onClick={handleCreate}
+              disabled={isLoading || !username.trim()}
+              className="neon-pill neon-pill-primary w-full flex items-center justify-center gap-3 py-4 font-bold text-base disabled:opacity-50"
             >
-              הוסף חשבון נוסף
+              {isLoading ? (
+                <>
+                  <span>יוצר ומפעיל סריקה...</span>
+                  <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                </>
+              ) : (
+                <span>צור והתחל סריקה</span>
+              )}
             </button>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
