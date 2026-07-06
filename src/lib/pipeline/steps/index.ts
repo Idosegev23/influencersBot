@@ -2,6 +2,7 @@ import type { PipelineStep, StepContext } from '../types';
 import { createAccountStep } from './create-account';
 import { igScanStep } from './ig-scan';
 import { transcribeStep } from './transcribe';
+import { siteDiscoverStep } from './site-discover';
 
 export type StepResult =
   | { status: 'advance' }
@@ -15,7 +16,7 @@ export const STEP_HANDLERS: Record<PipelineStep, StepHandler> = {
   'create-account': createAccountStep,
   'ig-scan': igScanStep,
   'transcribe': transcribeStep,
-  'site-discover': notImplemented,
+  'site-discover': siteDiscoverStep,
   'site-crawl': notImplemented,
   'rag-ingest': notImplemented,
   'product-extract': notImplemented,
