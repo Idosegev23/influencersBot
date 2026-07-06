@@ -317,6 +317,22 @@ export async function redisLTrim(key: string, start: number, stop: number): Prom
 }
 
 // ============================================
+// Locking (mutex)
+// ============================================
+
+export async function redisSetNx(key: string, value: string, ttlSeconds: number): Promise<boolean> {
+  const client = getClient();
+  if (!client) return false;
+  try {
+    const res = await client.set(key, value, { nx: true, ex: ttlSeconds });
+    return res === 'OK';
+  } catch (err) {
+    console.error('[Redis] SET NX error:', err);
+    return false;
+  }
+}
+
+// ============================================
 // Health Check
 // ============================================
 
