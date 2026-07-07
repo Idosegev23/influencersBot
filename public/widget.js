@@ -1107,12 +1107,37 @@
     render();
   }
 
-  // Wires mobile-sheet interactions after each open render: tap-backdrop closes.
-  // (Drag + keyboard are added in later tasks to this same function.)
+  // Wires mobile-sheet interactions after each open render: tap-backdrop closes,
+  // drag-the-handle-down dismisses.
+  // (Keyboard is added in a later task to this same function.)
   function attachSheetBehaviors() {
     if (window.innerWidth >= 640 || !isOpen) return;
     var bd = document.getElementById('ibot-backdrop');
     if (bd) bd.onclick = function () { closeWidget(); };
+
+    var panel = document.getElementById('ibot-panel');
+    var handle = document.querySelector('#ibot-widget-container [data-ibot-drag="1"]');
+    if (panel && handle) {
+      var startY = 0, dy = 0, dragging = false;
+      handle.ontouchstart = function (e) {
+        dragging = true; dy = 0;
+        startY = e.touches && e.touches[0] ? e.touches[0].clientY : 0;
+        panel.style.transition = 'none';
+      };
+      handle.ontouchmove = function (e) {
+        if (!dragging) return;
+        var y = e.touches && e.touches[0] ? e.touches[0].clientY : 0;
+        dy = Math.max(0, y - startY);           // only downward
+        panel.style.transform = 'translateY(' + dy + 'px)';
+      };
+      handle.ontouchend = function () {
+        if (!dragging) return;
+        dragging = false;
+        panel.style.transition = 'transform 0.25s ease-out';
+        if (dy > 120) { closeWidget(); }         // dragged far enough → dismiss
+        else { panel.style.transform = 'translateY(0)'; }  // snap back
+      };
+    }
   }
 
   // ---- Closed state: blob only ----
