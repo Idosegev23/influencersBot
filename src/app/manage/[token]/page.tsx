@@ -619,14 +619,32 @@ export default function ManagePage() {
     );
   }
 
-  const tabs = [
-    { id: 'instructions' as const, label: 'הנחיות לבוט', icon: 'smart_toy' },
-    { id: 'faq' as const, label: 'שאלות נפוצות', icon: 'help' },
-    { id: 'pages' as const, label: 'דפים סרוקים', icon: 'article' },
-    { id: 'knowledge' as const, label: 'ידע נוסף', icon: 'menu_book' },
-    { id: 'products' as const, label: 'מוצרים', icon: 'shopping_bag' },
-    { id: 'design' as const, label: 'הגדרות ווידג\'ט', icon: 'palette' },
-    ...(hasLeads ? [{ id: 'leads' as const, label: 'לידים', icon: 'group_add' }] : []),
+  // Grouped into 3 zones so the sidebar reads as Appearance / Content / Leads
+  // instead of a flat list of 7 — the widget look lives under "מראה", the
+  // knowledge the bot draws on under "תוכן ובוט", and lead data on its own.
+  const tabGroups = [
+    {
+      title: 'מראה',
+      tabs: [
+        { id: 'design' as const, label: 'עיצוב הווידג\'ט', icon: 'palette' },
+      ],
+    },
+    {
+      title: 'תוכן ובוט',
+      tabs: [
+        { id: 'instructions' as const, label: 'הנחיות לבוט', icon: 'smart_toy' },
+        { id: 'faq' as const, label: 'שאלות נפוצות', icon: 'help' },
+        { id: 'knowledge' as const, label: 'ידע נוסף', icon: 'menu_book' },
+        { id: 'products' as const, label: 'מוצרים', icon: 'shopping_bag' },
+        { id: 'pages' as const, label: 'דפים סרוקים', icon: 'article' },
+      ],
+    },
+    ...(hasLeads ? [{
+      title: 'לידים',
+      tabs: [
+        { id: 'leads' as const, label: 'לידים', icon: 'group_add' },
+      ],
+    }] : []),
   ];
 
   const customShadow = { boxShadow: '0 20px 40px rgba(71, 71, 71, 0.06)' };
@@ -692,22 +710,29 @@ export default function ManagePage() {
             <p className="text-sm text-[#655e51]">{displayName || 'Management Dashboard'}</p>
           </div>
 
-          {/* Navigation Links */}
-          <nav className="flex flex-col gap-1 w-full">
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => { setActiveTab(tab.id); setShowMobileSidebar(false); }}
-                className={`flex items-center gap-2.5 px-4 py-2.5 text-sm w-full text-right transition-all ${
-                  activeTab === tab.id
-                    ? 'bg-white text-[#006c4e] rounded-full font-medium'
-                    : 'text-[#655e51] hover:bg-white/50 rounded-full'
-                }`}
-                style={activeTab === tab.id ? { boxShadow: '0 2px 8px rgba(0,0,0,0.04)' } : undefined}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: 20, color: activeTab === tab.id ? '#006c4e' : '#655e51' }}>{tab.icon}</span>
-                {tab.label}
-              </button>
+          {/* Navigation Links — grouped into 3 labeled zones */}
+          <nav className="flex flex-col gap-4 w-full">
+            {tabGroups.map(group => (
+              <div key={group.title} className="w-full">
+                <div className="px-4 pb-1.5 text-[11px] font-semibold text-[#a89f8e] uppercase tracking-wide">{group.title}</div>
+                <div className="flex flex-col gap-1">
+                  {group.tabs.map(tab => (
+                    <button
+                      key={tab.id}
+                      onClick={() => { setActiveTab(tab.id); setShowMobileSidebar(false); }}
+                      className={`flex items-center gap-2.5 px-4 py-2.5 text-sm w-full text-right transition-all ${
+                        activeTab === tab.id
+                          ? 'bg-white text-[#006c4e] rounded-full font-medium'
+                          : 'text-[#655e51] hover:bg-white/50 rounded-full'
+                      }`}
+                      style={activeTab === tab.id ? { boxShadow: '0 2px 8px rgba(0,0,0,0.04)' } : undefined}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 20, color: activeTab === tab.id ? '#006c4e' : '#655e51' }}>{tab.icon}</span>
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
           </nav>
         </aside>
