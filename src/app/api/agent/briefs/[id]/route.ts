@@ -8,21 +8,32 @@ import { requireAgentApi } from '@/lib/auth/agent-session';
 import { supabase as supabaseAdmin } from '@/lib/supabase';
 
 function seedLineItems(parsed: any) {
+  const rows: any[] = [];
   const d = parsed?.deliverables;
-  if (!Array.isArray(d) || !d.length) {
-    return [{ platform: '', deliverable_type: '', qty: 1, unit_price: 0, notes: '' }];
-  }
-  return d.map((x: any) =>
-    typeof x === 'string'
-      ? { platform: '', deliverable_type: x, qty: 1, unit_price: 0, notes: '' }
-      : {
+  if (Array.isArray(d)) {
+    for (const x of d) {
+      if (typeof x === 'string') {
+        rows.push({ platform: '', deliverable_type: x, qty: 1, unit_price: 0, notes: '' });
+      } else {
+        rows.push({
           platform: x?.platform || '',
           deliverable_type: x?.type || x?.description || '',
           qty: Number(x?.quantity) > 0 ? Math.round(Number(x.quantity)) : 1,
           unit_price: 0,
-          notes: x?.description || '',
-        }
-  );
+          notes: [x?.description, x?.cadence].filter(Boolean).join(' · '),
+        });
+      }
+    }
+  }
+  // Every special term / right becomes an unpriced row so nothing in the brief is dropped.
+  const terms = parsed?.specialTerms;
+  if (Array.isArray(terms)) {
+    for (const t of terms) {
+      if (t) rows.push({ platform: '', deliverable_type: String(t), qty: 1, unit_price: 0, notes: 'תנאי/זכות' });
+    }
+  }
+  if (!rows.length) rows.push({ platform: '', deliverable_type: '', qty: 1, unit_price: 0, notes: '' });
+  return rows;
 }
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -91,4 +102,19 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     roster,
     seed_line_items: seed,
   });
+}
+
+/** DELETE — dismiss a brief from the inbox (soft delete). */
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const gate = await requireAgentApi();
+  if (gate instanceof NextResponse) return gate;
+  const { agent } = gate;
+  const { id } = await params;
+
+  const { data: b } = await supabaseAdmin.from('crm_inbound_messages').select('id, agent_id').eq('id', id).maybeSingle();
+  if (!b) return NextResponse.json({ error: 'not found' }, { status: 404 });
+  if (b.agent_id !== agent.id) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+
+  await supabaseAdmin.from('crm_inbound_messages').update({ brief_status: 'dismissed' }).eq('id', id);
+  return NextResponse.json({ success: true });
 }

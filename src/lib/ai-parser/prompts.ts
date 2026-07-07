@@ -16,64 +16,51 @@ export function getPrompt(documentType: DocumentType, language: Language = 'he')
  */
 const PROMPTS_BY_LANGUAGE: Record<string, Record<DocumentType, string>> = {
   he: {
-    quote: `אתה עוזר AI מומחה שמנתח הצעות מחיר לשת"פים עם משפיענים ומותגים.
+    quote: `אתה עוזר AI מומחה שמנתח בקשות והצעות מחיר לשיתופי פעולה עם משפיענים.
+הקלט יכול להיות מסמך רשמי או הודעת וואטסאפ חופשית בעברית. חלץ את כל המידע ל-JSON.
 
-המשימה שלך היא לחלץ את כל המידע המובנה מהמסמך ולהחזיר אותו כ-JSON.
+הבחנה קריטית בין התפקידים:
+- "influencerName" = ה**מיוצג/ת** שנותן/ת את השירות. בדרך כלל אחרי "עבור" (למשל "הצעת מחיר עבור אנה אהרונוב" → influencerName = "אנה אהרונוב").
+- "clientName" = מי ש**מזמין** את השירות — מותג או משרד פרסום — אם מצוין.
+- "brandName" = שם המותג שאליו הקמפיין. יכול להיות זהה ל-clientName, או שונה (אם המזמין הוא משרד פרסום).
 
 חלץ את השדות הבאים:
 
 {
-  "brandName": "שם המותג/חברה (string)",
-  "campaignName": "שם הקמפיין (string)",
-  "totalAmount": מחיר כולל (number, רק המספר ללא סימנים),
+  "influencerName": "שם המיוצג שההצעה עבורו (string או null)",
+  "clientName": "מי מזמין - מותג/משרד פרסום (string או null)",
+  "brandName": "שם המותג (string או null)",
+  "campaignName": "שם/תיאור הקמפיין (string או null)",
+  "totalAmount": מחיר כולל אם צוין (number או null, ללא סימנים),
   "currency": "ILS/USD/EUR (string)",
   "deliverables": [
     {
-      "type": "סוג התוצר - post/story/reel/video/tiktok/youtube/etc",
+      "type": "סוג התוצר/הסעיף - reel/story/post/photo_day/reminder/beat/וכו'",
       "quantity": כמות (number),
-      "platform": "פלטפורמה - instagram/tiktok/youtube/facebook",
-      "dueDate": "תאריך יעד בפורמט YYYY-MM-DD (string או null)",
-      "description": "תיאור התוצר (string)"
+      "platform": "פלטפורמה אם צוינה (string או null)",
+      "cadence": "תדירות אם רלוונטי - חודשי/רבעוני/שנתי (string או null)",
+      "description": "תיאור מלא של הסעיף כפי שנכתב (string)"
     }
   ],
+  "specialTerms": ["כל תנאי/זכות/סעיף שאינו תוצר ישיר - זכויות שימוש/קידום, תקופות קידום, בלעדיות, אורגני מול ממומן. כל סעיף כמחרוזת נפרדת"],
   "timeline": {
-    "startDate": "תאריך התחלה YYYY-MM-DD (string או null)",
-    "endDate": "תאריך סיום YYYY-MM-DD (string או null)"
+    "startDate": "YYYY-MM-DD (string או null)",
+    "endDate": "YYYY-MM-DD (string או null)"
   },
-  "paymentTerms": {
-    "milestones": [
-      {
-        "percentage": אחוז מהסכום (number),
-        "amount": סכום בפועל (number),
-        "trigger": "מתי משלמים - למשל 'חתימה על חוזה', 'סיום פרויקט'",
-        "dueDate": "תאריך YYYY-MM-DD (string או null)"
-      }
-    ]
-  },
-  "specialTerms": ["תנאים מיוחדים כמערך של strings"],
   "contactPerson": {
     "name": "שם איש קשר (string או null)",
     "email": "אימייל (string או null)",
     "phone": "טלפון (string או null)"
-  },
-  "coupon_codes": [
-    {
-      "code": "קוד הקופון (string)",
-      "brand_name": "שם המותג (string או null)",
-      "discount_type": "percentage/fixed/free_shipping (string או null)",
-      "discount_value": "ערך ההנחה (number או null)",
-      "description": "תיאור הקופון (string או null)"
-    }
-  ]
+  }
 }
 
-הנחיות חשובות:
-1. אם שדה לא קיים במסמך, השאר null
-2. תאריכים תמיד בפורמט YYYY-MM-DD
-3. מספרים ללא סימנים (₪, $, ,)
-4. היה מדויק ככל האפשר
-5. אם יש ספק, העדף null על ניחוש
-6. אם יש קודי קופון/הנחה/הטבה במסמך - חלץ אותם ל-coupon_codes. אם אין, החזר מערך ריק.
+הנחיות קריטיות:
+1. **חלץ כל סעיף בהודעה — אל תשמיט אף אחד.** כל פעילות, פעימה, תזכורת, יום צילום, זכות קידום ותקופת קידום = סעיף נפרד.
+2. מונחים בעברית: "פעימה"=beat (פעילות תוכן); "תזכורת"=reminder; "יום צילום"=photo_day; "זכויות קידום"=usage/promotion rights; "קידום"=paid boost; "אורגני"=organic; "רבעוני/ברבעון"=quarterly (×4 בשנה); "חודשי"=monthly (×12); "שנתי"=annual.
+3. כמויות מתדירות: "פעימה ברבעון" בפעילות שנתית → quantity 4, cadence "רבעוני". "תזכורת חודשית" → quantity 12, cadence "חודשי". "יום צילום ברבעון" → quantity 4, cadence "רבעוני".
+4. תנאים שאינם תוצר (זכויות קידום קבועות, קידום שבועיים לפעימות אורגניות, בלעדיות) → specialTerms, כל אחד כמחרוזת נפרדת.
+5. אם המזמין הוא משרד פרסום (למשל "לידרס") והמותג שונה (למשל H&M) — clientName=משרד הפרסום, brandName=המותג.
+6. אם שדה לא קיים — null. אל תנחש. מספרים ללא סימנים (₪,$,,).
 
 החזר רק JSON תקין, ללא טקסט נוסף.`,
 

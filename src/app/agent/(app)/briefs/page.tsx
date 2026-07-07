@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { Trash2, RefreshCw } from 'lucide-react';
 
 type Brief = {
   id: string;
@@ -17,24 +18,54 @@ export default function BriefsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetch('/api/agent/briefs')
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.error) setError(d.error);
-        else setBriefs(d.briefs || []);
-      })
-      .catch(() => setError('שגיאה בטעינת הבריפים'))
-      .finally(() => setLoading(false));
+  const load = useCallback(async () => {
+    try {
+      const r = await fetch('/api/agent/briefs', { cache: 'no-store' });
+      const d = await r.json();
+      if (d.error) setError(d.error);
+      else {
+        setBriefs(d.briefs || []);
+        setError(null);
+      }
+    } catch {
+      setError('שגיאה בטעינת הבריפים');
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 15000); // auto-refresh every 15s
+    const onFocus = () => load();
+    window.addEventListener('focus', onFocus);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [load]);
+
+  const dismiss = async (id: string) => {
+    setBriefs((bs) => bs.filter((b) => b.id !== id)); // optimistic
+    try {
+      await fetch(`/api/agent/briefs/${id}`, { method: 'DELETE' });
+    } catch {
+      load();
+    }
+  };
 
   return (
     <div dir="rtl" className="space-y-5">
-      <div>
-        <h1 className="text-xl font-semibold text-[color:var(--ink-900)]">בריפים</h1>
-        <p className="text-sm text-[color:var(--ink-500)]">
-          הצעות שנכנסו בוואטסאפ/מייל — בחר/י מיוצג, תמחר/י כל תוצר, ושלח/י הצעה לחתימה.
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-[color:var(--ink-900)]">תיבה נכנסת</h1>
+          <p className="text-sm text-[color:var(--ink-500)]">
+            בריפים שנכנסו בוואטסאפ/מייל — בחר/י מיוצג, תמחר/י כל סעיף, ושלח/י הצעה לחתימה.
+          </p>
+        </div>
+        <button onClick={load} className="ui-btn ui-btn-sm ui-btn-ghost focus-ring shrink-0" title="רענן">
+          <RefreshCw className="w-4 h-4" />
+        </button>
       </div>
 
       {loading && <div className="text-sm text-[color:var(--ink-500)]">טוען…</div>}
@@ -48,28 +79,37 @@ export default function BriefsPage() {
 
       <div className="grid gap-3">
         {briefs.map((b) => (
-          <Link
+          <div
             key={b.id}
-            href={`/agent/briefs/${b.id}`}
-            className="block rounded-xl border border-[color:var(--line)] bg-[color:var(--surface-0)] p-4 hover:border-[color:var(--brand)] transition-colors"
+            className="relative rounded-xl border border-[color:var(--line)] bg-[color:var(--surface-0)] hover:border-[color:var(--brand)] transition-colors"
           >
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="font-semibold text-[color:var(--ink-900)] truncate">{b.brand_name}</div>
-                <div className="text-[13px] text-[color:var(--ink-500)] truncate">
-                  {b.suggested_client_name ? `מיוצג מוצע: ${b.suggested_client_name}` : 'לא זוהה מיוצג — יש לשייך'}
+            <Link href={`/agent/briefs/${b.id}`} className="block p-4 pl-12">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-semibold text-[color:var(--ink-900)] truncate">{b.brand_name}</div>
+                  <div className="text-[13px] text-[color:var(--ink-500)] truncate">
+                    {b.suggested_client_name ? `מיוצג מוצע: ${b.suggested_client_name}` : 'לא זוהה מיוצג — יש לשייך'}
+                  </div>
+                </div>
+                <div className="text-left shrink-0">
+                  {b.amount ? (
+                    <div className="text-sm font-medium text-[color:var(--ink-800)]">~{b.amount.toLocaleString('en-US')} ₪</div>
+                  ) : null}
+                  <span className="inline-block mt-1 text-[11px] px-2 py-0.5 rounded-full bg-[color:var(--ink-100)] text-[color:var(--ink-600)]">
+                    {b.status === 'assigned' ? 'ממתין לתמחור' : 'חדש'}
+                  </span>
                 </div>
               </div>
-              <div className="text-left shrink-0">
-                {b.amount ? (
-                  <div className="text-sm font-medium text-[color:var(--ink-800)]">~{b.amount.toLocaleString('en-US')} ₪</div>
-                ) : null}
-                <span className="inline-block mt-1 text-[11px] px-2 py-0.5 rounded-full bg-[color:var(--ink-100)] text-[color:var(--ink-600)]">
-                  {b.status === 'assigned' ? 'ממתין לתמחור' : 'חדש'}
-                </span>
-              </div>
-            </div>
-          </Link>
+            </Link>
+            <button
+              onClick={() => dismiss(b.id)}
+              className="absolute top-3 left-3 w-8 h-8 rounded-md flex items-center justify-center text-[color:var(--ink-400)] hover:text-red-600 hover:bg-red-50 transition-colors"
+              title="מחק בריף"
+              aria-label="מחק בריף"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
         ))}
       </div>
     </div>
