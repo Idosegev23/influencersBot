@@ -156,7 +156,8 @@ export default function BriefPricingPage() {
               <input
                 type="number"
                 min={1}
-                value={r.qty}
+                value={r.qty || ''}
+                onFocus={(e) => e.target.select()}
                 onChange={(e) => update(i, { qty: Number(e.target.value) })}
                 placeholder="כמות"
                 className="col-span-2 rounded-lg border border-[color:var(--line)] px-2 py-1.5 text-sm"
@@ -164,7 +165,8 @@ export default function BriefPricingPage() {
               <input
                 type="number"
                 min={0}
-                value={r.unit_price}
+                value={r.unit_price || ''}
+                onFocus={(e) => e.target.select()}
                 onChange={(e) => update(i, { unit_price: Number(e.target.value) })}
                 placeholder="מחיר ליחידה"
                 className="col-span-3 rounded-lg border border-[color:var(--line)] px-2 py-1.5 text-sm"
