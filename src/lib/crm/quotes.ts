@@ -8,9 +8,29 @@
  */
 import { randomBytes } from 'crypto';
 import { supabase as supabaseAdmin } from '@/lib/supabase';
-import { generateQuotePdf } from '@/lib/crm/pdf';
+import { generateQuotePdf, type QuoteContent } from '@/lib/crm/pdf';
 
 const BUCKET = 'partnership-documents';
+
+/** Load the agent's agency branding (+ logo bytes) for the quote header. */
+async function loadAgencyBranding(agentId?: string | null): Promise<Partial<QuoteContent>> {
+  if (!agentId) return {};
+  const { data } = await supabaseAdmin.from('users').select('agency').eq('id', agentId).maybeSingle();
+  const a = (data?.agency as any) || {};
+  let agencyLogo: Uint8Array | null = null;
+  if (a.logo_path) {
+    const { data: file } = await supabaseAdmin.storage.from(BUCKET).download(a.logo_path);
+    if (file) agencyLogo = new Uint8Array(await file.arrayBuffer());
+  }
+  return {
+    agencyName: a.name || null,
+    agencyPhone: a.phone || null,
+    agencyEmail: a.email || null,
+    agencyAddress: a.address || null,
+    agencyLogo,
+    agencyLogoType: a.logo_type || null,
+  };
+}
 
 export function appBaseUrl(): string {
   // Public signing / invoice-upload links must use the stable custom domain
@@ -91,6 +111,7 @@ export async function issueQuote(partnershipId: string, input: CreateQuoteInput)
   if (input.originalPdf && (!input.originalMime || input.originalMime === 'application/pdf')) {
     pdfBytes = input.originalPdf;
   } else {
+    const branding = await loadAgencyBranding(input.agentId);
     pdfBytes = await generateQuotePdf({
       title,
       clientName: input.clientName ?? null,
@@ -103,6 +124,7 @@ export async function issueQuote(partnershipId: string, input: CreateQuoteInput)
       terms: input.terms ?? null,
       notes: input.notes ?? null,
       agentName: input.agentName ?? null,
+      ...branding,
     });
   }
 

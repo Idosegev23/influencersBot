@@ -23,6 +23,13 @@ export interface QuoteContent {
   terms?: string | null;
   notes?: string | null;
   agentName?: string | null;
+  // agency branding (rendered in the header)
+  agencyName?: string | null;
+  agencyLogo?: Uint8Array | null;
+  agencyLogoType?: string | null; // image/png | image/jpeg
+  agencyPhone?: string | null;
+  agencyEmail?: string | null;
+  agencyAddress?: string | null;
 }
 
 const HEB_RE = /[֐-׿]/;
@@ -109,16 +116,39 @@ export async function generateQuotePdf(q: QuoteContent): Promise<Uint8Array> {
   // Brand strip
   page.drawRectangle({ x: 0, y: 842 - 6, width: 595, height: 6, color: rgb(0.535, 0.247, 0.886) });
 
-  page.drawText('Bestie', { x: margin, y, size: 16, font: bold, color: rgb(0.535, 0.247, 0.886) });
-  y -= 36;
+  // Agency logo (top-left) or agency/Bestie name
+  let drewLogo = false;
+  if (q.agencyLogo && q.agencyLogo.length) {
+    try {
+      const img = /png/i.test(q.agencyLogoType || '')
+        ? await pdf.embedPng(q.agencyLogo)
+        : await pdf.embedJpg(q.agencyLogo);
+      const targetH = 38;
+      const scale = targetH / img.height;
+      page.drawImage(img, { x: margin, y: y - targetH + 14, width: img.width * scale, height: targetH });
+      drewLogo = true;
+    } catch {
+      /* fall back to text below */
+    }
+  }
+  if (!drewLogo) {
+    page.drawText(q.agencyName || 'Bestie', { x: margin, y, size: 16, font: bold, color: rgb(0.535, 0.247, 0.886) });
+  }
+
+  // Agency contact (top-right, small)
+  const contact = [q.agencyPhone, q.agencyEmail].filter(Boolean).join('  ·  ');
+  if (contact) drawRtl(page, contact, y, 9.5, reg, margin, rgb(0.45, 0.45, 0.5));
+
+  y -= drewLogo ? 44 : 36;
 
   y = drawRtl(page, q.title || 'הצעת מחיר', y, 26, bold, margin);
   y -= 6;
 
   const meta: string[] = [];
-  if (q.clientName) meta.push(`משפיען/לקוח: ${q.clientName}`);
+  if (q.clientName) meta.push(`מיוצג: ${q.clientName}`);
   if (q.brandName) meta.push(`מותג: ${q.brandName}`);
   if (q.campaignName) meta.push(`קמפיין: ${q.campaignName}`);
+  if (q.agencyName) meta.push(`סוכנות: ${q.agencyName}`);
   if (q.agentName) meta.push(`סוכן: ${q.agentName}`);
   for (const m of meta) y = drawRtl(page, m, y, 12, reg, margin, rgb(0.3, 0.3, 0.38));
 

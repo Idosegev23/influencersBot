@@ -13,10 +13,25 @@ export default function AgentSettingsPage() {
   const [pwBusy, setPwBusy] = useState(false);
   const [pwMsg, setPwMsg] = useState('');
 
+  // agency branding
+  const [brand, setBrand] = useState({ name: '', phone: '', email: '', address: '' });
+  const [hasLogo, setHasLogo] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [bBusy, setBBusy] = useState(false);
+  const [bMsg, setBMsg] = useState('');
+
   useEffect(() => {
-    fetch('/api/agent/settings/profile')
-      .then((r) => r.json())
-      .then((d) => setProfile({ username: d.username || '', full_name: d.full_name || '', contact_email: d.contact_email || '', whatsapp: d.whatsapp || '' }))
+    Promise.all([
+      fetch('/api/agent/settings/profile').then((r) => r.json()),
+      fetch('/api/agent/settings/branding').then((r) => r.json()),
+    ])
+      .then(([p, b]) => {
+        setProfile({ username: p.username || '', full_name: p.full_name || '', contact_email: p.contact_email || '', whatsapp: p.whatsapp || '' });
+        if (b.agency) {
+          setBrand({ name: b.agency.name || '', phone: b.agency.phone || '', email: b.agency.email || '', address: b.agency.address || '' });
+          setHasLogo(!!b.agency.has_logo);
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -32,6 +47,29 @@ export default function AgentSettingsPage() {
       setPMsg(res.ok ? '✓ נשמר' : d.error || 'שגיאה');
     } finally {
       setPBusy(false);
+    }
+  };
+
+  const saveBranding = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBBusy(true);
+    setBMsg('');
+    try {
+      const fd = new FormData();
+      fd.append('name', brand.name);
+      fd.append('phone', brand.phone);
+      fd.append('email', brand.email);
+      fd.append('address', brand.address);
+      if (logoFile) fd.append('logo', logoFile);
+      const res = await fetch('/api/agent/settings/branding', { method: 'POST', body: fd });
+      const d = await res.json();
+      setBMsg(res.ok ? '✓ נשמר' : d.error || 'שגיאה');
+      if (res.ok) {
+        if (d.has_logo) setHasLogo(true);
+        setLogoFile(null);
+      }
+    } finally {
+      setBBusy(false);
     }
   };
 
@@ -67,6 +105,27 @@ export default function AgentSettingsPage() {
         <div className="flex items-center gap-3">
           <button type="submit" disabled={pBusy} className="ui-btn ui-btn-solid gap-1.5">{pBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}שמירה</button>
           {pMsg && <span className="text-[13px] text-[color:var(--ink-600)]">{pMsg}</span>}
+        </div>
+      </form>
+
+      {/* Agency branding — appears on the quote PDF */}
+      <form onSubmit={saveBranding} className="grid gap-4 mb-8 p-4 rounded-xl border border-[color:var(--line)] bg-[color:var(--surface-0)]">
+        <div className="text-[13px] font-semibold text-[color:var(--ink-900)]">מיתוג הסוכנות (מופיע על הצעת המחיר)</div>
+        <Field label="שם הסוכנות"><input className="ui-input" value={brand.name} onChange={(e) => setBrand({ ...brand, name: e.target.value })} /></Field>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="טלפון"><input className="ui-input" dir="ltr" value={brand.phone} onChange={(e) => setBrand({ ...brand, phone: e.target.value })} /></Field>
+          <Field label="אימייל"><input className="ui-input" dir="ltr" type="email" value={brand.email} onChange={(e) => setBrand({ ...brand, email: e.target.value })} /></Field>
+        </div>
+        <Field label="כתובת"><input className="ui-input" value={brand.address} onChange={(e) => setBrand({ ...brand, address: e.target.value })} /></Field>
+        <Field label="לוגו (PNG/JPG)">
+          <input type="file" accept="image/png,image/jpeg" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} className="text-[13px]" />
+          <span className="block text-[12px] text-[color:var(--ink-500)] mt-1">
+            {logoFile ? `נבחר: ${logoFile.name}` : hasLogo ? 'לוגו קיים — העלה קובץ חדש כדי להחליף' : 'לא הועלה לוגו'}
+          </span>
+        </Field>
+        <div className="flex items-center gap-3">
+          <button type="submit" disabled={bBusy} className="ui-btn ui-btn-solid gap-1.5">{bBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}שמירת מיתוג</button>
+          {bMsg && <span className="text-[13px] text-[color:var(--ink-600)]">{bMsg}</span>}
         </div>
       </form>
 
