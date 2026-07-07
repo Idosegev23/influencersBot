@@ -1073,7 +1073,7 @@
       // "go to website" icon is dead weight on the welcome screen.
       var plat = (l.platform || '').toLowerCase();
       if (plat === 'website' || plat === 'web' || plat === 'site' || plat === 'globe') continue;
-      items += '<a href="' + escapeHtml(l.url) + '" target="_blank" rel="noopener noreferrer" aria-label="' + escapeHtml(l.platform || 'link') + '" ' +
+      items += '<a href="' + escapeHtml(bestieTag(l.url, 'social_' + plat, 'social')) + '" target="_blank" rel="noopener noreferrer" aria-label="' + escapeHtml(l.platform || 'link') + '" ' +
         'onclick="window.__ibotSocialClick(\'' + escapeHtml(plat) + '\')" ' +
         'style="width:34px;height:34px;border-radius:50%;background:var(--ibot-surface);border:1px solid var(--ibot-border);' +
         'display:flex;align-items:center;justify-content:center;color:var(--ibot-text-primary);text-decoration:none;flex-shrink:0;">' +
@@ -1712,13 +1712,13 @@
   // Only tags absolute http(s) URLs and never overrides utm_* the merchant set.
   // `content` distinguishes the surface (card vs inline). Returns the URL
   // unchanged on any parse failure — attribution must never break a click.
-  function bestieTag(url, content) {
+  function bestieTag(url, content, medium) {
     if (!url) return url;
     try {
       var u = new URL(url, document.baseURI);
       if (u.protocol !== 'http:' && u.protocol !== 'https:') return url;
       if (!u.searchParams.has('utm_source')) u.searchParams.set('utm_source', 'bestie');
-      if (!u.searchParams.has('utm_medium')) u.searchParams.set('utm_medium', 'chat');
+      if (!u.searchParams.has('utm_medium')) u.searchParams.set('utm_medium', medium || 'chat');
       if (content && !u.searchParams.has('utm_content')) u.searchParams.set('utm_content', content);
       return u.href;
     } catch (e) {
