@@ -1,26 +1,24 @@
 /**
- * Public: submit a signature for a quote.
- * Stamps the PDF, stores the signed copy, and — since a signed quote IS the
- * agreement — advances the partnership to 'active' and records the agreement
- * document. Notifies the managing agent (best-effort).
+ * Public: submit a signature.
+ * Branches on doc_kind:
+ *  - quote:    a signed quote IS the agreement → partnership → 'active', then the
+ *              agent is nudged (email + WhatsApp) to generate the contract.
+ *  - contract: mark the contract signed and notify the agent.
+ * Stamps the PDF, stores the signed copy either way.
  */
 import { NextResponse } from 'next/server';
 import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { getSignatureByToken, downloadDoc, uploadSignedPdf, appBaseUrl } from '@/lib/crm/quotes';
 import { stampPdfWithSignature } from '@/lib/crm/pdf';
-import { sendEmail } from '@/lib/email';
+import { notifyAgent } from '@/lib/crm/notify';
 
 export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const sig = await getSignatureByToken(token);
   if (!sig) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
-  if (sig.status === 'signed') {
-    return NextResponse.json({ error: 'המסמך כבר נחתם' }, { status: 409 });
-  }
-  if (sig.status === 'cancelled') {
-    return NextResponse.json({ error: 'בקשת החתימה בוטלה' }, { status: 409 });
-  }
+  if (sig.status === 'signed') return NextResponse.json({ error: 'המסמך כבר נחתם' }, { status: 409 });
+  if (sig.status === 'cancelled') return NextResponse.json({ error: 'בקשת החתימה בוטלה' }, { status: 409 });
   if (sig.expires_at && new Date(sig.expires_at) < new Date()) {
     return NextResponse.json({ error: 'בקשת החתימה פגה תוקף' }, { status: 409 });
   }
@@ -28,16 +26,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const body = await req.json().catch(() => null);
   const signerName = String(body?.signer_name ?? '').trim();
   if (!signerName) return NextResponse.json({ error: 'שם החותם נדרש' }, { status: 400 });
+  if (!sig.document_storage_path) return NextResponse.json({ error: 'המסמך אינו זמין' }, { status: 400 });
 
-  if (!sig.document_storage_path) {
-    return NextResponse.json({ error: 'המסמך אינו זמין' }, { status: 400 });
-  }
   const original = await downloadDoc(sig.document_storage_path);
   if (!original) return NextResponse.json({ error: 'המסמך אינו זמין' }, { status: 400 });
 
   const signedAtIso = new Date().toISOString();
 
-  // Stamp the signature onto the PDF.
   let signedBytes: Uint8Array;
   try {
     signedBytes = await stampPdfWithSignature({
@@ -54,7 +49,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
   const signedPath = await uploadSignedPdf(token, signedBytes);
 
-  // Mark signature request signed + capture signer fields.
   await supabaseAdmin
     .from('signature_requests')
     .update({
@@ -72,28 +66,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     })
     .eq('id', sig.id);
 
-  // Signed quote = agreement → activate the partnership + record the agreement doc.
+  const docKind = (sig as any).doc_kind || 'quote';
+
   if (sig.partnership_id) {
-    const { data: partnership } = await supabaseAdmin
-      .from('partnerships')
-      .select('proposal_amount, currency')
-      .eq('id', sig.partnership_id)
-      .maybeSingle();
-
-    await supabaseAdmin
-      .from('partnerships')
-      .update({
-        status: 'active',
-        contract_signed_date: signedAtIso.slice(0, 10),
-        contract_amount: partnership?.proposal_amount ?? null,
-        updated_at: signedAtIso,
-      })
-      .eq('id', sig.partnership_id);
-
     await supabaseAdmin.from('partnership_documents').insert({
       partnership_id: sig.partnership_id,
       account_id: sig.account_id,
-      filename: `${sig.title || 'agreement'} (חתום).pdf`,
+      filename: `${sig.title || (docKind === 'contract' ? 'הסכם' : 'הצעה')} (חתום).pdf`,
       mime_type: 'application/pdf',
       storage_path: signedPath,
       document_type: 'contract',
@@ -101,30 +80,41 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     });
   }
 
-  // Notify the managing agent (best-effort).
-  notifyAgent(sig.agent_id, sig.title, signerName, token).catch(() => {});
+  if (docKind === 'contract') {
+    // Mark the contract signed.
+    await supabaseAdmin
+      .from('contracts')
+      .update({ status: 'signed', updated_at: signedAtIso })
+      .eq('signature_request_id', sig.id);
+
+    notifyAgent(sig.agent_id, {
+      subject: `✅ החוזה "${sig.title || ''}" נחתם`,
+      text: `${signerName} חתם/ה על החוזה "${sig.title || ''}".\nהעסקה מסודרת — אפשר להמשיך לפעילות ולחשבונית ב-Bestie.\n${appBaseUrl()}/agent/deals`,
+    }).catch(() => {});
+  } else {
+    // Signed quote = agreement → activate the partnership.
+    if (sig.partnership_id) {
+      const { data: partnership } = await supabaseAdmin
+        .from('partnerships')
+        .select('proposal_amount')
+        .eq('id', sig.partnership_id)
+        .maybeSingle();
+      await supabaseAdmin
+        .from('partnerships')
+        .update({
+          status: 'active',
+          contract_signed_date: signedAtIso.slice(0, 10),
+          contract_amount: partnership?.proposal_amount ?? null,
+          updated_at: signedAtIso,
+        })
+        .eq('id', sig.partnership_id);
+    }
+
+    notifyAgent(sig.agent_id, {
+      subject: `✅ ההצעה "${sig.title || ''}" נחתמה`,
+      text: `${signerName} חתם/ה על ההצעה "${sig.title || ''}". העסקה עברה ל"פעיל".\nהיכנס/י ל-Bestie כדי ליצור חוזה מהעסקה:\n${appBaseUrl()}/agent/deals`,
+    }).catch(() => {});
+  }
 
   return NextResponse.json({ signed_at: signedAtIso, signed_url: `/api/signatures/${token}/signed` });
-}
-
-async function notifyAgent(agentId: string | null, title: string, signerName: string, token: string) {
-  if (!agentId) return;
-  const { data: agent } = await supabaseAdmin
-    .from('users')
-    .select('contact_email, full_name')
-    .eq('id', agentId)
-    .maybeSingle();
-  const to = agent?.contact_email;
-  if (!to) return;
-  const link = `${appBaseUrl()}/sign/${token}`;
-  await sendEmail({
-    to,
-    subject: `✅ ההצעה "${title}" נחתמה`,
-    html: `<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.6">
-      <h2>ההצעה נחתמה 🎉</h2>
-      <p><b>${signerName}</b> חתם/ה על ההצעה <b>${title}</b>.</p>
-      <p>הפעילות עברה לסטטוס "פעיל". <a href="${link}">צפייה במסמך החתום</a>.</p>
-      <hr/><p style="color:#888;font-size:12px">Bestie CRM</p>
-    </div>`,
-  });
 }

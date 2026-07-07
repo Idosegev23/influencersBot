@@ -23,6 +23,9 @@ export default function DealDetail({ params }: { params: Promise<{ id: string }>
   const [newBeat, setNewBeat] = useState({ title: '', due_date: '' });
   const [reqOpts, setReqOpts] = useState({ payment_route: 'via_agency', payment_terms_days: 30 });
   const [copied, setCopied] = useState(false);
+  const [contract, setContract] = useState<any>(null);
+  const [contractSig, setContractSig] = useState<any>(null);
+  const [cBody, setCBody] = useState('');
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/agent/partnerships/${id}`);
@@ -32,8 +35,30 @@ export default function DealDetail({ params }: { params: Promise<{ id: string }>
       .then((r) => r.json())
       .then((dd) => setDocs(dd.documents || []))
       .catch(() => {});
+    fetch(`/api/agent/partnerships/${id}/contract`)
+      .then((r) => r.json())
+      .then((cd) => {
+        setContract(cd.contract || null);
+        setContractSig(cd.signature || null);
+        setCBody(cd.contract?.body || '');
+      })
+      .catch(() => {});
     setLoading(false);
   }, [id]);
+
+  const cAct = async (payload: any) => {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/agent/partnerships/${id}/contract`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      await load();
+      return { ok: res.ok, data };
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const DOC_LABEL: Record<string, string> = { quote: 'הצעת מחיר', contract: 'הסכם חתום', invoice: 'חשבונית', brief: 'בריף', receipt: 'קבלה', other: 'מסמך' };
 
@@ -85,6 +110,70 @@ export default function DealDetail({ params }: { params: Promise<{ id: string }>
               <a href={`/sign/${d.signature.token}`} target="_blank" rel="noopener noreferrer" className="ui-btn ui-btn-sm ui-btn-ghost"><ExternalLink className="w-3.5 h-3.5" /></a>
             </div>
           </div>
+        </Section>
+      )}
+
+      {/* Contract */}
+      {(d.signature?.status === 'signed' || p.status === 'active' || p.status === 'completed') && (
+        <Section title="חוזה">
+          {!contract && (
+            <div>
+              <p className="text-[13px] text-[color:var(--ink-600)] mb-3">
+                ההצעה נחתמה. אפשר ליצור חוזה מפורט מנתוני העסקה, לערוך אותו, ולשלוח לחתימה.
+              </p>
+              <button disabled={busy} onClick={() => cAct({ action: 'create' })} className="ui-btn ui-btn-solid">
+                צור חוזה
+              </button>
+            </div>
+          )}
+          {contract && contract.status === 'draft' && (
+            <div className="space-y-2">
+              <textarea
+                className="ui-input w-full text-[12px] leading-relaxed"
+                dir="rtl"
+                rows={16}
+                value={cBody}
+                onChange={(e) => setCBody(e.target.value)}
+              />
+              <div className="flex gap-2">
+                <button disabled={busy} onClick={() => cAct({ action: 'save', contract_id: contract.id, body: cBody })} className="ui-btn ui-btn-sm ui-btn-outline">
+                  שמור טיוטה
+                </button>
+                <button
+                  disabled={busy}
+                  onClick={async () => {
+                    await cAct({ action: 'save', contract_id: contract.id, body: cBody });
+                    await cAct({ action: 'send', contract_id: contract.id });
+                  }}
+                  className="ui-btn ui-btn-sm ui-btn-solid"
+                >
+                  שלח לחתימה
+                </button>
+              </div>
+            </div>
+          )}
+          {contract && contract.status !== 'draft' && (
+            <div className="flex items-center justify-between">
+              <span className="text-[13px] text-[color:var(--ink-700)]">
+                {contract.status === 'signed'
+                  ? `החוזה נחתם ${contractSig?.signed_at ? new Date(contractSig.signed_at).toLocaleDateString('he-IL') : ''} ✓`
+                  : 'החוזה נשלח — ממתין לחתימה'}
+              </span>
+              {contractSig?.token && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/sign/${contractSig.token}`); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
+                    className="ui-btn ui-btn-sm ui-btn-ghost"
+                  >
+                    {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                  <a href={`/sign/${contractSig.token}`} target="_blank" rel="noopener noreferrer" className="ui-btn ui-btn-sm ui-btn-ghost">
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
         </Section>
       )}
 

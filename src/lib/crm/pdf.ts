@@ -229,6 +229,63 @@ export async function generateQuotePdf(q: QuoteContent): Promise<Uint8Array> {
   return pdf.save();
 }
 
+/** Render an editable text contract (Hebrew) to a paginated A4 PDF. */
+export async function generateContractPdf(opts: {
+  title: string;
+  body: string;
+  agencyName?: string | null;
+  agencyLogo?: Uint8Array | null;
+  agencyLogoType?: string | null;
+}): Promise<Uint8Array> {
+  const pdf = await PDFDocument.create();
+  pdf.registerFontkit(fontkit);
+  const reg = await loadFont(pdf, 'Heebo-Regular.ttf');
+  const bold = await loadFont(pdf, 'Heebo-Bold.ttf');
+
+  const margin = 48;
+  let page = pdf.addPage([595, 842]);
+  let y = 842 - margin - 10;
+  page.drawRectangle({ x: 0, y: 842 - 6, width: 595, height: 6, color: rgb(0.535, 0.247, 0.886) });
+
+  let drewLogo = false;
+  if (opts.agencyLogo && opts.agencyLogo.length) {
+    try {
+      const img = /png/i.test(opts.agencyLogoType || '') ? await pdf.embedPng(opts.agencyLogo) : await pdf.embedJpg(opts.agencyLogo);
+      const h = 34;
+      page.drawImage(img, { x: margin, y: y - h + 12, width: (img.width / img.height) * h, height: h });
+      drewLogo = true;
+    } catch {
+      /* fall back */
+    }
+  }
+  if (!drewLogo) page.drawText(opts.agencyName || 'Bestie', { x: margin, y, size: 15, font: bold, color: rgb(0.535, 0.247, 0.886) });
+  y -= drewLogo ? 42 : 34;
+
+  y = drawRtl(page, opts.title || 'הסכם', y, 20, bold, margin);
+  y -= 14;
+
+  const newPageIfNeeded = () => {
+    if (y < margin + 70) {
+      page = pdf.addPage([595, 842]);
+      y = 842 - margin - 10;
+    }
+  };
+
+  for (const rawLine of (opts.body || '').split('\n')) {
+    const line = rawLine.replace(/\s+$/, '');
+    if (!line.trim()) {
+      y -= 8;
+      continue;
+    }
+    const isHeading = /^\d+\.\s/.test(line) || line.length < 22;
+    y = drawRtlParagraph(page, line, y, isHeading ? 12 : 11, isHeading ? bold : reg, margin, isHeading ? rgb(0.1, 0.1, 0.18) : rgb(0.25, 0.25, 0.32));
+    y -= 4;
+    newPageIfNeeded();
+  }
+
+  return pdf.save();
+}
+
 /* ---------------- signature stamping (ported from leaders-platform) ---------------- */
 
 function prepBidi(text: string): string {
