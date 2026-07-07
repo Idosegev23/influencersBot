@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Users, FileText, LogOut, Menu, X, Sparkles, ChevronLeft, LayoutDashboard, Briefcase, Inbox, Building2, Megaphone, Settings } from 'lucide-react';
+import { Users, FileText, LogOut, Menu, X, Sparkles, ChevronLeft, LayoutDashboard, Briefcase, Inbox, Building2, Megaphone, BarChart3, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type NavItem = {
@@ -15,6 +15,7 @@ type NavItem = {
 
 const NAV: NavItem[] = [
   { href: '/agent', label: 'דשבורד', icon: LayoutDashboard, match: (p) => p === '/agent' },
+  { href: '/agent/overview', label: 'סקירה', icon: BarChart3, match: (p) => p.startsWith('/agent/overview') },
   { href: '/agent/briefs', label: 'תיבה נכנסת', icon: Inbox, match: (p) => p.startsWith('/agent/briefs') || p.startsWith('/agent/inbox') },
   { href: '/agent/deals', label: 'עסקאות', icon: Briefcase, match: (p) => p.startsWith('/agent/deals') },
   { href: '/agent/quotes', label: 'הצעות מחיר', icon: FileText, match: (p) => p.startsWith('/agent/quotes') },
@@ -30,6 +31,7 @@ function Crumbs({ pathname }: { pathname: string }) {
       clients: 'מיוצגים',
       orderers: 'לקוחות',
       campaigns: 'קמפיינים',
+      overview: 'סקירה',
       quotes: 'הצעות מחיר',
       deals: 'עסקאות',
       briefs: 'בריפים',

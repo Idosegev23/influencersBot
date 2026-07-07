@@ -22,6 +22,7 @@ export async function GET() {
       phone: a.phone || '',
       email: a.email || '',
       address: a.address || '',
+      commission_pct: a.commission_pct ?? '',
       has_logo: !!a.logo_path,
     },
   });
@@ -45,6 +46,8 @@ export async function POST(req: Request) {
   agency.phone = String(form.get('phone') || '').trim() || null;
   agency.email = String(form.get('email') || '').trim() || null;
   agency.address = String(form.get('address') || '').trim() || null;
+  const pctRaw = String(form.get('commission_pct') || '').trim();
+  agency.commission_pct = pctRaw !== '' && Number.isFinite(Number(pctRaw)) ? Number(pctRaw) : null;
 
   const logo = form.get('logo');
   if (logo instanceof File && logo.size > 0) {

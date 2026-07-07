@@ -14,7 +14,7 @@ export default function AgentSettingsPage() {
   const [pwMsg, setPwMsg] = useState('');
 
   // agency branding
-  const [brand, setBrand] = useState({ name: '', phone: '', email: '', address: '' });
+  const [brand, setBrand] = useState({ name: '', phone: '', email: '', address: '', commission_pct: '' });
   const [hasLogo, setHasLogo] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [bBusy, setBBusy] = useState(false);
@@ -28,7 +28,7 @@ export default function AgentSettingsPage() {
       .then(([p, b]) => {
         setProfile({ username: p.username || '', full_name: p.full_name || '', contact_email: p.contact_email || '', whatsapp: p.whatsapp || '' });
         if (b.agency) {
-          setBrand({ name: b.agency.name || '', phone: b.agency.phone || '', email: b.agency.email || '', address: b.agency.address || '' });
+          setBrand({ name: b.agency.name || '', phone: b.agency.phone || '', email: b.agency.email || '', address: b.agency.address || '', commission_pct: b.agency.commission_pct ?? '' });
           setHasLogo(!!b.agency.has_logo);
         }
       })
@@ -60,6 +60,7 @@ export default function AgentSettingsPage() {
       fd.append('phone', brand.phone);
       fd.append('email', brand.email);
       fd.append('address', brand.address);
+      fd.append('commission_pct', String(brand.commission_pct ?? ''));
       if (logoFile) fd.append('logo', logoFile);
       const res = await fetch('/api/agent/settings/branding', { method: 'POST', body: fd });
       const d = await res.json();
@@ -117,6 +118,7 @@ export default function AgentSettingsPage() {
           <Field label="אימייל"><input className="ui-input" dir="ltr" type="email" value={brand.email} onChange={(e) => setBrand({ ...brand, email: e.target.value })} /></Field>
         </div>
         <Field label="כתובת"><input className="ui-input" value={brand.address} onChange={(e) => setBrand({ ...brand, address: e.target.value })} /></Field>
+        <Field label="אחוז עמלת מכירות (%) — לחישוב עמלה בסקירה"><input className="ui-input" dir="ltr" type="number" value={brand.commission_pct} onChange={(e) => setBrand({ ...brand, commission_pct: e.target.value })} /></Field>
         <Field label="לוגו (PNG/JPG)">
           <input type="file" accept="image/png,image/jpeg" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} className="text-[13px]" />
           <span className="block text-[12px] text-[color:var(--ink-500)] mt-1">
