@@ -44,6 +44,48 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const clientName = (acct?.config as any)?.display_name || (acct?.config as any)?.username || null;
   const deliverables = lineItemsToDeliverables(items);
 
+  // Resolve the campaign / client / brand linkage.
+  let campaignId: string | null = body?.campaign_id ? String(body.campaign_id) : null;
+  let clientId: string | null = body?.client_id ? String(body.client_id) : null;
+  let brandId: string | null = null;
+  const newCampaignName = String(body?.new_campaign_name || '').trim();
+
+  const resolveBrandId = async (): Promise<string | null> => {
+    if (!brandName) return null;
+    const { data: existingBrand } = await supabaseAdmin
+      .from('brands')
+      .select('id')
+      .eq('agent_id', agent.id)
+      .ilike('name', brandName)
+      .maybeSingle();
+    if (existingBrand) return existingBrand.id;
+    const { data: nb } = await supabaseAdmin.from('brands').insert({ agent_id: agent.id, name: brandName }).select('id').single();
+    return nb?.id || null;
+  };
+
+  if (campaignId) {
+    const { data: camp } = await supabaseAdmin
+      .from('campaigns')
+      .select('brand_id, client_id')
+      .eq('id', campaignId)
+      .eq('agent_id', agent.id)
+      .maybeSingle();
+    if (camp) {
+      brandId = camp.brand_id || null;
+      if (!clientId) clientId = camp.client_id || null;
+    } else {
+      campaignId = null; // not owned by this agent
+    }
+  } else if (newCampaignName) {
+    brandId = await resolveBrandId();
+    const { data: nc } = await supabaseAdmin
+      .from('campaigns')
+      .insert({ agent_id: agent.id, name: newCampaignName, brand_id: brandId, client_id: clientId })
+      .select('id')
+      .single();
+    campaignId = nc?.id || null;
+  }
+
   // 1) create the deal — or update it in place on an edit/resend
   const existingDealId = (b.deal_id as string | null) || null;
   let partnershipId: string;
@@ -57,6 +99,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         status: 'proposal',
         proposal_amount: totals.total,
         deliverables: deliverables.length ? deliverables : null,
+        campaign_id: campaignId,
+        client_id: clientId,
+        brand_id: brandId,
         updated_at: new Date().toISOString(),
       })
       .eq('id', existingDealId)
@@ -84,6 +129,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         currency: 'ILS',
         brief: b.raw_text || null,
         deliverables: deliverables.length ? deliverables : null,
+        campaign_id: campaignId,
+        client_id: clientId,
+        brand_id: brandId,
         proposal_date: new Date().toISOString().slice(0, 10),
       })
       .select('id')

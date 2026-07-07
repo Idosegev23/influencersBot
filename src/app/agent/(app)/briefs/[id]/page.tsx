@@ -19,6 +19,11 @@ export default function BriefPricingPage() {
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ signUrl: string } | null>(null);
+  const [clients, setClients] = useState<{ id: string; name: string; type: string }[]>([]);
+  const [campaigns, setCampaigns] = useState<{ id: string; name: string }[]>([]);
+  const [clientId, setClientId] = useState('');
+  const [campaignId, setCampaignId] = useState('');
+  const [newCampaign, setNewCampaign] = useState('');
 
   useEffect(() => {
     fetch(`/api/agent/briefs/${id}`)
@@ -30,6 +35,8 @@ export default function BriefPricingPage() {
         }
         setBrief(d.brief);
         setRoster(d.roster || []);
+        setClients(d.clients || []);
+        setCampaigns(d.campaigns || []);
         setAccountId(d.brief?.suggested_account_id || d.roster?.[0]?.id || '');
         setRows(
           (d.seed_line_items || []).map((x: any) => ({
@@ -62,6 +69,9 @@ export default function BriefPricingPage() {
           account_id: accountId,
           brand_name: brief?.brand_name,
           campaign_name: brief?.campaign_name,
+          client_id: clientId || null,
+          campaign_id: campaignId || null,
+          new_campaign_name: newCampaign || null,
           line_items: rows,
         }),
       });
@@ -129,6 +139,48 @@ export default function BriefPricingPage() {
             </option>
           ))}
         </select>
+      </div>
+
+      {/* Client (orderer) + campaign linkage */}
+      <div className="rounded-xl border border-[color:var(--line)] bg-[color:var(--surface-0)] p-4 grid gap-3 md:grid-cols-2">
+        <div>
+          <label className="block text-sm font-medium text-[color:var(--ink-700)] mb-1">לקוח (מזמין)</label>
+          <select
+            value={clientId}
+            onChange={(e) => setClientId(e.target.value)}
+            className="w-full rounded-lg border border-[color:var(--line)] bg-white px-3 py-2 text-sm"
+          >
+            <option value="">— ללא —</option>
+            {clients.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name} {c.type === 'agency' ? '(משרד פרסום)' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-[color:var(--ink-700)] mb-1">קמפיין</label>
+          <select
+            value={campaignId}
+            onChange={(e) => setCampaignId(e.target.value)}
+            className="w-full rounded-lg border border-[color:var(--line)] bg-white px-3 py-2 text-sm"
+          >
+            <option value="">— בחר/י קמפיין קיים —</option>
+            {campaigns.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          {!campaignId && (
+            <input
+              value={newCampaign}
+              onChange={(e) => setNewCampaign(e.target.value)}
+              placeholder="או שם קמפיין חדש (ייווצר עם המותג)"
+              className="mt-2 w-full rounded-lg border border-[color:var(--line)] bg-white px-3 py-2 text-sm"
+            />
+          )}
+        </div>
       </div>
 
       <div className="rounded-xl border border-[color:var(--line)] bg-[color:var(--surface-0)] p-4 space-y-3">

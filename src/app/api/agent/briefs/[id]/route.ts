@@ -55,6 +55,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     roster = (accts || []).map((a: any) => ({ id: a.id, name: a.config?.display_name || a.config?.username || 'ללא שם' }));
   }
 
+  // Clients (orderers) + campaigns for the linkage pickers.
+  const [{ data: clientsList }, { data: campaignsList }] = await Promise.all([
+    supabaseAdmin.from('clients').select('id, name, type').eq('agent_id', agent.id).order('name', { ascending: true }),
+    supabaseAdmin.from('campaigns').select('id, name, brand_id, client_id').eq('agent_id', agent.id).order('created_at', { ascending: false }),
+  ]);
+
   // On an edit (deal already exists), seed from the saved line items + surface
   // the client's change request; otherwise seed from the parsed deliverables.
   let seed = seedLineItems(parsed);
@@ -100,6 +106,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       brand_contact_phone: parsed?.contactPerson?.phone || null,
     },
     roster,
+    clients: clientsList || [],
+    campaigns: campaignsList || [],
     seed_line_items: seed,
   });
 }
