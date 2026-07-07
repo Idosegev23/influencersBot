@@ -68,9 +68,11 @@ export async function handleAgentMessage(
   const state = await getState(agent.id);
   const hasAttach = (attachments || []).length > 0;
 
-  // A voice command is a holistic instruction ("for Anna the leading-brand quote,
-  // 200,000") — route it through the AI understanding layer first.
-  if (opts.isVoice && text) {
+  // A voice note is treated as a holistic multi-brief command ONLY when it's a
+  // FRESH command (nothing in flight). A voice reply to "build? / price?" is a
+  // reply to the current stage — transcribe it and let the stage machine handle
+  // it below (so we don't auto-build/loop on a confirmation).
+  if (opts.isVoice && text && (state.stage === 'idle' || state.stage === 'quote_sent')) {
     const v = await handleVoiceCommand(agent, waId, text, state);
     if (v !== undefined) return v;
   }
@@ -310,7 +312,12 @@ async function buildQuoteFromBrief(agent: WaAgent, briefId: string, accountId: s
   const totals = computeTotals(lineItems);
   const brandName = parsed?.brandName || brief?.subject || 'מותג';
   const clientName = await accountName(accountId);
-  const deliverables = lineItemsToDeliverables(lineItems);
+  // Show the brief's requested detail (in Hebrew) on the quote — not a single
+  // "סה״כ" line — even when the agent priced with one total.
+  const briefItems = seedFromParsed(parsed).map((r) => `${r.qty}× ${[r.deliverable_type, r.notes].filter(Boolean).join(' · ')}`.trim());
+  const briefTerms = Array.isArray(parsed?.specialTerms) ? parsed.specialTerms.filter(Boolean) : [];
+  const briefDeliverables = [...briefItems, ...briefTerms].filter((s) => s && s !== '1× ');
+  const deliverables = briefDeliverables.length ? briefDeliverables : lineItemsToDeliverables(lineItems);
 
   const result = await createQuote({
     agentId: agent.id,

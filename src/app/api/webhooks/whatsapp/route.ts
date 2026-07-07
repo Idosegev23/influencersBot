@@ -31,6 +31,7 @@ import { handleAgentMessage } from '@/lib/crm/wa-conversation';
 
 export const runtime = 'nodejs';          // need crypto + Buffer
 export const dynamic = 'force-dynamic';   // never cache
+export const maxDuration = 300;           // AI parse + audio transcription are slow; don't let Vercel kill the fn
 
 // ---------------------------------------------------------------------
 // GET — verification handshake
@@ -220,20 +221,30 @@ async function processWebhook(payload: any): Promise<void> {
           msg.interactive?.list_reply?.title ??
           null;
 
-        // Insert message (wa_message_id UNIQUE guards against webhook retries)
-        await supabase.from('whatsapp_messages').insert({
-          conversation_id:   convo.id,
-          direction:         'inbound',
-          wa_message_id:     msg.id,
-          reply_to_wa_id:    msg.context?.id ?? null,
-          message_type:      normaliseType(type),
-          text_body:         textBody,
-          media_id:          msg[type]?.id ?? null,
-          media_mime_type:   msg[type]?.mime_type ?? null,
-          media_sha256:      msg[type]?.sha256 ?? null,
-          payload:           msg,
-          status:            'delivered',          // inbound == delivered to us
-        });
+        // Insert message. wa_message_id is UNIQUE; ignoreDuplicates makes Meta's
+        // at-least-once retries a NO-OP for everything below — otherwise the same
+        // brief gets processed twice (2nd pass lands in awaiting_build_confirm →
+        // spurious "לא הבנתי") and voice notes get double-handled.
+        const { data: insertedRows } = await supabase
+          .from('whatsapp_messages')
+          .upsert(
+            {
+              conversation_id:   convo.id,
+              direction:         'inbound',
+              wa_message_id:     msg.id,
+              reply_to_wa_id:    msg.context?.id ?? null,
+              message_type:      normaliseType(type),
+              text_body:         textBody,
+              media_id:          msg[type]?.id ?? null,
+              media_mime_type:   msg[type]?.mime_type ?? null,
+              media_sha256:      msg[type]?.sha256 ?? null,
+              payload:           msg,
+              status:            'delivered',          // inbound == delivered to us
+            },
+            { onConflict: 'wa_message_id', ignoreDuplicates: true }
+          )
+          .select('id');
+        if (!insertedRows || insertedRows.length === 0) continue; // duplicate delivery — already handled
 
         // bump unread
         await supabase
