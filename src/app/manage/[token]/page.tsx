@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
+import WidgetPreview from '@/components/manage/WidgetPreview';
 
 // ============================================
 // Types
@@ -1379,8 +1380,21 @@ export default function ManagePage() {
               </div>
 
               <div className="space-y-6">
-                {/* ============ Card 1: Appearance ============ */}
-                <div className="bg-white p-4 sm:p-8 rounded-xl" style={customShadow}>
+                {/* ============ Card 1: Appearance (fields + live preview) ============ */}
+                <div className="grid lg:grid-cols-[1fr_300px] gap-6 items-start">
+                  {/* Live preview — above the fields on narrow screens, beside them (sticky) on wide screens */}
+                  <div className="order-1 lg:order-2 lg:sticky lg:top-6 bg-white p-4 sm:p-6 rounded-xl" style={customShadow}>
+                    <WidgetPreview
+                      primaryColor={primaryColor}
+                      coverImage={coverImage}
+                      brandName={brandNameOverride || displayName}
+                      welcomeMessage={welcomeMessage}
+                      tooltip={tooltip}
+                      socialLinks={socialLinks}
+                    />
+                  </div>
+
+                  <div className="order-2 lg:order-1 bg-white p-4 sm:p-8 rounded-xl" style={customShadow}>
                   <div className="flex items-center gap-3 mb-5">
                     <span className="material-symbols-outlined text-[#575a8c]" style={{ fontSize: 22 }}>palette</span>
                     <div>
@@ -1482,6 +1496,7 @@ export default function ManagePage() {
                         ))}
                       </div>
                     </div>
+                  </div>
                   </div>
                 </div>
 
