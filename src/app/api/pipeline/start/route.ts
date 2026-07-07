@@ -26,6 +26,7 @@ export async function POST(req: Request) {
     transcribe = true,
     maxPages = null,
     postsLimit = DEFAULT_SCAN_CONFIG.postsLimit,
+    archetype = 'brand',
   } = body;
 
   if (!username || !accountId) {
@@ -46,7 +47,7 @@ export async function POST(req: Request) {
     counts: {},
     cursors: {},
     websiteUrl,
-    options: { transcribe, maxPages, postsLimit, isDemo },
+    options: { transcribe, maxPages, postsLimit, isDemo, archetype },
   };
   await saveState(job.id, state);
   await publishStep({ jobId: job.id, step: 'create-account', batch: 0 });

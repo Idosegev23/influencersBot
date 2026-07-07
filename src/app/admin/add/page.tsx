@@ -9,6 +9,7 @@ export default function AddAccountPage() {
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [websiteUrl, setWebsiteUrl] = useState('');
+  const [archetype, setArchetype] = useState('brand');
   const [isDemo, setIsDemo] = useState(true);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [postsLimit, setPostsLimit] = useState('');
@@ -67,6 +68,7 @@ export default function AddAccountPage() {
           websiteUrl: websiteUrl.trim() || undefined,
           isDemo,
           transcribe,
+          archetype,
           maxPages: maxPages ? Number(maxPages) : null,
           postsLimit: postsLimit ? Number(postsLimit) : undefined,
         }),
@@ -147,6 +149,25 @@ export default function AddAccountPage() {
               className="neon-input w-full"
               style={{ direction: 'ltr' }}
             />
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-sm font-semibold mr-2" style={{ color: '#1f2937' }}>
+              סוג חשבון <span className="font-normal" style={{ color: '#817a6c' }}>(archetype)</span>
+            </label>
+            <select
+              value={archetype}
+              onChange={(e) => setArchetype(e.target.value)}
+              className="neon-input w-full"
+            >
+              <option value="brand">מותג (brand)</option>
+              <option value="influencer">משפיען (influencer)</option>
+              <option value="local_business">עסק מקומי (local_business)</option>
+              <option value="service_provider">נותן שירות (service_provider)</option>
+              <option value="government_ministry">משרד ממשלתי (government_ministry)</option>
+              <option value="media_news">מדיה/חדשות (media_news)</option>
+              <option value="tech_creator">יוצר טק (tech_creator)</option>
+            </select>
           </div>
 
           <label className="flex items-center gap-3 cursor-pointer select-none">

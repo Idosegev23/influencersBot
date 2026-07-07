@@ -17,6 +17,7 @@ export interface PipelineOptions {
   maxPages: number | null; // null = all sitemap urls
   postsLimit: number;
   isDemo: boolean;
+  archetype?: string; // brand | influencer | service_provider | ... (applied in finalize)
 }
 
 export interface PipelineState {
