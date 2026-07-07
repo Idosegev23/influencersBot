@@ -27,7 +27,7 @@ import { createClient } from '@/lib/supabase';
 import { isItamarSender, processItamarReply } from '@/lib/handoff/process-itamar-reply';
 import { routeInboundToTicket } from '@/lib/support/route-inbound';
 import { toWaId, downloadMedia, sendText } from '@/lib/whatsapp-cloud/client';
-import { ingestQuote } from '@/lib/crm/quote-ingest';
+import { handleAgentMessage } from '@/lib/crm/wa-conversation';
 
 export const runtime = 'nodejs';          // need crypto + Buffer
 export const dynamic = 'force-dynamic';   // never cache
@@ -332,7 +332,7 @@ async function maybeHandleAgentQuote(args: {
   const supabase = createClient();
   const { data: agent } = await supabase
     .from('users')
-    .select('id, role, status')
+    .select('id, role, status, managed_account_ids, full_name')
     .eq('whatsapp', toWaId(args.waId))
     .maybeSingle();
   if (!agent || (agent as any).role !== 'agent' || (agent as any).status !== 'active') {
@@ -360,21 +360,13 @@ async function maybeHandleAgentQuote(args: {
     }
   }
 
-  const result = await ingestQuote({
-    channel: 'whatsapp',
-    sender: args.waId,
-    providerMessageId: args.msg.id,
-    rawText: args.textBody,
-    attachments,
-  });
-
-  // Reply within the 24h service window (the agent just messaged us).
-  if (result.ackText) {
-    try {
-      await sendText({ to: args.waId, body: result.ackText, contextMessageId: args.msg.id });
-    } catch (e) {
-      console.warn('[agent quote] reply failed', e);
-    }
+  // Drive the WhatsApp conversation (build quote? → price → link) and reply
+  // within the 24h service window (the agent just messaged us).
+  try {
+    const reply = await handleAgentMessage(agent as any, args.waId, args.textBody, attachments);
+    if (reply) await sendText({ to: args.waId, body: reply, contextMessageId: args.msg.id });
+  } catch (e) {
+    console.warn('[agent quote] conversation failed', e);
   }
   return true;
 }
