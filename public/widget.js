@@ -911,6 +911,25 @@
     window.visualViewport.addEventListener('scroll', applyVV);
   }
 
+  // Scroll-aware bubble: on mobile, hide the closed bubble while the visitor
+  // scrolls DOWN (so it never covers the site's own bottom bar / cart), and
+  // bring it back when they scroll up or stop. No-op when the widget is open.
+  if (!window.__ibotScrollBound) {
+    window.__ibotScrollBound = true;
+    var lastY = 0, hideTimer = null;
+    window.addEventListener('scroll', function () {
+      if (isOpen || window.innerWidth >= 640) return;
+      var t = document.getElementById('ibot-trigger');
+      if (!t) return;
+      var y = window.pageYOffset || document.documentElement.scrollTop || 0;
+      if (y > lastY + 8) { t.style.transform = 'translateY(140%)'; t.style.opacity = '0'; }
+      else if (y < lastY - 8) { t.style.transform = ''; t.style.opacity = '1'; }
+      lastY = y;
+      if (hideTimer) clearTimeout(hideTimer);
+      hideTimer = setTimeout(function () { if (t) { t.style.transform = ''; t.style.opacity = '1'; } }, 900);
+    }, { passive: true });
+  }
+
   function updateContainerPosition() {
     container.style.cssText = 'position:fixed;z-index:2147483647;' +
       (config.position === 'bottom-left'
@@ -1177,7 +1196,7 @@
     container.innerHTML =
       '<div id="ibot-trigger" style="' +
       'width:60px;height:60px;cursor:pointer;' +
-      'transition:transform 0.3s ease;animation:ibot-slide-up 0.35s ease-out;' +
+      'transition:transform 0.25s ease, opacity 0.25s ease;animation:ibot-slide-up 0.35s ease-out;' +
       'border-radius:50%;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.1);">' +
       avatarHtml(60) +
       '</div>';
