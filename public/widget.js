@@ -723,7 +723,11 @@
       }).catch(function () { /* */ });
     } catch (e) { /* */ }
     if (product.productUrl) {
-      window.open(bestieTag(product.productUrl, 'card'), '_blank', 'noopener');
+      // Navigate the CURRENT tab to the product page — the e-commerce norm
+      // (keep the shopping flow in one tab, don't spawn a new one). The click
+      // beacon above uses keepalive:true so it still lands during the unload,
+      // and the widget restores its conversation on the destination page.
+      window.location.href = bestieTag(product.productUrl, 'card');
     }
   }
 
@@ -1808,7 +1812,9 @@
         var trackAttr = isProductLink
           ? ' onclick="try{window.__ibotInlineProductClick&&window.__ibotInlineProductClick(this.href)}catch(e){}"'
           : '';
-        return '<a href="' + escapeHtml(href) + '" target="_blank" rel="noopener"' + trackAttr +
+        // Product links navigate the CURRENT tab (e-commerce norm, same as the
+        // cards); other links (contact, external references) still open a new tab.
+        return '<a href="' + escapeHtml(href) + '" rel="noopener"' + (isProductLink ? '' : ' target="_blank"') + trackAttr +
           ' style="color:' + linkColor + ';text-decoration:underline;' +
           'text-underline-offset:2px;font-weight:500;">' + t + '</a>';
       });
