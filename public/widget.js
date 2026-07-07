@@ -1196,7 +1196,7 @@
     container.innerHTML =
       '<div id="ibot-trigger" style="' +
       'width:60px;height:60px;cursor:pointer;' +
-      'transition:transform 0.25s ease, opacity 0.25s ease;animation:ibot-slide-up 0.35s ease-out;' +
+      'transition:transform 0.3s ease, opacity 0.25s ease;animation:ibot-slide-up 0.35s ease-out;' +
       'border-radius:50%;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.1);">' +
       avatarHtml(60) +
       '</div>';
