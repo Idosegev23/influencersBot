@@ -74,9 +74,19 @@ export async function createQuote(input: CreateQuoteInput): Promise<CreateQuoteR
     .single();
   if (pErr || !partnership) throw new Error(pErr?.message || 'failed to create partnership');
 
+  // 2) generate the quote document + signature request for the new partnership
+  return issueQuote(partnership.id, input);
+}
+
+/**
+ * Generate the quote PDF + signature request for an EXISTING partnership.
+ * Reused by createQuote (auto path) and by the brief-pricing "send" flow, where
+ * the partnership + priced line items are created first, then the quote issued.
+ */
+export async function issueQuote(partnershipId: string, input: CreateQuoteInput): Promise<CreateQuoteResult> {
   const title = input.title || `הצעת מחיר${input.brandName ? ` — ${input.brandName}` : ''}`;
 
-  // 2) quote PDF — reuse a forwarded PDF if present, else generate
+  // quote PDF — reuse a forwarded PDF if present, else generate
   let pdfBytes: Uint8Array;
   if (input.originalPdf && (!input.originalMime || input.originalMime === 'application/pdf')) {
     pdfBytes = input.originalPdf;
@@ -96,16 +106,16 @@ export async function createQuote(input: CreateQuoteInput): Promise<CreateQuoteR
     });
   }
 
-  // 3) upload to private bucket
-  const docPath = `quotes/${partnership.id}.pdf`;
+  // upload to private bucket
+  const docPath = `quotes/${partnershipId}.pdf`;
   const { error: upErr } = await supabaseAdmin.storage
     .from(BUCKET)
     .upload(docPath, Buffer.from(pdfBytes), { contentType: 'application/pdf', upsert: true });
   if (upErr) throw new Error(`upload failed: ${upErr.message}`);
 
-  // 4) partnership_documents record
+  // partnership_documents record
   await supabaseAdmin.from('partnership_documents').insert({
-    partnership_id: partnership.id,
+    partnership_id: partnershipId,
     account_id: input.accountId,
     filename: `${title}.pdf`,
     mime_type: 'application/pdf',
@@ -115,13 +125,13 @@ export async function createQuote(input: CreateQuoteInput): Promise<CreateQuoteR
     parsed_data: input.parsedData || null,
   });
 
-  // 5) signature request
+  // signature request
   const token = randomBytes(18).toString('base64url');
   const { data: sig, error: sErr } = await supabaseAdmin
     .from('signature_requests')
     .insert({
       token,
-      partnership_id: partnership.id,
+      partnership_id: partnershipId,
       account_id: input.accountId,
       agent_id: input.agentId,
       title,
@@ -135,7 +145,7 @@ export async function createQuote(input: CreateQuoteInput): Promise<CreateQuoteR
   if (sErr || !sig) throw new Error(sErr?.message || 'failed to create signature request');
 
   return {
-    partnershipId: partnership.id,
+    partnershipId,
     signatureRequestId: sig.id,
     token: sig.token,
     signUrl: signUrlFor(sig.token),
