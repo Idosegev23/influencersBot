@@ -1931,6 +1931,60 @@
     return ctx;
   }
 
+  // Multi-strategy add-to-cart detection for SPA stores (QuickShop = Next.js, no /cart.js).
+  // Heuristics + optional per-account overrides from config.cartWatcher. Best-effort.
+  function initCartWatcher(onAdd) {
+    var cw = (config.cartWatcher || {});
+    var fire = function () {
+      try {
+        var pc = (typeof extractPageContext === 'function') ? extractPageContext() : { product: null, cart: null };
+        var added = pc.product || null;
+        behaviorTrack('cart_change', { added_product: added ? { name: added.name, price: added.price, sku: added.sku } : null, value: pc.cart ? pc.cart.total : null });
+        if (onAdd) onAdd(added);
+      } catch (e) { /* never break host page */ }
+    };
+    // (a) Delegated click on add-to-cart controls.
+    try {
+      document.addEventListener('click', function (e) {
+        var el = e.target;
+        for (var i = 0; el && i < 5; i++, el = el.parentElement) {
+          var sel = cw.addToCartSelector;
+          var match = sel ? (el.matches && el.matches(sel)) :
+            ((el.getAttribute && (/(add[-_ ]?to[-_ ]?cart|הוסף|לסל|לעגלה)/i).test((el.getAttribute('class') || '') + ' ' + (el.textContent || '').slice(0, 40))));
+          if (match) { setTimeout(fire, 600); break; }  // let the SPA update the cart first
+        }
+      }, true);
+    } catch (e) { /* */ }
+    // (b) MutationObserver on the cart-count element.
+    try {
+      var countEl = cw.cartCountSelector ? document.querySelector(cw.cartCountSelector) : null;
+      if (countEl && window.MutationObserver) {
+        var last = (countEl.textContent || '').trim();
+        new MutationObserver(function () {
+          var now = (countEl.textContent || '').trim();
+          if (now !== last && (parseInt(now, 10) || 0) > (parseInt(last, 10) || 0)) fire();
+          last = now;
+        }).observe(countEl, { childList: true, characterData: true, subtree: true });
+      }
+    } catch (e) { /* */ }
+    // (c) localStorage cart diff (poll every 2s; low cost).
+    try {
+      var key = cw.cartStorageKey || null;
+      var readCount = function () {
+        try {
+          var raw = key ? localStorage.getItem(key) : null;
+          if (!key) { for (var k = 0; k < localStorage.length; k++) { var kk = localStorage.key(k); if (kk && /cart/i.test(kk)) { raw = localStorage.getItem(kk); break; } } }
+          if (!raw) return 0;
+          var v = JSON.parse(raw);
+          var items = v.items || v.lines || v.products || (Array.isArray(v) ? v : []);
+          return Array.isArray(items) ? items.length : 0;
+        } catch (e) { return 0; }
+      };
+      var lastCount = readCount();
+      setInterval(function () { var c = readCount(); if (c > lastCount) fire(); lastCount = c; }, 2000);
+    } catch (e) { /* */ }
+  }
+
   // ============================================
   // Support form — view + submit + success states.
   // ============================================
