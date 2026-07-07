@@ -1099,7 +1099,7 @@
   // Small "new conversation" pill (welcome state, absolute top-right).
   function newChatBtnHtml() {
     return '<button onclick="window.__ibotNewChat()" title="' + escapeHtml(wlbl('שיחה חדשה','New chat')) + '" ' +
-      'style="position:absolute;top:10px;right:12px;z-index:6;background:rgba(255,255,255,0.92);border:1px solid var(--ibot-border);' +
+      'style="position:absolute;top:calc(10px + env(safe-area-inset-top));right:12px;z-index:6;background:rgba(255,255,255,0.92);border:1px solid var(--ibot-border);' +
       'color:#333;border-radius:999px;cursor:pointer;display:flex;align-items:center;gap:5px;font-family:inherit;font-size:12px;padding:5px 10px;line-height:1;">' +
       newChatIconSvg(13) +
       '<span>' + escapeHtml(wlbl('שיחה חדשה','New chat')) + '</span></button>';
@@ -1126,16 +1126,16 @@
         : 'background:var(--ibot-panel-bg);';
       return '<div style="position:relative;flex-shrink:0;' + radius + 'overflow:hidden;">' +
         newChatBtnHtml() +
-        '<div style="position:absolute;top:12px;left:14px;z-index:6;display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.85);padding:3px 8px;border-radius:999px;font-size:11.5px;color:#15803d;">' +
+        '<div style="position:absolute;top:calc(12px + env(safe-area-inset-top));left:14px;z-index:6;display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.85);padding:3px 8px;border-radius:999px;font-size:11.5px;color:#15803d;">' +
         '<span style="width:7px;height:7px;border-radius:50%;background:#22c55e;"></span>' + escapeHtml(locale.status) + '</div>' +
         '<div style="height:' + (isMobile ? '132px' : '112px') + ';position:relative;' + coverBg + '"><div style="position:absolute;left:0;right:0;bottom:0;height:46px;background:linear-gradient(to bottom,transparent,var(--ibot-panel-bg));"></div></div>' +
         '<div style="width:84px;height:84px;margin:-42px auto 0;border-radius:50%;border:4px solid var(--ibot-panel-bg);overflow:hidden;position:relative;z-index:2;box-shadow:0 4px 14px rgba(0,0,0,0.12);">' + avatarHtml(84) + '</div>' +
         '<div style="text-align:center;font-weight:800;font-size:20px;color:var(--ibot-text-primary);margin:9px 12px 2px;">' + escapeHtml(config.brandName) + '</div>' +
         socialRowHtml() +
-        (isMobile ? '<button id="ibot-close-mobile" style="position:absolute;top:10px;left:54px;background:rgba(0,0,0,0.32);border:none;color:#fff;cursor:pointer;width:30px;height:30px;border-radius:50%;font-size:18px;display:flex;align-items:center;justify-content:center;z-index:6;">&times;</button>' : '') +
+        (isMobile ? '<button id="ibot-close-mobile" style="position:absolute;top:calc(10px + env(safe-area-inset-top));left:54px;background:rgba(0,0,0,0.32);border:none;color:#fff;cursor:pointer;width:30px;height:30px;border-radius:50%;font-size:18px;display:flex;align-items:center;justify-content:center;z-index:6;">&times;</button>' : '') +
         '</div>';
     }
-    return '<div style="display:flex;align-items:center;gap:10px;padding:0 12px;height:62px;flex-shrink:0;position:relative;z-index:2;' +
+    return '<div style="display:flex;align-items:center;gap:10px;padding:env(safe-area-inset-top) 12px 0;height:62px;flex-shrink:0;position:relative;z-index:2;' +
       'background:var(--ibot-surface);border-bottom:1px solid var(--ibot-border);' + radius + '">' +
       '<div style="width:40px;height:40px;flex-shrink:0;border-radius:50%;overflow:hidden;">' + avatarHtml(40) + '</div>' +
       '<div style="flex:1;min-width:0;">' +
