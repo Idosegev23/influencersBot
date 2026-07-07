@@ -897,13 +897,14 @@
   // ~88% of the dynamic viewport height so a strip of the (dimmed) site shows above.
   function mobilePanelStyle() {
     return 'position:fixed;left:0;right:0;bottom:0;top:auto;width:100%;height:88dvh;' +
-      'max-height:92dvh;border-radius:20px 20px 0 0;';
+      'max-height:92dvh;border-radius:20px 20px 0 0;z-index:1;';
   }
 
   // Dimmed backdrop behind the mobile bottom sheet. Sits under #ibot-panel
-  // (container z-index:2147483647 wraps both; backdrop is one below the panel).
+  // (panel has z-index:1; backdrop stays at the default z-index:auto so it
+  // paints beneath the panel regardless of DOM order).
   function mobileBackdropHtml() {
-    return '<div id="ibot-backdrop" style="position:fixed;inset:0;z-index:2147483646;' +
+    return '<div id="ibot-backdrop" style="position:fixed;inset:0;' +
       'background:rgba(0,0,0,0.45);animation:ibot-fade-in 0.28s ease-out;"></div>';
   }
 
@@ -1101,6 +1102,7 @@
   // sequence the close buttons already use.
   function closeWidget() {
     isOpen = false;
+    view = 'chat';
     widgetTrack('widget_closed', { msg_count: messages.length });
     render();
   }
