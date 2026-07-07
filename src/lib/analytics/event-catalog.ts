@@ -82,6 +82,8 @@ export const EVENT_CATALOG: Record<string, EventDef> = {
   widget_action_proposed: { category: 'engagement', surface: 'widget' },
   widget_action_confirmed: { category: 'engagement', surface: 'widget' },
   widget_action_dismissed: { category: 'engagement', surface: 'widget' },
+  // Widget — brand-personalized bubble tooltip (mobile-only, once per visitor)
+  widget_tooltip_shown: { category: 'engagement', surface: 'widget' },
   widget_navigate_confirmed: { category: 'navigation', surface: 'widget' },
   // Widget — support module
   widget_support_opened: { category: 'engagement', surface: 'widget' },

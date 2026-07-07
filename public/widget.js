@@ -940,6 +940,7 @@
           .catch(function () { /* fail silently — keep welcome */ });
       }
       render();
+      setTimeout(function () { try { showBubbleTooltip(); } catch (e) {} }, 2500);
       try { initCartWatcher(onCartAdd); } catch (e) { /* */ }
     })
     .catch(function () {
@@ -1246,6 +1247,35 @@
     }
   }
 
+  // ---- Brand-personalized bubble tooltip (mobile-only, once per visitor) ----
+  var TIP_KEY = 'ibot_tip_' + ACCOUNT_ID;
+  function tooltipSeen() { try { return localStorage.getItem(TIP_KEY) === '1'; } catch (e) { return true; } }
+  function markTooltipSeen() { try { localStorage.setItem(TIP_KEY, '1'); } catch (e) { /* */ } }
+  window.__ibotTipDismiss = function () {
+    markTooltipSeen();
+    var el = document.getElementById('ibot-tip'); if (el && el.parentNode) el.parentNode.removeChild(el);
+  };
+  function showBubbleTooltip() {
+    try {
+      if (window.innerWidth >= 640) return;          // mobile-only per spec
+      if (!config.tooltip || !config.tooltip.text) return;
+      if (isOpen || tooltipSeen()) return;
+      if (document.getElementById('ibot-tip')) return;
+      var side = (config.position === 'bottom-left') ? 'left:20px;' : 'right:20px;';
+      var el = document.createElement('div');
+      el.id = 'ibot-tip';
+      el.style.cssText = 'position:fixed;z-index:2147483646;bottom:calc(84px + env(safe-area-inset-bottom));' + side +
+        'max-width:min(72vw,260px);background:var(--ibot-panel-bg,#fff);color:var(--ibot-text-primary,#111);' +
+        'border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,0.18);padding:10px 12px;font-size:13.5px;line-height:1.35;' +
+        'direction:' + locale.dir + ';animation:ibot-slide-up 0.3s ease-out;display:flex;gap:8px;align-items:flex-start;';
+      el.innerHTML = '<span style="flex:1;min-width:0;">' + escapeHtml(config.tooltip.text) + '</span>' +
+        '<button onclick="window.__ibotTipDismiss()" aria-label="close" style="background:transparent;border:none;color:var(--ibot-text-muted,#888);cursor:pointer;font-size:16px;line-height:1;flex-shrink:0;">&times;</button>';
+      document.body.appendChild(el);
+      widgetTrack('widget_tooltip_shown', {});
+      setTimeout(function () { try { window.__ibotTipDismiss(); } catch (e) {} }, 6000);
+    } catch (e) { /* never break host page */ }
+  }
+
   // ---- Closed state: blob only ----
   function renderClosed() {
     container.innerHTML =
@@ -1259,6 +1289,7 @@
     var trigger = document.getElementById('ibot-trigger');
     trigger.onclick = function () {
       isOpen = true;
+      try { markTooltipSeen(); } catch (e) {}
       widgetTrack('widget_opened', {});
       render();
     };
