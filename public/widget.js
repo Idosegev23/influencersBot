@@ -885,6 +885,25 @@
   updateContainerPosition();
   document.body.appendChild(container);
 
+  // Keyboard handling: when the on-screen keyboard opens, visualViewport shrinks.
+  // Resize the open mobile sheet to the visible height so the input bar stays
+  // above the keyboard instead of being covered. Registered once.
+  if (window.visualViewport && !window.__ibotVVBound) {
+    window.__ibotVVBound = true;
+    var applyVV = function () {
+      var panel = document.getElementById('ibot-panel');
+      if (!panel || !isOpen || window.innerWidth >= 640) return;
+      var vh = window.visualViewport.height;
+      // Cap at 92% of the visible viewport; anchor to the bottom of it.
+      panel.style.height = Math.round(vh * 0.92) + 'px';
+      panel.style.bottom = Math.round(window.innerHeight - vh - window.visualViewport.offsetTop) + 'px';
+      var msgs = document.getElementById('ibot-messages');
+      if (msgs) msgs.scrollTop = msgs.scrollHeight;
+    };
+    window.visualViewport.addEventListener('resize', applyVV);
+    window.visualViewport.addEventListener('scroll', applyVV);
+  }
+
   function updateContainerPosition() {
     container.style.cssText = 'position:fixed;z-index:2147483647;' +
       (config.position === 'bottom-left'
@@ -1112,6 +1131,11 @@
   // (Keyboard is added in a later task to this same function.)
   function attachSheetBehaviors() {
     if (window.innerWidth >= 640 || !isOpen) return;
+    // Clear any stale inline height/bottom left over from a prior visualViewport
+    // (keyboard-open) resize so a fresh render starts from the CSS 88dvh; the
+    // visualViewport handler only overrides these while the keyboard is up.
+    var p0 = document.getElementById('ibot-panel');
+    if (p0) { p0.style.height = ''; p0.style.bottom = ''; }
     var bd = document.getElementById('ibot-backdrop');
     if (bd) bd.onclick = function () { closeWidget(); };
 
