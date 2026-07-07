@@ -29,10 +29,15 @@ export default function SignClient(props: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ signed_at: string; signed_url: string } | null>(null);
+  const [showReq, setShowReq] = useState(false);
+  const [changeNotes, setChangeNotes] = useState('');
+  const [reqSubmitting, setReqSubmitting] = useState(false);
+  const [reqDone, setReqDone] = useState(false);
 
   if (props.status === 'signed') return <AlreadySigned {...props} />;
   if (props.status === 'expired' || props.status === 'cancelled') return <Expired status={props.status} />;
   if (done) return <ThankYou title={props.title} signedAt={done.signed_at} signedUrl={done.signed_url} />;
+  if (reqDone) return <ChangeRequested title={props.title} />;
 
   const submit = async () => {
     setError(null);
@@ -75,6 +80,28 @@ export default function SignClient(props: Props) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const requestChange = async () => {
+    setError(null);
+    if (!changeNotes.trim()) return setError('פרט/י מה תרצה/י לשנות בהצעה');
+    setReqSubmitting(true);
+    try {
+      const res = await fetch(`/api/signatures/${props.token}/request-change`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: changeNotes.trim() }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || `HTTP ${res.status}`);
+      }
+      setReqDone(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setReqSubmitting(false);
     }
   };
 
@@ -175,6 +202,30 @@ export default function SignClient(props: Props) {
             style={{ background: PURPLE }}>
             {submitting ? 'שולח חתימה…' : 'חתום ושלח ←'}
           </button>
+
+          {/* Return the quote for edits instead of signing */}
+          <div className="mt-2 border-t border-stone-200 pt-4">
+            {!showReq ? (
+              <button type="button" onClick={() => setShowReq(true)}
+                className="text-[13px] text-stone-500 hover:text-[color:var(--p)] font-medium underline underline-offset-2">
+                לא מסכים/ה על משהו? בקש/י שינוי בהצעה
+              </button>
+            ) : (
+              <div className="grid gap-2">
+                <span className="text-[10px] tracking-[0.28em] uppercase text-stone-400 font-medium">בקשת שינוי</span>
+                <textarea rows={3} value={changeNotes} onChange={(e) => setChangeNotes(e.target.value)}
+                  placeholder="למשל: נא להוריד סטורי אחד / המחיר גבוה מדי, אפשר להוזיל?"
+                  className={inputCls} />
+                <div className="flex items-center gap-3">
+                  <button type="button" disabled={reqSubmitting} onClick={requestChange}
+                    className="inline-flex items-center justify-center rounded-full px-6 py-2.5 text-[14px] font-semibold ring-1 ring-stone-300 text-stone-700 hover:bg-stone-100 disabled:opacity-50">
+                    {reqSubmitting ? 'שולח…' : 'שלח בקשת שינוי'}
+                  </button>
+                  <button type="button" onClick={() => setShowReq(false)} className="text-[13px] text-stone-400 hover:text-stone-600">ביטול</button>
+                </div>
+              </div>
+            )}
+          </div>
         </section>
 
         <footer className="text-center py-10 text-[10px] tracking-[0.28em] uppercase text-stone-300 font-medium">
@@ -310,6 +361,19 @@ function AlreadySigned(props: Props) {
             צפה בעותק החתום ←
           </a>
         )}
+      </div>
+    </div>
+  );
+}
+
+function ChangeRequested({ title }: { title: string }) {
+  return (
+    <div dir="rtl" className="min-h-screen bg-stone-50 text-stone-900 flex items-center justify-center px-6">
+      <div className="max-w-lg text-center">
+        <h1 className="text-[30px] font-bold tracking-tight mb-3">בקשת השינוי נשלחה.</h1>
+        <p className="text-[14px] text-stone-500 leading-relaxed">
+          הסוכן קיבל את הערותיך על "{title}" ויחזור אליך עם הצעה מעודכנת.
+        </p>
       </div>
     </div>
   );

@@ -92,5 +92,29 @@ export async function GET(req: NextRequest) {
     paymentChased++;
   }
 
-  return NextResponse.json({ ok: true, markedOverdue, uploadChased, paymentChased });
+  // 3) Unsigned-quote follow-up (3-day cadence, cap 5) — nudge the agent to chase the client.
+  const cutoff3d = new Date(now - 3 * 24 * 3600 * 1000).toISOString();
+  let quoteChased = 0;
+  const { data: pendingQuotes } = await supabaseAdmin
+    .from('signature_requests')
+    .select('id, agent_id, title, last_reminder_at, reminder_count, partnerships(brand_name)')
+    .eq('status', 'pending')
+    .lt('created_at', cutoff3d)
+    .lt('reminder_count', 5);
+  for (const s of pendingQuotes || []) {
+    if (!s.agent_id) continue;
+    if (s.last_reminder_at && s.last_reminder_at > cutoff3d) continue; // 3-day cadence
+    const brand = (s as any).partnerships?.brand_name || s.title || 'הצעה';
+    await notifyAgent(s.agent_id, {
+      subject: `⏰ הצעה ממתינה לחתימה — ${brand}`,
+      text: `ההצעה "${brand}" נשלחה מעל 3 ימים ועדיין לא נחתמה. שווה follow-up ללקוח. (תזכורת ${(s.reminder_count || 0) + 1})`,
+    });
+    await supabaseAdmin
+      .from('signature_requests')
+      .update({ last_reminder_at: new Date().toISOString(), reminder_count: (s.reminder_count || 0) + 1 })
+      .eq('id', s.id);
+    quoteChased++;
+  }
+
+  return NextResponse.json({ ok: true, markedOverdue, uploadChased, paymentChased, quoteChased });
 }

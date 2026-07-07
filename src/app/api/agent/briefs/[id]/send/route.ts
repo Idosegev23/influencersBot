@@ -20,7 +20,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { data: b } = await supabaseAdmin.from('crm_inbound_messages').select('*').eq('id', id).maybeSingle();
   if (!b) return NextResponse.json({ error: 'not found' }, { status: 404 });
   if (b.agent_id !== agent.id) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
-  if (b.deal_id) return NextResponse.json({ error: 'כבר נשלחה הצעה מהבריף הזה' }, { status: 409 });
+  // A brief with an existing deal_id is an EDIT/RESEND (e.g. after the client
+  // returned it for changes) — the deal is updated in place below.
 
   const body = await req.json().catch(() => ({} as any));
   const accountId = String(body?.account_id ?? '');
@@ -43,30 +44,57 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const clientName = (acct?.config as any)?.display_name || (acct?.config as any)?.username || null;
   const deliverables = lineItemsToDeliverables(items);
 
-  // 1) create the deal (partnership)
-  const { data: partnership, error: pErr } = await supabaseAdmin
-    .from('partnerships')
-    .insert({
-      account_id: accountId,
-      agent_id: agent.id,
-      brand_name: brandName,
-      brand_contact_name: parsed?.contactPerson?.name || null,
-      brand_contact_email: parsed?.contactPerson?.email || null,
-      brand_contact_phone: parsed?.contactPerson?.phone || null,
-      status: 'proposal',
-      proposal_amount: totals.total,
-      currency: 'ILS',
-      brief: b.raw_text || null,
-      deliverables: deliverables.length ? deliverables : null,
-      proposal_date: new Date().toISOString().slice(0, 10),
-    })
-    .select('id')
-    .single();
-  if (pErr || !partnership) return NextResponse.json({ error: pErr?.message || 'יצירת העסקה נכשלה' }, { status: 500 });
+  // 1) create the deal — or update it in place on an edit/resend
+  const existingDealId = (b.deal_id as string | null) || null;
+  let partnershipId: string;
+
+  if (existingDealId) {
+    await supabaseAdmin
+      .from('partnerships')
+      .update({
+        account_id: accountId,
+        brand_name: brandName,
+        status: 'proposal',
+        proposal_amount: totals.total,
+        deliverables: deliverables.length ? deliverables : null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existingDealId)
+      .eq('agent_id', agent.id);
+    // replace old line items + cancel the returned-for-edit signature
+    await supabaseAdmin.from('deal_line_items').delete().eq('partnership_id', existingDealId);
+    await supabaseAdmin
+      .from('signature_requests')
+      .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+      .eq('partnership_id', existingDealId)
+      .eq('status', 'pending');
+    partnershipId = existingDealId;
+  } else {
+    const { data: partnership, error: pErr } = await supabaseAdmin
+      .from('partnerships')
+      .insert({
+        account_id: accountId,
+        agent_id: agent.id,
+        brand_name: brandName,
+        brand_contact_name: parsed?.contactPerson?.name || null,
+        brand_contact_email: parsed?.contactPerson?.email || null,
+        brand_contact_phone: parsed?.contactPerson?.phone || null,
+        status: 'proposal',
+        proposal_amount: totals.total,
+        currency: 'ILS',
+        brief: b.raw_text || null,
+        deliverables: deliverables.length ? deliverables : null,
+        proposal_date: new Date().toISOString().slice(0, 10),
+      })
+      .select('id')
+      .single();
+    if (pErr || !partnership) return NextResponse.json({ error: pErr?.message || 'יצירת העסקה נכשלה' }, { status: 500 });
+    partnershipId = partnership.id;
+  }
 
   // 2) persist priced line items
   const rows = items.map((li, i) => ({
-    partnership_id: partnership.id,
+    partnership_id: partnershipId,
     account_id: accountId,
     platform: li?.platform || null,
     deliverable_type: li?.deliverable_type || null,
@@ -81,7 +109,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // 3) issue the quote (PDF + signature) for this partnership
   let result;
   try {
-    result = await issueQuote(partnership.id, {
+    result = await issueQuote(partnershipId, {
       agentId: agent.id,
       accountId,
       brandName,
@@ -105,13 +133,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   await supabaseAdmin
     .from('crm_inbound_messages')
     .update({
-      deal_id: partnership.id,
-      partnership_id: partnership.id,
+      deal_id: partnershipId,
+      partnership_id: partnershipId,
       signature_request_id: result.signatureRequestId,
       suggested_account_id: accountId,
       brief_status: 'sent',
     })
     .eq('id', id);
 
-  return NextResponse.json({ success: true, signUrl: result.signUrl, partnershipId: partnership.id, totals });
+  return NextResponse.json({ success: true, signUrl: result.signUrl, partnershipId, totals });
 }

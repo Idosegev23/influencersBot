@@ -108,6 +108,11 @@ export default function BriefPricingPage() {
             סכום שזוהה בבריף: ~{Number(brief.amount).toLocaleString('en-US')} ₪ (לאימות ותמחור ידני)
           </p>
         ) : null}
+        {brief.edit_notes && (
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+            <span className="font-semibold">הלקוח ביקש שינוי:</span> {brief.edit_notes}
+          </div>
+        )}
       </div>
 
       <div className="rounded-xl border border-[color:var(--line)] bg-[color:var(--surface-0)] p-4 space-y-2">

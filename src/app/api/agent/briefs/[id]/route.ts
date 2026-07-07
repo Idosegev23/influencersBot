@@ -44,6 +44,35 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     roster = (accts || []).map((a: any) => ({ id: a.id, name: a.config?.display_name || a.config?.username || 'ללא שם' }));
   }
 
+  // On an edit (deal already exists), seed from the saved line items + surface
+  // the client's change request; otherwise seed from the parsed deliverables.
+  let seed = seedLineItems(parsed);
+  let editNotes: string | null = null;
+  if (b.deal_id) {
+    const { data: existing } = await supabaseAdmin
+      .from('deal_line_items')
+      .select('platform, deliverable_type, qty, unit_price, notes')
+      .eq('partnership_id', b.deal_id)
+      .order('sort_order', { ascending: true });
+    if (existing && existing.length) {
+      seed = existing.map((x: any) => ({
+        platform: x.platform || '',
+        deliverable_type: x.deliverable_type || '',
+        qty: x.qty || 1,
+        unit_price: Number(x.unit_price) || 0,
+        notes: x.notes || '',
+      }));
+    }
+    const { data: sig } = await supabaseAdmin
+      .from('signature_requests')
+      .select('edit_notes, returned_for_edit')
+      .eq('partnership_id', b.deal_id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    editNotes = sig?.returned_for_edit ? sig.edit_notes || null : null;
+  }
+
   return NextResponse.json({
     brief: {
       id: b.id,
@@ -54,11 +83,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       suggested_account_id: b.suggested_account_id,
       status: b.brief_status,
       deal_id: b.deal_id,
+      edit_notes: editNotes,
       brand_contact_name: parsed?.contactPerson?.name || null,
       brand_contact_email: parsed?.contactPerson?.email || null,
       brand_contact_phone: parsed?.contactPerson?.phone || null,
     },
     roster,
-    seed_line_items: seedLineItems(parsed),
+    seed_line_items: seed,
   });
 }
