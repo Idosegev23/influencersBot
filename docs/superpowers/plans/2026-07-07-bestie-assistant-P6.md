@@ -1,1307 +1,1087 @@
-## P6 — Proactivity Engine & Anti-Nag — Bite-Sized TDD Plan
+_# Phase P6 — Proactivity Engine & Anti-Nag (TDD, bite-sized)
 
-**Global invariants honored throughout:** Planner proposes / Executor decides (proactivity is a *deterministic* Executor-side scheduler — NO LLM in the send decision); the digest is composed deterministically by `composeDigest` (slot-filling, not generation) so it is testable + cheap; all money shown comes from `computeTotals`/persisted deal totals, never re-derived by an LLM; **the assistant only ever messages the AGENT** (every proactive send targets `users.whatsapp`, never a client/talent — there is no external recipient path in this phase); anti-nag is deliverability-survival; every send is gated by the `proactive_messages.dedup_key` UNIQUE index BEFORE the Meta call; every proactive row is written to the ledger BEFORE composing/sending.
+Generalizes the account-centric `crm-reminders` cron + the single `crm_agent_wa_state` row into an **event-sourced outbox → gated ledger → one-batched-digest** pipeline that talks ONLY to the agent (Principle 5), survives Meta at-least-once refire (idempotent triggers), and never sends in quiet hours / Shabbat (hard KPI). Every anti-nag decision is a **pure function taking an injected `nowMs`** so §14 scheduler invariants run with a simulated clock and no LLM.
 
-**TDD shape:** pure scheduler + composer + template + dismissal logic are dependency-free and vitest-tested with a *simulated clock* (matches `src/lib/crm/wa-interpret.ts` + `tests/unit/crm-wa-interpret.test.ts`). DB orchestration is written with injected deps (`ProactivityDeps`) so the worker/digest/shadow logic is unit-tested with fakes; migrations are applied via `mcp__supabase__apply_migration` and verified with `mcp__supabase__execute_sql` round-trips.
+**Global invariants honored:** digest READS stored totals (never recomputes VAT — money math stays in Executor via `computeTotals`); untrusted DB strings (brand names) are DATA in the digest, never instructions; conservative default (`proactivity_optin=false`) + explicit opt-in gates ALL sends; log to `assistant_actions` before composing reply; service-window gate on every proactive send.
 
-Migrations are numbered `066`–`069` here; **at apply time renumber to the next contiguous free integers after P1–P5 land** (P1 owns 061). Commit after every task, atomic, with trailer:
-`Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`
+Tests are FLAT under `tests/unit/` (repo convention, e.g. `crm-wa-interpret.test.ts`). Modules under `src/lib/assistant/`. Migrations continue from the assistant band (shown 069–071; **rebase to the next free numbers after P1–P5 land** — see open questions). Commit after every green task, atomic, with the trailer.
 
 ---
 
-### Task 1 — Migration: `assistant_events` outbox + `proactive_messages` ledger + `assistant_nag_policy` + `proactive_dismissal_counter`
+## Task 1 — `assistant_nag_policy` migration + Jerusalem clock + quiet-hours (PURE)
 
-**Files (create):** `supabase/migrations/066_assistant_proactivity.sql`
+**Files**
+- create `supabase/migrations/071_assistant_nag_policy.sql`
+- create `src/lib/assistant/proactivity.ts`
+- create `tests/unit/assistant-proactivity.test.ts`
 
-**Interfaces produced:** the four tables (schema below), the `dedup_key` UNIQUE guard, per-agent RLS (deny-all, service-role only — mirrors `052_crm_rls.sql`).
+**Interfaces produced**
+```ts
+export interface NagPolicy {
+  agent_id: string; tz: string;
+  quiet_start: string; quiet_end: string;      // 'HH:MM' local
+  daily_cap: number; digest_hour: number;      // local hour 0-23
+  shabbat_quiet: boolean; proactivity_optin: boolean; consent_at: string | null;
+}
+export function toJerusalem(nowMs: number): { dow: number; minutes: number }; // dow 0=Sun..6=Sat
+export function parseHhmm(s: string): number;
+export function isQuietHours(nowMs: number, p: NagPolicy): boolean;
+```
 
-1. **Failing check (schema round-trip).** Run via MCP to prove the tables are absent first:
-   `mcp__supabase__execute_sql({ query: "select to_regclass('public.proactive_messages') as t;" })` → expect `t = null` (fails the assertion "table exists").
-
-2. **Write the migration** (real SQL):
+**Step 1 — migration** (`071_assistant_nag_policy.sql`):
 ```sql
--- Migration 066: Assistant proactivity — outbox + anti-nag ledger + per-agent policy.
--- Service-role only (RLS deny-all, like 052_crm_rls). agency_id from P1 (061).
-
-create table if not exists public.assistant_events (
-  id            uuid primary key default gen_random_uuid(),
-  agent_id      uuid not null references public.users(id) on delete cascade,
-  agency_id     uuid,
-  event_type    text not null,          -- quote_signed|quote_returned|invoice_paid|contract_signed|invoice_overdue|signature_expiring
-  entity_type   text not null,          -- partnership|invoice|signature_request|contract
-  entity_id     uuid not null,
-  payload       jsonb not null default '{}'::jsonb,
-  created_at    timestamptz not null default now(),
-  processed_at  timestamptz,
-  process_result text
-);
-create index if not exists idx_assistant_events_unprocessed
-  on public.assistant_events (created_at) where processed_at is null;
-create index if not exists idx_assistant_events_agent on public.assistant_events (agent_id);
-
-create table if not exists public.proactive_messages (
-  id              uuid primary key default gen_random_uuid(),
-  agent_id        uuid not null references public.users(id) on delete cascade,
-  agency_id       uuid,
-  kind            text not null,        -- event_notify|daily_digest|reminder
-  source_event_id uuid references public.assistant_events(id) on delete set null,
-  dedup_key       text not null,
-  status          text not null default 'queued', -- queued|suppressed|scheduled|sent|failed|dismissed
-  suppressed_reason text,               -- quiet_hours|daily_cap|duplicate|learned_dismissal|no_template
-  payload         jsonb not null default '{}'::jsonb, -- free-form text + knock vars held until window opens
-  template_name   text,
-  scheduled_for   timestamptz,
-  wa_message_id   text,
-  sent_at         timestamptz,
-  delivered_at    timestamptz,
-  read_at         timestamptz,
-  dismissed_at    timestamptz,
-  created_at      timestamptz not null default now()
-);
--- The send guard AND the outbound double-send guard on retry (spec §5.3).
-create unique index if not exists uq_proactive_dedup on public.proactive_messages (dedup_key);
-create index if not exists idx_proactive_agent_status on public.proactive_messages (agent_id, status);
-
+-- Migration 071: per-agent anti-nag policy (Asia/Jerusalem quiet hours + Shabbat + caps + opt-in).
+-- Conservative default: proactivity_optin=false — NO proactive send until the owner opts the agent
+-- in at web onboarding (stores consent_at). Digest lands at digest_hour local; quiet window wraps midnight.
 create table if not exists public.assistant_nag_policy (
-  agent_id           uuid primary key references public.users(id) on delete cascade,
-  agency_id          uuid,
-  tz                 text not null default 'Asia/Jerusalem',
-  quiet_start        text not null default '21:00',
-  quiet_end          text not null default '08:00',
-  daily_cap          int  not null default 3,
-  digest_hour        text not null default '09:00',
-  shabbat_quiet      boolean not null default true,
-  shabbat_start_hour int not null default 17,
-  shabbat_end_hour   int not null default 21,
-  proactivity_optin  boolean not null default false,   -- CONSERVATIVE default (spec §5.1)
-  consent_at         timestamptz,
-  updated_at         timestamptz not null default now()
+  agent_id uuid primary key references public.users(id) on delete cascade,
+  tz text not null default 'Asia/Jerusalem',
+  quiet_start text not null default '21:00',
+  quiet_end text not null default '08:00',
+  daily_cap int not null default 3,
+  digest_hour int not null default 9,
+  shabbat_quiet boolean not null default true,
+  proactivity_optin boolean not null default false,
+  consent_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
-
--- Dismissal learning counters per (agent,event_type). Feeds learnedDismissedEventTypes.
-create table if not exists public.proactive_dismissal_counter (
-  agent_id     uuid not null references public.users(id) on delete cascade,
-  event_type   text not null,
-  weak_count   int not null default 0,
-  strong_count int not null default 0,
-  demoted_to_digest boolean not null default false,
-  updated_at   timestamptz not null default now(),
-  primary key (agent_id, event_type)
-);
-
-alter table public.assistant_events            enable row level security;
-alter table public.proactive_messages          enable row level security;
-alter table public.assistant_nag_policy        enable row level security;
-alter table public.proactive_dismissal_counter enable row level security;
--- No policies = service-role only. Tenant isolation via agent_id/agency_id + assertAgentOwns in code.
+alter table public.assistant_nag_policy enable row level security; -- service-role only (defense-in-depth, §6.6)
 ```
+Apply: `mcp__supabase__apply_migration` name `071_assistant_nag_policy`. Verify with `mcp__supabase__list_tables`.
 
-3. **Apply:** `mcp__supabase__apply_migration({ name: '066_assistant_proactivity', query: <file contents> })`.
-
-4. **Run-to-pass (round-trip):**
-```
-mcp__supabase__execute_sql({ query:
-  "insert into public.assistant_nag_policy(agent_id) select id from public.users limit 1 returning agent_id, tz, daily_cap, proactivity_optin;" })
-```
-Expect one row with `tz='Asia/Jerusalem'`, `daily_cap=3`, `proactivity_optin=false`. Then delete it. Verify the dedup guard:
-```
-insert two proactive_messages with the SAME dedup_key → second insert must raise unique_violation on uq_proactive_dedup.
-```
-
-5. **Commit:** `feat(assistant): proactivity outbox, ledger, nag-policy, dismissal counters (066)`
-
----
-
-### Task 2 — Migration: DB triggers → outbox on status transitions
-
-**Files (create):** `supabase/migrations/067_assistant_event_triggers.sql`
-
-**Depends on real status values (verified in repo):** `signature_requests.status: pending→signed|cancelled`; `invoices.status: draft→sent→overdue→paid`; `contracts.status: draft→sent→signed`.
-
-1. **Failing check:** `mcp__supabase__execute_sql({ query: "select tgname from pg_trigger where tgname like 'trg_assistant_evt_%';" })` → expect 0 rows.
-
-2. **Write migration** (one generic emit fn + AFTER-UPDATE triggers; idempotent because the worker dedups downstream and re-fires are harmless):
-```sql
--- Migration 067: status-transition triggers populate the assistant_events outbox.
-create or replace function public.emit_assistant_event(
-  p_agent uuid, p_agency uuid, p_type text, p_etype text, p_eid uuid, p_payload jsonb
-) returns void language sql as $$
-  insert into public.assistant_events(agent_id, agency_id, event_type, entity_type, entity_id, payload)
-  select p_agent, p_agency, p_type, p_etype, p_eid, coalesce(p_payload,'{}'::jsonb)
-  where p_agent is not null;
-$$;
-
-create or replace function public.trg_sig_status() returns trigger language plpgsql as $$
-begin
-  if new.status is distinct from old.status then
-    if new.status = 'signed' then
-      perform public.emit_assistant_event(new.agent_id, null, 'quote_signed', 'signature_request', new.id,
-        jsonb_build_object('partnership_id', new.partnership_id));
-    elsif new.status = 'cancelled' then
-      perform public.emit_assistant_event(new.agent_id, null, 'quote_returned', 'signature_request', new.id,
-        jsonb_build_object('partnership_id', new.partnership_id));
-    end if;
-  end if;
-  return new;
-end $$;
-drop trigger if exists trg_assistant_evt_sig on public.signature_requests;
-create trigger trg_assistant_evt_sig after update on public.signature_requests
-  for each row execute function public.trg_sig_status();
-
-create or replace function public.trg_inv_status() returns trigger language plpgsql as $$
-begin
-  if new.status is distinct from old.status then
-    if new.status = 'paid' then
-      perform public.emit_assistant_event(new.agent_id, null, 'invoice_paid', 'invoice', new.id,
-        jsonb_build_object('partnership_id', new.partnership_id));
-    elsif new.status = 'overdue' then
-      perform public.emit_assistant_event(new.agent_id, null, 'invoice_overdue', 'invoice', new.id,
-        jsonb_build_object('partnership_id', new.partnership_id));
-    end if;
-  end if;
-  return new;
-end $$;
-drop trigger if exists trg_assistant_evt_inv on public.invoices;
-create trigger trg_assistant_evt_inv after update on public.invoices
-  for each row execute function public.trg_inv_status();
-
-create or replace function public.trg_contract_status() returns trigger language plpgsql as $$
-begin
-  if new.status is distinct from old.status and new.status = 'signed' then
-    perform public.emit_assistant_event(new.agent_id, null, 'contract_signed', 'contract', new.id,
-      jsonb_build_object('partnership_id', new.partnership_id));
-  end if;
-  return new;
-end $$;
-drop trigger if exists trg_assistant_evt_contract on public.contracts;
-create trigger trg_assistant_evt_contract after update on public.contracts
-  for each row execute function public.trg_contract_status();
-```
-> If `contracts.agent_id` does not exist, first run `select column_name from information_schema.columns where table_name='contracts';` and read `agent_id` via the partnership instead. Verify columns before applying.
-
-3. **Apply** via `mcp__supabase__apply_migration`.
-
-4. **Run-to-pass (behavioral, rolled back):**
-```
-mcp__supabase__execute_sql({ query:
-  "begin;
-   with pick as (select id, agent_id from public.signature_requests where status='pending' limit 1)
-   update public.signature_requests s set status='signed' from pick where s.id=pick.id;
-   select count(*) from public.assistant_events where event_type='quote_signed' and created_at > now()-interval '10 seconds';
-   rollback;" })
-```
-Expect count ≥ 1 (an outbox row was emitted). Rollback leaves prod state clean.
-
-5. **Commit:** `feat(assistant): status-transition triggers emit outbox events (067)`
-
----
-
-### Task 3 — Pure nag-policy time helpers (quiet hours, Shabbat, service window) — simulated clock
-
-**Files (create):** `src/lib/assistant/proactivity-policy.ts`, `tests/unit/assistant-proactivity-policy.test.ts`
-
-**Interfaces produced:** `NagPolicy`, `zonedParts`, `isQuietHours`, `isShabbat`, `withinServiceWindow`, `dayBucket`.
-
-1. **Failing test** (`tests/unit/assistant-proactivity-policy.test.ts`):
+**Step 2 — failing test** (`tests/unit/assistant-proactivity.test.ts`):
 ```ts
 import { describe, it, expect } from 'vitest';
-import { isQuietHours, isShabbat, withinServiceWindow, dayBucket, type NagPolicy } from '@/lib/assistant/proactivity-policy';
+import { toJerusalem, parseHhmm, isQuietHours, type NagPolicy } from '@/lib/assistant/proactivity';
 
-const P: NagPolicy = {
-  agent_id: 'a', agency_id: 'g', tz: 'Asia/Jerusalem',
-  quiet_start: '21:00', quiet_end: '08:00', daily_cap: 3, digest_hour: '09:00',
-  shabbat_quiet: true, shabbat_start_hour: 17, shabbat_end_hour: 21,
-  proactivity_optin: true, consent_at: null,
+const base: NagPolicy = {
+  agent_id: 'a', tz: 'Asia/Jerusalem', quiet_start: '21:00', quiet_end: '08:00',
+  daily_cap: 3, digest_hour: 9, shabbat_quiet: true, proactivity_optin: true, consent_at: '2026-01-01T00:00:00Z',
 };
-// Asia/Jerusalem is UTC+3 in July (DST).
+
+describe('toJerusalem (DST-correct via Intl)', () => {
+  it('winter UTC+2: 2026-01-16T14:00Z → Fri 16:00', () => {
+    expect(toJerusalem(Date.parse('2026-01-16T14:00:00Z'))).toEqual({ dow: 5, minutes: 16 * 60 });
+  });
+  it('summer UTC+3: 2026-07-17T05:00Z → Fri 08:00', () => {
+    expect(toJerusalem(Date.parse('2026-07-17T05:00:00Z'))).toEqual({ dow: 5, minutes: 8 * 60 });
+  });
+});
+
+describe('parseHhmm', () => {
+  it('converts to minutes', () => { expect(parseHhmm('08:30')).toBe(510); expect(parseHhmm('21:00')).toBe(1260); });
+});
+
 describe('isQuietHours (wraps midnight)', () => {
-  it('22:30 local is quiet', () => expect(isQuietHours(new Date('2026-07-08T19:30:00Z'), P)).toBe(true));   // 22:30 IL
-  it('09:00 local is not quiet', () => expect(isQuietHours(new Date('2026-07-08T06:00:00Z'), P)).toBe(false)); // 09:00 IL
-  it('07:00 local (before quiet_end) is quiet', () => expect(isQuietHours(new Date('2026-07-08T04:00:00Z'), P)).toBe(true)); // 07:00 IL
-});
-describe('isShabbat (conservative fixed window)', () => {
-  it('Friday 18:00 IL is Shabbat', () => expect(isShabbat(new Date('2026-07-10T15:00:00Z'), P)).toBe(true)); // Fri 18:00 IL
-  it('Friday 10:00 IL is not', () => expect(isShabbat(new Date('2026-07-10T07:00:00Z'), P)).toBe(false));
-  it('Saturday 20:00 IL is Shabbat', () => expect(isShabbat(new Date('2026-07-11T17:00:00Z'), P)).toBe(true)); // Sat 20:00 IL
-  it('Saturday 22:00 IL is not', () => expect(isShabbat(new Date('2026-07-11T19:00:00Z'), P)).toBe(false));
-  it('toggle off disables', () => expect(isShabbat(new Date('2026-07-10T15:00:00Z'), { ...P, shabbat_quiet: false })).toBe(false));
-});
-describe('withinServiceWindow', () => {
-  it('null → closed', () => expect(withinServiceWindow(new Date(), null)).toBe(false));
-  it('future expiry → open', () => expect(withinServiceWindow(new Date('2026-07-08T10:00:00Z'), '2026-07-08T20:00:00Z')).toBe(true));
-  it('past expiry → closed', () => expect(withinServiceWindow(new Date('2026-07-08T21:00:00Z'), '2026-07-08T20:00:00Z')).toBe(false));
-});
-describe('dayBucket', () => {
-  it('buckets by IL local date', () => expect(dayBucket(new Date('2026-07-08T22:30:00Z'), 'Asia/Jerusalem')).toBe('2026-07-09')); // 01:30 next day IL
+  it('22:00 local is quiet', () => { expect(isQuietHours(Date.parse('2026-01-15T20:00:00Z'), base)).toBe(true); });   // 22:00 IST
+  it('07:00 local is quiet', () => { expect(isQuietHours(Date.parse('2026-01-15T05:00:00Z'), base)).toBe(true); });   // 07:00 IST
+  it('08:30 local is NOT quiet', () => { expect(isQuietHours(Date.parse('2026-01-15T06:30:00Z'), base)).toBe(false); }); // 08:30 IST
+  it('start===end disables the window', () => {
+    expect(isQuietHours(Date.parse('2026-01-15T20:00:00Z'), { ...base, quiet_start: '00:00', quiet_end: '00:00' })).toBe(false);
+  });
 });
 ```
+Run-to-fail: `npx vitest run tests/unit/assistant-proactivity.test.ts`
 
-2. **Run-to-fail:** `npx vitest run tests/unit/assistant-proactivity-policy.test.ts` (module missing).
-
-3. **Minimal impl** (dependency-free; `Intl` for TZ correctness):
+**Step 3 — minimal impl** (`src/lib/assistant/proactivity.ts`):
 ```ts
-export type SuppressReason = 'quiet_hours' | 'daily_cap' | 'duplicate' | 'learned_dismissal' | 'no_template';
-export type ProactiveKind = 'event_notify' | 'daily_digest' | 'reminder';
-
+/**
+ * Anti-nag PURE helpers — every decision takes an injected `nowMs` so §14 scheduler
+ * invariants run with a simulated clock (no Date.now(), no LLM, no DB). Asia/Jerusalem
+ * wall-clock is derived DST-correctly via Intl. Dependency-free + fully unit-tested.
+ */
 export interface NagPolicy {
-  agent_id: string; agency_id: string | null; tz: string;
-  quiet_start: string; quiet_end: string; daily_cap: number; digest_hour: string;
-  shabbat_quiet: boolean; shabbat_start_hour: number; shabbat_end_hour: number;
-  proactivity_optin: boolean; consent_at: string | null;
+  agent_id: string; tz: string;
+  quiet_start: string; quiet_end: string;
+  daily_cap: number; digest_hour: number;
+  shabbat_quiet: boolean; proactivity_optin: boolean; consent_at: string | null;
 }
 
-const WD: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+const DOW: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
 
-export function zonedParts(now: Date, tz: string) {
+export function toJerusalem(nowMs: number): { dow: number; minutes: number } {
   const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: tz, weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
-  }).formatToParts(now);
-  const get = (t: string) => parts.find((p) => p.type === t)?.value || '';
-  const hour = parseInt(get('hour'), 10) % 24;
-  const minute = parseInt(get('minute'), 10);
-  return { dow: WD[get('weekday')] ?? 0, hour, minute, minutesOfDay: hour * 60 + minute };
+    timeZone: 'Asia/Jerusalem', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(new Date(nowMs));
+  const wd = parts.find((p) => p.type === 'weekday')!.value;
+  let hh = Number(parts.find((p) => p.type === 'hour')!.value);
+  const mm = Number(parts.find((p) => p.type === 'minute')!.value);
+  if (hh === 24) hh = 0; // Intl hour12:false can emit '24' at midnight
+  return { dow: DOW[wd], minutes: hh * 60 + mm };
 }
 
-const toMin = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return (h || 0) * 60 + (m || 0); };
-
-export function isQuietHours(now: Date, p: NagPolicy): boolean {
-  const { minutesOfDay } = zonedParts(now, p.tz);
-  const s = toMin(p.quiet_start), e = toMin(p.quiet_end);
-  if (s === e) return false;
-  return s < e ? minutesOfDay >= s && minutesOfDay < e : minutesOfDay >= s || minutesOfDay < e;
+export function parseHhmm(s: string): number {
+  const [h, m] = String(s || '0:0').split(':').map((x) => Number(x) || 0);
+  return h * 60 + m;
 }
 
-export function isShabbat(now: Date, p: NagPolicy): boolean {
-  if (!p.shabbat_quiet) return false;
-  const { dow, hour } = zonedParts(now, p.tz);
-  if (dow === 5 && hour >= p.shabbat_start_hour) return true; // Fri evening → sunset (conservative)
-  if (dow === 6 && hour < p.shabbat_end_hour) return true;    // Sat until night
-  return false;
-}
-
-export function withinServiceWindow(now: Date, expiresAtISO: string | null): boolean {
-  if (!expiresAtISO) return false;
-  return now.getTime() < new Date(expiresAtISO).getTime();
-}
-
-export function dayBucket(now: Date, tz: string): string {
-  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
-  const g = (t: string) => parts.find((p) => p.type === t)?.value || '';
-  return `${g('year')}-${g('month')}-${g('day')}`;
+export function isQuietHours(nowMs: number, p: NagPolicy): boolean {
+  const { minutes } = toJerusalem(nowMs);
+  const start = parseHhmm(p.quiet_start);
+  const end = parseHhmm(p.quiet_end);
+  if (start === end) return false;
+  return start < end ? minutes >= start && minutes < end : minutes >= start || minutes < end;
 }
 ```
+Run-to-pass: `npx vitest run tests/unit/assistant-proactivity.test.ts`
 
-4. **Run-to-pass:** `npx vitest run tests/unit/assistant-proactivity-policy.test.ts`.
-
-5. **Commit:** `feat(assistant): pure quiet-hours/Shabbat/service-window/day-bucket helpers`
+**Commit:** `feat(assistant/proactivity): nag-policy table + Jerusalem clock + quiet-hours gate`
 
 ---
 
-### Task 4 — Pure `decideProactive` scheduler + `dedupKeyForEvent` + `nextDigestSlot` (the anti-nag decision core)
+## Task 2 — Shabbat hard quiet zone (PURE)
 
-**Files (modify):** `src/lib/assistant/proactivity-policy.ts`; **(modify)** `tests/unit/assistant-proactivity-policy.test.ts`
+**Files:** modify `src/lib/assistant/proactivity.ts`, `tests/unit/assistant-proactivity.test.ts`.
+
+**Interface produced:** `export function isShabbat(nowMs: number, p: NagPolicy): boolean;`
+
+**Step 1 — failing test** (append):
+```ts
+import { isShabbat } from '@/lib/assistant/proactivity';
+describe('isShabbat (Fri 16:00 → Sat 20:30, conservative, per-agent toggle)', () => {
+  it('Fri 16:00 IST is Shabbat', () => { expect(isShabbat(Date.parse('2026-01-16T14:00:00Z'), base)).toBe(true); });
+  it('Fri 15:59 IST is NOT yet', () => { expect(isShabbat(Date.parse('2026-01-16T13:59:00Z'), base)).toBe(false); });
+  it('Sat 20:00 IST still Shabbat', () => { expect(isShabbat(Date.parse('2026-01-17T18:00:00Z'), base)).toBe(true); });
+  it('Sat 20:30 IST is over', () => { expect(isShabbat(Date.parse('2026-01-17T18:30:00Z'), base)).toBe(false); });
+  it('toggle off disables it entirely', () => { expect(isShabbat(Date.parse('2026-01-16T14:00:00Z'), { ...base, shabbat_quiet: false })).toBe(false); });
+});
+```
+Run-to-fail: `npx vitest run tests/unit/assistant-proactivity.test.ts`
+
+**Step 2 — impl** (append to proactivity.ts):
+```ts
+// Conservative fixed window (errs toward silence). v1 does NOT call a zmanim API so the
+// scheduler invariant stays deterministic; real candle-lighting/havdalah is a later refinement.
+const FRIDAY_QUIET_FROM = 16 * 60;        // 16:00
+const SATURDAY_QUIET_UNTIL = 20 * 60 + 30; // 20:30
+
+export function isShabbat(nowMs: number, p: NagPolicy): boolean {
+  if (!p.shabbat_quiet) return false;
+  const { dow, minutes } = toJerusalem(nowMs);
+  if (dow === 5 && minutes >= FRIDAY_QUIET_FROM) return true;
+  if (dow === 6 && minutes < SATURDAY_QUIET_UNTIL) return true;
+  return false;
+}
+```
+Run-to-pass; **commit:** `feat(assistant/proactivity): Shabbat hard quiet zone (Fri 16:00→Sat 20:30, per-agent toggle)`
+
+---
+
+## Task 3 — `gateProactiveSend` core anti-nag gate (PURE)
+
+The heart of §5.4. Precedence is exhaustive & ordered so the invariant tests pin behavior.
+
+**Files:** modify `src/lib/assistant/proactivity.ts`, `tests/unit/assistant-proactivity.test.ts`.
 
 **Interfaces produced:**
 ```ts
-export const CRITICAL_EVENT_TYPES: Set<string>;   // signature_expiring, contract_expiring, invoice_legally_overdue
-export function isCritical(eventType: string): boolean;
-export interface DecisionInput {
-  now: Date; policy: NagPolicy;
-  event: { kind: ProactiveKind; event_type: string; entity_id: string; agency_id: string | null; critical?: boolean };
-  serviceWindowExpiresAt: string | null;
-  sentInterruptionsToday: number;
-  existingDedupKeys: Set<string>;
-  learnedDismissedEventTypes: Set<string>;
+export type SuppressReason = 'not_opted_in'|'duplicate'|'daily_cap'|'learned_dismissal'|'quiet_hours'|'shabbat'|'no_template';
+export interface GateInput {
+  nowMs: number; policy: NagPolicy;
+  kind: 'event_notify'|'daily_digest'|'reminder';
+  dedupExists: boolean; interruptionsToday: number;
+  learnedDismissed: boolean; severityFloor: boolean; hasTemplate: boolean;
 }
-export interface Decision {
-  action: 'send_now' | 'schedule' | 'suppress';
-  dedup_key: string; suppressed_reason?: SuppressReason;
-  scheduled_for?: string; via: 'free_form' | 'knock_template';
-}
-export function dedupKeyForEvent(e, tz: string, now: Date): string;
-export function nextDigestSlot(now: Date, p: NagPolicy): Date;
-export function decideProactive(input: DecisionInput): Decision;
+export type GateDecision =
+  | { decision: 'send' }
+  | { decision: 'suppress'; reason: SuppressReason }
+  | { decision: 'schedule'; reason: SuppressReason; scheduledFor: number };
+export function nextAllowedSend(nowMs: number, p: NagPolicy): number;
+export function gateProactiveSend(input: GateInput): GateDecision;
 ```
 
-1. **Failing tests (scheduler invariants — the crux of this phase):**
+**Step 1 — failing test** (append):
 ```ts
-import { decideProactive, nextDigestSlot } from '@/lib/assistant/proactivity-policy';
-
-const base = (over = {}) => ({
-  now: new Date('2026-07-08T10:00:00Z'), policy: P,           // 13:00 IL, not quiet, not Shabbat
-  event: { kind: 'event_notify', event_type: 'quote_signed', entity_id: 'e1', agency_id: 'g' },
-  serviceWindowExpiresAt: '2026-07-08T20:00:00Z',
-  sentInterruptionsToday: 0, existingDedupKeys: new Set<string>(), learnedDismissedEventTypes: new Set<string>(),
-  ...over,
+import { gateProactiveSend, nextAllowedSend, type GateInput } from '@/lib/assistant/proactivity';
+const gi = (o: Partial<GateInput>): GateInput => ({
+  nowMs: Date.parse('2026-01-15T10:00:00Z'), policy: base, kind: 'event_notify',
+  dedupExists: false, interruptionsToday: 0, learnedDismissed: false, severityFloor: false, hasTemplate: true, ...o,
 });
-
-describe('decideProactive invariants', () => {
-  it('happy path in-window → send_now free_form', () => {
-    const d = decideProactive(base());
-    expect(d.action).toBe('send_now'); expect(d.via).toBe('free_form');
+describe('gateProactiveSend precedence', () => {
+  it('opt-out suppresses everything', () => {
+    expect(gateProactiveSend(gi({ policy: { ...base, proactivity_optin: false } }))).toEqual({ decision: 'suppress', reason: 'not_opted_in' });
   });
-  it('outside service window → knock_template', () => {
-    const d = decideProactive(base({ serviceWindowExpiresAt: '2026-07-08T05:00:00Z' }));
-    expect(d.action).toBe('send_now'); expect(d.via).toBe('knock_template');
+  it('duplicate dedup_key suppressed', () => {
+    expect(gateProactiveSend(gi({ dedupExists: true }))).toEqual({ decision: 'suppress', reason: 'duplicate' });
   });
-  it('duplicate dedup_key → suppress(duplicate)', () => {
-    const first = decideProactive(base());
-    const d = decideProactive(base({ existingDedupKeys: new Set([first.dedup_key]) }));
-    expect(d.action).toBe('suppress'); expect(d.suppressed_reason).toBe('duplicate');
+  it('event beyond daily_cap folds into digest (suppressed)', () => {
+    expect(gateProactiveSend(gi({ interruptionsToday: 3 }))).toEqual({ decision: 'suppress', reason: 'daily_cap' });
   });
-  it('daily cap reached (non-critical) → suppress(daily_cap)', () => {
-    const d = decideProactive(base({ sentInterruptionsToday: 3 }));
-    expect(d.suppressed_reason).toBe('daily_cap');
+  it('daily_digest is EXEMPT from the cap', () => {
+    expect(gateProactiveSend(gi({ kind: 'daily_digest', interruptionsToday: 9 }))).toEqual({ decision: 'send' });
   });
-  it('learned dismissal → suppress(learned_dismissal)', () => {
-    const d = decideProactive(base({ learnedDismissedEventTypes: new Set(['quote_signed']) }));
-    expect(d.suppressed_reason).toBe('learned_dismissal');
+  it('learned dismissal suppresses a normal event', () => {
+    expect(gateProactiveSend(gi({ learnedDismissed: true }))).toEqual({ decision: 'suppress', reason: 'learned_dismissal' });
   });
-  it('SEVERITY FLOOR: critical bypasses cap + learned dismissal', () => {
-    const d = decideProactive(base({
-      event: { kind: 'event_notify', event_type: 'signature_expiring', entity_id: 'e9', agency_id: 'g' },
-      sentInterruptionsToday: 9, learnedDismissedEventTypes: new Set(['signature_expiring']),
-    }));
-    expect(d.action).toBe('send_now');
+  it('severity floor overrides learned dismissal AND cap', () => {
+    expect(gateProactiveSend(gi({ learnedDismissed: true, interruptionsToday: 9, severityFloor: true }))).toEqual({ decision: 'send' });
   });
-  it('quiet hours → schedule to quiet_end (non-critical)', () => {
-    const d = decideProactive(base({ now: new Date('2026-07-08T19:30:00Z') })); // 22:30 IL
-    expect(d.action).toBe('schedule');
-    expect(new Date(d.scheduled_for!).getTime()).toBeGreaterThan(new Date('2026-07-08T19:30:00Z').getTime());
+  it('quiet hours SCHEDULE, never send (0-sends-in-quiet KPI)', () => {
+    const d = gateProactiveSend(gi({ nowMs: Date.parse('2026-01-15T20:00:00Z') })); // 22:00 IST
+    expect(d.decision).toBe('schedule'); expect((d as any).reason).toBe('quiet_hours');
+    expect(isQuietHours((d as any).scheduledFor, base)).toBe(false);
   });
-  it('Shabbat → schedule past Saturday night', () => {
-    const d = decideProactive(base({ now: new Date('2026-07-10T15:00:00Z') })); // Fri 18:00 IL
-    expect(d.action).toBe('schedule');
+  it('Shabbat SCHEDULE, even for severity floor (hard zone)', () => {
+    const d = gateProactiveSend(gi({ nowMs: Date.parse('2026-01-16T14:00:00Z'), severityFloor: true })); // Fri 16:00
+    expect(d.decision).toBe('schedule'); expect((d as any).reason).toBe('shabbat');
+    expect(isShabbat((d as any).scheduledFor, base)).toBe(false);
   });
-  it('daily_digest ignores daily_cap', () => {
-    const d = decideProactive(base({ event: { kind: 'daily_digest', event_type: 'daily_digest', entity_id: 'd', agency_id: 'g' }, sentInterruptionsToday: 9 }));
-    expect(d.action).toBe('send_now');
-  });
-  it('event dedup is AGENCY-scoped (multi-user dedup)', () => {
-    const a = decideProactive(base());
-    const b = decideProactive(base({ policy: { ...P, agent_id: 'other-agent' } }));
-    expect(a.dedup_key).toBe(b.dedup_key); // same agency+event+entity+day → one ping for the deal
-  });
-  it('digest dedup is per-agent-per-day', () => {
-    const d = decideProactive(base({ event: { kind: 'daily_digest', event_type: 'daily_digest', entity_id: '-', agency_id: 'g' } }));
-    expect(d.dedup_key).toContain('digest:a:');
+  it('no approved template suppressed', () => {
+    expect(gateProactiveSend(gi({ hasTemplate: false }))).toEqual({ decision: 'suppress', reason: 'no_template' });
   });
 });
-describe('nextDigestSlot', () => {
-  it('never lands on Shabbat', () => {
-    const slot = nextDigestSlot(new Date('2026-07-10T05:00:00Z'), P); // Fri morning IL
-    // 09:00 IL Friday is fine (before shabbat_start_hour 17); but a Saturday slot must be pushed to Sunday.
-    expect([5, 0]).toContain(new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Jerusalem', weekday: 'short' }).format(slot) === 'Sat' ? 6 : 5);
+describe('nextAllowedSend', () => {
+  it('advances past quiet window to a clear slot', () => {
+    const t = nextAllowedSend(Date.parse('2026-01-15T20:00:00Z'), base);
+    expect(isQuietHours(t, base)).toBe(false); expect(isShabbat(t, base)).toBe(false); expect(t).toBeGreaterThan(Date.parse('2026-01-15T20:00:00Z'));
   });
 });
 ```
+Run-to-fail.
 
-2. **Run-to-fail:** `npx vitest run tests/unit/assistant-proactivity-policy.test.ts`.
-
-3. **Minimal impl** (append to `proactivity-policy.ts`):
+**Step 2 — impl** (append):
 ```ts
-export const CRITICAL_EVENT_TYPES = new Set(['signature_expiring', 'contract_expiring', 'invoice_legally_overdue']);
-export function isCritical(eventType: string): boolean { return CRITICAL_EVENT_TYPES.has(eventType); }
-
-export function dedupKeyForEvent(
-  e: { kind: ProactiveKind; event_type: string; entity_id: string; agency_id: string | null },
-  agentId: string, tz: string, now: Date,
-): string {
-  const day = dayBucket(now, tz);
-  if (e.kind === 'daily_digest') return `digest:${agentId}:${day}`;
-  // Agency-scoped so owner + assigned employee don't double-ping for the same deal (spec §5.4).
-  return `${e.agency_id || 'noagency'}:${e.event_type}:${e.entity_id}`;
+export function nextAllowedSend(nowMs: number, p: NagPolicy): number {
+  const STEP = 15 * 60 * 1000;
+  let t = nowMs;
+  for (let i = 0; i < 4 * 24 * 4; i++) { // ≤4 days of 15-min steps
+    if (!isQuietHours(t, p) && !isShabbat(t, p)) return t;
+    t += STEP;
+  }
+  return t;
 }
 
-export function nextDigestSlot(now: Date, p: NagPolicy): Date {
-  const [dh, dm] = p.digest_hour.split(':').map(Number);
-  // Step forward in 30-min increments until we hit >= digest_hour local on a non-Shabbat, non-quiet day.
-  const cursor = new Date(now.getTime());
-  for (let i = 0; i < 96 * 8; i++) {
-    const { hour, minute } = zonedParts(cursor, p.tz);
-    const atOrPastDigest = hour > dh || (hour === dh && minute >= (dm || 0));
-    if (atOrPastDigest && !isShabbat(cursor, p) && !isQuietHours(cursor, p)) return cursor;
-    cursor.setMinutes(cursor.getMinutes() + 30);
+export function gateProactiveSend(input: GateInput): GateDecision {
+  const { nowMs, policy, kind, dedupExists, interruptionsToday, learnedDismissed, severityFloor, hasTemplate } = input;
+  // 1. opt-in is the master switch (§5.1, §7.3 explicit consent)
+  if (!policy.proactivity_optin || !policy.consent_at) return { decision: 'suppress', reason: 'not_opted_in' };
+  // 2. approved he UTILITY template must exist (§7.3 blast-radius)
+  if (!hasTemplate) return { decision: 'suppress', reason: 'no_template' };
+  // 3. idempotent ledger dedup (also the outbound double-send guard)
+  if (dedupExists) return { decision: 'suppress', reason: 'duplicate' };
+  // 4. hard time zones — SCHEDULE, never send (KPI: 0 sends in quiet/Shabbat; severity floor still deferred)
+  if (isShabbat(nowMs, policy)) return { decision: 'schedule', reason: 'shabbat', scheduledFor: nextAllowedSend(nowMs, policy) };
+  if (isQuietHours(nowMs, policy)) return { decision: 'schedule', reason: 'quiet_hours', scheduledFor: nextAllowedSend(nowMs, policy) };
+  // 5. severity floor overrides the LEARNING layer + the cap (§5.4 severity floor)
+  if (!severityFloor) {
+    if (learnedDismissed) return { decision: 'suppress', reason: 'learned_dismissal' };
+    // digest is 1/day regardless of item count → exempt from the interruption cap
+    if (kind !== 'daily_digest' && interruptionsToday >= policy.daily_cap) return { decision: 'suppress', reason: 'daily_cap' };
   }
-  return cursor;
-}
-
-function nextAllowed(now: Date, p: NagPolicy): Date {
-  const cursor = new Date(now.getTime());
-  for (let i = 0; i < 96 * 8; i++) {
-    if (!isShabbat(cursor, p) && !isQuietHours(cursor, p)) return cursor;
-    cursor.setMinutes(cursor.getMinutes() + 30);
-  }
-  return cursor;
-}
-
-export function decideProactive(input: DecisionInput): Decision {
-  const { now, policy, event, serviceWindowExpiresAt, sentInterruptionsToday, existingDedupKeys, learnedDismissedEventTypes } = input;
-  const critical = Boolean(event.critical) || isCritical(event.event_type);
-  const dedup_key = dedupKeyForEvent(event, policy.agent_id, policy.tz, now);
-  const via: Decision['via'] = withinServiceWindow(now, serviceWindowExpiresAt) ? 'free_form' : 'knock_template';
-
-  if (existingDedupKeys.has(dedup_key)) return { action: 'suppress', dedup_key, suppressed_reason: 'duplicate', via };
-
-  // Severity floor sits ABOVE the learning + cap layers (spec §5.4), but still below time gates.
-  if (!critical && learnedDismissedEventTypes.has(event.event_type))
-    return { action: 'suppress', dedup_key, suppressed_reason: 'learned_dismissal', via };
-
-  // Time gates: schedule to the next allowed slot (never suppress — the message still matters).
-  if (isShabbat(now, policy) || isQuietHours(now, policy)) {
-    const slot = event.kind === 'daily_digest' ? nextDigestSlot(now, policy) : nextAllowed(now, policy);
-    return { action: 'schedule', dedup_key, scheduled_for: slot.toISOString(), via };
-  }
-
-  // Interruption cap — digest is exempt (1/day regardless); critical bypasses.
-  if (event.kind !== 'daily_digest' && !critical && sentInterruptionsToday >= policy.daily_cap)
-    return { action: 'suppress', dedup_key, suppressed_reason: 'daily_cap', via };
-
-  return { action: 'send_now', dedup_key, via };
+  return { decision: 'send' };
 }
 ```
-
-4. **Run-to-pass:** `npx vitest run tests/unit/assistant-proactivity-policy.test.ts`.
-
-5. **Commit:** `feat(assistant): decideProactive scheduler + agency/day dedup + severity floor`
+Run-to-pass; **commit:** `feat(assistant/proactivity): consequence-ordered anti-nag gate (opt-in/dedup/cap/dismissal/quiet/Shabbat/severity-floor)`
 
 ---
 
-### Task 5 — Pure dismissal classification + down-tune/stop-intent parsers
+## Task 4 — Digest scheduling + dedup keys + percentile (PURE)
 
-**Files (modify):** `src/lib/assistant/proactivity-policy.ts`; **(create)** `tests/unit/assistant-dismissal.test.ts`
+**Files:** modify proactivity.ts + test.
 
-**Interfaces produced:** `classifyDismissal`, `parseStopIntent`, `parseDownTuneCommand`, `shouldDemoteToDigest`.
-
-1. **Failing test** (`tests/unit/assistant-dismissal.test.ts`):
+**Interfaces produced:**
 ```ts
-import { describe, it, expect } from 'vitest';
-import { classifyDismissal, parseStopIntent, parseDownTuneCommand, shouldDemoteToDigest } from '@/lib/assistant/proactivity-policy';
+export function computeDigestScheduledFor(nowMs: number, p: NagPolicy): number; // today/tomorrow at digest_hour, skipping quiet/Shabbat
+export function eventDedupKey(eventType: string, entityId: string): string;
+export function proactiveDedupKey(agencyId: string | null, agentId: string, kind: string, sourceKey: string): string;
+export function percentile(nums: number[], q: number): number;
+```
 
-describe('classifyDismissal (button-less medium taxonomy §5.4)', () => {
-  it('read but no action in window → weak', () =>
-    expect(classifyDismissal({ delivered: true, read: true, actedInWindow: false, hoursSinceSent: 2 }).level).toBe('weak'));
-  it('read AND acted → null (engaged)', () =>
-    expect(classifyDismissal({ delivered: true, read: true, actedInWindow: true, hoursSinceSent: 1 }).level).toBe(null));
-  it('sent-unread for hours → ambiguous, NOT a dismissal', () =>
-    expect(classifyDismissal({ delivered: true, read: false, actedInWindow: false, hoursSinceSent: 6 }).level).toBe('ambiguous'));
-});
-describe('parseStopIntent', () => {
-  it('explicit Hebrew negatives → strong', () => {
-    for (const t of ['די', 'תפסיק', 'תפסיקי', 'עזוב', 'לא עכשיו', 'מספיק']) expect(parseStopIntent(t)).toBe('strong');
+**Step 1 — failing test** (append):
+```ts
+import { computeDigestScheduledFor, eventDedupKey, proactiveDedupKey, percentile } from '@/lib/assistant/proactivity';
+describe('digest scheduling + dedup', () => {
+  it('lands at digest_hour local, in the future', () => {
+    const now = Date.parse('2026-01-15T05:00:00Z');              // 07:00 IST Thu, before 09:00
+    const t = computeDigestScheduledFor(now, base);
+    expect(toJerusalem(t).minutes).toBe(9 * 60); expect(t).toBeGreaterThan(now);
+    expect(isQuietHours(t, base)).toBe(false); expect(isShabbat(t, base)).toBe(false);
   });
-  it('neutral → null', () => expect(parseStopIntent('כן תשלח')).toBe(null));
-});
-describe('parseDownTuneCommand', () => {
-  it('"רק פעם ביום" → daily_cap 1', () => expect(parseDownTuneCommand('רק פעם ביום')).toMatchObject({ daily_cap: 1 }));
-  it('"שקט בשבת" → shabbat_quiet true', () => expect(parseDownTuneCommand('שקט בשבת')).toMatchObject({ shabbat_quiet: true }));
-  it('unrelated → null', () => expect(parseDownTuneCommand('מה קורה')).toBe(null));
-});
-describe('shouldDemoteToDigest', () => {
-  it('one strong dismissal demotes', () => expect(shouldDemoteToDigest({ strong_count: 1, weak_count: 0 })).toBe(true));
-  it('three weak dismissals demote', () => expect(shouldDemoteToDigest({ strong_count: 0, weak_count: 3 })).toBe(true));
-  it('two weak does not', () => expect(shouldDemoteToDigest({ strong_count: 0, weak_count: 2 })).toBe(false));
+  it('agency-level dedup: owner & employee collapse to ONE key (multi-user dedup §5.4)', () => {
+    expect(proactiveDedupKey('agency-1', 'owner', 'daily_digest', '2026-01-15'))
+      .toEqual(proactiveDedupKey('agency-1', 'employee', 'daily_digest', '2026-01-15'));
+  });
+  it('event dedup key is stable per entity transition (refire-idempotent)', () => {
+    expect(eventDedupKey('quote_signed', 'sig-9')).toBe('quote_signed:sig-9');
+  });
+  it('percentile p95', () => { expect(percentile([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 0.95)).toBe(10); });
 });
 ```
+Run-to-fail.
 
-2. **Run-to-fail:** `npx vitest run tests/unit/assistant-dismissal.test.ts`.
-
-3. **Minimal impl** (append):
+**Step 2 — impl** (append):
 ```ts
-export function classifyDismissal(i: { delivered: boolean; read: boolean; actedInWindow: boolean; hoursSinceSent: number }): { level: 'strong' | 'weak' | 'ambiguous' | null } {
-  if (i.read && i.actedInWindow) return { level: null };       // engaged
-  if (i.read && !i.actedInWindow) return { level: 'weak' };     // read, ignored
-  if (i.delivered && !i.read) return { level: 'ambiguous' };    // sent-unread ≠ dismissal
-  return { level: null };
+export function computeDigestScheduledFor(nowMs: number, p: NagPolicy): number {
+  // Walk forward in 1-min steps to the first future instant at digest_hour:00 local that clears quiet+Shabbat.
+  const STEP = 60 * 1000;
+  let t = nowMs + STEP;
+  for (let i = 0; i < 5 * 24 * 60; i++) {
+    const j = toJerusalem(t);
+    if (j.minutes === p.digest_hour * 60 && !isQuietHours(t, p) && !isShabbat(t, p)) return t;
+    t += STEP;
+  }
+  return t;
 }
-
-const STOP_TOKENS = new Set(['די', 'תפסיק', 'תפסיקי', 'עזוב', 'עזבי', 'מספיק']);
-export function parseStopIntent(text: string): 'strong' | null {
-  const t = (text || '').trim();
-  if (!t) return null;
-  if (/לא\s+עכשיו/.test(t)) return 'strong';
-  const toks = t.toLowerCase().split(/[\s,.!?;:()\-]+/).filter(Boolean);
-  return toks.some((w) => STOP_TOKENS.has(w)) ? 'strong' : null;
+export function eventDedupKey(eventType: string, entityId: string): string { return `${eventType}:${entityId}`; }
+export function proactiveDedupKey(agencyId: string | null, agentId: string, kind: string, sourceKey: string): string {
+  return `${agencyId || agentId}:${kind}:${sourceKey}`; // agency-scoped so owner+employee never double-ping
 }
-
-export function parseDownTuneCommand(text: string): Partial<NagPolicy> | null {
-  const t = (text || '');
-  const out: Partial<NagPolicy> = {};
-  if (/פעם\s+ביום|רק\s+פעם/.test(t)) out.daily_cap = 1;
-  if (/שקט\s+בשבת|שבת/.test(t)) out.shabbat_quiet = true;
-  if (/רק\s+בוקר|בבוקר/.test(t)) out.digest_hour = '09:00';
-  if (/רק\s+ערב|בערב/.test(t)) out.digest_hour = '19:00';
-  return Object.keys(out).length ? out : null;
-}
-
-export function shouldDemoteToDigest(c: { strong_count: number; weak_count: number }): boolean {
-  return c.strong_count >= 1 || c.weak_count >= 3;
+export function percentile(nums: number[], q: number): number {
+  if (!nums.length) return 0;
+  const s = [...nums].sort((a, b) => a - b);
+  return s[Math.min(s.length - 1, Math.ceil(q * s.length) - 1)];
 }
 ```
-
-4. **Run-to-pass:** `npx vitest run tests/unit/assistant-dismissal.test.ts`.
-
-5. **Commit:** `feat(assistant): dismissal taxonomy + stop-intent + down-tune parsers`
+Run-to-pass; **commit:** `feat(assistant/proactivity): digest scheduling + agency-scoped dedup keys + p95`
 
 ---
 
-### Task 6 — Pure digest composer (RTL 3-second skim + bidi-safe amounts)
+## Task 5 — `composeDigest` RTL-Hebrew 3-second skim (PURE, bidi-safe)
 
-**Files (create):** `src/lib/assistant/digest-compose.ts`, `tests/unit/assistant-digest-compose.test.ts`
+**Files:** modify proactivity.ts + test.
 
-**Interfaces produced:** `DigestItem`, `formatBidiAmount`, `composeDigest`.
-
-1. **Failing test** (`tests/unit/assistant-digest-compose.test.ts`):
+**Interfaces produced:**
 ```ts
-import { describe, it, expect } from 'vitest';
-import { formatBidiAmount, composeDigest, type DigestItem } from '@/lib/assistant/digest-compose';
-
-describe('formatBidiAmount (§5.4 — Hebrew + ₪ + Latin brand + number must not mangle)', () => {
-  it('wraps amount+₪ in an LTR isolate', () => {
-    const s = formatBidiAmount('Argania', 11800, 'ILS');
-    expect(s).toContain('Argania');
-    expect(s).toContain('11,800');
-    expect(s).toContain('₪');
-    expect(s).toContain('⁦'); // LRI isolate around the numeric+symbol run
-  });
-});
-describe('composeDigest', () => {
-  const items: DigestItem[] = [
-    { kind: 'signed', talent: 'יונתן', brand: 'סודהסטרים', amount: 20000, currency: 'ILS', entityId: 's1' },
-    { kind: 'unpaid', talent: 'אנה', brand: 'Coca-Cola', amount: 80000, currency: 'ILS', entityId: 'i1', ageDays: 32 },
-    { kind: 'unsigned', talent: 'מאור', brand: 'Argania', amount: 11800, currency: 'ILS', entityId: 'q1', ageDays: 6 },
-    { kind: 'reminder', talent: 'דנה', brand: 'Fox', entityId: 'r1' },
-    { kind: 'brief', brand: 'Superpharm', entityId: 'b1' },
-  ];
-  it('surfaces top-3 and collapses the rest', () => {
-    const d = composeDigest(items, { agentName: 'עידו', now: new Date('2026-07-08T06:00:00Z'), tz: 'Asia/Jerusalem' });
-    expect(d.topLines).toHaveLength(3);
-    expect(d.collapsedCount).toBe(2);
-    expect(d.freeFormText).toContain('ועוד 2');
-  });
-  it('emits exactly one suggested next action', () => {
-    const d = composeDigest(items, { now: new Date('2026-07-08T06:00:00Z'), tz: 'Asia/Jerusalem' });
-    expect(typeof d.nextAction).toBe('string');
-  });
-  it('knockVars carry count + top brand for the UTILITY template', () => {
-    const d = composeDigest(items, { now: new Date('2026-07-08T06:00:00Z'), tz: 'Asia/Jerusalem' });
-    expect(d.knockVars.count).toBe('5');
-    expect(d.knockVars.topBrand).toBe('סודהסטרים');
-  });
-  it('empty items → empty digest (no send should follow)', () => {
-    const d = composeDigest([], { now: new Date(), tz: 'Asia/Jerusalem' });
-    expect(d.topLines).toHaveLength(0);
-    expect(d.freeFormText).toBe('');
-  });
-});
+export interface DigestItem { emoji: string; brand: string; talent: string | null; amountText: string | null; priority: number; }
+export function composeDigest(items: DigestItem[]): string;
 ```
 
-2. **Run-to-fail:** `npx vitest run tests/unit/assistant-digest-compose.test.ts`.
-
-3. **Minimal impl** (deterministic, no LLM):
+**Step 1 — failing test** (append):
 ```ts
-const LRI = '⁦', PDI = '⁩'; // isolate a mixed numeric+symbol run inside RTL text
-const SYM: Record<string, string> = { ILS: '₪', USD: '$', EUR: '€' };
-const PRIORITY: Record<string, number> = { unpaid: 0, unsigned: 1, signed: 2, reminder: 3, brief: 4 };
-const EMOJI: Record<string, string> = { unpaid: '💸', unsigned: '🖊️', signed: '✅', reminder: '⏰', brief: '📥' };
+import { composeDigest, type DigestItem } from '@/lib/assistant/proactivity';
+const ISO = '⁨', PDI = '⁩'; // FSI/PDI isolate Latin+₪+digits inside RTL
+const mk = (brand: string, amt: string | null, pr: number): DigestItem => ({ emoji: '🖊️', brand, talent: null, amountText: amt, priority: pr });
+describe('composeDigest (RTL, top-3, collapse, one action)', () => {
+  it('isolates brand+amount so bidi does not mangle "Argania 11,800 ₪"', () => {
+    const out = composeDigest([mk('Argania', '11,800 ₪', 5)]);
+    expect(out).toContain(`${ISO}Argania${PDI}`); expect(out).toContain(`${ISO}11,800 ₪${PDI}`);
+  });
+  it('shows top-3 by priority and collapses the rest', () => {
+    const out = composeDigest([mk('A', null, 5), mk('B', null, 4), mk('C', null, 3), mk('D', null, 2), mk('E', null, 1)]);
+    expect(out).toContain('A'); expect(out).toContain('B'); expect(out).toContain('C');
+    expect(out).toContain('ועוד 2 פריטים'); expect(out).not.toContain(' מ-E');
+  });
+  it('exactly 3 items → no collapse line', () => {
+    expect(composeDigest([mk('A', null, 3), mk('B', null, 2), mk('C', null, 1)])).not.toContain('ועוד');
+  });
+  it('always ends with ONE suggested next action', () => {
+    expect(composeDigest([mk('A', null, 1)])).toContain('מה תרצה לעשות?');
+  });
+  it('empty → nothing-new line', () => { expect(composeDigest([])).toContain('אין עדכונים חדשים'); });
+});
+```
+Run-to-fail.
 
-export interface DigestItem {
-  kind: 'signed' | 'unsigned' | 'unpaid' | 'reminder' | 'brief';
-  talent?: string; brand?: string; amount?: number; currency?: string; entityId: string; ageDays?: number; emoji?: string;
-}
+**Step 2 — impl** (append):
+```ts
+export interface DigestItem { emoji: string; brand: string; talent: string | null; amountText: string | null; priority: number; }
+const iso = (s: string) => `⁨${s}⁩`; // First-Strong Isolate + Pop Directional Isolate
 
-export function formatBidiAmount(brand: string, amount: number, currency = 'ILS'): string {
-  const sym = SYM[currency] || currency;
-  return `${brand} ${LRI}${amount.toLocaleString('en-US')} ${sym}${PDI}`;
-}
-
-function lineFor(it: DigestItem): string {
-  const emoji = it.emoji || EMOJI[it.kind] || '•';
-  const who = [it.talent, it.brand].filter(Boolean).join(' ↔ ');
-  const money = typeof it.amount === 'number' ? ' — ' + formatBidiAmount('', it.amount, it.currency).trim() : '';
-  const age = it.ageDays ? ` (${it.ageDays} ימים)` : '';
-  return `${emoji} ${who}${money}${age}`;
-}
-
-function nextActionFor(items: DigestItem[]): string | null {
-  const unsigned = items.find((i) => i.kind === 'unsigned');
-  if (unsigned) return `שלח שוב קישור חתימה ל${unsigned.brand || 'הצעה'}?`;
-  const unpaid = items.find((i) => i.kind === 'unpaid');
-  if (unpaid) return `להזכיר תשלום ל${unpaid.brand || 'חשבונית'}?`;
-  return items.length ? 'רוצה לתמחר בריפים חדשים?' : null;
-}
-
-export function composeDigest(items: DigestItem[], opts: { agentName?: string; now: Date; tz: string }) {
-  const sorted = [...items].sort((a, b) => (PRIORITY[a.kind] - PRIORITY[b.kind]) || ((b.amount || 0) - (a.amount || 0)));
+export function composeDigest(items: DigestItem[]): string {
+  if (!items.length) return '📋 סיכום יומי\nאין עדכונים חדשים היום. שבת שלום 🙂';
+  const sorted = [...items].sort((a, b) => b.priority - a.priority);
   const top = sorted.slice(0, 3);
-  const collapsedCount = Math.max(0, sorted.length - top.length);
-  const topLines = top.map(lineFor);
-  const nextAction = nextActionFor(sorted);
-  const headline = items.length
-    ? `בוקר טוב${opts.agentName ? ' ' + opts.agentName : ''} — היום ${items.length} פריטים:`
-    : '';
-  const freeFormText = items.length
-    ? [headline, '', ...topLines, collapsedCount ? `\nועוד ${collapsedCount} פריטים בדשבורד.` : '', nextAction ? `\n${nextAction}` : '']
-        .filter((l) => l !== '').join('\n')
-    : '';
-  const knockVars = { count: String(items.length), topBrand: top[0]?.brand || top[0]?.talent || '' };
-  return { headline, topLines, collapsedCount, nextAction, freeFormText, knockVars };
+  const lines = top.map((it) => {
+    const who = it.talent ? `${iso(it.brand)} ↔ ${iso(it.talent)}` : iso(it.brand);
+    const amt = it.amountText ? ` — ${iso(it.amountText)}` : '';
+    return `${it.emoji} ${who}${amt}`;
+  });
+  const rest = sorted.length - top.length;
+  const body = [`📋 סיכום יומי — ${items.length} עדכונים`, ...lines];
+  if (rest > 0) body.push(`ועוד ${rest} פריטים`);
+  body.push('', 'מה תרצה לעשות?');
+  return body.join('\n');
 }
 ```
-
-4. **Run-to-pass:** `npx vitest run tests/unit/assistant-digest-compose.test.ts`.
-
-5. **Commit:** `feat(assistant): deterministic RTL digest composer with bidi-safe amounts`
+Note: `amountText` is passed **pre-formatted** by the worker from stored totals — `composeDigest` performs zero arithmetic (invariant: money math only in Executor).
+Run-to-pass; **commit:** `feat(assistant/proactivity): bidi-safe RTL daily-digest composer (top-3 + collapse + one action)`
 
 ---
 
-### Task 7 — Hebrew UTILITY template catalog + knock-template sender
+## Task 6 — Dismissal taxonomy + learning counters (PURE)
 
-**Files (create):** `src/lib/assistant/templates.ts`, `tests/unit/assistant-templates.test.ts`
+**Files:** modify proactivity.ts + test.
 
-**Interfaces produced:** `ASSISTANT_TEMPLATES`, `buildKnockComponents`, `buildReminderComponents`, `buildEventNotifyComponents`, `sendKnockTemplate`.
-
-> Blast-radius isolation (spec §7.3): three separate UTILITY templates so Meta pausing one does not kill all proactivity. All `language: 'he'` (client default is `en_US` → would 132001).
-
-1. **Failing test** (`tests/unit/assistant-templates.test.ts`):
+**Interfaces produced:**
 ```ts
-import { describe, it, expect, vi } from 'vitest';
-import { ASSISTANT_TEMPLATES, buildKnockComponents, buildReminderComponents, buildEventNotifyComponents } from '@/lib/assistant/templates';
+export function classifyDismissalText(text: string): 'strong' | null;
+export function nextDismissalCount(prev: number, signal: 'strong'|'weak'|'ambiguous'): number;
+export function isDemoted(count: number): boolean; // 3 ignores → digest-only
+```
 
-describe('template catalog', () => {
-  it('exposes >=3 distinct UTILITY templates, all he', () => {
-    const names = Object.values(ASSISTANT_TEMPLATES).map((t) => t.name);
-    expect(new Set(names).size).toBeGreaterThanOrEqual(3);
-    for (const t of Object.values(ASSISTANT_TEMPLATES)) expect(t.lang).toBe('he');
+**Step 1 — failing test** (append):
+```ts
+import { classifyDismissalText, nextDismissalCount, isDemoted } from '@/lib/assistant/proactivity';
+describe('dismissal taxonomy (button-less medium, §5.4)', () => {
+  it('explicit Hebrew negatives = strong', () => {
+    for (const t of ['די', 'עזוב', 'לא עכשיו', 'תפסיק', 'מספיק', 'שקט']) expect(classifyDismissalText(t)).toBe('strong');
   });
-  it('knock body carries count + topBrand slots', () => {
-    const c = buildKnockComponents({ count: '5', topBrand: 'סודהסטרים' });
-    const body = c.find((x) => x.type === 'body');
-    expect(body?.parameters?.map((p: any) => p.text)).toEqual(['5', 'סודהסטרים']);
-  });
-  it('event-notify body carries brand slot', () => {
-    const c = buildEventNotifyComponents({ brand: 'Argania' });
-    expect(c.find((x) => x.type === 'body')?.parameters?.[0]).toMatchObject({ type: 'text', text: 'Argania' });
-  });
-  it('reminder body carries subject slot', () => {
-    const c = buildReminderComponents({ subject: 'תשלום Fox' });
-    expect(c.find((x) => x.type === 'body')?.parameters?.[0]).toMatchObject({ text: 'תשלום Fox' });
+  it('normal reply = not a dismissal', () => { expect(classifyDismissalText('כן תשלח את החוזה')).toBeNull(); });
+  it('strong jumps straight to demotion; ambiguous never counts', () => {
+    expect(nextDismissalCount(0, 'strong')).toBe(3);
+    expect(nextDismissalCount(2, 'weak')).toBe(3);
+    expect(nextDismissalCount(2, 'ambiguous')).toBe(2);
+    expect(isDemoted(3)).toBe(true); expect(isDemoted(2)).toBe(false);
   });
 });
 ```
+Run-to-fail.
 
-2. **Run-to-fail:** `npx vitest run tests/unit/assistant-templates.test.ts`.
-
-3. **Minimal impl** (`templates.ts`):
+**Step 2 — impl** (append):
 ```ts
-import { sendTemplate, type TemplateComponent, type WhatsAppSendResult } from '@/lib/whatsapp-cloud/client';
-
-// Names MUST match templates approved in Meta Business Manager (UTILITY, he).
-export const ASSISTANT_TEMPLATES = {
-  digest_knock: { name: 'bestie_digest_knock', lang: 'he' as const },  // "יש לך {{1}} עדכונים, כולל {{2}}. פתח לצפייה." + quick-reply button
-  reminder:     { name: 'bestie_reminder',     lang: 'he' as const },  // "תזכורת: {{1}}."
-  event_notify: { name: 'bestie_event_notify', lang: 'he' as const },  // "הצעת המחיר של {{1}} נחתמה."
-};
-
-const body = (...texts: string[]): TemplateComponent => ({ type: 'body', parameters: texts.map((t) => ({ type: 'text', text: t })) });
-
-export function buildKnockComponents(v: { count: string; topBrand: string }): TemplateComponent[] { return [body(v.count, v.topBrand)]; }
-export function buildReminderComponents(v: { subject: string }): TemplateComponent[] { return [body(v.subject)]; }
-export function buildEventNotifyComponents(v: { brand: string }): TemplateComponent[] { return [body(v.brand)]; }
-
-export async function sendKnockTemplate(
-  to: string, tpl: { name: string; lang: string }, components: TemplateComponent[],
-): Promise<WhatsAppSendResult> {
-  return sendTemplate({ to, templateName: tpl.name, languageCode: tpl.lang, components });
+const STRONG_DISMISS = ['די', 'עזוב', 'לא עכשיו', 'תפסיק', 'מספיק', 'שקט'];
+export function classifyDismissalText(text: string): 'strong' | null {
+  const t = (text || '').trim().toLowerCase();
+  return t && STRONG_DISMISS.some((w) => t.includes(w)) ? 'strong' : null;
 }
+export function nextDismissalCount(prev: number, signal: 'strong' | 'weak' | 'ambiguous'): number {
+  if (signal === 'ambiguous') return prev;       // sent-unread ≠ dismissal
+  if (signal === 'strong') return Math.max(prev, 3); // one explicit "די" demotes immediately
+  return prev + 1;                                // weak: read-no-action
+}
+export function isDemoted(count: number): boolean { return count >= 3; }
 ```
-
-4. **Run-to-pass:** `npx vitest run tests/unit/assistant-templates.test.ts`.
-
-5. **Commit:** `feat(assistant): 3 Hebrew UTILITY templates + knock-template sender`
+Run-to-pass; **commit:** `feat(assistant/proactivity): dismissal taxonomy + demotion counters (3 ignores → digest-only)`
 
 ---
 
-### Task 8 — `proactivity.ts` event worker (consume outbox → decide → ledger) with service-window gate + dedup guard + shadow mode
+## Task 7 — `assistant_events` outbox migration + idempotent DB triggers
 
-**Files (create):** `src/lib/assistant/proactivity.ts`, `tests/unit/assistant-proactivity-worker.test.ts`
+**Files**
+- create `supabase/migrations/069_assistant_events_outbox.sql`
+- create `tests/integration/assistant-events-trigger.test.ts` (env-gated integration; asserts refire idempotency on a real branch)
 
-**Interfaces produced:** `ProactivityDeps`, `runEventWorker`, `simulateShadow` (partial — extended in later tasks). The worker is written against an injected `db` + `send` seam so it is fully unit-testable and reused by cron + shadow.
+**Step 1 — migration** (`069_assistant_events_outbox.sql`):
+```sql
+-- Migration 069: assistant_events outbox — DB triggers on CRM status transitions.
+-- Decouples "something happened" from "should we tell the agent". ON CONFLICT(dedup_key)
+-- makes signature/invoice webhook re-fires a NO-OP (Meta + provider both re-deliver).
+create table if not exists public.assistant_events (
+  id uuid primary key default gen_random_uuid(),
+  agent_id uuid references public.users(id) on delete set null,
+  agency_id uuid,
+  event_type text not null,   -- quote_signed | quote_returned | invoice_paid | contract_uploaded
+  entity_type text not null,  -- signature_request | invoice | contract
+  entity_id uuid not null,
+  payload jsonb not null default '{}'::jsonb,
+  dedup_key text not null,
+  processed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create unique index if not exists assistant_events_dedup_uidx on public.assistant_events(dedup_key);
+create index if not exists assistant_events_unprocessed_idx on public.assistant_events(created_at) where processed_at is null;
+alter table public.assistant_events enable row level security;
 
-1. **Failing test** — build in-memory fakes and assert the full decision→ledger→gate flow:
-```ts
-import { describe, it, expect, vi } from 'vitest';
-import { runEventWorker, type ProactivityDeps } from '@/lib/assistant/proactivity';
-import type { NagPolicy } from '@/lib/assistant/proactivity-policy';
+-- contracts may lack agent_id on older rows; ensure the column + backfill so the trigger resolves.
+alter table public.contracts add column if not exists agent_id uuid references public.users(id);
+update public.contracts c set agent_id = p.agent_id
+  from public.partnerships p where c.partnership_id = p.id and c.agent_id is null;
 
-const policy: NagPolicy = {
-  agent_id: 'A', agency_id: 'G', tz: 'Asia/Jerusalem', quiet_start: '21:00', quiet_end: '08:00',
-  daily_cap: 3, digest_hour: '09:00', shabbat_quiet: true, shabbat_start_hour: 17, shabbat_end_hour: 21,
-  proactivity_optin: true, consent_at: '2026-01-01',
-};
+create or replace function public.emit_assistant_event() returns trigger as $$
+declare
+  v_agent uuid := new.agent_id;
+  v_agency uuid;
+begin
+  select agency_id into v_agency from public.users where id = v_agent;
+  insert into public.assistant_events(agent_id, agency_id, event_type, entity_type, entity_id, dedup_key, payload)
+  values (v_agent, v_agency, tg_argv[0], tg_argv[1], new.id,
+          tg_argv[0] || ':' || new.id::text,
+          jsonb_build_object('entity_id', new.id, 'status', new.status))
+  on conflict (dedup_key) do nothing;
+  return new;
+end; $$ language plpgsql;
 
-function makeDeps(over: Partial<any> = {}): { deps: ProactivityDeps; sent: any[]; ledger: any[] } {
-  const events = over.events ?? [{ id: 'E1', agent_id: 'A', agency_id: 'G', event_type: 'quote_signed', entity_type: 'signature_request', entity_id: 'e1', payload: { partnership_id: 'p1' }, processed_at: null }];
-  const sent: any[] = []; const ledger: any[] = [];
-  const deps: ProactivityDeps = {
-    now: () => new Date('2026-07-08T10:00:00Z'), // 13:00 IL
-    shadow: over.shadow ?? false,
-    db: {
-      claimUnprocessedEvents: async () => events,
-      markEventProcessed: async () => {},
-      getPolicy: async () => policy,
-      getServiceWindow: async () => '2026-07-08T20:00:00Z',
-      countInterruptionsToday: async () => 0,
-      getExistingDedupKeys: async () => new Set<string>(),
-      getLearnedDismissed: async () => new Set<string>(),
-      insertLedger: async (row: any) => { ledger.push(row); return { ...row, id: 'L' + ledger.length }; },
-      updateLedger: async (id: string, patch: any) => { Object.assign(ledger.find((r) => r.id === id) || {}, patch); },
-      getAgentWaId: async () => '972500000000',
-      getEventPayloadForNotify: async () => ({ brand: 'Argania' }),
-      ...(over.db || {}),
-    },
-    send: {
-      sendText: vi.fn(async (a: any) => { sent.push({ type: 'text', ...a }); return { success: true, wa_message_id: 'wam1' }; }),
-      sendKnockTemplate: vi.fn(async (...a: any[]) => { sent.push({ type: 'template', a }); return { success: true, wa_message_id: 'wamt' }; }),
-    },
-  };
-  return { deps, sent, ledger };
-}
+drop trigger if exists trg_sig_signed on public.signature_requests;
+create trigger trg_sig_signed after update on public.signature_requests
+  for each row when (old.status is distinct from new.status and new.status = 'signed')
+  execute function public.emit_assistant_event('quote_signed', 'signature_request');
 
-describe('runEventWorker', () => {
-  it('in-window event → ledger row sent + free-form text send', async () => {
-    const { deps, sent } = makeDeps();
-    const r = await runEventWorker(deps);
-    expect(r.sent).toBe(1);
-    expect(sent[0].type).toBe('text');
-  });
-  it('outside window → knock template, no free-form text', async () => {
-    const { deps, sent } = makeDeps({ db: { getServiceWindow: async () => '2026-07-08T05:00:00Z' } });
-    await runEventWorker(deps);
-    expect(sent[0].type).toBe('template');
-  });
-  it('duplicate dedup_key already in ledger → suppressed, no send', async () => {
-    const { deps, sent, ledger } = makeDeps({ db: { getExistingDedupKeys: async () => new Set(['G:quote_signed:e1']) } });
-    const r = await runEventWorker(deps);
-    expect(r.suppressed).toBe(1);
-    expect(sent).toHaveLength(0);
-    expect(ledger[0].suppressed_reason).toBe('duplicate');
-  });
-  it('SHADOW mode → ledger written, ZERO Meta sends', async () => {
-    const { deps, sent } = makeDeps({ shadow: true });
-    const r = await runEventWorker(deps);
-    expect(sent).toHaveLength(0);
-    expect(r.sent).toBe(1); // "would send"
-  });
-  it('never claims sent until send succeeds (failed send → status failed)', async () => {
-    const { deps, ledger } = makeDeps();
-    (deps.send.sendText as any).mockResolvedValueOnce({ success: false, error: { code: 131047 } });
-    await runEventWorker(deps);
-    expect(ledger[0].status).toBe('failed');
-  });
-});
+drop trigger if exists trg_sig_returned on public.signature_requests;
+create trigger trg_sig_returned after update on public.signature_requests
+  for each row when (old.status is distinct from new.status and new.status in ('expired', 'cancelled'))
+  execute function public.emit_assistant_event('quote_returned', 'signature_request');
+
+drop trigger if exists trg_inv_paid on public.invoices;
+create trigger trg_inv_paid after update on public.invoices
+  for each row when (old.paid_at is null and new.paid_at is not null)
+  execute function public.emit_assistant_event('invoice_paid', 'invoice');
+
+drop trigger if exists trg_contract_uploaded on public.contracts;
+create trigger trg_contract_uploaded after update on public.contracts
+  for each row when (old.status is distinct from new.status and new.status in ('sent', 'signed'))
+  execute function public.emit_assistant_event('contract_uploaded', 'contract');
 ```
+Apply via `mcp__supabase__apply_migration` name `069_assistant_events_outbox`.
 
-2. **Run-to-fail:** `npx vitest run tests/unit/assistant-proactivity-worker.test.ts`.
-
-3. **Minimal impl** (`proactivity.ts`) — thin orchestration over the pure core:
-```ts
-import { decideProactive, dedupKeyForEvent, type NagPolicy, type ProactiveKind } from '@/lib/assistant/proactivity-policy';
-import { ASSISTANT_TEMPLATES, buildEventNotifyComponents, buildKnockComponents } from '@/lib/assistant/templates';
-
-export interface ProactivityDeps {
-  now: () => Date;
-  shadow: boolean;
-  db: {
-    claimUnprocessedEvents(limit?: number): Promise<any[]>;
-    markEventProcessed(id: string, result: string): Promise<void>;
-    getPolicy(agentId: string): Promise<NagPolicy | null>;
-    getServiceWindow(agentId: string): Promise<string | null>;
-    countInterruptionsToday(agentId: string, day: string): Promise<number>;
-    getExistingDedupKeys(agentId: string): Promise<Set<string>>;
-    getLearnedDismissed(agentId: string): Promise<Set<string>>;
-    insertLedger(row: any): Promise<any>;
-    updateLedger(id: string, patch: any): Promise<void>;
-    getAgentWaId(agentId: string): Promise<string | null>;
-    getEventPayloadForNotify(event: any): Promise<{ brand: string }>;
-  };
-  send: {
-    sendText(a: { to: string; body: string }): Promise<{ success: boolean; wa_message_id?: string; error?: any }>;
-    sendKnockTemplate(to: string, tpl: any, components: any[]): Promise<{ success: boolean; wa_message_id?: string; error?: any }>;
-  };
-}
-
-const EVENT_NOTIFY_TEXT: Record<string, (b: string) => string> = {
-  quote_signed:  (b) => `הצעת המחיר של ${b} נחתמה ✅ — לשלוח חוזה?`,
-  invoice_paid:  (b) => `התקבל תשלום מ-${b} 💸`,
-  contract_signed: (b) => `החוזה של ${b} נחתם ✍️`,
-  quote_returned: (b) => `ההצעה ל-${b} הוחזרה — לבדוק?`,
-  invoice_overdue: (b) => `חשבונית ${b} באיחור — להזכיר?`,
-};
-
-export async function runEventWorker(deps: ProactivityDeps): Promise<{ processed: number; sent: number; suppressed: number; scheduled: number }> {
-  const now = deps.now();
-  const events = await deps.db.claimUnprocessedEvents(100);
-  let sent = 0, suppressed = 0, scheduled = 0;
-
-  for (const ev of events) {
-    const policy = await deps.db.getPolicy(ev.agent_id);
-    if (!policy || !policy.proactivity_optin) { await deps.db.markEventProcessed(ev.id, 'no_optin'); continue; }
-
-    const day = new Intl.DateTimeFormat('en-CA', { timeZone: policy.tz }).format(now);
-    const decision = decideProactive({
-      now, policy,
-      event: { kind: 'event_notify' as ProactiveKind, event_type: ev.event_type, entity_id: ev.entity_id, agency_id: ev.agency_id },
-      serviceWindowExpiresAt: await deps.db.getServiceWindow(ev.agent_id),
-      sentInterruptionsToday: await deps.db.countInterruptionsToday(ev.agent_id, day),
-      existingDedupKeys: await deps.db.getExistingDedupKeys(ev.agent_id),
-      learnedDismissedEventTypes: await deps.db.getLearnedDismissed(ev.agent_id),
-    });
-
-    // Ledger BEFORE any send (Principle 7). dedup_key UNIQUE = the double-send guard.
-    const { brand } = await deps.db.getEventPayloadForNotify(ev);
-    const bodyText = (EVENT_NOTIFY_TEXT[ev.event_type] || ((b: string) => `עדכון על ${b}`))(brand);
-    const row = await deps.db.insertLedger({
-      agent_id: ev.agent_id, agency_id: ev.agency_id, kind: 'event_notify', source_event_id: ev.id,
-      dedup_key: decision.dedup_key, status: decision.action === 'send_now' ? 'queued' : decision.action === 'schedule' ? 'scheduled' : 'suppressed',
-      suppressed_reason: decision.suppressed_reason || null, scheduled_for: decision.scheduled_for || null,
-      payload: { text: bodyText, brand }, template_name: decision.via === 'knock_template' ? ASSISTANT_TEMPLATES.event_notify.name : null,
-    }).catch(() => null); // unique_violation on dedup_key → already handled, treat as suppressed
-    if (!row) { suppressed++; await deps.db.markEventProcessed(ev.id, 'dup'); continue; }
-
-    if (decision.action === 'suppress') { suppressed++; await deps.db.markEventProcessed(ev.id, `suppressed:${decision.suppressed_reason}`); continue; }
-    if (decision.action === 'schedule') { scheduled++; await deps.db.markEventProcessed(ev.id, 'scheduled'); continue; }
-
-    if (deps.shadow) { sent++; await deps.db.updateLedger(row.id, { status: 'sent', payload: { ...row.payload, shadow: true } }); await deps.db.markEventProcessed(ev.id, 'shadow_send'); continue; }
-
-    const to = await deps.db.getAgentWaId(ev.agent_id);
-    if (!to) { await deps.db.updateLedger(row.id, { status: 'failed' }); await deps.db.markEventProcessed(ev.id, 'no_waid'); continue; }
-
-    const res = decision.via === 'free_form'
-      ? await deps.send.sendText({ to, body: bodyText })
-      : await deps.send.sendKnockTemplate(to, ASSISTANT_TEMPLATES.event_notify, buildEventNotifyComponents({ brand }));
-
-    if (res.success) { sent++; await deps.db.updateLedger(row.id, { status: 'sent', wa_message_id: res.wa_message_id, sent_at: now.toISOString() }); await deps.db.markEventProcessed(ev.id, 'sent'); }
-    else { await deps.db.updateLedger(row.id, { status: 'failed' }); await deps.db.markEventProcessed(ev.id, `failed:${res.error?.code || ''}`); }
-  }
-  return { processed: events.length, sent, suppressed, scheduled };
-}
-```
-
-4. **Run-to-pass:** `npx vitest run tests/unit/assistant-proactivity-worker.test.ts`.
-
-5. **Commit:** `feat(assistant): event worker — decide→ledger→service-window gate→send, shadow-safe`
-
----
-
-### Task 9 — Daily digest runner (the heartbeat) + `simulateShadow`
-
-**Files (modify):** `src/lib/assistant/proactivity.ts`; **(create)** `tests/unit/assistant-digest-runner.test.ts`
-
-**Interfaces produced:** `runDailyDigest(deps)`, `simulateShadow(deps, {fromISO,toISO})`.
-
-> Lane-B (status drift) is NEVER pushed cold — it is folded into this one daily digest (spec §5.2). One interruption regardless of item count. Digest amounts come from persisted deal totals / `computeTotals` — never LLM.
-
-1. **Failing test:**
-```ts
-import { describe, it, expect, vi } from 'vitest';
-import { runDailyDigest } from '@/lib/assistant/proactivity';
-// reuse makeDeps helper from worker test (extract to tests/unit/_proactivity-fakes.ts)
-
-describe('runDailyDigest', () => {
-  it('one opted-in agent with 5 drift items → exactly ONE send', async () => {
-    const { deps, sent } = makeDigestDeps({ items: fiveItems, window: '2026-07-08T20:00:00Z' });
-    const r = await runDailyDigest(deps);
-    expect(sent).toHaveLength(1);
-    expect(r.sent).toBe(1);
-  });
-  it('agent with ZERO items → no send (no empty digest)', async () => {
-    const { deps, sent } = makeDigestDeps({ items: [], window: '2026-07-08T20:00:00Z' });
-    await runDailyDigest(deps);
-    expect(sent).toHaveLength(0);
-  });
-  it('outside window → knock template, payload held for flush', async () => {
-    const { deps, sent, ledger } = makeDigestDeps({ items: fiveItems, window: '2026-07-08T05:00:00Z' });
-    await runDailyDigest(deps);
-    expect(sent[0].type).toBe('template');
-    expect(ledger[0].payload.text).toContain('היום'); // free-form held in ledger for flush
-  });
-  it('opt-out agent → skipped', async () => {
-    const { deps, sent } = makeDigestDeps({ items: fiveItems, optin: false });
-    await runDailyDigest(deps);
-    expect(sent).toHaveLength(0);
-  });
-  it('digest dedup: second run same day → no second send', async () => {
-    const { deps, sent } = makeDigestDeps({ items: fiveItems, existingDedup: new Set(['digest:A:2026-07-08']) });
-    await runDailyDigest(deps);
-    expect(sent).toHaveLength(0);
-  });
-});
-```
-(Add `makeDigestDeps` + `fiveItems` to a shared `tests/unit/_proactivity-fakes.ts`; `db.listOptedInAgents`, `db.gatherDigestItems` are the new seams.)
-
-2. **Run-to-fail:** `npx vitest run tests/unit/assistant-digest-runner.test.ts`.
-
-3. **Minimal impl** (append to `proactivity.ts`) — add `listOptedInAgents`, `gatherDigestItems` to `ProactivityDeps.db`:
-```ts
-import { composeDigest, type DigestItem } from '@/lib/assistant/digest-compose';
-import { ASSISTANT_TEMPLATES, buildKnockComponents } from '@/lib/assistant/templates';
-import { dedupKeyForEvent } from '@/lib/assistant/proactivity-policy';
-
-export async function runDailyDigest(deps: ProactivityDeps): Promise<{ agents: number; sent: number; suppressed: number }> {
-  const now = deps.now();
-  const agents = await deps.db.listOptedInAgents();
-  let sent = 0, suppressed = 0;
-  for (const a of agents) {
-    const policy = await deps.db.getPolicy(a.agent_id);
-    if (!policy || !policy.proactivity_optin) continue;
-    const items: DigestItem[] = await deps.db.gatherDigestItems(a.agent_id);
-    if (!items.length) continue; // never an empty digest
-
-    const dedup_key = dedupKeyForEvent({ kind: 'daily_digest', event_type: 'daily_digest', entity_id: '-', agency_id: policy.agency_id }, policy.agent_id, policy.tz, now);
-    const existing = await deps.db.getExistingDedupKeys(a.agent_id);
-    if (existing.has(dedup_key)) { suppressed++; continue; }
-
-    const window = await deps.db.getServiceWindow(a.agent_id);
-    const open = window && now.getTime() < new Date(window).getTime();
-    const digest = composeDigest(items, { agentName: a.full_name, now, tz: policy.tz });
-
-    const row = await deps.db.insertLedger({
-      agent_id: a.agent_id, agency_id: policy.agency_id, kind: 'daily_digest', source_event_id: null,
-      dedup_key, status: 'queued', payload: { text: digest.freeFormText, knockVars: digest.knockVars },
-      template_name: open ? null : ASSISTANT_TEMPLATES.digest_knock.name,
-    }).catch(() => null);
-    if (!row) { suppressed++; continue; }
-
-    if (deps.shadow) { sent++; await deps.db.updateLedger(row.id, { status: 'sent', payload: { ...row.payload, shadow: true } }); continue; }
-    const to = await deps.db.getAgentWaId(a.agent_id);
-    if (!to) { await deps.db.updateLedger(row.id, { status: 'failed' }); continue; }
-
-    const res = open
-      ? await deps.send.sendText({ to, body: digest.freeFormText })
-      : await deps.send.sendKnockTemplate(to, ASSISTANT_TEMPLATES.digest_knock, buildKnockComponents(digest.knockVars));
-    if (res.success) { sent++; await deps.db.updateLedger(row.id, { status: open ? 'sent' : 'scheduled', wa_message_id: res.wa_message_id, sent_at: open ? now.toISOString() : null }); }
-    else { await deps.db.updateLedger(row.id, { status: 'failed' }); }
-  }
-  return { agents: agents.length, sent, suppressed };
-}
-
-// Shadow-mode launch gate (spec §13): replay events + digest, send NOTHING, report volumes.
-export interface ShadowReport { wouldSend: number; suppressed: number; scheduled: number; perAgent: Record<string, number>; }
-export async function simulateShadow(deps: ProactivityDeps): Promise<ShadowReport> {
-  const shadowDeps = { ...deps, shadow: true };
-  const perAgent: Record<string, number> = {};
-  const w = await runEventWorker(shadowDeps);
-  const d = await runDailyDigest(shadowDeps);
-  return { wouldSend: w.sent + d.sent, suppressed: w.suppressed + d.suppressed, scheduled: w.scheduled, perAgent };
-}
-```
-
-4. **Run-to-pass:** `npx vitest run tests/unit/assistant-digest-runner.test.ts`.
-
-5. **Commit:** `feat(assistant): daily digest heartbeat runner + shadow-mode simulator`
-
----
-
-### Task 10 — Lane-A in-flow nudge + pending-payload flush (knock→free-form completion)
-
-**Files (modify):** `src/lib/assistant/proactivity.ts`; **(create)** `tests/unit/assistant-lane-a.test.ts`
-
-**Interfaces produced:** `maybeLaneANudge(deps, {agentId,eventType,entityId,brand})`, `flushPendingProactive(deps, agentId)`.
-
-> Lane-A fires only INSIDE the open window, immediately after the agent interacts (spec §5.2) — e.g. quote signed while chatting → "לשלוח חוזה?". `flushPendingProactive` delivers held free-form payloads the instant the agent replies after a knock template (spec §7.2).
-
-1. **Failing test:**
+**Step 2 — idempotency verification** (run-to-fail = run BEFORE the migration is applied). Integration test (`tests/integration/assistant-events-trigger.test.ts`), gated on env so CI without creds skips:
 ```ts
 import { describe, it, expect } from 'vitest';
-import { maybeLaneANudge, flushPendingProactive } from '@/lib/assistant/proactivity';
+import { createClient } from '@supabase/supabase-js';
 
-describe('maybeLaneANudge', () => {
-  it('in-window + optin → sends free-form nudge', async () => {
-    const { deps, sent } = makeLaneDeps({ window: futureISO, optin: true });
-    const r = await maybeLaneANudge(deps, { agentId: 'A', eventType: 'quote_signed', entityId: 'e1', brand: 'Fox' });
-    expect(r.sent).toBe(true); expect(sent[0].body).toContain('חוזה');
-  });
-  it('window closed → no Lane-A nudge (never a cold push)', async () => {
-    const { deps, sent } = makeLaneDeps({ window: pastISO, optin: true });
-    const r = await maybeLaneANudge(deps, { agentId: 'A', eventType: 'quote_signed', entityId: 'e1', brand: 'Fox' });
-    expect(r.sent).toBe(false); expect(sent).toHaveLength(0);
-  });
-  it('respects dedup (already nudged this deal)', async () => {
-    const { deps, sent } = makeLaneDeps({ window: futureISO, optin: true, existingDedup: new Set(['G:quote_signed:e1']) });
-    const r = await maybeLaneANudge(deps, { agentId: 'A', eventType: 'quote_signed', entityId: 'e1', brand: 'Fox' });
-    expect(r.sent).toBe(false);
-  });
-});
-describe('flushPendingProactive', () => {
-  it('delivers held digest payload once window re-opens', async () => {
-    const { deps, sent, ledger } = makeFlushDeps({ pending: [{ id: 'L1', payload: { text: 'בוקר טוב — 5 פריטים' } }] });
-    const r = await flushPendingProactive(deps, 'A');
-    expect(r.flushed).toBe(1);
-    expect(sent[0].body).toContain('בוקר טוב');
-    expect(ledger[0].status).toBe('sent');
-  });
-  it('no pending → flushes 0', async () => {
-    const { deps } = makeFlushDeps({ pending: [] });
-    expect((await flushPendingProactive(deps, 'A')).flushed).toBe(0);
+const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const d = url && key ? describe : describe.skip;
+
+d('assistant_events trigger idempotency (real branch)', () => {
+  const sb = createClient(url!, key!);
+  it('signing twice yields exactly ONE quote_signed event (refire NO-OP)', async () => {
+    // seed a signature_request via the CRM factories, capture sigId (see helper), then:
+    const sigId = process.env.TEST_SIG_ID!; // provisioned by the fixture step below
+    await sb.from('signature_requests').update({ status: 'opened' }).eq('id', sigId);
+    await sb.from('signature_requests').update({ status: 'signed' }).eq('id', sigId);
+    await sb.from('signature_requests').update({ status: 'signed' }).eq('id', sigId); // refire
+    const { data } = await sb.from('assistant_events').select('id').eq('dedup_key', `quote_signed:${sigId}`);
+    expect(data?.length).toBe(1);
   });
 });
 ```
-
-2. **Run-to-fail:** `npx vitest run tests/unit/assistant-lane-a.test.ts`.
-
-3. **Minimal impl** (append; add `db.listPendingProactive` + reuse `getServiceWindow`, `getExistingDedupKeys`, `insertLedger`):
-```ts
-export async function maybeLaneANudge(
-  deps: ProactivityDeps, a: { agentId: string; eventType: string; entityId: string; brand: string },
-): Promise<{ sent: boolean }> {
-  const now = deps.now();
-  const policy = await deps.db.getPolicy(a.agentId);
-  if (!policy || !policy.proactivity_optin) return { sent: false };
-  const window = await deps.db.getServiceWindow(a.agentId);
-  if (!window || now.getTime() >= new Date(window).getTime()) return { sent: false }; // Lane-A is in-window only
-
-  const dedup_key = dedupKeyForEvent({ kind: 'event_notify', event_type: a.eventType, entity_id: a.entityId, agency_id: policy.agency_id }, policy.agent_id, policy.tz, now);
-  const existing = await deps.db.getExistingDedupKeys(a.agentId);
-  if (existing.has(dedup_key)) return { sent: false };
-
-  const text = (EVENT_NOTIFY_TEXT[a.eventType] || ((b: string) => `עדכון על ${b}`))(a.brand);
-  const row = await deps.db.insertLedger({ agent_id: a.agentId, agency_id: policy.agency_id, kind: 'event_notify', dedup_key, status: 'queued', payload: { text, lane: 'A' } }).catch(() => null);
-  if (!row) return { sent: false };
-  if (deps.shadow) { await deps.db.updateLedger(row.id, { status: 'sent', payload: { text, shadow: true } }); return { sent: true }; }
-  const to = await deps.db.getAgentWaId(a.agentId);
-  if (!to) { await deps.db.updateLedger(row.id, { status: 'failed' }); return { sent: false }; }
-  const res = await deps.send.sendText({ to, body: text });
-  await deps.db.updateLedger(row.id, res.success ? { status: 'sent', wa_message_id: res.wa_message_id, sent_at: now.toISOString() } : { status: 'failed' });
-  return { sent: res.success };
-}
-
-export async function flushPendingProactive(deps: ProactivityDeps, agentId: string): Promise<{ flushed: number }> {
-  const now = deps.now();
-  const pending = await deps.db.listPendingProactive(agentId); // status 'scheduled' with a held free-form payload
-  const to = await deps.db.getAgentWaId(agentId);
-  let flushed = 0;
-  if (!to) return { flushed: 0 };
-  for (const row of pending) {
-    const text = row.payload?.text;
-    if (!text) continue;
-    if (deps.shadow) { await deps.db.updateLedger(row.id, { status: 'sent' }); flushed++; continue; }
-    const res = await deps.send.sendText({ to, body: text });
-    if (res.success) { await deps.db.updateLedger(row.id, { status: 'sent', wa_message_id: res.wa_message_id, sent_at: now.toISOString() }); flushed++; }
-  }
-  return { flushed };
-}
+Because vitest cannot reach the branch in this repo's CI, ALSO verify inline via `mcp__supabase__execute_sql`:
+```sql
+-- against the branch: update a known signature_request to 'signed' twice, then:
+select count(*) from public.assistant_events where dedup_key = 'quote_signed:<known-uuid>'; -- expect 1
 ```
+Run-to-pass: `npx vitest run tests/unit/assistant-proactivity.test.ts && npx vitest run tests/integration/assistant-events-trigger.test.ts` (integration auto-skips without creds; the pure `eventDedupKey` test from Task 4 already pins the key shape in CI).
 
-4. **Run-to-pass:** `npx vitest run tests/unit/assistant-lane-a.test.ts`.
-
-5. **Commit:** `feat(assistant): Lane-A in-flow nudge + knock→free-form pending flush`
+**Commit:** `feat(assistant/events): status-transition outbox + idempotent DB triggers (quote_signed/returned/invoice_paid/contract_uploaded)`
 
 ---
 
-### Task 11 — Dismissal learning wired to delivery/read webhooks
+## Task 8 — `proactive_messages` ledger migration
 
-**Files (modify):** `src/lib/assistant/proactivity.ts` (add `recordDeliveryStatus`), `src/app/api/webhooks/whatsapp/route.ts` (call it in the status loop); **(create)** `tests/unit/assistant-delivery-learning.test.ts`
+**Files:** create `supabase/migrations/070_proactive_messages.sql`.
 
-> Uses Meta `delivered`/`read`/`failed` webhooks as the anti-nag signal (spec §5.4, §7.4). `read` with no action in the window → weak dismissal; N dismissals demote that event_type to digest-only (writes `demoted_to_digest` + an `assistant_facts` inferred suppression, read back by `getLearnedDismissed`). `delivered` guards the "sent" claim (never say ✓ on the sync 202).
+**Step 1 — migration**:
+```sql
+-- Migration 070: proactive_messages — the anti-nag ledger. Every proactive send is gated by
+-- dedup_key BEFORE the Meta call (also the outbound double-send guard on retry). body is stored
+-- so a knocked message can be flushed safely and a failed delivery can be re-sent.
+create table if not exists public.proactive_messages (
+  id uuid primary key default gen_random_uuid(),
+  agent_id uuid not null references public.users(id) on delete cascade,
+  agency_id uuid,
+  kind text not null check (kind in ('event_notify', 'daily_digest', 'reminder')),
+  source_event_id uuid references public.assistant_events(id) on delete set null,
+  dedup_key text not null,
+  status text not null check (status in ('queued', 'suppressed', 'scheduled', 'sent', 'failed', 'dismissed')),
+  suppressed_reason text check (suppressed_reason in ('not_opted_in', 'quiet_hours', 'shabbat', 'daily_cap', 'duplicate', 'learned_dismissal', 'no_template')),
+  scheduled_for timestamptz,
+  sent_at timestamptz,
+  wa_message_id text,
+  body text,
+  created_at timestamptz not null default now()
+);
+create unique index if not exists proactive_messages_dedup_uidx on public.proactive_messages(dedup_key);
+create index if not exists proactive_messages_agent_day_idx on public.proactive_messages(agent_id, created_at);
+create index if not exists proactive_messages_scheduled_idx on public.proactive_messages(scheduled_for) where status = 'scheduled';
+create index if not exists proactive_messages_wamid_idx on public.proactive_messages(wa_message_id);
+alter table public.proactive_messages enable row level security;
+```
+Apply via `mcp__supabase__apply_migration` name `070_proactive_messages`. This migration has no code test — verify with `mcp__supabase__list_tables` that the unique index exists.
 
-1. **Failing test:**
+**Commit:** `feat(assistant/proactive): proactive_messages anti-nag ledger (dedup_key unique, suppression reasons)`
+
+---
+
+## Task 9 — Hebrew UTILITY template registry (≥3, blast-radius isolation)
+
+**Files**
+- create `src/lib/assistant/proactive-templates.ts`
+- create `docs/whatsapp-templates/bestie-proactive-he.md`
+- create `tests/unit/assistant-proactive-templates.test.ts`
+
+**Interfaces produced:**
+```ts
+export type ProactiveKind = 'event_notify' | 'daily_digest' | 'reminder';
+export interface ProactiveTemplate { name: string; languageCode: 'he'; }
+export const TEMPLATES: Record<ProactiveKind, ProactiveTemplate>;
+export function templateFor(kind: ProactiveKind): ProactiveTemplate;
+```
+
+**Step 1 — failing test:**
 ```ts
 import { describe, it, expect } from 'vitest';
-import { recordDeliveryStatus } from '@/lib/assistant/proactivity';
-
-describe('recordDeliveryStatus', () => {
-  it('marks ledger delivered_at + read_at from webhook', async () => {
-    const { deps, ledger } = makeDelivDeps({ row: { id: 'L1', agent_id: 'A', kind: 'event_notify', payload: { event_type: 'invoice_overdue' } } });
-    await recordDeliveryStatus(deps, { wa_message_id: 'wam1', status: 'read', now: new Date() });
-    expect(ledger[0].read_at).toBeTruthy();
+import { TEMPLATES, templateFor } from '@/lib/assistant/proactive-templates';
+describe('proactive templates (≥3 he UTILITY, one per kind for blast-radius isolation §7.3)', () => {
+  it('has a distinct he template per kind', () => {
+    const names = Object.values(TEMPLATES).map((t) => t.name);
+    expect(new Set(names).size).toBe(3);
+    for (const t of Object.values(TEMPLATES)) expect(t.languageCode).toBe('he');
   });
-  it('3rd weak dismissal demotes event_type to digest-only', async () => {
-    const { deps, counters } = makeDelivDeps({ row: { id: 'L1', agent_id: 'A', kind: 'event_notify', payload: { event_type: 'invoice_overdue' } }, counter: { weak_count: 2, strong_count: 0 } });
-    await recordDeliveryStatus(deps, { wa_message_id: 'wam1', status: 'read', now: new Date() }); // read, unacted → weak (3rd)
-    expect(counters['A:invoice_overdue'].demoted_to_digest).toBe(true);
-  });
-  it('failed 131026 (unreachable) → status failed, no demotion', async () => {
-    const { deps, ledger } = makeDelivDeps({ row: { id: 'L1', agent_id: 'A', kind: 'event_notify', payload: { event_type: 'invoice_overdue' } } });
-    await recordDeliveryStatus(deps, { wa_message_id: 'wam1', status: 'failed', errorCode: 131026, now: new Date() });
-    expect(ledger[0].status).toBe('failed');
+  it('templateFor resolves each kind', () => {
+    expect(templateFor('daily_digest').name).toBe('bestie_daily_digest_knock');
+    expect(templateFor('event_notify').name).toBe('bestie_event_notify');
+    expect(templateFor('reminder').name).toBe('bestie_reminder');
   });
 });
 ```
+Run-to-fail.
 
-2. **Run-to-fail:** `npx vitest run tests/unit/assistant-delivery-learning.test.ts`.
-
-3. **Minimal impl** — add `db.getLedgerByWaMessageId`, `db.bumpDismissalCounter`, `db.setLearnedSuppression` seams + append:
+**Step 2 — impl** (`proactive-templates.ts`):
 ```ts
-import { classifyDismissal, shouldDemoteToDigest } from '@/lib/assistant/proactivity-policy';
-
-export async function recordDeliveryStatus(
-  deps: ProactivityDeps, s: { wa_message_id: string; status: 'sent' | 'delivered' | 'read' | 'failed'; errorCode?: number; now: Date },
-): Promise<void> {
-  const row = await deps.db.getLedgerByWaMessageId(s.wa_message_id);
-  if (!row) return; // not a proactive message
-  const ts = s.now.toISOString();
-  if (s.status === 'delivered') { await deps.db.updateLedger(row.id, { delivered_at: ts }); return; }
-  if (s.status === 'failed')    { await deps.db.updateLedger(row.id, { status: 'failed' }); return; }
-  if (s.status === 'read') {
-    await deps.db.updateLedger(row.id, { read_at: ts });
-    if (row.kind !== 'event_notify') return;
-    const eventType = row.payload?.event_type;
-    if (!eventType) return;
-    // read but no CRM action followed inside the window → weak dismissal.
-    const level = classifyDismissal({ delivered: true, read: true, actedInWindow: false, hoursSinceSent: 1 }).level;
-    if (!level) return;
-    const counter = await deps.db.bumpDismissalCounter(row.agent_id, eventType, level);
-    if (!counter.demoted_to_digest && shouldDemoteToDigest(counter)) {
-      await deps.db.setLearnedSuppression(row.agent_id, eventType); // marks demoted + writes assistant_facts inferred
-    }
-  }
-}
+/** he UTILITY templates. Meta PAUSES templates individually on blocks/reports — one per proactive
+ * kind so an annoyed agency can't kill the whole channel. languageCode MUST be 'he' (client.ts
+ * defaults to en_US → 132001 otherwise). The knock template merely re-opens the 24h window; the
+ * rich LLM-composed digest is delivered free-form after the agent taps (§7.2). */
+export type ProactiveKind = 'event_notify' | 'daily_digest' | 'reminder';
+export interface ProactiveTemplate { name: string; languageCode: 'he'; }
+export const TEMPLATES: Record<ProactiveKind, ProactiveTemplate> = {
+  daily_digest: { name: 'bestie_daily_digest_knock', languageCode: 'he' },
+  event_notify: { name: 'bestie_event_notify', languageCode: 'he' },
+  reminder: { name: 'bestie_reminder', languageCode: 'he' },
+};
+export function templateFor(kind: ProactiveKind): ProactiveTemplate { return TEMPLATES[kind]; }
 ```
-Then in `route.ts`, inside the `for (const status of value.statuses ?? [])` loop, after the existing `whatsapp_messages` update, add a best-effort call:
-```ts
-try {
-  const { recordDeliveryStatus } = await import('@/lib/assistant/proactivity');
-  await recordDeliveryStatus(makeLiveDeps(), { wa_message_id: status.id, status: status.status, errorCode: status.errors?.[0]?.code, now: new Date() });
-} catch (err) { console.warn('[assistant] delivery-learning failed', err); }
+
+**Step 3 — doc** (`docs/whatsapp-templates/bestie-proactive-he.md`) — the exact bodies to submit in Meta Business Manager (category UTILITY, language Hebrew), business register not machine-translated:
+```md
+# Bestie proactive templates (submit as category=UTILITY, language=he)
+1. bestie_daily_digest_knock — body: "יש לי סיכום יומי מוכן בשבילך 📋" · button: quick_reply "הצג סיכום"
+2. bestie_event_notify — body: "עדכון על {{1}} מוכן ב-Bestie." ({{1}} = brand)
+3. bestie_reminder — body: "תזכורת: {{1}}." ({{1}} = subject)
 ```
-(`makeLiveDeps()` — a factory in `proactivity.ts` binding the real Supabase `db` adapter + `sendText`/`sendKnockTemplate` from `client.ts`; `shadow: process.env.ASSISTANT_PROACTIVITY_SHADOW === 'true'`.)
-
-4. **Run-to-pass:** `npx vitest run tests/unit/assistant-delivery-learning.test.ts`.
-
-5. **Commit:** `feat(assistant): dismissal-learning from delivery/read webhooks → digest demotion`
+Run-to-pass; **commit:** `feat(assistant/proactive): 3 he UTILITY template defs + Meta submission doc`
 
 ---
 
-### Task 12 — Live Supabase `db` adapter + cron routes + vercel.json wiring + flags
+## Task 10 — `sendProactiveMessage`: ledger-dedup + service-window gate + knock→free-form (DI)
 
-**Files (create):** `src/lib/assistant/proactivity-db.ts` (real adapter implementing `ProactivityDeps['db']` over `supabase` service-role client), `src/app/api/cron/assistant-events/route.ts`, `src/app/api/cron/assistant-digest/route.ts`; **(modify)** `vercel.json`, `src/lib/assistant/proactivity.ts` (`makeLiveDeps` factory), `.env` docs / `scripts/check-env.ts`
+**Files**
+- create `src/lib/assistant/proactive-send.ts`
+- create `tests/unit/assistant-proactive-send.test.ts`
 
-**Interfaces produced:** `makeLiveDeps()`, two cron endpoints (CRON_SECRET-guarded, matching `crm-reminders`).
+**Interfaces produced:**
+```ts
+export interface ProactiveDeps {
+  ledgerHas(dedupKey: string): Promise<boolean>;
+  insertLedger(row: { agent_id: string; agency_id: string | null; kind: ProactiveKind; source_event_id?: string | null;
+    dedup_key: string; status: string; suppressed_reason?: string | null; scheduled_for?: string | null;
+    sent_at?: string | null; wa_message_id?: string | null; body: string }): Promise<void>;
+  isWindowOpen(waId: string): Promise<boolean>;
+  sendText: typeof import('@/lib/whatsapp-cloud/client').sendText;
+  sendTemplate: typeof import('@/lib/whatsapp-cloud/client').sendTemplate;
+  logAction(row: { agent_id: string; tool_name: string; origin: string; entity_type: string; entity_id: string | null; result: any }): Promise<void>;
+}
+export interface SendArgs { agentId: string; agencyId: string | null; waId: string; kind: ProactiveKind;
+  body: string; dedupKey: string; sourceEventId?: string | null; }
+export async function sendProactiveMessage(args: SendArgs, deps?: Partial<ProactiveDeps>): Promise<{ status: 'sent'|'suppressed'|'scheduled'|'failed'; reason?: string }>;
+```
+`deps` defaults to real Supabase/client impls (below); tests inject fakes — no supabase mocking, mirroring the pure-helper/DB-call separation in `wa-interpret.ts`.
 
-1. **Failing test** (adapter shape + flag gating — pure-ish, mock supabase):
+**Step 1 — failing test:**
 ```ts
 import { describe, it, expect, vi } from 'vitest';
-import { makeLiveDeps } from '@/lib/assistant/proactivity';
-
-describe('makeLiveDeps', () => {
-  it('honors ASSISTANT_PROACTIVITY_SHADOW flag', () => {
-    process.env.ASSISTANT_PROACTIVITY_SHADOW = 'true';
-    expect(makeLiveDeps().shadow).toBe(true);
-    process.env.ASSISTANT_PROACTIVITY_SHADOW = 'false';
-    expect(makeLiveDeps().shadow).toBe(false);
-  });
-  it('exposes the full db seam', () => {
-    const d = makeLiveDeps();
-    for (const k of ['claimUnprocessedEvents','getPolicy','getServiceWindow','insertLedger','getAgentWaId','listOptedInAgents','gatherDigestItems','getLedgerByWaMessageId','bumpDismissalCounter','setLearnedSuppression','getLearnedDismissed'])
-      expect(typeof (d.db as any)[k]).toBe('function');
-  });
-});
-```
-
-2. **Run-to-fail:** `npx vitest run tests/unit/assistant-livedeps.test.ts`.
-
-3. **Minimal impl:**
-   - `proactivity-db.ts`: real methods using `supabase` service-role. Key ones:
-     - `claimUnprocessedEvents`: `select * from assistant_events where processed_at is null order by created_at limit N` (worker sets `processed_at` per row; at-least-once + dedup_key makes re-processing safe).
-     - `getServiceWindow`: join agent → `whatsapp_contacts.wa_id = toWaId(users.whatsapp)` → `whatsapp_conversations.service_window_expires_at`.
-     - `getExistingDedupKeys`: `select dedup_key from proactive_messages where agent_id=? and created_at > now()-interval '7 days'` → Set.
-     - `countInterruptionsToday`: `count from proactive_messages where agent_id=? and status='sent' and kind in ('event_notify','reminder') and sent_at::date = <day>`.
-     - `getLearnedDismissed`: `select event_type from proactive_dismissal_counter where agent_id=? and demoted_to_digest` → Set.
-     - `gatherDigestItems`: deterministic SQL — unsigned quotes (signature_requests.status='pending' age≥5d), unpaid invoices (status in ('sent','overdue') past due), today's briefs, due reminders; amounts read from persisted `partnerships.amount`/`invoices.amount` (already `computeTotals`-derived at creation) → `DigestItem[]`.
-     - `bumpDismissalCounter`: upsert increment weak/strong; return row.
-     - `setLearnedSuppression`: `update proactive_dismissal_counter set demoted_to_digest=true` + insert `assistant_facts(provenance='inferred', predicate='suppresses_event', value={event_type})` (guarded: skip if `assistant_facts` absent).
-   - `makeLiveDeps`: `{ now: () => new Date(), shadow: process.env.ASSISTANT_PROACTIVITY_SHADOW === 'true', db: liveDb, send: { sendText, sendKnockTemplate } }`.
-   - Cron routes (mirror `crm-reminders`): CRON_SECRET bearer check; `if (process.env.ASSISTANT_PROACTIVITY_ENABLED !== 'true') return {skipped:true}`; call `runEventWorker(makeLiveDeps())` / `runDailyDigest(makeLiveDeps())`; return counts.
-```ts
-// src/app/api/cron/assistant-digest/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { makeLiveDeps, runDailyDigest } from '@/lib/assistant/proactivity';
-export const runtime = 'nodejs'; export const maxDuration = 300; export const dynamic = 'force-dynamic';
-export async function GET(req: NextRequest) {
-  if (req.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (process.env.ASSISTANT_PROACTIVITY_ENABLED !== 'true') return NextResponse.json({ skipped: 'disabled' });
-  const r = await runDailyDigest(makeLiveDeps());
-  return NextResponse.json({ ok: true, ...r });
+import { sendProactiveMessage, type ProactiveDeps } from '@/lib/assistant/proactive-send';
+function fakeDeps(over: Partial<ProactiveDeps> = {}): ProactiveDeps {
+  return {
+    ledgerHas: vi.fn().mockResolvedValue(false),
+    insertLedger: vi.fn().mockResolvedValue(undefined),
+    isWindowOpen: vi.fn().mockResolvedValue(true),
+    sendText: vi.fn().mockResolvedValue({ success: true, wa_message_id: 'wamid.text' }),
+    sendTemplate: vi.fn().mockResolvedValue({ success: true, wa_message_id: 'wamid.knock' }),
+    logAction: vi.fn().mockResolvedValue(undefined),
+    ...over,
+  };
 }
-```
-   - `vercel.json`: add
-```json
-{ "path": "/api/cron/assistant-events", "schedule": "*/5 * * * *" },
-{ "path": "/api/cron/assistant-digest", "schedule": "0 6 * * *" }
-```
-     (digest cron runs hourly-ish window; the runner itself enforces per-agent `digest_hour` + dedup so an agent gets exactly one/day — set `"0 6 * * *"` for the common 09:00 IL slot, or `"0 * * * *"` if per-agent hours vary. Start with the single 06:00 UTC ≈ 09:00 IL slot.)
-   - Add `ASSISTANT_PROACTIVITY_ENABLED`, `ASSISTANT_PROACTIVITY_SHADOW` to `scripts/check-env.ts` optional list.
-
-4. **Run-to-pass:** `npx vitest run tests/unit/assistant-livedeps.test.ts` then full guard `npx vitest run tests/unit/assistant-*.test.ts` and `npm run type-check`.
-
-5. **Commit:** `feat(assistant): live proactivity db adapter + event/digest crons + flags`
-
----
-
-### Task 13 — Opt-in onboarding hook + down-tune command application (agent-driven, warmly confirmed)
-
-**Files (create):** `src/lib/assistant/nag-policy.ts` (`ensureNagPolicy(agentId)`, `applyDownTune(agentId, patch)`, `setOptIn(agentId, on)`), `tests/unit/assistant-nag-policy.test.ts`; **(modify)** the WhatsApp agent branch (`wa-conversation.ts` or its P1 successor) to intercept stop-intent + down-tune commands before planning.
-
-> Conservative default: `proactivity_optin=false` until explicit one-tap opt-in with stored `consent_at` (spec §5.1, §7.3). Down-tune commands are first-class, reversible, and confirmed concretely ("סגור — מהיום סיכום אחד ב-9:00, שקט בסופ״ש").
-
-1. **Failing test:**
-```ts
-import { describe, it, expect } from 'vitest';
-import { confirmDownTune } from '@/lib/assistant/nag-policy';
-describe('confirmDownTune (pure confirmation copy)', () => {
-  it('daily_cap 1 → concrete Hebrew confirmation', () => {
-    expect(confirmDownTune({ daily_cap: 1 })).toContain('פעם ביום');
+const args = { agentId: 'ag', agencyId: 'agency', waId: '972500000000', kind: 'daily_digest' as const, body: 'סיכום', dedupKey: 'agency:daily_digest:2026-01-15' };
+describe('sendProactiveMessage', () => {
+  it('window OPEN → free-form sendText, ledger sent, NO template', async () => {
+    const d = fakeDeps();
+    const r = await sendProactiveMessage(args, d);
+    expect(r.status).toBe('sent'); expect(d.sendText).toHaveBeenCalledOnce(); expect(d.sendTemplate).not.toHaveBeenCalled();
+    expect(d.insertLedger).toHaveBeenCalledWith(expect.objectContaining({ status: 'sent', wa_message_id: 'wamid.text' }));
+    expect(d.logAction).toHaveBeenCalled(); // logged before returning (Principle 7)
   });
-  it('shabbat_quiet → mentions Shabbat', () => {
-    expect(confirmDownTune({ shabbat_quiet: true })).toContain('שבת');
+  it('window CLOSED → knock template, ledger scheduled with body stashed', async () => {
+    const d = fakeDeps({ isWindowOpen: vi.fn().mockResolvedValue(false) });
+    const r = await sendProactiveMessage(args, d);
+    expect(r.status).toBe('scheduled'); expect(d.sendTemplate).toHaveBeenCalledOnce(); expect(d.sendText).not.toHaveBeenCalled();
+    expect(d.insertLedger).toHaveBeenCalledWith(expect.objectContaining({ status: 'scheduled', body: 'סיכום' }));
   });
-  it('empty patch → generic ack', () => {
-    expect(confirmDownTune({})).toMatch(/עדכנתי|סגור/);
+  it('dedup_key already present → suppress(duplicate), NO Meta call (double-send guard)', async () => {
+    const d = fakeDeps({ ledgerHas: vi.fn().mockResolvedValue(true) });
+    const r = await sendProactiveMessage(args, d);
+    expect(r).toEqual({ status: 'suppressed', reason: 'duplicate' });
+    expect(d.sendText).not.toHaveBeenCalled(); expect(d.sendTemplate).not.toHaveBeenCalled();
+  });
+  it('sendText failure → ledger failed', async () => {
+    const d = fakeDeps({ sendText: vi.fn().mockResolvedValue({ success: false }) });
+    expect((await sendProactiveMessage(args, d)).status).toBe('failed');
+    expect(d.insertLedger).toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }));
   });
 });
 ```
-(`ensureNagPolicy`/`applyDownTune`/`setOptIn` are DB-thin; covered by the round-trip in Task 1 + type-check. The *pure* `confirmDownTune` copy builder is unit-tested; the interception path is exercised by the wa-conversation tests inherited from P1.)
+Run-to-fail.
 
-2. **Run-to-fail:** `npx vitest run tests/unit/assistant-nag-policy.test.ts`.
-
-3. **Minimal impl** (`nag-policy.ts`):
+**Step 2 — impl** (`proactive-send.ts`):
 ```ts
 import { supabase as supabaseAdmin } from '@/lib/supabase';
-import type { NagPolicy } from '@/lib/assistant/proactivity-policy';
+import { sendText, sendTemplate, toWaId } from '@/lib/whatsapp-cloud/client';
+import { templateFor, type ProactiveKind } from '@/lib/assistant/proactive-templates';
 
-export async function ensureNagPolicy(agentId: string): Promise<void> {
-  await supabaseAdmin.from('assistant_nag_policy').upsert({ agent_id: agentId }, { onConflict: 'agent_id', ignoreDuplicates: true });
+export interface ProactiveDeps { /* ...as in Interfaces above... */ }
+export interface SendArgs { agentId: string; agencyId: string | null; waId: string; kind: ProactiveKind; body: string; dedupKey: string; sourceEventId?: string | null; }
+
+async function defaultIsWindowOpen(waId: string): Promise<boolean> {
+  const { data: contact } = await supabaseAdmin.from('whatsapp_contacts').select('id').eq('wa_id', toWaId(waId)).maybeSingle();
+  if (!contact) return false;
+  const { data: convo } = await supabaseAdmin.from('whatsapp_conversations').select('service_window_expires_at').eq('contact_id', contact.id).maybeSingle();
+  const exp = convo?.service_window_expires_at ? new Date(convo.service_window_expires_at).getTime() : 0;
+  return exp > Date.now();
 }
-export async function setOptIn(agentId: string, on: boolean): Promise<void> {
-  await supabaseAdmin.from('assistant_nag_policy').upsert(
-    { agent_id: agentId, proactivity_optin: on, consent_at: on ? new Date().toISOString() : null, updated_at: new Date().toISOString() },
-    { onConflict: 'agent_id' });
-}
-export async function applyDownTune(agentId: string, patch: Partial<NagPolicy>): Promise<void> {
-  if (!patch || !Object.keys(patch).length) return;
-  await supabaseAdmin.from('assistant_nag_policy').upsert({ agent_id: agentId, ...patch, updated_at: new Date().toISOString() }, { onConflict: 'agent_id' });
-}
-export function confirmDownTune(patch: Partial<NagPolicy>): string {
-  const parts: string[] = [];
-  if (patch.daily_cap === 1) parts.push('מהיום סיכום אחד ביום');
-  if (patch.shabbat_quiet) parts.push('שקט בשבת');
-  if (patch.digest_hour) parts.push(`הסיכום ב-${patch.digest_hour}`);
-  return parts.length ? `סגור — ${parts.join(', ')}. תמיד אפשר לשנות.` : 'עדכנתי את ההעדפות שלך.';
+const realDeps: ProactiveDeps = {
+  ledgerHas: async (k) => { const { data } = await supabaseAdmin.from('proactive_messages').select('id').eq('dedup_key', k).maybeSingle(); return !!data; },
+  insertLedger: async (row) => { await supabaseAdmin.from('proactive_messages').insert(row); },
+  isWindowOpen: defaultIsWindowOpen,
+  sendText, sendTemplate,
+  logAction: async (row) => { await supabaseAdmin.from('assistant_actions').insert({ ...row, status: 'done', executed_at: new Date().toISOString() }); },
+};
+
+export async function sendProactiveMessage(args: SendArgs, override: Partial<ProactiveDeps> = {}): Promise<{ status: 'sent'|'suppressed'|'scheduled'|'failed'; reason?: string }> {
+  const d: ProactiveDeps = { ...realDeps, ...override };
+  // 1. ledger dedup BEFORE any Meta call (idempotent double-send guard)
+  if (await d.ledgerHas(args.dedupKey)) return { status: 'suppressed', reason: 'duplicate' };
+  const base = { agent_id: args.agentId, agency_id: args.agencyId, kind: args.kind, source_event_id: args.sourceEventId ?? null, dedup_key: args.dedupKey, body: args.body };
+  // 2. service-window gate (§7.1) — NEVER sendText without it (else 131047 silent failure)
+  if (await d.isWindowOpen(args.waId)) {
+    const res = await d.sendText({ to: args.waId, body: args.body });
+    const status = res.success ? 'sent' : 'failed';
+    await d.insertLedger({ ...base, status, sent_at: res.success ? new Date().toISOString() : null, wa_message_id: res.wa_message_id ?? null });
+    await d.logAction({ agent_id: args.agentId, tool_name: 'proactive.send', origin: 'assistant_auto', entity_type: 'proactive_message', entity_id: args.sourceEventId ?? null, result: { status, kind: args.kind } });
+    return { status };
+  }
+  // 3. window closed → knock template (UTILITY he), stash body for flush on the agent's reply (§7.2)
+  const tpl = templateFor(args.kind);
+  const knock = await d.sendTemplate({ to: args.waId, templateName: tpl.name, languageCode: tpl.languageCode });
+  await d.insertLedger({ ...base, status: 'scheduled', wa_message_id: knock.wa_message_id ?? null });
+  await d.logAction({ agent_id: args.agentId, tool_name: 'proactive.knock', origin: 'assistant_auto', entity_type: 'proactive_message', entity_id: args.sourceEventId ?? null, result: { kind: args.kind } });
+  return { status: 'scheduled', reason: 'knock_sent' };
 }
 ```
-   Wire into the agent message handler (before planning): `const stop = parseStopIntent(text); if (stop) { await setOptIn(agent.id, false); return 'סגור, כיביתי התראות יזומות. תכתוב "הפעל התראות" מתי שתרצה.'; } const tune = parseDownTuneCommand(text); if (tune) { await applyDownTune(agent.id, tune); return confirmDownTune(tune); }` — plus a positive opt-in intent ("הפעל התראות") → `setOptIn(true)` + `ensureNagPolicy`.
-
-4. **Run-to-pass:** `npx vitest run tests/unit/assistant-nag-policy.test.ts` then `npx vitest run tests/unit/assistant-*.test.ts`.
-
-5. **Commit:** `feat(assistant): opt-in consent + down-tune/stop command handling with warm confirmations`
+Run-to-pass; **commit:** `feat(assistant/proactive): service-window-gated send with knock-template→free-form + ledger double-send guard`
 
 ---
 
-### Final gate (before marking P6 done)
+## Task 11 — Event-outbox worker + daily-digest composer (the heartbeat) + cron
 
-- `npm run type-check` clean for all new files.
-- `npx vitest run tests/unit/assistant-*.test.ts tests/unit/crm-*.test.ts` green (no regression to `crm-wa-interpret`/`crm-pricing`).
-- Migrations `066`+`067` applied to the Supabase branch; the trigger round-trip (Task 2) confirmed against real constraints.
-- **Ship in SHADOW mode:** deploy with `ASSISTANT_PROACTIVITY_ENABLED=true` + `ASSISTANT_PROACTIVITY_SHADOW=true`; run `simulateShadow` over a replay window; confirm p95 interruptions/agent/day ≤ `daily_cap` and 0 would-sends inside quiet/Shabbat before flipping `ASSISTANT_PROACTIVITY_SHADOW=false`.
-- **Ops prerequisite (not code):** the 3 Hebrew UTILITY templates (`bestie_digest_knock`, `bestie_reminder`, `bestie_event_notify`) approved in Meta Business Manager, names matching `ASSISTANT_TEMPLATES`.
+**Files**
+- modify `src/lib/assistant/proactive-send.ts` (add `consumeAssistantEvents`, `runDailyDigest`)
+- create `src/app/api/cron/assistant-proactive/route.ts`
+- create `tests/unit/assistant-proactive-worker.test.ts`
+
+**Interfaces produced:**
+```ts
+export interface WorkerDeps extends ProactiveDeps {
+  fetchUnprocessedEvents(): Promise<Array<{ id: string; agent_id: string; agency_id: string | null; event_type: string; entity_type: string; entity_id: string; payload: any }>>;
+  markEventProcessed(id: string): Promise<void>;
+  loadPolicy(agentId: string): Promise<NagPolicy | null>;
+  interruptionsToday(agentId: string, nowMs: number): Promise<number>;
+  learnedDismissed(agentId: string, eventType: string): Promise<boolean>;
+  enrichEvent(e: any): Promise<{ brand: string; talent: string | null; amountText: string | null }>; // reads stored totals — no math
+  waIdForAgent(agentId: string): Promise<string | null>;
+  fetchDigestItems(agentId: string, nowMs: number): Promise<DigestItem[]>;
+  listOptedInAgents(): Promise<Array<{ agent_id: string; agency_id: string | null }>>;
+}
+export async function consumeAssistantEvents(nowMs: number, deps?: Partial<WorkerDeps>): Promise<{ sent: number; scheduled: number; suppressed: number }>;
+export async function runDailyDigest(nowMs: number, deps?: Partial<WorkerDeps>): Promise<{ digestsSent: number }>;
+```
+
+Worker flow per event (§5.2 Lane-B folds into digest, so event-notify here is ONLY for Lane-A-style immediate transitions the agent should see now): resolve policy → `gateProactiveSend({ kind:'event_notify', dedupExists via ledgerHas(proactiveDedupKey), interruptionsToday, learnedDismissed, severityFloor:false, hasTemplate:true })` → on `send` compose one-line body from `enrichEvent` + `sendProactiveMessage`; on `schedule` insert ledger `scheduled_for`; on `suppress` insert ledger `suppressed` (transparent, so §5.4 "transparent suppression" can surface it). Always `markEventProcessed`. `runDailyDigest` iterates opted-in agents whose local time == digest_hour, dedup_key `proactiveDedupKey(agencyId, agentId, 'daily_digest', localDate)` (agency-level → one digest for owner+employee), `composeDigest(fetchDigestItems)`, `sendProactiveMessage(kind:'daily_digest')`.
+
+**Step 1 — failing test** (fakes injected; simulated clock):
+```ts
+import { describe, it, expect, vi } from 'vitest';
+import { consumeAssistantEvents, runDailyDigest } from '@/lib/assistant/proactive-send';
+const policy = { agent_id: 'ag', tz: 'Asia/Jerusalem', quiet_start: '21:00', quiet_end: '08:00', daily_cap: 3, digest_hour: 9, shabbat_quiet: true, proactivity_optin: true, consent_at: 'x' };
+function wdeps(over = {}) {
+  return {
+    fetchUnprocessedEvents: vi.fn().mockResolvedValue([{ id: 'e1', agent_id: 'ag', agency_id: 'agency', event_type: 'quote_signed', entity_type: 'signature_request', entity_id: 's1', payload: {} }]),
+    markEventProcessed: vi.fn().mockResolvedValue(undefined),
+    loadPolicy: vi.fn().mockResolvedValue(policy),
+    interruptionsToday: vi.fn().mockResolvedValue(0),
+    learnedDismissed: vi.fn().mockResolvedValue(false),
+    enrichEvent: vi.fn().mockResolvedValue({ brand: 'Fox', talent: 'נועה', amountText: '23,600 ₪' }),
+    waIdForAgent: vi.fn().mockResolvedValue('972500000000'),
+    fetchDigestItems: vi.fn(), listOptedInAgents: vi.fn(),
+    ledgerHas: vi.fn().mockResolvedValue(false), insertLedger: vi.fn().mockResolvedValue(undefined),
+    isWindowOpen: vi.fn().mockResolvedValue(true),
+    sendText: vi.fn().mockResolvedValue({ success: true, wa_message_id: 'w1' }),
+    sendTemplate: vi.fn().mockResolvedValue({ success: true, wa_message_id: 'w2' }),
+    logAction: vi.fn().mockResolvedValue(undefined),
+    ...over,
+  };
+}
+const NOON = Date.parse('2026-01-15T10:00:00Z'); // 12:00 IST Thu — not quiet, not Shabbat
+describe('consumeAssistantEvents', () => {
+  it('signed event inside window → one free-form send + event processed', async () => {
+    const d = wdeps();
+    const r = await consumeAssistantEvents(NOON, d);
+    expect(r.sent).toBe(1); expect(d.sendText).toHaveBeenCalledOnce(); expect(d.markEventProcessed).toHaveBeenCalledWith('e1');
+  });
+  it('learned-dismissed event → suppressed, not sent, still processed', async () => {
+    const d = wdeps({ learnedDismissed: vi.fn().mockResolvedValue(true) });
+    const r = await consumeAssistantEvents(NOON, d);
+    expect(r.suppressed).toBe(1); expect(d.sendText).not.toHaveBeenCalled(); expect(d.markEventProcessed).toHaveBeenCalledWith('e1');
+  });
+  it('quiet hours → scheduled, not sent', async () => {
+    const d = wdeps();
+    const r = await consumeAssistantEvents(Date.parse('2026-01-15T20:00:00Z'), d); // 22:00 IST
+    expect(r.scheduled).toBe(1); expect(d.sendText).not.toHaveBeenCalled();
+  });
+});
+describe('runDailyDigest', () => {
+  it('one agency-scoped digest at digest_hour', async () => {
+    const items = [{ emoji: '🖊️', brand: 'Fox', talent: null, amountText: '23,600 ₪', priority: 5 }];
+    const d = wdeps({ listOptedInAgents: vi.fn().mockResolvedValue([{ agent_id: 'ag', agency_id: 'agency' }]), fetchDigestItems: vi.fn().mockResolvedValue(items), loadPolicy: vi.fn().mockResolvedValue(policy) });
+    const at9 = Date.parse('2026-01-15T07:00:00Z'); // 09:00 IST
+    const r = await runDailyDigest(at9, d);
+    expect(r.digestsSent).toBe(1); expect(d.sendText).toHaveBeenCalledOnce();
+    expect(d.insertLedger).toHaveBeenCalledWith(expect.objectContaining({ kind: 'daily_digest', dedup_key: 'agency:daily_digest:2026-01-15' }));
+  });
+  it('skips agents whose local hour != digest_hour', async () => {
+    const d = wdeps({ listOptedInAgents: vi.fn().mockResolvedValue([{ agent_id: 'ag', agency_id: 'agency' }]), loadPolicy: vi.fn().mockResolvedValue(policy) });
+    expect((await runDailyDigest(NOON, d)).digestsSent).toBe(0);
+  });
+});
+```
+Run-to-fail.
+
+**Step 2 — impl** (append to proactive-send.ts): real `WorkerDeps` defaults wired to Supabase (`fetchUnprocessedEvents` = `assistant_events` where `processed_at is null`; `interruptionsToday` counts `proactive_messages` with `status='sent'` and `kind in ('event_notify','reminder')` created today local; `learnedDismissed` reads `assistant_facts` predicate `dismisses_event_type` value.count>=3 via `isDemoted`; `enrichEvent` joins `partnerships.brand_name` + stored `total_amount` formatted with `toLocaleString('en-US')`+' ₪' — **no `computeTotals` call**; `fetchDigestItems` aggregates today's `assistant_events` for the agent into `DigestItem[]`; `listOptedInAgents` = `assistant_nag_policy` where `proactivity_optin` and `consent_at not null`). Core orchestration uses the pure gate:
+```ts
+export async function consumeAssistantEvents(nowMs, override = {}) {
+  const d = { ...realWorkerDeps, ...override };
+  let sent = 0, scheduled = 0, suppressed = 0;
+  for (const e of await d.fetchUnprocessedEvents()) {
+    const policy = await d.loadPolicy(e.agent_id);
+    if (!policy) { await d.markEventProcessed(e.id); continue; }
+    const sourceKey = eventDedupKey(e.event_type, e.entity_id);
+    const dedupKey = proactiveDedupKey(e.agency_id, e.agent_id, 'event_notify', sourceKey);
+    const dec = gateProactiveSend({ nowMs, policy, kind: 'event_notify',
+      dedupExists: await d.ledgerHas(dedupKey), interruptionsToday: await d.interruptionsToday(e.agent_id, nowMs),
+      learnedDismissed: await d.learnedDismissed(e.agent_id, e.event_type), severityFloor: false, hasTemplate: true });
+    if (dec.decision === 'send') {
+      const en = await d.enrichEvent(e); const wa = await d.waIdForAgent(e.agent_id);
+      if (wa) { await sendProactiveMessage({ agentId: e.agent_id, agencyId: e.agency_id, waId: wa, kind: 'event_notify',
+        body: composeDigest([{ emoji: emojiFor(e.event_type), brand: en.brand, talent: en.talent, amountText: en.amountText, priority: 1 }]),
+        dedupKey, sourceEventId: e.id }, d); sent++; }
+    } else if (dec.decision === 'schedule') {
+      await d.insertLedger({ agent_id: e.agent_id, agency_id: e.agency_id, kind: 'event_notify', source_event_id: e.id, dedup_key: dedupKey, status: 'scheduled', suppressed_reason: dec.reason, scheduled_for: new Date(dec.scheduledFor).toISOString(), body: '' }); scheduled++;
+    } else {
+      await d.insertLedger({ agent_id: e.agent_id, agency_id: e.agency_id, kind: 'event_notify', source_event_id: e.id, dedup_key: dedupKey, status: 'suppressed', suppressed_reason: dec.reason, body: '' }); suppressed++;
+    }
+    await d.markEventProcessed(e.id);
+  }
+  return { sent, scheduled, suppressed };
+}
+export async function runDailyDigest(nowMs, override = {}) {
+  const d = { ...realWorkerDeps, ...override }; let digestsSent = 0;
+  const localDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date(nowMs)); // YYYY-MM-DD
+  for (const a of await d.listOptedInAgents()) {
+    const policy = await d.loadPolicy(a.agent_id); if (!policy) continue;
+    if (toJerusalem(nowMs).minutes !== policy.digest_hour * 60) continue;
+    if (isShabbat(nowMs, policy) || isQuietHours(nowMs, policy)) continue;
+    const items = await d.fetchDigestItems(a.agent_id, nowMs);
+    const wa = await d.waIdForAgent(a.agent_id); if (!wa) continue;
+    const r = await sendProactiveMessage({ agentId: a.agent_id, agencyId: a.agency_id, waId: wa, kind: 'daily_digest',
+      body: composeDigest(items), dedupKey: proactiveDedupKey(a.agency_id, a.agent_id, 'daily_digest', localDate) }, d);
+    if (r.status === 'sent' || r.status === 'scheduled') digestsSent++;
+  }
+  return { digestsSent };
+}
+```
+(`emojiFor` + `import { gateProactiveSend, composeDigest, proactiveDedupKey, eventDedupKey, isShabbat, isQuietHours, toJerusalem, type DigestItem, type NagPolicy } from './proactivity'`.)
+
+**Step 3 — cron route** (`src/app/api/cron/assistant-proactive/route.ts`) — mirror `crm-reminders`:
+```ts
+import { NextRequest, NextResponse } from 'next/server';
+import { consumeAssistantEvents, runDailyDigest } from '@/lib/assistant/proactive-send';
+export const runtime = 'nodejs'; export const maxDuration = 300; export const dynamic = 'force-dynamic';
+function ok(req: NextRequest) { const h = req.headers.get('authorization'); return !!h && h === `Bearer ${process.env.CRON_SECRET}`; }
+export async function GET(req: NextRequest) {
+  if (!ok(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const now = Date.now();
+  const events = await consumeAssistantEvents(now);
+  const digest = await runDailyDigest(now);
+  return NextResponse.json({ ok: true, ...events, ...digest });
+}
+```
+Run-to-pass: `npx vitest run tests/unit/assistant-proactive-worker.test.ts`; **commit:** `feat(assistant/proactive): event-outbox worker + agency-scoped daily-digest heartbeat + cron`
+
+---
+
+## Task 12 — Lane-A in-flow nudge (in-window only, never knocks)
+
+**Files:** modify `src/lib/assistant/proactive-send.ts` (`queueLaneANudge`), `tests/unit/assistant-proactive-send.test.ts`.
+
+**Interface produced:**
+```ts
+export async function queueLaneANudge(args: { agentId: string; agencyId: string | null; waId: string;
+  eventType: string; entityId: string; body: string; midNegotiation: boolean }, deps?: Partial<ProactiveDeps & { loadPolicy(id:string):Promise<NagPolicy|null>; isWindowOpen(w:string):Promise<boolean> }>): Promise<{ status: 'sent'|'held'|'suppressed' }>;
+```
+Called from the **Executor** (P2) right after a `write_external` tool success (e.g. `build_quote` DRAFT → "לשלוח חוזה?"). Lane-A fires ONLY inside the live window and is HELD if the agent is mid-negotiation (`midNegotiation` = active typing thread). It never sends a knock template (that's Lane-B/digest only).
+
+**Step 1 — failing test** (append):
+```ts
+import { queueLaneANudge } from '@/lib/assistant/proactive-send';
+const pol = { agent_id: 'ag', tz: 'Asia/Jerusalem', quiet_start: '21:00', quiet_end: '08:00', daily_cap: 3, digest_hour: 9, shabbat_quiet: true, proactivity_optin: true, consent_at: 'x' };
+describe('queueLaneANudge (Lane A — in-flow only)', () => {
+  const a = { agentId: 'ag', agencyId: 'agency', waId: '972500000000', eventType: 'quote_built', entityId: 'q1', body: 'לשלוח חוזה?', midNegotiation: false };
+  it('inside window + not negotiating → sent', async () => {
+    const d = fakeDeps(); (d as any).loadPolicy = vi.fn().mockResolvedValue(pol);
+    expect((await queueLaneANudge(a, d)).status).toBe('sent'); expect(d.sendText).toHaveBeenCalledOnce();
+  });
+  it('mid-negotiation → held, no send (do-not-interrupt)', async () => {
+    const d = fakeDeps(); (d as any).loadPolicy = vi.fn().mockResolvedValue(pol);
+    expect((await queueLaneANudge({ ...a, midNegotiation: true }, d)).status).toBe('held'); expect(d.sendText).not.toHaveBeenCalled();
+  });
+  it('window closed → suppressed, NEVER a knock template', async () => {
+    const d = fakeDeps({ isWindowOpen: vi.fn().mockResolvedValue(false) }); (d as any).loadPolicy = vi.fn().mockResolvedValue(pol);
+    expect((await queueLaneANudge(a, d)).status).toBe('suppressed'); expect(d.sendTemplate).not.toHaveBeenCalled();
+  });
+});
+```
+Run-to-fail.
+
+**Step 2 — impl** (append):
+```ts
+export async function queueLaneANudge(args, override = {}) {
+  const d = { ...realWorkerDeps, ...realDeps, ...override };
+  const policy = await d.loadPolicy(args.agentId);
+  if (!policy) return { status: 'suppressed' as const };
+  if (args.midNegotiation) return { status: 'held' as const }; // do-not-interrupt an active thread (§5.2)
+  const dedupKey = proactiveDedupKey(args.agencyId, args.agentId, 'event_notify', eventDedupKey(args.eventType, args.entityId));
+  const dec = gateProactiveSend({ nowMs: Date.now(), policy, kind: 'event_notify',
+    dedupExists: await d.ledgerHas(dedupKey), interruptionsToday: await d.interruptionsToday(args.agentId, Date.now()),
+    learnedDismissed: await d.learnedDismissed(args.agentId, args.eventType), severityFloor: false, hasTemplate: true });
+  if (dec.decision !== 'send') return { status: 'suppressed' as const };
+  if (!(await d.isWindowOpen(args.waId))) return { status: 'suppressed' as const }; // Lane A is window-bound; no knock
+  const r = await sendProactiveMessage({ agentId: args.agentId, agencyId: args.agencyId, waId: args.waId, kind: 'event_notify', body: args.body, dedupKey }, d);
+  return { status: r.status === 'sent' ? 'sent' as const : 'suppressed' as const };
+}
+```
+Run-to-pass; **commit:** `feat(assistant/proactive): Lane-A in-flow nudge (window-bound, do-not-interrupt, no knock)`
+
+---
+
+## Task 13 — Dismissal-learning writer + knock flush (webhook signals)
+
+**Files:** modify `src/lib/assistant/proactive-send.ts` (`recordDeliverySignal`, `flushKnockedProactive`), `tests/unit/assistant-proactive-dismissal.test.ts`.
+
+**Interfaces produced:**
+```ts
+export async function recordDeliverySignal(waMessageId: string, signal: 'strong'|'weak'|'ambiguous', deps?): Promise<{ demoted: boolean }>;
+export async function flushKnockedProactive(agentId: string, waId: string, deps?): Promise<{ flushed: number }>;
+```
+`recordDeliverySignal` maps a Meta delivered/read webhook (or an explicit Hebrew "די") on a proactive `wa_message_id` → looks up the ledger row's `agent_id`+event_type → `nextDismissalCount` → upserts `assistant_facts` (provenance `inferred`, predicate `dismisses_event_type`) → returns `demoted` per `isDemoted`. `flushKnockedProactive` sends the stashed `body` of any `status='scheduled'` knocked rows for the agent the instant they reply (§7.2), marking them `sent`.
+
+**Step 1 — failing test:**
+```ts
+import { describe, it, expect, vi } from 'vitest';
+import { recordDeliverySignal, flushKnockedProactive } from '@/lib/assistant/proactive-send';
+describe('recordDeliverySignal → assistant_facts inferred dismissal', () => {
+  it('strong "די" demotes immediately (count→3)', async () => {
+    const upsertFact = vi.fn().mockResolvedValue(undefined);
+    const d = { ledgerRowByWamid: vi.fn().mockResolvedValue({ agent_id: 'ag', kind: 'event_notify', source_event_type: 'invoice_paid' }),
+      currentDismissCount: vi.fn().mockResolvedValue(0), upsertFact };
+    const r = await recordDeliverySignal('w1', 'strong', d);
+    expect(r.demoted).toBe(true);
+    expect(upsertFact).toHaveBeenCalledWith(expect.objectContaining({ predicate: 'dismisses_event_type', provenance: 'inferred' }));
+  });
+  it('weak read-no-action from 2 → 3 demotes', async () => {
+    const d = { ledgerRowByWamid: vi.fn().mockResolvedValue({ agent_id: 'ag', kind: 'event_notify', source_event_type: 'invoice_paid' }),
+      currentDismissCount: vi.fn().mockResolvedValue(2), upsertFact: vi.fn().mockResolvedValue(undefined) };
+    expect((await recordDeliverySignal('w1', 'weak', d)).demoted).toBe(true);
+  });
+  it('ambiguous does not count', async () => {
+    const d = { ledgerRowByWamid: vi.fn().mockResolvedValue({ agent_id: 'ag', kind: 'event_notify', source_event_type: 'invoice_paid' }),
+      currentDismissCount: vi.fn().mockResolvedValue(2), upsertFact: vi.fn().mockResolvedValue(undefined) };
+    expect((await recordDeliverySignal('w1', 'ambiguous', d)).demoted).toBe(false);
+  });
+});
+describe('flushKnockedProactive', () => {
+  it('sends stashed body + marks sent', async () => {
+    const markSent = vi.fn().mockResolvedValue(undefined);
+    const d = { fetchScheduledKnocks: vi.fn().mockResolvedValue([{ id: 'p1', body: 'סיכום' }]),
+      sendText: vi.fn().mockResolvedValue({ success: true, wa_message_id: 'w9' }), markSent };
+    const r = await flushKnockedProactive('ag', '972500000000', d);
+    expect(r.flushed).toBe(1); expect(d.sendText).toHaveBeenCalledOnce(); expect(markSent).toHaveBeenCalledWith('p1', 'w9');
+  });
+});
+```
+Run-to-fail.
+
+**Step 2 — impl** (append; uses `nextDismissalCount`/`isDemoted`/`classifyDismissalText` from proactivity.ts). Real deps wire `ledgerRowByWamid` → `proactive_messages` join; `currentDismissCount`/`upsertFact` → `assistant_facts`; `fetchScheduledKnocks` → `proactive_messages status='scheduled'` for the agent; `markSent` updates row `status='sent', wa_message_id, sent_at`.
+Run-to-pass; **commit:** `feat(assistant/proactive): dismissal-learning writer (inferred fact) + knock-flush on reply`
+
+---
+
+## Task 14 — Shadow-mode simulator (launch gate) + zero-side-effect proof
+
+**Files:** create `src/lib/assistant/shadow-proactivity.ts`, `scripts/shadow-proactivity.ts`, `tests/unit/assistant-shadow.test.ts`.
+
+**Interfaces produced:**
+```ts
+export interface SimEvent { agent_id: string; agency_id: string | null; event_type: string; entity_id: string; at: number; }
+export interface SimSend { agent_id: string; localDate: string; kind: string; }
+export function simulateProactivity(input: { events: SimEvent[]; policies: Record<string, NagPolicy>; nowMs: number }): { wouldSend: SimSend[]; perAgentDaily: Record<string, number>; p95: number };
+```
+Replays historical `assistant_events` through the SAME pure `gateProactiveSend`, tracking dedup in-memory, sending NOTHING (§13 launch gate: p95 daily volume under cap AND no Meta calls). Imports ONLY `./proactivity` — statically no `whatsapp-cloud/client` import (the test asserts this).
+
+**Step 1 — failing test:**
+```ts
+import { describe, it, expect } from 'vitest';
+import { simulateProactivity } from '@/lib/assistant/shadow-proactivity';
+const pol = { agent_id: 'ag', tz: 'Asia/Jerusalem', quiet_start: '21:00', quiet_end: '08:00', daily_cap: 3, digest_hour: 9, shabbat_quiet: true, proactivity_optin: true, consent_at: 'x' };
+describe('shadow-mode simulator', () => {
+  it('respects the daily cap and never exceeds it', () => {
+    const day = Date.parse('2026-01-15T10:00:00Z');
+    const events = Array.from({ length: 8 }, (_, i) => ({ agent_id: 'ag', agency_id: 'a', event_type: 'quote_signed', entity_id: 'e' + i, at: day + i * 60000 }));
+    const r = simulateProactivity({ events, policies: { ag: pol }, nowMs: day });
+    expect(r.perAgentDaily.ag).toBeLessThanOrEqual(pol.daily_cap);
+    expect(r.p95).toBeLessThanOrEqual(pol.daily_cap);
+  });
+  it('opted-out agent → zero would-send', () => {
+    const r = simulateProactivity({ events: [{ agent_id: 'ag', agency_id: 'a', event_type: 'quote_signed', entity_id: 'e1', at: Date.parse('2026-01-15T10:00:00Z') }], policies: { ag: { ...pol, proactivity_optin: false } }, nowMs: 0 });
+    expect(r.wouldSend.length).toBe(0);
+  });
+  it('imports no Meta client (pure, side-effect-free)', async () => {
+    const src = await import('fs').then((fs) => fs.readFileSync('src/lib/assistant/shadow-proactivity.ts', 'utf8'));
+    expect(src).not.toContain('whatsapp-cloud/client');
+  });
+});
+```
+Run-to-fail.
+
+**Step 2 — impl** (`shadow-proactivity.ts`): loop events, per agent+localDate track sent count + dedup set; call `gateProactiveSend` with `interruptionsToday` = running count, `dedupExists` from the set; count `decision==='send'`; aggregate `perAgentDaily` (max per day) + `percentile(values, 0.95)`. Script `scripts/shadow-proactivity.ts` pulls real `assistant_events` + `assistant_nag_policy` via service-role client and prints `perAgentDaily` + `p95` + a sample `wouldSend` log.
+Run-to-pass; **commit:** `feat(assistant/proactive): shadow-mode simulator + p95 launch-gate + zero-side-effect proof`
+
+---
+
+## Task 15 — Wire cron + webhook flush/dismissal + type-check
+
+**Files:** modify `vercel.json`, `src/app/api/webhooks/whatsapp/route.ts`.
+
+**Step 1 — cron entry** — add to `vercel.json` `crons` (worker every 15 min covers digest_hour minute-match + event drain):
+```json
+{ "path": "/api/cron/assistant-proactive", "schedule": "*/15 * * * *" }
+```
+
+**Step 2 — webhook wiring** (`route.ts`):
+- In `maybeHandleAgentQuote`, after the agent is resolved and BEFORE `handleAgentMessage`, call `await flushKnockedProactive(agent.id, args.waId).catch(...)` (fire-and-forget) so a knocked digest flushes the instant the agent replies (§7.2).
+- Also on inbound text, `const dz = classifyDismissalText(args.textBody || ''); if (dz === 'strong' && msg.context?.id) await recordDeliverySignal(msg.context.id, 'strong').catch(...)` — an explicit "די" in reply to a proactive message demotes that event_type.
+- In the outbound `statuses` loop, when `status.status === 'read'` on a proactive `wa_message_id`, `await recordDeliverySignal(status.id, 'weak').catch(...)` (read-no-action weak signal); `delivered`-only after N hours stays ambiguous (handled by a later reaper, not here).
+
+**Step 3** — no new unit test (integration wiring); guard with the existing suite + `npm run type-check`. Run: `npm run type-check && npx vitest run tests/unit/assistant-proactivity.test.ts tests/unit/assistant-proactive-send.test.ts tests/unit/assistant-proactive-worker.test.ts tests/unit/assistant-proactive-dismissal.test.ts tests/unit/assistant-proactive-templates.test.ts tests/unit/assistant-shadow.test.ts`
+
+**Commit:** `feat(assistant/proactive): schedule cron + webhook knock-flush + read/dismissal learning signals`
+
+---
+
+## Invariant checklist (must hold at phase end)
+- 0 sends in quiet hours / Shabbat — `gateProactiveSend` returns `schedule`, never `send`, in both zones (Tasks 1–3, pinned by tests).
+- Every proactive send passes the ledger `dedup_key` check AND the service-window gate before any Meta call (Task 10).
+- Conservative default: `proactivity_optin=false` suppresses everything until onboarding opt-in + `consent_at` (Task 3).
+- Digest is agency-scoped dedup (owner+employee → one) and exempt from the interruption cap (Tasks 4, 3).
+- Money is never recomputed in P6 — `amountText` is pre-formatted from stored totals; `composeDigest` does zero arithmetic (Tasks 5, 11).
+- Assistant only messages the agent — no tool addresses a client/talent; every send targets `agent.whatsapp` (all tasks).
+- Every proactive send logs to `assistant_actions` before returning (Task 10, Principle 7).
+- Severity floor overrides learned-dismissal + cap, but still defers in quiet/Shabbat (Task 3)._
