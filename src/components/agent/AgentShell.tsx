@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Users, FileText, LogOut, Menu, X, Sparkles, ChevronLeft, LayoutDashboard, Briefcase, Inbox, Settings } from 'lucide-react';
+import { Users, FileText, LogOut, Menu, X, Sparkles, ChevronLeft, LayoutDashboard, Briefcase, Inbox, Building2, Megaphone, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type NavItem = {
@@ -18,14 +18,18 @@ const NAV: NavItem[] = [
   { href: '/agent/briefs', label: 'תיבה נכנסת', icon: Inbox, match: (p) => p.startsWith('/agent/briefs') || p.startsWith('/agent/inbox') },
   { href: '/agent/deals', label: 'עסקאות', icon: Briefcase, match: (p) => p.startsWith('/agent/deals') },
   { href: '/agent/quotes', label: 'הצעות מחיר', icon: FileText, match: (p) => p.startsWith('/agent/quotes') },
-  { href: '/agent/clients', label: 'לקוחות', icon: Users, match: (p) => p.startsWith('/agent/clients') },
+  { href: '/agent/clients', label: 'מיוצגים', icon: Users, match: (p) => p.startsWith('/agent/clients') },
+  { href: '/agent/orderers', label: 'לקוחות', icon: Building2, match: (p) => p.startsWith('/agent/orderers') },
+  { href: '/agent/campaigns', label: 'קמפיינים', icon: Megaphone, match: (p) => p.startsWith('/agent/campaigns') },
 ];
 
 function Crumbs({ pathname }: { pathname: string }) {
   const labelOf = (s: string) => {
     const map: Record<string, string> = {
       agent: 'סוכן',
-      clients: 'לקוחות',
+      clients: 'מיוצגים',
+      orderers: 'לקוחות',
+      campaigns: 'קמפיינים',
       quotes: 'הצעות מחיר',
       deals: 'עסקאות',
       briefs: 'בריפים',
