@@ -967,12 +967,18 @@
       var vh = window.visualViewport.height;
       var kb = window.innerHeight - vh;   // space below the visible viewport (keyboard + browser chrome)
       if (kb > 120) {
-        // Keyboard up → shrink the sheet into the visible area, anchored above the keyboard.
-        panel.style.height = Math.round(vh * 0.92) + 'px';
-        panel.style.bottom = Math.round(kb - window.visualViewport.offsetTop) + 'px';
+        // Keyboard up → shrink the full-screen panel to exactly the visible
+        // viewport rect so the input bar sits just above the keyboard. The
+        // full-screen panel is top:0 via inset:0, so we pin top+height (bottom
+        // is ignored when both top and height are set) — unlike the old
+        // bottom-sheet which offset `bottom`.
+        panel.style.height = Math.round(vh) + 'px';
+        panel.style.top = Math.round(window.visualViewport.offsetTop || 0) + 'px';
+        panel.style.bottom = 'auto';
       } else {
-        // Keyboard down → clear the overrides so the CSS 88dvh governs.
+        // Keyboard down → clear the overrides so the CSS inset:0 / 100dvh governs.
         panel.style.height = '';
+        panel.style.top = '';
         panel.style.bottom = '';
       }
       var msgs = document.getElementById('ibot-messages');
