@@ -807,6 +807,7 @@
 
   var COMP_COOLDOWN_KEY = 'ibot_comp_cd_' + ACCOUNT_ID;
   var lastCompShown = 0;
+  var lastCompProducts = [];   // products currently shown in the popup — click dispatches by index (never interpolate the URL into markup)
   function complementCooldownActive() {
     try { var v = parseInt(localStorage.getItem(COMP_COOLDOWN_KEY) || '0', 10); return v && Date.now() < v; } catch (e) { return false; }
   }
@@ -827,17 +828,25 @@
     var el = document.getElementById('ibot-comp'); if (el) el.parentNode.removeChild(el);
   }
   window.__ibotComplementDismiss = dismissComplements;
-  window.__ibotComplementClick = function (url) {
+  window.__ibotComplementClick = function (idx) {
+    // Dispatch by index (like __ibotChipClick) so no untrusted URL is ever
+    // interpolated into inline-onclick markup — avoids attribute/JS-string XSS.
+    var p = lastCompProducts[idx];
+    var url = (p && p.productUrl) ? String(p.productUrl) : '';
     widgetTrack('widget_product_click', { surface: 'complement_popup', href: url || null });
-    if (url) window.location.href = bestieTag(url, 'complementary');   // same-tab, e-commerce norm
+    // Navigate only to http(s) or site-relative targets; block javascript:/data: schemes.
+    if (/^https?:\/\//i.test(url) || url.charAt(0) === '/') {
+      window.location.href = bestieTag(url, 'complementary');   // same-tab, e-commerce norm
+    }
   };
   function showComplementPopup(products) {
     if (document.getElementById('ibot-comp')) return;
     var pc = config.primaryColor;
-    var cards = products.slice(0, 3).map(function (p) {
+    lastCompProducts = products.slice(0, 3);   // index in the button below maps into this array
+    var cards = lastCompProducts.map(function (p, i) {
       var price = p.price != null ? locale.currencyPrefix + p.price : '';
       var img = p.image ? '<img src="' + escapeHtml(p.image) + '" style="width:44px;height:44px;object-fit:cover;border-radius:8px;flex-shrink:0;" onerror="this.style.display=\'none\'"/>' : '';
-      return '<button onclick="window.__ibotComplementClick(\'' + escapeHtml(p.productUrl || '') + '\')" style="display:flex;align-items:center;gap:8px;width:100%;text-align:' + (locale.dir === 'rtl' ? 'right' : 'left') + ';background:var(--ibot-surface);border:1px solid var(--ibot-border);border-radius:10px;padding:7px 9px;cursor:pointer;font-family:inherit;margin-bottom:6px;">' +
+      return '<button onclick="window.__ibotComplementClick(' + i + ')" style="display:flex;align-items:center;gap:8px;width:100%;text-align:' + (locale.dir === 'rtl' ? 'right' : 'left') + ';background:var(--ibot-surface);border:1px solid var(--ibot-border);border-radius:10px;padding:7px 9px;cursor:pointer;font-family:inherit;margin-bottom:6px;">' +
         img + '<span style="flex:1;min-width:0;"><span style="display:block;font-size:12.5px;font-weight:600;color:var(--ibot-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(p.name || '') + '</span><span style="font-size:12px;color:' + pc + ';font-weight:700;">' + price + '</span></span></button>';
     }).join('');
     var el = document.createElement('div');
