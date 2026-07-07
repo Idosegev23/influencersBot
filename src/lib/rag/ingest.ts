@@ -255,7 +255,7 @@ export async function ingestDocument(input: IngestInput): Promise<IngestResult> 
  */
 export async function ingestAllForAccount(
   accountId: string,
-  options?: { entityTypes?: EntityType[]; batchSize?: number; archetype?: string }
+  options?: { entityTypes?: EntityType[]; batchSize?: number; archetype?: string; contentBudgets?: Partial<Record<EntityType, number>> }
 ): Promise<{ total: number; byType: Record<string, number>; errors: string[] }> {
   const supabase = createClient();
   const types = options?.entityTypes || [
@@ -267,7 +267,10 @@ export async function ingestAllForAccount(
 
   for (const entityType of types) {
     try {
-      const maxChunks = archetypeConfig.contentBudgets?.[entityType as EntityType];
+      // Explicit per-type cap (options.contentBudgets) overrides the archetype budget.
+      // Used by the serverless pipeline to bound huge website crawls per invocation.
+      const maxChunks = options?.contentBudgets?.[entityType as EntityType]
+        ?? archetypeConfig.contentBudgets?.[entityType as EntityType];
       const count = await ingestEntityType(supabase, accountId, entityType, maxChunks);
       result.byType[entityType] = count;
       result.total += count;

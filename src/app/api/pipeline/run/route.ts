@@ -7,7 +7,7 @@ import { getScanJobsRepo } from '@/lib/db/repositories/scanJobsRepo';
 import { nextStep } from '@/lib/pipeline/types';
 import type { PipelineStep } from '@/lib/pipeline/types';
 
-export const maxDuration = 300;
+export const maxDuration = 600;
 
 export async function POST(req: Request) {
   const rawBody = await req.text();
