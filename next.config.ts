@@ -63,6 +63,17 @@ const nextConfig: NextConfig = {
           : h,
       );
 
+    // Same-origin framing only — our /sign page embeds the quote PDF from the same
+    // origin (/api/signatures/:token/document). Third parties still can't frame it.
+    const sameOriginFrameHeaders = securityHeaders
+      .filter((h) => h.key !== 'X-Frame-Options')
+      .map((h) =>
+        h.key === 'Content-Security-Policy'
+          ? { ...h, value: h.value.replace("frame-ancestors 'none'", "frame-ancestors 'self'") }
+          : h,
+      )
+      .concat([{ key: 'X-Frame-Options', value: 'SAMEORIGIN' }]);
+
     // Permissive CSP for the preview proxy ONLY — the proxied HTML is the
     // customer's actual site and loads scripts/CSS/fonts/images from many
     // third-party CDNs (Shopify, Cloudflare, Google Fonts, …). Locking it to
@@ -112,8 +123,13 @@ const nextConfig: NextConfig = {
         headers: headersWithoutFrame,
       },
       {
+        // Signature document PDF is framed by our own /sign page (same-origin).
+        source: '/api/signatures/:path*',
+        headers: sameOriginFrameHeaders,
+      },
+      {
         // All other routes: full security headers including X-Frame-Options
-        source: '/((?!api/widget|api/admin/proxy|blob-animation|manage|widget-preview).*)',
+        source: '/((?!api/widget|api/admin/proxy|blob-animation|manage|widget-preview|api/signatures).*)',
         headers: securityHeaders,
       },
       {
