@@ -1389,8 +1389,12 @@
         : '') +
 
       // ---- Input area (centered, same 16px side padding as header) ----
-      '<div style="padding:8px 16px 14px;flex-shrink:0;">' +
+      // Bottom padding clears the home-indicator safe area on full-screen mobile
+      // (env=0 on desktop, so desktop is unchanged). A hairline brand border on
+      // mobile ties the composer to the brand alongside the brand send button.
+      '<div style="padding:8px 16px calc(14px + env(safe-area-inset-bottom));flex-shrink:0;">' +
       '<div style="display:flex;align-items:center;gap:8px;background:var(--ibot-surface);border-radius:18px;' +
+      (isMobile ? 'border:1.5px solid ' + pc + '22;' : '') +
       'padding:8px 8px 8px 10px;height:60px;box-shadow:4px 6px 23px rgba(0,0,0,0.1);overflow:hidden;">' +
       // Send button (left side in RTL)
       '<button id="ibot-send" style="width:38px;height:38px;background:' + pc + ';color:#fff;border:none;' +
@@ -1699,6 +1703,7 @@
   function renderChipsRow(items, pc) {
     var pills = '';
     var rendered = 0;
+    var mob = window.innerWidth < 640;   // prominent tap targets on mobile full-screen
     for (var i = 0; i < items.length && rendered < 4; i++) {
       var label = String(items[i] || '').trim();
       if (!label) continue;
@@ -1708,7 +1713,8 @@
       pills +=
         '<button onclick="window.__ibotChipClick(' + i + ')" ' +
         'style="background:var(--ibot-surface);border:1px solid var(--ibot-border);color:var(--ibot-text-primary);cursor:pointer;' +
-        'border-radius:999px;padding:6px 11px;font-size:12.5px;line-height:1.3;white-space:normal;text-align:center;' +
+        'border-radius:999px;padding:' + (mob ? '9px 15px' : '6px 11px') + ';font-size:' + (mob ? '14px' : '12.5px') + ';line-height:1.3;white-space:normal;text-align:center;' +
+        (mob ? 'min-height:40px;' : '') +
         'font-family:inherit;transition:transform 0.15s,border-color 0.15s;max-width:100%;" ' +
         'onmouseover="this.style.transform=\'translateY(-1px)\';this.style.borderColor=\'' + pc + '\';" ' +
         'onmouseout="this.style.transform=\'\';this.style.borderColor=\'var(--ibot-border)\';">' +
@@ -1717,7 +1723,7 @@
     }
     if (!pills) return '';
     return (
-      '<div style="padding:4px 16px;display:flex;flex-wrap:wrap;gap:6px;direction:' + locale.dir + ';flex-shrink:0;">' +
+      '<div style="padding:' + (mob ? '6px 16px' : '4px 16px') + ';display:flex;flex-wrap:wrap;gap:' + (mob ? '8px' : '6px') + ';direction:' + locale.dir + ';flex-shrink:0;">' +
       pills +
       '</div>'
     );
