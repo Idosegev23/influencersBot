@@ -22,12 +22,13 @@ export async function POST(req: NextRequest) {
     const { data: rows } = await supabase
       .from('widget_products')
       .select('id, name, name_he, category, description, price, original_price, is_on_sale, image_url, product_url')
-      .eq('account_id', accountId).eq('is_available', true);
+      .eq('account_id', accountId).eq('is_available', true)
+      .order('priority', { ascending: false, nullsFirst: false });
     const catalog = (rows || []) as any[];
     // Resolve the added product from the catalog (by id, else fuzzy by name).
     const added = catalog.find((p) => p.id === productId)
       || catalog.find((p) => productName && (p.name === productName || p.name_he === productName))
-      || { id: productId || 'added', name: productName || 'product' };
+      || { id: 'q:' + String(productName || productId || 'x').toLowerCase().replace(/\s+/g, '-').slice(0, 100), name: productName || 'product' };
     const picks = await generateComplementaryProducts(accountId, { id: added.id, name: added.name, nameHe: added.name_he, category: added.category, description: added.description }, catalog.map((p) => ({ id: p.id, name: p.name, nameHe: p.name_he, category: p.category })));
     const pickRows = picks.map((pk) => catalog.find((p) => p.id === pk.id)).filter(Boolean) as any[];
 

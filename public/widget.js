@@ -845,7 +845,11 @@
     var pc = config.primaryColor;
     lastCompProducts = products.slice(0, 3);   // index in the button below maps into this array
     var cards = lastCompProducts.map(function (p, i) {
-      var price = p.price != null ? locale.currencyPrefix + p.price : '';
+      var price = p.price != null
+        ? ((p.isOnSale && p.originalPrice != null)
+            ? '<span style="text-decoration:line-through;color:var(--ibot-text-muted);font-size:11px;margin-inline-end:4px;">' + locale.currencyPrefix + p.originalPrice + '</span>' + locale.currencyPrefix + p.price
+            : locale.currencyPrefix + p.price)
+        : '';
       var img = p.image ? '<img src="' + escapeHtml(p.image) + '" style="width:44px;height:44px;object-fit:cover;border-radius:8px;flex-shrink:0;" onerror="this.style.display=\'none\'"/>' : '';
       return '<button onclick="window.__ibotComplementClick(' + i + ')" style="display:flex;align-items:center;gap:8px;width:100%;text-align:' + (locale.dir === 'rtl' ? 'right' : 'left') + ';background:var(--ibot-surface);border:1px solid var(--ibot-border);border-radius:10px;padding:7px 9px;cursor:pointer;font-family:inherit;margin-bottom:6px;">' +
         img + '<span style="flex:1;min-width:0;"><span style="display:block;font-size:12.5px;font-weight:600;color:var(--ibot-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(p.name || '') + '</span><span style="font-size:12px;color:' + pc + ';font-weight:700;">' + price + '</span></span></button>';
@@ -1996,8 +2000,11 @@
   // Heuristics + optional per-account overrides from config.cartWatcher. Best-effort.
   function initCartWatcher(onAdd) {
     var cw = (config.cartWatcher || {});
+    var lastFire = 0;
     var fire = function () {
       try {
+        if (Date.now() - lastFire < 1500) return;   // collapse multi-strategy duplicates for one add
+        lastFire = Date.now();
         var pc = (typeof extractPageContext === 'function') ? extractPageContext() : { product: null, cart: null };
         var added = pc.product || null;
         behaviorTrack('cart_change', { added_product: added ? { name: added.name, price: added.price, sku: added.sku } : null, value: pc.cart ? pc.cart.total : null });
