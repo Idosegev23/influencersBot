@@ -42,17 +42,37 @@ async function loadFont(pdf: PDFDocument, fileName: string): Promise<PDFFont> {
   return pdf.embedFont(cachedFontBytes[fileName], { subset: true });
 }
 
-/** Reorder for visual RTL: reverse token order; reverse chars inside Hebrew tokens. */
+/**
+ * Keep logical order. Modern PDF renderers (CoreText/Preview, browser PDF.js,
+ * Chrome) are bidi-aware and shape RTL correctly from logical order — manually
+ * reversing double-reverses it into mirror text. We only right-align (drawRtl).
+ */
 function bidi(text: string): string {
-  if (!text || !HEB_RE.test(text)) return text;
-  const tokens = text.split(' ');
-  const out = tokens
-    .map((t) => (HEB_RE.test(t) && !/[A-Za-z]/.test(t) ? Array.from(t).reverse().join('') : t))
-    .reverse();
-  return out.join(' ');
+  return text;
 }
 
-/** Draw a right-aligned (RTL) line, returns the next y. */
+// Isolate number tokens as their own LTR runs — a renderer that otherwise
+// mishandles bidi digit-reverses numbers embedded in Hebrew (15,000 → 000,51).
+const NUM_RE = /[0-9][0-9.,\/-]*/g;
+function rtlSegments(text: string): { s: string; num: boolean }[] {
+  const segs: { s: string; num: boolean }[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  NUM_RE.lastIndex = 0;
+  while ((m = NUM_RE.exec(text))) {
+    if (m.index > last) segs.push({ s: text.slice(last, m.index), num: false });
+    segs.push({ s: m[0], num: true });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) segs.push({ s: text.slice(last), num: false });
+  return segs.length ? segs : [{ s: text, num: false }];
+}
+
+/**
+ * Draw a right-aligned (RTL) line, returns the next y.
+ * Hebrew lines are laid out run-by-run (numbers kept as isolated LTR runs so they
+ * don't digit-reverse); lines with no Hebrew are drawn as-is (LTR), right-aligned.
+ */
 function drawRtl(
   page: PDFPage,
   text: string,
@@ -62,10 +82,19 @@ function drawRtl(
   marginRight: number,
   color = rgb(0.12, 0.12, 0.2)
 ): number {
-  const s = bidi(text);
-  const w = font.widthOfTextAtSize(s, size);
-  const x = page.getWidth() - marginRight - w;
-  page.drawText(s, { x, y: yTop, size, font, color });
+  if (!HEB_RE.test(text)) {
+    const w = font.widthOfTextAtSize(text, size);
+    page.drawText(text, { x: page.getWidth() - marginRight - w, y: yTop, size, font, color });
+    return yTop - size * 1.6;
+  }
+  const segs = rtlSegments(text);
+  const widths = segs.map((r) => font.widthOfTextAtSize(r.s, size));
+  const total = widths.reduce((a, b) => a + b, 0);
+  let x = page.getWidth() - marginRight - total;
+  for (let i = segs.length - 1; i >= 0; i--) {
+    page.drawText(segs[i].s, { x, y: yTop, size, font, color });
+    x += widths[i];
+  }
   return yTop - size * 1.6;
 }
 
@@ -203,9 +232,7 @@ export async function generateQuotePdf(q: QuoteContent): Promise<Uint8Array> {
 /* ---------------- signature stamping (ported from leaders-platform) ---------------- */
 
 function prepBidi(text: string): string {
-  if (!text) return text;
-  if (!HEB_RE.test(text)) return text;
-  if (!/[A-Za-z]/.test(text)) return Array.from(text).reverse().join('');
+  // Logical order — see bidi() above; renderers handle RTL.
   return text;
 }
 
