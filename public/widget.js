@@ -333,6 +333,7 @@
     profilePic: null,
     coverImage: null,
     socialLinks: [],
+    tooltip: null,
     enabled: true,
     primaryColor: '#0c1013',
     darkMode: false,
@@ -893,6 +894,7 @@
       if (data.coverImage) config.coverImage = data.coverImage;
       if (Array.isArray(data.socialLinks)) config.socialLinks = data.socialLinks;
       if (data.cartWatcher) config.cartWatcher = data.cartWatcher;
+      if (data.tooltip && data.tooltip.text) config.tooltip = data.tooltip;
       // Master on/off from the admin toggle. Default ON: only an explicit
       // false hides the widget, so accounts that never set it are unaffected.
       config.enabled = data.enabled !== false;

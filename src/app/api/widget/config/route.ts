@@ -100,6 +100,9 @@ export async function GET(req: NextRequest) {
         coverImage: widgetConfig.coverImage || null,
         socialLinks: Array.isArray(widgetConfig.socialLinks) ? widgetConfig.socialLinks : [],
         cartWatcher: (widgetConfig.cartWatcher && typeof widgetConfig.cartWatcher === 'object') ? widgetConfig.cartWatcher : null,
+        tooltip: (widgetConfig.tooltip && typeof widgetConfig.tooltip === 'string' && widgetConfig.tooltip.trim())
+          ? { text: String(widgetConfig.tooltip).trim().slice(0, 140) }
+          : null,
         enabled: widgetConfig.enabled !== false,
         welcomeMessage: widgetConfig.welcomeMessage || fb.welcome,
         placeholder: widgetConfig.placeholder || fb.placeholder,
