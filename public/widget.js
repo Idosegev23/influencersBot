@@ -802,6 +802,55 @@
   applyLocaleAssets();
 
   // ============================================
+  // Complementary Products — Trigger Engine + Popup
+  // ============================================
+
+  var COMP_COOLDOWN_KEY = 'ibot_comp_cd_' + ACCOUNT_ID;
+  var lastCompShown = 0;
+  function complementCooldownActive() {
+    try { var v = parseInt(localStorage.getItem(COMP_COOLDOWN_KEY) || '0', 10); return v && Date.now() < v; } catch (e) { return false; }
+  }
+  function onCartAdd(added) {
+    if (isOpen) return;                                   // never over the open chat
+    if (Date.now() - lastCompShown < 90000) return;       // max 1 / 90s
+    if (complementCooldownActive()) return;               // dismissed recently
+    lastCompShown = Date.now();
+    fetch(BASE_URL + '/api/widget/complementary', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId: ACCOUNT_ID, productId: added && added.sku ? added.sku : null, productName: added ? added.name : null, sessionId: sessionId }),
+    }).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { if (d && d.products && d.products.length) showComplementPopup(d.products); })
+      .catch(function () { /* */ });
+  }
+  function dismissComplements() {
+    try { localStorage.setItem(COMP_COOLDOWN_KEY, String(Date.now() + 10 * 60 * 1000)); } catch (e) { /* */ }
+    var el = document.getElementById('ibot-comp'); if (el) el.parentNode.removeChild(el);
+  }
+  window.__ibotComplementDismiss = dismissComplements;
+  window.__ibotComplementClick = function (url) {
+    widgetTrack('widget_product_click', { surface: 'complement_popup', href: url || null });
+    if (url) window.location.href = bestieTag(url, 'complementary');   // same-tab, e-commerce norm
+  };
+  function showComplementPopup(products) {
+    if (document.getElementById('ibot-comp')) return;
+    var pc = config.primaryColor;
+    var cards = products.slice(0, 3).map(function (p) {
+      var price = p.price != null ? locale.currencyPrefix + p.price : '';
+      var img = p.image ? '<img src="' + escapeHtml(p.image) + '" style="width:44px;height:44px;object-fit:cover;border-radius:8px;flex-shrink:0;" onerror="this.style.display=\'none\'"/>' : '';
+      return '<button onclick="window.__ibotComplementClick(\'' + escapeHtml(p.productUrl || '') + '\')" style="display:flex;align-items:center;gap:8px;width:100%;text-align:' + (locale.dir === 'rtl' ? 'right' : 'left') + ';background:var(--ibot-surface);border:1px solid var(--ibot-border);border-radius:10px;padding:7px 9px;cursor:pointer;font-family:inherit;margin-bottom:6px;">' +
+        img + '<span style="flex:1;min-width:0;"><span style="display:block;font-size:12.5px;font-weight:600;color:var(--ibot-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(p.name || '') + '</span><span style="font-size:12px;color:' + pc + ';font-weight:700;">' + price + '</span></span></button>';
+    }).join('');
+    var el = document.createElement('div');
+    el.id = 'ibot-comp';
+    el.style.cssText = 'position:fixed;z-index:2147483646;bottom:calc(96px + env(safe-area-inset-bottom));' + (config.position === 'bottom-left' ? 'left:20px;' : 'right:20px;') + 'width:260px;max-width:calc(100vw - 40px);background:var(--ibot-panel-bg);border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,0.18);padding:12px;animation:ibot-slide-up 0.3s ease-out;direction:' + locale.dir + ';';
+    el.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
+      '<span style="font-size:13px;font-weight:700;color:var(--ibot-text-primary);">' + escapeHtml(wlbl('משלים מצוין 👇', 'Goes great with it 👇')) + '</span>' +
+      '<button onclick="window.__ibotComplementDismiss()" style="background:transparent;border:none;color:var(--ibot-text-muted);cursor:pointer;font-size:18px;line-height:1;">&times;</button></div>' + cards;
+    document.body.appendChild(el);
+    widgetTrack('widget_action_proposed', { type: 'complementary', count: products.length });
+  }
+
+  // ============================================
   // Load Config
   // ============================================
 
@@ -829,6 +878,7 @@
       if (data.profilePic) config.profilePic = data.profilePic;
       if (data.coverImage) config.coverImage = data.coverImage;
       if (Array.isArray(data.socialLinks)) config.socialLinks = data.socialLinks;
+      if (data.cartWatcher) config.cartWatcher = data.cartWatcher;
       // Master on/off from the admin toggle. Default ON: only an explicit
       // false hides the widget, so accounts that never set it are unaffected.
       config.enabled = data.enabled !== false;
@@ -874,6 +924,7 @@
           .catch(function () { /* fail silently — keep welcome */ });
       }
       render();
+      try { initCartWatcher(onCartAdd); } catch (e) { /* */ }
     })
     .catch(function () {
       messages = [{ role: 'assistant', content: config.welcomeMessage }];
