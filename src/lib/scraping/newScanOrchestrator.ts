@@ -8,6 +8,7 @@ import { randomUUID } from 'crypto';
 import { getScrapeCreatorsClient, ScrapeCreatorsError } from './scrapeCreatorsClient';
 import { getGlobalRateLimiter, ScanJobLock } from './rateLimiter';
 import { crawlWebsite, extractUrlsFromBio, saveWebsiteData } from './website-crawler';
+import { deriveSocialLinks } from './derive-social-links';
 import { getScanJobsRepo } from '@/lib/db/repositories/scanJobsRepo';
 
 // ============================================
@@ -519,10 +520,35 @@ export class NewScanOrchestrator {
       // ==========================================
       // STEP 10: Update Account
       // ==========================================
-      await this.supabase
-        .from('accounts')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', accountId);
+      // Touch updated_at, and seed widget social links from the scraped profile
+      // — but ONLY if the owner hasn't set any (never overwrite manual edits).
+      // Read fresh config immediately before writing and spread-merge so we
+      // don't clobber identity fields (see the concurrent-write wipe note in
+      // STEP 11). Non-fatal: any failure falls back to the bare updated_at touch.
+      try {
+        const { data: acct } = await this.supabase
+          .from('accounts').select('config').eq('id', accountId).single();
+        const cfg: any = acct?.config || {};
+        const widget: any = cfg.widget || {};
+        const patch: any = { updated_at: new Date().toISOString() };
+        if (!(Array.isArray(widget.socialLinks) && widget.socialLinks.length)) {
+          const derived = deriveSocialLinks(
+            [profile.external_url, ...(((profile.bio_links as any[]) || []))],
+            profile.username,
+          );
+          if (derived.length) {
+            patch.config = { ...cfg, widget: { ...widget, socialLinks: derived } };
+            console.log(`[Step 10] Seeded ${derived.length} widget social links from profile`);
+          }
+        }
+        await this.supabase.from('accounts').update(patch).eq('id', accountId);
+      } catch (e: any) {
+        console.error('[Step 10] social-links seed failed (non-fatal):', e?.message);
+        await this.supabase
+          .from('accounts')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', accountId);
+      }
 
       // ==========================================
       // STEP 11: Process Content & Build Persona 🎬 (Background)
