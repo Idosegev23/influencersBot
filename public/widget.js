@@ -894,9 +894,16 @@
       var panel = document.getElementById('ibot-panel');
       if (!panel || !isOpen || window.innerWidth >= 640) return;
       var vh = window.visualViewport.height;
-      // Cap at 92% of the visible viewport; anchor to the bottom of it.
-      panel.style.height = Math.round(vh * 0.92) + 'px';
-      panel.style.bottom = Math.round(window.innerHeight - vh - window.visualViewport.offsetTop) + 'px';
+      var kb = window.innerHeight - vh;   // space below the visible viewport (keyboard + browser chrome)
+      if (kb > 120) {
+        // Keyboard up → shrink the sheet into the visible area, anchored above the keyboard.
+        panel.style.height = Math.round(vh * 0.92) + 'px';
+        panel.style.bottom = Math.round(kb - window.visualViewport.offsetTop) + 'px';
+      } else {
+        // Keyboard down → clear the overrides so the CSS 88dvh governs.
+        panel.style.height = '';
+        panel.style.bottom = '';
+      }
       var msgs = document.getElementById('ibot-messages');
       if (msgs) msgs.scrollTop = msgs.scrollHeight;
     };
@@ -1131,11 +1138,12 @@
   // (Keyboard is added in a later task to this same function.)
   function attachSheetBehaviors() {
     if (window.innerWidth >= 640 || !isOpen) return;
-    // Clear any stale inline height/bottom left over from a prior visualViewport
-    // (keyboard-open) resize so a fresh render starts from the CSS 88dvh; the
-    // visualViewport handler only overrides these while the keyboard is up.
-    var p0 = document.getElementById('ibot-panel');
-    if (p0) { p0.style.height = ''; p0.style.bottom = ''; }
+    // Re-apply keyboard-safe geometry after every render — render() fires on
+    // send/thinking/reply while the keyboard stays open, with no visualViewport
+    // event to trigger it. applyVV sets the geometry when the keyboard is up and
+    // clears it (→ CSS 88dvh) when down. Single source of truth. (applyVV is
+    // var-hoisted to this IIFE; undefined only if visualViewport is unsupported.)
+    if (typeof applyVV === 'function') applyVV();
     var bd = document.getElementById('ibot-backdrop');
     if (bd) bd.onclick = function () { closeWidget(); };
 
