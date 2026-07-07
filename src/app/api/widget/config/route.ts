@@ -99,6 +99,7 @@ export async function GET(req: NextRequest) {
         profilePic: config.profile_pic_url || config.avatar_url || config.logo_url || widgetConfig.profilePic || null,
         coverImage: widgetConfig.coverImage || null,
         socialLinks: Array.isArray(widgetConfig.socialLinks) ? widgetConfig.socialLinks : [],
+        cartWatcher: (widgetConfig.cartWatcher && typeof widgetConfig.cartWatcher === 'object') ? widgetConfig.cartWatcher : null,
         enabled: widgetConfig.enabled !== false,
         welcomeMessage: widgetConfig.welcomeMessage || fb.welcome,
         placeholder: widgetConfig.placeholder || fb.placeholder,
