@@ -1,29 +1,25 @@
 import { createClient } from '@/lib/supabase/server';
+import { preprocessInstagramData } from '@/lib/scraping/preprocessing';
 import { buildPersonaWithGemini, savePersonaToDatabase } from '@/lib/ai/gemini-persona-builder';
 import type { StepContext } from '../types';
 import type { StepResult } from './index';
 
 /**
- * Persona-build step. Mirrors `setup-account.ts` step 6 (persona rebuild with
- * GPT-5.4, Gemini 3.1 Pro fallback): reads the `preprocessing_data` that RAG
- * ingestion produced, rebuilds the persona, and saves it back.
+ * Persona-build step — self-contained.
  *
- * If there is no `preprocessing_data` yet, the initial persona from scanning
- * stands — we skip rather than fail.
+ * The old version read a pre-existing `chatbot_persona.preprocessing_data` and
+ * bailed if absent. But this pipeline's `ig-scan` is `runScanJob` only, and the
+ * `preprocessing_data`-producing `preprocessInstagramData` used to live inside
+ * the `processAccountContent` call that `rag-ingest` no longer makes — so nothing
+ * produced it and persona was never built (Carolina acceptance run: persona=0).
+ *
+ * Now we run the preprocess (analyses scanned posts + transcriptions) and then
+ * build + save the persona in one step, mirroring `setup-account.ts` step 6.
  */
 export async function personaBuildStep(ctx: StepContext): Promise<StepResult> {
   const supabase = await createClient();
 
-  const { data: persona } = await supabase
-    .from('chatbot_persona')
-    .select('preprocessing_data, name')
-    .eq('account_id', ctx.accountId)
-    .single();
-
-  if (!persona?.preprocessing_data) {
-    // No preprocessing_data — keep the initial persona from the scan step.
-    return { status: 'advance' };
-  }
+  const preprocessedData = await preprocessInstagramData(ctx.accountId);
 
   const { data: account } = await supabase
     .from('accounts')
@@ -42,13 +38,13 @@ export async function personaBuildStep(ctx: StepContext): Promise<StepResult> {
       }
     : undefined;
 
-  const newPersona = await buildPersonaWithGemini(persona.preprocessing_data, profileData);
+  const newPersona = await buildPersonaWithGemini(preprocessedData, profileData);
 
   await savePersonaToDatabase(
     supabase,
     ctx.accountId,
     newPersona,
-    persona.preprocessing_data,
+    preprocessedData,
     JSON.stringify(newPersona),
   );
 

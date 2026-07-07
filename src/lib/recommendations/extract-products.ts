@@ -168,7 +168,7 @@ ${(page.page_content || '').substring(0, 3000)}
 // Batch Extract All Products for an Account
 // ============================================
 
-export async function extractAllProducts(accountId: string): Promise<ExtractionResult> {
+export async function extractAllProducts(accountId: string, options?: { maxPages?: number }): Promise<ExtractionResult> {
   const start = Date.now();
   const errors: string[] = [];
   const supabase = await createClient();
@@ -186,12 +186,27 @@ export async function extractAllProducts(accountId: string): Promise<ExtractionR
     return { accountId, totalPages: 0, productsExtracted: 0, seriesDetected: 0, errors: [error?.message || 'No pages found'], durationMs: Date.now() - start };
   }
 
-  // Filter to product pages only (heuristic: URL contains /product)
-  const productPages = pages.filter((p: any) =>
-    p.url?.includes('/product') &&
-    !p.url?.endsWith('/products') &&
-    !p.url?.includes('/category')
-  );
+  // Product pages: the crawl extracted a price into extracted_data.price (the
+  // general, site-agnostic signal — Carolina Lemke uses root-level SKU slugs like
+  // /cl3606-01 with no "/product" in the URL), OR the URL looks like a product page
+  // (backward-compat for QuickShop /product/ sites).
+  let productPages = pages.filter((p: any) => {
+    const price = p.extracted_data?.price;
+    const hasPrice = price != null && String(price).trim() !== '';
+    const urlMatch =
+      p.url?.includes('/product') &&
+      !p.url?.endsWith('/products') &&
+      !p.url?.includes('/category');
+    return hasPrice || urlMatch;
+  });
+
+  // Optional cap (serverless time budget): large catalogs (Carolina ~1,444) would
+  // exceed maxDuration if every page went through Gemini extraction. Log the cap —
+  // never silently truncate.
+  if (options?.maxPages && productPages.length > options.maxPages) {
+    console.log(`[ExtractProducts] Capping ${productPages.length} product pages to ${options.maxPages} (time budget)`);
+    productPages = productPages.slice(0, options.maxPages);
+  }
 
   console.log(`[ExtractProducts] Found ${productPages.length} product pages out of ${pages.length} total`);
 

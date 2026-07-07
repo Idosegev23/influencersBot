@@ -15,7 +15,10 @@ import type { StepResult } from './index';
 export async function productExtractStep(ctx: StepContext): Promise<StepResult> {
   if (!ctx.state.websiteUrl) return { status: 'advance' };
 
-  await extractAllProducts(ctx.accountId);
+  // Cap for serverless time budget — large catalogs (Carolina ~1,444 products)
+  // would exceed maxDuration if every page went through Gemini extraction.
+  // Full-catalog ingestion is a follow-up (batch this step like site-crawl).
+  await extractAllProducts(ctx.accountId, { maxPages: 200 });
   await enrichAllProducts(ctx.accountId);
 
   return { status: 'advance' };
