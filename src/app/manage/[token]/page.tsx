@@ -121,6 +121,10 @@ export default function ManagePage() {
   // (persists straight to config.widget.coverImage); empty = white header.
   const [coverImage, setCoverImage] = useState('');
   const [coverUploading, setCoverUploading] = useState(false);
+  // Tooltip bubble shown near the widget launcher button (mobile, once per visitor).
+  const [tooltip, setTooltip] = useState('');
+  // Social links — auto-filled from scraping, editable here; rendered in the widget footer/header.
+  const [socialLinks, setSocialLinks] = useState<{ platform: string; url: string }[]>([]);
   const [brandNameOverride, setBrandNameOverride] = useState('');
   const [supportEmail, setSupportEmail] = useState('');
   const [modSupport, setModSupport] = useState(false);
@@ -190,6 +194,8 @@ export default function ManagePage() {
         setPlaceholderText(w.placeholder || '');
         setBrandNameOverride(w.brandName || '');
         setCoverImage(w.coverImage || '');
+        setTooltip(w.tooltip || '');
+        setSocialLinks(Array.isArray(w.socialLinks) ? w.socialLinks : []);
         const mods = w.modules || {};
         setModSupport(mods.support?.enabled === true);
         setModLeads(mods.leads?.enabled === true);
@@ -307,6 +313,8 @@ export default function ManagePage() {
           primaryColor,
           placeholder: placeholderText,
           brandName: brandNameOverride,
+          tooltip: tooltip.trim(),
+          socialLinks: socialLinks.filter((s) => s.platform && /^https?:\/\//i.test(s.url)),
           modules: {
             support: { enabled: modSupport, categories: supportCategories },
             leads: { enabled: modLeads },
@@ -1435,6 +1443,16 @@ export default function ManagePage() {
                       <p className="text-xs text-[#655e51] mt-1.5">מוצגת בראש הווידג&apos;ט במסך הפתיחה. בלי תמונה — הרקע יישאר לבן ונקי.</p>
                     </div>
 
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-[#655e51] mb-1.5">טולטיפ (בועית ליד הכפתור)</label>
+                      <input value={tooltip} onChange={e => setTooltip(e.target.value.slice(0, 140))}
+                        maxLength={140}
+                        placeholder="היי 👋 יש שאלה? אני כאן"
+                        className="w-full px-4 py-2.5 rounded-xl text-sm outline-none border border-[#c6c6c6]"
+                        style={{ backgroundColor: '#faf2e9' }} />
+                      <p className="text-xs text-[#655e51] mt-1.5">מוצג פעם אחת למבקר במובייל, נערך פר-מותג ({tooltip.length}/140).</p>
+                    </div>
+
                     <div>
                       <label className="block text-xs font-semibold text-[#655e51] mb-1.5">טקסט בקלט</label>
                       <input value={placeholderText} onChange={e => setPlaceholderText(e.target.value)}
@@ -1561,6 +1579,58 @@ export default function ManagePage() {
                     >
                       <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add</span>
                       הוסף עמוד
+                    </button>
+                  </div>
+                </div>
+
+                {/* ============ Card 3b: Social links ============ */}
+                <div className="bg-white p-4 sm:p-8 rounded-xl" style={customShadow}>
+                  <div className="flex items-center gap-3 mb-5">
+                    <span className="material-symbols-outlined text-[#575a8c]" style={{ fontSize: 22 }}>share</span>
+                    <div>
+                      <h3 className="text-lg sm:text-xl font-bold text-[#1e1b15]">רשתות חברתיות (מתמלא אוטומטית מהסריקה, ניתן לערוך)</h3>
+                      <p className="text-sm text-[#655e51]">קישורים שיוצגו בווידג&apos;ט (למשל בכותרת/פוטר).</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {socialLinks.map((link, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <select
+                          value={link.platform}
+                          onChange={(e) => setSocialLinks((prev) => prev.map((l, idx) => idx === i ? { ...l, platform: e.target.value } : l))}
+                          className="w-32 px-3 py-2 rounded-xl text-sm outline-none border border-[#c6c6c6] bg-white"
+                        >
+                          <option value="instagram">Instagram</option>
+                          <option value="facebook">Facebook</option>
+                          <option value="tiktok">TikTok</option>
+                          <option value="youtube">YouTube</option>
+                          <option value="website">אתר</option>
+                        </select>
+                        <input
+                          type="text"
+                          value={link.url}
+                          onChange={(e) => setSocialLinks((prev) => prev.map((l, idx) => idx === i ? { ...l, url: e.target.value } : l))}
+                          placeholder="https://..."
+                          dir="ltr"
+                          className="flex-1 px-3 py-2 rounded-xl text-sm outline-none border border-[#c6c6c6] font-mono"
+                          style={{ backgroundColor: '#faf2e9' }}
+                        />
+                        <button
+                          onClick={() => setSocialLinks((prev) => prev.filter((_, idx) => idx !== i))}
+                          className="w-9 h-9 rounded-full border border-[#c6c6c6] text-[#655e51] hover:text-red-600 hover:border-red-300 flex items-center justify-center"
+                          title="מחק"
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => setSocialLinks((prev) => [...prev, { platform: 'instagram', url: '' }])}
+                      className="mt-1 px-3 py-2 rounded-full text-sm font-medium bg-[#e1e0ff] text-[#575a8c] hover:bg-[#d4d3ff] flex items-center gap-1.5"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add</span>
+                      הוסף רשת
                     </button>
                   </div>
                 </div>
