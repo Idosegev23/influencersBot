@@ -1115,23 +1115,6 @@
 
   // Header: rich cover+logo on the welcome screen, compact bar once chatting.
   function headerHtml(pc, isMobile) {
-    if (isMobile) {
-      // Slim mobile header (no cover image — it wastes half the sheet). Small
-      // logo + brand + status + drag handle + close. The handle is the drag
-      // target wired in a later task (data-ibot-drag).
-      return '<div data-ibot-drag="1" style="flex-shrink:0;position:relative;z-index:2;background:var(--ibot-surface);border-bottom:1px solid var(--ibot-border);border-radius:20px 20px 0 0;">' +
-        '<div style="display:flex;justify-content:center;padding:8px 0 2px;"><div style="width:40px;height:4px;border-radius:999px;background:var(--ibot-border);"></div></div>' +
-        '<div style="display:flex;align-items:center;gap:10px;padding:2px 12px 10px;">' +
-        '<div style="width:34px;height:34px;flex-shrink:0;border-radius:50%;overflow:hidden;">' + avatarHtml(34) + '</div>' +
-        '<div style="flex:1;min-width:0;">' +
-        '<div style="font-weight:700;font-size:15px;color:var(--ibot-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(config.brandName) + '</div>' +
-        '<div style="display:flex;align-items:center;gap:4px;margin-top:1px;"><span style="width:6px;height:6px;border-radius:50%;background:#22c55e;"></span><span style="font-size:11px;color:#15803d;">' + escapeHtml(locale.status) + '</span></div>' +
-        '</div>' +
-        '<button onclick="window.__ibotNewChat()" title="' + escapeHtml(wlbl('שיחה חדשה','New chat')) + '" style="background:transparent;border:none;color:var(--ibot-text-muted);cursor:pointer;width:32px;height:32px;flex-shrink:0;">' + newChatIconSvg(16) + '</button>' +
-        (modules.support.enabled ? '<button id="ibot-open-support" title="' + escapeHtml(locale.support.openLink) + '" style="background:transparent;border:none;color:var(--ibot-text-muted);cursor:pointer;width:32px;height:32px;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></button>' : '') +
-        '<button id="ibot-close-mobile" style="background:transparent;border:none;color:var(--ibot-text-muted);cursor:pointer;width:32px;height:32px;font-size:22px;flex-shrink:0;line-height:1;">&times;</button>' +
-        '</div></div>';
-    }
     var hasUser = messages.some(function (mm) { return mm.role === 'user'; });
     var radius = isMobile ? '' : 'border-radius:18px 18px 0 0;';
     if (!hasUser) {
@@ -1145,7 +1128,7 @@
         newChatBtnHtml() +
         '<div style="position:absolute;top:12px;left:14px;z-index:6;display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.85);padding:3px 8px;border-radius:999px;font-size:11.5px;color:#15803d;">' +
         '<span style="width:7px;height:7px;border-radius:50%;background:#22c55e;"></span>' + escapeHtml(locale.status) + '</div>' +
-        '<div style="height:112px;position:relative;' + coverBg + '"><div style="position:absolute;left:0;right:0;bottom:0;height:46px;background:linear-gradient(to bottom,transparent,var(--ibot-panel-bg));"></div></div>' +
+        '<div style="height:' + (isMobile ? '132px' : '112px') + ';position:relative;' + coverBg + '"><div style="position:absolute;left:0;right:0;bottom:0;height:46px;background:linear-gradient(to bottom,transparent,var(--ibot-panel-bg));"></div></div>' +
         '<div style="width:84px;height:84px;margin:-42px auto 0;border-radius:50%;border:4px solid var(--ibot-panel-bg);overflow:hidden;position:relative;z-index:2;box-shadow:0 4px 14px rgba(0,0,0,0.12);">' + avatarHtml(84) + '</div>' +
         '<div style="text-align:center;font-weight:800;font-size:20px;color:var(--ibot-text-primary);margin:9px 12px 2px;">' + escapeHtml(config.brandName) + '</div>' +
         socialRowHtml() +
