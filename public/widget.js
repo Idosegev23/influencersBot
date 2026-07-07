@@ -1946,13 +1946,15 @@
     // (a) Delegated click on add-to-cart controls.
     try {
       document.addEventListener('click', function (e) {
-        var el = e.target;
-        for (var i = 0; el && i < 5; i++, el = el.parentElement) {
-          var sel = cw.addToCartSelector;
-          var match = sel ? (el.matches && el.matches(sel)) :
-            ((el.getAttribute && (/(add[-_ ]?to[-_ ]?cart|הוסף|לסל|לעגלה)/i).test((el.getAttribute('class') || '') + ' ' + (el.textContent || '').slice(0, 40))));
-          if (match) { setTimeout(fire, 600); break; }  // let the SPA update the cart first
-        }
+        try {  // guard the callback itself: a bad selector override must never throw into the host page
+          var el = e.target;
+          for (var i = 0; el && i < 5; i++, el = el.parentElement) {
+            var sel = cw.addToCartSelector;
+            var match = sel ? (el.matches && el.matches(sel)) :
+              ((el.getAttribute && (/(add[-_ ]?to[-_ ]?cart|הוסף|לסל|לעגלה)/i).test((el.getAttribute('class') || '') + ' ' + (el.textContent || '').slice(0, 40))));
+            if (match) { setTimeout(fire, 600); break; }  // let the SPA update the cart first
+          }
+        } catch (e2) { /* swallow: never break host page on click */ }
       }, true);
     } catch (e) { /* */ }
     // (b) MutationObserver on the cart-count element.
@@ -1961,9 +1963,11 @@
       if (countEl && window.MutationObserver) {
         var last = (countEl.textContent || '').trim();
         new MutationObserver(function () {
-          var now = (countEl.textContent || '').trim();
-          if (now !== last && (parseInt(now, 10) || 0) > (parseInt(last, 10) || 0)) fire();
-          last = now;
+          try {  // guard the callback itself: never throw into the host page
+            var now = (countEl.textContent || '').trim();
+            if (now !== last && (parseInt(now, 10) || 0) > (parseInt(last, 10) || 0)) fire();
+            last = now;
+          } catch (e2) { /* swallow: never break host page on mutation */ }
         }).observe(countEl, { childList: true, characterData: true, subtree: true });
       }
     } catch (e) { /* */ }
