@@ -9,7 +9,7 @@
 import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { toWaId } from '@/lib/whatsapp-cloud/client';
 import { parseDocument } from '@/lib/ai-parser';
-import { createQuote, signUrlFor } from '@/lib/crm/quotes';
+import { signUrlFor } from '@/lib/crm/quotes';
 import { pickInfluencerAccount } from '@/lib/crm/match-influencer';
 
 export interface IngestAttachment {
@@ -161,7 +161,9 @@ export async function ingestQuote(input: IngestInput): Promise<IngestResult> {
     return { ok: false, matched: true, agentId: agent.id, reason: 'parse_failed', inboundId };
   }
 
-  // 4) Match the influencer (agent's client) by phone.
+  // 4) Suggest the influencer — name when present, else phone. The AGENT confirms.
+  //    We do NOT auto-create a quote here: pricing each deliverable requires the
+  //    agent's judgement (human-in-the-loop). The inbound becomes a "brief".
   const phones = collectPhones(input.rawText, [parsed?.contactPerson?.phone, parsed?.clientPhone]);
   const nameHay = [input.rawText, input.subject, parsed?.influencerName, parsed?.talentName]
     .filter(Boolean)
@@ -170,78 +172,34 @@ export async function ingestQuote(input: IngestInput): Promise<IngestResult> {
 
   const brandName = parsed?.brandName || input.subject || 'מותג';
   const amount = typeof parsed?.totalAmount === 'number' ? parsed.totalAmount : null;
+  const clientName = influencer
+    ? (influencer.config as any)?.display_name || (influencer.config as any)?.username || null
+    : null;
 
-  if (!influencer) {
-    // Parsed but no client matched → hold for agent review.
-    if (inboundId) {
-      await supabaseAdmin
-        .from('crm_inbound_messages')
-        .update({ parse_status: 'parsed', parsed_data: parsed })
-        .eq('id', inboundId);
-    }
-    return {
-      ok: true,
-      matched: true,
-      agentId: agent.id,
-      needsClient: true,
-      inboundId,
-      ackText: `קיבלתי הצעה מ-${brandName}${amount ? ` בסך ${amount.toLocaleString('en-US')} ₪` : ''}. לא זוהה לקוח תואם — היכנס/י ל-Bestie כדי לשייך ולשלוח לחתימה.`,
-    };
+  // Record the parsed brief + the suggested influencer for the agent to confirm & price.
+  if (inboundId) {
+    await supabaseAdmin
+      .from('crm_inbound_messages')
+      .update({
+        parse_status: 'parsed',
+        parsed_data: { ...parsed, _confidence: confidence, _model: model },
+        suggested_account_id: influencer?.id ?? null,
+        brief_status: influencer ? 'assigned' : 'new',
+      })
+      .eq('id', inboundId);
   }
 
-  // 5) Create the quote.
-  try {
-    const clientName = (influencer.config as any)?.display_name || (influencer.config as any)?.username || null;
-    const result = await createQuote({
-      agentId: agent.id,
-      accountId: influencer.id,
-      brandName,
-      clientName,
-      campaignName: parsed?.campaignName || null,
-      amount,
-      currency: parsed?.currency || 'ILS',
-      validUntil: parsed?.timeline?.endDate || null,
-      deliverables: deliverablesToStrings(parsed?.deliverables),
-      terms: Array.isArray(parsed?.specialTerms) ? parsed.specialTerms.join('\n') : parsed?.specialTerms || null,
-      notes: input.rawText || null,
-      brandContactName: parsed?.contactPerson?.name || null,
-      brandContactEmail: parsed?.contactPerson?.email || null,
-      brandContactPhone: parsed?.contactPerson?.phone || null,
-      agentName: agent.full_name,
-      originalPdf: att && att.mime === 'application/pdf' ? att.bytes : null,
-      originalMime: att?.mime || null,
-      parsedData: { ...parsed, _confidence: confidence, _model: model },
-    });
-
-    if (inboundId) {
-      await supabaseAdmin
-        .from('crm_inbound_messages')
-        .update({
-          parse_status: 'parsed',
-          parsed_data: parsed,
-          partnership_id: result.partnershipId,
-          signature_request_id: result.signatureRequestId,
-        })
-        .eq('id', inboundId);
-    }
-
-    return {
-      ok: true,
-      matched: true,
-      agentId: agent.id,
-      inboundId,
-      quote: { signUrl: result.signUrl, title: result.title, partnershipId: result.partnershipId },
-      ackText: `✅ נוצרה הצעה: ${result.title}${clientName ? ` (${clientName})` : ''}.\nקישור לחתימה: ${result.signUrl}`,
-    };
-  } catch (e: any) {
-    if (inboundId) {
-      await supabaseAdmin
-        .from('crm_inbound_messages')
-        .update({ parse_status: 'failed', parsed_data: parsed, error: String(e?.message || e) })
-        .eq('id', inboundId);
-    }
-    return { ok: false, matched: true, agentId: agent.id, reason: 'quote_failed', inboundId };
-  }
+  const amountHint = amount ? ` (~${amount.toLocaleString('en-US')} ₪)` : '';
+  return {
+    ok: true,
+    matched: true,
+    agentId: agent.id,
+    inboundId,
+    needsClient: !influencer,
+    ackText: influencer
+      ? `📥 התקבל בריף מ-${brandName}${amountHint} עבור ${clientName}.\nהיכנס/י ל-Bestie כדי לתמחר כל תוצר ולשלוח הצעה.`
+      : `📥 התקבל בריף מ-${brandName}${amountHint}. לא זוהה מיוצג תואם — היכנס/י ל-Bestie לשייך, לתמחר ולשלוח.`,
+  };
 }
 
 export { signUrlFor };
