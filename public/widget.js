@@ -1009,20 +1009,15 @@
       'font-family:"' + locale.font + '",system-ui,sans-serif;direction:' + locale.dir + ';';
   }
 
-  // Mobile open-state = a bottom sheet, not a full-screen takeover. Rounded top,
-  // ~88% of the dynamic viewport height so a strip of the (dimmed) site shows above.
+  // Mobile open-state = clean full-screen (not a bottom sheet). Full dynamic
+  // viewport, safe-area aware, slides up. z-index:1 keeps it under the backdrop-less stack.
   function mobilePanelStyle() {
-    return 'position:fixed;left:0;right:0;bottom:0;top:auto;width:100%;height:88dvh;' +
-      'max-height:92dvh;border-radius:20px 20px 0 0;z-index:1;';
+    return 'position:fixed;inset:0;width:100%;height:100dvh;max-height:100dvh;' +
+      'border-radius:0;z-index:1;animation:ibot-slide-up 0.28s ease-out;';
   }
 
-  // Dimmed backdrop behind the mobile bottom sheet. Sits under #ibot-panel
-  // (panel has z-index:1; backdrop stays at the default z-index:auto so it
-  // paints beneath the panel regardless of DOM order).
-  function mobileBackdropHtml() {
-    return '<div id="ibot-backdrop" style="position:fixed;inset:0;' +
-      'background:rgba(0,0,0,0.45);animation:ibot-fade-in 0.28s ease-out;"></div>';
-  }
+  // Full-screen mobile has no backdrop — the panel fills the viewport.
+  function mobileBackdropHtml() { return ''; }
 
   // ============================================
   // Avatar helper
@@ -1231,7 +1226,7 @@
     // Re-apply keyboard-safe geometry after every render — render() fires on
     // send/thinking/reply while the keyboard stays open, with no visualViewport
     // event to trigger it. applyVV sets the geometry when the keyboard is up and
-    // clears it (→ CSS 88dvh) when down. Single source of truth. (applyVV is
+    // clears it (→ CSS 100dvh) when down. Single source of truth. (applyVV is
     // var-hoisted to this IIFE; undefined only if visualViewport is unsupported.)
     if (typeof applyVV === 'function') applyVV();
     var bd = document.getElementById('ibot-backdrop');
