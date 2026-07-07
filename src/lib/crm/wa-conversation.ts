@@ -58,11 +58,24 @@ function deliverableLabel(r: Seed): string {
 }
 
 /** Main entry — returns the reply to send back to the agent, or null (not handled). */
-export async function handleAgentMessage(agent: WaAgent, waId: string, text: string | null, attachments: any[]): Promise<string | null> {
+export async function handleAgentMessage(
+  agent: WaAgent,
+  waId: string,
+  text: string | null,
+  attachments: any[],
+  opts: { isVoice?: boolean } = {}
+): Promise<string | null> {
   const state = await getState(agent.id);
   const hasAttach = (attachments || []).length > 0;
-  const startNew = hasAttach || state.stage === 'idle' || state.stage === 'quote_sent';
 
+  // A voice command is a holistic instruction ("for Anna the leading-brand quote,
+  // 200,000") — route it through the AI understanding layer first.
+  if (opts.isVoice && text) {
+    const v = await handleVoiceCommand(agent, waId, text, state);
+    if (v !== undefined) return v;
+  }
+
+  const startNew = hasAttach || state.stage === 'idle' || state.stage === 'quote_sent';
   if (startNew) return startBrief(agent, waId, text, attachments);
 
   switch (state.stage) {
@@ -155,7 +168,7 @@ async function handlePrices(agent: WaAgent, state: any, text: string | null): Pr
   if (!lineItems) lineItems = await aiPricing(text || '', seed);
   if (!lineItems) return `לא הבנתי את התמחור. שלח סכום כולל, או ${seed.length || ''} מחירים לפי הסדר.`;
 
-  const built = await buildQuoteFromBrief(agent, state, lineItems);
+  const built = await buildQuoteFromBrief(agent, state.brief_id, state.context?.account_id, lineItems);
   await setState(agent.id, { stage: 'quote_sent', deal_id: built.partnershipId });
   return `✅ ההצעה מוכנה (${built.total.toLocaleString('en-US')} ₪ + מע״מ).\nקישור לחתימה — שלח/י ללקוח:\n${built.signUrl}`;
 }
@@ -182,9 +195,87 @@ async function aiPricing(text: string, seed: Seed[]): Promise<LineItem[] | null>
   return null;
 }
 
-async function buildQuoteFromBrief(agent: WaAgent, state: any, lineItems: LineItem[]): Promise<{ partnershipId: string; signUrl: string; total: number }> {
-  const accountId = state.context?.account_id as string;
-  const { data: brief } = await supabaseAdmin.from('crm_inbound_messages').select('*').eq('id', state.brief_id).maybeSingle();
+/**
+ * Voice command — a holistic spoken instruction. AI maps it to one of the agent's
+ * open briefs + the represented talent + the price, then builds the quote. Returns
+ * undefined to fall back to the normal stage machine.
+ */
+async function handleVoiceCommand(agent: WaAgent, waId: string, transcript: string, _state: any): Promise<string | null | undefined> {
+  const { data: briefsRaw } = await supabaseAdmin
+    .from('crm_inbound_messages')
+    .select('id, subject, raw_text, parsed_data, suggested_account_id, brief_status')
+    .eq('agent_id', agent.id)
+    .in('brief_status', ['new', 'assigned'])
+    .is('deal_id', null)
+    .order('created_at', { ascending: false })
+    .limit(10);
+  const briefs = briefsRaw || [];
+
+  const ids = agent.managed_account_ids || [];
+  const { data: accts } = ids.length ? await supabaseAdmin.from('accounts').select('id, config').in('id', ids) : { data: [] as any[] };
+  const roster = (accts || []).map((a: any) => ({ id: a.id, name: (a.config as any)?.display_name || (a.config as any)?.username || '' }));
+
+  // No open brief → the voice message itself is a new brief.
+  if (!briefs.length) return startBrief(agent, waId, transcript, []);
+
+  const briefSummary = briefs.map((b) => {
+    const p = (b.parsed_data as any) || {};
+    const talent = b.suggested_account_id ? roster.find((r) => r.id === b.suggested_account_id)?.name || null : null;
+    return { brief_id: b.id, brand: p.brandName || b.subject || 'מותג', talent, deliverables: seedFromParsed(p).map(deliverableLabel) };
+  });
+
+  let ai: any = null;
+  try {
+    const { chat } = await import('@/lib/openai');
+    const instr =
+      'אתה מנוע הבנה של סוכן משפיענים. הסוכן שלח הודעה קולית מתומללת. הבן לאיזה בריף הוא מתכוון, איזה מיוצג, ואיזה תמחור. ' +
+      'החזר JSON בלבד ללא טקסט: {"brief_id":<id|null>,"account_id":<talent id|null>,"pricing":{"mode":"total"|"per_line"|"none","total":<number|null>,"prices":<number[]|null>},"reply":<string|null>}. ' +
+      'reply = שאלה מבהירה בעברית אם חסר מידע קריטי, אחרת null. הבן מספרים גם במילים (מאתיים אלף = 200000). ' +
+      `בריפים פתוחים: ${JSON.stringify(briefSummary)}. רוסטר: ${JSON.stringify(roster)}.`;
+    const { response } = await chat(instr, transcript);
+    ai = JSON.parse(String(response || '').replace(/```json|```/g, '').trim());
+  } catch {
+    return undefined;
+  }
+  if (!ai) return undefined;
+
+  const briefId = ai.brief_id && briefs.find((b) => b.id === ai.brief_id) ? (ai.brief_id as string) : null;
+  if (!briefId) return ai.reply || 'לא הבנתי לאיזה בריף מדובר. אפשר להגיד שוב עם שם המותג או המיוצג?';
+
+  const brief = briefs.find((b) => b.id === briefId)!;
+  const parsed = (brief.parsed_data as any) || {};
+  const accountId = (ai.account_id && roster.find((r) => r.id === ai.account_id)?.id) || brief.suggested_account_id || null;
+  if (!accountId) {
+    await setState(agent.id, { stage: 'awaiting_talent', brief_id: briefId, context: { brand: parsed.brandName || 'מותג' } });
+    return ai.reply || 'עבור מי ההצעה? (שם המיוצג)';
+  }
+
+  const seed = seedFromParsed(parsed);
+  const pricing = ai.pricing || { mode: 'none' };
+  let lineItems: LineItem[] | null = null;
+  if (pricing.mode === 'per_line' && Array.isArray(pricing.prices) && seed.length && pricing.prices.length === seed.length) {
+    lineItems = seed.map((r, i) => ({ ...r, unit_price: Number(pricing.prices[i]) || 0 }));
+  } else if (pricing.mode === 'total' && pricing.total) {
+    lineItems = seed.length
+      ? [{ platform: '', deliverable_type: 'סה״כ', qty: 1, unit_price: Number(pricing.total), notes: seed.map(deliverableLabel).join(' · ') }]
+      : [{ platform: '', deliverable_type: 'הצעה', qty: 1, unit_price: Number(pricing.total) }];
+  }
+
+  await supabaseAdmin.from('crm_inbound_messages').update({ suggested_account_id: accountId, brief_status: 'assigned' }).eq('id', briefId);
+
+  if (!lineItems) {
+    await setState(agent.id, { stage: 'awaiting_prices', brief_id: briefId, context: { account_id: accountId, seed } });
+    return ai.reply || 'מה המחיר? (סכום כולל או מחיר לכל שורה)';
+  }
+
+  const built = await buildQuoteFromBrief(agent, briefId, accountId, lineItems);
+  await setState(agent.id, { stage: 'quote_sent', brief_id: briefId, deal_id: built.partnershipId, context: {} });
+  const clientName = await accountName(accountId);
+  return `✅ הבנתי — הצעה ל-${clientName} (${built.total.toLocaleString('en-US')} ₪ + מע״מ).\nקישור לחתימה — שלח/י ללקוח:\n${built.signUrl}`;
+}
+
+async function buildQuoteFromBrief(agent: WaAgent, briefId: string, accountId: string, lineItems: LineItem[]): Promise<{ partnershipId: string; signUrl: string; total: number }> {
+  const { data: brief } = await supabaseAdmin.from('crm_inbound_messages').select('*').eq('id', briefId).maybeSingle();
   const parsed = (brief?.parsed_data as any) || {};
   const totals = computeTotals(lineItems);
   const brandName = parsed?.brandName || brief?.subject || 'מותג';
@@ -223,7 +314,7 @@ async function buildQuoteFromBrief(agent: WaAgent, state: any, lineItems: LineIt
   await supabaseAdmin
     .from('crm_inbound_messages')
     .update({ deal_id: result.partnershipId, partnership_id: result.partnershipId, signature_request_id: result.signatureRequestId, brief_status: 'sent' })
-    .eq('id', state.brief_id);
+    .eq('id', briefId);
 
   return { partnershipId: result.partnershipId, signUrl: result.signUrl, total: totals.total };
 }

@@ -360,10 +360,30 @@ async function maybeHandleAgentQuote(args: {
     }
   }
 
+  // Voice note → transcribe → treat as a spoken command.
+  let voiceText: string | null = null;
+  let isVoice = false;
+  if (type === 'audio' && mediaId) {
+    try {
+      const dl = await downloadMedia(mediaId);
+      if (dl) {
+        const mime = dl.mimeType || args.msg.audio?.mime_type || 'audio/ogg';
+        const ext = (mime.split('/')[1] || 'ogg').split(';')[0];
+        const file = new File([Buffer.from(dl.bytes)], `voice.${ext}`, { type: mime });
+        const { parseAudioWithGemini } = await import('@/lib/ai-parser');
+        const res: any = await parseAudioWithGemini({ file, documentType: 'quote', language: 'he' });
+        voiceText = res?.transcription || res?.data?.transcription || null;
+        isVoice = true;
+      }
+    } catch (e) {
+      console.warn('[agent voice] transcription failed', e);
+    }
+  }
+
   // Drive the WhatsApp conversation (build quote? → price → link) and reply
   // within the 24h service window (the agent just messaged us).
   try {
-    const reply = await handleAgentMessage(agent as any, args.waId, args.textBody, attachments);
+    const reply = await handleAgentMessage(agent as any, args.waId, voiceText || args.textBody, attachments, { isVoice });
     if (reply) await sendText({ to: args.waId, body: reply, contextMessageId: args.msg.id });
   } catch (e) {
     console.warn('[agent quote] conversation failed', e);
