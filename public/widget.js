@@ -900,6 +900,13 @@
       'max-height:92dvh;border-radius:20px 20px 0 0;';
   }
 
+  // Dimmed backdrop behind the mobile bottom sheet. Sits under #ibot-panel
+  // (container z-index:2147483647 wraps both; backdrop is one below the panel).
+  function mobileBackdropHtml() {
+    return '<div id="ibot-backdrop" style="position:fixed;inset:0;z-index:2147483646;' +
+      'background:rgba(0,0,0,0.45);animation:ibot-fade-in 0.28s ease-out;"></div>';
+  }
+
   // ============================================
   // Avatar helper
   // ============================================
@@ -1077,15 +1084,33 @@
       renderClosed();
       return;
     }
-    if (view === 'support_form') { renderSupportForm(); return; }
-    if (view === 'support_success') { renderSupportSuccess(); return; }
-    if (view === 'lead_form') { renderLeadForm(); return; }
-    if (view === 'lead_success') { renderGenericSuccess(locale.lead); return; }
-    if (view === 'book_demo_form') { renderBookDemoForm(); return; }
-    if (view === 'book_demo_success') { renderGenericSuccess(locale.bookDemo); return; }
-    if (view === 'order_form') { renderOrderForm(); return; }
-    if (view === 'order_result') { renderOrderResult(); return; }
-    renderOpen();
+    if (view === 'support_form') { renderSupportForm(); }
+    else if (view === 'support_success') { renderSupportSuccess(); }
+    else if (view === 'lead_form') { renderLeadForm(); }
+    else if (view === 'lead_success') { renderGenericSuccess(locale.lead); }
+    else if (view === 'book_demo_form') { renderBookDemoForm(); }
+    else if (view === 'book_demo_success') { renderGenericSuccess(locale.bookDemo); }
+    else if (view === 'order_form') { renderOrderForm(); }
+    else if (view === 'order_result') { renderOrderResult(); }
+    else { renderOpen(); }
+    attachSheetBehaviors();
+  }
+
+  // Shared close: used by the backdrop tap (and available to later tasks'
+  // drag/keyboard-close behaviors). Mirrors the inline isOpen/track/render
+  // sequence the close buttons already use.
+  function closeWidget() {
+    isOpen = false;
+    widgetTrack('widget_closed', { msg_count: messages.length });
+    render();
+  }
+
+  // Wires mobile-sheet interactions after each open render: tap-backdrop closes.
+  // (Drag + keyboard are added in later tasks to this same function.)
+  function attachSheetBehaviors() {
+    if (window.innerWidth >= 640 || !isOpen) return;
+    var bd = document.getElementById('ibot-backdrop');
+    if (bd) bd.onclick = function () { closeWidget(); };
   }
 
   // ---- Closed state: blob only ----
@@ -1193,6 +1218,7 @@
       : 'width:400px;height:auto;max-height:min(680px, calc(100vh - 80px));border-radius:18px;position:relative;';
 
     container.innerHTML =
+      (isMobile ? mobileBackdropHtml() : '') +
       // Main panel
       '<div id="ibot-panel" style="' + panelStyle +
       'background:var(--ibot-panel-bg);' +
@@ -1955,6 +1981,7 @@
     }
 
     container.innerHTML =
+      (isMobile ? mobileBackdropHtml() : '') +
       '<div id="ibot-panel" style="' + panelStyle +
       'background:var(--ibot-panel-bg);display:flex;flex-direction:column;overflow:hidden;' +
       'box-shadow:0 8px 40px rgba(0,0,0,0.15);animation:ibot-slide-up 0.3s ease-out;">' +
@@ -2070,6 +2097,7 @@
       : 'width:400px;height:auto;max-height:min(680px, calc(100vh - 80px));border-radius:18px;position:relative;';
 
     container.innerHTML =
+      (isMobile ? mobileBackdropHtml() : '') +
       '<div id="ibot-panel" style="' + panelStyle +
       'background:var(--ibot-panel-bg);display:flex;flex-direction:column;overflow:hidden;' +
       'box-shadow:0 8px 40px rgba(0,0,0,0.15);animation:ibot-slide-up 0.3s ease-out;">' +
@@ -2353,6 +2381,7 @@
       : 'width:370px;height:min(560px, calc(100vh - 140px));border-radius:18px;position:relative;';
 
     return (
+      (isMobile ? mobileBackdropHtml() : '') +
       '<div id="ibot-panel" style="' + panelStyle +
       'background:var(--ibot-panel-bg);display:flex;flex-direction:column;overflow:hidden;' +
       'box-shadow:0 8px 40px rgba(0,0,0,0.15);animation:ibot-slide-up 0.3s ease-out;">' +
@@ -2694,6 +2723,7 @@
       : '<div style="background:var(--ibot-surface);border:1px solid var(--ibot-border);border-radius:12px;padding:16px;color:var(--ibot-text-secondary);font-size:14px;text-align:center;">' + escapeHtml(O.notFound) + '</div>';
 
     container.innerHTML =
+      (isMobile ? mobileBackdropHtml() : '') +
       '<div id="ibot-panel" style="' + panelStyle +
       'background:var(--ibot-panel-bg);display:flex;flex-direction:column;overflow:hidden;' +
       'box-shadow:0 8px 40px rgba(0,0,0,0.15);animation:ibot-slide-up 0.3s ease-out;">' +
@@ -2721,6 +2751,7 @@
       ? mobilePanelStyle()
       : 'width:400px;height:auto;max-height:min(680px, calc(100vh - 80px));border-radius:18px;position:relative;';
     container.innerHTML =
+      (isMobile ? mobileBackdropHtml() : '') +
       '<div id="ibot-panel" style="' + panelStyle +
       'background:var(--ibot-panel-bg);display:flex;flex-direction:column;overflow:hidden;' +
       'box-shadow:0 8px 40px rgba(0,0,0,0.15);animation:ibot-slide-up 0.3s ease-out;">' +
