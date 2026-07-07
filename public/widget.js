@@ -834,8 +834,9 @@
     var p = lastCompProducts[idx];
     var url = (p && p.productUrl) ? String(p.productUrl) : '';
     widgetTrack('widget_product_click', { surface: 'complement_popup', href: url || null });
-    // Navigate only to http(s) or site-relative targets; block javascript:/data: schemes.
-    if (/^https?:\/\//i.test(url) || url.charAt(0) === '/') {
+    // Navigate only to http(s) or site-relative targets; block javascript:/data:
+    // schemes and protocol-relative (//host) open-redirects.
+    if (/^https?:\/\//i.test(url) || (url.charAt(0) === '/' && url.charAt(1) !== '/')) {
       window.location.href = bestieTag(url, 'complementary');   // same-tab, e-commerce norm
     }
   };
