@@ -10,6 +10,7 @@ import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { toWaId } from '@/lib/whatsapp-cloud/client';
 import { parseDocument } from '@/lib/ai-parser';
 import { createQuote, signUrlFor } from '@/lib/crm/quotes';
+import { pickInfluencerAccount } from '@/lib/crm/match-influencer';
 
 export interface IngestAttachment {
   filename: string;
@@ -60,17 +61,14 @@ function collectPhones(text: string | null | undefined, extra: (string | null | 
   return Array.from(set).filter((p) => p.length >= 9);
 }
 
-async function matchInfluencer(managedIds: string[], phones: string[]) {
-  if (!managedIds?.length || !phones.length) return null;
+async function matchInfluencer(managedIds: string[], phones: string[], text?: string | null) {
+  if (!managedIds?.length) return null;
   const { data: accts } = await supabaseAdmin
     .from('accounts')
     .select('id, config')
     .in('id', managedIds);
-  for (const a of accts || []) {
-    const accPhone = (a.config as any)?.phone;
-    if (accPhone && phones.includes(toWaId(String(accPhone)))) return a;
-  }
-  return null;
+  // Phone when present (strong), else the influencer's name in the brief text.
+  return pickInfluencerAccount((accts || []) as any[], phones, text);
 }
 
 export function deliverablesToStrings(d: any): string[] {
@@ -165,7 +163,10 @@ export async function ingestQuote(input: IngestInput): Promise<IngestResult> {
 
   // 4) Match the influencer (agent's client) by phone.
   const phones = collectPhones(input.rawText, [parsed?.contactPerson?.phone, parsed?.clientPhone]);
-  const influencer = await matchInfluencer(agent.managed_account_ids || [], phones);
+  const nameHay = [input.rawText, input.subject, parsed?.influencerName, parsed?.talentName]
+    .filter(Boolean)
+    .join(' \n ');
+  const influencer = await matchInfluencer(agent.managed_account_ids || [], phones, nameHay);
 
   const brandName = parsed?.brandName || input.subject || 'מותג';
   const amount = typeof parsed?.totalAmount === 'number' ? parsed.totalAmount : null;
