@@ -24,10 +24,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
   const bytes = await downloadDoc(sig.document_storage_path);
   if (!bytes) return NextResponse.json({ error: 'document unavailable' }, { status: 404 });
 
+  // Meaningful Hebrew filename (e.g. "הצעת מחיר — מותג אופנה.pdf") instead of the token.
+  const niceName = `${String((sig as any).title || 'הצעת מחיר').replace(/[\/\\:*?"<>|]+/g, ' ').trim()}.pdf`;
+
   return new NextResponse(Buffer.from(bytes), {
     headers: {
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `inline; filename="quote-${token}.pdf"`,
+      'Content-Disposition': `inline; filename="quote.pdf"; filename*=UTF-8''${encodeURIComponent(niceName)}`,
       'Cache-Control': 'no-store',
     },
   });

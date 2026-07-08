@@ -343,9 +343,25 @@ function buildLineItemsFromPricing(pricing: any, seed: Seed[]): LineItem[] | nul
 
 type PendingDeal = { partnershipId: string; clientName: string; brand: string; subtotal: number; total: number };
 
+// Map parser deliverable-type CODES → Hebrew (the quote is Hebrew; English codes both
+// look wrong and break RTL rendering when glued to Hebrew).
+const TYPE_HE: Record<string, string> = {
+  beat: 'פעימה', reminder: 'תזכורת', photo_day: 'יום צילום', day_photo: 'יום צילום',
+  reel: 'רילס', reels: 'רילס', story: 'סטורי', stories: 'סטוריז', post: 'פוסט', posts: 'פוסטים',
+  video: 'וידאו', tiktok: 'טיקטוק', rights: 'זכויות', usage: 'זכויות שימוש', promotion: 'קידום',
+  live: 'לייב', carousel: 'קרוסלה',
+};
+function heType(t: string): string {
+  const k = String(t || '').trim().toLowerCase().replace(/\s+/g, '_');
+  return TYPE_HE[k] || t;
+}
+
 /** Brief's requested deliverables rendered in Hebrew (falls back to line items). */
 function briefDeliverablesOf(parsed: any, lineItems: LineItem[]): string[] {
-  const items = seedFromParsed(parsed).map((r) => `${r.qty}× ${[r.deliverable_type, r.notes].filter(Boolean).join(' · ')}`.trim());
+  const items = seedFromParsed(parsed).map((r) => {
+    const label = (r.notes && r.notes.trim()) || heType(r.deliverable_type); // prefer the Hebrew description
+    return `${r.qty}× ${label}`.trim();
+  });
   const terms = Array.isArray(parsed?.specialTerms) ? parsed.specialTerms.filter(Boolean) : [];
   const all = [...items, ...terms].filter((s) => s && s !== '1×');
   return all.length ? all : lineItemsToDeliverables(lineItems);

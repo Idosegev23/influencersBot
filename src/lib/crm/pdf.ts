@@ -43,78 +43,48 @@ async function loadFont(pdf: PDFDocument, fileName: string): Promise<PDFFont> {
 }
 
 /**
- * Keep logical order. Modern PDF renderers (CoreText/Preview, browser PDF.js,
- * Chrome) are bidi-aware and shape RTL correctly from logical order — manually
- * reversing double-reverses it into mirror text. We only right-align (drawRtl).
+ * RTL shaping for pdf-lib. The PDF renderer (CoreText/Preview, PDF.js, WhatsApp's
+ * viewer) bidi-shapes Hebrew and keeps Latin LTR correctly from LOGICAL order — but
+ * it digit-REVERSES number runs that sit inside RTL text (94,400 → 004,49). So the
+ * one correction we make is to pre-reverse each digit run on a Hebrew line; the
+ * renderer's own reversal cancels it back to correct. Lines with no Hebrew are drawn
+ * verbatim (LTR), right-aligned. Verified by rendering to PNG. (Keep deliverable text
+ * in Hebrew — a number glued to a Latin word sits in an LTR run and must NOT be pre-reversed.)
  */
-function bidi(text: string): string {
-  return text;
+const DIGIT_RUN = /[0-9][0-9.,\/:\-]*/g;
+function shape(text: string): string {
+  if (!HEB_RE.test(text)) return text;
+  return text.replace(DIGIT_RUN, (m: string, offset: number) => {
+    // A digit run glued to a following Latin word sits in an LTR run — the renderer
+    // keeps it LTR, so don't pre-reverse it. Otherwise it's in RTL text → reverse.
+    const after = text.slice(offset + m.length, offset + m.length + 12);
+    return /^\s*[·×.]?\s*[A-Za-z]/.test(after) ? m : [...m].reverse().join('');
+  });
 }
-
-// Isolate number tokens as their own LTR runs — a renderer that otherwise
-// mishandles bidi digit-reverses numbers embedded in Hebrew (15,000 → 000,51).
-const NUM_RE = /[0-9][0-9.,\/-]*/g;
-function rtlSegments(text: string): { s: string; num: boolean }[] {
-  const segs: { s: string; num: boolean }[] = [];
-  let last = 0;
-  let m: RegExpExecArray | null;
-  NUM_RE.lastIndex = 0;
-  while ((m = NUM_RE.exec(text))) {
-    if (m.index > last) segs.push({ s: text.slice(last, m.index), num: false });
-    segs.push({ s: m[0], num: true });
-    last = m.index + m[0].length;
-  }
-  if (last < text.length) segs.push({ s: text.slice(last), num: false });
-  return segs.length ? segs : [{ s: text, num: false }];
+function widthOf(font: PDFFont, text: string, size: number): number {
+  return font.widthOfTextAtSize(shape(text), size);
 }
-
-/**
- * Draw a right-aligned (RTL) line, returns the next y.
- * Hebrew lines are laid out run-by-run (numbers kept as isolated LTR runs so they
- * don't digit-reverse); lines with no Hebrew are drawn as-is (LTR), right-aligned.
- */
-function drawRtl(
-  page: PDFPage,
-  text: string,
-  yTop: number,
-  size: number,
-  font: PDFFont,
-  marginRight: number,
-  color = rgb(0.12, 0.12, 0.2)
-): number {
-  if (!HEB_RE.test(text)) {
-    const w = font.widthOfTextAtSize(text, size);
-    page.drawText(text, { x: page.getWidth() - marginRight - w, y: yTop, size, font, color });
-    return yTop - size * 1.6;
-  }
-  const segs = rtlSegments(text);
-  const widths = segs.map((r) => font.widthOfTextAtSize(r.s, size));
-  const total = widths.reduce((a, b) => a + b, 0);
-  let x = page.getWidth() - marginRight - total;
-  for (let i = segs.length - 1; i >= 0; i--) {
-    page.drawText(segs[i].s, { x, y: yTop, size, font, color });
-    x += widths[i];
-  }
+/** Draw text with its RIGHT edge at xRight; returns the drawn width. */
+function drawRight(page: PDFPage, text: string, xRight: number, y: number, size: number, font: PDFFont, color: ReturnType<typeof rgb>): number {
+  const s = shape(text);
+  const w = font.widthOfTextAtSize(s, size);
+  page.drawText(s, { x: xRight - w, y, size, font, color });
+  return w;
+}
+/** Draw a right-aligned (RTL) line; returns the next y. */
+function drawRtl(page: PDFPage, text: string, yTop: number, size: number, font: PDFFont, marginRight: number, color = rgb(0.12, 0.12, 0.2)): number {
+  drawRight(page, text, page.getWidth() - marginRight, yTop, size, font, color);
   return yTop - size * 1.6;
 }
-
-/** Wrap a long RTL paragraph to a width, return next y. */
-function drawRtlParagraph(
-  page: PDFPage,
-  text: string,
-  yTop: number,
-  size: number,
-  font: PDFFont,
-  margin: number,
-  color = rgb(0.25, 0.25, 0.32)
-): number {
+/** Wrap a long RTL paragraph to a width; returns next y. */
+function drawRtlParagraph(page: PDFPage, text: string, yTop: number, size: number, font: PDFFont, margin: number, color = rgb(0.25, 0.25, 0.32)): number {
   const maxW = page.getWidth() - margin * 2;
   const words = text.split(/\s+/);
   let line = '';
   let y = yTop;
   for (const word of words) {
     const trial = line ? `${line} ${word}` : word;
-    if (font.widthOfTextAtSize(bidi(trial), size) > maxW && line) {
+    if (widthOf(font, trial, size) > maxW && line) {
       y = drawRtl(page, line, y, size, font, margin, color);
       line = word;
     } else {
@@ -131,100 +101,128 @@ function fmtAmount(amount?: number | null, currency?: string | null): string | n
   return `${cur} ${amount.toLocaleString('en-US')}`;
 }
 
-/** Generate a clean A4 Hebrew quote PDF. */
+// Palette
+const BRAND = rgb(0.42, 0.28, 0.75);
+const INK = rgb(0.13, 0.13, 0.2);
+const GRAY = rgb(0.46, 0.46, 0.54);
+const LINE = rgb(0.9, 0.9, 0.94);
+const TINT = rgb(0.955, 0.94, 0.99);
+const WHITE = rgb(1, 1, 1);
+
+/** Generate a clean, modern A4 Hebrew quote PDF. */
 export async function generateQuotePdf(q: QuoteContent): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   pdf.registerFontkit(fontkit);
   const reg = await loadFont(pdf, 'Heebo-Regular.ttf');
   const bold = await loadFont(pdf, 'Heebo-Bold.ttf');
 
-  const page = pdf.addPage([595, 842]); // A4
-  const margin = 48;
-  let y = 842 - margin - 10;
+  const W = 595, H = 842, margin = 48, innerW = W - margin * 2;
+  const page = pdf.addPage([W, H]);
 
-  // Brand strip
-  page.drawRectangle({ x: 0, y: 842 - 6, width: 595, height: 6, color: rgb(0.535, 0.247, 0.886) });
-
-  // Agency logo (top-left) or agency/Bestie name
+  // ── Header band ──────────────────────────────────────────────
+  const bandH = 104;
+  page.drawRectangle({ x: 0, y: H - bandH, width: W, height: bandH, color: BRAND });
+  // agency logo or name (right)
   let drewLogo = false;
   if (q.agencyLogo && q.agencyLogo.length) {
     try {
-      const img = /png/i.test(q.agencyLogoType || '')
-        ? await pdf.embedPng(q.agencyLogo)
-        : await pdf.embedJpg(q.agencyLogo);
-      const targetH = 38;
-      const scale = targetH / img.height;
-      page.drawImage(img, { x: margin, y: y - targetH + 14, width: img.width * scale, height: targetH });
+      const img = /png/i.test(q.agencyLogoType || '') ? await pdf.embedPng(q.agencyLogo) : await pdf.embedJpg(q.agencyLogo);
+      const th = 44, sc = th / img.height;
+      page.drawImage(img, { x: W - margin - img.width * sc, y: H - bandH / 2 - th / 2, width: img.width * sc, height: th });
       drewLogo = true;
-    } catch {
-      /* fall back to text below */
+    } catch { /* fall back to text */ }
+  }
+  if (!drewLogo) drawRight(page, q.agencyName || 'Bestie', W - margin, H - 46, 19, bold, WHITE);
+  // "הצעת מחיר" eyebrow (right, under agency) + contact (left)
+  drawRight(page, 'הצעת מחיר', W - margin, H - 72, 11, reg, rgb(0.9, 0.86, 0.99));
+  const contact = [q.agencyPhone, q.agencyEmail].filter(Boolean).join('    ·    ');
+  if (contact) page.drawText(shape(contact), { x: margin, y: H - 46, size: 10, font: reg, color: rgb(0.92, 0.89, 0.99) });
+  if (q.agencyName && !drewLogo === false) { /* name already drawn */ }
+
+  let y = H - bandH - 46;
+
+  // ── Title: brand name (the deal subject) ─────────────────────
+  if (q.brandName) y = drawRtl(page, q.brandName, y, 24, bold, margin, INK);
+  if (q.campaignName) { y += 6; y = drawRtl(page, q.campaignName, y, 13, reg, margin, GRAY); }
+  y -= 8;
+
+  // ── Meta card ────────────────────────────────────────────────
+  const metaPairs: [string, string][] = [];
+  if (q.clientName) metaPairs.push(['מיוצג', q.clientName]);
+  if (q.agentName) metaPairs.push(['סוכן', q.agentName]);
+  if (q.agencyName) metaPairs.push(['סוכנות', q.agencyName]);
+  if (q.validUntil) metaPairs.push(['בתוקף עד', q.validUntil]);
+  if (metaPairs.length) {
+    const rows = Math.ceil(metaPairs.length / 2);
+    const cardH = 14 + rows * 22;
+    page.drawRectangle({ x: margin, y: y - cardH + 12, width: innerW, height: cardH, color: rgb(0.975, 0.975, 0.985) });
+    let ry = y - 6;
+    for (let i = 0; i < metaPairs.length; i += 2) {
+      const colRight = W - margin - 14;
+      const colMid = margin + innerW / 2;
+      for (const [ci, pair] of [[0, metaPairs[i]], [1, metaPairs[i + 1]]] as [number, [string, string] | undefined][]) {
+        if (!pair) continue;
+        const rightEdge = ci === 0 ? colRight : colMid - 14;
+        const lw = drawRight(page, pair[0], rightEdge, ry, 9, reg, GRAY);
+        drawRight(page, pair[1], rightEdge - lw - 6, ry, 11.5, bold, INK);
+      }
+      ry -= 22;
     }
-  }
-  if (!drewLogo) {
-    page.drawText(q.agencyName || 'Bestie', { x: margin, y, size: 16, font: bold, color: rgb(0.535, 0.247, 0.886) });
+    y = y - cardH - 4;
   }
 
-  // Agency contact (top-right, small)
-  const contact = [q.agencyPhone, q.agencyEmail].filter(Boolean).join('  ·  ');
-  if (contact) drawRtl(page, contact, y, 9.5, reg, margin, rgb(0.45, 0.45, 0.5));
-
-  y -= drewLogo ? 44 : 36;
-
-  y = drawRtl(page, q.title || 'הצעת מחיר', y, 26, bold, margin);
-  y -= 6;
-
-  const meta: string[] = [];
-  if (q.clientName) meta.push(`מיוצג: ${q.clientName}`);
-  if (q.brandName) meta.push(`מותג: ${q.brandName}`);
-  if (q.campaignName) meta.push(`קמפיין: ${q.campaignName}`);
-  if (q.agencyName) meta.push(`סוכנות: ${q.agencyName}`);
-  if (q.agentName) meta.push(`סוכן: ${q.agentName}`);
-  for (const m of meta) y = drawRtl(page, m, y, 12, reg, margin, rgb(0.3, 0.3, 0.38));
-
-  y -= 12;
-  page.drawRectangle({ x: margin, y: y + 6, width: 595 - margin * 2, height: 0.8, color: rgb(0.85, 0.85, 0.9) });
-  y -= 14;
-
+  // ── Amount highlight card ────────────────────────────────────
   const amount = fmtAmount(q.amount, q.currency);
   if (amount) {
-    y = drawRtl(page, `סכום: ${amount}`, y, 16, bold, margin);
-    y -= 4;
+    const cardH = 62;
+    page.drawRectangle({ x: margin, y: y - cardH + 12, width: innerW, height: cardH, color: TINT, borderColor: rgb(0.86, 0.8, 0.96), borderWidth: 1 });
+    drawRight(page, 'סה״כ לתשלום', W - margin - 18, y - 10, 11, reg, BRAND);
+    drawRight(page, 'כולל מע״מ', W - margin - 18, y - 30, 9.5, reg, GRAY);
+    // big amount on the left of the card
+    const s = shape(amount);
+    const aw = bold.widthOfTextAtSize(s, 26);
+    page.drawText(s, { x: margin + 18, y: y - 26, size: 26, font: bold, color: INK });
+    void aw;
+    y = y - cardH - 6;
   }
-  if (q.validUntil) y = drawRtl(page, `בתוקף עד: ${q.validUntil}`, y, 12, reg, margin, rgb(0.3, 0.3, 0.38));
 
+  // ── Deliverables ─────────────────────────────────────────────
   if (q.deliverables && q.deliverables.length) {
-    y -= 12;
-    y = drawRtl(page, 'תוצרים:', y, 13, bold, margin);
+    y -= 6;
+    y = drawRtl(page, 'מה כלול', y, 13, bold, margin, INK);
+    y -= 2;
     for (const d of q.deliverables) {
       if (!d?.trim()) continue;
-      y = drawRtl(page, `•  ${d}`, y, 12, reg, margin, rgb(0.25, 0.25, 0.32));
+      // bullet dot
+      page.drawCircle({ x: W - margin - 4, y: y + 4, size: 2.4, color: BRAND });
+      drawRight(page, d, W - margin - 14, y, 11.5, reg, rgb(0.24, 0.24, 0.32));
+      y -= 20;
     }
   }
 
-  if (q.terms?.trim()) {
-    y -= 12;
-    y = drawRtl(page, 'תנאים:', y, 13, bold, margin);
-    y = drawRtlParagraph(page, q.terms, y, 11, reg, margin);
-  }
-
+  // ── Brief / notes ────────────────────────────────────────────
   if (q.notes?.trim()) {
     y -= 8;
-    y = drawRtlParagraph(page, q.notes, y, 11, reg, margin, rgb(0.4, 0.4, 0.46));
+    page.drawRectangle({ x: margin, y: y + 6, width: innerW, height: 0.8, color: LINE });
+    y -= 12;
+    y = drawRtl(page, 'תיאור הבקשה', y, 11, bold, margin, GRAY);
+    y = drawRtlParagraph(page, q.notes, y, 10.5, reg, margin, rgb(0.4, 0.4, 0.46));
+  }
+  if (q.terms?.trim()) {
+    y -= 10;
+    y = drawRtl(page, 'תנאים', y, 11, bold, margin, GRAY);
+    y = drawRtlParagraph(page, q.terms, y, 10.5, reg, margin);
   }
 
-  // Agreement note (signed quote = agreement)
+  // ── Agreement footer ─────────────────────────────────────────
   y -= 18;
-  page.drawRectangle({ x: margin, y: y + 6, width: 595 - margin * 2, height: 0.8, color: rgb(0.85, 0.85, 0.9) });
+  page.drawRectangle({ x: margin, y: y + 6, width: innerW, height: 0.8, color: LINE });
   y -= 14;
-  y = drawRtlParagraph(
-    page,
-    'חתימה על הצעה זו מהווה אישור והסכמה לתנאים המפורטים לעיל, ומחליפה חוזה נפרד.',
-    y,
-    10.5,
-    reg,
-    margin,
-    rgb(0.4, 0.4, 0.46)
-  );
+  drawRtlParagraph(page, 'חתימה על הצעה זו מהווה אישור והסכמה לתנאים המפורטים לעיל, ומחליפה חוזה נפרד.', y, 10, reg, margin, GRAY);
+
+  // ── Powered-by footer strip ──────────────────────────────────
+  page.drawRectangle({ x: 0, y: 0, width: W, height: 4, color: BRAND });
+  page.drawText('Powered by Bestie', { x: margin, y: 14, size: 8, font: reg, color: rgb(0.7, 0.7, 0.75) });
 
   return pdf.save();
 }
