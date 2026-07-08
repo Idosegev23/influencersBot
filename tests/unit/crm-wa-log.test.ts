@@ -1,4 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+// wa-log.ts imports @/lib/supabase (throws without env) — mock it; the assembler is pure.
+vi.mock('@/lib/supabase', () => ({ supabase: { from: () => ({ insert: async () => ({ error: null }) }) } }));
 import { buildAgentWaLogRow } from '@/lib/crm/wa-log';
 
 describe('buildAgentWaLogRow', () => {
