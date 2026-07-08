@@ -11,7 +11,7 @@ export interface Transcript {
  * parseAudioWithGemini path. Both providers are Gemini today; an OpenAI gpt-4o-transcribe
  * fallback is an env-switchable add (AGENT_MODEL_STT). Returns null text if both fail.
  */
-export async function transcribeHebrew(bytes: Uint8Array, mime: string): Promise<Transcript> {
+export async function transcribeHebrew(bytes: Uint8Array, mime: string, vocabulary?: string[]): Promise<Transcript> {
   const ext = (mime.split('/')[1] || 'ogg').split(';')[0];
   const file = new File([Buffer.from(bytes)], `voice.${ext}`, { type: mime });
 
@@ -20,7 +20,7 @@ export async function transcribeHebrew(bytes: Uint8Array, mime: string): Promise
   // Primary — fast Flash transcription (no thinking-token burn → doesn't truncate a long note).
   // Force flash explicitly so a stale AGENT_MODEL_STT_GEMINI=<pro model> env can't reintroduce the bug.
   try {
-    const r = await transcribeAudioHebrew(file, 'gemini-3.5-flash');
+    const r = await transcribeAudioHebrew(file, 'gemini-3.5-flash', vocabulary);
     if (r.transcript && r.transcript.trim()) {
       return { text: r.transcript, confidence: Number.isFinite(r.confidence) ? r.confidence : null, provider: 'gemini-flash' };
     }
@@ -31,7 +31,7 @@ export async function transcribeHebrew(bytes: Uint8Array, mime: string): Promise
   // Fallback — the SAME lean transcription on a stronger model (NOT the quote doc-parser, which
   // returned empty transcription for plain voice notes). A different model can catch a Flash miss.
   try {
-    const r = await transcribeAudioHebrew(file, 'gemini-3.1-pro-preview');
+    const r = await transcribeAudioHebrew(file, 'gemini-3.1-pro-preview', vocabulary);
     if (r.transcript && r.transcript.trim()) {
       return { text: r.transcript, confidence: Number.isFinite(r.confidence) ? r.confidence : null, provider: 'gemini-pro' };
     }

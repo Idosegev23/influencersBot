@@ -331,7 +331,7 @@ ${structuredPrompt}
  * ONLY for the transcript + a self-reported confidence (how clear the audio was) — much
  * cheaper, and the confidence gates a read-back before any money action.
  */
-export async function transcribeAudioHebrew(file: File, modelOverride?: string): Promise<{ transcript: string; confidence: number }> {
+export async function transcribeAudioHebrew(file: File, modelOverride?: string, vocabulary?: string[]): Promise<{ transcript: string; confidence: number }> {
   const base64 = await fileToBase64(file);
   const mimeType = file.type || 'audio/ogg';
   // Flash (fast, NON-thinking). A PRO/thinking model (the old default gemini-3-pro-preview) burns the
@@ -339,10 +339,16 @@ export async function transcribeAudioHebrew(file: File, modelOverride?: string):
   // transcript → error. Flash transcribes reliably + fast. maxOutputTokens 8192→16384 so a long
   // transcript never truncates. modelOverride lets transcribeHebrew try a second model on failure.
   const model = modelOverride || process.env.AGENT_MODEL_STT_GEMINI || 'gemini-3.5-flash';
+  // Vocabulary bias — the agent's talent + brand names, so the model spells them canonically
+  // ("אנה אהרונוב", "לביא שגב") instead of a phonetic guess ("ארונוב", "סגב") that fails matching.
+  const vocab = (vocabulary || []).filter(Boolean).slice(0, 60);
+  const vocabHint = vocab.length
+    ? `\nשמות מיוצגים ומותגים מוכרים בהקשר — אם נשמע שם דומה, תמלל אותו בדיוק כך: ${vocab.join(' · ')}.`
+    : '';
   const prompt =
     'תמלל את ההודעה הקולית בעברית במדויק. החזר JSON נקי בלבד: ' +
     '{"transcript":"<התמלול המלא>","confidence":<מספר בין 0 ל-1 — עד כמה התמלול ברור ובטוח>}. ' +
-    'אם האודיו רועש/מגומגם/חלקי — תן confidence נמוך. מספרים תמלל כספרות.';
+    'אם האודיו רועש/מגומגם/חלקי — תן confidence נמוך. מספרים תמלל כספרות.' + vocabHint;
   const client = getGeminiClient();
   const result = await retryWithBackoff(async () => {
     return await client.models.generateContent({

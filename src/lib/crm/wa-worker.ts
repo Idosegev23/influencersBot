@@ -27,8 +27,30 @@ export async function loadAgentById(agentId: string): Promise<WaAgent | null> {
   return data as any;
 }
 
+/** Talent names + recent brand names for this agent — fed to STT as a spelling bias for voice notes. */
+async function loadAgentVocabulary(agent: WaAgent): Promise<string[]> {
+  const names = new Set<string>();
+  try {
+    const ids = agent.managed_account_ids || [];
+    if (ids.length) {
+      const { data } = await supabaseAdmin.from('accounts').select('config').in('id', ids);
+      for (const a of data || []) {
+        const n = (a.config as any)?.display_name || (a.config as any)?.username;
+        if (n) names.add(String(n).trim());
+      }
+    }
+    const { data: deals } = await supabaseAdmin
+      .from('partnerships').select('brand_name').eq('agent_id', agent.id)
+      .order('created_at', { ascending: false }).limit(40);
+    for (const d of deals || []) if ((d as any).brand_name) names.add(String((d as any).brand_name).trim());
+  } catch (e) {
+    console.warn('[wa-worker] loadAgentVocabulary failed', e);
+  }
+  return Array.from(names).filter(Boolean);
+}
+
 /** Download an attachment / transcribe a voice note (P1 keeps the Gemini quote-parser path; P2 swaps STT). */
-export async function materializeInbound(msg: any): Promise<{ attachments: any[]; voiceText: string | null; isVoice: boolean; sttConfidence: number | null; sttProvider: string | null }> {
+export async function materializeInbound(msg: any, vocabulary?: string[]): Promise<{ attachments: any[]; voiceText: string | null; isVoice: boolean; sttConfidence: number | null; sttProvider: string | null }> {
   const attachments: { filename: string; mime: string; bytes: Uint8Array }[] = [];
   const type: string = msg?.type;
   const mediaId: string | undefined = msg?.[type]?.id;
@@ -55,7 +77,7 @@ export async function materializeInbound(msg: any): Promise<{ attachments: any[]
       if (dl) {
         const mime = dl.mimeType || msg.audio?.mime_type || 'audio/ogg';
         const { transcribeHebrew } = await import('@/lib/stt/transcribeHebrew');
-        const t = await transcribeHebrew(new Uint8Array(dl.bytes), mime);
+        const t = await transcribeHebrew(new Uint8Array(dl.bytes), mime, vocabulary);
         voiceText = t.text;
         sttConfidence = t.confidence;
         sttProvider = t.provider;
@@ -77,7 +99,10 @@ async function processOneInbound(agent: WaAgent, job: AgentJob): Promise<string 
   try { if (job.msg?.id && (await redisGet(doneKey))) return null; } catch { /* ignore */ }
 
   const startedAt = Date.now();
-  const { attachments, voiceText, isVoice, sttConfidence, sttProvider } = await materializeInbound(job.msg);
+  // Vocabulary bias for STT: the agent's talent names + recent brands, so a voice note spells
+  // "אנה אהרונוב" / "לביא שגב" canonically instead of a phonetic guess that fails matching.
+  const vocabulary = job.msg?.type === 'audio' ? await loadAgentVocabulary(agent) : undefined;
+  const { attachments, voiceText, isVoice, sttConfidence, sttProvider } = await materializeInbound(job.msg, vocabulary);
   const result = await handleAgentMessage(agent, job.waId, voiceText || job.textBody, attachments, { isVoice, sttConfidence });
   if (result.reply) {
     // Meta returns {success:false} WITHOUT throwing on a 429/503 — so retry the SEND (not the
