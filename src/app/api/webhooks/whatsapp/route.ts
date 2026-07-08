@@ -26,10 +26,8 @@ import { verifyWhatsAppSignature } from '@/lib/whatsapp-cloud/signature';
 import { createClient } from '@/lib/supabase';
 import { isItamarSender, processItamarReply } from '@/lib/handoff/process-itamar-reply';
 import { routeInboundToTicket } from '@/lib/support/route-inbound';
-import { toWaId, downloadMedia, sendText, sendReaction, markAsRead } from '@/lib/whatsapp-cloud/client';
-import { handleAgentMessage } from '@/lib/crm/wa-conversation';
-import { reactionForOutcome, channelOf, type AgentMessageResult } from '@/lib/crm/wa-outcome';
-import { logAgentWa } from '@/lib/crm/wa-log';
+import { toWaId, sendReaction, sendTyping } from '@/lib/whatsapp-cloud/client';
+import { publishAgentJob } from '@/lib/crm/wa-queue';
 
 export const runtime = 'nodejs';          // need crypto + Buffer
 export const dynamic = 'force-dynamic';   // never cache
@@ -260,9 +258,9 @@ async function processWebhook(payload: any): Promise<void> {
         let handledAsAgent = false;
         if (!isItamarSender(waId)) {
           try {
-            handledAsAgent = await maybeHandleAgentQuote({ waId, msg, textBody });
+            handledAsAgent = await maybeEnqueueAgentJob({ waId, msg, textBody });
           } catch (err) {
-            console.error('[whatsapp webhook] agent quote ingest failed', err);
+            console.error('[whatsapp webhook] agent enqueue failed', err);
           }
         }
 
@@ -337,94 +335,32 @@ function normaliseType(t: string): string {
  * reply with a tailored ack. Returns true if the sender was an agent (so the
  * caller skips support routing).
  */
-async function maybeHandleAgentQuote(args: {
-  waId: string;
-  msg: any;
-  textBody: string | null;
-}): Promise<boolean> {
+/**
+ * Agency-CRM async ingress. If the WhatsApp sender is a registered active agent:
+ * give instant feedback (👀 + typing) and ENQUEUE the heavy work (media download,
+ * transcription, brain, quote, reply) to the QStash worker so the webhook returns
+ * 200 in <300ms — Vercel freezes the fn after the response, so it can't process inline.
+ * Returns true if the sender was an agent (so the caller skips support routing).
+ */
+async function maybeEnqueueAgentJob(args: { waId: string; msg: any; textBody: string | null }): Promise<boolean> {
   const supabase = createClient();
   const { data: agent } = await supabase
     .from('users')
-    .select('id, role, status, managed_account_ids, full_name')
+    .select('id, role, status')
     .eq('whatsapp', toWaId(args.waId))
     .maybeSingle();
-  if (!agent || (agent as any).role !== 'agent' || (agent as any).status !== 'active') {
-    return false; // not an agent → let support routing handle it
-  }
+  if (!agent || (agent as any).role !== 'agent' || (agent as any).status !== 'active') return false;
 
-  // Instant "got it, working on it" feedback — the AI brain (and voice transcription)
-  // take a second or two. Fire-and-forget so they don't add latency; 👀 lands first,
-  // then the reply below swaps it to ✅.
+  // Instant feedback — fire-and-forget so they add no latency. 👀 lands first; the
+  // worker swaps it to ✅/⚠️ when the reply is ready. Typing also marks-as-read.
   void sendReaction({ to: args.waId, messageId: args.msg.id, emoji: '👀' }).catch(() => {});
-  void markAsRead(args.msg.id).catch(() => {});
+  void sendTyping(args.msg.id).catch(() => {});
 
-  // Download an attachment if present (forwarded quote as PDF/image).
-  const attachments: { filename: string; mime: string; bytes: Uint8Array }[] = [];
-  const type: string = args.msg.type;
-  const mediaId: string | undefined = args.msg?.[type]?.id;
-  if (mediaId && (type === 'document' || type === 'image')) {
-    try {
-      const dl = await downloadMedia(mediaId);
-      if (dl) {
-        const mime = dl.mimeType || args.msg[type]?.mime_type || 'application/octet-stream';
-        const ext = mime.split('/')[1] || 'bin';
-        attachments.push({
-          filename: args.msg[type]?.filename || `${type}.${ext}`,
-          mime,
-          bytes: new Uint8Array(dl.bytes),
-        });
-      }
-    } catch (e) {
-      console.warn('[agent quote] media download failed', e);
-    }
-  }
-
-  // Voice note → transcribe → treat as a spoken command.
-  let voiceText: string | null = null;
-  let isVoice = false;
-  if (type === 'audio' && mediaId) {
-    isVoice = true; // set NOW so a transcription THROW still triggers the "resend" guard downstream
-    try {
-      const dl = await downloadMedia(mediaId);
-      if (dl) {
-        const mime = dl.mimeType || args.msg.audio?.mime_type || 'audio/ogg';
-        const ext = (mime.split('/')[1] || 'ogg').split(';')[0];
-        const file = new File([Buffer.from(dl.bytes)], `voice.${ext}`, { type: mime });
-        const { parseAudioWithGemini } = await import('@/lib/ai-parser');
-        const res: any = await parseAudioWithGemini({ file, documentType: 'quote', language: 'he' });
-        voiceText = res?.transcription || res?.data?.transcription || null;
-      }
-    } catch (e) {
-      console.warn('[agent voice] transcription failed', e);
-    }
-  }
-
-  // Drive the WhatsApp conversation (build quote? → price → link) and reply
-  // within the 24h service window (the agent just messaged us).
-  const startedAt = Date.now();
-  let result: AgentMessageResult = { reply: null, outcome: 'error' };
   try {
-    result = await handleAgentMessage(agent as any, args.waId, voiceText || args.textBody, attachments, { isVoice });
+    await publishAgentJob({ waId: args.waId, agentId: (agent as any).id, msg: args.msg, textBody: args.textBody });
   } catch (e) {
-    console.warn('[agent quote] conversation failed', e);
-    result = { reply: 'קרתה תקלה זמנית, אפשר לשלוח שוב?', outcome: 'error' };
+    console.error('[whatsapp webhook] failed to enqueue agent job', e);
+    // fall through: still return true so support routing is skipped for an agent
   }
-  if (result.reply) {
-    await sendText({ to: args.waId, body: result.reply, contextMessageId: args.msg.id });
-  }
-  // ✅ ONLY on outcome==='done'; ⚠️ on error; nothing while awaiting the agent.
-  const emoji = reactionForOutcome(result.outcome);
-  if (emoji) void sendReaction({ to: args.waId, messageId: args.msg.id, emoji }).catch(() => {});
-
-  void logAgentWa({
-    messageId: args.msg.id,
-    agentId: (agent as any).id,
-    channel: channelOf(args.msg),
-    transcript: voiceText || args.textBody || null,
-    outcome: result.outcome,
-    latencyMs: Date.now() - startedAt,
-    sttProvider: isVoice ? 'gemini' : null,
-    log: result.log,
-  }).catch(() => {});
   return true;
 }
