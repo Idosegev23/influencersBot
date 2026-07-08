@@ -4,6 +4,7 @@ import { getScanJobsRepo } from '@/lib/db/repositories/scanJobsRepo';
 import { saveState } from '@/lib/pipeline/state';
 import { publishStep } from '@/lib/pipeline/qstash';
 import { DEFAULT_SCAN_CONFIG } from '@/lib/scraping/newScanOrchestrator';
+import { normalizeIgUsername } from '@/lib/pipeline/username';
 import type { PipelineState } from '@/lib/pipeline/types';
 
 export async function POST(req: Request) {
@@ -31,8 +32,9 @@ export async function POST(req: Request) {
     categories,
   } = body;
 
-  // Website-only (quote) scans may omit the IG username — anchor on the site domain instead.
-  let uname = username;
+  // Normalize the IG handle — admins often paste a full profile URL / @ / ?hl=he,
+  // which used verbatim as the scrape handle yields an empty account.
+  let uname = username ? normalizeIgUsername(username) : username;
   if (!uname && websiteUrl) {
     try { uname = new URL(websiteUrl).host; } catch { return NextResponse.json({ error: 'bad websiteUrl' }, { status: 400 }); }
   }

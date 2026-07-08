@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { Category } from '@/lib/pipeline/discover';
+import { normalizeIgUsername } from '@/lib/pipeline/username';
 
 type ScanMode = 'quote' | 'full';
 
@@ -150,7 +151,7 @@ export default function AddAccountPage() {
   }
 
   async function handleCreate() {
-    const igUsername = username.trim().replace(/^@/, '');
+    const igUsername = normalizeIgUsername(username);
     const site = websiteUrl.trim();
 
     // The account row needs a username. Use the IG handle if present, else anchor on the site domain.
