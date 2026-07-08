@@ -105,8 +105,8 @@ export default function AgentClientsPage() {
     <div dir="rtl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-[color:var(--ink-900)]">הלקוחות שלי</h1>
-          <p className="text-sm text-[color:var(--ink-500)] mt-1">משפיענים ולקוחות שמנוהלים על ידך</p>
+          <h1 className="text-2xl font-bold text-[color:var(--ink-900)]">המיוצגים שלי</h1>
+          <p className="text-sm text-[color:var(--ink-500)] mt-1">משפיענים ומיוצגים שמנוהלים על ידך</p>
         </div>
         <button onClick={() => setShowForm((v) => !v)} className="ui-btn ui-btn-sm ui-btn-solid gap-1.5">
           <Plus className="w-4 h-4" />
