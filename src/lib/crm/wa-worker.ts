@@ -7,7 +7,10 @@ import { reactionForOutcome, channelOf } from '@/lib/crm/wa-outcome';
 import { logAgentWa } from '@/lib/crm/wa-log';
 import { redisGet, redisSetNx } from '@/lib/redis';
 
-const MAX_REQUEUE = 5;
+// A brief-parse + gpt-5.5 turn can take ~30s while holding the per-agent lock; give
+// requeued burst messages enough attempts (10 × 3s ≈ 30s) to wait it out and process
+// SERIALLY, instead of exhausting retries and running degraded/concurrent.
+const MAX_REQUEUE = 10;
 
 export async function loadAgentById(agentId: string): Promise<WaAgent | null> {
   const { data } = await supabaseAdmin
