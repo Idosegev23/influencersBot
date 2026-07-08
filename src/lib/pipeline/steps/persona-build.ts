@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server';
 import { preprocessInstagramData } from '@/lib/scraping/preprocessing';
 import { buildPersonaWithGemini, savePersonaToDatabase } from '@/lib/ai/gemini-persona-builder';
+import { buildPersonaFromWebsite } from '@/lib/ai/persona-from-website';
 import type { StepContext } from '../types';
-import type { StepResult } from './index';
+import { hasInstagram, type StepResult } from './index';
 
 /**
  * Persona-build step — self-contained.
@@ -17,6 +18,13 @@ import type { StepResult } from './index';
  * build + save the persona in one step, mirroring `setup-account.ts` step 6.
  */
 export async function personaBuildStep(ctx: StepContext): Promise<StepResult> {
+  // Website-only accounts have no Instagram posts/transcriptions to preprocess;
+  // build the persona from scraped website content instead.
+  if (!hasInstagram(ctx)) {
+    await buildPersonaFromWebsite(ctx.accountId);
+    return { status: 'advance' };
+  }
+
   const supabase = await createClient();
 
   const preprocessedData = await preprocessInstagramData(ctx.accountId);
