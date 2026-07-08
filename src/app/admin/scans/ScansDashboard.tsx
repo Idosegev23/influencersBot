@@ -189,7 +189,7 @@ export default function ScansDashboard() {
                     </span>
                     <span className="flex items-center gap-3 shrink-0 tabular-nums">
                       <span>{fmtElapsed(scan.elapsedMs)}</span>
-                      <span>עודכן לפני {fmtAgo(scan.lastUpdateMs)}</span>
+                      {isActive && <span>עודכן לפני {fmtAgo(scan.lastUpdateMs)}</span>}
                       <span aria-hidden style={{ color: '#c4b5fd' }}>→</span>
                     </span>
                   </div>

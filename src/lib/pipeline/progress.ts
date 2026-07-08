@@ -15,12 +15,21 @@ export function computeScanProgress(
   const completedSteps = SCAN_STEPS.filter(s => completed.has(s)).length;
   const percent = Math.round((completedSteps / SCAN_STEPS.length) * 100);
 
-  // currentStep: latest running log whose step has no later completed; else last log's step; else first step.
+  // currentStep: latest running log whose step has no LATER completed; else last log's step; else first step.
+  // ("no later completed" — not "never completed" — so retrying an already-completed step is tracked correctly.)
+  const lastCompletedAt = new Map<string, number>();
+  for (const l of logs) {
+    if (l.status === 'completed') {
+      const t = Date.parse(l.timestamp);
+      if (t > (lastCompletedAt.get(l.step) ?? -Infinity)) lastCompletedAt.set(l.step, t);
+    }
+  }
   let currentStep: string | null = null;
   const sorted = [...logs].sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
   for (let i = sorted.length - 1; i >= 0; i--) {
     const l = sorted[i];
-    if (l.status === 'running' && !completed.has(l.step)) { currentStep = l.step; break; }
+    const completedAfter = (lastCompletedAt.get(l.step) ?? -Infinity) > Date.parse(l.timestamp);
+    if (l.status === 'running' && !completedAfter) { currentStep = l.step; break; }
   }
   if (!currentStep) currentStep = sorted.length ? sorted[sorted.length - 1].step : SCAN_STEPS[0];
 
