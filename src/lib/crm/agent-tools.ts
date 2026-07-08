@@ -7,7 +7,10 @@ import { generateEmbedding } from '@/lib/rag/embeddings';
 
 const sinceIso = (months?: number) =>
   months ? new Date(Date.now() - months * 30 * 24 * 3600 * 1000).toISOString() : null;
-const SIGNED = 'signed';
+// A signed/won CRM deal = partnerships.status 'active' — that's what the signature-completion
+// handler sets (signatures/[token]/sign → status:'active'). ('signed' never existed in the status
+// CHECK constraint, so the old value silently matched nothing.)
+const SIGNED = 'active';
 
 export async function countContracts(
   sb: any,
