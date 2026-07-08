@@ -103,8 +103,26 @@ export async function createQuote(input: CreateQuoteInput): Promise<CreateQuoteR
  * Reused by createQuote (auto path) and by the brief-pricing "send" flow, where
  * the partnership + priced line items are created first, then the quote issued.
  */
-export async function issueQuote(partnershipId: string, input: CreateQuoteInput): Promise<CreateQuoteResult> {
+export async function issueQuote(partnershipId: string, input: CreateQuoteInput, idempotencyKey?: string): Promise<CreateQuoteResult> {
   const title = input.title || `הצעת מחיר${input.brandName ? ` — ${input.brandName}` : ''}`;
+
+  // Idempotency: a double reply / webhook redelivery must never mint two signatures.
+  if (idempotencyKey) {
+    const { data: existing } = await supabaseAdmin
+      .from('signature_requests')
+      .select('id, token, partnership_id')
+      .eq('idempotency_key', idempotencyKey)
+      .maybeSingle();
+    if (existing) {
+      return {
+        partnershipId: existing.partnership_id || partnershipId,
+        signatureRequestId: existing.id,
+        token: existing.token,
+        signUrl: signUrlFor(existing.token),
+        title,
+      };
+    }
+  }
 
   // quote PDF — reuse a forwarded PDF if present, else generate
   let pdfBytes: Uint8Array;
@@ -161,10 +179,20 @@ export async function issueQuote(partnershipId: string, input: CreateQuoteInput)
       document_storage_path: docPath,
       signer_name: input.brandContactName || null,
       signer_email: input.brandContactEmail || null,
+      idempotency_key: idempotencyKey ?? null,
     })
     .select('id, token')
     .single();
-  if (sErr || !sig) throw new Error(sErr?.message || 'failed to create signature request');
+  if (sErr || !sig) {
+    // Concurrent double-reply raced us to the same idempotency_key → return the winner.
+    if (idempotencyKey && (sErr as any)?.code === '23505') {
+      const { data: raced } = await supabaseAdmin
+        .from('signature_requests').select('id, token, partnership_id')
+        .eq('idempotency_key', idempotencyKey).maybeSingle();
+      if (raced) return { partnershipId: raced.partnership_id || partnershipId, signatureRequestId: raced.id, token: raced.token, signUrl: signUrlFor(raced.token), title };
+    }
+    throw new Error(sErr?.message || 'failed to create signature request');
+  }
 
   return {
     partnershipId,

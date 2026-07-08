@@ -445,7 +445,7 @@ async function issueQuoteForDeal(agent: WaAgent, partnershipId: string): Promise
     brandContactPhone: p.brand_contact_phone,
     agentName: agent.full_name,
     parsedData: parsed,
-  });
+  }, `issue:${partnershipId}`);
   await supabaseAdmin
     .from('crm_inbound_messages')
     .update({ signature_request_id: result.signatureRequestId, brief_status: 'sent' })
