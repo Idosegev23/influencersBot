@@ -80,10 +80,23 @@ async function processOneInbound(agent: WaAgent, job: AgentJob): Promise<string 
   const { attachments, voiceText, isVoice, sttConfidence, sttProvider } = await materializeInbound(job.msg);
   const result = await handleAgentMessage(agent, job.waId, voiceText || job.textBody, attachments, { isVoice, sttConfidence });
   if (result.reply) {
-    await sendText({ to: job.waId, body: result.reply, contextMessageId: job.msg.id });
-    try { if (job.msg?.id) await redisSetNx(doneKey, '1', 900); } catch { /* ignore */ } // mark replied → dedup a retry
-    const emoji = reactionForOutcome(result.outcome);
-    if (emoji) void sendReaction({ to: job.waId, messageId: job.msg.id, emoji }).catch(() => {});
+    // Meta returns {success:false} WITHOUT throwing on a 429/503 — so retry the SEND (not the
+    // brain: re-running handleAgentMessage isn't idempotent for document_brief). Only mark the
+    // message "done" on a CONFIRMED delivery, so a genuine failure isn't silently swallowed.
+    let sent = { success: false } as { success: boolean };
+    for (let i = 0; i < 3; i++) {
+      try { sent = await sendText({ to: job.waId, body: result.reply, contextMessageId: job.msg.id }); }
+      catch (e) { sent = { success: false }; console.warn('[wa-worker] sendText threw', e); }
+      if (sent.success) break;
+      await new Promise((r) => setTimeout(r, 400 * (i + 1))); // back off a transient throttle
+    }
+    if (sent.success) {
+      try { if (job.msg?.id) await redisSetNx(doneKey, '1', 900); } catch { /* ignore */ } // replied → dedup a retry
+      const emoji = reactionForOutcome(result.outcome);
+      if (emoji) void sendReaction({ to: job.waId, messageId: job.msg.id, emoji }).catch(() => {});
+    } else {
+      console.error('[wa-worker] reply delivery FAILED after 3 retries', job.msg?.id);
+    }
   }
   void logAgentWa({
     messageId: job.msg.id,
