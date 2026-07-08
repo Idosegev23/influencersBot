@@ -26,9 +26,19 @@ import { Avatar } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 
-type AccountFilter = 'all' | 'creator' | 'brand' | 'demo';
+type AccountFilter = 'all' | 'creator' | 'brand' | 'service' | 'demo';
 type SortKey = 'recent' | 'followers' | 'name';
 type AccountRow = Influencer & { is_demo?: boolean };
+
+// Real classification lives in config.archetype (surfaced by /api/admin/accounts),
+// NOT in accounts.type — which is hard-coded to 'creator' at account creation.
+// Brands + service providers are otherwise wrongly shown under "משפיענים".
+function accountBucket(row: AccountRow): 'brand' | 'service' | 'creator' {
+  const a = (row.archetype || '').toLowerCase();
+  if (a === 'brand') return 'brand';
+  if (a === 'service_provider') return 'service';
+  return 'creator';
+}
 
 export default function AccountsPage() {
   const router = useRouter();
@@ -76,8 +86,9 @@ export default function AccountsPage() {
         if (!i.is_demo) return false;
       } else {
         if (i.is_demo) return false;
-        if (filter === 'creator' && i.type !== 'creator') return false;
-        if (filter === 'brand' && i.type !== 'brand') return false;
+        if (filter === 'creator' && accountBucket(i) !== 'creator') return false;
+        if (filter === 'brand' && accountBucket(i) !== 'brand') return false;
+        if (filter === 'service' && accountBucket(i) !== 'service') return false;
       }
       if (q) {
         const hay = [i.display_name, i.username, i.category, i.full_name].filter(Boolean).join(' ').toLowerCase();
@@ -96,8 +107,9 @@ export default function AccountsPage() {
     const active = influencers.filter((i) => !i.is_demo);
     return {
       all: active.length,
-      creator: active.filter((i) => i.type === 'creator').length,
-      brand: active.filter((i) => i.type === 'brand').length,
+      creator: active.filter((i) => accountBucket(i) === 'creator').length,
+      brand: active.filter((i) => accountBucket(i) === 'brand').length,
+      service: active.filter((i) => accountBucket(i) === 'service').length,
       demo: influencers.filter((i) => i.is_demo).length,
     };
   }, [influencers]);
@@ -176,6 +188,9 @@ export default function AccountsPage() {
           </FilterTab>
           <FilterTab active={filter === 'brand'} onClick={() => setFilter('brand')}>
             מותגים <Counter n={totals.brand} />
+          </FilterTab>
+          <FilterTab active={filter === 'service'} onClick={() => setFilter('service')}>
+            נותני שירות <Counter n={totals.service} />
           </FilterTab>
           <FilterTab active={filter === 'demo'} onClick={() => setFilter('demo')}>
             <FlaskConical className="w-3.5 h-3.5 -ms-0.5" />

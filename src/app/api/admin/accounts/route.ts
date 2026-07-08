@@ -93,6 +93,10 @@ export async function GET() {
         is_demo: config.isDemo === true,
         plan: account.plan || 'free',
         type: account.type,
+        // Real classification lives in config.archetype (brand / service_provider /
+        // influencer / …); accounts.type is always 'creator' at creation, so tabs must
+        // bucket by archetype, not type.
+        archetype: config.archetype || null,
         created_at: account.created_at,
         updated_at: account.updated_at,
         
