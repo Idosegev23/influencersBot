@@ -568,7 +568,7 @@ async function issueQuoteForDeal(agent: WaAgent, partnershipId: string): Promise
 export async function interpretConfirmReply(
   text: string,
   pending: PendingDeal[],
-): Promise<{ decision: 'yes' | 'no' | 'amend' | 'unclear'; reply?: string }> {
+): Promise<{ decision: 'yes' | 'no' | 'amend' | 'unclear' | 'other'; reply?: string }> {
   const fast = classifyConfirm(text || '');
   if (fast === 'yes') return { decision: 'yes' };
   if (fast === 'no') return { decision: 'no' };
@@ -576,15 +576,16 @@ export async function interpretConfirmReply(
   const instr =
     'הסוכן קיבל אישור-חזרה (read-back) על הצעת מחיר וענה בשפה חופשית. ' +
     `ההצעה שהוקראה: ${summary}. ` +
-    'סווג את התשובה. החזר JSON נקי בלבד: {"decision":"yes"|"no"|"amend"|"unclear","reply":<string|null>}. ' +
+    'סווג את התשובה. החזר JSON נקי בלבד: {"decision":"yes"|"no"|"amend"|"other"|"unclear","reply":<string|null>}. ' +
     'yes = מאשר לשלוח. no = לא לשלוח / להשאיר כתיעוד. ' +
-    'amend = הסוכן מבקש שינוי (מחיר/מיוצג/מותג אחר) — reply=null. ' +
-    'unclear = לא ברור; ב-reply נסח שאלה קצרה ואנושית שחוזרת על מי/כמה, בלי מזהים פנימיים.';
+    'amend = הסוכן מבקש שינוי בהצעה הזו (מחיר/מיוצג/מותג אחר) — reply=null. ' +
+    'other = הסוכן שולח בקשה או שאלה חדשה שלא קשורה לאישור הזה ("תפרק לי את הבריפים", "מה פתוח לי", "כמה עסקאות סגרתי", "מה ביקשו בבריף של דני", "תשלח לדני") — reply=null. ' +
+    'unclear = תשובה מעורפלת שכן מתייחסת לאישור אבל לא ברור אם כן/לא; ב-reply נסח שאלה קצרה שחוזרת על מי/כמה, בלי מזהים פנימיים.';
   try {
     const { chatModel } = await import('@/lib/openai');
-    const { response } = await chatModel(instr, text || '', laneModel('money'));
+    const { response } = await chatModel(instr, text || '', laneModel('money'), { effort: 'low', timeoutMs: 45_000 });
     const j = JSON.parse(String(response || '').replace(/```json|```/g, '').trim());
-    const decision = ['yes', 'no', 'amend', 'unclear'].includes(j?.decision) ? j.decision : 'unclear';
+    const decision = ['yes', 'no', 'amend', 'other', 'unclear'].includes(j?.decision) ? j.decision : 'unclear';
     return { decision, reply: j?.reply || undefined };
   } catch {
     return { decision: 'unclear', reply: 'לא בטוח שהבנתי — לשלוח את ההצעה? (כן/לא)' };
@@ -606,6 +607,21 @@ async function handleCreateConfirm(agent: WaAgent, state: any, text: string | nu
     // Pass the real waId so a document_brief re-route has a resolvable sender.
     await resetState(agent.id);
     return runBrain(agent, waId, text || '');
+  }
+  if (decision === 'other') {
+    // An unrelated NEW request while a confirmation is pending must not be trapped as a
+    // yes/no. Handle it. If it was just an info answer (state untouched), keep the pending
+    // confirmation alive and remind at the end so a later "כן" still issues the quote.
+    const res = await runBrain(agent, waId, text || '');
+    const act = (res.log as any)?.plan_json?.action;
+    if (act === 'answer' || act === 'analytics') {
+      const who = pending[0]?.clientName || '';
+      const reminder = who
+        ? `\n\n(עדיין ממתין: ליצור ולשלוח את ההצעה של ${who}? כן/לא)`
+        : '\n\n(עדיין ממתין: ליצור ולשלוח את ההצעה? כן/לא)';
+      return { ...res, reply: `${res.reply || ''}${reminder}`.trim() };
+    }
+    return res; // a new action (price/document/issue) took over the flow
   }
   if (decision === 'unclear') {
     return needMore(reply || `ליצור ${pending.length > 1 ? pending.length + ' הצעות' : 'הצעת מחיר'} ולשלוח קישור? (כן/לא)`);
