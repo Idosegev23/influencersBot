@@ -155,8 +155,11 @@ export default function AddAccountPage() {
     }
 
     if (scanMode === 'quote') {
-      if (!site) { setError('יש להזין כתובת אתר'); return; }
-      if (selectedCategories.length === 0) { setError('יש לבחור לפחות קטגוריה אחת'); return; }
+      // Either an Instagram account OR a website (or both) — at least one is required.
+      if (!igUsername && !site) { setError('הזן חשבון אינסטגרם או כתובת אתר'); return; }
+      // If a website was given, require a category selection so we don't crawl the whole site.
+      if (site && selectedCategories.length === 0) { setError('בחר לפחות קטגוריה אחת מהאתר'); return; }
+      // IG-only quote needs no website/categories — the pipeline skips the site steps.
     } else if (!igUsername) {
       setError('יש להזין username');
       return;
@@ -263,7 +266,8 @@ export default function AddAccountPage() {
   }
 
   const primaryDisabled = isLoading || (scanMode === 'quote'
-    ? selectedCategories.length === 0
+    // Quote needs at least one source: an Instagram handle OR a website category selection.
+    ? (!username.trim() && selectedCategories.length === 0)
     : !username.trim());
 
   return (

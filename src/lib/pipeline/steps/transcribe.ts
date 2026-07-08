@@ -9,6 +9,11 @@ import { hasInstagram, type StepResult } from './index';
 import { transcribeVideo, saveTranscription } from '@/lib/transcription/gemini-transcriber';
 import type { TranscriptionInput } from '@/lib/transcription/gemini-transcriber';
 
+// Quote (pre-sales demo) scans transcribe only the N most recent videos — the
+// whole point of quote mode is speed/cost, and transcription is the slowest step
+// (~15 min for ~40 videos). The persona builds fine from captions + a few reels.
+const QUOTE_TRANSCRIBE_CAP = 5;
+
 /** Extract a usable video URL from an `instagram_posts.media_urls` value. */
 function extractVideoUrl(mediaUrls: any): string | null {
   if (!mediaUrls) return null;
@@ -41,13 +46,18 @@ export async function transcribeStep(ctx: StepContext): Promise<StepResult> {
   // content-processor: only posts with a usable video URL are transcribable.
   const { data: videoPosts } = await supabase
     .from('instagram_posts')
-    .select('id, media_urls, video_duration')
+    .select('id, media_urls, video_duration, posted_at')
     .eq('account_id', ctx.accountId)
-    .in('type', ['reel', 'video']);
+    .in('type', ['reel', 'video'])
+    .order('posted_at', { ascending: false, nullsFirst: false }); // most recent first
 
-  const posts = (videoPosts ?? [])
+  let posts = (videoPosts ?? [])
     .map((p: any) => ({ id: p.id as string, url: extractVideoUrl(p.media_urls), duration: p.video_duration as number | undefined }))
     .filter((p: { url: string | null }) => !!p.url) as Array<{ id: string; url: string; duration?: number }>;
+
+  // Quote mode: only the N most recent videos (posts are ordered posted_at DESC).
+  if (ctx.state.options?.scanMode === 'quote') posts = posts.slice(0, QUOTE_TRANSCRIBE_CAP);
+
   const total = posts.length;
 
   if (total === 0) {
