@@ -18,6 +18,8 @@ export interface PipelineOptions {
   postsLimit: number;
   isDemo: boolean;
   archetype?: string; // brand | influencer | service_provider | ... (applied in finalize)
+  scanMode?: 'quote' | 'full'; // quote = bounded pre-sales demo scan; undefined/full = current behaviour
+  categories?: { pathPattern: string; cap: number }[]; // selected path slices for quote mode; undefined = full scope
 }
 
 export interface PipelineState {
