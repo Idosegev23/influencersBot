@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const chat = vi.fn();
-vi.mock('@/lib/openai', () => ({ chat, CHAT_MODEL: 'gpt-5-nano' }));
+vi.mock('@/lib/openai', () => ({ chat, chatModel: chat, CHAT_MODEL: 'gpt-5-nano' }));
 vi.mock('@/lib/supabase', () => ({ supabase: {} }));
 vi.mock('@/lib/crm/quote-ingest', () => ({ ingestQuote: async () => ({ matched: false }) }));
 vi.mock('@/lib/crm/quotes', () => ({ createQuote: vi.fn(), issueQuote: vi.fn(), signUrlFor: (t: string) => `/sign/${t}` }));

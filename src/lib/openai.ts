@@ -485,6 +485,22 @@ export async function chat(
   }
 }
 
+/** Like chat(), but with an explicit model id (for the agent's config-driven lanes). */
+export async function chatModel(
+  instructions: string,
+  input: string,
+  model: string
+): Promise<{ response: string; responseId: string; model: string }> {
+  const client = getClient();
+  try {
+    const response = await client.responses.create({ model, instructions, input, store: true });
+    return { response: response.output_text, responseId: response.id, model };
+  } catch (error) {
+    console.error(`Error in chatModel(${model}):`, error);
+    throw error;
+  }
+}
+
 // ============================================
 // Streaming Chat - Using Responses API with streaming
 // ============================================

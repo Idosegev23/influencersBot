@@ -9,7 +9,7 @@ vi.mock('@/lib/supabase', () => {
   return { supabase: { from: () => chain } };
 });
 vi.mock('@/lib/crm/quote-ingest', () => ({ ingestQuote: async () => ({ ok: true, matched: false }) }));
-vi.mock('@/lib/openai', () => ({ chat: async () => { throw new Error('planner down'); }, CHAT_MODEL: 'gpt-5-nano' }));
+vi.mock('@/lib/openai', () => ({ chat: async () => { throw new Error('planner down'); }, chatModel: async () => { throw new Error('planner down'); }, CHAT_MODEL: 'gpt-5-nano' }));
 
 import { handleAgentMessage } from '@/lib/crm/wa-conversation';
 

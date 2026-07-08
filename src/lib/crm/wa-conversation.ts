@@ -11,6 +11,7 @@ import { computeTotals, lineItemsToDeliverables, type LineItem } from '@/lib/crm
 import { interpretYesNo, interpretPricing, normalizeAmount, isStateStale, resolveTalent, classifyConfirm } from '@/lib/crm/wa-interpret';
 import type { AgentMessageResult } from '@/lib/crm/wa-outcome';
 import { CHAT_MODEL } from '@/lib/openai';
+import { laneModel } from '@/lib/llm/config';
 
 export interface WaAgent {
   id: string;
@@ -178,8 +179,8 @@ async function planFreeform(text: string, ctx: Awaited<ReturnType<typeof loadBra
     'clarify = רק כשבאמת אי אפשר להחליט — למשל למיוצג יש בריפים לכמה מותגים שונים וההודעה לא אומרת לאיזה. ב-reply דבר אנושית לחלוטין: לעולם אל תזכיר מזהים פנימיים (brief_id / account_id / id / שמות שדות) — שאל לפי שם המותג או הקמפיין ("לאיזה מותג — X או Y?"). ' +
     `בריפים פתוחים: ${JSON.stringify(briefSummary)}. עסקאות אחרונות: ${JSON.stringify(dealSummary)}. רוסטר מיוצגים: ${JSON.stringify(ctx.roster)}.`;
   try {
-    const { chat } = await import('@/lib/openai');
-    const { response } = await chat(instr, text);
+    const { chatModel } = await import('@/lib/openai');
+    const { response } = await chatModel(instr, text, laneModel('money'));
     return JSON.parse(String(response || '').replace(/```json|```/g, '').trim());
   } catch {
     return null;
@@ -351,13 +352,13 @@ async function handlePrices(agent: WaAgent, state: any, text: string | null): Pr
 
 async function aiPricing(text: string, seed: Seed[]): Promise<{ lineItems: LineItem[]; needsConfirmation: boolean } | null> {
   try {
-    const { chat } = await import('@/lib/openai');
+    const { chatModel } = await import('@/lib/openai');
     const list = seed.map((r, i) => `${i + 1}) ${deliverableLabel(r)}`).join('; ');
     const instr =
       `אתה מפרש תמחור של סוכן. ${seed.length ? `יש ${seed.length} תוצרים: ${list}.` : 'אין פירוט תוצרים.'} ` +
       `הסוכן שלח תמחור בטקסט חופשי (בשקלים). החזר JSON בלבד ללא טקסט: ` +
       `{"mode":"total"|"per_line","total":number|null,"prices":number[]|null}. per_line = מספר לכל תוצר לפי הסדר.`;
-    const { response } = await chat(instr, text);
+    const { response } = await chatModel(instr, text, laneModel('money'));
     const j = JSON.parse(String(response || '').replace(/```json|```/g, '').trim());
     if (j.mode === 'per_line' && Array.isArray(j.prices) && j.prices.length === seed.length) {
       let nc = false;
@@ -534,8 +535,8 @@ export async function interpretConfirmReply(
     'amend = הסוכן מבקש שינוי (מחיר/מיוצג/מותג אחר) — reply=null. ' +
     'unclear = לא ברור; ב-reply נסח שאלה קצרה ואנושית שחוזרת על מי/כמה, בלי מזהים פנימיים.';
   try {
-    const { chat } = await import('@/lib/openai');
-    const { response } = await chat(instr, text || '');
+    const { chatModel } = await import('@/lib/openai');
+    const { response } = await chatModel(instr, text || '', laneModel('money'));
     const j = JSON.parse(String(response || '').replace(/```json|```/g, '').trim());
     const decision = ['yes', 'no', 'amend', 'unclear'].includes(j?.decision) ? j.decision : 'unclear';
     return { decision, reply: j?.reply || undefined };
