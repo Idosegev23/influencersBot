@@ -26,7 +26,7 @@ import { Avatar } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 
-type AccountFilter = 'all' | 'creator' | 'brand';
+type AccountFilter = 'all' | 'creator' | 'brand' | 'demo';
 type SortKey = 'recent' | 'followers' | 'name';
 type AccountRow = Influencer & { is_demo?: boolean };
 
@@ -71,8 +71,14 @@ export default function AccountsPage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const base = influencers.filter((i) => {
-      if (filter === 'creator' && i.type !== 'creator') return false;
-      if (filter === 'brand' && i.type !== 'brand') return false;
+      // Demo accounts live in their own tab and are excluded from the active tabs
+      if (filter === 'demo') {
+        if (!i.is_demo) return false;
+      } else {
+        if (i.is_demo) return false;
+        if (filter === 'creator' && i.type !== 'creator') return false;
+        if (filter === 'brand' && i.type !== 'brand') return false;
+      }
       if (q) {
         const hay = [i.display_name, i.username, i.category, i.full_name].filter(Boolean).join(' ').toLowerCase();
         if (!hay.includes(q)) return false;
@@ -87,10 +93,12 @@ export default function AccountsPage() {
   }, [influencers, filter, query, sort]);
 
   const totals = useMemo(() => {
+    const active = influencers.filter((i) => !i.is_demo);
     return {
-      all: influencers.length,
-      creator: influencers.filter((i) => i.type === 'creator').length,
-      brand: influencers.filter((i) => i.type === 'brand').length,
+      all: active.length,
+      creator: active.filter((i) => i.type === 'creator').length,
+      brand: active.filter((i) => i.type === 'brand').length,
+      demo: influencers.filter((i) => i.is_demo).length,
     };
   }, [influencers]);
 
@@ -168,6 +176,10 @@ export default function AccountsPage() {
           </FilterTab>
           <FilterTab active={filter === 'brand'} onClick={() => setFilter('brand')}>
             מותגים <Counter n={totals.brand} />
+          </FilterTab>
+          <FilterTab active={filter === 'demo'} onClick={() => setFilter('demo')}>
+            <FlaskConical className="w-3.5 h-3.5 -ms-0.5" />
+            דמו <Counter n={totals.demo} />
           </FilterTab>
         </div>
 
