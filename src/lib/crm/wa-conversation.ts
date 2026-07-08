@@ -8,7 +8,7 @@ import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { ingestQuote } from '@/lib/crm/quote-ingest';
 import { createQuote, issueQuote, signUrlFor } from '@/lib/crm/quotes';
 import { computeTotals, lineItemsToDeliverables, type LineItem } from '@/lib/crm/pricing';
-import { interpretYesNo, interpretPricing, normalizeAmount } from '@/lib/crm/wa-interpret';
+import { interpretYesNo, interpretPricing, normalizeAmount, isStateStale, resolveTalent, classifyConfirm } from '@/lib/crm/wa-interpret';
 import type { AgentMessageResult } from '@/lib/crm/wa-outcome';
 import { CHAT_MODEL } from '@/lib/openai';
 
@@ -27,13 +27,31 @@ const withLog = (r: AgentMessageResult, log: AgentMessageResult['log']): AgentMe
 
 async function getState(agentId: string) {
   const { data } = await supabaseAdmin.from('crm_agent_wa_state').select('*').eq('agent_id', agentId).maybeSingle();
-  return data || { agent_id: agentId, stage: 'idle', brief_id: null, deal_id: null, context: {} as any };
+  const fallback = { agent_id: agentId, stage: 'idle', brief_id: null, deal_id: null, context: {} as any, version: 0 };
+  if (!data) return fallback;
+  // §5.3 — a stale mid-flow row would read tomorrow's brief as a "yes/no". Expire it.
+  if (data.stage && data.stage !== 'idle' && isStateStale(data.updated_at)) {
+    return { ...data, stage: 'idle', brief_id: null, deal_id: null, context: {} };
+  }
+  return data;
 }
 async function setState(agentId: string, patch: Record<string, any>) {
   await supabaseAdmin
     .from('crm_agent_wa_state')
     .upsert({ agent_id: agentId, ...patch, updated_at: new Date().toISOString() }, { onConflict: 'agent_id' });
 }
+
+/** Optimistic write: only succeeds if the row's version still equals expectedVersion. */
+async function setStateGuarded(agentId: string, patch: Record<string, any>, expectedVersion: number): Promise<boolean> {
+  const { data } = await supabaseAdmin
+    .from('crm_agent_wa_state')
+    .update({ ...patch, version: expectedVersion + 1, updated_at: new Date().toISOString() })
+    .eq('agent_id', agentId)
+    .eq('version', expectedVersion)
+    .select('agent_id');
+  return !!(data && data.length);
+}
+void setStateGuarded; // available to the worker's optimistic-retry backstop (P1)
 async function resetState(agentId: string) {
   await setState(agentId, { stage: 'idle', brief_id: null, deal_id: null, context: {} });
 }
@@ -495,18 +513,57 @@ async function issueQuoteForDeal(agent: WaAgent, partnershipId: string): Promise
   return { signUrl: result.signUrl, total: amount, clientName, brand: p.brand_name };
 }
 
-/** After pricing, the agent confirms whether to issue the quote(s) + send links. */
+/**
+ * Interpret the agent's free-form reply to a read-back ("הבנתי: אנה · קוקה-קולה ·
+ * 94,400 ₪ — לשלוח?"). Deterministic yes/no first; anything else goes to the model
+ * WITH the read-back context so "תשנה לאנה ל-90" is an amend, not a "no". NO buttons.
+ */
+export async function interpretConfirmReply(
+  text: string,
+  pending: PendingDeal[],
+): Promise<{ decision: 'yes' | 'no' | 'amend' | 'unclear'; reply?: string }> {
+  const fast = classifyConfirm(text || '');
+  if (fast === 'yes') return { decision: 'yes' };
+  if (fast === 'no') return { decision: 'no' };
+  const summary = pending.map((p) => `${p.clientName} · ${p.brand} · ${p.total.toLocaleString('en-US')} ₪`).join(' ; ');
+  const instr =
+    'הסוכן קיבל אישור-חזרה (read-back) על הצעת מחיר וענה בשפה חופשית. ' +
+    `ההצעה שהוקראה: ${summary}. ` +
+    'סווג את התשובה. החזר JSON נקי בלבד: {"decision":"yes"|"no"|"amend"|"unclear","reply":<string|null>}. ' +
+    'yes = מאשר לשלוח. no = לא לשלוח / להשאיר כתיעוד. ' +
+    'amend = הסוכן מבקש שינוי (מחיר/מיוצג/מותג אחר) — reply=null. ' +
+    'unclear = לא ברור; ב-reply נסח שאלה קצרה ואנושית שחוזרת על מי/כמה, בלי מזהים פנימיים.';
+  try {
+    const { chat } = await import('@/lib/openai');
+    const { response } = await chat(instr, text || '');
+    const j = JSON.parse(String(response || '').replace(/```json|```/g, '').trim());
+    const decision = ['yes', 'no', 'amend', 'unclear'].includes(j?.decision) ? j.decision : 'unclear';
+    return { decision, reply: j?.reply || undefined };
+  } catch {
+    return { decision: 'unclear', reply: 'לא בטוח שהבנתי — לשלוח את ההצעה? (כן/לא)' };
+  }
+}
+
+/** After pricing, the agent confirms (free-form, model-in-context) whether to issue. */
 async function handleCreateConfirm(agent: WaAgent, state: any, text: string | null): Promise<AgentMessageResult> {
   const pending: PendingDeal[] = state.context?.pending || [];
-  const yn = interpretYesNo(text || '');
-  if (yn === 'no') {
+  const { decision, reply } = await interpretConfirmReply(text || '', pending);
+
+  if (decision === 'no') {
     await resetState(agent.id);
     const who = pending[0]?.clientName || 'המיוצג';
     return done(`בסדר — נשמר כתיעוד (מתומחר, בלי הצעה שנשלחה).\nתגיד/י "תן לי את ההצעה של ${who}" מתי שתרצה קישור.`);
   }
-  if (yn !== 'yes') return needMore(`ליצור ${pending.length > 1 ? pending.length + ' הצעות' : 'הצעת מחיר'} ולשלוח קישור? (כן/לא)`);
+  if (decision === 'amend') {
+    // free-form change → re-plan the message in context (may re-price / re-target).
+    await resetState(agent.id);
+    return runBrain(agent, '', text || '');
+  }
+  if (decision === 'unclear') {
+    return needMore(reply || `ליצור ${pending.length > 1 ? pending.length + ' הצעות' : 'הצעת מחיר'} ולשלוח קישור? (כן/לא)`);
+  }
+  // decision === 'yes'
   if (!pending.length) { await resetState(agent.id); return needMore('אין מה ליצור. שלח/י תמחור.'); }
-
   const links: string[] = [];
   let anyOk = false;
   for (const d of pending) {
@@ -528,18 +585,17 @@ async function handleTalentReply(agent: WaAgent, state: any, text: string | null
   const ids = agent.managed_account_ids || [];
   if (!ids.length) { await resetState(agent.id); return needMore('אין מיוצגים ברוסטר שלך.'); }
   const { data: accts } = await supabaseAdmin.from('accounts').select('id, config').in('id', ids);
-  const q = (text || '').toLowerCase();
-  const match = (accts || []).find((a) => {
-    const n = String((a.config as any)?.display_name || (a.config as any)?.username || '').toLowerCase();
-    return n.length >= 2 && q.includes(n);
-  });
-  if (!match) return needMore('לא מצאתי מיוצג בשם הזה ברוסטר. נסה/י שם אחר.');
+  const roster = (accts || []).map((a: any) => ({ id: a.id, name: String((a.config as any)?.display_name || (a.config as any)?.username || '') })).filter((r) => r.name.length >= 2);
+  const hit = resolveTalent(text || '', roster); // fuzzy Hebrew, replaces q.includes
+  if (!hit) return needMore('לא מצאתי מיוצג בשם הזה ברוסטר. נסה/י שם אחר.');
+  if (hit.ambiguous?.length === 2) return needMore(`לאיזה מיוצג — ${hit.ambiguous[0].name} או ${hit.ambiguous[1].name}?`);
+  const match = (accts || []).find((a: any) => a.id === hit.id)!;
   await supabaseAdmin.from('crm_inbound_messages').update({ suggested_account_id: match.id, brief_status: 'assigned' }).eq('id', state.brief_id);
   const seed: Seed[] = state.context?.seed || [];
   const built = buildLineItemsFromPricing(state.context?.pricing, seed);
   if (!built) {
     await setState(agent.id, { stage: 'awaiting_prices', context: { account_id: match.id, brand: state.context?.brand, seed } });
-    return needMore(`מעולה — ${(match.config as any)?.display_name || 'המיוצג'}. מה המחיר? (סכום כולל, או מחיר לכל שורה)`);
+    return needMore(`מעולה — ${hit.name}. מה המחיר? (סכום כולל, או מחיר לכל שורה)`);
   }
   const rec = await recordDealFromBrief(agent, state.brief_id, match.id, built.lineItems);
   await setState(agent.id, { stage: 'awaiting_create_confirm', context: { pending: [rec] } });
