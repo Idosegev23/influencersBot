@@ -31,6 +31,10 @@
   // ============================================
 
   var isOpen = false;
+  // WhatsApp-style keyboard: never auto-focus the composer on mobile open — the
+  // keyboard appears only after the user taps the input. This flag flips true on
+  // that first tap so the keyboard then stays through re-renders while chatting.
+  var inputTouched = false;
   var sessionId = localStorage.getItem('ibot_widget_' + ACCOUNT_ID) || null;
   var messages = [];
   var isLoading = false;
@@ -1293,6 +1297,7 @@
     var trigger = document.getElementById('ibot-trigger');
     trigger.onclick = function () {
       isOpen = true;
+      inputTouched = false;   // fresh open → no keyboard until the user taps the input
       try { markTooltipSeen(); } catch (e) {}
       widgetTrack('widget_opened', {});
       render();
@@ -1522,7 +1527,12 @@
     inputEl.onkeydown = function (e) {
       if (e.key === 'Enter') sendMessage();
     };
-    inputEl.focus();
+    // Remember the first real tap on the composer so the keyboard stays up
+    // while chatting, but never pops on open (WhatsApp behaviour).
+    inputEl.onfocus = function () { inputTouched = true; };
+    // Desktop: always focus (no keyboard to pop). Mobile: only re-focus once the
+    // user has tapped the input themselves — never on the initial open.
+    if (window.innerWidth >= 640 || inputTouched) inputEl.focus();
   }
 
   // ============================================
@@ -3118,6 +3128,7 @@
     try { localStorage.setItem('ibot_proactive_' + ACCOUNT_ID, String(proactiveLastFired)); } catch (e) { /* */ }
     widgetTrack('widget_proactive_opened', { reason: reason });
     isOpen = true;
+    inputTouched = false;   // proactive open → no keyboard until the user taps the input
     render();
   }
 
