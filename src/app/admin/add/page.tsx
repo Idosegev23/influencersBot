@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import type { Category } from '@/lib/pipeline/discover';
 
 type ScanMode = 'quote' | 'full';
@@ -49,6 +50,10 @@ export default function AddAccountPage() {
   const [maxPages, setMaxPages] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Parallel-scan UX: after a successful start we show a success panel (instead of
+  // navigating away) so the admin can jump to the board OR add another account.
+  const [started, setStarted] = useState<{ jobId: string; name: string } | null>(null);
 
   // Quote-mode discover state
   const [discovering, setDiscovering] = useState(false);
@@ -217,13 +222,29 @@ export default function AddAccountPage() {
         return;
       }
 
-      // 4. Navigate to the live progress board
-      router.push(`/admin/scan/${startData.jobId}`);
+      // 4. Show the success panel (parallel-scan UX) instead of navigating away,
+      //    so the admin can go to the board OR immediately add another account.
+      const startedName = displayName.trim() || igUsername || accountUsername;
+      setStarted({ jobId: startData.jobId, name: startedName });
     } catch {
       setError('שגיאת רשת');
     } finally {
       setIsLoading(false);
     }
+  }
+
+  // Reset the per-account form fields and dismiss the success panel so the admin
+  // can add another account while the previous scan keeps running in the background.
+  function handleAddAnother() {
+    setUsername('');
+    setDisplayName('');
+    setWebsiteUrl('');
+    setCategories([]);
+    setSelections({});
+    setPostsLimit('');
+    setMaxPages('');
+    setError(null);
+    setStarted(null);
   }
 
   // Enrich an existing quote/demo account to a full scan: same accountId,
@@ -249,7 +270,7 @@ export default function AddAccountPage() {
         setError(startData.error || 'שגיאה בהפעלת הסריקה');
         return;
       }
-      router.push(`/admin/scan/${startData.jobId}`);
+      setStarted({ jobId: startData.jobId, name: acct.display_name });
     } catch {
       setError('שגיאת רשת');
     } finally {
@@ -261,6 +282,52 @@ export default function AddAccountPage() {
     return (
       <div className="flex items-center justify-center py-32">
         <div className="w-8 h-8 border-2 border-[#2663EB] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Success panel — shown after a scan starts. The scan runs in the background, so
+  // the admin can go to the board, add another account, or view all scans.
+  if (started) {
+    return (
+      <div className="max-w-lg mx-auto">
+        <div className="neon-card p-5 sm:p-10">
+          <div className="flex flex-col items-center text-center">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center mb-4 sm:mb-6" style={{ background: '#DCFCE8' }}>
+              <span className="material-symbols-outlined text-[36px] sm:text-[48px]" style={{ color: '#22c55e' }}>check_circle</span>
+            </div>
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight mb-2" style={{ color: '#1f2937' }}>
+              ✅ הסריקה התחילה עבור {started.name}
+            </h1>
+            <p className="text-sm mb-6" style={{ color: '#4b5563' }}>
+              הסריקה רצה ברקע — אפשר לעבור ללוח המעקב או להוסיף חשבון נוסף כבר עכשיו.
+            </p>
+            <div className="w-full space-y-3">
+              <button
+                type="button"
+                onClick={() => router.push(`/admin/scan/${started.jobId}`)}
+                className="neon-pill neon-pill-primary w-full flex items-center justify-center gap-3 py-4 font-bold text-base"
+              >
+                עבור ללוח
+              </button>
+              <button
+                type="button"
+                onClick={handleAddAnother}
+                className="neon-pill w-full flex items-center justify-center gap-2 py-3 font-semibold text-sm"
+                style={{ color: '#9334EB', border: '1px solid #9334EB' }}
+              >
+                הוסף חשבון נוסף
+              </button>
+              <Link
+                href="/admin/scans"
+                className="block text-center text-sm font-semibold pt-1"
+                style={{ color: '#6b7280' }}
+              >
+                צפה בכל הסריקות
+              </Link>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -283,6 +350,13 @@ export default function AddAccountPage() {
               ? 'דמו מהיר להצעת מחיר — בוחרים חלק מהאתר וסורקים אותו בלבד'
               : 'הזן את פרטי החשבון וההפעלה תתחיל סריקה מלאה אוטומטית'}
           </p>
+        </div>
+
+        {/* Persistent link to the central scans dashboard */}
+        <div className="flex justify-center mb-4">
+          <Link href="/admin/scans" className="text-sm font-semibold" style={{ color: '#9334EB' }}>
+            צפה בכל הסריקות ←
+          </Link>
         </div>
 
         {/* Mode selector */}
