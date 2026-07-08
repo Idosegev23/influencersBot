@@ -18,11 +18,12 @@ export interface AgentJob {
  * backstops). Vercel freezes the fn after the response, so heavy work must run here.
  */
 export async function publishAgentJob(job: AgentJob, opts: { delaySeconds?: number } = {}): Promise<void> {
-  const baseId = String(job.msg?.id || `${job.agentId}:${Date.now()}`);
+  const baseId = String(job.msg?.id || `${job.agentId}_${Date.now()}`);
   // A REQUEUE (attempt>0) must NOT reuse the original wamid dedup id — QStash would
   // drop it inside its ~10-min dedup window and the message would be lost forever.
   // Attempt 0 keeps the wamid so a Meta webhook redelivery still can't double-enqueue.
-  const deduplicationId = job.attempt ? `${baseId}:a${job.attempt}` : baseId;
+  // NOTE: QStash rejects a deduplicationId containing ':' — separators must be '_' / '-'.
+  const deduplicationId = job.attempt ? `${baseId}_a${job.attempt}` : baseId;
   const payload = {
     url: `${BASE_URL}/api/crm/wa-worker`,
     body: job,
@@ -48,7 +49,9 @@ export async function publishAgentJob(job: AgentJob, opts: { delaySeconds?: numb
  */
 export async function publishDrain(agentId: string, opts: { force?: boolean } = {}): Promise<void> {
   const bucket = Math.floor(Date.now() / 10_000);
-  const deduplicationId = opts.force ? `drain:${agentId}:f:${Date.now()}` : `drain:${agentId}:${bucket}`;
+  // QStash REJECTS a deduplicationId containing ':' (error "DeduplicationId cannot contain ':'").
+  // Use '_' separators. agentId is a UUID (hyphens only), so the id stays collision-safe.
+  const deduplicationId = opts.force ? `drain_${agentId}_f_${Date.now()}` : `drain_${agentId}_${bucket}`;
   const payload = {
     url: `${BASE_URL}/api/crm/wa-worker`,
     body: { drain: true, agentId },
