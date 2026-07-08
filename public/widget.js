@@ -1133,11 +1133,11 @@
         newChatBtnHtml() +
         '<div style="position:absolute;top:calc(12px + env(safe-area-inset-top));left:14px;z-index:6;display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.85);padding:3px 8px;border-radius:999px;font-size:11.5px;color:#15803d;">' +
         '<span style="width:7px;height:7px;border-radius:50%;background:#22c55e;"></span>' + escapeHtml(locale.status) + '</div>' +
-        '<div style="height:' + (isMobile ? '132px' : '112px') + ';position:relative;' + coverBg + '"><div style="position:absolute;left:0;right:0;bottom:0;height:46px;background:linear-gradient(to bottom,transparent,var(--ibot-panel-bg));"></div></div>' +
+        '<div style="height:112px;position:relative;' + coverBg + '"><div style="position:absolute;left:0;right:0;bottom:0;height:46px;background:linear-gradient(to bottom,transparent,var(--ibot-panel-bg));"></div></div>' +
         '<div style="width:84px;height:84px;margin:-42px auto 0;border-radius:50%;border:4px solid var(--ibot-panel-bg);overflow:hidden;position:relative;z-index:2;box-shadow:0 4px 14px rgba(0,0,0,0.12);">' + avatarHtml(84) + '</div>' +
         '<div style="text-align:center;font-weight:800;font-size:20px;color:var(--ibot-text-primary);margin:9px 12px 2px;">' + escapeHtml(config.brandName) + '</div>' +
         socialRowHtml() +
-        (isMobile ? '<button id="ibot-close-mobile" style="position:absolute;top:calc(10px + env(safe-area-inset-top));left:54px;background:rgba(0,0,0,0.32);border:none;color:#fff;cursor:pointer;width:30px;height:30px;border-radius:50%;font-size:18px;display:flex;align-items:center;justify-content:center;z-index:6;">&times;</button>' : '') +
+        (isMobile ? '<button id="ibot-close-mobile" aria-label="close" style="position:absolute;top:calc(8px + env(safe-area-inset-top));left:50px;background:rgba(0,0,0,0.4);border:none;color:#fff;cursor:pointer;width:40px;height:40px;border-radius:50%;font-size:22px;display:flex;align-items:center;justify-content:center;z-index:6;">&times;</button>' : '') +
         '</div>';
     }
     return '<div style="display:flex;align-items:center;gap:10px;padding:env(safe-area-inset-top) 12px 0;height:62px;flex-shrink:0;position:relative;z-index:2;' +
@@ -1150,7 +1150,7 @@
       '<button onclick="window.__ibotNewChat()" title="' + escapeHtml(wlbl('שיחה חדשה','New chat')) + '" style="background:transparent;border:none;color:var(--ibot-text-muted);cursor:pointer;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
       newChatIconSvg(17) + '</button>' +
       (modules.support.enabled ? '<button id="ibot-open-support" title="' + escapeHtml(locale.support.openLink) + '" style="background:transparent;border:none;color:var(--ibot-text-muted);cursor:pointer;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></button>' : '') +
-      (isMobile ? '<button id="ibot-close-mobile" style="background:transparent;border:none;color:var(--ibot-text-muted);cursor:pointer;width:34px;height:34px;font-size:22px;flex-shrink:0;line-height:1;">&times;</button>' : '') +
+      (isMobile ? '<button id="ibot-close-mobile" aria-label="close" style="background:transparent;border:none;color:var(--ibot-text-muted);cursor:pointer;width:40px;height:40px;font-size:24px;flex-shrink:0;line-height:1;">&times;</button>' : '') +
       '</div>';
   }
 
@@ -2213,7 +2213,7 @@
       return '<div style="margin-bottom:12px;">' +
         '<label for="' + id + '" style="display:block;font-size:12px;font-weight:600;color:var(--ibot-label-text);margin-bottom:4px;">' + escapeHtml(label) + asterisk + '</label>' +
         '<input id="' + id + '" type="' + (type || 'text') + '" value="' + escapeHtml(value || '') + '" placeholder="' + escapeHtml(placeholder || '') + '" ' +
-        'style="width:100%;border:1px solid var(--ibot-border);border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;background:var(--ibot-input-bg);color:var(--ibot-text-primary);direction:' + locale.dir + ';" />' +
+        'style="width:100%;border:1px solid var(--ibot-border);border-radius:10px;padding:10px 12px;font-size:16px;font-family:inherit;background:var(--ibot-input-bg);color:var(--ibot-text-primary);direction:' + locale.dir + ';" />' +
         '</div>';
     }
 
@@ -2246,14 +2246,14 @@
       // Category dropdown
       '<div style="margin-bottom:12px;">' +
       '<label for="ibot-sf-category" style="display:block;font-size:12px;font-weight:600;color:var(--ibot-label-text);margin-bottom:4px;">' + escapeHtml(s.categoryLabel) + '</label>' +
-      '<select id="ibot-sf-category" style="width:100%;border:1px solid var(--ibot-border);border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;background:var(--ibot-input-bg);color:var(--ibot-text-primary);direction:' + locale.dir + ';">' +
+      '<select id="ibot-sf-category" style="width:100%;border:1px solid var(--ibot-border);border-radius:10px;padding:10px 12px;font-size:16px;font-family:inherit;background:var(--ibot-input-bg);color:var(--ibot-text-primary);direction:' + locale.dir + ';">' +
       categories + '</select>' +
       '</div>' +
       // Message textarea
       '<div style="margin-bottom:12px;">' +
       '<label for="ibot-sf-message" style="display:block;font-size:12px;font-weight:600;color:var(--ibot-label-text);margin-bottom:4px;">' + escapeHtml(s.messageLabel) + ' <span style="color:#dc2626;">*</span></label>' +
       '<textarea id="ibot-sf-message" rows="4" placeholder="' + escapeHtml(s.messagePlaceholder) + '" ' +
-      'style="width:100%;border:1px solid var(--ibot-border);border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;background:var(--ibot-input-bg);color:var(--ibot-text-primary);resize:vertical;min-height:90px;direction:' + locale.dir + ';">' + escapeHtml(supportForm.message) + '</textarea>' +
+      'style="width:100%;border:1px solid var(--ibot-border);border-radius:10px;padding:10px 12px;font-size:16px;font-family:inherit;background:var(--ibot-input-bg);color:var(--ibot-text-primary);resize:vertical;min-height:90px;direction:' + locale.dir + ';">' + escapeHtml(supportForm.message) + '</textarea>' +
       '</div>' +
       // Attachment (photo / pdf) — opens native file picker; uploads on selection
       '<div style="margin-bottom:12px;">' +
@@ -2659,7 +2659,7 @@
     return '<div style="margin-bottom:12px;">' +
       '<label for="' + id + '" style="display:block;font-size:12px;font-weight:600;color:var(--ibot-label-text);margin-bottom:4px;">' + escapeHtml(label) + asterisk + '</label>' +
       '<input id="' + id + '" type="' + (type || 'text') + '" value="' + escapeHtml(value || '') + '" placeholder="' + escapeHtml(placeholder || '') + '" ' +
-      'style="width:100%;border:1px solid var(--ibot-border);border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;background:var(--ibot-input-bg);color:var(--ibot-text-primary);direction:' + locale.dir + ';" />' +
+      'style="width:100%;border:1px solid var(--ibot-border);border-radius:10px;padding:10px 12px;font-size:16px;font-family:inherit;background:var(--ibot-input-bg);color:var(--ibot-text-primary);direction:' + locale.dir + ';" />' +
       '</div>';
   }
   function textareaFieldHtml(id, label, value, placeholder, required, rows) {
@@ -2667,7 +2667,7 @@
     return '<div style="margin-bottom:12px;">' +
       '<label for="' + id + '" style="display:block;font-size:12px;font-weight:600;color:var(--ibot-label-text);margin-bottom:4px;">' + escapeHtml(label) + asterisk + '</label>' +
       '<textarea id="' + id + '" rows="' + (rows || 4) + '" placeholder="' + escapeHtml(placeholder || '') + '" ' +
-      'style="width:100%;border:1px solid var(--ibot-border);border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;background:var(--ibot-input-bg);color:var(--ibot-text-primary);resize:vertical;min-height:90px;direction:' + locale.dir + ';">' + escapeHtml(value || '') + '</textarea>' +
+      'style="width:100%;border:1px solid var(--ibot-border);border-radius:10px;padding:10px 12px;font-size:16px;font-family:inherit;background:var(--ibot-input-bg);color:var(--ibot-text-primary);resize:vertical;min-height:90px;direction:' + locale.dir + ';">' + escapeHtml(value || '') + '</textarea>' +
       '</div>';
   }
   function selectFieldHtml(id, label, value, options, required) {
@@ -2680,7 +2680,7 @@
     }).join('');
     return '<div style="margin-bottom:12px;">' +
       '<label for="' + id + '" style="display:block;font-size:12px;font-weight:600;color:var(--ibot-label-text);margin-bottom:4px;">' + escapeHtml(label) + asterisk + '</label>' +
-      '<select id="' + id + '" style="width:100%;border:1px solid var(--ibot-border);border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;background:var(--ibot-input-bg);color:var(--ibot-text-primary);direction:' + locale.dir + ';">' +
+      '<select id="' + id + '" style="width:100%;border:1px solid var(--ibot-border);border-radius:10px;padding:10px 12px;font-size:16px;font-family:inherit;background:var(--ibot-input-bg);color:var(--ibot-text-primary);direction:' + locale.dir + ';">' +
       opts + '</select>' +
       '</div>';
   }
