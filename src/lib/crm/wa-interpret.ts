@@ -43,15 +43,139 @@ export interface PricingResult {
   mode: 'total' | 'per_line' | 'unclear';
   total?: number;
   prices?: number[];
+  needsConfirmation?: boolean; // any amount was bare-scaled / below-min → read back
 }
 
 /** Interpret a pricing reply against the number of deliverables. */
 export function interpretPricing(text: string, deliverableCount: number): PricingResult {
   const nums = extractNumbers(text || '');
   if (nums.length === 0) return { mode: 'unclear' };
-  if (deliverableCount > 1 && nums.length === deliverableCount) return { mode: 'per_line', prices: nums };
-  if (nums.length === 1) return { mode: 'total', total: nums[0] };
+
+  if (deliverableCount > 1 && nums.length === deliverableCount) {
+    const norm = nums.map((n) => normalizeAmount(n, { scaleBare: true }));
+    return { mode: 'per_line', prices: norm.map((x) => x.amount), needsConfirmation: norm.some((x) => x.needsConfirmation) };
+  }
+  if (nums.length === 1) {
+    const n = normalizeAmount(nums[0], { scaleBare: true });
+    return { mode: 'total', total: n.amount, needsConfirmation: n.needsConfirmation };
+  }
   return { mode: 'unclear' };
+}
+
+// ───────────────────────── canonical money normalization ─────────────────────────
+export const AMOUNT_MIN_REASONABLE = 1000;
+export const BARE_THOUSANDS_SCALE = 1000;
+export const AMOUNT_ANOMALY_FACTOR = 6;
+
+export interface NormalizeAmountOptions {
+  thousands?: boolean; // an explicit k/אלף marker sat next to the number
+  scaleBare?: boolean; // pricing context: a bare number < min means thousands
+  history?: number[]; // prior amounts for this talent/brand (anomaly gate)
+}
+export interface NormalizedAmount {
+  amount: number;
+  needsConfirmation: boolean;
+  reason: null | 'below_min' | 'bare_scaled' | 'anomalous';
+}
+
+function median(nums: number[]): number {
+  const a = nums.filter((n) => Number.isFinite(n) && n > 0).sort((x, y) => x - y);
+  if (!a.length) return 0;
+  const mid = Math.floor(a.length / 2);
+  return a.length % 2 ? a[mid] : (a[mid - 1] + a[mid]) / 2;
+}
+
+/**
+ * The single source of truth for a money amount. Domain rule: in this
+ * influencer-agency pricing context a bare small number means thousands of ₪.
+ * Explicit markers (k/אלף) are trusted; a bare-scaled / below-min / anomalous
+ * amount is flagged needsConfirmation so the engine reads it back before issuing.
+ */
+export function normalizeAmount(value: number, opts: NormalizeAmountOptions = {}): NormalizedAmount {
+  let amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { amount: 0, needsConfirmation: true, reason: 'below_min' };
+  }
+  let reason: NormalizedAmount['reason'] = null;
+  let needsConfirmation = false;
+
+  if (opts.thousands) {
+    amount = amount * 1000; // explicit marker → trust it
+  } else if (opts.scaleBare && amount < AMOUNT_MIN_REASONABLE) {
+    amount = amount * BARE_THOUSANDS_SCALE; // "80" → 80,000
+    reason = 'bare_scaled';
+    needsConfirmation = true; // guessed a magnitude → read back
+  }
+
+  if (amount < AMOUNT_MIN_REASONABLE) {
+    reason = 'below_min';
+    needsConfirmation = true;
+  }
+
+  if (!needsConfirmation && opts.history && opts.history.length) {
+    const med = median(opts.history);
+    if (med > 0 && (amount > med * AMOUNT_ANOMALY_FACTOR || amount < med / AMOUNT_ANOMALY_FACTOR)) {
+      reason = 'anomalous';
+      needsConfirmation = true;
+    }
+  }
+  return { amount: Math.round(amount), needsConfirmation, reason };
+}
+
+// Hebrew round-amount vocabulary used in pricing (units, tens, hundreds, scales).
+const HE_ONES: Record<string, number> = {
+  אחד: 1, אחת: 1, שתיים: 2, שניים: 2, שתי: 2, שני: 2, שלוש: 3, שלושה: 3, ארבע: 4, ארבעה: 4,
+  חמש: 5, חמישה: 5, שש: 6, שישה: 6, שבע: 7, שבעה: 7, שמונה: 8, תשע: 9, תשעה: 9,
+};
+const HE_TENS: Record<string, number> = {
+  עשר: 10, עשרה: 10, עשרים: 20, שלושים: 30, ארבעים: 40, חמישים: 50, שישים: 60, שבעים: 70, שמונים: 80, תשעים: 90,
+};
+const HE_HUNDREDS: Record<string, number> = { מאה: 100, מאתיים: 200 };
+
+/** Turn a leading run of Hebrew number-words into a value, or 0 if none. */
+function hebrewWordValue(words: string[]): number {
+  let total = 0;
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i];
+    if (HE_HUNDREDS[w] != null) { total += HE_HUNDREDS[w]; continue; }
+    if (w === 'מאות' && HE_ONES[words[i - 1]]) { total += (HE_ONES[words[i - 1]] - 1) * 100; continue; }
+    if (HE_TENS[w] != null) { total += HE_TENS[w]; continue; }
+    if (HE_ONES[w] != null) { total += HE_ONES[w]; continue; }
+    if (w === 'ו' || w === '') continue;
+    break;
+  }
+  return total;
+}
+
+/**
+ * Parse ONE amount phrase → { value, thousands }. Handles 80 / 80k / "80 אלף" /
+ * "80,000" and the common Hebrew round forms ("מאתיים אלף", "מאה אלף", "מיליון",
+ * "חצי מיליון"). Arbitrary compound Hebrew is left to the LLM fallback path.
+ */
+export function parseAmountText(text: string): { value: number; thousands: boolean } | null {
+  const t = (text || '').trim();
+  if (!t) return null;
+
+  if (/חצי\s+(מיליון|מליון)/.test(t)) return { value: 500000, thousands: false };
+  const milMatch = t.match(/(\d[\d,.]*)?\s*(מיליון|מליון)/);
+  if (milMatch) {
+    const lead = milMatch[1] ? Number(milMatch[1].replace(/,/g, '')) : (hebrewWordValue(t.split(/\s+/)) || 1);
+    return { value: Math.round((lead || 1) * 1000000), thousands: false };
+  }
+
+  const thousands = /(k|K|אלף|אלפים)/.test(t);
+
+  const dig = t.match(/(\d[\d,.]*)/);
+  if (dig) {
+    const v = Number(dig[1].replace(/,/g, ''));
+    if (Number.isFinite(v) && v > 0) return { value: v, thousands };
+  }
+
+  const words = t.split(/\s+/).filter(Boolean);
+  const v = hebrewWordValue(words);
+  if (v > 0) return { value: v, thousands };
+
+  return null;
 }
 
 /**

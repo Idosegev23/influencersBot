@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { interpretYesNo, extractNumbers, interpretPricing, isRetrievalRequest } from '@/lib/crm/wa-interpret';
+import { interpretYesNo, extractNumbers, interpretPricing, isRetrievalRequest, normalizeAmount, parseAmountText } from '@/lib/crm/wa-interpret';
 
 describe('interpretYesNo', () => {
   it('yes variants', () => {
@@ -46,14 +46,60 @@ describe('extractNumbers', () => {
 });
 
 describe('interpretPricing', () => {
-  it('single number → total', () => {
-    expect(interpretPricing('80000', 3)).toEqual({ mode: 'total', total: 80000 });
-    expect(interpretPricing('80,000 בסך הכל', 3)).toEqual({ mode: 'total', total: 80000 });
+  it('single large number → total, no confirmation', () => {
+    expect(interpretPricing('80000', 3)).toEqual({ mode: 'total', total: 80000, needsConfirmation: false });
+    expect(interpretPricing('80,000 בסך הכל', 3)).toEqual({ mode: 'total', total: 80000, needsConfirmation: false });
   });
-  it('count-matching numbers → per line', () => {
-    expect(interpretPricing('20000 5000 15000', 3)).toEqual({ mode: 'per_line', prices: [20000, 5000, 15000] });
+  it('bare small total → scaled + confirmation', () => {
+    expect(interpretPricing('80', 3)).toEqual({ mode: 'total', total: 80000, needsConfirmation: true });
+  });
+  it('count-matching numbers → per line (all large, no confirmation)', () => {
+    expect(interpretPricing('20000 5000 15000', 3)).toEqual({ mode: 'per_line', prices: [20000, 5000, 15000], needsConfirmation: false });
+  });
+  it('count-matching bare numbers → per line scaled + confirmation', () => {
+    expect(interpretPricing('80 50 30', 3)).toEqual({ mode: 'per_line', prices: [80000, 50000, 30000], needsConfirmation: true });
   });
   it('no number → unclear', () => {
     expect(interpretPricing('לא יודע', 3)).toEqual({ mode: 'unclear' });
+  });
+});
+
+describe('normalizeAmount — domain thousands rule + sanity gate', () => {
+  it('explicit thousands marker → ×1000, no confirmation', () => {
+    expect(normalizeAmount(80, { thousands: true })).toEqual({ amount: 80000, needsConfirmation: false, reason: null });
+    expect(normalizeAmount(200, { thousands: true })).toEqual({ amount: 200000, needsConfirmation: false, reason: null });
+  });
+  it('already-large numbers pass through untouched', () => {
+    expect(normalizeAmount(80000, { scaleBare: true })).toEqual({ amount: 80000, needsConfirmation: false, reason: null });
+    expect(normalizeAmount(94400)).toEqual({ amount: 94400, needsConfirmation: false, reason: null });
+  });
+  it('bare small number in pricing context → scaled ×1000 AND flagged for read-back', () => {
+    expect(normalizeAmount(80, { scaleBare: true })).toEqual({ amount: 80000, needsConfirmation: true, reason: 'bare_scaled' });
+  });
+  it('final amount still < min → below_min confirmation', () => {
+    expect(normalizeAmount(500)).toEqual({ amount: 500, needsConfirmation: true, reason: 'below_min' });
+    expect(normalizeAmount(0, { scaleBare: true })).toEqual({ amount: 0, needsConfirmation: true, reason: 'below_min' });
+  });
+  it('anomaly vs history → flagged', () => {
+    expect(normalizeAmount(500000, { history: [8000, 10000, 9000] }).reason).toBe('anomalous');
+    expect(normalizeAmount(9000, { history: [8000, 10000, 9000] }).needsConfirmation).toBe(false);
+  });
+});
+
+describe('parseAmountText', () => {
+  it('digit forms', () => {
+    expect(parseAmountText('80')).toEqual({ value: 80, thousands: false });
+    expect(parseAmountText('80k')).toEqual({ value: 80, thousands: true });
+    expect(parseAmountText('80 אלף')).toEqual({ value: 80, thousands: true });
+    expect(parseAmountText('80,000')).toEqual({ value: 80000, thousands: false });
+  });
+  it('hebrew word amounts', () => {
+    expect(parseAmountText('מאתיים אלף')).toEqual({ value: 200, thousands: true });
+    expect(parseAmountText('מאה אלף')).toEqual({ value: 100, thousands: true });
+    expect(parseAmountText('מיליון')).toEqual({ value: 1000000, thousands: false });
+    expect(parseAmountText('חצי מיליון')).toEqual({ value: 500000, thousands: false });
+  });
+  it('no amount → null', () => {
+    expect(parseAmountText('שלום מה קורה')).toBeNull();
   });
 });
