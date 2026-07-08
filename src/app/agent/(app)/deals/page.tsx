@@ -44,8 +44,8 @@ export default function DealsPage() {
   return (
     <div dir="rtl">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[color:var(--ink-900)]">עסקאות ופעילויות</h1>
-        <p className="text-sm text-[color:var(--ink-500)] mt-1">צנרת מהצעה ועד תשלום</p>
+        <h1 className="text-2xl font-bold text-[color:var(--ink-900)]">הסכמים</h1>
+        <p className="text-sm text-[color:var(--ink-500)] mt-1">הצעות שנשלחו, נחתמו ופעילות — צנרת ההסכמים</p>
       </div>
 
       {loading ? (
@@ -53,7 +53,7 @@ export default function DealsPage() {
       ) : deals.length === 0 ? (
         <div className="text-center py-20 text-[color:var(--ink-500)]">
           <Briefcase className="w-10 h-10 mx-auto mb-3 opacity-40" />
-          <p>אין עדיין עסקאות. צור/י הצעת מחיר כדי להתחיל.</p>
+          <p>אין עדיין הסכמים. צור/י הצעת מחיר כדי להתחיל.</p>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-[color:var(--line)]">

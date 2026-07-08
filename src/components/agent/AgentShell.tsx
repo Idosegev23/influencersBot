@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Users, FileText, LogOut, Menu, X, Sparkles, ChevronLeft, LayoutDashboard, Briefcase, Inbox, Building2, Megaphone, BarChart3, Settings } from 'lucide-react';
+import { Users, FileText, LogOut, Menu, X, Sparkles, ChevronLeft, LayoutDashboard, Inbox, Building2, Megaphone, Settings, FolderKanban, FileSignature, Receipt } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type NavItem = {
@@ -13,16 +13,42 @@ type NavItem = {
   match?: (p: string) => boolean;
 };
 
-const NAV: NavItem[] = [
+// Command center + projects overview.
+const NAV_TOP: NavItem[] = [
   { href: '/agent', label: 'דשבורד', icon: LayoutDashboard, match: (p) => p === '/agent' },
-  { href: '/agent/overview', label: 'סקירה', icon: BarChart3, match: (p) => p.startsWith('/agent/overview') },
-  { href: '/agent/briefs', label: 'תיבה נכנסת', icon: Inbox, match: (p) => p.startsWith('/agent/briefs') || p.startsWith('/agent/inbox') },
-  { href: '/agent/deals', label: 'עסקאות', icon: Briefcase, match: (p) => p.startsWith('/agent/deals') },
-  { href: '/agent/quotes', label: 'הצעות מחיר', icon: FileText, match: (p) => p.startsWith('/agent/quotes') },
-  { href: '/agent/clients', label: 'מיוצגים', icon: Users, match: (p) => p.startsWith('/agent/clients') },
-  { href: '/agent/orderers', label: 'לקוחות', icon: Building2, match: (p) => p.startsWith('/agent/orderers') },
+  { href: '/agent/projects', label: 'פרויקטים', icon: FolderKanban, match: (p) => p.startsWith('/agent/projects') || p.startsWith('/agent/overview') },
+];
+// Deal lifecycle pipeline: brief → quote → agreement → payment, plus in-flight campaigns.
+const NAV_PIPELINE: NavItem[] = [
+  { href: '/agent/briefs', label: 'בריפים', icon: Inbox, match: (p) => p.startsWith('/agent/briefs') || p.startsWith('/agent/inbox') },
+  { href: '/agent/quotes', label: 'הצעות', icon: FileText, match: (p) => p.startsWith('/agent/quotes') },
+  { href: '/agent/deals', label: 'הסכמים', icon: FileSignature, match: (p) => p.startsWith('/agent/deals') },
+  { href: '/agent/payments', label: 'תשלומים', icon: Receipt, match: (p) => p.startsWith('/agent/payments') },
   { href: '/agent/campaigns', label: 'קמפיינים', icon: Megaphone, match: (p) => p.startsWith('/agent/campaigns') },
 ];
+// Contacts — grouped at the bottom.
+const NAV_BOTTOM: NavItem[] = [
+  { href: '/agent/orderers', label: 'לקוחות', icon: Building2, match: (p) => p.startsWith('/agent/orderers') },
+  { href: '/agent/clients', label: 'מיוצגים', icon: Users, match: (p) => p.startsWith('/agent/clients') },
+];
+
+function NavGroup({ items, pathname, onNavigate }: { items: NavItem[]; pathname: string; onNavigate: () => void }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      {items.map((item) => {
+        const Icon = item.icon;
+        const active = item.match ? item.match(pathname) : pathname === item.href;
+        return (
+          <Link key={item.href} href={item.href} data-active={active} onClick={onNavigate} className="ui-nav-item focus-ring">
+            <Icon className="ui-nav-icon" strokeWidth={1.75} />
+            <span className="flex-1 truncate">{item.label}</span>
+            {active && <span className="w-1 h-1 rounded-full bg-[color:var(--brand)]" aria-hidden />}
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
 
 function Crumbs({ pathname }: { pathname: string }) {
   const labelOf = (s: string) => {
@@ -31,9 +57,11 @@ function Crumbs({ pathname }: { pathname: string }) {
       clients: 'מיוצגים',
       orderers: 'לקוחות',
       campaigns: 'קמפיינים',
-      overview: 'סקירה',
-      quotes: 'הצעות מחיר',
-      deals: 'עסקאות',
+      overview: 'פרויקטים',
+      projects: 'פרויקטים',
+      quotes: 'הצעות',
+      deals: 'הסכמים',
+      payments: 'תשלומים',
       briefs: 'בריפים',
       new: 'חדש',
     };
@@ -125,26 +153,12 @@ export default function AgentShell({
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-3 px-2">
-          <div className="flex flex-col gap-0.5">
-            {NAV.map((item) => {
-              const Icon = item.icon;
-              const active = item.match ? item.match(pathname) : pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  data-active={active}
-                  onClick={closeMobile}
-                  className="ui-nav-item focus-ring"
-                >
-                  <Icon className="ui-nav-icon" strokeWidth={1.75} />
-                  <span className="flex-1 truncate">{item.label}</span>
-                  {active && <span className="w-1 h-1 rounded-full bg-[color:var(--brand)]" aria-hidden />}
-                </Link>
-              );
-            })}
-          </div>
+        <nav className="flex-1 overflow-y-auto py-3 px-2 flex flex-col">
+          <NavGroup items={NAV_TOP} pathname={pathname} onNavigate={closeMobile} />
+          <div className="my-2 border-t border-[color:var(--line)] mx-2" />
+          <NavGroup items={NAV_PIPELINE} pathname={pathname} onNavigate={closeMobile} />
+          <div className="my-2 mt-auto border-t border-[color:var(--line)] mx-2" />
+          <NavGroup items={NAV_BOTTOM} pathname={pathname} onNavigate={closeMobile} />
         </nav>
 
         <div className="border-t border-[color:var(--line)] p-2">
