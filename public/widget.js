@@ -1073,6 +1073,7 @@
 
   function socialRowHtml() {
     var links = Array.isArray(config.socialLinks) ? config.socialLinks : [];
+    var mob = window.innerWidth < 640;   // compact social row on mobile welcome
     var items = '';
     for (var i = 0; i < links.length; i++) {
       var l = links[i];
@@ -1083,12 +1084,12 @@
       if (plat === 'website' || plat === 'web' || plat === 'site' || plat === 'globe') continue;
       items += '<a href="' + escapeHtml(bestieTag(l.url, 'social_' + plat, 'social')) + '" target="_blank" rel="noopener noreferrer" aria-label="' + escapeHtml(l.platform || 'link') + '" ' +
         'onclick="window.__ibotSocialClick(\'' + escapeHtml(plat) + '\')" ' +
-        'style="width:34px;height:34px;border-radius:50%;background:var(--ibot-surface);border:1px solid var(--ibot-border);' +
+        'style="width:' + (mob ? '30' : '34') + 'px;height:' + (mob ? '30' : '34') + 'px;border-radius:50%;background:var(--ibot-surface);border:1px solid var(--ibot-border);' +
         'display:flex;align-items:center;justify-content:center;color:var(--ibot-text-primary);text-decoration:none;flex-shrink:0;">' +
         socialIconSvg(l.platform) + '</a>';
     }
     if (!items) return '';
-    return '<div style="display:flex;justify-content:center;gap:13px;padding:6px 0 12px;">' + items + '</div>';
+    return '<div style="display:flex;justify-content:center;gap:' + (mob ? '10' : '13') + 'px;padding:' + (mob ? '2px 0 8px' : '6px 0 12px') + ';">' + items + '</div>';
   }
 
   // Social icon exit tracking — reuses the catalog's external_link_clicked
@@ -1137,9 +1138,9 @@
         newChatBtnHtml() +
         '<div style="position:absolute;top:calc(12px + env(safe-area-inset-top));left:14px;z-index:6;display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.85);padding:3px 8px;border-radius:999px;font-size:11.5px;color:#15803d;">' +
         '<span style="width:7px;height:7px;border-radius:50%;background:#22c55e;"></span>' + escapeHtml(locale.status) + '</div>' +
-        '<div style="height:112px;position:relative;' + coverBg + '"><div style="position:absolute;left:0;right:0;bottom:0;height:46px;background:linear-gradient(to bottom,transparent,var(--ibot-panel-bg));"></div></div>' +
-        '<div style="width:84px;height:84px;margin:-42px auto 0;border-radius:50%;border:4px solid var(--ibot-panel-bg);overflow:hidden;position:relative;z-index:2;box-shadow:0 4px 14px rgba(0,0,0,0.12);">' + avatarHtml(84) + '</div>' +
-        '<div style="text-align:center;font-weight:800;font-size:20px;color:var(--ibot-text-primary);margin:9px 12px 2px;">' + escapeHtml(config.brandName) + '</div>' +
+        '<div style="height:' + (isMobile ? '72px' : '112px') + ';position:relative;' + coverBg + '"><div style="position:absolute;left:0;right:0;bottom:0;height:' + (isMobile ? '30px' : '46px') + ';background:linear-gradient(to bottom,transparent,var(--ibot-panel-bg));"></div></div>' +
+        '<div style="width:' + (isMobile ? '54px' : '84px') + ';height:' + (isMobile ? '54px' : '84px') + ';margin:' + (isMobile ? '-27px' : '-42px') + ' auto 0;border-radius:50%;border:' + (isMobile ? '3px' : '4px') + ' solid var(--ibot-panel-bg);overflow:hidden;position:relative;z-index:2;box-shadow:0 4px 14px rgba(0,0,0,0.12);">' + avatarHtml(isMobile ? 54 : 84) + '</div>' +
+        '<div style="text-align:center;font-weight:800;font-size:' + (isMobile ? '16px' : '20px') + ';color:var(--ibot-text-primary);margin:' + (isMobile ? '5px 12px 0' : '9px 12px 2px') + ';">' + escapeHtml(config.brandName) + '</div>' +
         socialRowHtml() +
         (isMobile ? '<button id="ibot-close-mobile" aria-label="close" style="position:absolute;top:calc(8px + env(safe-area-inset-top));left:50px;background:rgba(0,0,0,0.4);border:none;color:#fff;cursor:pointer;width:40px;height:40px;border-radius:50%;font-size:22px;display:flex;align-items:center;justify-content:center;z-index:6;">&times;</button>' : '') +
         '</div>';
