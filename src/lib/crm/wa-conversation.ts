@@ -197,6 +197,7 @@ async function planFreeform(text: string, ctx: Awaited<ReturnType<typeof loadBra
     'analytics = שאלה שדורשת אגרגציה או היסטוריה מעבר להקשר שלמטה ("כמה עסקאות סה"כ חתמתי?","מה סך המכירות של ירדן?","הכנסות לפי חודש","כמה עמלה הרווחתי?") — אל תמלא reply; זה יופנה למנוע העובדות (SQL על כל ההיסטוריה). ' +
     'price = הסוכן נותן או מעדכן מחיר לבריף ("תמחר את אנה ב-200 אלף","לאנה 80 לרילס 50 לזכויות") — מלא commands (per_line לפי סדר ה-deliverables; 80=80000; "מאתיים אלף"=200000). ' +
     'אם ההודעה מזהה מיוצג + מחיר, תמחר — גם אם לא כתוב כל פרט. אם יש כמה בריפים זהים לאותו מיוצג ואותו מותג, זה אותו בריף כפול: בחר את הראשון ברשימה (האחרון בזמן) ותמחר, אל תשאל. ' +
+    'תמחור גורף/מרובה ("תמחר את כל הלא-מתומחרים ב-80 אלף","לכל הבריפים הפתוחים תן 80","תמחר את אלה: X ב-50, Y ב-200"): צור פקודת price נפרדת לכל בריף רלוונטי מהרשימה למטה — כל אחת עם ה-brief_id וה-account_id שלו (מ-talent_id של הבריף) ומחירה. "כל הלא-מתומחרים" = כל בריף שאצלו priced=false. בצע לכולם בפעם אחת, אל תשאל. ' +
     'issue_quote = הסוכן מבקש להכין/ליצור/להוציא/לשלוח הצעה ("שלח/תכין/תוציא/צור/הכן את ההצעה של אנה") — מלא target (talent_id/brand מההקשר). עובד גם על עסקה שתומחרה מזמן (גם 20 הודעות אחרי); מצא אותה לפי המיוצג/המותג. ' +
     'get_link = הסוכן מבקש את הקישור הקיים ("תן לי את הקישור של אנה") — מלא target. ' +
     'document_brief = ההודעה עצמה היא בריף חדש שהועבר (בקשה ממותג, בד"כ טקסט ארוך עם תוצרים) — אין צורך ב-reply. ' +
@@ -269,7 +270,19 @@ async function applyPricingCommands(agent: WaAgent, commands: any, ctx: Awaited<
     const parsed = (brief.parsed_data as any) || {};
     const brand = parsed.brandName || brief.subject || 'מותג';
     const seed = seedFromParsed(parsed);
-    const accountId = (cmd.account_id && ctx.roster.find((r) => r.id === cmd.account_id)?.id) || brief.suggested_account_id || null;
+    let accountId = (cmd.account_id && ctx.roster.find((r) => r.id === cmd.account_id)?.id) || brief.suggested_account_id || null;
+    if (!accountId) {
+      // The model may emit a NAME (or a mis-heard one) instead of an exact id, or the brief may
+      // carry a talent name that was never assigned — fuzzy-resolve either against the roster
+      // (tolerant of "ארונוב"→"אהרונוב", "סגב"→"שגב") before giving up and asking.
+      const nameHint =
+        (cmd.account_id && !ctx.roster.some((r) => r.id === cmd.account_id) ? String(cmd.account_id) : '') ||
+        parsed.talentName || parsed.influencer || parsed.creator || '';
+      if (nameHint) {
+        const m = resolveTalent(String(nameHint), ctx.roster);
+        if (m && !m.ambiguous) accountId = m.id;
+      }
+    }
     if (!accountId) {
       pending.push(`• ${brand}: עבור מי ההצעה?`);
       incomplete.push({ stage: 'awaiting_talent', brief_id: brief.id, deal_id: null, context: { brand, pricing: cmd.pricing, seed } });
