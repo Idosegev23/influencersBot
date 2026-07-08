@@ -12,6 +12,7 @@ import { interpretYesNo, interpretPricing, normalizeAmount, isStateStale, resolv
 import type { AgentMessageResult } from '@/lib/crm/wa-outcome';
 import { CHAT_MODEL } from '@/lib/openai';
 import { laneModel } from '@/lib/llm/config';
+import { shouldReadBack } from '@/lib/stt/confidence';
 
 export interface WaAgent {
   id: string;
@@ -90,7 +91,7 @@ export async function handleAgentMessage(
   waId: string,
   text: string | null,
   attachments: any[],
-  opts: { isVoice?: boolean } = {}
+  opts: { isVoice?: boolean; sttConfidence?: number | null } = {}
 ): Promise<AgentMessageResult> {
   const state = await getState(agent.id);
   const hasAttach = (attachments || []).length > 0;
@@ -100,10 +101,23 @@ export async function handleAgentMessage(
   //    text. Never document it as an empty brief — ask for a resend.
   if (opts.isVoice && !text) return fail('לא הצלחתי להבין את ההקלטה 🙏 אפשר לשלוח שוב?');
 
+  // 0.5) STT read-back — a LOW-confidence voice transcription is echoed for confirmation
+  //      before any action, so a mis-heard price/talent is caught (voice-first safety).
+  if (opts.isVoice && idle && text && shouldReadBack(opts.sttConfidence, text)) {
+    await setState(agent.id, { stage: 'awaiting_stt_confirm', context: { sttText: text } });
+    return needMore(`🎙️ שמעתי: "${text}"\nזה נכון? כתוב/י "כן", או פשוט תקן/י.`);
+  }
+
   // 1) Mid-flow reply → the stage machine owns short-lived confirmations / follow-ups
   //    (so a "כן" to "ליצור?" is a confirmation, not a re-planned command).
   if (!idle) {
     switch (state.stage) {
+      case 'awaiting_stt_confirm': {
+        const heard = state.context?.sttText || '';
+        await resetState(agent.id);
+        // "כן" → plan the heard text; anything else IS the correction → plan the new text.
+        return classifyConfirm(text || '') === 'yes' ? runBrain(agent, waId, heard) : runBrain(agent, waId, text || heard);
+      }
       case 'awaiting_talent':
         return handleTalentReply(agent, state, text);
       case 'awaiting_prices':

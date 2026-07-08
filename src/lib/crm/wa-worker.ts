@@ -20,12 +20,14 @@ export async function loadAgentById(agentId: string): Promise<WaAgent | null> {
 }
 
 /** Download an attachment / transcribe a voice note (P1 keeps the Gemini quote-parser path; P2 swaps STT). */
-export async function materializeInbound(msg: any): Promise<{ attachments: any[]; voiceText: string | null; isVoice: boolean }> {
+export async function materializeInbound(msg: any): Promise<{ attachments: any[]; voiceText: string | null; isVoice: boolean; sttConfidence: number | null; sttProvider: string | null }> {
   const attachments: { filename: string; mime: string; bytes: Uint8Array }[] = [];
   const type: string = msg?.type;
   const mediaId: string | undefined = msg?.[type]?.id;
   let voiceText: string | null = null;
   let isVoice = false;
+  let sttConfidence: number | null = null;
+  let sttProvider: string | null = null;
 
   if (mediaId && (type === 'document' || type === 'image')) {
     try {
@@ -44,15 +46,15 @@ export async function materializeInbound(msg: any): Promise<{ attachments: any[]
       const dl = await downloadMedia(mediaId);
       if (dl) {
         const mime = dl.mimeType || msg.audio?.mime_type || 'audio/ogg';
-        const ext = (mime.split('/')[1] || 'ogg').split(';')[0];
-        const file = new File([Buffer.from(dl.bytes)], `voice.${ext}`, { type: mime });
-        const { parseAudioWithGemini } = await import('@/lib/ai-parser');
-        const res: any = await parseAudioWithGemini({ file, documentType: 'quote', language: 'he' });
-        voiceText = res?.transcription || res?.data?.transcription || null;
+        const { transcribeHebrew } = await import('@/lib/stt/transcribeHebrew');
+        const t = await transcribeHebrew(new Uint8Array(dl.bytes), mime);
+        voiceText = t.text;
+        sttConfidence = t.confidence;
+        sttProvider = t.provider;
       }
     } catch (e) { console.warn('[wa-worker] transcription failed', e); }
   }
-  return { attachments, voiceText, isVoice };
+  return { attachments, voiceText, isVoice, sttConfidence, sttProvider };
 }
 
 /**
@@ -78,8 +80,8 @@ export async function runAgentJob(job: AgentJob): Promise<{ status: string; outc
   try {
     const agent = await loadAgentById(job.agentId);
     if (!agent) return { status: 'no-agent' };
-    const { attachments, voiceText, isVoice } = await materializeInbound(job.msg);
-    const result = await handleAgentMessage(agent, job.waId, voiceText || job.textBody, attachments, { isVoice });
+    const { attachments, voiceText, isVoice, sttConfidence, sttProvider } = await materializeInbound(job.msg);
+    const result = await handleAgentMessage(agent, job.waId, voiceText || job.textBody, attachments, { isVoice, sttConfidence });
     if (result.reply) {
       await sendText({ to: job.waId, body: result.reply, contextMessageId: job.msg.id });
       try { if (job.msg?.id) await redisSetNx(doneKey, '1', 900); } catch { /* ignore */ } // mark replied → dedup a retry
@@ -93,7 +95,8 @@ export async function runAgentJob(job: AgentJob): Promise<{ status: string; outc
       transcript: voiceText || job.textBody || null,
       outcome: result.outcome,
       latencyMs: Date.now() - startedAt,
-      sttProvider: isVoice ? 'gemini' : null,
+      sttProvider: isVoice ? sttProvider : null,
+      sttConfidence: isVoice ? sttConfidence : null,
       log: result.log,
     }).catch(() => {});
     return { status: 'ok', outcome: result.outcome };

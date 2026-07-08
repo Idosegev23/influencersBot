@@ -326,6 +326,33 @@ ${structuredPrompt}
 }
 
 /**
+ * LEAN Hebrew transcription for the agent voice path (P2). Unlike parseAudioWithGemini
+ * (which runs the full 32K-token quote-document extraction and discards it), this asks
+ * ONLY for the transcript + a self-reported confidence (how clear the audio was) — much
+ * cheaper, and the confidence gates a read-back before any money action.
+ */
+export async function transcribeAudioHebrew(file: File): Promise<{ transcript: string; confidence: number }> {
+  const base64 = await fileToBase64(file);
+  const mimeType = file.type || 'audio/ogg';
+  const model = process.env.AGENT_MODEL_STT_GEMINI || 'gemini-3-pro-preview';
+  const prompt =
+    'תמלל את ההודעה הקולית בעברית במדויק. החזר JSON נקי בלבד: ' +
+    '{"transcript":"<התמלול המלא>","confidence":<מספר בין 0 ל-1 — עד כמה התמלול ברור ובטוח>}. ' +
+    'אם האודיו רועש/מגומגם/חלקי — תן confidence נמוך. מספרים תמלל כספרות.';
+  const client = getGeminiClient();
+  const result = await retryWithBackoff(async () => {
+    return await client.models.generateContent({
+      model,
+      contents: [{ role: 'user', parts: [{ inlineData: { data: base64, mimeType } }, { text: prompt }] }],
+      config: { temperature: 0.1, topP: 0.95, maxOutputTokens: 8192, responseMimeType: 'application/json' },
+    });
+  }, 3, 3000);
+  const parsed = robustJsonParse(result.text || '', 'Gemini-STT');
+  const c = Number(parsed.confidence);
+  return { transcript: String(parsed.transcript || ''), confidence: Number.isFinite(c) ? Math.max(0, Math.min(1, c)) : 0.75 };
+}
+
+/**
  * Process video file with Gemini — visual + audio analysis
  * Gemini processes both video frames AND audio track simultaneously
  */
