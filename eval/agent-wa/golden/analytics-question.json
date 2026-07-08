@@ -1,0 +1,11 @@
+{
+  "id": "analytics-question",
+  "input": { "text": "כמה סגרתי החודש ומי הטאלנט הכי חזק שלי?" },
+  "expect": {
+    "intent": "analytics",
+    "judge": {
+      "rubric": "האם התשובה מדווחת מספרים קונקרטיים (סכום שנסגר) ושם טאלנט מוביל, בעברית, בלי להמציא נתונים"
+    },
+    "mustNotLeak": ["agent_id", "account_id", "uuid"]
+  }
+}

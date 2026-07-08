@@ -1,0 +1,9 @@
+{
+  "id": "single-brief",
+  "input": { "text": "תשלחו לאנה הצעה על 94,400 ₪ לקמפיין הקיץ" },
+  "expect": {
+    "intent": "price",
+    "money": { "total": 94400 },
+    "mustNotLeak": ["brief_id", "account_id", "uuid"]
+  }
+}

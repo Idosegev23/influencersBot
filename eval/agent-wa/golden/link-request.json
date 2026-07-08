@@ -1,0 +1,8 @@
+{
+  "id": "link-request",
+  "input": { "text": "תן לי את ההצעה של אנה" },
+  "expect": {
+    "intent": "retrieval",
+    "mustNotLeak": ["brief_id", "quote_id", "uuid"]
+  }
+}

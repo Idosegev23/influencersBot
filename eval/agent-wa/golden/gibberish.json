@@ -1,0 +1,7 @@
+{
+  "id": "gibberish",
+  "input": { "text": "אבגד קשקוש ווו לחלחלח" },
+  "expect": {
+    "intent": "unclear"
+  }
+}

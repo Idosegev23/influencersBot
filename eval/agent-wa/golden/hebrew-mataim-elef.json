@@ -1,0 +1,8 @@
+{
+  "id": "hebrew-mataim-elef",
+  "input": { "text": "מאתיים אלף", "isVoice": true },
+  "expect": {
+    "intent": "price",
+    "money": { "total": 200000 }
+  }
+}

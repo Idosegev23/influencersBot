@@ -1,0 +1,8 @@
+{
+  "id": "shorthand-80",
+  "input": { "text": "80" },
+  "expect": {
+    "intent": "price",
+    "money": { "total": 80000 }
+  }
+}

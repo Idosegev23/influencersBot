@@ -212,8 +212,16 @@ async function runBrain(agent: WaAgent, waId: string, text: string): Promise<Age
   const tlog: AgentMessageResult['log'] = { plan_json: plan, model_used: CHAT_MODEL, router_intent: plan.action };
 
   switch (plan.action) {
-    case 'answer':
-      return done(plan.reply || 'לא בטוח שהבנתי — אפשר לנסח שוב?', tlog);
+    case 'answer': {
+      // Advisory lane: the read-only tool-calling brain (SQL for numbers, RAG for meaning).
+      try {
+        const { answerAgentQuestion } = await import('@/lib/crm/agent-brain');
+        const a = await answerAgentQuestion(agent, text);
+        return done(a.reply, { ...tlog, model_used: a.modelUsed });
+      } catch {
+        return done(plan.reply || 'לא בטוח שהבנתי — אפשר לנסח שוב?', tlog);
+      }
+    }
     case 'clarify':
       return needMore(plan.reply || 'לא בטוח שהבנתי — אפשר לנסח שוב?', tlog);
     case 'document_brief':
@@ -315,6 +323,8 @@ async function startBrief(agent: WaAgent, waId: string, text: string | null, att
     await resetState(agent.id);
     return fail('לא הצלחתי לקרוא את הבריף. אפשר לשלוח שוב?');
   }
+  // fire-and-forget: index this brief for the advisory RAG brain (meaning questions).
+  void import('@/lib/rag/ingest-agent').then((m) => m.ingestBriefEmbeddings(supabaseAdmin, briefId)).catch(() => {});
 
   const { data: brief } = await supabaseAdmin
     .from('crm_inbound_messages')
@@ -491,6 +501,9 @@ async function recordDealFromBrief(agent: WaAgent, briefId: string, accountId: s
     .from('crm_inbound_messages')
     .update({ deal_id: partnership.id, partnership_id: partnership.id, brief_status: 'priced' })
     .eq('id', briefId);
+
+  // fire-and-forget: index this deal for the advisory RAG brain.
+  void import('@/lib/rag/ingest-agent').then((m) => m.ingestDealEmbeddings(supabaseAdmin, partnership.id)).catch(() => {});
 
   return { partnershipId: partnership.id, clientName, brand: brandName, subtotal: totals.subtotal, total: totals.total };
 }

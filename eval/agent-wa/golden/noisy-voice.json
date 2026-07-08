@@ -1,0 +1,9 @@
+{
+  "id": "noisy-voice",
+  "input": { "text": "אהמ רגע תעשי לה 90 אלף בערך אוקיי", "isVoice": true },
+  "expect": {
+    "intent": "price",
+    "money": { "total": 90000 },
+    "mustNotLeak": ["talent_id", "uuid"]
+  }
+}

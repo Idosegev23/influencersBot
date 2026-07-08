@@ -1,0 +1,15 @@
+{
+  "id": "ambiguous-talent",
+  "input": { "text": "תשלח הצעה לדנה" },
+  "context": {
+    "roster": [
+      { "id": "t-1", "name": "דנה כהן" },
+      { "id": "t-2", "name": "דנה לוי" }
+    ]
+  },
+  "expect": {
+    "intent": "price",
+    "mustMention": ["דנה"],
+    "mustNotLeak": ["t-1", "t-2", "talent_id", "uuid"]
+  }
+}

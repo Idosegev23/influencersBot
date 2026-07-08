@@ -1,0 +1,9 @@
+{
+  "id": "multi-brief-shorthand",
+  "input": { "text": "לאנה 80 לרילס 20 לזכויות", "isVoice": true },
+  "expect": {
+    "intent": "price",
+    "money": { "total": 100000, "lineItems": [80000, 20000] },
+    "mustNotLeak": ["brief_id", "account_id"]
+  }
+}
