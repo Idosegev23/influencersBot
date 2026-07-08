@@ -339,7 +339,19 @@ export class NewScanOrchestrator {
       // ==========================================
       report('posts', 'running', 50, `סורק ${fullConfig.postsLimit} פוסטים...`);
 
-      const posts = await this.client.getPosts(username, fullConfig.postsLimit);
+      let posts = await this.client.getPosts(username, fullConfig.postsLimit);
+
+      // ScrapeCreators intermittently returns 0 posts for valid public accounts
+      // (observed: same handle fails, then succeeds on a retry). Retry a couple
+      // times with backoff before accepting an empty result — turns scan success
+      // from luck-of-the-draw into reliable. A genuinely private/empty account
+      // still ends at 0 and is failed cleanly by the ig-scan no-content guard.
+      for (let attempt = 1; posts.length === 0 && attempt <= 2; attempt++) {
+        console.warn(`[Scan] getPosts returned 0 for @${username} — retry ${attempt}/2`);
+        await new Promise((r) => setTimeout(r, 4000 * attempt));
+        posts = await this.client.getPosts(username, fullConfig.postsLimit);
+      }
+      if (posts.length > 0) console.log(`[Scan] getPosts: ${posts.length} posts for @${username}`);
 
       // Identify new vs existing posts for incremental comments
       let newPosts = posts;
