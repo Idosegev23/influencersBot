@@ -435,14 +435,16 @@ async function handleRetrieve(agent: WaAgent, text: string): Promise<string | nu
     .limit(1)
     .maybeSingle();
   if (!deal) return `לא מצאתי עסקה מתומחרת ל-${clientName}. שלח/י תמחור ואבנה.`;
+  // Latest signature for this deal, ANY status. 'pending'/'opened' links are still
+  // live → return them (don't mint a duplicate). 'signed' → it's done. None → issue.
   const { data: sig } = await supabaseAdmin
     .from('signature_requests')
-    .select('token')
+    .select('token, status')
     .eq('partnership_id', deal.id)
-    .eq('status', 'pending')
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (sig?.status === 'signed') return `ההצעה של ${clientName} · ${deal.brand_name} כבר נחתמה ✓`;
   let signUrl: string;
   if (sig?.token) signUrl = signUrlFor(sig.token);
   else { const r = await issueQuoteForDeal(agent, deal.id); signUrl = r.signUrl; }
