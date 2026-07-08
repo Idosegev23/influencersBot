@@ -977,10 +977,14 @@
         panel.style.top = Math.round(window.visualViewport.offsetTop || 0) + 'px';
         panel.style.bottom = 'auto';
       } else {
-        // Keyboard down → clear the overrides so the CSS inset:0 / 100dvh governs.
-        panel.style.height = '';
-        panel.style.top = '';
-        panel.style.bottom = '';
+        // Keyboard down → RESTORE explicit full-screen. Clearing to '' would
+        // strip the top/height/bottom longhands that mobilePanelStyle's
+        // `inset:0`/`height:100dvh` expanded into, dropping the fixed panel to
+        // its static position inside the bottom-right launcher container
+        // (off-screen). So set the full-screen values explicitly instead.
+        panel.style.top = '0px';
+        panel.style.bottom = '0px';
+        panel.style.height = '100dvh';
       }
       var msgs = document.getElementById('ibot-messages');
       if (msgs) msgs.scrollTop = msgs.scrollHeight;
