@@ -78,7 +78,10 @@ export async function discoverCategories(
   websiteUrl: string
 ): Promise<{ domain: string; noSitemap: boolean; categories: Category[] }> {
   const domain = new URL(websiteUrl).host;
-  const urls = await discoverSitemapUrls(websiteUrl);
+  // Tight bounds: discovery only needs enough URLs to identify the path groups —
+  // a sample is plenty, and this must return well under the route's 60s timeout
+  // even for huge sites (H&M's nested sitemap otherwise runs for minutes).
+  const urls = await discoverSitemapUrls(websiteUrl, { maxUrls: 20000, maxSitemaps: 40, deadlineMs: 40000, perFetchMs: 8000 });
   if (!urls.length) return { domain, noSitemap: true, categories: [] };
   const categories = await labelCategories(groupUrlsByPath(urls));
   return { domain, noSitemap: false, categories };

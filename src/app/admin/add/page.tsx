@@ -99,8 +99,10 @@ export default function AddAccountPage() {
   }
 
   async function handleDiscover() {
-    const site = websiteUrl.trim();
+    let site = websiteUrl.trim();
     if (!site) { setError('יש להזין כתובת אתר'); return; }
+    // Be forgiving about a missing protocol (common input like "example.com").
+    if (!/^https?:\/\//i.test(site)) { site = 'https://' + site; setWebsiteUrl(site); }
 
     setDiscovering(true);
     setError(null);
@@ -110,12 +112,24 @@ export default function AddAccountPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ websiteUrl: site }),
       });
+      if (!res.ok) {
+        // A 504 (huge/slow sitemap) returns an HTML page, so res.json() would throw —
+        // parse defensively and show a clear, actionable message instead of "network error".
+        let data: any = null;
+        try { data = await res.json(); } catch { /* non-JSON error page */ }
+        setError(
+          data?.error ||
+          (res.status === 504
+            ? 'האתר גדול או איטי מדי לגילוי מהיר — נסה שוב, או השתמש בסריקה רגילה'
+            : `שגיאה בגילוי האתר (${res.status})`),
+        );
+        return;
+      }
       const data = await res.json();
-      if (!res.ok) { setError(data.error || 'שגיאה בגילוי האתר'); return; }
       if (data.noSitemap || !Array.isArray(data.categories) || data.categories.length === 0) {
         setCategories([]);
         setSelections({});
-        setError('לא נמצאו קטגוריות באתר (אין sitemap)');
+        setError('לא נמצאו קטגוריות (אין sitemap) — אפשר להשתמש בסריקה רגילה');
         return;
       }
       const cats: Category[] = data.categories;
@@ -124,7 +138,7 @@ export default function AddAccountPage() {
       for (const c of cats) init[c.pathPattern] = defaultCap(c.type);
       setSelections(init);
     } catch {
-      setError('שגיאת רשת');
+      setError('שגיאת רשת — בדוק את החיבור ונסה שוב');
     } finally {
       setDiscovering(false);
     }
