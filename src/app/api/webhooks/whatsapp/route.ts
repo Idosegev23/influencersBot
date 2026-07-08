@@ -28,6 +28,8 @@ import { isItamarSender, processItamarReply } from '@/lib/handoff/process-itamar
 import { routeInboundToTicket } from '@/lib/support/route-inbound';
 import { toWaId, downloadMedia, sendText, sendReaction, markAsRead } from '@/lib/whatsapp-cloud/client';
 import { handleAgentMessage } from '@/lib/crm/wa-conversation';
+import { reactionForOutcome, channelOf, type AgentMessageResult } from '@/lib/crm/wa-outcome';
+import { logAgentWa } from '@/lib/crm/wa-log';
 
 export const runtime = 'nodejs';          // need crypto + Buffer
 export const dynamic = 'force-dynamic';   // never cache
@@ -399,14 +401,30 @@ async function maybeHandleAgentQuote(args: {
 
   // Drive the WhatsApp conversation (build quote? → price → link) and reply
   // within the 24h service window (the agent just messaged us).
+  const startedAt = Date.now();
+  let result: AgentMessageResult = { reply: null, outcome: 'error' };
   try {
-    const reply = await handleAgentMessage(agent as any, args.waId, voiceText || args.textBody, attachments, { isVoice });
-    if (reply) {
-      await sendText({ to: args.waId, body: reply, contextMessageId: args.msg.id });
-      void sendReaction({ to: args.waId, messageId: args.msg.id, emoji: '✅' }).catch(() => {}); // 👀 → ✅ (done)
-    }
+    result = await handleAgentMessage(agent as any, args.waId, voiceText || args.textBody, attachments, { isVoice });
   } catch (e) {
     console.warn('[agent quote] conversation failed', e);
+    result = { reply: 'קרתה תקלה זמנית, אפשר לשלוח שוב?', outcome: 'error' };
   }
+  if (result.reply) {
+    await sendText({ to: args.waId, body: result.reply, contextMessageId: args.msg.id });
+  }
+  // ✅ ONLY on outcome==='done'; ⚠️ on error; nothing while awaiting the agent.
+  const emoji = reactionForOutcome(result.outcome);
+  if (emoji) void sendReaction({ to: args.waId, messageId: args.msg.id, emoji }).catch(() => {});
+
+  void logAgentWa({
+    messageId: args.msg.id,
+    agentId: (agent as any).id,
+    channel: channelOf(args.msg),
+    transcript: voiceText || args.textBody || null,
+    outcome: result.outcome,
+    latencyMs: Date.now() - startedAt,
+    sttProvider: isVoice ? 'gemini' : null,
+    log: result.log,
+  }).catch(() => {});
   return true;
 }

@@ -9,7 +9,7 @@ function getClient() {
 }
 
 // Models configuration - using Responses API
-const CHAT_MODEL = 'gpt-5-nano';      // Fastest, cheapest - for chat
+export const CHAT_MODEL = 'gpt-5-nano';      // Fastest, cheapest - for chat
 const ANALYSIS_MODEL = 'gpt-5-nano';  // For analysis  
 const COMPLEX_MODEL = 'gpt-5';        // For persona generation
 

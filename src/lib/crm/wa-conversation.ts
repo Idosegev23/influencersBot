@@ -8,7 +8,9 @@ import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { ingestQuote } from '@/lib/crm/quote-ingest';
 import { createQuote, issueQuote, signUrlFor } from '@/lib/crm/quotes';
 import { computeTotals, lineItemsToDeliverables, type LineItem } from '@/lib/crm/pricing';
-import { interpretYesNo, interpretPricing } from '@/lib/crm/wa-interpret';
+import { interpretYesNo, interpretPricing, normalizeAmount } from '@/lib/crm/wa-interpret';
+import type { AgentMessageResult } from '@/lib/crm/wa-outcome';
+import { CHAT_MODEL } from '@/lib/openai';
 
 export interface WaAgent {
   id: string;
@@ -16,6 +18,12 @@ export interface WaAgent {
   full_name?: string | null;
 }
 type Seed = { platform: string; deliverable_type: string; qty: number; unit_price?: number; notes: string };
+
+// {reply,outcome} constructors — ✅ fires only on 'done' (see wa-outcome/route).
+const done = (reply: string | null, log?: AgentMessageResult['log']): AgentMessageResult => ({ reply, outcome: 'done', log });
+const needMore = (reply: string | null, log?: AgentMessageResult['log']): AgentMessageResult => ({ reply, outcome: 'need_more', log });
+const fail = (reply: string, log?: AgentMessageResult['log']): AgentMessageResult => ({ reply, outcome: 'error', log });
+const withLog = (r: AgentMessageResult, log: AgentMessageResult['log']): AgentMessageResult => ({ ...r, log: { ...log, ...r.log } });
 
 async function getState(agentId: string) {
   const { data } = await supabaseAdmin.from('crm_agent_wa_state').select('*').eq('agent_id', agentId).maybeSingle();
@@ -64,14 +72,14 @@ export async function handleAgentMessage(
   text: string | null,
   attachments: any[],
   opts: { isVoice?: boolean } = {}
-): Promise<string | null> {
+): Promise<AgentMessageResult> {
   const state = await getState(agent.id);
   const hasAttach = (attachments || []).length > 0;
   const idle = !state.stage || state.stage === 'idle' || state.stage === 'quote_sent';
 
   // 0) A voice note whose transcription failed/returned empty arrives as isVoice with no
   //    text. Never document it as an empty brief — ask for a resend.
-  if (opts.isVoice && !text) return 'לא הצלחתי להבין את ההקלטה 🙏 אפשר לשלוח שוב?';
+  if (opts.isVoice && !text) return fail('לא הצלחתי להבין את ההקלטה 🙏 אפשר לשלוח שוב?');
 
   // 1) Mid-flow reply → the stage machine owns short-lived confirmations / follow-ups
   //    (so a "כן" to "ליצור?" is a confirmation, not a re-planned command).
@@ -93,7 +101,7 @@ export async function handleAgentMessage(
   //    agent's live context, understands the intent, and executes the right action.
   if (text) return runBrain(agent, waId, text);
 
-  return null;
+  return done(null);
 }
 
 // ───────────────────────── AI brain (free-form understanding) ─────────────────────────
@@ -161,34 +169,40 @@ async function planFreeform(text: string, ctx: Awaited<ReturnType<typeof loadBra
 }
 
 /** Front door for a fresh free-form message: plan the intent, then execute it. */
-async function runBrain(agent: WaAgent, waId: string, text: string): Promise<string | null> {
+async function runBrain(agent: WaAgent, waId: string, text: string): Promise<AgentMessageResult> {
   const ctx = await loadBrainContext(agent);
   const plan = await planFreeform(text, ctx);
-  if (!plan || !plan.action) return startBrief(agent, waId, text, []); // planner failed → safest default: document
+  // Planner failure must NOT document a junk brief + earn a false ✅ (§5.5).
+  if (!plan || !plan.action) {
+    return fail('לא הצלחתי לעבד את ההודעה. אפשר לשלוח שוב? אם זה בריף חדש — אפשר להעביר אותו כקובץ.');
+  }
+  const tlog: AgentMessageResult['log'] = { plan_json: plan, model_used: CHAT_MODEL, router_intent: plan.action };
 
   switch (plan.action) {
     case 'answer':
+      return done(plan.reply || 'לא בטוח שהבנתי — אפשר לנסח שוב?', tlog);
     case 'clarify':
-      return plan.reply || 'לא בטוח שהבנתי — אפשר לנסח שוב?';
+      return needMore(plan.reply || 'לא בטוח שהבנתי — אפשר לנסח שוב?', tlog);
     case 'document_brief':
-      return startBrief(agent, waId, text, []);
+      return withLog(await startBrief(agent, waId, text, []), tlog);
     case 'price':
-      return applyPricingCommands(agent, plan.commands || [], ctx);
+      return withLog(await applyPricingCommands(agent, plan.commands || [], ctx), tlog);
     case 'issue_quote':
     case 'get_link':
-      return brainDealLink(agent, plan.target || {}, ctx);
+      return withLog(await brainDealLink(agent, plan.target || {}, ctx), tlog);
     default:
-      return startBrief(agent, waId, text, []);
+      return fail('לא הבנתי בדיוק מה לעשות. אפשר לנסח שוב?', tlog);
   }
 }
 
 /** Record priced commands (documented) then ask ONCE whether to issue the quote(s). */
-async function applyPricingCommands(agent: WaAgent, commands: any, ctx: Awaited<ReturnType<typeof loadBrainContext>>): Promise<string> {
+async function applyPricingCommands(agent: WaAgent, commands: any, ctx: Awaited<ReturnType<typeof loadBrainContext>>): Promise<AgentMessageResult> {
   // The LLM sometimes collapses a single-element array to a bare object — normalize.
   const list: any[] = Array.isArray(commands) ? commands : commands ? [commands] : [];
   const recorded: PendingDeal[] = [];
   const pending: string[] = [];
   const incomplete: any[] = [];
+  let needsConfirmation = false;
   for (const cmd of list) {
     const brief = ctx.briefs.find((b) => b.id === cmd.brief_id);
     if (!brief) { pending.push('• בריף לא זוהה'); continue; }
@@ -202,31 +216,32 @@ async function applyPricingCommands(agent: WaAgent, commands: any, ctx: Awaited<
       continue;
     }
     await supabaseAdmin.from('crm_inbound_messages').update({ suggested_account_id: accountId, brief_status: 'assigned' }).eq('id', brief.id);
-    const lineItems = buildLineItemsFromPricing(cmd.pricing, seed);
-    if (!lineItems) {
+    const built = buildLineItemsFromPricing(cmd.pricing, seed);
+    if (!built) {
       pending.push(`• ${brand}: מה המחיר?`);
       incomplete.push({ stage: 'awaiting_prices', brief_id: brief.id, deal_id: null, context: { account_id: accountId, brand, seed } });
       continue;
     }
-    recorded.push(await recordDealFromBrief(agent, brief.id, accountId, lineItems));
+    needsConfirmation = needsConfirmation || built.needsConfirmation;
+    recorded.push(await recordDealFromBrief(agent, brief.id, accountId, built.lineItems));
   }
   if (recorded.length) {
     await setState(agent.id, { stage: 'awaiting_create_confirm', context: { pending: recorded } });
-    const list = recorded.map((r) => `• ${r.clientName} · ${r.brand}: ${r.subtotal.toLocaleString('en-US')} + מע״מ = ${r.total.toLocaleString('en-US')} ₪`).join('\n');
-    let msg = `📝 עודכן:\n${list}\n\nליצור ${recorded.length > 1 ? recorded.length + ' הצעות מחיר' : 'הצעת מחיר'} ולשלוח קישור? (כן/לא)`;
+    const listTxt = recorded.map((r) => `• ${r.clientName} · ${r.brand}: ${r.subtotal.toLocaleString('en-US')} + מע״מ = ${r.total.toLocaleString('en-US')} ₪`).join('\n');
+    let msg = `${needsConfirmation ? 'רק לוודא שהבנתי נכון 👇\n' : ''}📝 עודכן:\n${listTxt}\n\nליצור ${recorded.length > 1 ? recorded.length + ' הצעות מחיר' : 'הצעת מחיר'} ולשלוח קישור? (כן/לא)`;
     if (pending.length) msg += `\n\nצריך השלמה:\n${pending.join('\n')}`;
-    return msg;
+    return needMore(msg, { deal_id: recorded[0]?.partnershipId, amount: recorded[0]?.total });
   }
   if (incomplete.length === 1) {
     await setState(agent.id, incomplete[0]);
-    return incomplete[0].stage === 'awaiting_talent' ? (pending[0] || 'עבור מי ההצעה?') : `${pending[0] || 'מה המחיר?'} (סכום כולל, או מחיר לכל שורה)`;
+    return needMore(incomplete[0].stage === 'awaiting_talent' ? (pending[0] || 'עבור מי ההצעה?') : `${pending[0] || 'מה המחיר?'} (סכום כולל, או מחיר לכל שורה)`);
   }
   await resetState(agent.id);
-  return pending.length ? `צריך השלמה:\n${pending.join('\n')}` : 'לא הצלחתי להבין את התמחור. אפשר לנסות שוב?';
+  return pending.length ? needMore(`צריך השלמה:\n${pending.join('\n')}`) : fail('לא הצלחתי להבין את התמחור. אפשר לנסות שוב?');
 }
 
 /** Resolve the agent's meant deal → return (issuing if needed) its sign link. */
-async function brainDealLink(agent: WaAgent, target: any, ctx: Awaited<ReturnType<typeof loadBrainContext>>): Promise<string> {
+async function brainDealLink(agent: WaAgent, target: any, ctx: Awaited<ReturnType<typeof loadBrainContext>>): Promise<AgentMessageResult> {
   let dealId: string | null = target?.deal_id || null;
   const talentId: string | null = target?.talent_id || null;
   if (!dealId) {
@@ -239,29 +254,33 @@ async function brainDealLink(agent: WaAgent, target: any, ctx: Awaited<ReturnTyp
   }
   if (!dealId) {
     const name = ctx.roster.find((r) => r.id === talentId)?.name || 'המיוצג';
-    return `אין עדיין עסקה מתומחרת ל-${name}. שלח/י תמחור ואבנה.`;
+    return needMore(`אין עדיין עסקה מתומחרת ל-${name}. שלח/י תמחור ואבנה.`);
   }
   return dealLink(agent, dealId);
 }
 
 /** Latest signature for a deal → existing link, "signed", or issue a fresh one. */
-async function dealLink(agent: WaAgent, dealId: string): Promise<string> {
+async function dealLink(agent: WaAgent, dealId: string): Promise<AgentMessageResult> {
   const { data: p } = await supabaseAdmin.from('partnerships').select('brand_name, account_id').eq('id', dealId).maybeSingle();
-  if (!p) return 'לא מצאתי את העסקה.';
+  if (!p) return fail('לא מצאתי את העסקה.');
   const clientName = await accountName(p.account_id);
   const { data: sig } = await supabaseAdmin.from('signature_requests').select('token, status').eq('partnership_id', dealId).order('created_at', { ascending: false }).limit(1).maybeSingle();
-  if (sig?.status === 'signed') return `ההצעה של ${clientName} · ${p.brand_name} כבר נחתמה ✓`;
-  const signUrl = sig?.token ? signUrlFor(sig.token) : (await issueQuoteForDeal(agent, dealId)).signUrl;
-  return `הצעת המחיר של ${clientName} · ${p.brand_name}:\n${signUrl}`;
+  if (sig?.status === 'signed') return done(`ההצעה של ${clientName} · ${p.brand_name} כבר נחתמה ✓`);
+  try {
+    const signUrl = sig?.token ? signUrlFor(sig.token) : (await issueQuoteForDeal(agent, dealId)).signUrl;
+    return done(`הצעת המחיר של ${clientName} · ${p.brand_name}:\n${signUrl}`, { deal_id: dealId });
+  } catch {
+    return fail('לא הצלחתי ליצור את ההצעה, אפשר לנסות שוב?');
+  }
 }
 
-async function startBrief(agent: WaAgent, waId: string, text: string | null, attachments: any[]): Promise<string | null> {
+async function startBrief(agent: WaAgent, waId: string, text: string | null, attachments: any[]): Promise<AgentMessageResult> {
   const res = await ingestQuote({ channel: 'whatsapp', sender: waId, rawText: text, attachments, providerMessageId: null });
-  if (!res.matched) return null;
+  if (!res.matched) return done(null);
   const briefId = res.inboundId;
   if (res.reason === 'parse_failed' || !briefId) {
     await resetState(agent.id);
-    return 'לא הצלחתי לקרוא את הבריף. אפשר לשלוח שוב?';
+    return fail('לא הצלחתי לקרוא את הבריף. אפשר לשלוח שוב?');
   }
 
   const { data: brief } = await supabaseAdmin
@@ -276,16 +295,17 @@ async function startBrief(agent: WaAgent, waId: string, text: string | null, att
   // own terms (a voice note hours/days later) — Bestie does not push to build here.
   await resetState(agent.id);
   if (!brief?.suggested_account_id) {
-    return `📥 קיבלתי בריף מ-${brand}, תיעדתי ✓.\nכשתרצה לתמחר — שלח/י לי (ציין/י את שם המיוצג).`;
+    return done(`📥 קיבלתי בריף מ-${brand}, תיעדתי ✓.\nכשתרצה לתמחר — שלח/י לי (ציין/י את שם המיוצג).`);
   }
   const clientName = await accountName(brief.suggested_account_id);
-  return `📥 קיבלתי בריף מ-${brand} עבור ${clientName}, תיעדתי ✓.\nכשתרצה — שלח/י תמחור (למשל בהקלטה קולית) ואשאל אם ליצור הצעה.`;
+  return done(`📥 קיבלתי בריף מ-${brand} עבור ${clientName}, תיעדתי ✓.\nכשתרצה — שלח/י תמחור (למשל בהקלטה קולית) ואשאל אם ליצור הצעה.`);
 }
 
-async function handlePrices(agent: WaAgent, state: any, text: string | null): Promise<string> {
+async function handlePrices(agent: WaAgent, state: any, text: string | null): Promise<AgentMessageResult> {
   const seed: Seed[] = state.context?.seed || [];
-  const pricing = interpretPricing(text || '', seed.length);
+  const pricing = interpretPricing(text || '', seed.length); // already normalized (Task 2)
   let lineItems: LineItem[] | null = null;
+  let needsConfirmation = !!pricing.needsConfirmation;
 
   if (seed.length === 0) {
     if (pricing.mode !== 'unclear' && (pricing.total || pricing.prices?.[0])) {
@@ -297,15 +317,21 @@ async function handlePrices(agent: WaAgent, state: any, text: string | null): Pr
     lineItems = [{ platform: '', deliverable_type: 'סה״כ', qty: 1, unit_price: pricing.total, notes: seed.map(deliverableLabel).join(' · ') }];
   }
 
-  if (!lineItems) lineItems = await aiPricing(text || '', seed);
-  if (!lineItems) return `לא הבנתי את התמחור. שלח סכום כולל, או ${seed.length || ''} מחירים לפי הסדר.`;
+  if (!lineItems) {
+    const ai = await aiPricing(text || '', seed);
+    if (ai) { lineItems = ai.lineItems; needsConfirmation = needsConfirmation || ai.needsConfirmation; }
+  }
+  if (!lineItems) return needMore(`לא הבנתי את התמחור. שלח סכום כולל, או ${seed.length || ''} מחירים לפי הסדר.`);
 
   const rec = await recordDealFromBrief(agent, state.brief_id, state.context?.account_id, lineItems);
   await setState(agent.id, { stage: 'awaiting_create_confirm', context: { pending: [rec] } });
-  return `📝 עודכן: ${rec.clientName} · ${rec.brand} — ${rec.subtotal.toLocaleString('en-US')} ₪ + מע״מ = ${rec.total.toLocaleString('en-US')} ₪.\nליצור הצעת מחיר ולשלוח קישור לחתימה? (כן/לא)`;
+  return needMore(
+    `${needsConfirmation ? 'רק לוודא שהבנתי נכון 👇\n' : ''}📝 עודכן: ${rec.clientName} · ${rec.brand} — ${rec.subtotal.toLocaleString('en-US')} ₪ + מע״מ = ${rec.total.toLocaleString('en-US')} ₪.\nליצור הצעת מחיר ולשלוח קישור לחתימה? (כן/לא)`,
+    { deal_id: rec.partnershipId, amount: rec.total },
+  );
 }
 
-async function aiPricing(text: string, seed: Seed[]): Promise<LineItem[] | null> {
+async function aiPricing(text: string, seed: Seed[]): Promise<{ lineItems: LineItem[]; needsConfirmation: boolean } | null> {
   try {
     const { chat } = await import('@/lib/openai');
     const list = seed.map((r, i) => `${i + 1}) ${deliverableLabel(r)}`).join('; ');
@@ -316,10 +342,17 @@ async function aiPricing(text: string, seed: Seed[]): Promise<LineItem[] | null>
     const { response } = await chat(instr, text);
     const j = JSON.parse(String(response || '').replace(/```json|```/g, '').trim());
     if (j.mode === 'per_line' && Array.isArray(j.prices) && j.prices.length === seed.length) {
-      return seed.map((r, i) => ({ ...r, unit_price: Number(j.prices[i]) || 0 }));
+      let nc = false;
+      const lineItems = seed.map((r, i) => {
+        const n = normalizeAmount(Number(j.prices[i]) || 0, { scaleBare: true });
+        nc = nc || n.needsConfirmation;
+        return { ...r, unit_price: n.amount };
+      });
+      return { lineItems, needsConfirmation: nc };
     }
     if (j.mode === 'total' && j.total) {
-      return [{ platform: '', deliverable_type: 'סה״כ', qty: 1, unit_price: Number(j.total), notes: seed.map(deliverableLabel).join(' · ') }];
+      const n = normalizeAmount(Number(j.total), { scaleBare: true });
+      return { lineItems: [{ platform: '', deliverable_type: 'סה״כ', qty: 1, unit_price: n.amount, notes: seed.map(deliverableLabel).join(' · ') }], needsConfirmation: n.needsConfirmation };
     }
   } catch {
     /* fall through */
@@ -327,15 +360,24 @@ async function aiPricing(text: string, seed: Seed[]): Promise<LineItem[] | null>
   return null;
 }
 
-function buildLineItemsFromPricing(pricing: any, seed: Seed[]): LineItem[] | null {
+/** LLM pricing → normalized line items + whether a magnitude was guessed (read-back). */
+function buildLineItemsFromPricing(pricing: any, seed: Seed[]): { lineItems: LineItem[]; needsConfirmation: boolean } | null {
   if (!pricing) return null;
   if (pricing.mode === 'per_line' && Array.isArray(pricing.prices) && seed.length && pricing.prices.length === seed.length) {
-    return seed.map((r, i) => ({ ...r, unit_price: Number(pricing.prices[i]) || 0 }));
+    let nc = false;
+    const lineItems = seed.map((r, i) => {
+      const n = normalizeAmount(Number(pricing.prices[i]) || 0, { scaleBare: true });
+      nc = nc || n.needsConfirmation;
+      return { ...r, unit_price: n.amount };
+    });
+    return { lineItems, needsConfirmation: nc };
   }
   if (pricing.mode === 'total' && pricing.total) {
-    return seed.length
-      ? [{ platform: '', deliverable_type: 'סה״כ', qty: 1, unit_price: Number(pricing.total), notes: seed.map(deliverableLabel).join(' · ') }]
-      : [{ platform: '', deliverable_type: 'הצעה', qty: 1, unit_price: Number(pricing.total) }];
+    const n = normalizeAmount(Number(pricing.total), { scaleBare: true });
+    const lineItems = seed.length
+      ? [{ platform: '', deliverable_type: 'סה״כ', qty: 1, unit_price: n.amount, notes: seed.map(deliverableLabel).join(' · ') }]
+      : [{ platform: '', deliverable_type: 'הצעה', qty: 1, unit_price: n.amount }];
+    return { lineItems, needsConfirmation: n.needsConfirmation };
   }
   return null;
 }
@@ -454,50 +496,56 @@ async function issueQuoteForDeal(agent: WaAgent, partnershipId: string): Promise
 }
 
 /** After pricing, the agent confirms whether to issue the quote(s) + send links. */
-async function handleCreateConfirm(agent: WaAgent, state: any, text: string | null): Promise<string> {
+async function handleCreateConfirm(agent: WaAgent, state: any, text: string | null): Promise<AgentMessageResult> {
   const pending: PendingDeal[] = state.context?.pending || [];
   const yn = interpretYesNo(text || '');
   if (yn === 'no') {
     await resetState(agent.id);
     const who = pending[0]?.clientName || 'המיוצג';
-    return `בסדר — נשמר כתיעוד (מתומחר, בלי הצעה שנשלחה).\nתגיד/י "תן לי את ההצעה של ${who}" מתי שתרצה קישור.`;
+    return done(`בסדר — נשמר כתיעוד (מתומחר, בלי הצעה שנשלחה).\nתגיד/י "תן לי את ההצעה של ${who}" מתי שתרצה קישור.`);
   }
-  if (yn !== 'yes') return `ליצור ${pending.length > 1 ? pending.length + ' הצעות' : 'הצעת מחיר'} ולשלוח קישור? (כן/לא)`;
-  if (!pending.length) { await resetState(agent.id); return 'אין מה ליצור. שלח/י תמחור.'; }
+  if (yn !== 'yes') return needMore(`ליצור ${pending.length > 1 ? pending.length + ' הצעות' : 'הצעת מחיר'} ולשלוח קישור? (כן/לא)`);
+  if (!pending.length) { await resetState(agent.id); return needMore('אין מה ליצור. שלח/י תמחור.'); }
 
   const links: string[] = [];
+  let anyOk = false;
   for (const d of pending) {
     try {
       const r = await issueQuoteForDeal(agent, d.partnershipId);
+      anyOk = true;
       links.push(`✅ ${r.clientName} · ${r.brand}: ${r.total.toLocaleString('en-US')} ₪ כולל מע״מ\n${r.signUrl}`);
     } catch {
       links.push(`⚠️ ${d.clientName} · ${d.brand}: לא הצלחתי ליצור`);
     }
   }
   await resetState(agent.id);
-  return `הנה — שלח/י ללקוח:\n\n${links.join('\n\n')}`;
+  const msg = `הנה — שלח/י ללקוח:\n\n${links.join('\n\n')}`;
+  return anyOk ? done(msg, { deal_id: pending[0]?.partnershipId, amount: pending[0]?.total }) : fail(msg);
 }
 
 /** Reply that names the talent for a priced-but-unassigned voice command → record + ask. */
-async function handleTalentReply(agent: WaAgent, state: any, text: string | null): Promise<string> {
+async function handleTalentReply(agent: WaAgent, state: any, text: string | null): Promise<AgentMessageResult> {
   const ids = agent.managed_account_ids || [];
-  if (!ids.length) { await resetState(agent.id); return 'אין מיוצגים ברוסטר שלך.'; }
+  if (!ids.length) { await resetState(agent.id); return needMore('אין מיוצגים ברוסטר שלך.'); }
   const { data: accts } = await supabaseAdmin.from('accounts').select('id, config').in('id', ids);
   const q = (text || '').toLowerCase();
   const match = (accts || []).find((a) => {
     const n = String((a.config as any)?.display_name || (a.config as any)?.username || '').toLowerCase();
     return n.length >= 2 && q.includes(n);
   });
-  if (!match) return 'לא מצאתי מיוצג בשם הזה ברוסטר. נסה/י שם אחר.';
+  if (!match) return needMore('לא מצאתי מיוצג בשם הזה ברוסטר. נסה/י שם אחר.');
   await supabaseAdmin.from('crm_inbound_messages').update({ suggested_account_id: match.id, brief_status: 'assigned' }).eq('id', state.brief_id);
   const seed: Seed[] = state.context?.seed || [];
-  const lineItems = buildLineItemsFromPricing(state.context?.pricing, seed);
-  if (!lineItems) {
+  const built = buildLineItemsFromPricing(state.context?.pricing, seed);
+  if (!built) {
     await setState(agent.id, { stage: 'awaiting_prices', context: { account_id: match.id, brand: state.context?.brand, seed } });
-    return `מעולה — ${(match.config as any)?.display_name || 'המיוצג'}. מה המחיר? (סכום כולל, או מחיר לכל שורה)`;
+    return needMore(`מעולה — ${(match.config as any)?.display_name || 'המיוצג'}. מה המחיר? (סכום כולל, או מחיר לכל שורה)`);
   }
-  const rec = await recordDealFromBrief(agent, state.brief_id, match.id, lineItems);
+  const rec = await recordDealFromBrief(agent, state.brief_id, match.id, built.lineItems);
   await setState(agent.id, { stage: 'awaiting_create_confirm', context: { pending: [rec] } });
-  return `📝 עודכן: ${rec.clientName} · ${rec.brand} — ${rec.subtotal.toLocaleString('en-US')} ₪ + מע״מ = ${rec.total.toLocaleString('en-US')} ₪.\nליצור הצעת מחיר ולשלוח קישור? (כן/לא)`;
+  return needMore(
+    `${built.needsConfirmation ? 'רק לוודא שהבנתי נכון 👇\n' : ''}📝 עודכן: ${rec.clientName} · ${rec.brand} — ${rec.subtotal.toLocaleString('en-US')} ₪ + מע״מ = ${rec.total.toLocaleString('en-US')} ₪.\nליצור הצעת מחיר ולשלוח קישור? (כן/לא)`,
+    { deal_id: rec.partnershipId, amount: rec.total },
+  );
 }
 
