@@ -168,7 +168,19 @@ export async function ingestQuote(input: IngestInput): Promise<IngestResult> {
   const nameHay = [input.rawText, input.subject, parsed?.influencerName, parsed?.talentName]
     .filter(Boolean)
     .join(' \n ');
-  const influencer = await matchInfluencer(agent.managed_account_ids || [], phones, nameHay);
+  let influencer = await matchInfluencer(agent.managed_account_ids || [], phones, nameHay);
+  // Fuzzy fallback — the exact-substring matcher misses a name the brand spelled slightly off
+  // ("סהר קרן"/"אנה ארונוב"). Resolve the parsed talent name against the roster (Hebrew-tolerant).
+  if (!influencer && (agent.managed_account_ids || []).length) {
+    const candidate = String(parsed?.influencerName || parsed?.talentName || '').trim();
+    if (candidate.length >= 2) {
+      const { data: accts } = await supabaseAdmin.from('accounts').select('id, config').in('id', agent.managed_account_ids);
+      const roster = (accts || []).map((a: any) => ({ id: a.id, name: (a.config as any)?.display_name || (a.config as any)?.username || '' }));
+      const { resolveTalent } = await import('@/lib/crm/wa-interpret');
+      const m = resolveTalent(candidate, roster);
+      if (m && !m.ambiguous) influencer = (accts || []).find((a: any) => a.id === m.id) || null;
+    }
+  }
 
   const brandName = parsed?.brandName || input.subject || 'מותג';
   const amount = typeof parsed?.totalAmount === 'number' ? parsed.totalAmount : null;

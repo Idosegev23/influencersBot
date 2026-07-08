@@ -23,6 +23,8 @@ type Seed = { platform: string; deliverable_type: string; qty: number; unit_pric
 
 // {reply,outcome} constructors — ✅ fires only on 'done' (see wa-outcome/route).
 const done = (reply: string | null, log?: AgentMessageResult['log']): AgentMessageResult => ({ reply, outcome: 'done', log });
+// Captured/recorded successfully, one short confirmation expected next (not a failure/stall).
+const progress = (reply: string | null, log?: AgentMessageResult['log']): AgentMessageResult => ({ reply, outcome: 'progress', log });
 const needMore = (reply: string | null, log?: AgentMessageResult['log']): AgentMessageResult => ({ reply, outcome: 'need_more', log });
 const fail = (reply: string, log?: AgentMessageResult['log']): AgentMessageResult => ({ reply, outcome: 'error', log });
 const withLog = (r: AgentMessageResult, log: AgentMessageResult['log']): AgentMessageResult => ({ ...r, log: { ...log, ...r.log } });
@@ -303,7 +305,7 @@ async function applyPricingCommands(agent: WaAgent, commands: any, ctx: Awaited<
     const listTxt = recorded.map((r) => `• ${r.clientName} · ${r.brand}: ${r.subtotal.toLocaleString('en-US')} + מע״מ = ${r.total.toLocaleString('en-US')} ₪`).join('\n');
     let msg = `${needsConfirmation ? 'רק לוודא שהבנתי נכון 👇\n' : ''}📝 עודכן:\n${listTxt}\n\nליצור ${recorded.length > 1 ? recorded.length + ' הצעות מחיר' : 'הצעת מחיר'} ולשלוח קישור? (כן/לא)`;
     if (pending.length) msg += `\n\nצריך השלמה:\n${pending.join('\n')}`;
-    return needMore(msg, { deal_id: recorded[0]?.partnershipId, amount: recorded[0]?.total });
+    return progress(msg, { deal_id: recorded[0]?.partnershipId, amount: recorded[0]?.total });
   }
   if (incomplete.length === 1) {
     await setState(agent.id, incomplete[0]);
@@ -400,7 +402,7 @@ async function handlePrices(agent: WaAgent, state: any, text: string | null): Pr
 
   const rec = await recordDealFromBrief(agent, state.brief_id, state.context?.account_id, lineItems);
   await setState(agent.id, { stage: 'awaiting_create_confirm', context: { pending: [rec] } });
-  return needMore(
+  return progress(
     `${needsConfirmation ? 'רק לוודא שהבנתי נכון 👇\n' : ''}📝 עודכן: ${rec.clientName} · ${rec.brand} — ${rec.subtotal.toLocaleString('en-US')} ₪ + מע״מ = ${rec.total.toLocaleString('en-US')} ₪.\nליצור הצעת מחיר ולשלוח קישור לחתימה? (כן/לא)`,
     { deal_id: rec.partnershipId, amount: rec.total },
   );
@@ -668,7 +670,7 @@ async function handleTalentReply(agent: WaAgent, state: any, text: string | null
   }
   const rec = await recordDealFromBrief(agent, state.brief_id, match.id, built.lineItems);
   await setState(agent.id, { stage: 'awaiting_create_confirm', context: { pending: [rec] } });
-  return needMore(
+  return progress(
     `${built.needsConfirmation ? 'רק לוודא שהבנתי נכון 👇\n' : ''}📝 עודכן: ${rec.clientName} · ${rec.brand} — ${rec.subtotal.toLocaleString('en-US')} ₪ + מע״מ = ${rec.total.toLocaleString('en-US')} ₪.\nליצור הצעת מחיר ולשלוח קישור? (כן/לא)`,
     { deal_id: rec.partnershipId, amount: rec.total },
   );
