@@ -5,6 +5,7 @@ import { publishAgentJob, type AgentJob } from '@/lib/crm/wa-queue';
 import { handleAgentMessage, type WaAgent } from '@/lib/crm/wa-conversation';
 import { reactionForOutcome, channelOf } from '@/lib/crm/wa-outcome';
 import { logAgentWa } from '@/lib/crm/wa-log';
+import { redisGet, redisSetNx } from '@/lib/redis';
 
 const MAX_REQUEUE = 5;
 
@@ -62,6 +63,11 @@ export async function materializeInbound(msg: any): Promise<{ attachments: any[]
  * message writes one crm_agent_wa_log row (Decision-Log moved here from the webhook).
  */
 export async function runAgentJob(job: AgentJob): Promise<{ status: string; outcome?: string }> {
+  // Worker-side dedup: a QStash redelivery (fn timeout AFTER we already replied) must not
+  // re-run the brain / re-send. Defensive — a Redis blip just means no dedup (safe).
+  const doneKey = `wa:msg:${job.msg?.id}:done`;
+  try { if (job.msg?.id && (await redisGet(doneKey))) return { status: 'duplicate' }; } catch { /* ignore */ }
+
   const attempt = job.attempt ?? 0;
   const locked = await acquireAgentLock(job.agentId);
   if (!locked && attempt < MAX_REQUEUE) {
@@ -76,6 +82,7 @@ export async function runAgentJob(job: AgentJob): Promise<{ status: string; outc
     const result = await handleAgentMessage(agent, job.waId, voiceText || job.textBody, attachments, { isVoice });
     if (result.reply) {
       await sendText({ to: job.waId, body: result.reply, contextMessageId: job.msg.id });
+      try { if (job.msg?.id) await redisSetNx(doneKey, '1', 900); } catch { /* ignore */ } // mark replied → dedup a retry
       const emoji = reactionForOutcome(result.outcome);
       if (emoji) void sendReaction({ to: job.waId, messageId: job.msg.id, emoji }).catch(() => {});
     }

@@ -359,8 +359,9 @@ async function maybeEnqueueAgentJob(args: { waId: string; msg: any; textBody: st
   try {
     await publishAgentJob({ waId: args.waId, agentId: (agent as any).id, msg: args.msg, textBody: args.textBody });
   } catch (e) {
-    console.error('[whatsapp webhook] failed to enqueue agent job', e);
-    // fall through: still return true so support routing is skipped for an agent
+    // publishAgentJob already retried 3×; a sustained QStash outage → don't drop silently.
+    console.error('[whatsapp webhook] failed to enqueue agent job (after retries)', e);
+    return false; // let support routing handle it as a visible last resort
   }
   return true;
 }

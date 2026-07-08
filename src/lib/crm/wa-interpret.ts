@@ -274,6 +274,9 @@ export function resolveTalent(query: string, roster: RosterEntry[]): TalentMatch
  * re-planner so "תשנה לאנה ל-90" is understood as an amendment, not a "no".
  */
 export function classifyConfirm(text: string): 'yes' | 'no' | 'other' {
+  // A reply carrying a number is a correction/amend ("כן אבל 90"), NOT a plain yes/no —
+  // let the model decide so the correction isn't dropped and the OLD price issued.
+  if (extractNumbers(text || '').some((n) => n >= 1)) return 'other';
   const yn = interpretYesNo(text);
   return yn === 'unclear' ? 'other' : yn;
 }

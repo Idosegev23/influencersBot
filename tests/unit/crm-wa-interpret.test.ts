@@ -173,6 +173,10 @@ describe('classifyConfirm', () => {
     expect(classifyConfirm('רגע תשנה לאנה ל-90')).toBe('other');
     expect(classifyConfirm('בעצם תמחר את דני 50')).toBe('other');
   });
+  it('a "yes" that also carries a correction number is "other" (not a blind yes)', () => {
+    expect(classifyConfirm('כן אבל תעדכן ל-90')).toBe('other');
+    expect(classifyConfirm('כן 100')).toBe('other');
+  });
   it('empty / vague is "other"', () => {
     expect(classifyConfirm('')).toBe('other');
     expect(classifyConfirm('אולי מחר')).toBe('other');

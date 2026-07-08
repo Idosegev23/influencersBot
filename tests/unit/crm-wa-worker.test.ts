@@ -14,6 +14,7 @@ vi.mock('@/lib/whatsapp-cloud/client', () => ({ sendText, sendReaction, download
 vi.mock('@/lib/supabase', () => ({
   supabase: { from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'ag1', role: 'agent', status: 'active', managed_account_ids: [], full_name: 'A' } }) }) }) }) },
 }));
+vi.mock('@/lib/redis', () => ({ redisGet: vi.fn().mockResolvedValue(null), redisSetNx: vi.fn().mockResolvedValue(true) }));
 
 describe('runAgentJob', () => {
   beforeEach(() => { acquireAgentLock.mockReset(); handleAgentMessage.mockReset(); sendText.mockClear(); sendReaction.mockClear(); publishAgentJob.mockClear(); });

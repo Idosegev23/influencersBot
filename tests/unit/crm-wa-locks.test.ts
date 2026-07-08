@@ -9,7 +9,7 @@ describe('agent lock', () => {
     redisSetNx.mockResolvedValueOnce(true);
     const { acquireAgentLock, releaseAgentLock } = await import('@/lib/crm/wa-locks');
     expect(await acquireAgentLock('agent-1')).toBe(true);
-    expect(redisSetNx).toHaveBeenCalledWith('wa:agent:agent-1:lock', '1', 120);
+    expect(redisSetNx).toHaveBeenCalledWith('wa:agent:agent-1:lock', '1', 300);
     await releaseAgentLock('agent-1');
     expect(redisDel).toHaveBeenCalledWith('wa:agent:agent-1:lock');
   });

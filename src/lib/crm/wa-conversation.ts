@@ -108,7 +108,7 @@ export async function handleAgentMessage(
       case 'awaiting_prices':
         return handlePrices(agent, state, text);
       case 'awaiting_create_confirm':
-        return handleCreateConfirm(agent, state, text);
+        return handleCreateConfirm(agent, state, text, waId);
     }
   }
 
@@ -545,7 +545,7 @@ export async function interpretConfirmReply(
 }
 
 /** After pricing, the agent confirms (free-form, model-in-context) whether to issue. */
-async function handleCreateConfirm(agent: WaAgent, state: any, text: string | null): Promise<AgentMessageResult> {
+async function handleCreateConfirm(agent: WaAgent, state: any, text: string | null, waId: string = ''): Promise<AgentMessageResult> {
   const pending: PendingDeal[] = state.context?.pending || [];
   const { decision, reply } = await interpretConfirmReply(text || '', pending);
 
@@ -556,8 +556,9 @@ async function handleCreateConfirm(agent: WaAgent, state: any, text: string | nu
   }
   if (decision === 'amend') {
     // free-form change → re-plan the message in context (may re-price / re-target).
+    // Pass the real waId so a document_brief re-route has a resolvable sender.
     await resetState(agent.id);
-    return runBrain(agent, '', text || '');
+    return runBrain(agent, waId, text || '');
   }
   if (decision === 'unclear') {
     return needMore(reply || `ליצור ${pending.length > 1 ? pending.length + ' הצעות' : 'הצעת מחיר'} ולשלוח קישור? (כן/לא)`);
