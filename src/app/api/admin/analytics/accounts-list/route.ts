@@ -21,7 +21,10 @@ export async function GET() {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const rows = (data || []).map((a) => {
+  const rows = (data || [])
+    // Exclude agent-CRM roster talents (config.crmOnly) — represented influencers, not Bestie accounts.
+    .filter((a) => ((a.config || {}) as Record<string, any>).crmOnly !== true)
+    .map((a) => {
     const cfg = (a.config || {}) as Record<string, any>;
     return {
       id: a.id,

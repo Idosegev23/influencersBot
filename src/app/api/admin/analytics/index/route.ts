@@ -73,7 +73,10 @@ export async function GET(_req: NextRequest) {
     dates.push(new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
   }
 
-  const rows = (accountsRes.data || []).map((a) => {
+  const rows = (accountsRes.data || [])
+    // Exclude agent-CRM roster talents (config.crmOnly) — not Bestie accounts.
+    .filter((a) => ((a.config || {}) as Record<string, any>).crmOnly !== true)
+    .map((a) => {
     const cfg = (a.config || {}) as Record<string, any>;
     const seriesMap = seriesByAccount.get(a.id) || new Map<string, number>();
     const spark = dates.map((d) => seriesMap.get(d) || 0);

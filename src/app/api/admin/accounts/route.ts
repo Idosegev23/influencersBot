@@ -54,8 +54,13 @@ export async function GET() {
       );
     }
 
-    // Transform to match old influencer format for backward compatibility
-    const transformed = (accounts || []).map((account: any) => {
+    // Transform to match old influencer format for backward compatibility.
+    // Exclude agent-CRM roster talents (config.crmOnly): they are an agent's represented
+    // influencers, NOT Bestie accounts — they get no scan/persona/widget and must not
+    // pollute the admin accounts list. (Same discriminator daily-scan filters on.)
+    const transformed = (accounts || [])
+      .filter((account: any) => (account.config as any)?.crmOnly !== true)
+      .map((account: any) => {
       const config = account.config || {};
       const persona = account.chatbot_persona?.[0];
       
