@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useScanNotifications } from '@/components/admin/useScanNotifications';
 
 // One row from GET /api/admin/scans (shape mirrors that route's response).
 interface ScanRow {
@@ -54,6 +55,9 @@ function fmtAgo(ms: number): string {
 export default function ScansDashboard() {
   const [scans, setScans] = useState<ScanRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { notify, Toasts } = useScanNotifications();
+  // Last-seen status per jobId — lets us fire a notification when a job flips terminal.
+  const prevStatusesRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
     let alive = true;
@@ -80,8 +84,27 @@ export default function ScansDashboard() {
     return () => { alive = false; };
   }, []);
 
+  // Notify for any job that flipped to a terminal state since the previous poll.
+  // First poll seeds prevStatusesRef, so pre-finished jobs don't spuriously notify.
+  useEffect(() => {
+    if (!scans) return;
+    const prev = prevStatusesRef.current;
+    const next: Record<string, string> = {};
+    for (const s of scans) {
+      const before = prev[s.jobId];
+      next[s.jobId] = s.status;
+      if (before && before !== s.status) {
+        if (s.status === 'succeeded') notify('הסריקה הושלמה', s.name);
+        else if (s.status === 'failed') notify('הסריקה נכשלה', s.name);
+      }
+    }
+    prevStatusesRef.current = next;
+  }, [scans, notify]);
+
   return (
-    <div className="max-w-3xl mx-auto" dir="rtl">
+    <>
+      {Toasts}
+      <div className="max-w-3xl mx-auto" dir="rtl">
       <div className="neon-card p-5 sm:p-8">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight" style={{ color: '#1f2937' }}>
@@ -176,6 +199,7 @@ export default function ScansDashboard() {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </>
   );
 }

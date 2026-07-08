@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { SCAN_STEPS } from '@/lib/pipeline/progress';
+import { useScanNotifications } from '@/components/admin/useScanNotifications';
 
 // Hebrew labels for the 9 pipeline steps (mirrors ScansDashboard's STEP_LABELS).
 const STEP_LABELS: Record<string, string> = {
@@ -71,6 +72,9 @@ export default function StepBoard({ jobId }: { jobId: string }) {
   // smoothly between the 2.5s polls instead of freezing.
   const polledAtRef = useRef<number>(Date.now());
   const [, setTick] = useState(0);
+  const { notify, Toasts } = useScanNotifications();
+  // Previous poll's status — used to fire a notification exactly on the terminal flip.
+  const prevStatusRef = useRef<string | null>(null);
 
   // Poll the live status route. Restarts when retryNonce bumps (after a retry).
   useEffect(() => {
@@ -112,6 +116,21 @@ export default function StepBoard({ jobId }: { jobId: string }) {
     return () => clearInterval(id);
   }, [data]);
 
+  // Notify once when the scan flips to a terminal state during polling. The first
+  // poll seeds prevStatusRef (null → skip), so an already-finished scan opened
+  // fresh does not spuriously notify.
+  useEffect(() => {
+    if (!data) return;
+    const prev = prevStatusRef.current;
+    const cur = data.status;
+    if (prev && prev !== cur) {
+      const name = meta?.name || meta?.username || jobId;
+      if (cur === 'succeeded') notify('הסריקה הושלמה', name);
+      else if (cur === 'failed') notify('הסריקה נכשלה', name);
+    }
+    prevStatusRef.current = cur;
+  }, [data, meta, jobId, notify]);
+
   async function handleRetry(step: string) {
     setRetrying(true);
     try {
@@ -150,7 +169,9 @@ export default function StepBoard({ jobId }: { jobId: string }) {
   const title = meta?.name || meta?.username || jobId;
 
   return (
-    <div className="max-w-2xl mx-auto" dir="rtl">
+    <>
+      {Toasts}
+      <div className="max-w-2xl mx-auto" dir="rtl">
       <div className="neon-card p-5 sm:p-8">
         {/* Header */}
         <div className="flex items-center justify-between gap-3 mb-4">
@@ -293,6 +314,7 @@ export default function StepBoard({ jobId }: { jobId: string }) {
           </Link>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
