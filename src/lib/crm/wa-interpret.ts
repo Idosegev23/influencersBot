@@ -7,6 +7,7 @@
 const YES_WORDS = new Set([
   'כן', 'בטח', 'בסדר', 'סבבה', 'כמובן', 'אישור', 'מאשר', 'נכון', 'יאללה', 'בטוח', 'אוקיי', 'אוקי', 'נבנה',
   'ok', 'okay', 'yes', 'yep', 'yeah', 'בנה', 'תבנה', 'תבני', 'לבנות', 'שלח', 'שלחי', 'תשלח', 'תשלחי', 'לשלוח',
+  'תעשה', 'תעשי', 'עשה', 'קדימה', 'אפשר', 'צור', 'תוציא', 'אשר', 'בוא', 'נמשיך', 'ליצור', 'תבצע', 'go', 'sure',
 ]);
 const NO_WORDS = new Set(['לא', 'ביטול', 'בטל', 'עזוב', 'לאו', 'no', 'nope', 'not']);
 
@@ -51,4 +52,19 @@ export function interpretPricing(text: string, deliverableCount: number): Pricin
   if (deliverableCount > 1 && nums.length === deliverableCount) return { mode: 'per_line', prices: nums };
   if (nums.length === 1) return { mode: 'total', total: nums[0] };
   return { mode: 'unclear' };
+}
+
+/**
+ * Is the agent asking to RETRIEVE an existing quote's link ("תן לי את ההצעה של X")?
+ * Must NOT match a forwarded brief (which says "תשלחו הצעה" to the agency, is long,
+ * and often names a sum) — a false positive would hijack the brief away from being
+ * documented. So: short, addressed to the bot ("...לי"), and carrying NO price.
+ */
+export function isRetrievalRequest(text: string): boolean {
+  const t = (text || '').trim();
+  if (t.length > 90) return false;
+  if (extractNumbers(t).some((n) => n >= 1000)) return false;
+  const verb = /תן לי|שלח לי|שלחי לי|תשלח לי|תביא לי|הבא לי|איפה ה|מה עם ה/.test(t);
+  const obj = /הצעה|הצעת מחיר|קישור|חתימה/.test(t);
+  return verb && obj;
 }

@@ -8,7 +8,7 @@ import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { ingestQuote } from '@/lib/crm/quote-ingest';
 import { createQuote, issueQuote, signUrlFor } from '@/lib/crm/quotes';
 import { computeTotals, lineItemsToDeliverables, type LineItem } from '@/lib/crm/pricing';
-import { interpretYesNo, interpretPricing } from '@/lib/crm/wa-interpret';
+import { interpretYesNo, interpretPricing, isRetrievalRequest } from '@/lib/crm/wa-interpret';
 
 export interface WaAgent {
   id: string;
@@ -69,6 +69,10 @@ export async function handleAgentMessage(
   const hasAttach = (attachments || []).length > 0;
   const idle = !state.stage || state.stage === 'idle' || state.stage === 'quote_sent';
 
+  // 0) A voice note whose transcription failed/returned empty arrives as isVoice with no
+  //    text. Never document it as an empty brief — ask for a resend.
+  if (opts.isVoice && !text) return 'לא הצלחתי להבין את ההקלטה 🙏 אפשר לשלוח שוב?';
+
   // 1) Retrieval — "תן לי את ההצעה של X" returns an existing quote link. Runs
   //    first (text or transcribed voice) so it isn't misread as a new brief or a
   //    pricing command. Idle + no attachment only, so it can't hijack a reply.
@@ -90,6 +94,8 @@ export async function handleAgentMessage(
 
   // 4) Mid-flow reply.
   switch (state.stage) {
+    case 'awaiting_talent':
+      return handleTalentReply(agent, state, text);
     case 'awaiting_prices':
       return handlePrices(agent, state, text);
     case 'awaiting_create_confirm':
@@ -146,7 +152,7 @@ async function handlePrices(agent: WaAgent, state: any, text: string | null): Pr
 
   const rec = await recordDealFromBrief(agent, state.brief_id, state.context?.account_id, lineItems);
   await setState(agent.id, { stage: 'awaiting_create_confirm', context: { pending: [rec] } });
-  return `📝 עודכן: ${rec.clientName} · ${rec.brand} — ${rec.total.toLocaleString('en-US')} ₪ (+ מע״מ).\nליצור הצעת מחיר ולשלוח קישור לחתימה? (כן/לא)`;
+  return `📝 עודכן: ${rec.clientName} · ${rec.brand} — ${rec.subtotal.toLocaleString('en-US')} ₪ + מע״מ = ${rec.total.toLocaleString('en-US')} ₪.\nליצור הצעת מחיר ולשלוח קישור לחתימה? (כן/לא)`;
 }
 
 async function aiPricing(text: string, seed: Seed[]): Promise<LineItem[] | null> {
@@ -251,13 +257,17 @@ async function handleVoiceCommand(agent: WaAgent, waId: string, transcript: stri
     }
     const parsed = (brief.parsed_data as any) || {};
     const brand = parsed.brandName || brief.subject || 'מותג';
+    const seed = seedFromParsed(parsed);
     const accountId = (cmd.account_id && roster.find((r) => r.id === cmd.account_id)?.id) || brief.suggested_account_id || null;
     if (!accountId) {
+      // Missing talent → keep a follow-up stage so the agent's next reply (a name)
+      // resolves it and prices the deal, instead of resetting to idle (which would
+      // misroute the reply as a brand-new brief).
       pending.push(`• ${brand}: עבור מי ההצעה?`);
+      incomplete.push({ stage: 'awaiting_talent', brief_id: brief.id, deal_id: null, context: { brand, pricing: cmd.pricing, seed } });
       continue;
     }
     await supabaseAdmin.from('crm_inbound_messages').update({ suggested_account_id: accountId, brief_status: 'assigned' }).eq('id', brief.id);
-    const seed = seedFromParsed(parsed);
     const lineItems = buildLineItemsFromPricing(cmd.pricing, seed);
     if (!lineItems) {
       pending.push(`• ${brand}: מה המחיר?`);
@@ -270,7 +280,7 @@ async function handleVoiceCommand(agent: WaAgent, waId: string, transcript: stri
   // Recorded (documented) some deals → ask ONCE whether to issue quotes.
   if (recorded.length) {
     await setState(agent.id, { stage: 'awaiting_create_confirm', context: { pending: recorded } });
-    const list = recorded.map((r) => `• ${r.clientName} · ${r.brand}: ${r.total.toLocaleString('en-US')} ₪`).join('\n');
+    const list = recorded.map((r) => `• ${r.clientName} · ${r.brand}: ${r.subtotal.toLocaleString('en-US')} + מע״מ = ${r.total.toLocaleString('en-US')} ₪`).join('\n');
     let msg = `📝 עודכן:\n${list}\n\nליצור ${recorded.length > 1 ? recorded.length + ' הצעות מחיר' : 'הצעת מחיר'} ולשלוח קישור? (כן/לא)`;
     if (pending.length) msg += `\n\nצריך השלמה:\n${pending.join('\n')}`;
     return msg;
@@ -279,13 +289,15 @@ async function handleVoiceCommand(agent: WaAgent, waId: string, transcript: stri
   // Nothing recorded — one open follow-up → keep it active so a reply completes it.
   if (incomplete.length === 1) {
     await setState(agent.id, incomplete[0]);
-    return `${pending[0] || 'מה המחיר?'} (סכום כולל, או מחיר לכל שורה)`;
+    return incomplete[0].stage === 'awaiting_talent'
+      ? (pending[0] || 'עבור מי ההצעה?')
+      : `${pending[0] || 'מה המחיר?'} (סכום כולל, או מחיר לכל שורה)`;
   }
   await resetState(agent.id);
   return pending.length ? `צריך השלמה:\n${pending.join('\n')}` : ai.reply || 'לא הצלחתי להבין. אפשר לנסות שוב?';
 }
 
-type PendingDeal = { partnershipId: string; clientName: string; brand: string; total: number };
+type PendingDeal = { partnershipId: string; clientName: string; brand: string; subtotal: number; total: number };
 
 /** Brief's requested deliverables rendered in Hebrew (falls back to line items). */
 function briefDeliverablesOf(parsed: any, lineItems: LineItem[]): string[] {
@@ -345,7 +357,7 @@ async function recordDealFromBrief(agent: WaAgent, briefId: string, accountId: s
     .update({ deal_id: partnership.id, partnership_id: partnership.id, brief_status: 'priced' })
     .eq('id', briefId);
 
-  return { partnershipId: partnership.id, clientName, brand: brandName, total: totals.total };
+  return { partnershipId: partnership.id, clientName, brand: brandName, subtotal: totals.subtotal, total: totals.total };
 }
 
 /** Issue the quote (PDF + signature link) for an already-recorded deal. */
@@ -397,7 +409,7 @@ async function handleCreateConfirm(agent: WaAgent, state: any, text: string | nu
   for (const d of pending) {
     try {
       const r = await issueQuoteForDeal(agent, d.partnershipId);
-      links.push(`✅ ${r.clientName} · ${r.brand}: ${r.total.toLocaleString('en-US')} ₪\n${r.signUrl}`);
+      links.push(`✅ ${r.clientName} · ${r.brand}: ${r.total.toLocaleString('en-US')} ₪ כולל מע״מ\n${r.signUrl}`);
     } catch {
       links.push(`⚠️ ${d.clientName} · ${d.brand}: לא הצלחתי ליצור`);
     }
@@ -406,12 +418,27 @@ async function handleCreateConfirm(agent: WaAgent, state: any, text: string | nu
   return `הנה — שלח/י ללקוח:\n\n${links.join('\n\n')}`;
 }
 
-/** Heuristic: is the agent asking for an existing quote's link? */
-function isRetrievalRequest(text: string): boolean {
-  const t = (text || '').toLowerCase();
-  const verb = /תן לי|שלח לי|תשלח|הבא לי|תביא|איפה|תוציא|תעביר/.test(t);
-  const obj = /הצעה|הצעת מחיר|קישור|החתימה/.test(t);
-  return verb && obj;
+/** Reply that names the talent for a priced-but-unassigned voice command → record + ask. */
+async function handleTalentReply(agent: WaAgent, state: any, text: string | null): Promise<string> {
+  const ids = agent.managed_account_ids || [];
+  if (!ids.length) { await resetState(agent.id); return 'אין מיוצגים ברוסטר שלך.'; }
+  const { data: accts } = await supabaseAdmin.from('accounts').select('id, config').in('id', ids);
+  const q = (text || '').toLowerCase();
+  const match = (accts || []).find((a) => {
+    const n = String((a.config as any)?.display_name || (a.config as any)?.username || '').toLowerCase();
+    return n.length >= 2 && q.includes(n);
+  });
+  if (!match) return 'לא מצאתי מיוצג בשם הזה ברוסטר. נסה/י שם אחר.';
+  await supabaseAdmin.from('crm_inbound_messages').update({ suggested_account_id: match.id, brief_status: 'assigned' }).eq('id', state.brief_id);
+  const seed: Seed[] = state.context?.seed || [];
+  const lineItems = buildLineItemsFromPricing(state.context?.pricing, seed);
+  if (!lineItems) {
+    await setState(agent.id, { stage: 'awaiting_prices', context: { account_id: match.id, brand: state.context?.brand, seed } });
+    return `מעולה — ${(match.config as any)?.display_name || 'המיוצג'}. מה המחיר? (סכום כולל, או מחיר לכל שורה)`;
+  }
+  const rec = await recordDealFromBrief(agent, state.brief_id, match.id, lineItems);
+  await setState(agent.id, { stage: 'awaiting_create_confirm', context: { pending: [rec] } });
+  return `📝 עודכן: ${rec.clientName} · ${rec.brand} — ${rec.subtotal.toLocaleString('en-US')} ₪ + מע״מ = ${rec.total.toLocaleString('en-US')} ₪.\nליצור הצעת מחיר ולשלוח קישור? (כן/לא)`;
 }
 
 /** "תן לי את ההצעה של X" — return (issuing if needed) the sign link for X's latest deal. */

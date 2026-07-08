@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { interpretYesNo, extractNumbers, interpretPricing } from '@/lib/crm/wa-interpret';
+import { interpretYesNo, extractNumbers, interpretPricing, isRetrievalRequest } from '@/lib/crm/wa-interpret';
 
 describe('interpretYesNo', () => {
   it('yes variants', () => {
@@ -11,6 +11,28 @@ describe('interpretYesNo', () => {
   it('unclear', () => {
     expect(interpretYesNo('אולי מחר')).toBe('unclear');
     expect(interpretYesNo('')).toBe('unclear');
+  });
+  it('natural imperative affirmations (create-confirm)', () => {
+    for (const t of ['תעשה', 'תעשי', 'קדימה', 'אפשר', 'צור', 'תוציא', 'אשר']) expect(interpretYesNo(t)).toBe('yes');
+  });
+});
+
+describe('isRetrievalRequest', () => {
+  it('matches a real retrieval ask', () => {
+    for (const t of ['תן לי את ההצעה של אנה', 'שלח לי את הקישור של דני', 'איפה ההצעה של אנה?']) {
+      expect(isRetrievalRequest(t)).toBe(true);
+    }
+  });
+  it('does NOT match a forwarded brief that says "תשלחו הצעה" (the blocker)', () => {
+    expect(isRetrievalRequest('היי, אנה מוזמנת לקמפיין אופנה. נשמח שתשלחו הצעת מחיר.')).toBe(false);
+  });
+  it('does NOT match a pricing command carrying a sum', () => {
+    expect(isRetrievalRequest('תשלח הצעה לאנה 200000')).toBe(false);
+    expect(isRetrievalRequest('על הבריף של אנה תעדכן 200000')).toBe(false);
+  });
+  it('does NOT match plain chatter', () => {
+    expect(isRetrievalRequest('מה שלומך')).toBe(false);
+    expect(isRetrievalRequest('')).toBe(false);
   });
 });
 
