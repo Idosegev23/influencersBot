@@ -109,6 +109,13 @@ async function processOneInbound(agent: WaAgent, job: AgentJob): Promise<string 
     sttConfidence: isVoice ? sttConfidence : null,
     log: result.log,
   }).catch(() => {});
+  // Remember this turn (cheap append) so the next message can resolve follow-up references.
+  const userText = voiceText || job.textBody || '';
+  if (userText || result.reply) {
+    void import('@/lib/crm/agent-memory')
+      .then((m) => m.recordTurn(supabaseAdmin, agent.id, userText, result.reply || ''))
+      .catch(() => {});
+  }
   return result.outcome;
 }
 

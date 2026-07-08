@@ -14,11 +14,17 @@
 import { chatModel } from '@/lib/openai';
 import { laneModel } from '@/lib/llm/config';
 
+export type AgentTurn = { u: string; a: string };
 export type AgentMemory = {
   rollingSummary: string;
   lastResponseId: string | null;
   turnCount: number;
+  recentTurns: AgentTurn[];
 };
+
+// Keep the last few raw turns — enough to resolve an immediate reference ("כמה הצעתי לזה",
+// "והמחיר?", "תשנה את זה") without the lossy rolling summary.
+export const MAX_RECENT_TURNS = 6;
 
 /** Load an agent's rolling memory; returns empty defaults when no row exists yet. */
 export async function loadMemory(sb: any, agentId: string): Promise<AgentMemory> {
@@ -31,6 +37,7 @@ export async function loadMemory(sb: any, agentId: string): Promise<AgentMemory>
     rollingSummary: data?.rolling_summary || '',
     lastResponseId: data?.last_response_id || null,
     turnCount: data?.turn_count || 0,
+    recentTurns: Array.isArray(data?.recent_turns) ? data.recent_turns : [],
   };
 }
 
@@ -40,7 +47,26 @@ export async function saveMemory(sb: any, agentId: string, patch: Partial<AgentM
   if (patch.rollingSummary !== undefined) row.rolling_summary = patch.rollingSummary;
   if (patch.lastResponseId !== undefined) row.last_response_id = patch.lastResponseId;
   if (patch.turnCount !== undefined) row.turn_count = patch.turnCount;
+  if (patch.recentTurns !== undefined) row.recent_turns = patch.recentTurns;
   await sb.from('crm_agent_wa_memory').upsert(row, { onConflict: 'agent_id' });
+}
+
+/**
+ * Append one (user, assistant) turn to the agent's recent-turns buffer (cap MAX_RECENT_TURNS).
+ * Cheap — no LLM — so it runs on EVERY turn (price/document/answer/clarify), giving the front-door
+ * router the context to resolve follow-ups. Best-effort; a failure just means one lost turn.
+ */
+export async function recordTurn(sb: any, agentId: string, userMsg: string, assistantMsg: string): Promise<void> {
+  const u = String(userMsg || '').trim();
+  const a = String(assistantMsg || '').trim();
+  if (!u && !a) return;
+  try {
+    const mem = await loadMemory(sb, agentId);
+    const turns = [...mem.recentTurns, { u: u.slice(0, 600), a: a.slice(0, 600) }].slice(-MAX_RECENT_TURNS);
+    await saveMemory(sb, agentId, { recentTurns: turns });
+  } catch (e) {
+    console.warn('[agent-memory] recordTurn failed', e);
+  }
 }
 
 /**

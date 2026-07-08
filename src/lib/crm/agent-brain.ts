@@ -49,6 +49,7 @@ function systemPrompt(agent: WaAgent, memory: AgentMemory, roster: Roster): stri
     'אל תמציא מספרים — רק מה שכלי החזיר. אינך יכול לשלוח/להוציא/לשנות דבר; אם מבקשים פעולה כספית, אמור שצריך אישור בנתיב הכסף.',
     roster.length ? `מיוצגים ברוסטר — כשמסננים לפי מיוצג העבר את ה-id המדויק כ-talentId: ${JSON.stringify(roster)}` : '',
     memory.rollingSummary ? `הקשר שיחה: ${memory.rollingSummary}` : '',
+    memory.recentTurns?.length ? `שיחה אחרונה (החדש בסוף) — פענח ממנה הפניות כמו "זה"/"והמחיר?":\n${memory.recentTurns.map((t) => `סוכן: ${t.u}\nבסטי: ${t.a}`).join('\n')}` : '',
   ].filter(Boolean).join('\n');
 }
 

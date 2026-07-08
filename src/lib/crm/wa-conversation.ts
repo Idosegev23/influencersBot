@@ -142,7 +142,8 @@ export async function handleAgentMessage(
 /** Load the agent's live context the brain reasons over: open briefs, recent deals, roster. */
 async function loadBrainContext(agent: WaAgent) {
   const ids = agent.managed_account_ids || [];
-  const [briefsRes, dealsRes, acctsRes] = await Promise.all([
+  const { loadMemory } = await import('@/lib/crm/agent-memory');
+  const [briefsRes, dealsRes, acctsRes, memory] = await Promise.all([
     supabaseAdmin.from('crm_inbound_messages')
       .select('id, subject, raw_text, parsed_data, suggested_account_id, brief_status, deal_id')
       .eq('agent_id', agent.id).in('brief_status', ['new', 'assigned', 'priced'])
@@ -151,9 +152,10 @@ async function loadBrainContext(agent: WaAgent) {
       .select('id, account_id, brand_name, status, proposal_amount, contract_amount')
       .eq('agent_id', agent.id).order('created_at', { ascending: false }).limit(20),
     ids.length ? supabaseAdmin.from('accounts').select('id, config').in('id', ids) : Promise.resolve({ data: [] as any[] }),
+    loadMemory(supabaseAdmin, agent.id),
   ]);
   const roster = (acctsRes.data || []).map((a: any) => ({ id: a.id, name: (a.config as any)?.display_name || (a.config as any)?.username || '' }));
-  return { briefs: briefsRes.data || [], deals: dealsRes.data || [], roster };
+  return { briefs: briefsRes.data || [], deals: dealsRes.data || [], roster, memory };
 }
 
 /** LLM planner: free-form message + context → a single structured action. Returns null on failure. */
@@ -174,10 +176,16 @@ async function planFreeform(text: string, ctx: Awaited<ReturnType<typeof loadBra
     deal_id: d.id, talent: nameOf(d.account_id), talent_id: d.account_id,
     brand: d.brand_name, status: d.status, amount: d.contract_amount ?? d.proposal_amount,
   }));
+  // Recent conversation so a follow-up that refers back ("כמה הצעתי לזה", "והמחיר?", "תשנה את זה")
+  // resolves in context instead of asking a needless clarify. Newest turn is last.
+  const history = (ctx.memory?.recentTurns || []).map((t: any) => `סוכן: ${t.u}\nבסטי: ${t.a}`).join('\n');
   const instr =
     'אתה בסטי — עוזר אישי בוואטסאפ לסוכן משפיענים. הסוכן כותב בשפה חופשית בעברית. ' +
     'הבן את הכוונה והחזר פעולה אחת. אל תמציא נתונים. אל תחשב מספרים בעצמך. ' +
     'היה החלטי — העדף לבצע פעולה על פני לשאול; שאל רק כשחסר מידע קריטי שאי אפשר להסיק מההקשר. ' +
+    (ctx.memory?.rollingSummary ? `הקשר שיחה: ${ctx.memory.rollingSummary}. ` : '') +
+    (history ? `שיחה אחרונה (החדש בסוף):\n${history}\n` : '') +
+    'אם ההודעה מתייחסת למשהו מהשיחה האחרונה ("זה"/"כמה הצעתי לזה"/"והמחיר?"/"תשנה את זה") — פענח את המיוצג/המותג/העסקה מההיסטוריה ובצע; אל תבקש הבהרה כשאפשר להסיק מההקשר. ' +
     'החזר JSON נקי בלבד בפורמט: ' +
     '{"action":"answer"|"price"|"issue_quote"|"get_link"|"document_brief"|"clarify",' +
     '"reply":<string|null>,' +
