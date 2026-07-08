@@ -197,7 +197,7 @@ async function planFreeform(text: string, ctx: Awaited<ReturnType<typeof loadBra
     'analytics = שאלה שדורשת אגרגציה או היסטוריה מעבר להקשר שלמטה ("כמה עסקאות סה"כ חתמתי?","מה סך המכירות של ירדן?","הכנסות לפי חודש","כמה עמלה הרווחתי?") — אל תמלא reply; זה יופנה למנוע העובדות (SQL על כל ההיסטוריה). ' +
     'price = הסוכן נותן או מעדכן מחיר לבריף ("תמחר את אנה ב-200 אלף","לאנה 80 לרילס 50 לזכויות") — מלא commands (per_line לפי סדר ה-deliverables; 80=80000; "מאתיים אלף"=200000). ' +
     'אם ההודעה מזהה מיוצג + מחיר, תמחר — גם אם לא כתוב כל פרט. אם יש כמה בריפים זהים לאותו מיוצג ואותו מותג, זה אותו בריף כפול: בחר את הראשון ברשימה (האחרון בזמן) ותמחר, אל תשאל. ' +
-    'issue_quote = הסוכן מבקש במפורש לשלוח/להוציא הצעה ("שלח את ההצעה של אנה") — מלא target. ' +
+    'issue_quote = הסוכן מבקש להכין/ליצור/להוציא/לשלוח הצעה ("שלח/תכין/תוציא/צור/הכן את ההצעה של אנה") — מלא target (talent_id/brand מההקשר). עובד גם על עסקה שתומחרה מזמן (גם 20 הודעות אחרי); מצא אותה לפי המיוצג/המותג. ' +
     'get_link = הסוכן מבקש את הקישור הקיים ("תן לי את הקישור של אנה") — מלא target. ' +
     'document_brief = ההודעה עצמה היא בריף חדש שהועבר (בקשה ממותג, בד"כ טקסט ארוך עם תוצרים) — אין צורך ב-reply. ' +
     'clarify = רק כשבאמת אי אפשר להחליט — למשל למיוצג יש בריפים לכמה מותגים שונים וההודעה לא אומרת לאיזה. ב-reply דבר אנושית לחלוטין: לעולם אל תזכיר מזהים פנימיים (brief_id / account_id / id / שמות שדות) — שאל לפי שם המותג או הקמפיין ("לאיזה מותג — X או Y?"). ' +
@@ -609,19 +609,11 @@ async function handleCreateConfirm(agent: WaAgent, state: any, text: string | nu
     return runBrain(agent, waId, text || '');
   }
   if (decision === 'other') {
-    // An unrelated NEW request while a confirmation is pending must not be trapped as a
-    // yes/no. Handle it. If it was just an info answer (state untouched), keep the pending
-    // confirmation alive and remind at the end so a later "כן" still issues the quote.
-    const res = await runBrain(agent, waId, text || '');
-    const act = (res.log as any)?.plan_json?.action;
-    if (act === 'answer' || act === 'analytics') {
-      const who = pending[0]?.clientName || '';
-      const reminder = who
-        ? `\n\n(עדיין ממתין: ליצור ולשלוח את ההצעה של ${who}? כן/לא)`
-        : '\n\n(עדיין ממתין: ליצור ולשלוח את ההצעה? כן/לא)';
-      return { ...res, reply: `${res.reply || ''}${reminder}`.trim() };
-    }
-    return res; // a new action (price/document/issue) took over the flow
+    // The agent moved on to something else — DON'T nag. Silently drop the confirmation prompt.
+    // The deal stays priced+documented in the DB, so any time later (even 19 messages on) a
+    // "תכין/תשלח את ההצעה של X" retrieves it and issues the link. Just handle the new request.
+    await resetState(agent.id);
+    return runBrain(agent, waId, text || '');
   }
   if (decision === 'unclear') {
     return needMore(reply || `ליצור ${pending.length > 1 ? pending.length + ' הצעות' : 'הצעת מחיר'} ולשלוח קישור? (כן/לא)`);
