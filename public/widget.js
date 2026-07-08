@@ -1181,13 +1181,34 @@
   // ============================================
 
   function render() {
-    // Mobile: lock the host page's scroll while the chat is open (it's a
-    // full-screen takeover on phones) so the site doesn't scroll behind it and
-    // feel "stuck". Restored the moment the widget closes.
+    // Mobile: lock the host page's scroll while the chat is open (full-screen
+    // takeover on phones) so the site doesn't scroll behind it — and, when the
+    // keyboard opens, so the page can't scroll up and bleed through. iOS Safari
+    // IGNORES `overflow:hidden` on body for touch scrolling, so the only robust
+    // fix is to pin the body with `position:fixed` at the current scroll offset,
+    // then restore it (and the scroll position) on close. Guarded by a lock flag
+    // so we save the offset once on open, not on every re-render.
     try {
       var lockScroll = isOpen && window.innerWidth < 640 && config.enabled !== false;
-      document.documentElement.style.overflow = lockScroll ? 'hidden' : '';
-      document.body.style.overflow = lockScroll ? 'hidden' : '';
+      if (lockScroll && !window.__ibotScrollLocked) {
+        window.__ibotSavedScrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+        document.body.style.position = 'fixed';
+        document.body.style.top = (-window.__ibotSavedScrollY) + 'px';
+        document.body.style.left = '0';
+        document.body.style.right = '0';
+        document.body.style.width = '100%';
+        document.documentElement.style.overflow = 'hidden';
+        window.__ibotScrollLocked = true;
+      } else if (!lockScroll && window.__ibotScrollLocked) {
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.left = '';
+        document.body.style.right = '';
+        document.body.style.width = '';
+        document.documentElement.style.overflow = '';
+        window.scrollTo(0, window.__ibotSavedScrollY || 0);
+        window.__ibotScrollLocked = false;
+      }
     } catch (e) { /* */ }
     // Master switch (admin toggle): when disabled, render nothing at all.
     if (config.enabled === false) { try { container.innerHTML = ''; } catch (e) { /* */ } return; }
@@ -1407,7 +1428,7 @@
       renderToastHtml(pc) +
 
       // ---- Messages area (padding matches header 16px) ----
-      '<div id="ibot-messages" style="flex:1;min-height:0;overflow-y:auto;padding:12px 16px;direction:' + locale.dir + ';">' +
+      '<div id="ibot-messages" style="flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:12px 16px;direction:' + locale.dir + ';">' +
       msgsHtml +
       '</div>' +
 
