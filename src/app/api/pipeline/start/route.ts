@@ -27,15 +27,20 @@ export async function POST(req: Request) {
     maxPages = null,
     postsLimit = DEFAULT_SCAN_CONFIG.postsLimit,
     archetype = 'brand',
+    scanMode = 'full',
+    categories,
   } = body;
 
-  if (!username || !accountId) {
-    return NextResponse.json({ error: 'username and accountId required' }, { status: 400 });
+  // Website-only (quote) scans may omit the IG username — anchor on the site domain instead.
+  const uname = username || (websiteUrl ? new URL(websiteUrl).host : undefined);
+
+  if (!uname || !accountId) {
+    return NextResponse.json({ error: 'username (or websiteUrl) and accountId required' }, { status: 400 });
   }
 
   const repo = getScanJobsRepo();
   const job = await repo.create({
-    username,
+    username: uname,
     account_id: accountId,
     priority: 100,
     requested_by: 'admin:pipeline',
@@ -47,7 +52,7 @@ export async function POST(req: Request) {
     counts: {},
     cursors: {},
     websiteUrl,
-    options: { transcribe, maxPages, postsLimit, isDemo, archetype },
+    options: { transcribe, maxPages, postsLimit, isDemo, archetype, scanMode, categories },
   };
   await saveState(job.id, state);
   await publishStep({ jobId: job.id, step: 'create-account', batch: 0 });
