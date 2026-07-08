@@ -6,6 +6,15 @@ import type { Category } from '@/lib/pipeline/discover';
 
 type ScanMode = 'quote' | 'full';
 
+// A quote-mode (demo) account eligible for enrich-to-full — returned by
+// GET /api/admin/quote-accounts.
+interface QuoteAccount {
+  accountId: string;
+  display_name: string;
+  username: string | null;
+  website_url: string | null;
+}
+
 // Smart default page caps per category type (plan: products 50, articles/info 10, legal 0).
 function defaultCap(type: Category['type']): number {
   switch (type) {
@@ -46,6 +55,9 @@ export default function AddAccountPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [selections, setSelections] = useState<Record<string, number>>({});
 
+  // Regular (full) mode: existing quote/demo accounts available for enrich-to-full.
+  const [quoteAccounts, setQuoteAccounts] = useState<QuoteAccount[]>([]);
+
   useEffect(() => {
     fetch('/api/admin')
       .then((res) => res.json())
@@ -55,6 +67,16 @@ export default function AddAccountPage() {
       })
       .catch(() => router.push('/admin'));
   }, [router]);
+
+  // In full (regular) mode, load existing quote/demo accounts so the admin can
+  // enrich one to a full scan instead of starting from scratch.
+  useEffect(() => {
+    if (checkingAuth || scanMode !== 'full') return;
+    fetch('/api/admin/quote-accounts')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setQuoteAccounts(Array.isArray(data) ? data : (data?.accounts ?? [])))
+      .catch(() => setQuoteAccounts([]));
+  }, [checkingAuth, scanMode]);
 
   // Categories that will actually be crawled (cap > 0), and their total page budget.
   const selectedCategories = categories
@@ -187,6 +209,37 @@ export default function AddAccountPage() {
     }
   }
 
+  // Enrich an existing quote/demo account to a full scan: same accountId,
+  // scanMode 'full', no categories (⇒ full scope). Domain-anchored accounts
+  // stay website-only; IG-anchored ones run the full IG+web flow.
+  async function handleEnrich(acct: QuoteAccount) {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const startRes = await fetch('/api/pipeline/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId: acct.accountId,
+          username: acct.username || undefined,
+          websiteUrl: acct.website_url || undefined,
+          scanMode: 'full',
+          // no categories → full scope
+        }),
+      });
+      const startData = await startRes.json();
+      if (!startRes.ok || !startData.jobId) {
+        setError(startData.error || 'שגיאה בהפעלת הסריקה');
+        return;
+      }
+      router.push(`/admin/scan/${startData.jobId}`);
+    } catch {
+      setError('שגיאת רשת');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   if (checkingAuth) {
     return (
       <div className="flex items-center justify-center py-32">
@@ -237,6 +290,43 @@ export default function AddAccountPage() {
             דמו הצעת מחיר
           </button>
         </div>
+
+        {/* Regular mode: enrich an existing quote/demo account to a full scan */}
+        {scanMode === 'full' && quoteAccounts.length > 0 && (
+          <div className="mb-6 rounded-xl overflow-hidden" style={{ border: '1px solid #e5e7eb' }}>
+            <div className="p-3 text-sm font-bold" style={{ background: '#f9fafb', color: '#1f2937' }}>
+              עַבֵּה חשבון דמו קיים לסריקה מלאה
+            </div>
+            <div>
+              {quoteAccounts.map((a) => (
+                <div
+                  key={a.accountId}
+                  className="flex items-center justify-between gap-3 p-3"
+                  style={{ borderTop: '1px solid #f3f4f6' }}
+                >
+                  <div className="min-w-0">
+                    <div className="font-semibold truncate" style={{ color: '#1f2937' }}>{a.display_name}</div>
+                    <div className="text-xs truncate" style={{ color: '#9ca3af', direction: 'ltr' }}>
+                      {a.website_url || a.username || ''}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleEnrich(a)}
+                    disabled={isLoading}
+                    className="neon-pill px-4 py-2 text-sm font-semibold disabled:opacity-50 shrink-0"
+                    style={{ color: '#9334EB', border: '1px solid #9334EB' }}
+                  >
+                    עַבֵּה
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="p-2 text-center text-xs" style={{ background: '#f9fafb', color: '#6b7280' }}>
+              או מלא את הטופס למטה לסריקה מלאה חדשה
+            </div>
+          </div>
+        )}
 
         <div className="space-y-6">
           <div className="space-y-2">
