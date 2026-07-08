@@ -101,12 +101,18 @@ export const defaultCallModel: CallModel = async ({ instructions, input, toolRes
   try {
     // effort:'low' — tool selection + Hebrew summarization don't need deep reasoning.
     const { response } = await chatModel(instr, input, laneModel('qa'), { effort: 'low', timeoutMs: 45_000 });
-    const j = JSON.parse(String(response || '').replace(/```json|```/g, '').trim());
-    if (Array.isArray(j?.tools) && j.tools.length) {
-      return { toolCalls: j.tools.filter((t: any) => t?.name).map((t: any) => ({ name: t.name, args: t.args || {} })), text: null };
-    }
-    if (j?.tool?.name) return { toolCalls: [{ name: j.tool.name, args: j.tool.args || {} }], text: null }; // back-compat
-    return { toolCalls: [], text: j?.answer || String(response || '') };
+    const raw = String(response || '').replace(/```json|```/g, '').trim();
+    let j: any;
+    try { j = JSON.parse(raw); }
+    catch { return { toolCalls: [], text: raw }; } // not JSON → the model answered in plain Hebrew; pass it through
+    const rawTools = Array.isArray(j?.tools) ? j.tools : (j?.tool ? [j.tool] : []); // multi-tool or single, back-compat
+    const toolCalls = rawTools
+      .filter((t: any) => t && typeof t.name === 'string')
+      .map((t: any) => ({ name: t.name, args: t.args && typeof t.args === 'object' ? t.args : {} }));
+    if (toolCalls.length) return { toolCalls, text: null };
+    // No tool call → final answer. NEVER echo the raw JSON envelope (e.g. {"tools":[]} or a mis-shaped
+    // object) back to the WhatsApp user; empty text lets runAgentBrain use its graceful fallback.
+    return { toolCalls: [], text: typeof j?.answer === 'string' ? j.answer : '' };
   } catch {
     return { toolCalls: [], text: 'לא הצלחתי להפיק תשובה כרגע.' };
   }
