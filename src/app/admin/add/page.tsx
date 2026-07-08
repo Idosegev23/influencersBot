@@ -2,10 +2,33 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import type { Category } from '@/lib/pipeline/discover';
+
+type ScanMode = 'quote' | 'full';
+
+// Smart default page caps per category type (plan: products 50, articles/info 10, legal 0).
+function defaultCap(type: Category['type']): number {
+  switch (type) {
+    case 'products': return 50;
+    case 'articles': return 10;
+    case 'info': return 10;
+    case 'legal': return 0;
+    default: return 10;
+  }
+}
+
+const TYPE_LABEL: Record<Category['type'], string> = {
+  products: 'מוצרים',
+  articles: 'מאמרים',
+  info: 'מידע',
+  legal: 'משפטי',
+  other: 'אחר',
+};
 
 export default function AddAccountPage() {
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [scanMode, setScanMode] = useState<ScanMode>('full');
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [websiteUrl, setWebsiteUrl] = useState('');
@@ -18,6 +41,11 @@ export default function AddAccountPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Quote-mode discover state
+  const [discovering, setDiscovering] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selections, setSelections] = useState<Record<string, number>>({});
+
   useEffect(() => {
     fetch('/api/admin')
       .then((res) => res.json())
@@ -28,9 +56,76 @@ export default function AddAccountPage() {
       .catch(() => router.push('/admin'));
   }, [router]);
 
+  // Categories that will actually be crawled (cap > 0), and their total page budget.
+  const selectedCategories = categories
+    .filter((c) => (selections[c.pathPattern] ?? 0) > 0)
+    .map((c) => ({ pathPattern: c.pathPattern, cap: selections[c.pathPattern] }));
+  const totalPages = selectedCategories.reduce((sum, c) => sum + c.cap, 0);
+
+  function toggleCategory(cat: Category, checked: boolean) {
+    setSelections((prev) => ({
+      ...prev,
+      [cat.pathPattern]: checked
+        ? (prev[cat.pathPattern] > 0 ? prev[cat.pathPattern] : (defaultCap(cat.type) || 10))
+        : 0,
+    }));
+  }
+
+  function setCap(pathPattern: string, val: string) {
+    const n = Math.max(0, Math.floor(Number(val) || 0));
+    setSelections((prev) => ({ ...prev, [pathPattern]: n }));
+  }
+
+  async function handleDiscover() {
+    const site = websiteUrl.trim();
+    if (!site) { setError('יש להזין כתובת אתר'); return; }
+
+    setDiscovering(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/pipeline/discover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ websiteUrl: site }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'שגיאה בגילוי האתר'); return; }
+      if (data.noSitemap || !Array.isArray(data.categories) || data.categories.length === 0) {
+        setCategories([]);
+        setSelections({});
+        setError('לא נמצאו קטגוריות באתר (אין sitemap)');
+        return;
+      }
+      const cats: Category[] = data.categories;
+      setCategories(cats);
+      const init: Record<string, number> = {};
+      for (const c of cats) init[c.pathPattern] = defaultCap(c.type);
+      setSelections(init);
+    } catch {
+      setError('שגיאת רשת');
+    } finally {
+      setDiscovering(false);
+    }
+  }
+
   async function handleCreate() {
-    const trimmed = username.trim().replace(/^@/, '');
-    if (!trimmed) { setError('יש להזין username'); return; }
+    const igUsername = username.trim().replace(/^@/, '');
+    const site = websiteUrl.trim();
+
+    // The account row needs a username. Use the IG handle if present, else anchor on the site domain.
+    let accountUsername = igUsername;
+    if (!accountUsername && scanMode === 'quote' && site) {
+      try { accountUsername = new URL(site).host; } catch { setError('כתובת אתר לא תקינה'); return; }
+    }
+
+    if (scanMode === 'quote') {
+      if (!site) { setError('יש להזין כתובת אתר'); return; }
+      if (selectedCategories.length === 0) { setError('יש לבחור לפחות קטגוריה אחת'); return; }
+    } else if (!igUsername) {
+      setError('יש להזין username');
+      return;
+    }
+    if (!accountUsername) { setError('יש להזין username או כתובת אתר'); return; }
 
     setIsLoading(true);
     setError(null);
@@ -40,7 +135,7 @@ export default function AddAccountPage() {
       const res = await fetch('/api/admin/accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: trimmed, type: 'creator' }),
+        body: JSON.stringify({ username: accountUsername, type: 'creator' }),
       });
 
       const data = await res.json();
@@ -58,19 +153,22 @@ export default function AddAccountPage() {
         }).catch(() => {});
       }
 
-      // 3. Kick off the scan pipeline
+      // 3. Kick off the scan pipeline. In quote mode we pass scanMode + selected categories,
+      //    and omit the IG username so the start route domain-anchors (website-only scan).
       const startRes = await fetch('/api/pipeline/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          username: trimmed,
+          username: igUsername || undefined,
           accountId: data.accountId,
-          websiteUrl: websiteUrl.trim() || undefined,
+          websiteUrl: site || undefined,
           isDemo,
           transcribe,
           archetype,
           maxPages: maxPages ? Number(maxPages) : null,
           postsLimit: postsLimit ? Number(postsLimit) : undefined,
+          scanMode,
+          categories: scanMode === 'quote' ? selectedCategories : undefined,
         }),
       });
 
@@ -97,6 +195,10 @@ export default function AddAccountPage() {
     );
   }
 
+  const primaryDisabled = isLoading || (scanMode === 'quote'
+    ? selectedCategories.length === 0
+    : !username.trim());
+
   return (
     <div className="max-w-lg mx-auto">
       <div className="neon-card p-5 sm:p-10">
@@ -105,13 +207,41 @@ export default function AddAccountPage() {
             <span className="material-symbols-outlined text-[36px] sm:text-[48px]" style={{ color: '#9334EB' }}>person_add</span>
           </div>
           <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight mb-2" style={{ color: '#1f2937' }}>הוספת חשבון חדש</h1>
-          <p className="text-sm" style={{ color: '#4b5563' }}>הזן את פרטי החשבון וההפעלה תתחיל סריקה מלאה אוטומטית</p>
+          <p className="text-sm" style={{ color: '#4b5563' }}>
+            {scanMode === 'quote'
+              ? 'דמו מהיר להצעת מחיר — בוחרים חלק מהאתר וסורקים אותו בלבד'
+              : 'הזן את פרטי החשבון וההפעלה תתחיל סריקה מלאה אוטומטית'}
+          </p>
+        </div>
+
+        {/* Mode selector */}
+        <div className="flex gap-1 p-1 rounded-xl mb-6" style={{ background: '#f3f4f6' }}>
+          <button
+            type="button"
+            onClick={() => setScanMode('full')}
+            className="flex-1 py-2 rounded-lg text-sm font-bold transition-colors"
+            style={scanMode === 'full'
+              ? { background: '#ffffff', color: '#1f2937', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }
+              : { background: 'transparent', color: '#6b7280' }}
+          >
+            סריקה מלאה
+          </button>
+          <button
+            type="button"
+            onClick={() => setScanMode('quote')}
+            className="flex-1 py-2 rounded-lg text-sm font-bold transition-colors"
+            style={scanMode === 'quote'
+              ? { background: '#ffffff', color: '#9334EB', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }
+              : { background: 'transparent', color: '#6b7280' }}
+          >
+            דמו הצעת מחיר
+          </button>
         </div>
 
         <div className="space-y-6">
           <div className="space-y-2">
             <label className="block text-sm font-semibold mr-2" style={{ color: '#1f2937' }}>
-              שם משתמש
+              שם משתמש{scanMode === 'quote' && <span className="font-normal" style={{ color: '#817a6c' }}> (אופציונלי)</span>}
             </label>
             <input
               type="text"
@@ -139,7 +269,9 @@ export default function AddAccountPage() {
 
           <div className="space-y-2">
             <label className="block text-sm font-semibold mr-2" style={{ color: '#1f2937' }}>
-              כתובת אתר <span className="font-normal" style={{ color: '#817a6c' }}>(אופציונלי)</span>
+              כתובת אתר {scanMode === 'quote'
+                ? <span className="font-normal" style={{ color: '#817a6c' }}>(חובה לדמו)</span>
+                : <span className="font-normal" style={{ color: '#817a6c' }}>(אופציונלי)</span>}
             </label>
             <input
               type="text"
@@ -150,6 +282,91 @@ export default function AddAccountPage() {
               style={{ direction: 'ltr' }}
             />
           </div>
+
+          {/* Quote-mode discover + category table */}
+          {scanMode === 'quote' && (
+            <div className="space-y-4">
+              <button
+                type="button"
+                onClick={handleDiscover}
+                disabled={discovering || !websiteUrl.trim()}
+                className="neon-pill w-full flex items-center justify-center gap-2 py-3 font-semibold text-sm disabled:opacity-50"
+                style={{ color: '#9334EB', border: '1px solid #9334EB' }}
+              >
+                {discovering ? (
+                  <>
+                    <span>מגלה מה יש באתר...</span>
+                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-[18px]">travel_explore</span>
+                    <span>גלה מה יש באתר</span>
+                  </>
+                )}
+              </button>
+
+              {categories.length > 0 && (
+                <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #e5e7eb' }}>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ background: '#f9fafb', color: '#6b7280' }}>
+                          <th className="p-2 text-center font-semibold">בחר</th>
+                          <th className="p-2 text-right font-semibold">קטגוריה</th>
+                          <th className="p-2 text-center font-semibold">סוג</th>
+                          <th className="p-2 text-center font-semibold">נמצאו</th>
+                          <th className="p-2 text-center font-semibold">מקס׳</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {categories.map((c) => {
+                          const cap = selections[c.pathPattern] ?? 0;
+                          const checked = cap > 0;
+                          return (
+                            <tr key={c.pathPattern} style={{ borderTop: '1px solid #f3f4f6' }}>
+                              <td className="p-2 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={(e) => toggleCategory(c, e.target.checked)}
+                                  className="w-4 h-4"
+                                />
+                              </td>
+                              <td className="p-2 text-right">
+                                <div className="font-semibold" style={{ color: '#1f2937' }}>{c.label}</div>
+                                <div className="text-xs" style={{ color: '#9ca3af', direction: 'ltr' }}>{c.pathPattern}</div>
+                              </td>
+                              <td className="p-2 text-center">
+                                <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: '#f3f4f6', color: '#6b7280' }}>
+                                  {TYPE_LABEL[c.type]}
+                                </span>
+                              </td>
+                              <td className="p-2 text-center" style={{ color: '#6b7280' }}>{c.count}</td>
+                              <td className="p-2 text-center">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={cap}
+                                  disabled={!checked}
+                                  onChange={(e) => setCap(c.pathPattern, e.target.value)}
+                                  className="neon-input w-16 text-center disabled:opacity-40"
+                                  style={{ direction: 'ltr', padding: '4px 6px' }}
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="p-2 text-center text-sm font-semibold" style={{ background: '#f9fafb', color: '#1f2937' }}>
+                    סה״כ עמודים לסריקה: {totalPages}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="space-y-2">
             <label className="block text-sm font-semibold mr-2" style={{ color: '#1f2937' }}>
@@ -245,16 +462,16 @@ export default function AddAccountPage() {
           <div className="pt-4">
             <button
               onClick={handleCreate}
-              disabled={isLoading || !username.trim()}
+              disabled={primaryDisabled}
               className="neon-pill neon-pill-primary w-full flex items-center justify-center gap-3 py-4 font-bold text-base disabled:opacity-50"
             >
               {isLoading ? (
                 <>
-                  <span>יוצר ומפעיל סריקה...</span>
+                  <span>{scanMode === 'quote' ? 'יוצר דמו...' : 'יוצר ומפעיל סריקה...'}</span>
                   <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                 </>
               ) : (
-                <span>צור והתחל סריקה</span>
+                <span>{scanMode === 'quote' ? 'התחל דמו' : 'צור והתחל סריקה'}</span>
               )}
             </button>
           </div>
