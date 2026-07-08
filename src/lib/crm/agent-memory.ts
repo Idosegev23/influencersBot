@@ -78,7 +78,7 @@ export async function applyRollingSummary(
   const { instructions, input } = buildSummaryPrompt(mem.rollingSummary, userMsg, assistantMsg);
   let summary = mem.rollingSummary;
   try {
-    const { response } = await chatModel(instructions, input, laneModel('qa'));
+    const { response } = await chatModel(instructions, input, laneModel('qa'), { effort: 'low', timeoutMs: 30_000 });
     if (response?.trim()) summary = response.trim();
   } catch {
     /* keep prior summary — a failed summarization must never erase context */

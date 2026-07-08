@@ -194,7 +194,9 @@ async function planFreeform(text: string, ctx: Awaited<ReturnType<typeof loadBra
     `בריפים פתוחים: ${JSON.stringify(briefSummary)}. עסקאות אחרונות: ${JSON.stringify(dealSummary)}. רוסטר מיוצגים: ${JSON.stringify(ctx.roster)}.`;
   try {
     const { chatModel } = await import('@/lib/openai');
-    const { response } = await chatModel(instr, text, laneModel('money'));
+    // Router + pricing EXTRACTION only — the number MATH is deterministic (normalizeAmount),
+    // so low effort is safe and turns a ~40s reasoning turn into ~10s.
+    const { response } = await chatModel(instr, text, laneModel('money'), { effort: 'low', timeoutMs: 45_000 });
     return JSON.parse(String(response || '').replace(/```json|```/g, '').trim());
   } catch {
     return null;

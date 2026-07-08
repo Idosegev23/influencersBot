@@ -489,11 +489,19 @@ export async function chat(
 export async function chatModel(
   instructions: string,
   input: string,
-  model: string
+  model: string,
+  opts: { timeoutMs?: number; effort?: 'minimal' | 'low' | 'medium' | 'high'; maxOutputTokens?: number } = {}
 ): Promise<{ response: string; responseId: string; model: string }> {
   const client = getClient();
+  const body: any = { model, instructions, input, store: true };
+  // reasoning models (gpt-5.x): effort:'low' cuts a ~40s deep-reasoning turn to ~10s. Safe for
+  // the agent router/brain — money MATH is deterministic in normalizeAmount, not the model.
+  if (opts.effort) body.reasoning = { effort: opts.effort };
+  if (opts.maxOutputTokens) body.max_output_tokens = opts.maxOutputTokens;
   try {
-    const response = await client.responses.create({ model, instructions, input, store: true });
+    // Per-request ceiling: the SDK default is 600s, which let a single hung agent turn block
+    // the per-agent lock for ~3.5min. Cap it + drop auto-retries from 2→1 so failures fail fast.
+    const response = await client.responses.create(body, { timeout: opts.timeoutMs ?? 90_000, maxRetries: 1 });
     return { response: response.output_text, responseId: response.id, model };
   } catch (error) {
     console.error(`Error in chatModel(${model}):`, error);

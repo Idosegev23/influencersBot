@@ -1,7 +1,8 @@
 import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { downloadMedia, sendText, sendReaction } from '@/lib/whatsapp-cloud/client';
 import { acquireAgentLock, releaseAgentLock } from '@/lib/crm/wa-locks';
-import { publishAgentJob, type AgentJob } from '@/lib/crm/wa-queue';
+import { publishAgentJob, publishDrain, type AgentJob } from '@/lib/crm/wa-queue';
+import { dequeueAgentMessage, agentQueueLength } from '@/lib/crm/wa-agent-queue';
 import { handleAgentMessage, type WaAgent } from '@/lib/crm/wa-conversation';
 import { reactionForOutcome, channelOf } from '@/lib/crm/wa-outcome';
 import { logAgentWa } from '@/lib/crm/wa-log';
@@ -11,6 +12,10 @@ import { redisGet, redisSetNx } from '@/lib/redis';
 // requeued burst messages enough attempts (10 × 3s ≈ 30s) to wait it out and process
 // SERIALLY, instead of exhausting retries and running degraded/concurrent.
 const MAX_REQUEUE = 10;
+
+// Stop draining ~70s before Vercel's 300s kill so the loop exits cleanly, releases the lock,
+// and re-enqueues a continuation — instead of being killed mid-item with the lock still held.
+const DRAIN_BUDGET_MS = 230_000;
 
 export async function loadAgentById(agentId: string): Promise<WaAgent | null> {
   const { data } = await supabaseAdmin
@@ -61,15 +66,83 @@ export async function materializeInbound(msg: any): Promise<{ attachments: any[]
 }
 
 /**
- * Process one enqueued agent inbound. Per-agent Redis mutex serializes a burst of
- * voice notes; on contention the job is re-enqueued with a short delay (approx FIFO)
- * up to MAX_REQUEUE, after which it runs degraded (the wa_message_id dedup + issue
- * idempotency remain the correctness backstops). ✅/⚠️ reaction is outcome-gated; every
- * message writes one crm_agent_wa_log row (Decision-Log moved here from the webhook).
+ * Process exactly one inbound (materialize → brain → reply → ✅/⚠️ reaction → Decision-Log row).
+ * The caller (the drain loop) already holds the per-agent lock, so this does NO locking. A
+ * wa_message_id "done" guard makes a re-delivery a no-op; the reply is sent BEFORE the guard is
+ * set so a crash between them just re-processes (no lost reply). Returns the outcome, or null if
+ * the guard short-circuited a duplicate.
+ */
+async function processOneInbound(agent: WaAgent, job: AgentJob): Promise<string | null> {
+  const doneKey = `wa:msg:${job.msg?.id}:done`;
+  try { if (job.msg?.id && (await redisGet(doneKey))) return null; } catch { /* ignore */ }
+
+  const startedAt = Date.now();
+  const { attachments, voiceText, isVoice, sttConfidence, sttProvider } = await materializeInbound(job.msg);
+  const result = await handleAgentMessage(agent, job.waId, voiceText || job.textBody, attachments, { isVoice, sttConfidence });
+  if (result.reply) {
+    await sendText({ to: job.waId, body: result.reply, contextMessageId: job.msg.id });
+    try { if (job.msg?.id) await redisSetNx(doneKey, '1', 900); } catch { /* ignore */ } // mark replied → dedup a retry
+    const emoji = reactionForOutcome(result.outcome);
+    if (emoji) void sendReaction({ to: job.waId, messageId: job.msg.id, emoji }).catch(() => {});
+  }
+  void logAgentWa({
+    messageId: job.msg.id,
+    agentId: agent.id,
+    channel: channelOf(job.msg),
+    transcript: voiceText || job.textBody || null,
+    outcome: result.outcome,
+    latencyMs: Date.now() - startedAt,
+    sttProvider: isVoice ? sttProvider : null,
+    sttConfidence: isVoice ? sttConfidence : null,
+    log: result.log,
+  }).catch(() => {});
+  return result.outcome;
+}
+
+/**
+ * Drain the agent's FIFO queue. ONE drain holds the per-agent lock and pops messages one-by-one
+ * in ARRIVAL ORDER — nothing merged, nothing dropped, no concurrency (so a brief is always recorded
+ * before a later message prices it). A concurrent drain that can't get the lock simply exits; the
+ * holder will pick up whatever it pushed. On hitting the time budget with items still queued, it
+ * re-enqueues a continuation (and closes the tiny release-race by re-checking the queue after unlock).
+ */
+export async function runAgentDrain(agentId: string): Promise<{ status: string; processed: number }> {
+  const locked = await acquireAgentLock(agentId);
+  if (!locked) return { status: 'busy', processed: 0 }; // another drain owns it → it'll drain our items
+
+  const deadline = Date.now() + DRAIN_BUDGET_MS;
+  let processed = 0;
+  try {
+    const agent = await loadAgentById(agentId);
+    if (!agent) return { status: 'no-agent', processed: 0 };
+    while (Date.now() < deadline) {
+      const job = await dequeueAgentMessage(agentId);
+      if (!job) break; // queue drained
+      try { await processOneInbound(agent, job); }
+      catch (e) { console.warn('[wa-drain] item failed (dropped, dedup+idempotency are the backstops)', e); }
+      processed++;
+    }
+  } catch (e) {
+    console.warn('[wa-drain] drain failed', e);
+  } finally {
+    await releaseAgentLock(agentId);
+  }
+
+  // Continuation (budget hit) OR release-race closer (a message pushed in the unlock window):
+  // if anything remains, wake a fresh drain. force=true → unique dedup id so QStash won't swallow it.
+  try {
+    if (await agentQueueLength(agentId) > 0) await publishDrain(agentId, { force: true });
+  } catch (e) { console.warn('[wa-drain] continuation publish failed', e); }
+
+  return { status: 'ok', processed };
+}
+
+/**
+ * LEGACY single-message path — kept only to drain any old-format {msg,...} jobs still in flight
+ * across a deploy. New inbounds go through the Redis FIFO queue + runAgentDrain. Safe to remove
+ * once no legacy jobs remain in QStash (~10 min after deploy).
  */
 export async function runAgentJob(job: AgentJob): Promise<{ status: string; outcome?: string }> {
-  // Worker-side dedup: a QStash redelivery (fn timeout AFTER we already replied) must not
-  // re-run the brain / re-send. Defensive — a Redis blip just means no dedup (safe).
   const doneKey = `wa:msg:${job.msg?.id}:done`;
   try { if (job.msg?.id && (await redisGet(doneKey))) return { status: 'duplicate' }; } catch { /* ignore */ }
 
@@ -79,32 +152,13 @@ export async function runAgentJob(job: AgentJob): Promise<{ status: string; outc
     await publishAgentJob({ ...job, attempt: attempt + 1 }, { delaySeconds: 3 });
     return { status: 'requeued' };
   }
-  const startedAt = Date.now();
   try {
     const agent = await loadAgentById(job.agentId);
     if (!agent) return { status: 'no-agent' };
-    const { attachments, voiceText, isVoice, sttConfidence, sttProvider } = await materializeInbound(job.msg);
-    const result = await handleAgentMessage(agent, job.waId, voiceText || job.textBody, attachments, { isVoice, sttConfidence });
-    if (result.reply) {
-      await sendText({ to: job.waId, body: result.reply, contextMessageId: job.msg.id });
-      try { if (job.msg?.id) await redisSetNx(doneKey, '1', 900); } catch { /* ignore */ } // mark replied → dedup a retry
-      const emoji = reactionForOutcome(result.outcome);
-      if (emoji) void sendReaction({ to: job.waId, messageId: job.msg.id, emoji }).catch(() => {});
-    }
-    void logAgentWa({
-      messageId: job.msg.id,
-      agentId: agent.id,
-      channel: channelOf(job.msg),
-      transcript: voiceText || job.textBody || null,
-      outcome: result.outcome,
-      latencyMs: Date.now() - startedAt,
-      sttProvider: isVoice ? sttProvider : null,
-      sttConfidence: isVoice ? sttConfidence : null,
-      log: result.log,
-    }).catch(() => {});
-    return { status: 'ok', outcome: result.outcome };
+    const outcome = await processOneInbound(agent, job);
+    return { status: 'ok', outcome: outcome ?? undefined };
   } catch (e) {
-    console.warn('[wa-worker] job failed', e);
+    console.warn('[wa-worker] legacy job failed', e);
     return { status: 'error' };
   } finally {
     if (locked) await releaseAgentLock(job.agentId);

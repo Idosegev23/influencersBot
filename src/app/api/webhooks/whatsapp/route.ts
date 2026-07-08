@@ -27,7 +27,8 @@ import { createClient } from '@/lib/supabase';
 import { isItamarSender, processItamarReply } from '@/lib/handoff/process-itamar-reply';
 import { routeInboundToTicket } from '@/lib/support/route-inbound';
 import { toWaId, sendReaction, sendTyping } from '@/lib/whatsapp-cloud/client';
-import { publishAgentJob } from '@/lib/crm/wa-queue';
+import { publishDrain } from '@/lib/crm/wa-queue';
+import { enqueueAgentMessage } from '@/lib/crm/wa-agent-queue';
 
 export const runtime = 'nodejs';          // need crypto + Buffer
 export const dynamic = 'force-dynamic';   // never cache
@@ -356,12 +357,19 @@ async function maybeEnqueueAgentJob(args: { waId: string; msg: any; textBody: st
   void sendReaction({ to: args.waId, messageId: args.msg.id, emoji: '👀' }).catch(() => {});
   void sendTyping(args.msg.id).catch(() => {});
 
+  const agentId = (agent as any).id;
+  // Push onto the per-agent FIFO queue (arrival order). A burst of 15 messages lands here
+  // seconds apart; a single drain worker then processes them one-by-one, in order, none dropped.
   try {
-    await publishAgentJob({ waId: args.waId, agentId: (agent as any).id, msg: args.msg, textBody: args.textBody });
+    await enqueueAgentMessage({ waId: args.waId, agentId, msg: args.msg, textBody: args.textBody });
   } catch (e) {
-    // publishAgentJob already retried 3×; a sustained QStash outage → don't drop silently.
-    console.error('[whatsapp webhook] failed to enqueue agent job (after retries)', e);
-    return false; // let support routing handle it as a visible last resort
+    // Redis unreachable → we can't even queue it → fall back to visible support routing.
+    console.error('[whatsapp webhook] failed to enqueue agent message', e);
+    return false;
   }
+  // Message is safely queued; wake the drain (bucket-dedup coalesces a burst to ~1 publish).
+  // If this throws, the message still gets picked up by the next inbound's drain — so don't fail.
+  try { await publishDrain(agentId); }
+  catch (e) { console.error('[whatsapp webhook] publishDrain failed (queued; next trigger will drain)', e); }
   return true;
 }

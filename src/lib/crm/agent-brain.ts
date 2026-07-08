@@ -36,7 +36,8 @@ export type CallModel = (req: {
   tools: typeof AGENT_TOOL_SCHEMAS;
 }) => Promise<ModelTurn>;
 
-const MAX_ITERS = 4;
+// One multi-tool turn + one answer turn covers the common case ("make order" = 2 tools at once).
+const MAX_ITERS = 3;
 
 type Roster = { id: string; name: string }[];
 
@@ -95,12 +96,16 @@ export const defaultCallModel: CallModel = async ({ instructions, input, toolRes
   const instr =
     `${instructions}\n\nכלים זמינים (READ-ONLY):\n${toolList}\n` +
     (prior ? `\nתוצאות שכבר קיבלת:\n${prior}\n` : '') +
-    `\nהחזר JSON נקי בלבד: לקריאת כלי — {"tool":{"name":"<שם>","args":{...}}} ; לתשובה סופית — {"answer":"<תשובה בעברית>"}. ` +
-    `העדף לענות ברגע שיש מספיק עובדות; אל תמציא מספרים.`;
+    `\nהחזר JSON נקי בלבד. לקריאת כלים — {"tools":[{"name":"<שם>","args":{...}}, ...]} (אפשר כמה בבת אחת כשצריך כמה חתכים, למשל list_open_briefs + list_unassigned יחד) ; לתשובה סופית — {"answer":"<תשובה בעברית>"}. ` +
+    `העדף להביא בפעם אחת את כל הכלים שתצטרך, ואז לענות; אל תמציא מספרים.`;
   try {
-    const { response } = await chatModel(instr, input, laneModel('qa'));
+    // effort:'low' — tool selection + Hebrew summarization don't need deep reasoning.
+    const { response } = await chatModel(instr, input, laneModel('qa'), { effort: 'low', timeoutMs: 45_000 });
     const j = JSON.parse(String(response || '').replace(/```json|```/g, '').trim());
-    if (j?.tool?.name) return { toolCalls: [{ name: j.tool.name, args: j.tool.args || {} }], text: null };
+    if (Array.isArray(j?.tools) && j.tools.length) {
+      return { toolCalls: j.tools.filter((t: any) => t?.name).map((t: any) => ({ name: t.name, args: t.args || {} })), text: null };
+    }
+    if (j?.tool?.name) return { toolCalls: [{ name: j.tool.name, args: j.tool.args || {} }], text: null }; // back-compat
     return { toolCalls: [], text: j?.answer || String(response || '') };
   } catch {
     return { toolCalls: [], text: 'לא הצלחתי להפיק תשובה כרגע.' };
