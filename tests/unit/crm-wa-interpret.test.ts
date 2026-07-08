@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { interpretYesNo, extractNumbers, interpretPricing, isRetrievalRequest, normalizeAmount, parseAmountText } from '@/lib/crm/wa-interpret';
+import { interpretYesNo, extractNumbers, interpretPricing, isRetrievalRequest, normalizeAmount, parseAmountText, isStateStale, normalizeHebrew, levenshtein, resolveTalent, classifyConfirm } from '@/lib/crm/wa-interpret';
 
 describe('interpretYesNo', () => {
   it('yes variants', () => {
@@ -101,5 +101,80 @@ describe('parseAmountText', () => {
   });
   it('no amount → null', () => {
     expect(parseAmountText('שלום מה קורה')).toBeNull();
+  });
+});
+
+describe('isStateStale', () => {
+  const T0 = Date.parse('2026-07-08T12:00:00Z');
+  it('fresh state (2 min old) is not stale', () => {
+    expect(isStateStale(new Date(T0 - 2 * 60_000).toISOString(), T0)).toBe(false);
+  });
+  it('state older than 30 min is stale', () => {
+    expect(isStateStale(new Date(T0 - 31 * 60_000).toISOString(), T0)).toBe(true);
+  });
+  it('missing/invalid timestamp is treated as stale', () => {
+    expect(isStateStale(null, T0)).toBe(true);
+    expect(isStateStale('not-a-date', T0)).toBe(true);
+  });
+  it('honours a custom ttl', () => {
+    expect(isStateStale(new Date(T0 - 90_000).toISOString(), T0, 60_000)).toBe(true);
+  });
+});
+
+describe('normalizeHebrew', () => {
+  it('strips niqqud/geresh, unifies final forms, trims', () => {
+    expect(normalizeHebrew('שָׁלוֹם')).toBe('שלומ'); // final mem → mem
+    expect(normalizeHebrew('מאורָ')).toBe('מאור');
+    expect(normalizeHebrew(' מָיָא ')).toBe('מיא');
+    expect(normalizeHebrew('דן')).toBe('דנ'); // final nun → nun
+    expect(normalizeHebrew('דן')).toBe(normalizeHebrew('דנ'));
+  });
+});
+
+describe('levenshtein', () => {
+  it('basic distances', () => {
+    expect(levenshtein('אנה', 'אנה')).toBe(0);
+    expect(levenshtein('אנה', 'אנא')).toBe(1);
+    expect(levenshtein('', 'abc')).toBe(3);
+  });
+});
+
+describe('resolveTalent', () => {
+  const roster = [
+    { id: 'a', name: 'אנה' },
+    { id: 'b', name: 'מאור' },
+    { id: 'c', name: 'דניאל כהן' },
+  ];
+  it('resolves an exact name embedded in a sentence', () => {
+    expect(resolveTalent('תעשה לאנה 80 אלף', roster)?.id).toBe('a');
+  });
+  it('resolves a misspelling via edit distance', () => {
+    expect(resolveTalent('תמחר לאנא', roster)?.id).toBe('a');
+  });
+  it('resolves by first name only', () => {
+    expect(resolveTalent('הקישור של דניאל', roster)?.id).toBe('c');
+  });
+  it('returns null when nothing is close', () => {
+    expect(resolveTalent('שלח לרון', roster)).toBeNull();
+  });
+  it('flags ambiguity between two near matches', () => {
+    const r2 = [{ id: 'x', name: 'דנה' }, { id: 'y', name: 'דני' }];
+    const m = resolveTalent('העסקה של דנ', r2);
+    expect(m?.ambiguous?.length).toBe(2);
+  });
+});
+
+describe('classifyConfirm', () => {
+  it('clear yes / no', () => {
+    expect(classifyConfirm('כן שלח')).toBe('yes');
+    expect(classifyConfirm('לא צריך')).toBe('no');
+  });
+  it('a new instruction is "other" (goes to the model / re-plan)', () => {
+    expect(classifyConfirm('רגע תשנה לאנה ל-90')).toBe('other');
+    expect(classifyConfirm('בעצם תמחר את דני 50')).toBe('other');
+  });
+  it('empty / vague is "other"', () => {
+    expect(classifyConfirm('')).toBe('other');
+    expect(classifyConfirm('אולי מחר')).toBe('other');
   });
 });

@@ -178,6 +178,106 @@ export function parseAmountText(text: string): { value: number; thousands: boole
   return null;
 }
 
+// ───────────────────────── P1: reliability + input helpers ─────────────────────────
+
+/** True when a state row is older than the TTL (default 30 min) or has no valid timestamp. */
+export function isStateStale(
+  updatedAt: string | Date | null | undefined,
+  now: number = Date.now(),
+  ttlMs: number = 30 * 60 * 1000,
+): boolean {
+  if (!updatedAt) return true;
+  const t = updatedAt instanceof Date ? updatedAt.getTime() : Date.parse(String(updatedAt));
+  if (!Number.isFinite(t)) return true;
+  return now - t > ttlMs;
+}
+
+const FINALS: Record<string, string> = { 'ך': 'כ', 'ם': 'מ', 'ן': 'נ', 'ף': 'פ', 'ץ': 'צ' };
+
+/** Normalize Hebrew for fuzzy matching: strip niqqud, unify final forms, drop punctuation, lowercase latin. */
+export function normalizeHebrew(s: string): string {
+  return String(s || '')
+    .replace(/[֑-ׇ]/g, '') // niqqud + cantillation
+    .replace(/['"`׳״]/g, '') // geresh/gershayim/quotes
+    .split('')
+    .map((ch) => FINALS[ch] || ch)
+    .join('')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Classic Levenshtein edit distance. */
+export function levenshtein(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  if (!m) return n;
+  if (!n) return m;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  let cur = new Array(n + 1).fill(0);
+  for (let i = 1; i <= m; i++) {
+    cur[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+    }
+    [prev, cur] = [cur, prev];
+  }
+  return prev[n];
+}
+
+export interface RosterEntry { id: string; name: string }
+export interface TalentMatch { id: string; name: string; score: number; ambiguous?: RosterEntry[] }
+
+function tokenSimilarity(qTok: string, nameTok: string): number {
+  if (!qTok || !nameTok) return 0;
+  if (qTok === nameTok) return 1;
+  if (nameTok.includes(qTok) || qTok.includes(nameTok)) return 0.9;
+  const dist = levenshtein(qTok, nameTok);
+  const maxLen = Math.max(qTok.length, nameTok.length);
+  return maxLen ? 1 - dist / maxLen : 0;
+}
+
+// Single-letter Hebrew prefixes (to/in/the/from/and/that/as) — "לאנה" → also try "אנה".
+const HE_PREFIX = /^[לבהמושכ]/;
+function tokenVariants(t: string): string[] {
+  return t.length >= 3 && HE_PREFIX.test(t) ? [t, t.slice(1)] : [t];
+}
+
+/**
+ * Fuzzy-resolve a talent from free-form Hebrew against the roster. Replaces the old
+ * `q.includes(name)`. Returns the best match (>=0.66) or null, flagging ambiguity
+ * when the runner-up is within 0.08 and also strong.
+ */
+export function resolveTalent(query: string, roster: RosterEntry[]): TalentMatch | null {
+  const qTokens = normalizeHebrew(query).split(' ').filter((t) => t.length >= 2);
+  if (!qTokens.length || !roster?.length) return null;
+  const scored = roster
+    .map((r) => {
+      const nameTokens = normalizeHebrew(r.name).split(' ').filter(Boolean);
+      let best = 0;
+      for (const nt of nameTokens) for (const qt of qTokens) for (const qv of tokenVariants(qt)) best = Math.max(best, tokenSimilarity(qv, nt));
+      return { id: r.id, name: r.name, score: best };
+    })
+    .sort((x, y) => y.score - x.score);
+  const top = scored[0];
+  if (!top || top.score < 0.66) return null;
+  const runner = scored[1];
+  if (runner && runner.score >= 0.66 && top.score - runner.score <= 0.08) {
+    return { ...top, ambiguous: [{ id: top.id, name: top.name }, { id: runner.id, name: runner.name }] };
+  }
+  return top;
+}
+
+/**
+ * Free-form confirm classifier for the read-back step. Only a CLEAN yes/no is
+ * decided here; anything else ('other') is handed to the model-in-context /
+ * re-planner so "תשנה לאנה ל-90" is understood as an amendment, not a "no".
+ */
+export function classifyConfirm(text: string): 'yes' | 'no' | 'other' {
+  const yn = interpretYesNo(text);
+  return yn === 'unclear' ? 'other' : yn;
+}
+
 /**
  * Is the agent asking to RETRIEVE an existing quote's link ("תן לי את ההצעה של X")?
  * Must NOT match a forwarded brief (which says "תשלחו הצעה" to the agency, is long,
