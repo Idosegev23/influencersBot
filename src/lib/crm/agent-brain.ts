@@ -38,11 +38,14 @@ export type CallModel = (req: {
 
 const MAX_ITERS = 4;
 
-function systemPrompt(agent: WaAgent, memory: AgentMemory): string {
+type Roster = { id: string; name: string }[];
+
+function systemPrompt(agent: WaAgent, memory: AgentMemory, roster: Roster): string {
   return [
     'אתה בסטי — עוזר READ-ONLY לסוכן משפיענים בוואטסאפ. ענה בעברית, קצר ומדויק.',
     'כלל ברזל: מספרים (כמה/סכום/רשימה) → כלי SQL (count_contracts/sum_sales/list_contracts/get_quote_details/talent_stats/pipeline_status/revenue_by_period). משמעות/תוכן → search_context. שילוב מותר.',
     'אל תמציא מספרים — רק מה שכלי החזיר. אינך יכול לשלוח/להוציא/לשנות דבר; אם מבקשים פעולה כספית, אמור שצריך אישור בנתיב הכסף.',
+    roster.length ? `מיוצגים ברוסטר — כשמסננים לפי מיוצג העבר את ה-id המדויק כ-talentId: ${JSON.stringify(roster)}` : '',
     memory.rollingSummary ? `הקשר שיחה: ${memory.rollingSummary}` : '',
   ].filter(Boolean).join('\n');
 }
@@ -53,10 +56,11 @@ export async function runAgentBrain(deps: {
   agent: WaAgent;
   text: string;
   memory: AgentMemory;
+  roster?: Roster;
 }): Promise<{ reply: string; toolCalls: ToolCall[]; modelUsed: string }> {
-  const { callModel, sb, agent, text, memory } = deps;
+  const { callModel, sb, agent, text, memory, roster = [] } = deps;
   const executed: ToolCall[] = [];
-  const instructions = systemPrompt(agent, memory);
+  const instructions = systemPrompt(agent, memory, roster);
   let lastText: string | null = null;
 
   for (let iter = 0; iter < MAX_ITERS; iter++) {
@@ -104,8 +108,15 @@ export const defaultCallModel: CallModel = async ({ instructions, input, toolRes
 
 /** Single entry the front-door calls for an advisory (read-only) question. Loads + updates memory. */
 export async function answerAgentQuestion(agent: WaAgent, text: string): Promise<{ reply: string; modelUsed: string }> {
+  const ids = agent.managed_account_ids || [];
+  const { data: accts } = ids.length
+    ? await supabaseAdmin.from('accounts').select('id, config').in('id', ids)
+    : { data: [] as any[] };
+  const roster = (accts || [])
+    .map((a: any) => ({ id: a.id, name: String((a.config as any)?.display_name || (a.config as any)?.username || '') }))
+    .filter((r: any) => r.name);
   const memory = await loadMemory(supabaseAdmin, agent.id);
-  const res = await runAgentBrain({ callModel: defaultCallModel, sb: supabaseAdmin, agent, text, memory });
+  const res = await runAgentBrain({ callModel: defaultCallModel, sb: supabaseAdmin, agent, text, memory, roster });
   applyRollingSummary(supabaseAdmin, agent.id, text, res.reply).catch(() => {});
   return { reply: res.reply, modelUsed: res.modelUsed };
 }
