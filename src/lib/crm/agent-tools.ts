@@ -123,6 +123,78 @@ export async function pipelineStatus(
   return { new: c('new') + c('assigned'), priced: c('priced'), sent: c('sent'), signed: c('signed') };
 }
 
+// Statuses that mean the brief is still "in the agent's inbox" (not yet a sent/signed quote).
+const OPEN_BRIEF_STATUSES = ['new', 'assigned', 'priced'];
+const snippet = (s: any, n = 140) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, n);
+const briefBrand = (pd: any, subject?: any) =>
+  (pd?.brand || pd?.brand_name || pd?.company || pd?.advertiser || subject || null) || null;
+
+/**
+ * List the OPEN briefs sitting in the agent's inbox (new/assigned/priced — not yet sent/signed),
+ * newest first, with brand + a text snippet + the matched talent name (if any) + whether it's
+ * already priced. This is the "what's on my plate" tool — pipeline_status gives counts, this gives
+ * the actual items. Talent names are resolved from accounts.config so the answer is human-readable.
+ */
+export async function listOpenBriefs(
+  sb: any,
+  agentId: string,
+  opts: { limit?: number } = {}
+): Promise<{ rows: { brand: string | null; snippet: string; status: string; talent: string | null; priced: boolean; date: string }[]; total: number }> {
+  const { data } = await sb.from('crm_inbound_messages')
+    .select('id, raw_text, subject, parsed_data, brief_status, suggested_account_id, partnership_id, deal_id, created_at')
+    .eq('agent_id', agentId)
+    .in('brief_status', OPEN_BRIEF_STATUSES)
+    .order('created_at', { ascending: false })
+    .limit(opts.limit ?? 25);
+  const rows = data || [];
+  // Resolve talent names in one shot (tenant-safe: ids come from this agent's own briefs).
+  const ids = Array.from(new Set(rows.map((r: any) => r.suggested_account_id).filter(Boolean)));
+  const nameById: Record<string, string> = {};
+  if (ids.length) {
+    const { data: accts } = await sb.from('accounts').select('id, config').in('id', ids);
+    for (const a of accts || []) nameById[a.id] = String((a.config as any)?.display_name || (a.config as any)?.username || '');
+  }
+  return {
+    rows: rows.map((r: any) => ({
+      brand: briefBrand(r.parsed_data, r.subject),
+      snippet: snippet(r.raw_text || r.subject),
+      status: r.brief_status,
+      talent: r.suggested_account_id ? (nameById[r.suggested_account_id] || null) : null,
+      priced: !!(r.partnership_id || r.deal_id),
+      date: (r.created_at || '').slice(0, 10),
+    })),
+    total: rows.length,
+  };
+}
+
+/**
+ * List briefs the agent hasn't been able to ASSOCIATE to a talent yet — "לא ברור למי לשייך".
+ * These are open briefs with no matched talent (suggested_account_id is null). Newest first.
+ */
+export async function listUnassigned(
+  sb: any,
+  agentId: string,
+  opts: { limit?: number } = {}
+): Promise<{ rows: { brand: string | null; snippet: string; status: string; date: string }[]; total: number }> {
+  const { data } = await sb.from('crm_inbound_messages')
+    .select('id, raw_text, subject, parsed_data, brief_status, created_at')
+    .eq('agent_id', agentId)
+    .in('brief_status', OPEN_BRIEF_STATUSES)
+    .is('suggested_account_id', null)
+    .order('created_at', { ascending: false })
+    .limit(opts.limit ?? 25);
+  const rows = data || [];
+  return {
+    rows: rows.map((r: any) => ({
+      brand: briefBrand(r.parsed_data, r.subject),
+      snippet: snippet(r.raw_text || r.subject),
+      status: r.brief_status,
+      date: (r.created_at || '').slice(0, 10),
+    })),
+    total: rows.length,
+  };
+}
+
 export async function revenueByPeriod(
   sb: any,
   agentId: string,
@@ -188,8 +260,12 @@ export const AGENT_TOOL_SCHEMAS = [
     parameters: { type: 'object', properties: { dealId: { type: 'string' }, talentId: { type: 'string' } } } },
   { name: 'talent_stats', description: 'סטטיסטיקות מיוצג: מספר עסקאות, חתומות, מכירות, ממוצע.',
     parameters: { type: 'object', properties: { talentId: { type: 'string' } }, required: ['talentId'] } },
-  { name: 'pipeline_status', description: 'תמונת פייפליין: חדשים/מתומחרים/נשלחו/נחתמו.',
+  { name: 'pipeline_status', description: 'תמונת פייפליין: כמה חדשים/מתומחרים/נשלחו/נחתמו (ספירות בלבד).',
     parameters: { type: 'object', properties: {} } },
+  { name: 'list_open_briefs', description: 'רשימת הבריפים הפתוחים שעל השולחן (חדש/משויך/מתומחר, טרם נשלחו/נחתמו) — מותג, תקציר, המיוצג המשויך, והאם כבר תומחר. זה הכלי ל"מה פתוח לי / תעשי לי סדר".',
+    parameters: { type: 'object', properties: { limit: { type: 'number' } } } },
+  { name: 'list_unassigned', description: 'בריפים פתוחים שעדיין לא ברור למי לשייך (אין מיוצג משויך) — מותג + תקציר. זה הכלי ל"אילו הצעות/בריפים לא ברור לשייך".',
+    parameters: { type: 'object', properties: { limit: { type: 'number' } } } },
   { name: 'revenue_by_period', description: 'הכנסות לפי חודש/שבוע.',
     parameters: { type: 'object', properties: { granularity: { type: 'string', enum: ['month', 'week'] }, sinceMonths: { type: 'number' } }, required: ['granularity'] } },
   { name: 'search_context', description: 'חיפוש סמנטי בבריפים/תמלולים/הצעות (משמעות ותוכן, לא מספרים).',
@@ -203,6 +279,8 @@ const DISPATCH: Record<string, (sb: any, agentId: string, args: any) => Promise<
   get_quote_details: (sb, a, x) => getQuoteDetails(sb, a, x),
   talent_stats: (sb, a, x) => talentStats(sb, a, x.talentId),
   pipeline_status: (sb, a) => pipelineStatus(sb, a),
+  list_open_briefs: (sb, a, x) => listOpenBriefs(sb, a, x),
+  list_unassigned: (sb, a, x) => listUnassigned(sb, a, x),
   revenue_by_period: (sb, a, x) => revenueByPeriod(sb, a, x),
   search_context: (sb, a, x) => searchContext(sb, a, x.query, x),
 };
