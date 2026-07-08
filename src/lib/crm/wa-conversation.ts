@@ -181,11 +181,13 @@ async function runBrain(agent: WaAgent, waId: string, text: string): Promise<str
 }
 
 /** Record priced commands (documented) then ask ONCE whether to issue the quote(s). */
-async function applyPricingCommands(agent: WaAgent, commands: any[], ctx: Awaited<ReturnType<typeof loadBrainContext>>): Promise<string> {
+async function applyPricingCommands(agent: WaAgent, commands: any, ctx: Awaited<ReturnType<typeof loadBrainContext>>): Promise<string> {
+  // The LLM sometimes collapses a single-element array to a bare object — normalize.
+  const list: any[] = Array.isArray(commands) ? commands : commands ? [commands] : [];
   const recorded: PendingDeal[] = [];
   const pending: string[] = [];
   const incomplete: any[] = [];
-  for (const cmd of commands) {
+  for (const cmd of list) {
     const brief = ctx.briefs.find((b) => b.id === cmd.brief_id);
     if (!brief) { pending.push('• בריף לא זוהה'); continue; }
     const parsed = (brief.parsed_data as any) || {};

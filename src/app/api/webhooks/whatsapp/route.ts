@@ -381,6 +381,7 @@ async function maybeHandleAgentQuote(args: {
   let voiceText: string | null = null;
   let isVoice = false;
   if (type === 'audio' && mediaId) {
+    isVoice = true; // set NOW so a transcription THROW still triggers the "resend" guard downstream
     try {
       const dl = await downloadMedia(mediaId);
       if (dl) {
@@ -390,7 +391,6 @@ async function maybeHandleAgentQuote(args: {
         const { parseAudioWithGemini } = await import('@/lib/ai-parser');
         const res: any = await parseAudioWithGemini({ file, documentType: 'quote', language: 'he' });
         voiceText = res?.transcription || res?.data?.transcription || null;
-        isVoice = true;
       }
     } catch (e) {
       console.warn('[agent voice] transcription failed', e);
