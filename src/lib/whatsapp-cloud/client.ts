@@ -254,6 +254,25 @@ export async function sendReaction(params: { to: string; messageId: string; emoj
 }
 
 // -----------------------------------------------------------------------
+// Typing indicator (official). Sending it also marks the message as read.
+// Auto-clears after ~25s or when the next message is sent. Requires a recent
+// inbound wamid. Gated by Graph API version — if it 400s, keep the 👀 reaction.
+// -----------------------------------------------------------------------
+export async function sendTyping(waMessageId: string): Promise<boolean> {
+  const { phoneNumberId } = getConfig();
+  const { ok } = await graphFetch(`/${phoneNumberId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      status: 'read',
+      message_id: waMessageId,
+      typing_indicator: { type: 'text' },
+    }),
+  });
+  return ok;
+}
+
+// -----------------------------------------------------------------------
 // Media download: two-step — fetch metadata then download bytes.
 // -----------------------------------------------------------------------
 export async function getMediaUrl(mediaId: string): Promise<string | null> {
