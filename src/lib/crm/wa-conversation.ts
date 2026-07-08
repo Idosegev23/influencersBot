@@ -8,7 +8,7 @@ import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { ingestQuote } from '@/lib/crm/quote-ingest';
 import { createQuote, issueQuote, signUrlFor } from '@/lib/crm/quotes';
 import { computeTotals, lineItemsToDeliverables, type LineItem } from '@/lib/crm/pricing';
-import { interpretYesNo, interpretPricing, isRetrievalRequest } from '@/lib/crm/wa-interpret';
+import { interpretYesNo, interpretPricing } from '@/lib/crm/wa-interpret';
 
 export interface WaAgent {
   id: string;
@@ -73,36 +73,182 @@ export async function handleAgentMessage(
   //    text. Never document it as an empty brief — ask for a resend.
   if (opts.isVoice && !text) return 'לא הצלחתי להבין את ההקלטה 🙏 אפשר לשלוח שוב?';
 
-  // 1) Retrieval — "תן לי את ההצעה של X" returns an existing quote link. Runs
-  //    first (text or transcribed voice) so it isn't misread as a new brief or a
-  //    pricing command. Idle + no attachment only, so it can't hijack a reply.
-  if (text && idle && !hasAttach && isRetrievalRequest(text)) {
-    const r = await handleRetrieve(agent, text);
-    if (r) return r;
+  // 1) Mid-flow reply → the stage machine owns short-lived confirmations / follow-ups
+  //    (so a "כן" to "ליצור?" is a confirmation, not a re-planned command).
+  if (!idle) {
+    switch (state.stage) {
+      case 'awaiting_talent':
+        return handleTalentReply(agent, state, text);
+      case 'awaiting_prices':
+        return handlePrices(agent, state, text);
+      case 'awaiting_create_confirm':
+        return handleCreateConfirm(agent, state, text);
+    }
   }
 
-  // 2) A fresh voice note is a holistic multi-brief PRICING command. A voice
-  //    reply to "create? (כן/לא)" or "what price?" is NOT fresh — it flows to the
-  //    stage machine below, so we don't auto-build/loop on a confirmation.
-  if (opts.isVoice && text && idle) {
-    const v = await handleVoiceCommand(agent, waId, text, state);
-    if (v !== undefined) return v;
+  // 2) A forwarded attachment (PDF / doc / image) is always a brief → document it.
+  if (hasAttach) return startBrief(agent, waId, text, attachments);
+
+  // 3) Fresh free-form message (text or transcribed voice) → the AI brain reads the
+  //    agent's live context, understands the intent, and executes the right action.
+  if (text) return runBrain(agent, waId, text);
+
+  return null;
+}
+
+// ───────────────────────── AI brain (free-form understanding) ─────────────────────────
+
+/** Load the agent's live context the brain reasons over: open briefs, recent deals, roster. */
+async function loadBrainContext(agent: WaAgent) {
+  const ids = agent.managed_account_ids || [];
+  const [briefsRes, dealsRes, acctsRes] = await Promise.all([
+    supabaseAdmin.from('crm_inbound_messages')
+      .select('id, subject, raw_text, parsed_data, suggested_account_id, brief_status, deal_id')
+      .eq('agent_id', agent.id).in('brief_status', ['new', 'assigned', 'priced'])
+      .order('created_at', { ascending: false }).limit(20),
+    supabaseAdmin.from('partnerships')
+      .select('id, account_id, brand_name, status, proposal_amount, contract_amount')
+      .eq('agent_id', agent.id).order('created_at', { ascending: false }).limit(20),
+    ids.length ? supabaseAdmin.from('accounts').select('id, config').in('id', ids) : Promise.resolve({ data: [] as any[] }),
+  ]);
+  const roster = (acctsRes.data || []).map((a: any) => ({ id: a.id, name: (a.config as any)?.display_name || (a.config as any)?.username || '' }));
+  return { briefs: briefsRes.data || [], deals: dealsRes.data || [], roster };
+}
+
+/** LLM planner: free-form message + context → a single structured action. Returns null on failure. */
+async function planFreeform(text: string, ctx: Awaited<ReturnType<typeof loadBrainContext>>): Promise<any | null> {
+  const nameOf = (id: string | null) => (id ? ctx.roster.find((r) => r.id === id)?.name || null : null);
+  const briefSummary = ctx.briefs.map((b) => {
+    const p = (b.parsed_data as any) || {};
+    return {
+      brief_id: b.id, brand: p.brandName || b.subject || 'מותג',
+      talent: nameOf(b.suggested_account_id), talent_id: b.suggested_account_id,
+      status: b.brief_status, priced: !!b.deal_id,
+      deliverables: seedFromParsed(p).map(deliverableLabel),
+      terms: Array.isArray(p.specialTerms) ? p.specialTerms : [],
+      summary: String(b.raw_text || '').slice(0, 400),
+    };
+  });
+  const dealSummary = ctx.deals.map((d) => ({
+    deal_id: d.id, talent: nameOf(d.account_id), talent_id: d.account_id,
+    brand: d.brand_name, status: d.status, amount: d.contract_amount ?? d.proposal_amount,
+  }));
+  const instr =
+    'אתה בסטי — עוזר אישי בוואטסאפ לסוכן משפיענים. הסוכן כותב בשפה חופשית בעברית. ' +
+    'הבן את הכוונה והחזר פעולה אחת. אל תמציא נתונים. אל תחשב מספרים בעצמך. ' +
+    'החזר JSON נקי בלבד בפורמט: ' +
+    '{"action":"answer"|"price"|"issue_quote"|"get_link"|"document_brief"|"clarify",' +
+    '"reply":<string|null>,' +
+    '"commands":[{"brief_id":<id>,"account_id":<talent_id|null>,"pricing":{"mode":"total"|"per_line","total":<number|null>,"prices":<number[]|null>}}],' +
+    '"target":{"talent_id":<id|null>,"deal_id":<id|null>,"brand":<string|null>}}. ' +
+    'מתי כל פעולה: ' +
+    'answer = הסוכן שואל שאלה על מידע קיים ("מה רצו בבריף של אנה?","מה הסטטוס של דני?","כמה בריפים פתוחים?") — נסח ב-reply תשובה מלאה ומדויקת מתוך ההקשר (deliverables, terms, סכומים, סטטוס). ' +
+    'price = הסוכן נותן או מעדכן מחיר לבריף ("תמחר את אנה ב-200 אלף","לאנה 80 לרילס 50 לזכויות") — מלא commands (per_line לפי סדר ה-deliverables; 80=80000; "מאתיים אלף"=200000). ' +
+    'issue_quote = הסוכן מבקש במפורש לשלוח/להוציא הצעה ("שלח את ההצעה של אנה") — מלא target. ' +
+    'get_link = הסוכן מבקש את הקישור הקיים ("תן לי את הקישור של אנה") — מלא target. ' +
+    'document_brief = ההודעה עצמה היא בריף חדש שהועבר (בקשה ממותג, בד"כ טקסט ארוך עם תוצרים) — אין צורך ב-reply. ' +
+    'clarify = לא ברור מה רוצים — שאל שאלה קצרה ב-reply. ' +
+    `בריפים פתוחים: ${JSON.stringify(briefSummary)}. עסקאות אחרונות: ${JSON.stringify(dealSummary)}. רוסטר מיוצגים: ${JSON.stringify(ctx.roster)}.`;
+  try {
+    const { chat } = await import('@/lib/openai');
+    const { response } = await chat(instr, text);
+    return JSON.parse(String(response || '').replace(/```json|```/g, '').trim());
+  } catch {
+    return null;
   }
+}
 
-  // 3) New inbound (attachment or idle text) = a brief → DOCUMENT it (no build).
-  if (hasAttach || idle) return startBrief(agent, waId, text, attachments);
+/** Front door for a fresh free-form message: plan the intent, then execute it. */
+async function runBrain(agent: WaAgent, waId: string, text: string): Promise<string | null> {
+  const ctx = await loadBrainContext(agent);
+  const plan = await planFreeform(text, ctx);
+  if (!plan || !plan.action) return startBrief(agent, waId, text, []); // planner failed → safest default: document
 
-  // 4) Mid-flow reply.
-  switch (state.stage) {
-    case 'awaiting_talent':
-      return handleTalentReply(agent, state, text);
-    case 'awaiting_prices':
-      return handlePrices(agent, state, text);
-    case 'awaiting_create_confirm':
-      return handleCreateConfirm(agent, state, text);
+  switch (plan.action) {
+    case 'answer':
+    case 'clarify':
+      return plan.reply || 'לא בטוח שהבנתי — אפשר לנסח שוב?';
+    case 'document_brief':
+      return startBrief(agent, waId, text, []);
+    case 'price':
+      return applyPricingCommands(agent, plan.commands || [], ctx);
+    case 'issue_quote':
+    case 'get_link':
+      return brainDealLink(agent, plan.target || {}, ctx);
     default:
-      return startBrief(agent, waId, text, attachments);
+      return startBrief(agent, waId, text, []);
   }
+}
+
+/** Record priced commands (documented) then ask ONCE whether to issue the quote(s). */
+async function applyPricingCommands(agent: WaAgent, commands: any[], ctx: Awaited<ReturnType<typeof loadBrainContext>>): Promise<string> {
+  const recorded: PendingDeal[] = [];
+  const pending: string[] = [];
+  const incomplete: any[] = [];
+  for (const cmd of commands) {
+    const brief = ctx.briefs.find((b) => b.id === cmd.brief_id);
+    if (!brief) { pending.push('• בריף לא זוהה'); continue; }
+    const parsed = (brief.parsed_data as any) || {};
+    const brand = parsed.brandName || brief.subject || 'מותג';
+    const seed = seedFromParsed(parsed);
+    const accountId = (cmd.account_id && ctx.roster.find((r) => r.id === cmd.account_id)?.id) || brief.suggested_account_id || null;
+    if (!accountId) {
+      pending.push(`• ${brand}: עבור מי ההצעה?`);
+      incomplete.push({ stage: 'awaiting_talent', brief_id: brief.id, deal_id: null, context: { brand, pricing: cmd.pricing, seed } });
+      continue;
+    }
+    await supabaseAdmin.from('crm_inbound_messages').update({ suggested_account_id: accountId, brief_status: 'assigned' }).eq('id', brief.id);
+    const lineItems = buildLineItemsFromPricing(cmd.pricing, seed);
+    if (!lineItems) {
+      pending.push(`• ${brand}: מה המחיר?`);
+      incomplete.push({ stage: 'awaiting_prices', brief_id: brief.id, deal_id: null, context: { account_id: accountId, brand, seed } });
+      continue;
+    }
+    recorded.push(await recordDealFromBrief(agent, brief.id, accountId, lineItems));
+  }
+  if (recorded.length) {
+    await setState(agent.id, { stage: 'awaiting_create_confirm', context: { pending: recorded } });
+    const list = recorded.map((r) => `• ${r.clientName} · ${r.brand}: ${r.subtotal.toLocaleString('en-US')} + מע״מ = ${r.total.toLocaleString('en-US')} ₪`).join('\n');
+    let msg = `📝 עודכן:\n${list}\n\nליצור ${recorded.length > 1 ? recorded.length + ' הצעות מחיר' : 'הצעת מחיר'} ולשלוח קישור? (כן/לא)`;
+    if (pending.length) msg += `\n\nצריך השלמה:\n${pending.join('\n')}`;
+    return msg;
+  }
+  if (incomplete.length === 1) {
+    await setState(agent.id, incomplete[0]);
+    return incomplete[0].stage === 'awaiting_talent' ? (pending[0] || 'עבור מי ההצעה?') : `${pending[0] || 'מה המחיר?'} (סכום כולל, או מחיר לכל שורה)`;
+  }
+  await resetState(agent.id);
+  return pending.length ? `צריך השלמה:\n${pending.join('\n')}` : 'לא הצלחתי להבין את התמחור. אפשר לנסות שוב?';
+}
+
+/** Resolve the agent's meant deal → return (issuing if needed) its sign link. */
+async function brainDealLink(agent: WaAgent, target: any, ctx: Awaited<ReturnType<typeof loadBrainContext>>): Promise<string> {
+  let dealId: string | null = target?.deal_id || null;
+  const talentId: string | null = target?.talent_id || null;
+  if (!dealId) {
+    const cached = ctx.deals.find((d) => (talentId && d.account_id === talentId) || (target?.brand && String(d.brand_name || '').includes(target.brand)));
+    dealId = cached?.id || null;
+  }
+  if (!dealId && talentId) {
+    const { data } = await supabaseAdmin.from('partnerships').select('id').eq('agent_id', agent.id).eq('account_id', talentId).order('created_at', { ascending: false }).limit(1).maybeSingle();
+    dealId = data?.id || null;
+  }
+  if (!dealId) {
+    const name = ctx.roster.find((r) => r.id === talentId)?.name || 'המיוצג';
+    return `אין עדיין עסקה מתומחרת ל-${name}. שלח/י תמחור ואבנה.`;
+  }
+  return dealLink(agent, dealId);
+}
+
+/** Latest signature for a deal → existing link, "signed", or issue a fresh one. */
+async function dealLink(agent: WaAgent, dealId: string): Promise<string> {
+  const { data: p } = await supabaseAdmin.from('partnerships').select('brand_name, account_id').eq('id', dealId).maybeSingle();
+  if (!p) return 'לא מצאתי את העסקה.';
+  const clientName = await accountName(p.account_id);
+  const { data: sig } = await supabaseAdmin.from('signature_requests').select('token, status').eq('partnership_id', dealId).order('created_at', { ascending: false }).limit(1).maybeSingle();
+  if (sig?.status === 'signed') return `ההצעה של ${clientName} · ${p.brand_name} כבר נחתמה ✓`;
+  const signUrl = sig?.token ? signUrlFor(sig.token) : (await issueQuoteForDeal(agent, dealId)).signUrl;
+  return `הצעת המחיר של ${clientName} · ${p.brand_name}:\n${signUrl}`;
 }
 
 async function startBrief(agent: WaAgent, waId: string, text: string | null, attachments: any[]): Promise<string | null> {
@@ -190,112 +336,6 @@ function buildLineItemsFromPricing(pricing: any, seed: Seed[]): LineItem[] | nul
   return null;
 }
 
-/**
- * Voice command — a spoken instruction that may hold MANY sub-commands, each for a
- * different brief ("for Miran at Argania 20,000; for Anna at Coca-Cola 80k; for
- * Maor at Superpharm 400 reels, 50,000 rights"). AI splits + maps each to a
- * brief + talent + price, then builds each quote. undefined → fall back.
- */
-async function handleVoiceCommand(agent: WaAgent, waId: string, transcript: string, _state: any): Promise<string | null | undefined> {
-  const { data: briefsRaw } = await supabaseAdmin
-    .from('crm_inbound_messages')
-    .select('id, subject, raw_text, parsed_data, suggested_account_id, brief_status')
-    .eq('agent_id', agent.id)
-    .in('brief_status', ['new', 'assigned'])
-    .is('deal_id', null)
-    .order('created_at', { ascending: false })
-    .limit(20);
-  const briefs = briefsRaw || [];
-
-  const ids = agent.managed_account_ids || [];
-  const { data: accts } = ids.length ? await supabaseAdmin.from('accounts').select('id, config').in('id', ids) : { data: [] as any[] };
-  const roster = (accts || []).map((a: any) => ({ id: a.id, name: (a.config as any)?.display_name || (a.config as any)?.username || '' }));
-
-  // No open brief → the voice message itself is a new brief.
-  if (!briefs.length) return startBrief(agent, waId, transcript, []);
-
-  const briefSummary = briefs.map((b) => {
-    const p = (b.parsed_data as any) || {};
-    const talent = b.suggested_account_id ? roster.find((r) => r.id === b.suggested_account_id)?.name || null : null;
-    return { brief_id: b.id, brand: p.brandName || b.subject || 'מותג', talent, deliverables: seedFromParsed(p).map(deliverableLabel) };
-  });
-
-  let ai: any = null;
-  try {
-    const { chat } = await import('@/lib/openai');
-    const instr =
-      'אתה מנוע הבנה של סוכן משפיענים. הסוכן שלח הודעה קולית מתומללת שיכולה להכיל כמה פקודות לכמה בריפים שונים. ' +
-      'לכל פקודה זהה: לאיזה בריף (לפי מותג/מיוצג), איזה מיוצג, ואיזה תמחור. החזר JSON בלבד ללא טקסט: ' +
-      '{"commands":[{"brief_id":<id>,"account_id":<talent id|null>,"pricing":{"mode":"total"|"per_line"|"none","total":<number|null>,"prices":<number[]|null>}}],"reply":<string|null>}. ' +
-      'per_line = מחיר לכל תוצר לפי סדר ה-deliverables של אותו בריף. ' +
-      'מספרים יכולים להיות מקוצרים (80 = 80000) או במילים (מאתיים אלף = 200000) — הבן לפי הקשר (מחירי משפיענים באלפים). ' +
-      'reply = שאלה מבהירה בעברית רק אם באמת אי אפשר להבין, אחרת null. ' +
-      `בריפים פתוחים: ${JSON.stringify(briefSummary)}. רוסטר: ${JSON.stringify(roster)}.`;
-    const { response } = await chat(instr, transcript);
-    ai = JSON.parse(String(response || '').replace(/```json|```/g, '').trim());
-  } catch {
-    return undefined;
-  }
-  if (!ai) return undefined;
-
-  const commands: any[] = Array.isArray(ai.commands) && ai.commands.length
-    ? ai.commands
-    : ai.brief_id
-    ? [{ brief_id: ai.brief_id, account_id: ai.account_id, pricing: ai.pricing }]
-    : [];
-  if (!commands.length) return ai.reply || 'לא הבנתי לאיזה בריף מדובר. אפשר שם המותג או המיוצג?';
-
-  const recorded: PendingDeal[] = [];
-  const pending: string[] = [];
-  const incomplete: any[] = [];
-
-  for (const cmd of commands) {
-    const brief = briefs.find((b) => b.id === cmd.brief_id);
-    if (!brief) {
-      pending.push('• בריף לא זוהה');
-      continue;
-    }
-    const parsed = (brief.parsed_data as any) || {};
-    const brand = parsed.brandName || brief.subject || 'מותג';
-    const seed = seedFromParsed(parsed);
-    const accountId = (cmd.account_id && roster.find((r) => r.id === cmd.account_id)?.id) || brief.suggested_account_id || null;
-    if (!accountId) {
-      // Missing talent → keep a follow-up stage so the agent's next reply (a name)
-      // resolves it and prices the deal, instead of resetting to idle (which would
-      // misroute the reply as a brand-new brief).
-      pending.push(`• ${brand}: עבור מי ההצעה?`);
-      incomplete.push({ stage: 'awaiting_talent', brief_id: brief.id, deal_id: null, context: { brand, pricing: cmd.pricing, seed } });
-      continue;
-    }
-    await supabaseAdmin.from('crm_inbound_messages').update({ suggested_account_id: accountId, brief_status: 'assigned' }).eq('id', brief.id);
-    const lineItems = buildLineItemsFromPricing(cmd.pricing, seed);
-    if (!lineItems) {
-      pending.push(`• ${brand}: מה המחיר?`);
-      incomplete.push({ stage: 'awaiting_prices', brief_id: brief.id, deal_id: null, context: { account_id: accountId, brand, seed } });
-      continue;
-    }
-    recorded.push(await recordDealFromBrief(agent, brief.id, accountId, lineItems));
-  }
-
-  // Recorded (documented) some deals → ask ONCE whether to issue quotes.
-  if (recorded.length) {
-    await setState(agent.id, { stage: 'awaiting_create_confirm', context: { pending: recorded } });
-    const list = recorded.map((r) => `• ${r.clientName} · ${r.brand}: ${r.subtotal.toLocaleString('en-US')} + מע״מ = ${r.total.toLocaleString('en-US')} ₪`).join('\n');
-    let msg = `📝 עודכן:\n${list}\n\nליצור ${recorded.length > 1 ? recorded.length + ' הצעות מחיר' : 'הצעת מחיר'} ולשלוח קישור? (כן/לא)`;
-    if (pending.length) msg += `\n\nצריך השלמה:\n${pending.join('\n')}`;
-    return msg;
-  }
-
-  // Nothing recorded — one open follow-up → keep it active so a reply completes it.
-  if (incomplete.length === 1) {
-    await setState(agent.id, incomplete[0]);
-    return incomplete[0].stage === 'awaiting_talent'
-      ? (pending[0] || 'עבור מי ההצעה?')
-      : `${pending[0] || 'מה המחיר?'} (סכום כולל, או מחיר לכל שורה)`;
-  }
-  await resetState(agent.id);
-  return pending.length ? `צריך השלמה:\n${pending.join('\n')}` : ai.reply || 'לא הצלחתי להבין. אפשר לנסות שוב?';
-}
 
 type PendingDeal = { partnershipId: string; clientName: string; brand: string; subtotal: number; total: number };
 
@@ -441,39 +481,3 @@ async function handleTalentReply(agent: WaAgent, state: any, text: string | null
   return `📝 עודכן: ${rec.clientName} · ${rec.brand} — ${rec.subtotal.toLocaleString('en-US')} ₪ + מע״מ = ${rec.total.toLocaleString('en-US')} ₪.\nליצור הצעת מחיר ולשלוח קישור? (כן/לא)`;
 }
 
-/** "תן לי את ההצעה של X" — return (issuing if needed) the sign link for X's latest deal. */
-async function handleRetrieve(agent: WaAgent, text: string): Promise<string | null> {
-  const ids = agent.managed_account_ids || [];
-  if (!ids.length) return null;
-  const { data: accts } = await supabaseAdmin.from('accounts').select('id, config').in('id', ids);
-  const q = (text || '').toLowerCase();
-  const talent = (accts || []).find((a) => {
-    const n = String((a.config as any)?.display_name || (a.config as any)?.username || '').toLowerCase();
-    return n.length >= 2 && q.includes(n);
-  });
-  if (!talent) return 'על איזה מיוצג ההצעה?';
-  const clientName = (talent.config as any)?.display_name || (talent.config as any)?.username || 'המיוצג';
-  const { data: deal } = await supabaseAdmin
-    .from('partnerships')
-    .select('id, brand_name')
-    .eq('agent_id', agent.id)
-    .eq('account_id', talent.id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (!deal) return `לא מצאתי עסקה מתומחרת ל-${clientName}. שלח/י תמחור ואבנה.`;
-  // Latest signature for this deal, ANY status. 'pending'/'opened' links are still
-  // live → return them (don't mint a duplicate). 'signed' → it's done. None → issue.
-  const { data: sig } = await supabaseAdmin
-    .from('signature_requests')
-    .select('token, status')
-    .eq('partnership_id', deal.id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (sig?.status === 'signed') return `ההצעה של ${clientName} · ${deal.brand_name} כבר נחתמה ✓`;
-  let signUrl: string;
-  if (sig?.token) signUrl = signUrlFor(sig.token);
-  else { const r = await issueQuoteForDeal(agent, deal.id); signUrl = r.signUrl; }
-  return `הצעת המחיר של ${clientName} · ${deal.brand_name}:\n${signUrl}`;
-}

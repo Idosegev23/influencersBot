@@ -236,6 +236,24 @@ export async function markAsRead(waMessageId: string): Promise<boolean> {
 }
 
 // -----------------------------------------------------------------------
+// React to an inbound message (👀 = "got it, working on it"). Empty emoji removes it.
+// -----------------------------------------------------------------------
+export async function sendReaction(params: { to: string; messageId: string; emoji: string }): Promise<boolean> {
+  const { phoneNumberId } = getConfig();
+  const { ok } = await graphFetch(`/${phoneNumberId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: toWaId(params.to),
+      type: 'reaction',
+      reaction: { message_id: params.messageId, emoji: params.emoji },
+    }),
+  });
+  return ok;
+}
+
+// -----------------------------------------------------------------------
 // Media download: two-step — fetch metadata then download bytes.
 // -----------------------------------------------------------------------
 export async function getMediaUrl(mediaId: string): Promise<string | null> {

@@ -26,7 +26,7 @@ import { verifyWhatsAppSignature } from '@/lib/whatsapp-cloud/signature';
 import { createClient } from '@/lib/supabase';
 import { isItamarSender, processItamarReply } from '@/lib/handoff/process-itamar-reply';
 import { routeInboundToTicket } from '@/lib/support/route-inbound';
-import { toWaId, downloadMedia, sendText } from '@/lib/whatsapp-cloud/client';
+import { toWaId, downloadMedia, sendText, sendReaction, markAsRead } from '@/lib/whatsapp-cloud/client';
 import { handleAgentMessage } from '@/lib/crm/wa-conversation';
 
 export const runtime = 'nodejs';          // need crypto + Buffer
@@ -350,6 +350,12 @@ async function maybeHandleAgentQuote(args: {
     return false; // not an agent → let support routing handle it
   }
 
+  // Instant "got it, working on it" feedback — the AI brain (and voice transcription)
+  // take a second or two. Fire-and-forget so they don't add latency; 👀 lands first,
+  // then the reply below swaps it to ✅.
+  void sendReaction({ to: args.waId, messageId: args.msg.id, emoji: '👀' }).catch(() => {});
+  void markAsRead(args.msg.id).catch(() => {});
+
   // Download an attachment if present (forwarded quote as PDF/image).
   const attachments: { filename: string; mime: string; bytes: Uint8Array }[] = [];
   const type: string = args.msg.type;
@@ -395,7 +401,10 @@ async function maybeHandleAgentQuote(args: {
   // within the 24h service window (the agent just messaged us).
   try {
     const reply = await handleAgentMessage(agent as any, args.waId, voiceText || args.textBody, attachments, { isVoice });
-    if (reply) await sendText({ to: args.waId, body: reply, contextMessageId: args.msg.id });
+    if (reply) {
+      await sendText({ to: args.waId, body: reply, contextMessageId: args.msg.id });
+      void sendReaction({ to: args.waId, messageId: args.msg.id, emoji: '✅' }).catch(() => {}); // 👀 → ✅ (done)
+    }
   } catch (e) {
     console.warn('[agent quote] conversation failed', e);
   }
