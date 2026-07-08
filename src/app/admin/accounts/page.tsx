@@ -36,7 +36,10 @@ type AccountRow = Influencer & { is_demo?: boolean };
 function accountBucket(row: AccountRow): 'brand' | 'service' | 'creator' {
   const a = (row.archetype || '').toLowerCase();
   if (a === 'brand') return 'brand';
-  if (a === 'service_provider') return 'service';
+  // service_provider + b2b_saas (e.g. IMAI) are both "נותני שירות" for admin
+  // classification. b2b_saas keeps its own archetype elsewhere (chat tabs,
+  // persona) — this only affects which admin tab it appears under.
+  if (a === 'service_provider' || a === 'b2b_saas') return 'service';
   return 'creator';
 }
 
