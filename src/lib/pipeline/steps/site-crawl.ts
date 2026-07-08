@@ -29,7 +29,12 @@ export async function siteCrawlStep(ctx: StepContext): Promise<StepResult> {
   if (discoveredLinks.length > 0) {
     const bfsKey = `pipeline:${ctx.jobId}:bfs`;
     // Decide BFS mode once, durably: a seeded single-URL frontier means no sitemap.
-    if (ctx.batch === 0 && total <= 1) await redisSetNx(bfsKey, '1', KEY_TTL);
+    // NEVER enter BFS in quote mode — a bounded category selection can resolve to a
+    // single URL, and with maxPages null that would expand unbounded across the whole
+    // site, defeating the caps. Quote mode always has an explicit `categories` list.
+    if (ctx.batch === 0 && total <= 1 && !ctx.state.options?.categories?.length) {
+      await redisSetNx(bfsKey, '1', KEY_TTL);
+    }
     const bfsMode = await redisExists(bfsKey);
 
     if (bfsMode) {

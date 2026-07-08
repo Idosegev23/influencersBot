@@ -32,7 +32,10 @@ export async function POST(req: Request) {
   } = body;
 
   // Website-only (quote) scans may omit the IG username — anchor on the site domain instead.
-  const uname = username || (websiteUrl ? new URL(websiteUrl).host : undefined);
+  let uname = username;
+  if (!uname && websiteUrl) {
+    try { uname = new URL(websiteUrl).host; } catch { return NextResponse.json({ error: 'bad websiteUrl' }, { status: 400 }); }
+  }
 
   if (!uname || !accountId) {
     return NextResponse.json({ error: 'username (or websiteUrl) and accountId required' }, { status: 400 });
