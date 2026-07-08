@@ -15,6 +15,17 @@ export type StepResult =
   | { status: 'failed'; error: string };
 export type StepHandler = (ctx: StepContext) => Promise<StepResult>;
 
+/**
+ * A "website-only" account has no real Instagram handle. It is signalled by
+ * `ctx.username` being empty or equal to the website host (domain anchor set by
+ * the start route for website-only scans). When false, `ig-scan`/`transcribe`
+ * skip immediately and persona is built from website content.
+ */
+export function hasInstagram(ctx: StepContext): boolean {
+  if (!ctx.username) return false;
+  try { return ctx.username !== new URL(ctx.state.websiteUrl || 'http://x.invalid').host; } catch { return true; }
+}
+
 export const STEP_HANDLERS: Record<PipelineStep, StepHandler> = {
   'create-account': createAccountStep,
   'ig-scan': igScanStep,

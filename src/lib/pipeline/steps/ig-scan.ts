@@ -2,9 +2,10 @@ import { runScanJob } from '@/lib/scraping/runScanJob';
 import { createClient } from '@/lib/supabase/server';
 import { saveState } from '@/lib/pipeline/state';
 import type { StepContext } from '../types';
-import type { StepResult } from './index';
+import { hasInstagram, type StepResult } from './index';
 
 export async function igScanStep(ctx: StepContext): Promise<StepResult> {
+  if (!hasInstagram(ctx)) return { status: 'advance' }; // website-only account: nothing to scrape
   await runScanJob(ctx.jobId); // scrapes profile+posts+highlights+comments into DB
   if (!ctx.state.websiteUrl) {
     const supabase = await createClient();
