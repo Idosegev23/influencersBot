@@ -169,7 +169,7 @@ async function planFreeform(text: string, ctx: Awaited<ReturnType<typeof loadBra
       status: b.brief_status, priced: !!b.deal_id,
       deliverables: seedFromParsed(p).map(deliverableLabel),
       terms: Array.isArray(p.specialTerms) ? p.specialTerms : [],
-      summary: String(b.raw_text || '').slice(0, 400),
+      summary: String(b.raw_text || '').slice(0, 700),
     };
   });
   const dealSummary = ctx.deals.map((d) => ({
@@ -187,12 +187,14 @@ async function planFreeform(text: string, ctx: Awaited<ReturnType<typeof loadBra
     (history ? `שיחה אחרונה (החדש בסוף):\n${history}\n` : '') +
     'אם ההודעה מתייחסת למשהו מהשיחה האחרונה ("זה"/"כמה הצעתי לזה"/"והמחיר?"/"תשנה את זה") — פענח את המיוצג/המותג/העסקה מההיסטוריה ובצע; אל תבקש הבהרה כשאפשר להסיק מההקשר. ' +
     'החזר JSON נקי בלבד בפורמט: ' +
-    '{"action":"answer"|"price"|"issue_quote"|"get_link"|"document_brief"|"clarify",' +
+    '{"action":"answer"|"analytics"|"price"|"issue_quote"|"get_link"|"document_brief"|"clarify",' +
     '"reply":<string|null>,' +
     '"commands":[{"brief_id":<id>,"account_id":<talent_id|null>,"pricing":{"mode":"total"|"per_line","total":<number|null>,"prices":<number[]|null>}}],' +
     '"target":{"talent_id":<id|null>,"deal_id":<id|null>,"brand":<string|null>}}. ' +
     'מתי כל פעולה: ' +
-    'answer = הסוכן שואל שאלה על מידע קיים ("מה רצו בבריף של אנה?","מה הסטטוס של דני?","כמה בריפים פתוחים?") — נסח ב-reply תשובה מלאה ומדויקת מתוך ההקשר (deliverables, terms, סכומים, סטטוס). ' +
+    'answer = שאלה שהתשובה לה נמצאת בהקשר שלמטה (בריפים פתוחים, מה ביקשו בבריף של מיוצג, סטטוס, תוצרים/terms, סכום של עסקה ספציפית, אילו בריפים פתוחים / לא משויכים). ' +
+    'ענה ישירות ב-reply — תשובה מלאה, מפורטת ומדויקת מתוך הבריפים/העסקאות/הרוסטר שלמטה. אם המיוצג/המותג מופיע בהקשר, ענה עליו; אל תגיד "לא מצאתי" כשהמידע נמצא ברשימה. ' +
+    'analytics = שאלה שדורשת אגרגציה או היסטוריה מעבר להקשר שלמטה ("כמה עסקאות סה"כ חתמתי?","מה סך המכירות של ירדן?","הכנסות לפי חודש","כמה עמלה הרווחתי?") — אל תמלא reply; זה יופנה למנוע העובדות (SQL על כל ההיסטוריה). ' +
     'price = הסוכן נותן או מעדכן מחיר לבריף ("תמחר את אנה ב-200 אלף","לאנה 80 לרילס 50 לזכויות") — מלא commands (per_line לפי סדר ה-deliverables; 80=80000; "מאתיים אלף"=200000). ' +
     'אם ההודעה מזהה מיוצג + מחיר, תמחר — גם אם לא כתוב כל פרט. אם יש כמה בריפים זהים לאותו מיוצג ואותו מותג, זה אותו בריף כפול: בחר את הראשון ברשימה (האחרון בזמן) ותמחר, אל תשאל. ' +
     'issue_quote = הסוכן מבקש במפורש לשלוח/להוציא הצעה ("שלח את ההצעה של אנה") — מלא target. ' +
@@ -223,14 +225,21 @@ async function runBrain(agent: WaAgent, waId: string, text: string): Promise<Age
 
   switch (plan.action) {
     case 'answer': {
-      // Advisory lane: the read-only tool-calling brain (SQL for numbers, RAG for meaning).
+      // The answer is already in the loaded context (open briefs, deals, roster) — planFreeform
+      // wrote it into reply. Answer directly; don't round-trip through the tool loop (which was
+      // failing to converge on simple "what's in this brief / which briefs are open" questions).
+      if (plan.reply && String(plan.reply).trim()) return done(plan.reply, tlog);
+      // No context reply → treat as analytics (fall through to the fact-tools brain).
+    }
+    // eslint-disable-next-line no-fallthrough
+    case 'analytics': {
+      // Advisory lane: the read-only tool-calling brain (SQL for numbers, RAG for meaning across history).
       try {
         const { answerAgentQuestion } = await import('@/lib/crm/agent-brain');
         const a = await answerAgentQuestion(agent, text);
-        return done(a.reply, { ...tlog, model_used: a.modelUsed });
-      } catch {
-        return done(plan.reply || 'לא בטוח שהבנתי — אפשר לנסח שוב?', tlog);
-      }
+        if (a.reply && a.reply.trim()) return done(a.reply, { ...tlog, model_used: a.modelUsed });
+      } catch { /* fall through to plan.reply */ }
+      return done(plan.reply || 'לא בטוח שהבנתי — אפשר לנסח שוב?', tlog);
     }
     case 'clarify':
       return needMore(plan.reply || 'לא בטוח שהבנתי — אפשר לנסח שוב?', tlog);

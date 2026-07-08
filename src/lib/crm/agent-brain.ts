@@ -79,6 +79,17 @@ export async function runAgentBrain(deps: {
       }
     }
   }
+  // Converge: if we gathered facts but the loop never emitted a final answer (model kept calling
+  // tools / ran out of iterations), force ONE summarizing turn instead of the generic fallback.
+  if (!lastText && executed.length) {
+    try {
+      const final = await callModel({
+        instructions: instructions + '\nעכשיו סכם תשובה סופית בעברית מהתוצאות שקיבלת. אל תקרא עוד כלים — החזר {"answer":"..."}.',
+        input: text, toolResults: executed, tools: AGENT_TOOL_SCHEMAS,
+      });
+      if (final.text) lastText = final.text;
+    } catch { /* keep the fallback below */ }
+  }
   return {
     reply: (lastText || 'לא הצלחתי להפיק תשובה כרגע — אפשר לנסח שוב?').trim(),
     toolCalls: executed,
