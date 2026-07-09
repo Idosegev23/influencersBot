@@ -3,6 +3,7 @@
 import { use, useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import EscalationContactsForm from './EscalationContactsForm';
+import SourcesPanel from './SourcesPanel';
 
 interface AdminDocument {
   id: string;
@@ -773,6 +774,8 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
           מחק חשבון
         </button>
       </div>
+
+      <SourcesPanel accountId={id} />
 
       <EscalationContactsForm accountId={id} />
     </div>
