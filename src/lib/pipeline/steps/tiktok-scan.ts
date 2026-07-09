@@ -7,6 +7,18 @@ import type { StepResult } from './index';
 const QUOTE_VIDEO_CAP = 10;
 const FULL_VIDEO_CAP = 25;
 
+// instagram_posts.views_count is int4 — clamp so a huge view count doesn't
+// overflow the column and fail the upsert.
+const INT4_MAX = 2147483647;
+function capInt4(n?: number): number {
+  return Math.max(0, Math.min(Math.floor(Number(n) || 0), INT4_MAX));
+}
+// posted_at is NOT NULL with no default; TikTok gives create_time in unix seconds.
+function toPostedAt(unixSeconds?: number): string {
+  if (unixSeconds && Number.isFinite(unixSeconds)) return new Date(unixSeconds * 1000).toISOString();
+  return new Date().toISOString();
+}
+
 /**
  * TikTok scan step. If the account has a TikTok handle (`options.tiktok`), scrape
  * the profile + recent videos + transcripts via ScrapeCreators, store them
@@ -50,7 +62,8 @@ export async function tiktokScanStep(ctx: StepContext): Promise<StepResult> {
           type: 'video',
           caption: (v.desc || '').slice(0, 5000),
           media_urls: [v.shareUrl],
-          likes_count: v.views ?? 0,
+          views_count: capInt4(v.views),
+          posted_at: toPostedAt(v.createTime),
         },
         { onConflict: 'account_id,shortcode' },
       );

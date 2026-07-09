@@ -28,6 +28,7 @@ export interface YoutubeVideo {
   views?: number;
   lengthSeconds?: number;
   publishedTime?: string;
+  publishDate?: string; // absolute date (ISO-ish) when available
 }
 
 function client(): AxiosInstance {
@@ -80,6 +81,7 @@ export async function getYoutubeVideos(handleOrUrl: string, limit = 30): Promise
         views: v.viewCountInt,
         lengthSeconds: v.lengthSeconds,
         publishedTime: v.publishedTime,
+        publishDate: v.publishDate || v.publishedTimeText,
       }))
       .filter((v) => v.id && v.url);
   } catch {

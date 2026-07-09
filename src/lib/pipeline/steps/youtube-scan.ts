@@ -8,6 +8,21 @@ import type { StepResult } from './index';
 const QUOTE_VIDEO_CAP = 10;
 const FULL_VIDEO_CAP = 30;
 
+// instagram_posts.views_count / likes_count are int4 — clamp so a video with
+// billions of views doesn't overflow the column and fail the whole upsert.
+const INT4_MAX = 2147483647;
+function capInt4(n?: number): number {
+  return Math.max(0, Math.min(Math.floor(Number(n) || 0), INT4_MAX));
+}
+// posted_at is NOT NULL with no default — always supply a valid timestamp.
+function toPostedAt(dateLike?: string): string {
+  if (dateLike) {
+    const t = Date.parse(dateLike);
+    if (!Number.isNaN(t)) return new Date(t).toISOString();
+  }
+  return new Date().toISOString();
+}
+
 /**
  * YouTube scan step. If the account has a YouTube channel (`options.youtube`),
  * scrape the channel + its recent videos + transcripts via ScrapeCreators, store
@@ -53,7 +68,8 @@ export async function youtubeScanStep(ctx: StepContext): Promise<StepResult> {
           type: 'video',
           caption: [v.title, v.description].filter(Boolean).join('\n').slice(0, 5000),
           media_urls: [v.url],
-          likes_count: v.views ?? 0,
+          views_count: capInt4(v.views),
+          posted_at: toPostedAt(v.publishDate),
         },
         { onConflict: 'account_id,shortcode' },
       );
