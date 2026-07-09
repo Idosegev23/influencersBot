@@ -59,29 +59,35 @@ export async function youtubeScanStep(ctx: StepContext): Promise<StepResult> {
   let done = 0;
   for (const v of videos) {
     try {
-      await supabase.from('instagram_posts').upsert(
-        {
-          account_id: ctx.accountId,
-          platform: 'youtube',
-          shortcode: `yt_${v.id}`,
-          post_url: v.url,
-          type: 'video',
-          caption: [v.title, v.description].filter(Boolean).join('\n').slice(0, 5000),
-          media_urls: [v.url],
-          views_count: capInt4(v.views),
-          posted_at: toPostedAt(v.publishDate),
-        },
-        { onConflict: 'account_id,shortcode' },
-      );
+      const { data: postRow } = await supabase
+        .from('instagram_posts')
+        .upsert(
+          {
+            account_id: ctx.accountId,
+            platform: 'youtube',
+            shortcode: `yt_${v.id}`,
+            post_url: v.url,
+            type: 'video',
+            caption: [v.title, v.description].filter(Boolean).join('\n').slice(0, 5000),
+            media_urls: [v.url],
+            views_count: capInt4(v.views),
+            posted_at: toPostedAt(v.publishDate),
+          },
+          { onConflict: 'account_id,shortcode' },
+        )
+        .select('id')
+        .single();
 
-      const transcript = await getYoutubeTranscript(v.url);
-      if (transcript) {
+      // instagram_transcriptions.source_id is a uuid FK to the post row — use the
+      // post's id, NOT the shortcode (a text id here throws invalid-uuid).
+      const transcript = postRow?.id ? await getYoutubeTranscript(v.url) : '';
+      if (transcript && postRow?.id) {
         await supabase.from('instagram_transcriptions').upsert(
           {
             account_id: ctx.accountId,
             platform: 'youtube',
             source_type: 'post',
-            source_id: `yt_${v.id}`,
+            source_id: postRow.id,
             video_url: v.url,
             transcription_text: transcript,
             processing_status: 'completed',

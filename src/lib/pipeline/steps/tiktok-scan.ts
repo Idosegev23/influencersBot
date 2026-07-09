@@ -53,29 +53,35 @@ export async function tiktokScanStep(ctx: StepContext): Promise<StepResult> {
   let done = 0;
   for (const v of videos) {
     try {
-      await supabase.from('instagram_posts').upsert(
-        {
-          account_id: ctx.accountId,
-          platform: 'tiktok',
-          shortcode: `tt_${v.id}`,
-          post_url: v.shareUrl,
-          type: 'video',
-          caption: (v.desc || '').slice(0, 5000),
-          media_urls: [v.shareUrl],
-          views_count: capInt4(v.views),
-          posted_at: toPostedAt(v.createTime),
-        },
-        { onConflict: 'account_id,shortcode' },
-      );
+      const { data: postRow } = await supabase
+        .from('instagram_posts')
+        .upsert(
+          {
+            account_id: ctx.accountId,
+            platform: 'tiktok',
+            shortcode: `tt_${v.id}`,
+            post_url: v.shareUrl,
+            type: 'video',
+            caption: (v.desc || '').slice(0, 5000),
+            media_urls: [v.shareUrl],
+            views_count: capInt4(v.views),
+            posted_at: toPostedAt(v.createTime),
+          },
+          { onConflict: 'account_id,shortcode' },
+        )
+        .select('id')
+        .single();
 
-      const transcript = await getTiktokTranscript(v.shareUrl);
-      if (transcript) {
+      // instagram_transcriptions.source_id is a uuid FK to the post row — use the
+      // post's id, NOT the shortcode (a text id here throws invalid-uuid).
+      const transcript = postRow?.id ? await getTiktokTranscript(v.shareUrl) : '';
+      if (transcript && postRow?.id) {
         await supabase.from('instagram_transcriptions').upsert(
           {
             account_id: ctx.accountId,
             platform: 'tiktok',
             source_type: 'post',
-            source_id: `tt_${v.id}`,
+            source_id: postRow.id,
             video_url: v.shareUrl,
             transcription_text: transcript,
             processing_status: 'completed',
