@@ -30,6 +30,8 @@ export async function POST(req: Request) {
     archetype = 'brand',
     scanMode = 'full',
     categories,
+    youtube,
+    tiktok,
   } = body;
 
   // Normalize the IG handle — admins often paste a full profile URL / @ / ?hl=he,
@@ -38,9 +40,11 @@ export async function POST(req: Request) {
   if (!uname && websiteUrl) {
     try { uname = new URL(websiteUrl).host; } catch { return NextResponse.json({ error: 'bad websiteUrl' }, { status: 400 }); }
   }
+  // No IG and no website but a YouTube/TikTok source given — anchor on that handle.
+  if (!uname && (youtube || tiktok)) uname = String(tiktok || youtube).replace(/^@/, '').slice(0, 60);
 
   if (!uname || !accountId) {
-    return NextResponse.json({ error: 'username (or websiteUrl) and accountId required' }, { status: 400 });
+    return NextResponse.json({ error: 'username (or websiteUrl / youtube / tiktok) and accountId required' }, { status: 400 });
   }
 
   const repo = getScanJobsRepo();
@@ -57,7 +61,7 @@ export async function POST(req: Request) {
     counts: {},
     cursors: {},
     websiteUrl,
-    options: { transcribe, maxPages, postsLimit, isDemo, archetype, scanMode, categories },
+    options: { transcribe, maxPages, postsLimit, isDemo, archetype, scanMode, categories, youtube, tiktok },
   };
   await saveState(job.id, state);
   await publishStep({ jobId: job.id, step: 'create-account', batch: 0 });

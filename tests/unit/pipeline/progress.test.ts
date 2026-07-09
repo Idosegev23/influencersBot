@@ -9,9 +9,9 @@ describe('computeScanProgress', () => {
       { step: 'transcribe', status: 'running', timestamp: '2026-07-08T10:02:00Z' },
     ];
     const p = computeScanProgress({ status: 'running', step_logs: logs, created_at: '2026-07-08T10:00:00Z' }, Date.parse('2026-07-08T10:03:00Z'));
-    expect(p.totalSteps).toBe(9);
+    expect(p.totalSteps).toBe(11);
     expect(p.completedSteps).toBe(2);
-    expect(p.percent).toBe(22); // round(2/9*100)
+    expect(p.percent).toBe(18); // round(2/11*100)
     expect(p.currentStep).toBe('transcribe'); // running, no completed after
     expect(p.elapsedMs).toBe(180000);
     expect(p.lastUpdateMs).toBe(60000); // now - last log ts
@@ -21,8 +21,8 @@ describe('computeScanProgress', () => {
     expect(p.percent).toBe(0);
     expect(p.currentStep).toBe('create-account');
   });
-  it('exposes SCAN_STEPS as the 9 ordered pipeline steps', () => {
-    expect(SCAN_STEPS).toHaveLength(9);
+  it('exposes SCAN_STEPS as the ordered pipeline steps', () => {
+    expect(SCAN_STEPS).toHaveLength(11); // + youtube-scan + tiktok-scan
     expect(SCAN_STEPS[0]).toBe('create-account');
     expect(SCAN_STEPS[SCAN_STEPS.length - 1]).toBe('finalize');
   });

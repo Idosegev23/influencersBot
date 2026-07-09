@@ -28,9 +28,9 @@ describe('GET /api/pipeline/status/[jobId]', () => {
     expect(body.status).toBe('running');
     expect(body.steps).toHaveLength(3);
     expect(body.counts).toEqual({ 'ig-scan': { done: 12, total: 12 } });
-    expect(body.percent).toBe(22); // round(2/9*100)
+    expect(body.percent).toBe(18); // round(2/11*100)
     expect(body.completedSteps).toBe(2);
-    expect(body.totalSteps).toBe(9);
+    expect(body.totalSteps).toBe(11);
     expect(body.currentStep).toBe('transcribe'); // from computeScanProgress, NOT stale 'create-account'
     expect(typeof body.elapsedMs).toBe('number');
     expect(typeof body.lastUpdateMs).toBe('number');

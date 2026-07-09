@@ -2,6 +2,8 @@ import type { PipelineStep, StepContext } from '../types';
 import { createAccountStep } from './create-account';
 import { igScanStep } from './ig-scan';
 import { transcribeStep } from './transcribe';
+import { youtubeScanStep } from './youtube-scan';
+import { tiktokScanStep } from './tiktok-scan';
 import { siteDiscoverStep } from './site-discover';
 import { siteCrawlStep } from './site-crawl';
 import { ragIngestStep } from './rag-ingest';
@@ -30,6 +32,8 @@ export const STEP_HANDLERS: Record<PipelineStep, StepHandler> = {
   'create-account': createAccountStep,
   'ig-scan': igScanStep,
   'transcribe': transcribeStep,
+  'youtube-scan': youtubeScanStep,
+  'tiktok-scan': tiktokScanStep,
   'site-discover': siteDiscoverStep,
   'site-crawl': siteCrawlStep,
   'rag-ingest': ragIngestStep,

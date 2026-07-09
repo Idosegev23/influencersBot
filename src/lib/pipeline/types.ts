@@ -1,14 +1,14 @@
 export type PipelineStep =
-  | 'create-account' | 'ig-scan' | 'transcribe' | 'site-discover'
+  | 'create-account' | 'ig-scan' | 'transcribe' | 'youtube-scan' | 'tiktok-scan' | 'site-discover'
   | 'site-crawl' | 'rag-ingest' | 'product-extract' | 'persona-build' | 'finalize';
 
 export const STEP_ORDER: PipelineStep[] = [
-  'create-account', 'ig-scan', 'transcribe', 'site-discover',
+  'create-account', 'ig-scan', 'transcribe', 'youtube-scan', 'tiktok-scan', 'site-discover',
   'site-crawl', 'rag-ingest', 'product-extract', 'persona-build', 'finalize',
 ];
 
 export const BATCH_SIZES: Record<PipelineStep, number> = {
-  'create-account': 0, 'ig-scan': 0, 'transcribe': 5, 'site-discover': 0,
+  'create-account': 0, 'ig-scan': 0, 'transcribe': 5, 'youtube-scan': 0, 'tiktok-scan': 0, 'site-discover': 0,
   'site-crawl': 15, 'rag-ingest': 20, 'product-extract': 20, 'persona-build': 0, 'finalize': 0,
 };
 
@@ -20,6 +20,8 @@ export interface PipelineOptions {
   archetype?: string; // brand | influencer | service_provider | ... (applied in finalize)
   scanMode?: 'quote' | 'full'; // quote = bounded pre-sales demo scan; undefined/full = current behaviour
   categories?: { pathPattern: string; cap: number }[]; // selected path slices for quote mode; undefined = full scope
+  youtube?: string; // YouTube channel URL or @handle (optional extra source)
+  tiktok?: string;  // TikTok @handle or URL (optional extra source)
 }
 
 export interface PipelineState {

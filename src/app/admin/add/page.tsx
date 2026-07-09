@@ -43,6 +43,8 @@ export default function AddAccountPage() {
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [websiteUrl, setWebsiteUrl] = useState('');
+  const [youtube, setYoutube] = useState('');
+  const [tiktok, setTiktok] = useState('');
   const [archetype, setArchetype] = useState('brand');
   const [isDemo, setIsDemo] = useState(true);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -153,24 +155,26 @@ export default function AddAccountPage() {
   async function handleCreate() {
     const igUsername = normalizeIgUsername(username);
     const site = websiteUrl.trim();
+    const yt = youtube.trim();
+    const tt = tiktok.trim();
 
-    // The account row needs a username. Use the IG handle if present, else anchor on the site domain.
+    // The account row needs a username. Prefer IG, then site domain, then a YT/TikTok handle.
     let accountUsername = igUsername;
-    if (!accountUsername && scanMode === 'quote' && site) {
-      try { accountUsername = new URL(site).host; } catch { setError('כתובת אתר לא תקינה'); return; }
+    if (!accountUsername && site) {
+      try { accountUsername = new URL(site.startsWith('http') ? site : `https://${site}`).host; } catch { setError('כתובת אתר לא תקינה'); return; }
     }
+    if (!accountUsername && (tt || yt)) accountUsername = (tt || yt).replace(/^@/, '').slice(0, 60);
 
     if (scanMode === 'quote') {
-      // Either an Instagram account OR a website (or both) — at least one is required.
-      if (!igUsername && !site) { setError('הזן חשבון אינסטגרם או כתובת אתר'); return; }
+      // At least one source — Instagram, website, YouTube, or TikTok.
+      if (!igUsername && !site && !yt && !tt) { setError('הזן לפחות מקור אחד: אינסטגרם / אתר / יוטיוב / טיקטוק'); return; }
       // If a website was given, require a category selection so we don't crawl the whole site.
       if (site && selectedCategories.length === 0) { setError('בחר לפחות קטגוריה אחת מהאתר'); return; }
-      // IG-only quote needs no website/categories — the pipeline skips the site steps.
-    } else if (!igUsername) {
-      setError('יש להזין username');
+    } else if (!igUsername && !yt && !tt) {
+      setError('יש להזין username (או יוטיוב/טיקטוק)');
       return;
     }
-    if (!accountUsername) { setError('יש להזין username או כתובת אתר'); return; }
+    if (!accountUsername) { setError('יש להזין מקור לסריקה'); return; }
 
     setIsLoading(true);
     setError(null);
@@ -214,6 +218,8 @@ export default function AddAccountPage() {
           postsLimit: postsLimit ? Number(postsLimit) : undefined,
           scanMode,
           categories: scanMode === 'quote' ? selectedCategories : undefined,
+          youtube: youtube.trim() || undefined,
+          tiktok: tiktok.trim() || undefined,
         }),
       });
 
@@ -333,10 +339,11 @@ export default function AddAccountPage() {
     );
   }
 
+  const hasAnySource = !!(username.trim() || selectedCategories.length > 0 || youtube.trim() || tiktok.trim());
   const primaryDisabled = isLoading || (scanMode === 'quote'
-    // Quote needs at least one source: an Instagram handle OR a website category selection.
-    ? (!username.trim() && selectedCategories.length === 0)
-    : !username.trim());
+    // Quote needs at least one source: Instagram, website categories, YouTube, or TikTok.
+    ? !hasAnySource
+    : !(username.trim() || youtube.trim() || tiktok.trim()));
 
   return (
     <div className="max-w-lg mx-auto">
@@ -464,6 +471,35 @@ export default function AddAccountPage() {
               className="neon-input w-full"
               style={{ direction: 'ltr' }}
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold mr-2" style={{ color: '#1f2937' }}>
+                YouTube <span className="font-normal" style={{ color: '#817a6c' }}>(אופציונלי)</span>
+              </label>
+              <input
+                type="text"
+                value={youtube}
+                onChange={(e) => setYoutube(e.target.value)}
+                placeholder="@channel או URL"
+                className="neon-input w-full"
+                style={{ direction: 'ltr' }}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold mr-2" style={{ color: '#1f2937' }}>
+                TikTok <span className="font-normal" style={{ color: '#817a6c' }}>(אופציונלי)</span>
+              </label>
+              <input
+                type="text"
+                value={tiktok}
+                onChange={(e) => setTiktok(e.target.value)}
+                placeholder="@handle"
+                className="neon-input w-full"
+                style={{ direction: 'ltr' }}
+              />
+            </div>
           </div>
 
           {/* Quote-mode discover + category table */}
