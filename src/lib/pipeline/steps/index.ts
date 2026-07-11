@@ -25,6 +25,11 @@ export type StepHandler = (ctx: StepContext) => Promise<StepResult>;
  */
 export function hasInstagram(ctx: StepContext): boolean {
   if (!ctx.username) return false;
+  // Explicit signal from startPipeline wins: an IG handle can legitimately equal
+  // the domain (e.g. @buyme.co.il), which the host-comparison heuristic below would
+  // otherwise misread as "website-only" and skip the scrape.
+  const flag = ctx.state.options?.hasIg;
+  if (typeof flag === 'boolean') return flag;
   try { return ctx.username !== new URL(ctx.state.websiteUrl || 'http://x.invalid').host; } catch { return true; }
 }
 

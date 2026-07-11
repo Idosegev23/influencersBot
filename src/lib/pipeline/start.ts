@@ -49,6 +49,9 @@ export async function startPipeline(input: StartPipelineInput): Promise<StartPip
   // Normalize the IG handle — admins often paste a full profile URL / @ / ?hl=he,
   // which used verbatim as the scrape handle yields an empty account.
   let uname = username ? normalizeIgUsername(username) : username;
+  // An explicitly-provided handle is a REAL Instagram to scrape — even when it
+  // equals the domain (e.g. @buyme.co.il). The anchor fallbacks below are not.
+  const hasIg = !!uname;
   if (!uname && websiteUrl) {
     try {
       uname = new URL(websiteUrl).host;
@@ -77,7 +80,7 @@ export async function startPipeline(input: StartPipelineInput): Promise<StartPip
     counts: {},
     cursors: {},
     websiteUrl: websiteUrl || undefined,
-    options: { transcribe, maxPages, postsLimit, isDemo, archetype, scanMode, categories, youtube, tiktok },
+    options: { transcribe, maxPages, postsLimit, isDemo, archetype, scanMode, categories, youtube, tiktok, hasIg },
   };
   await saveState(job.id, state);
   await publishStep({ jobId: job.id, step: 'create-account', batch: 0 });

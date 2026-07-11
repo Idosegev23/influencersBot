@@ -22,6 +22,7 @@ export interface PipelineOptions {
   categories?: { pathPattern: string; cap: number }[]; // selected path slices for quote mode; undefined = full scope
   youtube?: string; // YouTube channel URL or @handle (optional extra source)
   tiktok?: string;  // TikTok @handle or URL (optional extra source)
+  hasIg?: boolean;  // true = `username` is a real IG handle to scrape (even if it equals the domain, e.g. @buyme.co.il); false = domain/social anchor only
 }
 
 export interface PipelineState {
