@@ -16,4 +16,20 @@ describe('social scan steps', () => {
     const res = await tiktokScanStep({ jobId: 'j', accountId: 'a', username: 'u', step: 'tiktok-scan', batch: 0, state: { options: {} } } as any);
     expect(res.status).toBe('advance');
   });
+
+  it('enrich mode: youtube-scan skips when enriching only tiktok (even with a youtube source)', async () => {
+    const { youtubeScanStep } = await import('@/lib/pipeline/steps/youtube-scan');
+    const res = await youtubeScanStep({ jobId: 'j', accountId: 'a', username: 'u', step: 'youtube-scan', batch: 0, state: { options: { youtube: '@x', enrichSources: ['tiktok'] } } } as any);
+    expect(res.status).toBe('advance');
+  });
+
+  it('enrichSkips: no enrichSources → runs all; else only listed sources run', async () => {
+    const { enrichSkips } = await import('@/lib/pipeline/steps/index');
+    const ctx = (enrichSources?: string[]) => ({ state: { options: enrichSources ? { enrichSources } : {} } } as any);
+    expect(enrichSkips(ctx(), 'youtube')).toBe(false); // full scan
+    expect(enrichSkips(ctx(['tiktok']), 'tiktok')).toBe(false); // the enriched source runs
+    expect(enrichSkips(ctx(['tiktok']), 'youtube')).toBe(true); // others skip
+    expect(enrichSkips(ctx(['tiktok']), 'instagram')).toBe(true);
+    expect(enrichSkips(ctx(['tiktok']), 'website')).toBe(true);
+  });
 });

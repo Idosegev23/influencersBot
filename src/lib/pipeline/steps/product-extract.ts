@@ -1,7 +1,7 @@
 import { extractAllProducts } from '@/lib/recommendations/extract-products';
 import { enrichAllProducts } from '@/lib/recommendations/enrich-products';
 import type { StepContext } from '../types';
-import type { StepResult } from './index';
+import { enrichSkips, type StepResult } from './index';
 
 /**
  * Product-extract step. Only meaningful for website-backed accounts — a
@@ -13,6 +13,7 @@ import type { StepResult } from './index';
  * profiles + embeddings for the recommendation engine.
  */
 export async function productExtractStep(ctx: StepContext): Promise<StepResult> {
+  if (enrichSkips(ctx, 'website')) return { status: 'advance' }; // enriching a different source
   if (!ctx.state.websiteUrl) return { status: 'advance' };
 
   // Cap for serverless time budget — large catalogs (Carolina ~1,444 products)

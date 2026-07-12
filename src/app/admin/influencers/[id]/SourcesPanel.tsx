@@ -17,11 +17,11 @@ interface Counts {
   products: number;
 }
 
-const FIELDS: { key: keyof Sources; label: string; icon: string; placeholder: string }[] = [
-  { key: 'instagram', label: 'אינסטגרם', icon: 'photo_camera', placeholder: 'שם משתמש או קישור פרופיל' },
-  { key: 'website', label: 'אתר', icon: 'language', placeholder: 'https://example.com' },
-  { key: 'youtube', label: 'יוטיוב', icon: 'smart_display', placeholder: '@handle או קישור ערוץ' },
-  { key: 'tiktok', label: 'טיקטוק', icon: 'music_note', placeholder: '@handle או קישור פרופיל' },
+const FIELDS: { key: keyof Sources; label: string; icon: string; placeholder: string; countKey: keyof Counts }[] = [
+  { key: 'instagram', label: 'אינסטגרם', icon: 'photo_camera', placeholder: 'שם משתמש או קישור פרופיל', countKey: 'instagramPosts' },
+  { key: 'website', label: 'אתר', icon: 'language', placeholder: 'https://example.com', countKey: 'websitePages' },
+  { key: 'youtube', label: 'יוטיוב', icon: 'smart_display', placeholder: '@handle או קישור ערוץ', countKey: 'youtubePosts' },
+  { key: 'tiktok', label: 'טיקטוק', icon: 'music_note', placeholder: '@handle או קישור פרופיל', countKey: 'tiktokPosts' },
 ];
 
 /**
@@ -36,6 +36,7 @@ export default function SourcesPanel({ accountId }: { accountId: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [enriching, setEnriching] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   useEffect(() => {
@@ -57,6 +58,12 @@ export default function SourcesPanel({ accountId }: { accountId: string }) {
   const set = (key: keyof Sources, v: string) => setSources((s) => ({ ...s, [key]: v }));
   const hasAny = Object.values(sources).some((v) => v.trim());
 
+  // Sources that have a value but no scraped content yet — candidates for enrichment.
+  const newSources = counts
+    ? FIELDS.filter((f) => sources[f.key].trim() && (counts[f.countKey] ?? 0) === 0).map((f) => f.key)
+    : [];
+  const newLabels = newSources.map((k) => FIELDS.find((f) => f.key === k)?.label).join(', ');
+
   async function save() {
     setSaving(true);
     setMsg(null);
@@ -71,6 +78,30 @@ export default function SourcesPanel({ accountId }: { accountId: string }) {
       setMsg({ text: 'שגיאה בשמירה', ok: false });
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function enrich() {
+    if (!newSources.length) return;
+    if (!confirm(`לעבות את החשבון עם: ${newLabels}?\nייסרק רק המקור החדש, ואז הפרסונה וה-RAG ייבנו מחדש מהתוכן המצטבר.`)) return;
+    setEnriching(true);
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/admin/accounts/${accountId}/sources`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...sources, enrich: newSources }),
+      });
+      const data = await res.json();
+      if (res.ok && data.jobId) {
+        window.location.href = `/admin/scan/${data.jobId}`;
+      } else {
+        setMsg({ text: data.error || 'שגיאה בעיבוי', ok: false });
+        setEnriching(false);
+      }
+    } catch {
+      setMsg({ text: 'שגיאה בעיבוי', ok: false });
+      setEnriching(false);
     }
   }
 
@@ -170,13 +201,25 @@ export default function SourcesPanel({ accountId }: { accountId: string }) {
       )}
 
       <div className="flex flex-wrap items-center gap-3">
+        {newSources.length > 0 && (
+          <button
+            onClick={enrich}
+            disabled={enriching || scanning || loading}
+            className="px-5 py-2.5 rounded-full text-sm font-semibold text-white shadow-sm transition-all disabled:opacity-50"
+            style={{ backgroundColor: '#059669' }}
+            title="סורק רק את המקור החדש ואז בונה מחדש פרסונה + RAG מהתוכן המצטבר"
+          >
+            {enriching ? 'מעבה…' : `עבה עם ${newLabels}`}
+          </button>
+        )}
         <button
           onClick={rescan}
-          disabled={scanning || loading || !hasAny}
+          disabled={scanning || enriching || loading || !hasAny}
           className="px-5 py-2.5 rounded-full text-sm font-semibold text-white shadow-sm transition-all disabled:opacity-50"
           style={{ backgroundColor: '#9334EB' }}
+          title="סורק מחדש את כל המקורות מאפס"
         >
-          {scanning ? 'מפעיל סריקה…' : 'סרוק מחדש'}
+          {scanning ? 'מפעיל סריקה…' : 'סרוק מחדש (הכל)'}
         </button>
         <button
           onClick={save}
@@ -187,6 +230,11 @@ export default function SourcesPanel({ accountId }: { accountId: string }) {
           {saving ? 'שומר…' : 'שמור מקורות'}
         </button>
       </div>
+      {newSources.length > 0 && (
+        <p className="text-xs text-[#059669] mt-2">
+          💡 מקורות חדשים ({newLabels}) — "עבה" יסרוק רק אותם ויוסיף לפרסונה ול-RAG הקיימים.
+        </p>
+      )}
     </div>
   );
 }

@@ -2,9 +2,10 @@ import { discoverSitemapUrls } from '@/lib/pipeline/sitemap';
 import { pushFrontier, setCount } from '@/lib/pipeline/state';
 import { groupUrlsByPath } from '@/lib/pipeline/discover';
 import type { StepContext } from '../types';
-import type { StepResult } from './index';
+import { enrichSkips, type StepResult } from './index';
 
 export async function siteDiscoverStep(ctx: StepContext): Promise<StepResult> {
+  if (enrichSkips(ctx, 'website')) return { status: 'advance' }; // enriching a different source
   if (!ctx.state.websiteUrl) return { status: 'advance' };
   let urls = await discoverSitemapUrls(ctx.state.websiteUrl);
   if (urls.length === 0) urls = [ctx.state.websiteUrl]; // BFS fallback seed

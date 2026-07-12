@@ -23,6 +23,18 @@ export type StepHandler = (ctx: StepContext) => Promise<StepResult>;
  * the start route for website-only scans). When false, `ig-scan`/`transcribe`
  * skip immediately and persona is built from website content.
  */
+/**
+ * Incremental enrichment gate. When `options.enrichSources` is set, a scrape step
+ * runs only if its source is in that list — the others skip. rag-ingest /
+ * persona-build / finalize do NOT call this, so they always run and fold the newly
+ * scraped source into the existing account content. No enrichSources = full scan.
+ */
+export function enrichSkips(ctx: StepContext, source: 'instagram' | 'website' | 'youtube' | 'tiktok'): boolean {
+  const enrich = ctx.state.options?.enrichSources;
+  if (!enrich || enrich.length === 0) return false;
+  return !enrich.includes(source);
+}
+
 export function hasInstagram(ctx: StepContext): boolean {
   if (!ctx.username) return false;
   // Explicit signal from startPipeline wins: an IG handle can legitimately equal

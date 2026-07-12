@@ -114,15 +114,24 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ac
   return NextResponse.json({ success: true, sources });
 }
 
+const SOURCE_KEYS = ['instagram', 'website', 'youtube', 'tiktok'] as const;
+type SourceKey = (typeof SOURCE_KEYS)[number];
+
 export async function POST(request: Request, { params }: { params: Promise<{ accountId: string }> }) {
   const denied = await requireAdminAuth();
   if (denied) return denied;
 
   const { accountId } = await params;
-  const sources = cleanSources(await request.json());
+  const body = await request.json();
+  const sources = cleanSources(body);
+  // `enrich`: incremental mode — scrape ONLY these sources, then re-ingest RAG +
+  // rebuild the persona over the combined content. Empty/absent = full re-scan.
+  const enrich: SourceKey[] = Array.isArray(body?.enrich)
+    ? body.enrich.filter((k: any): k is SourceKey => SOURCE_KEYS.includes(k))
+    : [];
   const supabase = await createClient();
 
-  // Persist the (possibly edited) sources, then re-scan off them.
+  // Persist the (possibly edited) sources, then (re)scan off them.
   const res = await saveSources(supabase, accountId, sources);
   if ('error' in res) return NextResponse.json({ error: res.error }, { status: res.status });
 
@@ -131,6 +140,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ acc
 
   if (!sources.instagram && !sources.website && !sources.youtube && !sources.tiktok) {
     return NextResponse.json({ error: 'לפחות מקור אחד נדרש (אינסטגרם / אתר / יוטיוב / טיקטוק)' }, { status: 400 });
+  }
+  // Enrich must target a source that actually has a value to scrape.
+  if (enrich.length && !enrich.some((k) => sources[k])) {
+    return NextResponse.json({ error: 'המקור לעיבוי ריק — הזן קישור/שם משתמש למקור שנבחר' }, { status: 400 });
   }
 
   const result = await startPipeline({
@@ -143,9 +156,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ acc
     // Demo accounts → light "quote" scan (recent items only); real accounts → full.
     scanMode: isDemo ? 'quote' : 'full',
     archetype: cfg.archetype || 'brand',
-    requestedBy: 'admin:rescan',
+    enrichSources: enrich.length ? enrich : undefined,
+    requestedBy: enrich.length ? 'admin:enrich' : 'admin:rescan',
   });
   if ('error' in result) return NextResponse.json({ error: result.error }, { status: result.status });
 
-  return NextResponse.json({ jobId: result.jobId, mode: isDemo ? 'quote' : 'full' });
+  return NextResponse.json({
+    jobId: result.jobId,
+    mode: enrich.length ? 'enrich' : isDemo ? 'quote' : 'full',
+    enrich,
+  });
 }

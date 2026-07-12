@@ -18,6 +18,7 @@ export interface StartPipelineInput {
   categories?: unknown;
   youtube?: string;
   tiktok?: string;
+  enrichSources?: ('instagram' | 'website' | 'youtube' | 'tiktok')[];
   requestedBy?: string;
 }
 
@@ -43,6 +44,7 @@ export async function startPipeline(input: StartPipelineInput): Promise<StartPip
     categories,
     youtube,
     tiktok,
+    enrichSources,
     requestedBy = 'admin:pipeline',
   } = input;
 
@@ -80,7 +82,7 @@ export async function startPipeline(input: StartPipelineInput): Promise<StartPip
     counts: {},
     cursors: {},
     websiteUrl: websiteUrl || undefined,
-    options: { transcribe, maxPages, postsLimit, isDemo, archetype, scanMode, categories, youtube, tiktok, hasIg },
+    options: { transcribe, maxPages, postsLimit, isDemo, archetype, scanMode, categories, youtube, tiktok, hasIg, enrichSources },
   };
   await saveState(job.id, state);
   await publishStep({ jobId: job.id, step: 'create-account', batch: 0 });

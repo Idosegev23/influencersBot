@@ -3,7 +3,7 @@ import { redisSetNx, redisExists } from '@/lib/redis';
 import { crawlPageBatch } from '@/lib/pipeline/crawl';
 import { BATCH_SIZES } from '../types';
 import type { StepContext } from '../types';
-import type { StepResult } from './index';
+import { enrichSkips, type StepResult } from './index';
 
 const KEY_TTL = 86400; // 24h — matches the pipeline cursor/frontier key lifetime
 
@@ -15,6 +15,7 @@ const KEY_TTL = 86400; // 24h — matches the pipeline cursor/frontier key lifet
  * Re-enqueues while the frontier still has URLs; advances once it drains.
  */
 export async function siteCrawlStep(ctx: StepContext): Promise<StepResult> {
+  if (enrichSkips(ctx, 'website')) return { status: 'advance' }; // enriching a different source
   const batchUrls = await popFrontier(ctx.jobId, BATCH_SIZES['site-crawl']);
   if (batchUrls.length === 0) return { status: 'advance' };
 

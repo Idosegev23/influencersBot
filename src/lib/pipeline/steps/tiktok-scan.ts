@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { setCount } from '@/lib/pipeline/state';
 import { getTiktokProfile, getTiktokVideos, getTiktokTranscript } from '@/lib/scraping/tiktokScraper';
 import type { StepContext } from '../types';
-import type { StepResult } from './index';
+import { enrichSkips, type StepResult } from './index';
 
 const QUOTE_VIDEO_CAP = 10;
 const FULL_VIDEO_CAP = 25;
@@ -27,6 +27,7 @@ function toPostedAt(unixSeconds?: number): string {
  * handle → skip.
  */
 export async function tiktokScanStep(ctx: StepContext): Promise<StepResult> {
+  if (enrichSkips(ctx, 'tiktok')) return { status: 'advance' }; // enriching a different source
   const handle = ctx.state.options?.tiktok;
   if (!handle) return { status: 'advance' };
 

@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { setCount } from '@/lib/pipeline/state';
 import { getYoutubeChannel, getYoutubeVideos, getYoutubeTranscript } from '@/lib/scraping/youtubeScraper';
 import type { StepContext } from '../types';
-import type { StepResult } from './index';
+import { enrichSkips, type StepResult } from './index';
 
 // Quote (demo) scans grab fewer videos to stay fast; full scans grab more.
 const QUOTE_VIDEO_CAP = 10;
@@ -31,6 +31,7 @@ function toPostedAt(dateLike?: string): string {
  * metadata (subscribers/views) in `config.youtube`. No channel → skip.
  */
 export async function youtubeScanStep(ctx: StepContext): Promise<StepResult> {
+  if (enrichSkips(ctx, 'youtube')) return { status: 'advance' }; // enriching a different source
   const channelInput = ctx.state.options?.youtube;
   if (!channelInput) return { status: 'advance' };
 

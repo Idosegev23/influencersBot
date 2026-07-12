@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { setCount } from '@/lib/pipeline/state';
 import { BATCH_SIZES } from '../types';
 import type { StepContext } from '../types';
-import { hasInstagram, type StepResult } from './index';
+import { hasInstagram, enrichSkips, type StepResult } from './index';
 // Same transcriber fns used by content-processor-orchestrator.ts. Transcriptions
 // are stored in the separate `instagram_transcriptions` table (keyed by
 // source_type/source_id) — `instagram_posts` has NO transcription column.
@@ -37,6 +37,7 @@ async function completedPostIds(supabase: any, accountId: string): Promise<Set<s
 }
 
 export async function transcribeStep(ctx: StepContext): Promise<StepResult> {
+  if (enrichSkips(ctx, 'instagram')) return { status: 'advance' }; // enriching a different source
   if (!hasInstagram(ctx)) return { status: 'advance' }; // website-only account: no IG videos to transcribe
   if (!ctx.state.options?.transcribe) return { status: 'advance' };
 
