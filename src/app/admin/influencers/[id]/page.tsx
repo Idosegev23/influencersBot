@@ -4,6 +4,7 @@ import { use, useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import EscalationContactsForm from './EscalationContactsForm';
 import SourcesPanel from './SourcesPanel';
+import MetaApiConsole from '@/components/admin/meta-review/MetaApiConsole';
 
 interface AdminDocument {
   id: string;
@@ -778,6 +779,8 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
       <SourcesPanel accountId={id} />
 
       <EscalationContactsForm accountId={id} />
+
+      <MetaApiConsole accountId={id} />
     </div>
   );
 }
