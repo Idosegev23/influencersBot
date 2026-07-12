@@ -17,9 +17,12 @@ export async function GET(req: NextRequest) {
   const conn = await getIgConnectionForAccount(accountId);
   if (!conn) return NextResponse.json({ error: 'No active Instagram connection' }, { status: 409 });
 
+  // NOTE: profile_views was removed from IG insights in v21+/v22 — including it makes
+  // Graph reject the ENTIRE request (#100), blanking every metric. Keep only metrics
+  // that support metric_type=total_value on graph.instagram.com.
   const account = await callGraph({
     method: 'GET',
-    url: `${GRAPH_BASE}/me/insights?metric=reach,accounts_engaged,total_interactions,profile_views&period=day&metric_type=total_value`,
+    url: `${GRAPH_BASE}/me/insights?metric=reach,accounts_engaged,total_interactions&period=day&metric_type=total_value`,
     accessToken: conn.accessToken,
   });
   const demographics = await callGraph({

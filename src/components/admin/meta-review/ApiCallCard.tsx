@@ -17,11 +17,13 @@ interface ApiCallCardProps {
   onRun: () => Promise<ApiCallResult>;
   disabled?: boolean;
   disabledReason?: string;
+  /** ok:true but no rows — show a neutral "0 items" banner instead of green success. */
+  emptyWhen?: (result: ApiCallResult) => boolean;
   children?: (result: ApiCallResult) => ReactNode;
 }
 
 export default function ApiCallCard({
-  title, permission, description, actionLabel, onRun, disabled, disabledReason, children,
+  title, permission, description, actionLabel, onRun, disabled, disabledReason, emptyWhen, children,
 }: ApiCallCardProps) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [result, setResult] = useState<ApiCallResult | null>(null);
@@ -65,11 +67,15 @@ export default function ApiCallCard({
 
       {status !== 'idle' && result && (
         <div className="mt-4 space-y-3">
-          {status === 'success' && (
+          {status === 'success' && (emptyWhen && emptyWhen(result) ? (
+            <div className="text-sm font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              ✓ Live API call succeeded, but returned 0 items — pick an item that has data.
+            </div>
+          ) : (
             <div className="text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
               ✓ Live API call succeeded
             </div>
-          )}
+          ))}
           {status === 'error' && (
             <div className="text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
               ✕ The API returned an error (shown in the response below)

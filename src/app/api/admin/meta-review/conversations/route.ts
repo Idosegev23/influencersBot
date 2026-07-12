@@ -23,6 +23,9 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     requests: [convos.request],
     response: convos.response,
+    // Full id set so the client can reliably exclude the business participant —
+    // the account can surface under any of its known ids, not just ig_business_account_id.
+    businessIgIds: conn.knownIgIds,
     businessIgId: conn.igId,
     ok: convos.ok,
   });

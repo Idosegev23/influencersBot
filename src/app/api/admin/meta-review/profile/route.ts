@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
 
   const profile = await callGraph({
     method: 'GET',
-    url: `${GRAPH_BASE}/me?fields=id,username,name,profile_picture_url,followers_count,media_count,biography,website`,
+    url: `${GRAPH_BASE}/me?fields=id,username,name,profile_picture_url,followers_count,media_count`,
     accessToken: conn.accessToken,
   });
   const media = await callGraph({

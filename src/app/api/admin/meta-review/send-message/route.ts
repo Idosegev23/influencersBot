@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminAuth } from '@/lib/auth/admin-auth';
 import { getIgConnectionForAccount } from '@/lib/instagram-graph/get-connection';
 import { sendInstagramDM } from '@/lib/instagram-graph/client';
-import { redactToken, type RequestMeta } from '@/lib/meta-review/util';
+import { redactToken, redactDeep, type RequestMeta } from '@/lib/meta-review/util';
 
 // instagram_business_manage_messages — the ONLY write/publish action: reply via DM.
 export async function POST(req: NextRequest) {
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const result = await sendInstagramDM(recipientId, text, conn.igId, conn.accessToken);
-    return NextResponse.json({ requests: [request], response: result, ok: true });
+    return NextResponse.json({ requests: [request], response: redactDeep(result), ok: true });
   } catch (e: any) {
     return NextResponse.json({ requests: [request], response: { error: { message: e?.message || 'send failed' } }, ok: false });
   }

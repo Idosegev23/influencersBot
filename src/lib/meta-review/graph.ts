@@ -1,4 +1,4 @@
-import { redactToken, type RequestMeta } from './util';
+import { redactToken, redactDeep, type RequestMeta } from './util';
 
 export const GRAPH_BASE = 'https://graph.instagram.com/v22.0';
 
@@ -32,6 +32,8 @@ export async function callGraph({ method, url, accessToken, body }: CallGraphArg
     headers: { 'Content-Type': 'application/json' },
     ...(body && method === 'POST' ? { body: JSON.stringify(body) } : {}),
   });
-  const response = await res.json().catch(() => ({ error: { message: `HTTP ${res.status}` } }));
+  const raw = await res.json().catch(() => ({ error: { message: `HTTP ${res.status}` } }));
+  // Scrub the token out of the WHOLE body — Graph embeds it in paging.next/previous URLs.
+  const response = redactDeep(raw);
   return { request, response, ok: res.ok };
 }

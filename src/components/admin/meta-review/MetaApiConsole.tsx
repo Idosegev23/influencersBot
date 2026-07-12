@@ -19,7 +19,9 @@ export default function MetaApiConsole({ accountId }: Props) {
   const [recentMedia, setRecentMedia] = useState<MediaItem[]>([]);
   const [selectedMedia, setSelectedMedia] = useState('');
   const [threads, setThreads] = useState<Thread[]>([]);
+  const [convosLoaded, setConvosLoaded] = useState(false);
   const [selectedThread, setSelectedThread] = useState('');
+  const [manualRecipientId, setManualRecipientId] = useState('');
   const [replyText, setReplyText] = useState('');
 
   useEffect(() => {
@@ -32,6 +34,9 @@ export default function MetaApiConsole({ accountId }: Props) {
   const reconnectUrl =
     `/api/auth/instagram/connect?accountId=${accountId}` +
     `&returnTo=${encodeURIComponent(`/admin/influencers/${accountId}#meta-api-console`)}`;
+
+  const selectedThreadObj = threads.find((t) => t.id === selectedThread);
+  const effectiveRecipientId = (selectedThreadObj?.recipientId || manualRecipientId).trim();
 
   return (
     <div id="meta-api-console" dir="ltr" lang="en" style={{ direction: 'ltr' }} className="mt-10">
@@ -108,8 +113,9 @@ export default function MetaApiConsole({ accountId }: Props) {
       <ApiCallCard
         title="Account insights"
         permission="instagram_business_manage_insights"
-        description="Retrieves account-level analytics (reach, accounts engaged, total interactions, profile views) and follower demographics."
+        description="Retrieves account-level analytics (reach, accounts engaged, total interactions) and follower demographics."
         actionLabel="Fetch account insights"
+        emptyWhen={(r) => !(((r.response as any)?.account?.data || []).length)}
         onRun={async () => {
           const res = await fetch(`/api/admin/meta-review/insights?accountId=${accountId}`);
           const json = await res.json();
@@ -136,33 +142,45 @@ export default function MetaApiConsole({ accountId }: Props) {
       <ApiCallCard
         title="Direct messages — conversations"
         permission="instagram_business_manage_messages"
-        description="Retrieves recent Instagram Direct conversations. Select one below to send a reply."
+        description="Retrieves recent Instagram Direct conversations. Use the panel below to send a reply."
         actionLabel="Load conversations"
         onRun={async () => {
           const res = await fetch(`/api/admin/meta-review/conversations?accountId=${accountId}`);
           const json = await res.json();
-          const bizId = json.businessIgId || '';
-          const data = (json.response?.data || []) as any[];
-          setThreads(
-            data
-              .map((c) => {
-                const other = (c.participants?.data || []).find((p: any) => p.id !== bizId) || {};
-                return {
-                  id: c.id,
-                  recipientId: other.id || '',
-                  recipientName: other.username || other.id || 'unknown',
-                  lastMessage: c.messages?.data?.[0]?.message || '',
-                };
-              })
-              .filter((t: Thread) => t.recipientId),
+          // Exclude the business under ANY of its known ids; drop threads with no real counterpart.
+          const bizIds = new Set<string>(
+            (json.businessIgIds && json.businessIgIds.length ? json.businessIgIds : [json.businessIgId]).filter(Boolean),
           );
+          const data = (json.response?.data || []) as any[];
+          const built: Thread[] = data
+            .map((c) => {
+              const other = (c.participants?.data || []).find((p: any) => p.id && !bizIds.has(p.id));
+              if (!other) return null;
+              return {
+                id: c.id,
+                recipientId: other.id,
+                recipientName: other.username || other.id,
+                lastMessage: c.messages?.data?.[0]?.message || '',
+              };
+            })
+            .filter(Boolean) as Thread[];
+          setThreads(built);
+          setConvosLoaded(true);
           return { requests: json.requests || [], response: json.response, ok: !!json.ok };
         }}
       />
 
-      {threads.length > 0 && (
-        <div className="rounded-xl border border-gray-200 bg-white p-5 mb-5">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Reply to conversation</label>
+      {/* Reply panel — always available so the publish demo can be recorded even
+          when the 24h window has no conversations (fall back to a manual IGSID). */}
+      <div className="rounded-xl border border-gray-200 bg-white p-5 mb-5">
+        <label className="block text-sm font-medium text-gray-700 mb-1">Reply via Direct Message</label>
+        {convosLoaded && threads.length === 0 && (
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mb-3">
+            No conversations in the 24-hour messaging window. Send a DM to the account and reload,
+            or paste a recipient IGSID below to send the reply.
+          </p>
+        )}
+        {threads.length > 0 && (
           <select
             value={selectedThread}
             onChange={(e) => setSelectedThread(e.target.value)}
@@ -175,33 +193,38 @@ export default function MetaApiConsole({ accountId }: Props) {
               </option>
             ))}
           </select>
-          <textarea
-            value={replyText}
-            onChange={(e) => setReplyText(e.target.value)}
-            placeholder="Type a reply to send via Instagram Direct…"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3"
-            rows={2}
-          />
-          <ApiCallCard
-            title="Send reply"
-            permission="instagram_business_manage_messages"
-            description="Sends the reply above to the selected conversation via the Instagram Send API and shows the message id returned on success."
-            actionLabel="Send reply"
-            disabled={!selectedThread || !replyText.trim()}
-            disabledReason="Select a conversation and type a reply first."
-            onRun={async () => {
-              const t = threads.find((x) => x.id === selectedThread);
-              const res = await fetch('/api/admin/meta-review/send-message', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ accountId, recipientId: t?.recipientId, text: replyText }),
-              });
-              const json = await res.json();
-              return { requests: json.requests || [], response: json.response, ok: !!json.ok };
-            }}
-          />
-        </div>
-      )}
+        )}
+        <input
+          value={manualRecipientId}
+          onChange={(e) => setManualRecipientId(e.target.value)}
+          placeholder="Recipient IGSID (auto-filled from a selected conversation, or paste one)"
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3 font-mono"
+        />
+        <textarea
+          value={replyText}
+          onChange={(e) => setReplyText(e.target.value)}
+          placeholder="Type a reply to send via Instagram Direct…"
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3"
+          rows={2}
+        />
+        <ApiCallCard
+          title="Send reply"
+          permission="instagram_business_manage_messages"
+          description="Sends the reply to the recipient via the Instagram Send API and shows the message id returned on success."
+          actionLabel="Send reply"
+          disabled={!effectiveRecipientId || !replyText.trim()}
+          disabledReason="Select a conversation (or paste a recipient IGSID) and type a reply first."
+          onRun={async () => {
+            const res = await fetch('/api/admin/meta-review/send-message', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ accountId, recipientId: effectiveRecipientId, text: replyText }),
+            });
+            const json = await res.json();
+            return { requests: json.requests || [], response: json.response, ok: !!json.ok };
+          }}
+        />
+      </div>
 
       {/* Block 4 — Comments (read-only) */}
       <div className="rounded-xl border border-gray-200 bg-white p-5 mb-5">
@@ -230,6 +253,7 @@ export default function MetaApiConsole({ accountId }: Props) {
         actionLabel="Load comments"
         disabled={!selectedMedia}
         disabledReason="Select a media item above first."
+        emptyWhen={(r) => !(((r.response as any)?.data || []).length)}
         onRun={async () => {
           const res = await fetch(
             `/api/admin/meta-review/comments?accountId=${accountId}&mediaId=${encodeURIComponent(selectedMedia)}`,
