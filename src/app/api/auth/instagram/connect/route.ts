@@ -20,6 +20,7 @@ const SCOPES = [
 
 export async function GET(req: NextRequest) {
   const accountId = req.nextUrl.searchParams.get('accountId') || '';
+  const returnTo = req.nextUrl.searchParams.get('returnTo') || '';
 
   if (!INSTAGRAM_APP_ID) {
     return NextResponse.json(
@@ -34,9 +35,10 @@ export async function GET(req: NextRequest) {
   // trailing-newline bug in NEXT_PUBLIC_APP_URL on Vercel).
   const redirectUri = `${req.nextUrl.origin}/api/auth/instagram/callback`;
 
-  // State parameter — passed through OAuth flow and returned in callback
-  // Contains the accountId so we can link the connection to the right account
-  const state = encodeURIComponent(JSON.stringify({ accountId }));
+  // State parameter — passed through OAuth flow and returned in callback.
+  // Carries the accountId (to link the connection) and an optional returnTo
+  // (so the admin console can send the user back to itself after reconnect).
+  const state = encodeURIComponent(JSON.stringify({ accountId, returnTo }));
 
   // Build Instagram OAuth URL
   const authUrl = new URL('https://www.instagram.com/oauth/authorize');

@@ -15,6 +15,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { isSafeReturnTo } from '@/lib/meta-review/util';
 
 const INSTAGRAM_APP_ID = process.env.INSTAGRAM_APP_ID || process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID || '';
 const INSTAGRAM_APP_SECRET = process.env.INSTAGRAM_APP_SECRET || '';
@@ -27,10 +28,15 @@ export async function GET(req: NextRequest) {
   const error = searchParams.get('error');
   const state = searchParams.get('state'); // Contains accountId if we passed it
 
-  // Parse state to get accountId for redirect
+  // Parse state to get accountId + optional returnTo for redirect
   let accountId = '';
+  let returnTo = '';
   if (state) {
-    try { accountId = JSON.parse(decodeURIComponent(state)).accountId || ''; } catch {}
+    try {
+      const parsed = JSON.parse(decodeURIComponent(state));
+      accountId = parsed.accountId || '';
+      returnTo = parsed.returnTo || '';
+    } catch {}
   }
   const redirectBase = accountId ? `/admin/influencers/${accountId}` : '/admin/influencers';
 
@@ -130,7 +136,11 @@ export async function GET(req: NextRequest) {
 
     console.log(`[IG OAuth] Successfully connected @${igAccount.username} (${igbaId})`);
 
-    // Redirect influencer to a simple "thank you" page (not admin dashboard)
+    // Redirect back to the admin console if a safe returnTo was supplied,
+    // otherwise the influencer "thank you" page.
+    if (isSafeReturnTo(returnTo)) {
+      return NextResponse.redirect(new URL(returnTo, req.url));
+    }
     return NextResponse.redirect(
       new URL(`/instagram/connected?username=${encodeURIComponent(igAccount.username)}`, req.url),
     );
