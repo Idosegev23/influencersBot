@@ -465,6 +465,20 @@ export async function getUserProfile(
 }
 
 /**
+ * Minimal profile of a DM participant (IGSID). Uses ONLY fields that are valid
+ * for a conversation participant on Instagram Login (name, username) — the broad
+ * getUserProfile field set (is_business_account/biography/media_count) triggers a
+ * whole-request #100 error for a plain participant id.
+ */
+export async function getDmParticipantProfile(
+  igUserId: string,
+  accessToken?: string,
+): Promise<{ id?: string; name?: string; username?: string }> {
+  const url = `${GRAPH_API_BASE}/${igUserId}?fields=name,username`;
+  return graphRequest<{ id?: string; name?: string; username?: string }>(url, 'GET', undefined, accessToken);
+}
+
+/**
  * Get story insights for a specific story
  */
 export async function getStoryInsights(

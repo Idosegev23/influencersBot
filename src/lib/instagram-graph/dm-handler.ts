@@ -23,6 +23,7 @@ import {
   type GenericTemplateElement,
 } from './client';
 import { applyActiveCouponFilter } from '@/lib/coupons/active-filter';
+import { claimDmMessage, resolveSenderIdentity, formatContactLabel } from './dm-guards';
 
 // ============================================
 // Types
@@ -66,9 +67,18 @@ export async function processInstagramGraphDM(
 
   console.log(`[IG Graph DM] Processing DM from ${senderId}: "${messageText.slice(0, 50)}..."`);
 
+  // Atomic cross-invocation dedup — claim the message id in Redis BEFORE any slow
+  // work. Meta re-delivers webhooks (and slow acks trigger retries); the DB meta_mid
+  // marker is only written after the ~5-15s LLM+send, so duplicate deliveries race
+  // past the SELECT below and double-reply. Only one invocation wins the claim.
+  if (!(await claimDmMessage(messageId))) {
+    console.log(`[IG Graph DM] Duplicate delivery for ${messageId} — already claimed, skipping`);
+    return { success: true };
+  }
+
   const supabase = await createClient();
 
-  // Dedup: skip if this message ID was already processed (Meta sends duplicate webhooks)
+  // Secondary dedup (fallback if Redis was unavailable): skip if already persisted
   if (messageId && !messageId.startsWith('postback_')) {
     const { data: existing } = await supabase
       .from('chat_messages')
@@ -108,6 +118,9 @@ export async function processInstagramGraphDM(
       return { success: true };
     }
 
+    // Access token — needed both for sender-identity resolution (below) and sending.
+    const accessToken = await getAccessTokenForAccount(supabase, accountId);
+
     // 3. Get or create DM session (keyed by sender + account via thread_id)
     const threadId = `dm_ig_graph_${senderId}_${accountId}`;
     const session = await getOrCreateSession(supabase, threadId, accountId, senderId);
@@ -141,6 +154,22 @@ export async function processInstagramGraphDM(
         role: 'assistant' as const,
         content: `[סיכום שיחה קודמת: ${session.rolling_summary}]`,
       });
+    }
+
+    // Resolve WHO we're talking to and hand it to the model — without this the bot
+    // speaks generically and can't tell a brand/collab DM from a fan. Best-effort:
+    // a failure or unknown identity must never block the reply.
+    try {
+      const contact = await resolveSenderIdentity(senderId, accessToken || undefined);
+      const contactLabel = formatContactLabel(contact);
+      if (contactLabel) {
+        conversationHistory.unshift({
+          role: 'assistant' as const,
+          content: `[הפונה בשיחה זו: ${contactLabel}]`,
+        });
+      }
+    } catch {
+      // identity is best-effort
     }
 
     // 5. Process through SandwichBot — SAME engine as widget, social, and Respond.io DM
@@ -180,8 +209,7 @@ export async function processInstagramGraphDM(
       suggestions: suggestions.length,
     });
 
-    // 6. Send reply via Instagram Graph API
-    const accessToken = await getAccessTokenForAccount(supabase, accountId);
+    // 6. Send reply via Instagram Graph API (accessToken already fetched above)
 
     // Convert suggestions to Instagram quick reply buttons (max 13, 20 chars each)
     const quickReplies = suggestions
