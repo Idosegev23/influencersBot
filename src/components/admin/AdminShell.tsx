@@ -176,7 +176,9 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const isLoginPage = pathname === '/admin';
+  // Render bare (no Hebrew RTL chrome) for the login page and the Meta App Review
+  // console — the latter is recorded for Meta and must be a clean English/LTR surface.
+  const isBareRoute = pathname === '/admin' || pathname.startsWith('/admin/meta-review');
   const closeMobile = () => setMobileOpen(false);
 
   // ⌘K placeholder — keyboard hint for future command palette
@@ -192,7 +194,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  if (isLoginPage) {
+  if (isBareRoute) {
     return <>{children}</>;
   }
 

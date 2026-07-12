@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import ApiCallCard from './ApiCallCard';
 
 interface Props { accountId: string; }
@@ -31,9 +32,12 @@ export default function MetaApiConsole({ accountId }: Props) {
       .catch(() => setConn(null));
   }, [accountId]);
 
+  // Return to whichever page hosts the console (standalone /admin/meta-review or the
+  // embedded influencer page) after the OAuth round-trip.
+  const pathname = usePathname() || `/admin/influencers/${accountId}`;
   const reconnectUrl =
     `/api/auth/instagram/connect?accountId=${accountId}` +
-    `&returnTo=${encodeURIComponent(`/admin/influencers/${accountId}#meta-api-console`)}`;
+    `&returnTo=${encodeURIComponent(`${pathname}#meta-api-console`)}`;
 
   const selectedThreadObj = threads.find((t) => t.id === selectedThread);
   const effectiveRecipientId = (selectedThreadObj?.recipientId || manualRecipientId).trim();

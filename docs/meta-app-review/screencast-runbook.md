@@ -1,7 +1,10 @@
 # Meta App Review — Screencast Runbook (LDRS Instagram)
 
 Re-recording after the "static examples" rejection. The console lives at
-`/admin/influencers/<LDRS-ACCOUNT-ID>#meta-api-console` and renders in English.
+`/admin/meta-review/<LDRS-ACCOUNT-ID>` (clean full-English page, no Hebrew chrome) and renders in English.
+
+LDRS account id: `de38eac6-d2fb-46a7-ac09-5ec860147ca0` →
+record at **`/admin/meta-review/de38eac6-d2fb-46a7-ac09-5ec860147ca0`**.
 Goal: show the full login flow + a live API call per permission with the raw
 JSON response and success state visible.
 
@@ -28,7 +31,7 @@ JSON response and success state visible.
 
 ## Recording sequence (English captions in brackets)
 
-1. Open `/admin/influencers/<LDRS-ACCOUNT-ID>#meta-api-console`.
+1. Open `/admin/meta-review/<LDRS-ACCOUNT-ID>` (clean full-English page, no Hebrew chrome).
    [Caption: "Admin opens the Instagram API console for the connected account."]
 2. **Connection & permissions** → "Reconnect & review permissions" → complete the
    Instagram login → **show the permission grant screen listing the four
