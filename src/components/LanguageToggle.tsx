@@ -27,10 +27,12 @@ export function LanguageToggle({ lang, variant = 'nav' }: LanguageToggleProps) {
   const t = getDashboardStrings(lang).nav;
 
   async function switchLanguage() {
-    if (busy) return;
+    if (busy || !username) return;
     setBusy(true);
     try {
-      const res = await fetch('/api/influencer/language', {
+      // username MUST be in the query string — requireInfluencerAuth reads it from
+      // there (extractUsername), not the body. Without it the endpoint 400s.
+      const res = await fetch(`/api/influencer/language?username=${encodeURIComponent(username)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ language: target }),
