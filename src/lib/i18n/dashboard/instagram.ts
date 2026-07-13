@@ -8,6 +8,11 @@ export const instagram = {
     // Connection + bot control
     connectedAs: 'מחובר כ-',
     notConnected: 'אין חשבון אינסטגרם מחובר',
+    connect: 'חבר/י אינסטגרם',
+    connectHint: 'חברו את חשבון האינסטגרם העסקי כדי שהבוט יוכל לענות להודעות DM.',
+    disconnect: 'נתק',
+    disconnectConfirm: 'לנתק את חשבון האינסטגרם? הבוט יפסיק לענות ל-DM עד לחיבור מחדש.',
+    disconnecting: 'מנתק…',
     botSectionTitle: 'תשובות DM אוטומטיות',
     botOn: 'פעיל',
     botOff: 'כבוי',
@@ -43,6 +48,11 @@ export const instagram = {
     // Connection + bot control
     connectedAs: 'Connected as',
     notConnected: 'No Instagram account connected',
+    connect: 'Connect Instagram',
+    connectHint: 'Connect your Instagram Business account so the bot can reply to DMs.',
+    disconnect: 'Disconnect',
+    disconnectConfirm: 'Disconnect this Instagram account? The bot will stop replying to DMs until you reconnect.',
+    disconnecting: 'Disconnecting…',
     botSectionTitle: 'Automated DM responses',
     botOn: 'On',
     botOff: 'Off',

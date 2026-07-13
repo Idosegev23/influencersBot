@@ -37,7 +37,7 @@ const BASE_NAV_ITEMS: {
   requiresInstagram?: boolean;
 }[] = [
   { key: 'dashboard', icon: LayoutDashboard },
-  { key: 'instagram', icon: Instagram, requiresInstagram: true },
+  { key: 'instagram', icon: Instagram },
   { key: 'analytics', icon: BarChart3 },
   { key: 'partnerships', icon: Briefcase },
   { key: 'coupons', icon: Tag },

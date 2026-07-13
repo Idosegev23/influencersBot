@@ -39,6 +39,24 @@ export default function InstagramPage() {
   const [replyText, setReplyText] = useState('');
   const [sending, setSending] = useState(false);
   const [sendErr, setSendErr] = useState('');
+  const [disconnecting, setDisconnecting] = useState(false);
+
+  const connectUrl =
+    `/api/auth/instagram/connect?accountId=${accountId}` +
+    `&returnTo=${encodeURIComponent(`/influencer/${username}/instagram`)}`;
+
+  async function disconnect() {
+    if (disconnecting) return;
+    if (typeof window !== 'undefined' && !window.confirm(t.disconnectConfirm)) return;
+    setDisconnecting(true);
+    try {
+      const res = await fetch(`/api/influencer/instagram/disconnect?username=${username}`, { method: 'POST' });
+      if (res.ok) window.location.reload();
+      else setDisconnecting(false);
+    } catch {
+      setDisconnecting(false);
+    }
+  }
 
   useEffect(() => {
     if (!username) return;
@@ -145,28 +163,55 @@ export default function InstagramPage() {
         <>
           {/* Connection + bot toggle */}
           <div className="rounded-2xl p-5 mb-5" style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-glass-border)' }}>
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div className="text-sm" style={{ color: 'var(--dash-text)' }}>
-                {conn.connected
-                  ? <>{t.connectedAs} <strong>@{conn.ig_username}</strong></>
-                  : <span style={{ color: 'var(--dash-text-3)' }}>{t.notConnected}</span>}
+            {conn.connected ? (
+              <>
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div className="text-sm" style={{ color: 'var(--dash-text)' }}>
+                    {t.connectedAs} <strong>@{conn.ig_username}</strong>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={toggleBot}
+                      disabled={botToggling}
+                      className="px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-50"
+                      style={{
+                        background: dmBotEnabled ? 'var(--color-primary)' : 'var(--dash-surface-hover)',
+                        color: dmBotEnabled ? '#fff' : 'var(--dash-text-2)',
+                      }}
+                      title={t.botToggleHint}
+                    >
+                      {t.botSectionTitle}: {dmBotEnabled ? t.botOn : t.botOff}
+                    </button>
+                    <button
+                      onClick={disconnect}
+                      disabled={disconnecting}
+                      className="px-3 py-2 rounded-xl text-sm font-medium disabled:opacity-50"
+                      style={{ background: 'rgba(220,38,39,0.1)', color: '#dc2627', border: '1px solid rgba(220,38,39,0.2)' }}
+                    >
+                      {disconnecting ? t.disconnecting : t.disconnect}
+                    </button>
+                  </div>
+                </div>
+                <p className="text-xs mt-2" style={{ color: 'var(--dash-text-3)' }}>{t.botToggleHint}</p>
+              </>
+            ) : (
+              <div className="text-center py-6">
+                <Instagram className="w-8 h-8 mx-auto mb-3" style={{ color: 'var(--color-primary)' }} />
+                <p className="text-sm font-medium mb-1" style={{ color: 'var(--dash-text)' }}>{t.notConnected}</p>
+                <p className="text-xs mb-4 max-w-sm mx-auto" style={{ color: 'var(--dash-text-3)' }}>{t.connectHint}</p>
+                <a
+                  href={connectUrl}
+                  className="inline-block px-5 py-2.5 rounded-xl text-sm font-semibold text-white"
+                  style={{ background: 'var(--color-primary)' }}
+                >
+                  {t.connect}
+                </a>
               </div>
-              <button
-                onClick={toggleBot}
-                disabled={botToggling || !conn.connected}
-                className="px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-50"
-                style={{
-                  background: dmBotEnabled ? 'var(--color-primary)' : 'var(--dash-surface-hover)',
-                  color: dmBotEnabled ? '#fff' : 'var(--dash-text-2)',
-                }}
-                title={t.botToggleHint}
-              >
-                {t.botSectionTitle}: {dmBotEnabled ? t.botOn : t.botOff}
-              </button>
-            </div>
-            <p className="text-xs mt-2" style={{ color: 'var(--dash-text-3)' }}>{t.botToggleHint}</p>
+            )}
           </div>
 
+          {conn.connected && (
+            <>
           {/* Analytics */}
           <div className="mb-5">
             <div className="text-xs font-semibold uppercase mb-2" style={{ color: 'var(--dash-text-3)' }}>{t.analyticsTitle}</div>
@@ -272,6 +317,8 @@ export default function InstagramPage() {
                 )}
               </div>
             </div>
+          )}
+            </>
           )}
         </>
       )}
