@@ -643,9 +643,19 @@ export default function InfluencerDashboardPage({
                           onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--dash-surface-hover)'; }}
                           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                         >
-                        <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-glass-border)' }}>
-                          <Icon className="w-3.5 h-3.5" style={{ color: 'var(--dash-text-3)' }} />
-                        </div>
+                        {post.thumbnail ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={post.thumbnail}
+                            alt=""
+                            className="w-8 h-8 rounded-xl object-cover flex-shrink-0"
+                            style={{ border: '1px solid var(--dash-glass-border)' }}
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-glass-border)' }}>
+                            <Icon className="w-3.5 h-3.5" style={{ color: 'var(--dash-text-3)' }} />
+                          </div>
+                        )}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm truncate" style={{ color: 'var(--dash-text)' }}>{post.caption || `${post.type} post`}</p>
                           <p className="text-[11px]" style={{ color: 'var(--dash-text-3)' }}>{formatRelativeTime(post.postedAt)}</p>
