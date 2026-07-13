@@ -22,6 +22,7 @@ import { coupons } from './coupons';
 import { products } from './products';
 import { botContent } from './botContent';
 import { conversations } from './conversations';
+import { instagram } from './instagram';
 import { chatbotSettings } from './chatbotSettings';
 import { chatbotPersona } from './chatbotPersona';
 import { documents } from './documents';
@@ -44,6 +45,7 @@ const STRINGS = {
     products: products.he,
     botContent: botContent.he,
     conversations: conversations.he,
+    instagram: instagram.he,
     chatbotSettings: chatbotSettings.he,
     chatbotPersona: chatbotPersona.he,
     documents: documents.he,
@@ -63,6 +65,7 @@ const STRINGS = {
     products: products.en,
     botContent: botContent.en,
     conversations: conversations.en,
+    instagram: instagram.en,
     chatbotSettings: chatbotSettings.en,
     chatbotPersona: chatbotPersona.en,
     documents: documents.en,

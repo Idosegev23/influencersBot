@@ -34,9 +34,19 @@ export async function GET(request: NextRequest) {
       .eq('account_id', auth.accountId)
       .not('slug', 'is', null);
 
+    // Instagram-connected → show the Instagram control tab.
+    const { data: igConn } = await supabase
+      .from('ig_graph_connections')
+      .select('id')
+      .eq('account_id', auth.accountId)
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle();
+
     return NextResponse.json({
       archetype,
       hasProducts: (count ?? 0) > 0,
+      instagramConnected: !!igConn,
       language,
     });
   } catch (error) {

@@ -13,6 +13,7 @@ import {
   BarChart3,
   Settings,
   Sparkles,
+  Instagram,
   Sun,
   Moon,
 } from 'lucide-react';
@@ -25,7 +26,7 @@ import { LanguageToggle } from '@/components/LanguageToggle';
 const BRAND_LIKE_ARCHETYPES = new Set(['brand', 'local_business', 'b2b_saas']);
 
 type NavKey =
-  | 'dashboard' | 'analytics' | 'partnerships' | 'coupons' | 'products'
+  | 'dashboard' | 'instagram' | 'analytics' | 'partnerships' | 'coupons' | 'products'
   | 'conversations' | 'support' | 'attribution' | 'settings';
 
 const BASE_NAV_ITEMS: {
@@ -33,8 +34,10 @@ const BASE_NAV_ITEMS: {
   icon: typeof LayoutDashboard;
   brandOnly?: boolean;
   requiresProducts?: boolean;
+  requiresInstagram?: boolean;
 }[] = [
   { key: 'dashboard', icon: LayoutDashboard },
+  { key: 'instagram', icon: Instagram, requiresInstagram: true },
   { key: 'analytics', icon: BarChart3 },
   { key: 'partnerships', icon: Briefcase },
   { key: 'coupons', icon: Tag },
@@ -54,6 +57,7 @@ export function NavigationMenu() {
   const [features, setFeatures] = useState<{
     archetype: string | null;
     hasProducts: boolean;
+    instagramConnected: boolean;
     language: DashboardLang;
   } | null>(null);
   useEffect(() => {
@@ -67,6 +71,7 @@ export function NavigationMenu() {
         if (!cancelled) setFeatures({
           archetype: data.archetype || null,
           hasProducts: !!data.hasProducts,
+          instagramConnected: !!data.instagramConnected,
           language: data.language === 'en' ? 'en' : 'he',
         });
       } catch {}
@@ -80,6 +85,7 @@ export function NavigationMenu() {
   // of missing tabs. Influencer-only adjustments apply once nav-features lands.
   const isBrandLike = features ? BRAND_LIKE_ARCHETYPES.has(features.archetype || '') : true;
   const hasProducts = features ? features.hasProducts : false;
+  const instagramConnected = features ? features.instagramConnected : false;
   const lang: DashboardLang = features?.language || 'he';
   const t = getDashboardStrings(lang).nav;
   const dir = dashboardDir(lang);
@@ -87,6 +93,7 @@ export function NavigationMenu() {
   const NAV_ITEMS = BASE_NAV_ITEMS.filter((item) => {
     if (item.brandOnly && !isBrandLike) return false;
     if (item.requiresProducts && !hasProducts) return false;
+    if (item.requiresInstagram && !instagramConnected) return false;
     return true;
   }).map((item) => ({ ...item, label: t[item.key] }));
 
