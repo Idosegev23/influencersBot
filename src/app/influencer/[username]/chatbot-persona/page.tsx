@@ -172,7 +172,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
       if (authData.accountId || accountId) {
         const aid = authData.accountId || accountId;
         setAccountId(aid);
-        const dmRes = await fetch(`/api/influencer/dm-settings?accountId=${aid}`);
+        const dmRes = await fetch(`/api/influencer/dm-settings?accountId=${aid}&username=${username}`);
         if (dmRes.ok) {
           const dmData = await dmRes.json();
           setIgConnection(dmData.ig_connection || { connected: false });
@@ -194,7 +194,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
     if (!accountId) return;
     setDmLoading(true);
     try {
-      const res = await fetch('/api/influencer/dm-settings', {
+      const res = await fetch(`/api/influencer/dm-settings?username=${username}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accountId, dm_bot_enabled: !dmBotEnabled }),

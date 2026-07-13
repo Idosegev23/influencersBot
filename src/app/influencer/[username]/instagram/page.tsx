@@ -49,7 +49,7 @@ export default function InstagramPage() {
         const accId = profileRes.ok ? (await profileRes.json())?.account?.id || '' : '';
         setAccountId(accId);
         if (accId) {
-          const dmRes = await fetch(`/api/influencer/dm-settings?accountId=${accId}`);
+          const dmRes = await fetch(`/api/influencer/dm-settings?accountId=${accId}&username=${username}`);
           if (dmRes.ok) {
             const d = await dmRes.json();
             setDmBotEnabled(d.dm_bot_enabled ?? true);
@@ -74,7 +74,7 @@ export default function InstagramPage() {
     setBotToggling(true);
     try {
       const next = !dmBotEnabled;
-      const res = await fetch('/api/influencer/dm-settings', {
+      const res = await fetch(`/api/influencer/dm-settings?username=${username}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accountId, dm_bot_enabled: next }),
@@ -86,14 +86,17 @@ export default function InstagramPage() {
   async function toggleFlag(th: Thread) {
     const next = !th.flagged;
     setThreads((prev) => prev.map((x) => (x.sessionId === th.sessionId ? { ...x, flagged: next } : x)));
+    setAnalytics((a) => ({ ...a, flagged: a.flagged + (next ? 1 : -1) }));
     try {
-      await fetch(`/api/influencer/dm/flag?username=${username}`, {
+      const res = await fetch(`/api/influencer/dm/flag?username=${username}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId: th.sessionId, flagged: next }),
       });
+      if (!res.ok) throw new Error('flag failed');
     } catch {
       setThreads((prev) => prev.map((x) => (x.sessionId === th.sessionId ? { ...x, flagged: th.flagged } : x)));
+      setAnalytics((a) => ({ ...a, flagged: a.flagged + (next ? -1 : 1) }));
     }
   }
 

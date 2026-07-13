@@ -13,6 +13,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { setIceBreakers, setPersistentMenu, getIceBreakers, getPersistentMenu } from '@/lib/instagram-graph/client';
+import { requireInfluencerAuth } from '@/lib/auth/influencer-auth';
+import { requireAdminAuth } from '@/lib/auth/admin-auth';
+
+/**
+ * Authorize a dm-settings request and resolve the target account.
+ * - Owner: an influencer/support-agent session (requires ?username=). The account
+ *   is derived from the session; any client-supplied accountId is IGNORED (prevents
+ *   cross-tenant IDOR — this endpoint uses the service-role client and bypasses RLS).
+ * - Admin: the trusted env-cookie session may act on any account via the supplied id.
+ */
+async function authorizeDmSettings(
+  req: NextRequest,
+  clientAccountId: string | null | undefined,
+): Promise<{ accountId: string } | NextResponse> {
+  if (req.nextUrl.searchParams.get('username')) {
+    const inf = await requireInfluencerAuth(req);
+    if (inf.authorized) return { accountId: inf.accountId };
+  }
+  const denied = await requireAdminAuth();
+  if (!denied) {
+    if (!clientAccountId) return NextResponse.json({ error: 'accountId is required' }, { status: 400 });
+    return { accountId: clientAccountId };
+  }
+  return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+}
 
 // ============================================
 // Default Configurations
@@ -38,11 +63,11 @@ const DEFAULT_PERSISTENT_MENU = [
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { accountId, ice_breakers, persistent_menu, use_defaults } = body;
+    const { ice_breakers, persistent_menu, use_defaults } = body;
 
-    if (!accountId) {
-      return NextResponse.json({ error: 'accountId is required' }, { status: 400 });
-    }
+    const authz = await authorizeDmSettings(req, body.accountId);
+    if (authz instanceof NextResponse) return authz;
+    const accountId = authz.accountId;
 
     const supabase = await createClient();
 
@@ -136,12 +161,10 @@ export async function POST(req: NextRequest) {
 // ============================================
 
 export async function GET(req: NextRequest) {
-  const accountId = req.nextUrl.searchParams.get('accountId');
+  const authz = await authorizeDmSettings(req, req.nextUrl.searchParams.get('accountId'));
+  if (authz instanceof NextResponse) return authz;
+  const accountId = authz.accountId;
   const verify = req.nextUrl.searchParams.get('verify') === 'true';
-
-  if (!accountId) {
-    return NextResponse.json({ error: 'accountId is required' }, { status: 400 });
-  }
 
   const supabase = await createClient();
 
@@ -212,11 +235,11 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
-    const { accountId, dm_bot_enabled } = body;
+    const { dm_bot_enabled } = body;
 
-    if (!accountId) {
-      return NextResponse.json({ error: 'accountId is required' }, { status: 400 });
-    }
+    const authz = await authorizeDmSettings(req, body.accountId);
+    if (authz instanceof NextResponse) return authz;
+    const accountId = authz.accountId;
 
     if (typeof dm_bot_enabled !== 'boolean') {
       return NextResponse.json({ error: 'dm_bot_enabled must be a boolean' }, { status: 400 });

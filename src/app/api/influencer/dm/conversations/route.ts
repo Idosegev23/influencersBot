@@ -27,14 +27,16 @@ export async function GET(req: NextRequest) {
   const now = Date.now();
 
   const threads = await Promise.all((sessions || []).map(async (s: any) => {
-    const { data: msgs } = await supabase
+    // Newest 50 (then reversed to chronological) — an ascending+limit would return
+    // the OLDEST messages, making within24h stale and blocking replies on busy threads.
+    const { data: msgsDesc } = await supabase
       .from('chat_messages')
       .select('role, content, created_at, metadata')
       .eq('session_id', s.id)
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
       .limit(50);
 
-    const messages = (msgs || []).map((m: any) => ({
+    const messages = (msgsDesc || []).reverse().map((m: any) => ({
       role: m.role,
       content: m.content,
       createdAt: m.created_at,

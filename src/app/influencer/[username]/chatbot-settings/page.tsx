@@ -90,7 +90,7 @@ export default function ChatbotSettingsPage() {
 
   const loadDmSettings = async (accId: string) => {
     try {
-      const res = await fetch(`/api/influencer/dm-settings?accountId=${accId}`);
+      const res = await fetch(`/api/influencer/dm-settings?accountId=${accId}&username=${username}`);
       if (res.ok) {
         const data = await res.json();
         setDmBotEnabled(data.dm_bot_enabled ?? true);
@@ -106,7 +106,7 @@ export default function ChatbotSettingsPage() {
     setDmToggleLoading(true);
     try {
       const newState = !dmBotEnabled;
-      const res = await fetch('/api/influencer/dm-settings', {
+      const res = await fetch(`/api/influencer/dm-settings?username=${username}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accountId, dm_bot_enabled: newState }),
