@@ -70,11 +70,13 @@ final step (reliable — the client need not keep the page open for hours); flip
 `status → ready` so it only fires once.
 
 - **Client:** WhatsApp via the existing `sendInfluencerWelcome` template (`whatsapp-notify.ts`)
-  to `config.onboarding.ownerWhatsapp`, and `sendEmail` to `config.onboarding.ownerEmail` —
-  both carry links to **the dashboard** (`/influencer/<username>/dashboard`) and **the chat**
-  (`/chat/<username>`). Dependency: the WhatsApp template must be **approved** in Meta (confirm
-  `sendInfluencerWelcome`'s template is live; if not, that's the one blocker for the WhatsApp
-  side — email still ships).
+  to `config.onboarding.ownerWhatsapp`, and `sendEmail` to `config.onboarding.ownerEmail`.
+  **Template status CONFIRMED APPROVED** (`influencer_welcome_v2`, MARKETING/he, verified against
+  Meta): body "היי {{1}}! החשבון שלך מוכן…", URL button → `bestie.ldrsgroup.com/influencer/{{1}}`
+  (the dashboard). The button carries the **dashboard** link; the **chat** link
+  (`/chat/<username>`) goes in the **email** (full content control there). The only thing needed
+  to make WhatsApp fire in prod is the env master switch `WHATSAPP_NOTIFY_ENABLED=true` on Vercel
+  (`WHATSAPP_TEMPLATE_INFLUENCER_WELCOME` defaults on) — an ops step, not code.
 - **Admin:** `sendAdminAlert({ level:'info', subject:'New account onboarded', message, details })`.
 
 ### Phase 3 — first-run dashboard tutorial
