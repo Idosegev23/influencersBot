@@ -1,0 +1,33 @@
+// Analytics page.
+export const analytics = {
+  he: {
+    pageTitle: 'אנליטיקס',
+    kpiVisitors: 'מבקרים',
+    kpiSessions: 'שיחות',
+    kpiMessages: 'הודעות',
+    kpiTickets: 'פניות',
+    kpiDemoRequests: 'בקשות דמו',
+    kpiConversion: 'אחוז המרה',
+    empty: 'אין נתונים להצגה',
+    rangeToday: 'היום',
+    range7d: '7 ימים',
+    range30d: '30 יום',
+    range90d: '90 יום',
+    rangeAllTime: 'מאז ומעולם',
+  },
+  en: {
+    pageTitle: 'Analytics',
+    kpiVisitors: 'Visitors',
+    kpiSessions: 'Sessions',
+    kpiMessages: 'Messages',
+    kpiTickets: 'Tickets',
+    kpiDemoRequests: 'Demo requests',
+    kpiConversion: 'Conversion rate',
+    empty: 'No data yet',
+    rangeToday: 'Today',
+    range7d: '7 days',
+    range30d: '30 days',
+    range90d: '90 days',
+    rangeAllTime: 'All time',
+  },
+} as const;
