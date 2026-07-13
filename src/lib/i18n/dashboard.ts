@@ -29,6 +29,7 @@ const STRINGS = {
       themeDark: 'מצב כהה',
       themeLightShort: 'בהיר',
       themeDarkShort: 'כהה',
+      langSwitchTitle: 'החלף שפה',
     },
 
     // Support inbox page
@@ -199,6 +200,7 @@ const STRINGS = {
       themeDark: 'Dark mode',
       themeLightShort: 'Light',
       themeDarkShort: 'Dark',
+      langSwitchTitle: 'Switch language',
     },
 
     support: {
@@ -360,4 +362,9 @@ export function getDashboardStrings(lang: string | null | undefined): DashboardS
 /** Resolve the layout direction for the dashboard surface. */
 export function dashboardDir(lang: string | null | undefined): 'ltr' | 'rtl' {
   return (lang || 'he').toLowerCase() === 'en' ? 'ltr' : 'rtl';
+}
+
+/** Validate an incoming language value. Returns the language or null if unsupported. */
+export function normalizeLang(lang: unknown): DashboardLang | null {
+  return lang === 'en' || lang === 'he' ? lang : null;
 }

@@ -1,8 +1,10 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
+import { usePathname, useParams } from 'next/navigation';
 import { NavigationMenu } from '@/components/NavigationMenu';
 import { ThemeProvider } from '@/components/ThemeProvider';
+import { useDashboardLang } from '@/hooks/useDashboardLang';
+import { dashboardDir } from '@/lib/i18n/dashboard';
 
 export default function InfluencerLayout({
   children,
@@ -10,11 +12,15 @@ export default function InfluencerLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const params = useParams();
+  const username = params?.username as string | undefined;
+  const { lang } = useDashboardLang(username);
+  const dir = dashboardDir(lang);
   const showNav = !pathname.endsWith('/login');
 
   return (
     <ThemeProvider>
-      <div style={{ background: 'var(--dash-bg)', minHeight: '100vh' }}>
+      <div dir={dir} style={{ background: 'var(--dash-bg)', minHeight: '100vh', direction: dir }}>
         {/* Ambient background layers */}
         <div className="dash-ambient-bg" />
         <div className="dash-noise" />

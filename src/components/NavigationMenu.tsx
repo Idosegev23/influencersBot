@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getDashboardStrings, dashboardDir, type DashboardLang } from '@/lib/i18n/dashboard';
+import { LanguageToggle } from '@/components/LanguageToggle';
 
 // b2b_saas also gets the "brand-like" tabs (support, attribution) — IMAI needs
 // the support inbox in particular.
@@ -133,23 +134,26 @@ export function NavigationMenu() {
             })}
           </div>
 
-          {/* Theme toggle */}
-          <button
-            onClick={toggle}
-            className="w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-300 relative overflow-hidden"
-            style={{ color: 'var(--dash-text-3)' }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'var(--dash-surface-hover)';
-              e.currentTarget.style.color = 'var(--dash-text)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
-              e.currentTarget.style.color = 'var(--dash-text-3)';
-            }}
-            title={theme === 'dark' ? t.themeLight : t.themeDark}
-          >
-            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </button>
+          {/* Language + theme toggles */}
+          <div className="flex items-center gap-0.5">
+            <LanguageToggle lang={lang} />
+            <button
+              onClick={toggle}
+              className="w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-300 relative overflow-hidden"
+              style={{ color: 'var(--dash-text-3)' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--dash-surface-hover)';
+                e.currentTarget.style.color = 'var(--dash-text)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+                e.currentTarget.style.color = 'var(--dash-text-3)';
+              }}
+              title={theme === 'dark' ? t.themeLight : t.themeDark}
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+          </div>
         </div>
       </nav>
 
