@@ -23,19 +23,30 @@ interface Progress {
 
 const BRAND = '#883fe2';
 
+/** Locally persist the typed fields so they survive the full-page IG-connect round trip. */
+function loadSaved(token: string): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  try { return JSON.parse(localStorage.getItem(`onboard:${token}`) || '{}'); } catch { return {}; }
+}
+
 export default function OnboardWizard({ token }: { token: string }) {
   const [data, setData] = useState<StatusData | null>(null);
-  const [phase, setPhase] = useState<'loading' | 'form' | 'scanning' | 'done'>('loading');
+  const [phase, setPhase] = useState<'loading' | 'form' | 'scanning' | 'done' | 'error'>('loading');
   const [jobId, setJobId] = useState<string | null>(null);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [starting, setStarting] = useState(false);
   const [err, setErr] = useState('');
 
-  const [website, setWebsite] = useState('');
-  const [tiktok, setTiktok] = useState('');
-  const [youtube, setYoutube] = useState('');
-  const [whatsapp, setWhatsapp] = useState('');
-  const [email, setEmail] = useState('');
+  const [website, setWebsite] = useState(() => loadSaved(token).website || '');
+  const [tiktok, setTiktok] = useState(() => loadSaved(token).tiktok || '');
+  const [youtube, setYoutube] = useState(() => loadSaved(token).youtube || '');
+  const [whatsapp, setWhatsapp] = useState(() => loadSaved(token).whatsapp || '');
+  const [email, setEmail] = useState(() => loadSaved(token).email || '');
+
+  // Persist fields on every change (survives the IG-connect navigation).
+  useEffect(() => {
+    try { localStorage.setItem(`onboard:${token}`, JSON.stringify({ website, tiktok, youtube, whatsapp, email })); } catch { /* ignore */ }
+  }, [token, website, tiktok, youtube, whatsapp, email]);
 
   const loadStatus = useCallback(async () => {
     const res = await fetch(`/api/onboard/${token}/status`);
@@ -70,8 +81,11 @@ export default function OnboardWizard({ token }: { token: string }) {
         if (res.ok) {
           const p: Progress = await res.json();
           setProgress(p);
-          if (['completed', 'done', 'success', 'ready'].includes((p.status || '').toLowerCase())) {
+          const s = (p.status || '').toLowerCase();
+          if (['completed', 'complete', 'done', 'success', 'succeeded', 'ready'].includes(s)) {
             if (!stop) setPhase('done');
+          } else if (['failed', 'cancelled', 'canceled', 'error'].includes(s)) {
+            if (!stop) setPhase('error');
           }
         }
       } catch { /* keep polling */ }
@@ -185,6 +199,14 @@ export default function OnboardWizard({ token }: { token: string }) {
               <div className="text-5xl mb-3">🎉</div>
               <h1 className="text-2xl font-extrabold text-gray-900">הכל מוכן!</h1>
               <p className="text-sm text-gray-500 mt-2">שלחנו לך לוואטסאפ ולמייל קישור לבסטי שלך. נתראה שם!</p>
+            </div>
+          )}
+
+          {phase === 'error' && (
+            <div className="py-8 text-center">
+              <div className="text-5xl mb-3">⚠️</div>
+              <h1 className="text-2xl font-extrabold text-gray-900">משהו השתבש בסריקה</h1>
+              <p className="text-sm text-gray-500 mt-2">הצוות שלנו קיבל התראה ויטפל בזה — נחזור אליך בהקדם.</p>
             </div>
           )}
         </div>

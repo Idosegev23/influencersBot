@@ -32,6 +32,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ tok
     connected: !!conn,
     igUsername: conn?.ig_username || null,
     jobId: ob.jobId || null,
-    connectUrl: `/api/auth/instagram/connect?accountId=${draft.id}&returnTo=${encodeURIComponent(`/onboard/${token}`)}`,
+    connectUrl: `/api/onboard/${token}/connect`,
   });
 }

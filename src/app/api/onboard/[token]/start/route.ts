@@ -9,8 +9,10 @@ export const dynamic = 'force-dynamic';
 /**
  * POST /api/onboard/[token]/start  { website, tiktok, youtube, whatsapp, email }
  * Token-guarded. Persists sources + owner contact, sets the account's username to
- * the connected IG handle, marks scanning, and kicks off the full pipeline.
- * Idempotent: only allowed while status is draft/filled.
+ * the connected IG handle, and kicks off the full pipeline. Idempotent via an
+ * ATOMIC status claim (draft/filled → starting) so concurrent starts can't
+ * double-scan; the transient 'starting' state is only promoted to 'scanning'
+ * after startPipeline succeeds, and reverted to 'draft' on failure so retry works.
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -40,16 +42,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     .maybeSingle();
   if (!conn?.ig_username) return NextResponse.json({ error: 'connect_instagram_first' }, { status: 422 });
 
+  // ATOMIC claim: only one request may transition draft/filled → starting.
+  // The JSON-path predicate is applied to the UPDATE's WHERE (PostgREST), so a
+  // concurrent second request affects 0 rows and is rejected.
+  const { data: claimed } = await supabase
+    .from('accounts')
+    .update({ config: { ...draft.config, onboarding: { ...ob, status: 'starting' } } })
+    .eq('id', draft.id)
+    .in('config->onboarding->>status', ['draft', 'filled'])
+    .select('id');
+  if (!claimed || claimed.length === 0) {
+    return NextResponse.json({ error: 'already started' }, { status: 409 });
+  }
+
   const igHandle = normalizeIgUsername(conn.ig_username);
   const sources = { instagram: igHandle, website, youtube, tiktok };
-
-  const nextConfig = {
+  const baseConfig = {
     ...draft.config,
     username: igHandle,
     sources,
-    onboarding: { ...ob, status: 'scanning', ownerWhatsapp: whatsapp, ownerEmail: email },
+    onboarding: { ...ob, ownerWhatsapp: whatsapp, ownerEmail: email },
   };
-  await supabase.from('accounts').update({ config: nextConfig }).eq('id', draft.id);
 
   const result = await startPipeline({
     accountId: draft.id,
@@ -62,12 +75,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     scanMode: 'full',
     requestedBy: 'onboarding',
   });
-  if ('error' in result) return NextResponse.json({ error: result.error }, { status: result.status });
 
-  // Stash the jobId for the status endpoint + the Phase-2 completion hook.
+  if ('error' in result) {
+    // Revert the claim so the creator can retry.
+    await supabase
+      .from('accounts')
+      .update({ config: { ...baseConfig, onboarding: { ...baseConfig.onboarding, status: 'draft' } } })
+      .eq('id', draft.id);
+    return NextResponse.json({ error: result.error }, { status: result.status });
+  }
+
+  // Promote to scanning + persist the jobId (for the status endpoint + Phase-2 hook).
   await supabase
     .from('accounts')
-    .update({ config: { ...nextConfig, onboarding: { ...nextConfig.onboarding, jobId: result.jobId } } })
+    .update({ config: { ...baseConfig, onboarding: { ...baseConfig.onboarding, status: 'scanning', jobId: result.jobId } } })
     .eq('id', draft.id);
 
   return NextResponse.json({ jobId: result.jobId });
