@@ -3,6 +3,7 @@
 import { useState, useEffect, use, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDashboardLang } from '@/hooks/useDashboardLang';
+import { getDashboardStrings } from '@/lib/i18n/dashboard';
 import {
   Bot,
   Instagram,
@@ -125,6 +126,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
   const { username } = use(params);
   const { lang } = useDashboardLang(username);
   const isEn = lang === 'en';
+  const t = getDashboardStrings(lang);
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
@@ -247,7 +249,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <Bot className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
-              {isEn ? 'My bot' : 'הבוט שלי'}
+              {t.chatbotPersona.headerTitle}
             </h1>
             {persona?.name && (
               <p className="text-sm mt-1" style={{ color: 'var(--dash-text-2)' }}>
@@ -261,16 +263,16 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm btn-primary disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-            {isEn ? 'Sync from Instagram' : 'סנכרון מאינסטגרם'}
+            {t.chatbotPersona.syncFromInstagram}
           </button>
         </div>
 
         {/* ═══ STATS STRIP ═══ */}
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: isEn ? 'Posts in KB' : 'פוסטים בבסיס', value: stats.totalPosts, icon: FileText },
-            { label: isEn ? 'Topics' : 'נושאים', value: stats.topicsCount, icon: Hash },
-            { label: isEn ? 'Last scan' : 'סריקה אחרונה', value: stats.lastScrape ? new Date(stats.lastScrape).toLocaleDateString(isEn ? 'en-US' : 'he-IL') : (isEn ? 'Not yet' : 'טרם נסרק'), icon: Calendar },
+            { label: t.chatbotPersona.statPostsInKb, value: stats.totalPosts, icon: FileText },
+            { label: t.chatbotPersona.statTopics, value: stats.topicsCount, icon: Hash },
+            { label: t.chatbotPersona.statLastScan, value: stats.lastScrape ? new Date(stats.lastScrape).toLocaleDateString(isEn ? 'en-US' : 'he-IL') : t.chatbotPersona.notYetScanned, icon: Calendar },
           ].map((s, i) => (
             <div key={i} className="metric-card">
               <div className="flex items-center gap-1.5 mb-1">
@@ -291,16 +293,16 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
                 <Instagram className="w-5 h-5" style={{ color: igConnection.connected ? '#22c55e' : '#ef4444' }} />
               </div>
               <div>
-                <h3 className="font-semibold text-sm">{isEn ? 'Instagram connection' : 'חיבור אינסטגרם'}</h3>
+                <h3 className="font-semibold text-sm">{t.chatbotPersona.igConnectionTitle}</h3>
                 {igConnection.connected ? (
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
-                    <span className="text-xs text-green-500">{isEn ? 'Connected — ' : 'מחובר — '}@{igConnection.ig_username}</span>
+                    <span className="text-xs text-green-500">{t.chatbotPersona.igConnectedPrefix}@{igConnection.ig_username}</span>
                   </div>
                 ) : (
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <XCircle className="w-3.5 h-3.5 text-red-400" />
-                    <span className="text-xs text-red-400">{isEn ? 'Not connected' : 'לא מחובר'}</span>
+                    <span className="text-xs text-red-400">{t.chatbotPersona.igNotConnected}</span>
                   </div>
                 )}
               </div>
@@ -309,7 +311,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
             {igConnection.connected ? (
               <div className="flex items-center gap-3">
                 <span className="text-xs" style={{ color: 'var(--dash-text-2)' }}>
-                  {isEn ? 'DM bot' : 'בוט DM'}
+                  {t.chatbotPersona.dmBot}
                 </span>
                 <button onClick={handleToggleDM} disabled={dmLoading} className="transition-colors">
                   {dmLoading ? (
@@ -324,7 +326,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
             ) : (
               <button onClick={handleConnectIG} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm btn-primary">
                 <ExternalLink className="w-4 h-4" />
-                {isEn ? 'Connect Instagram' : 'חבר אינסטגרם'}
+                {t.chatbotPersona.connectInstagram}
               </button>
             )}
           </div>
@@ -334,17 +336,17 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
         {!persona ? (
           <div className="text-center py-16 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
             <Bot className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--dash-text-3)' }} />
-            <h3 className="text-xl font-semibold mb-2">{isEn ? 'No persona yet' : 'אין פרסונה עדיין'}</h3>
-            <p className="mb-4" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Sync from Instagram to build the persona.' : 'סנכרנו מאינסטגרם כדי לבנות את הפרסונה'}</p>
+            <h3 className="text-xl font-semibold mb-2">{t.chatbotPersona.noPersonaTitle}</h3>
+            <p className="mb-4" style={{ color: 'var(--dash-text-2)' }}>{t.chatbotPersona.noPersonaHelp}</p>
           </div>
         ) : (
           <>
             {/* Voice & Style */}
-            <Section title={isEn ? 'Voice & style' : 'קול וסגנון'} icon={MessageSquare} defaultOpen>
+            <Section title={t.chatbotPersona.voiceStyleTitle} icon={MessageSquare} defaultOpen>
               <div className="space-y-4 pt-4">
                 {toneStr && (
                   <div>
-                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Tone' : 'טון'}</label>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>{t.chatbotPersona.tone}</label>
                     <p className="text-sm">{toneStr}</p>
                   </div>
                 )}
@@ -352,25 +354,25 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
                 <div className="grid grid-cols-2 gap-4">
                   {persona.narrative_perspective && (
                     <div>
-                      <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Perspective' : 'פרספקטיבה'}</label>
+                      <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>{t.chatbotPersona.perspective}</label>
                       <Badge>{persona.narrative_perspective}</Badge>
                     </div>
                   )}
                   {persona.emoji_usage && (
                     <div>
-                      <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Emojis' : 'אימוג׳ים'}</label>
+                      <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>{t.chatbotPersona.emojis}</label>
                       <Badge>{persona.emoji_usage}</Badge>
                     </div>
                   )}
                   {persona.storytelling_mode && (
                     <div>
-                      <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Story style' : 'סיפור'}</label>
+                      <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>{t.chatbotPersona.storyStyle}</label>
                       <Badge>{persona.storytelling_mode}</Badge>
                     </div>
                   )}
                   {persona.message_structure && (
                     <div>
-                      <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Structure' : 'מבנה'}</label>
+                      <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>{t.chatbotPersona.structure}</label>
                       <Badge>{persona.message_structure}</Badge>
                     </div>
                   )}
@@ -378,7 +380,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
 
                 {persona.sass_level !== null && persona.sass_level !== undefined && (
                   <div>
-                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Sass level' : 'רמת חוצפה'}</label>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>{t.chatbotPersona.sassLevel}</label>
                     <div className="flex items-center gap-2">
                       <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--dash-glass-border)' }}>
                         <div className="h-full rounded-full" style={{ width: `${(persona.sass_level / 10) * 100}%`, background: 'var(--color-primary)' }} />
@@ -390,14 +392,14 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
 
                 {voiceRules?.language && (
                   <div>
-                    <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Language' : 'שפה'}</label>
+                    <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>{t.chatbotPersona.language}</label>
                     <p className="text-sm">{voiceRules.language}</p>
                   </div>
                 )}
 
                 {persona.common_phrases && persona.common_phrases.length > 0 && (
                   <div>
-                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Signature phrases' : 'ביטויים אופייניים'}</label>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>{t.chatbotPersona.signaturePhrases}</label>
                     <div className="flex flex-wrap gap-1.5">
                       {persona.common_phrases.map((phrase, i) => (
                         <Badge key={i} color="var(--color-warning)">{phrase}</Badge>
@@ -408,7 +410,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
 
                 {voiceRules?.recurringPhrases && voiceRules.recurringPhrases.length > 0 && (
                   <div>
-                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Recurring phrases' : 'ביטויים חוזרים'}</label>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>{t.chatbotPersona.recurringPhrases}</label>
                     <div className="flex flex-wrap gap-1.5">
                       {voiceRules.recurringPhrases.map((phrase, i) => (
                         <Badge key={i} color="var(--color-info)">{phrase}</Badge>
@@ -419,7 +421,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
 
                 {voiceRules?.avoidedWords && voiceRules.avoidedWords.length > 0 && (
                   <div>
-                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Avoided words' : 'מילים שנמנע מהן'}</label>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>{t.chatbotPersona.avoidedWords}</label>
                     <div className="flex flex-wrap gap-1.5">
                       {voiceRules.avoidedWords.map((w, i) => (
                         <Badge key={i} color="var(--dash-negative)">{w}</Badge>
@@ -431,11 +433,11 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
             </Section>
 
             {/* Knowledge Map */}
-            <Section title={isEn ? 'Knowledge map' : 'מפת ידע'} icon={Map}>
+            <Section title={t.chatbotPersona.knowledgeMapTitle} icon={Map}>
               <div className="space-y-4 pt-4">
                 {knowledgeMap?.coreTopics && knowledgeMap.coreTopics.length > 0 && (
                   <div>
-                    <label className="text-xs font-medium block mb-2" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Core topics' : 'נושאי ליבה'}</label>
+                    <label className="text-xs font-medium block mb-2" style={{ color: 'var(--dash-text-2)' }}>{t.chatbotPersona.coreTopics}</label>
                     <div className="space-y-2">
                       {knowledgeMap.coreTopics.map((topic, i) => (
                         <div key={i} className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--dash-glass-border)' }}>
@@ -455,7 +457,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
 
                 {knowledgeMap?.domains && knowledgeMap.domains.length > 0 && (
                   <div>
-                    <label className="text-xs font-medium block mb-2" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Areas of expertise' : 'תחומי מומחיות'}</label>
+                    <label className="text-xs font-medium block mb-2" style={{ color: 'var(--dash-text-2)' }}>{t.chatbotPersona.areasOfExpertise}</label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                       {knowledgeMap.domains.map((d, i) => (
                         <div key={i} className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--dash-glass-border)' }}>
@@ -481,17 +483,17 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
             </Section>
 
             {/* Bio & Interests */}
-            <Section title={isEn ? 'About' : 'אודות'} icon={Brain}>
+            <Section title={t.chatbotPersona.aboutTitle} icon={Brain}>
               <div className="space-y-4 pt-4">
                 {persona.bio && (
                   <div>
-                    <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Bio' : 'ביו'}</label>
+                    <label className="text-xs font-medium block mb-1" style={{ color: 'var(--dash-text-2)' }}>{t.chatbotPersona.bio}</label>
                     <p className="text-sm">{persona.bio}</p>
                   </div>
                 )}
                 {persona.interests && persona.interests.length > 0 && (
                   <div>
-                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Interests' : 'תחומי עניין'}</label>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>{t.chatbotPersona.interests}</label>
                     <div className="flex flex-wrap gap-1.5">
                       {persona.interests.map((interest, i) => (
                         <Badge key={i}>{interest}</Badge>
@@ -501,7 +503,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
                 )}
                 {persona.directives && persona.directives.length > 0 && (
                   <div>
-                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Directives' : 'הנחיות'}</label>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>{t.chatbotPersona.directives}</label>
                     <ul className="space-y-1 text-sm" style={{ color: 'var(--dash-text-2)' }}>
                       {persona.directives.map((d, i) => (
                         <li key={i}>• {d}</li>
@@ -514,7 +516,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
 
             {/* Greeting */}
             {persona.greeting_message && (
-              <Section title={isEn ? 'Welcome message' : 'הודעת פתיחה'} icon={Sparkles}>
+              <Section title={t.chatbotPersona.welcomeMessageTitle} icon={Sparkles}>
                 <div className="pt-4">
                   <div className="rounded-lg p-4" style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid var(--dash-glass-border)' }}>
                     <p className="text-sm leading-relaxed">{persona.greeting_message}</p>
@@ -529,7 +531,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
         <div className="rounded-xl border p-4 flex items-center justify-between" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}>
           <div className="flex items-center gap-2">
             <Zap className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
-            <span className="text-sm font-medium">{isEn ? 'Chat link' : 'קישור לצ׳אט'}</span>
+            <span className="text-sm font-medium">{t.chatbotPersona.chatLink}</span>
           </div>
           <a
             href={`/chat/${username}`}
@@ -538,7 +540,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs btn-primary"
           >
             <ExternalLink className="w-3.5 h-3.5" />
-            {isEn ? 'Open chat' : 'פתח צ׳אט'}
+            {t.chatbotPersona.openChat}
           </a>
         </div>
       </main>

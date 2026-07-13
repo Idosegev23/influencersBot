@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import ScrapingProgress from '@/components/scraping/ScrapingProgress';
 import { useDashboardLang } from '@/hooks/useDashboardLang';
+import { getDashboardStrings } from '@/lib/i18n/dashboard';
 
 // ============================================
 // Type Definitions
@@ -42,6 +43,7 @@ export default function ChatbotSettingsPage() {
   const username = params.username as string;
   const { lang } = useDashboardLang(username);
   const isEn = lang === 'en';
+  const t = getDashboardStrings(lang);
 
   const [stats, setStats] = useState<Stats | null>(null);
   const [history, setHistory] = useState<JobHistory[]>([]);
@@ -157,11 +159,11 @@ export default function ChatbotSettingsPage() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    alert(isEn ? 'Code copied!' : 'קוד הועתק ללוח!');
+    alert(t.chatbotSettings.codeCopied);
   };
 
   const formatRelativeTime = (dateStr: string | null): string => {
-    if (!dateStr) return isEn ? 'Never' : 'אף פעם';
+    if (!dateStr) return t.chatbotSettings.never;
 
     const date = new Date(dateStr);
     const now = new Date();
@@ -169,9 +171,9 @@ export default function ChatbotSettingsPage() {
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffHours / 24);
 
-    if (diffDays > 0) return isEn ? `${diffDays}d ago` : `לפני ${diffDays} ימים`;
-    if (diffHours > 0) return isEn ? `${diffHours}h ago` : `לפני ${diffHours} שעות`;
-    return isEn ? 'just now' : 'עכשיו';
+    if (diffDays > 0) return t.chatbotSettings.daysAgo.replace('{n}', String(diffDays));
+    if (diffHours > 0) return t.chatbotSettings.hoursAgo.replace('{n}', String(diffHours));
+    return t.chatbotSettings.justNow;
   };
 
   const formatDuration = (startedAt: string | null, completedAt: string | null): string => {
@@ -207,8 +209,8 @@ export default function ChatbotSettingsPage() {
         {/* Header */}
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-4xl font-bold" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Chatbot Settings' : "הגדרות צ'אטבוט"}</h1>
-            <p className="mt-2" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Manage your chatbot persona and knowledge' : "ניהול הפרסונה והמידע של הצ'אטבוט שלך"}</p>
+            <h1 className="text-4xl font-bold" style={{ color: 'var(--dash-text)' }}>{t.chatbotSettings.pageTitle}</h1>
+            <p className="mt-2" style={{ color: 'var(--dash-text-2)' }}>{t.chatbotSettings.pageSubtitle}</p>
           </div>
           <button
             onClick={() => setShowLivePreview(true)}
@@ -216,7 +218,7 @@ export default function ChatbotSettingsPage() {
             style={{ backgroundColor: 'var(--color-primary)', color: '#fff' }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-            {isEn ? 'Live preview' : 'צפייה חיה'}
+            {t.chatbotSettings.livePreview}
           </button>
         </div>
 
@@ -240,15 +242,15 @@ export default function ChatbotSettingsPage() {
                 </div>
                 <div>
                   <h2 className="text-xl font-bold" style={{ color: 'var(--dash-text)' }}>
-                    {isEn ? 'Instagram DM bot' : 'בוט DM באינסטגרם'}
+                    {t.chatbotSettings.dmBotTitle}
                   </h2>
                   {igConnection.connected ? (
                     <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>
-                      {isEn ? 'Connected to ' : 'מחובר ל-'}<span className="font-medium" style={{ color: 'var(--dash-text)' }}>@{igConnection.ig_username}</span>
+                      {t.chatbotSettings.connectedTo}<span className="font-medium" style={{ color: 'var(--dash-text)' }}>@{igConnection.ig_username}</span>
                     </p>
                   ) : (
                     <p className="text-sm" style={{ color: 'var(--color-warning, #f59e0b)' }}>
-                      {isEn ? 'No active Instagram connection' : 'אין חיבור אינסטגרם פעיל'}
+                      {t.chatbotSettings.noIgConnection}
                     </p>
                   )}
                 </div>
@@ -260,7 +262,7 @@ export default function ChatbotSettingsPage() {
                     className="text-sm font-medium"
                     style={{ color: dmBotEnabled ? 'var(--color-success, #22c55e)' : 'var(--dash-text-3)' }}
                   >
-                    {isEn ? (dmBotEnabled ? 'On' : 'Off') : (dmBotEnabled ? 'פעיל' : 'כבוי')}
+                    {dmBotEnabled ? t.chatbotSettings.on : t.chatbotSettings.off}
                   </span>
                   <button
                     onClick={toggleDmBot}
@@ -282,13 +284,7 @@ export default function ChatbotSettingsPage() {
 
             {igConnection.connected && dmBotEnabled !== null && (
               <p className="mt-3 text-xs" style={{ color: 'var(--dash-text-3)' }}>
-                {isEn
-                  ? (dmBotEnabled
-                      ? 'The bot auto-replies to Instagram DMs. Turn off to reply manually.'
-                      : 'The bot is off — DMs won’t be answered automatically.')
-                  : (dmBotEnabled
-                      ? 'הבוט עונה אוטומטית על הודעות DM באינסטגרם. כבה כדי לענות ידנית.'
-                      : 'הבוט כבוי — הודעות DM לא ייענו אוטומטית.')}
+                {dmBotEnabled ? t.chatbotSettings.dmBotOnDesc : t.chatbotSettings.dmBotOffDesc}
               </p>
             )}
           </div>
@@ -297,22 +293,22 @@ export default function ChatbotSettingsPage() {
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <StatCard
-            title={isEn ? 'Posts in KB' : 'פוסטים בבסיס'}
+            title={t.chatbotSettings.statPosts}
             value={stats?.totalPosts || 0}
             icon="📝"
           />
           <StatCard
-            title={isEn ? 'Comments collected' : 'תגובות נאספו'}
+            title={t.chatbotSettings.statComments}
             value={stats?.totalComments || 0}
             icon="💬"
           />
           <StatCard
-            title={isEn ? 'Detected topics' : 'נושאים מזוהים'}
+            title={t.chatbotSettings.statTopics}
             value={stats?.topicsCount || 0}
             icon="🏷️"
           />
           <StatCard
-            title={isEn ? 'Last scan' : 'סריקה אחרונה'}
+            title={t.chatbotSettings.statLastScan}
             value={formatRelativeTime(stats?.lastScrape || null)}
             icon="🕐"
             isText
@@ -324,7 +320,7 @@ export default function ChatbotSettingsPage() {
           className="rounded-xl border p-6"
           style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}
         >
-          <h2 className="text-2xl font-bold mb-4" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Build persona' : 'בניית פרסונה'}</h2>
+          <h2 className="text-2xl font-bold mb-4" style={{ color: 'var(--dash-text)' }}>{t.chatbotSettings.buildPersonaTitle}</h2>
 
           {!showProgress ? (
             <div className="space-y-4">
@@ -333,14 +329,14 @@ export default function ChatbotSettingsPage() {
                 style={{ background: 'rgba(255,255,255,0.05)', borderColor: 'var(--color-info)' }}
               >
                 <p style={{ color: 'var(--dash-text)' }}>
-                  <strong>{isEn ? 'Building persona from scratch' : 'בניית פרסונה מאפס'}</strong>{' '}
-                  {isEn ? 'takes 20–30 minutes and runs 7 stages:' : 'תארך כ-20-30 דקות ותעבור על 7 שלבים:'}
+                  <strong>{t.chatbotSettings.buildFromScratch}</strong>{' '}
+                  {t.chatbotSettings.buildDuration}
                 </p>
                 <ul className="list-disc list-inside mt-2 text-sm space-y-1" style={{ color: 'var(--dash-text-2)' }}>
-                  <li>{isEn ? 'Scrape 500 most-recent posts' : 'סריקת 500 פוסטים אחרונים'}</li>
-                  <li>{isEn ? 'Scrape 7,500 comments from top posts' : 'סריקת 7,500 תגובות מהפוסטים המובילים'}</li>
-                  <li>{isEn ? 'Profile and hashtag analysis' : 'ניתוח פרופיל והאשטגים'}</li>
-                  <li>{isEn ? 'Build professional knowledge map with Gemini Pro' : 'בניית מפת ידע מקצועית עם Gemini Pro'}</li>
+                  <li>{t.chatbotSettings.step1}</li>
+                  <li>{t.chatbotSettings.step2}</li>
+                  <li>{t.chatbotSettings.step3}</li>
+                  <li>{t.chatbotSettings.step4}</li>
                 </ul>
               </div>
 
@@ -348,11 +344,11 @@ export default function ChatbotSettingsPage() {
                 onClick={() => setShowProgress(true)}
                 className="w-full px-6 py-4 rounded-xl font-bold text-lg transition-all btn-primary"
               >
-                {isEn ? 'Rebuild persona' : 'התחל בניית פרסונה מחדש'}
+                {t.chatbotSettings.rebuildButton}
               </button>
 
               <p className="text-sm text-center" style={{ color: 'var(--dash-text-3)' }}>
-                {isEn ? 'Tip: daily updates run automatically every night at 02:00.' : 'טיפ: עדכונים יומיים רצים אוטומטית בכל לילה ב-02:00'}
+                {t.chatbotSettings.dailyUpdateTip}
               </p>
             </div>
           ) : (
@@ -372,22 +368,22 @@ export default function ChatbotSettingsPage() {
           className="rounded-xl border p-6"
           style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}
         >
-          <h2 className="text-2xl font-bold mb-4" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Scan history' : 'היסטוריית סריקות'}</h2>
+          <h2 className="text-2xl font-bold mb-4" style={{ color: 'var(--dash-text)' }}>{t.chatbotSettings.historyTitle}</h2>
 
           {history.length === 0 ? (
             <p className="text-center py-8" style={{ color: 'var(--dash-text-3)' }}>
-              {isEn ? 'No scan history yet. Start your first persona build!' : 'אין עדיין היסטוריית סריקות. התחל בניית פרסונה ראשונה!'}
+              {t.chatbotSettings.noHistory}
             </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr style={{ background: 'rgba(255,255,255,0.05)' }}>
-                    <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Date' : 'תאריך'}</th>
-                    <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Status' : 'סטטוס'}</th>
-                    <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Type' : 'סוג'}</th>
-                    <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Duration' : 'משך'}</th>
-                    <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Results' : 'תוצאות'}</th>
+                    <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>{t.chatbotSettings.colDate}</th>
+                    <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>{t.chatbotSettings.colStatus}</th>
+                    <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>{t.chatbotSettings.colType}</th>
+                    <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>{t.chatbotSettings.colDuration}</th>
+                    <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>{t.chatbotSettings.colResults}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -407,19 +403,17 @@ export default function ChatbotSettingsPage() {
                         })}
                       </td>
                       <td className="p-3">
-                        <StatusBadge status={job.status} />
+                        <StatusBadge status={job.status} t={t.chatbotSettings} />
                       </td>
                       <td className="p-3 text-sm" style={{ color: 'var(--dash-text-2)' }}>
-                        {isEn
-                          ? (job.job_type === 'full_rebuild' ? 'Full rebuild' : 'Quick update')
-                          : (job.job_type === 'full_rebuild' ? 'סריקה מלאה' : 'עדכון מהיר')}
+                        {job.job_type === 'full_rebuild' ? t.chatbotSettings.typeFullRebuild : t.chatbotSettings.typeQuickUpdate}
                       </td>
                       <td className="p-3 text-sm" style={{ color: 'var(--dash-text-2)' }}>
                         {formatDuration(job.started_at, job.completed_at)}
                       </td>
                       <td className="p-3 text-sm" style={{ color: 'var(--dash-text-2)' }}>
-                        {job.total_posts_scraped > 0 && `${job.total_posts_scraped} ${isEn ? 'posts' : 'פוסטים'}`}
-                        {job.total_comments_scraped > 0 && `, ${job.total_comments_scraped} ${isEn ? 'comments' : 'תגובות'}`}
+                        {job.total_posts_scraped > 0 && `${job.total_posts_scraped} ${t.chatbotSettings.resultPosts}`}
+                        {job.total_comments_scraped > 0 && `, ${job.total_comments_scraped} ${t.chatbotSettings.resultComments}`}
                       </td>
                     </tr>
                   ))}
@@ -434,13 +428,11 @@ export default function ChatbotSettingsPage() {
           className="rounded-xl border p-6"
           style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}
         >
-          <h2 className="text-2xl font-bold mb-4" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Widget embed' : 'הטמעת Widget'}</h2>
+          <h2 className="text-2xl font-bold mb-4" style={{ color: 'var(--dash-text)' }}>{t.chatbotSettings.embedTitle}</h2>
 
           <div className="space-y-4">
             <p style={{ color: 'var(--dash-text-2)' }}>
-              {isEn
-                ? 'Copy this snippet and embed it on your site to add the chatbot:'
-                : "העתק את הקוד הבא והטמע אותו באתר האישי שלך כדי להוסיף את הצ'אטבוט:"}
+              {t.chatbotSettings.embedDesc}
             </p>
 
             <div
@@ -451,7 +443,7 @@ export default function ChatbotSettingsPage() {
                 onClick={() => copyToClipboard(generateEmbedCode())}
                 className="absolute top-2 left-2 px-3 py-1 rounded text-xs font-sans transition-colors btn-primary"
               >
-                {isEn ? 'Copy' : 'העתק'}
+                {t.chatbotSettings.copyButton}
               </button>
               <pre className="mt-8 overflow-x-auto">{generateEmbedCode()}</pre>
             </div>
@@ -461,7 +453,7 @@ export default function ChatbotSettingsPage() {
               style={{ background: 'rgba(255,255,255,0.05)', borderColor: 'var(--color-info)' }}
             >
               <p className="text-sm" style={{ color: 'var(--dash-text)' }}>
-                <strong>{isEn ? 'Direct link:' : 'קישור ישיר:'}</strong>{' '}
+                <strong>{t.chatbotSettings.directLink}</strong>{' '}
                 <a
                   href={`/chat/${username}`}
                   target="_blank"
@@ -472,9 +464,7 @@ export default function ChatbotSettingsPage() {
                 </a>
               </p>
               <p className="text-xs mt-2" style={{ color: 'var(--dash-text-3)' }}>
-                {isEn
-                  ? 'Share this link in stories, your bio or in marketing.'
-                  : 'שתף קישור זה עם העוקבים שלך בסטורי, בביו או בלינקים'}
+                {t.chatbotSettings.shareLinkHint}
               </p>
             </div>
           </div>
@@ -494,7 +484,7 @@ export default function ChatbotSettingsPage() {
           >
             <div className="flex items-center justify-between w-[390px] mb-3 px-1">
               <span className="text-sm font-medium text-white/80">
-                {isEn ? 'Live preview — how visitors see the chat' : 'צפייה חיה — כך העוקבים רואים את הצ׳אט'}
+                {t.chatbotSettings.previewHeader}
               </span>
               <div className="flex items-center gap-2">
                 <a
@@ -503,7 +493,7 @@ export default function ChatbotSettingsPage() {
                   rel="noopener noreferrer"
                   className="text-xs text-white/60 hover:text-white transition-colors underline"
                 >
-                  {isEn ? 'Open in new tab' : 'פתח בטאב חדש'}
+                  {t.chatbotSettings.openInNewTab}
                 </a>
                 <button
                   onClick={() => setShowLivePreview(false)}
@@ -525,12 +515,12 @@ export default function ChatbotSettingsPage() {
                 src={`/chat/${username}?preview=1&t=${Date.now()}`}
                 className="w-full border-0"
                 style={{ height: 'calc(100% - 30px)', borderRadius: '0 0 32px 32px', backgroundColor: '#f4f5f7' }}
-                title={isEn ? 'Live preview' : 'תצוגה מקדימה חיה'}
+                title={t.chatbotSettings.previewIframeTitle}
               />
             </div>
 
             <p className="text-xs text-white/50 mt-3">
-              {isEn ? 'This is the chat as visitors see it — try sending a message.' : 'זה הצ׳אט כמו שהעוקבים שלך רואים אותו — נסו לשלוח הודעה'}
+              {t.chatbotSettings.previewFooter}
             </p>
           </div>
         </div>
@@ -574,13 +564,13 @@ function StatCard({
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, t }: { status: string; t: Record<string, string> }) {
   const statusConfig = {
-    completed: { text: 'הושלם', color: 'bg-green-100 text-green-800 border-green-300' },
-    running: { text: 'רץ', color: 'bg-blue-100 text-blue-800 border-blue-300' },
-    failed: { text: 'נכשל', color: 'bg-red-100 text-red-800 border-red-300' },
-    pending: { text: 'ממתין', color: 'bg-gray-100 text-gray-800 border-gray-300' },
-    cancelled: { text: 'בוטל', color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
+    completed: { text: t.statusCompleted, color: 'bg-green-100 text-green-800 border-green-300' },
+    running: { text: t.statusRunning, color: 'bg-blue-100 text-blue-800 border-blue-300' },
+    failed: { text: t.statusFailed, color: 'bg-red-100 text-red-800 border-red-300' },
+    pending: { text: t.statusPending, color: 'bg-gray-100 text-gray-800 border-gray-300' },
+    cancelled: { text: t.statusCancelled, color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
   };
 
   const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;

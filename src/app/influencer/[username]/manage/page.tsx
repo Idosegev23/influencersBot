@@ -4,6 +4,7 @@ import { useState, useEffect, use, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useDashboardLang } from '@/hooks/useDashboardLang';
+import { getDashboardStrings } from '@/lib/i18n/dashboard';
 import Image from 'next/image';
 import {
   Plus,
@@ -35,115 +36,84 @@ import {
   Flame,
 } from 'lucide-react';
 
-const contentTypeLabels: Record<string, { label: string; labelEn: string; icon: any; color: string }> = {
-  recipe: { label: 'מתכון', labelEn: 'Recipe', icon: ChefHat, color: 'text-orange-400' },
-  look: { label: 'לוק', labelEn: 'Look', icon: Shirt, color: 'text-pink-400' },
-  tip: { label: 'טיפ', labelEn: 'Tip', icon: Lightbulb, color: 'text-yellow-400' },
-  workout: { label: 'אימון', labelEn: 'Workout', icon: Dumbbell, color: 'text-green-400' },
-  review: { label: 'ביקורת', labelEn: 'Review', icon: Star, color: 'text-purple-400' },
-  tutorial: { label: 'מדריך', labelEn: 'Tutorial', icon: FileText, color: 'text-blue-400' },
+// Icon + color per content type; the display label comes from the i18n catalog
+// (t.manage.contentTypes) so it renders in the account language.
+const contentTypeIcons: Record<string, { icon: any; color: string }> = {
+  recipe: { icon: ChefHat, color: 'text-orange-400' },
+  look: { icon: Shirt, color: 'text-pink-400' },
+  tip: { icon: Lightbulb, color: 'text-yellow-400' },
+  workout: { icon: Dumbbell, color: 'text-green-400' },
+  review: { icon: Star, color: 'text-purple-400' },
+  tutorial: { icon: FileText, color: 'text-blue-400' },
 };
 
-// ─── Archetype-specific tab config (per language) ───
+// ─── Archetype-specific tab config (labels come from the i18n catalog) ───
 type TabSpec = { id: string; label: string; icon: any };
-const buildArchetypeTabs = (isEn: boolean): Record<string, TabSpec[]> => isEn ? {
-  influencer: [
-    { id: 'coupons', label: 'Promotions', icon: Tag },
-    { id: 'brands', label: 'Partnerships', icon: Store },
-    { id: 'content', label: 'Content', icon: FileText },
-    { id: 'settings', label: 'Chat settings', icon: Settings },
-  ],
-  brand: [
-    { id: 'coupons', label: 'Offers & promos', icon: Tag },
-    { id: 'products', label: 'Products', icon: Package },
-    { id: 'content', label: 'Content', icon: FileText },
-    { id: 'settings', label: 'Chat settings', icon: Settings },
-  ],
-  service_provider: [
-    { id: 'brands', label: 'Clients', icon: Users },
-    { id: 'content', label: 'Content', icon: FileText },
-    { id: 'settings', label: 'Chat settings', icon: Settings },
-  ],
-  government_ministry: [
-    { id: 'content', label: 'Content & publications', icon: FileText },
-    { id: 'settings', label: 'Chat settings', icon: Settings },
-  ],
-  media_news: [
-    { id: 'content', label: 'Content', icon: FileText },
-    { id: 'settings', label: 'Chat settings', icon: Settings },
-  ],
-  local_business: [
-    { id: 'coupons', label: 'Perks & promos', icon: Tag },
-    { id: 'products', label: 'Products', icon: Package },
-    { id: 'content', label: 'Content', icon: FileText },
-    { id: 'settings', label: 'Chat settings', icon: Settings },
-  ],
-  tech_creator: [
-    { id: 'coupons', label: 'Deals & promos', icon: Tag },
-    { id: 'content', label: 'Content', icon: FileText },
-    { id: 'settings', label: 'Chat settings', icon: Settings },
-  ],
-  b2b_saas: [
-    { id: 'products', label: 'Products', icon: Package },
-    { id: 'content', label: 'Content', icon: FileText },
-    { id: 'settings', label: 'Chat settings', icon: Settings },
-  ],
-} : {
-  influencer: [
-    { id: 'coupons', label: 'קופונים', icon: Tag },
-    { id: 'brands', label: 'שיתופי פעולה', icon: Store },
-    { id: 'content', label: 'תוכן', icon: FileText },
-    { id: 'settings', label: 'הגדרות צ׳אט', icon: Settings },
-  ],
-  brand: [
-    { id: 'coupons', label: 'מבצעים וקופונים', icon: Tag },
-    { id: 'products', label: 'מוצרים', icon: Package },
-    { id: 'content', label: 'תוכן', icon: FileText },
-    { id: 'settings', label: 'הגדרות צ׳אט', icon: Settings },
-  ],
-  service_provider: [
-    { id: 'brands', label: 'לקוחות', icon: Users },
-    { id: 'content', label: 'תוכן', icon: FileText },
-    { id: 'settings', label: 'הגדרות צ׳אט', icon: Settings },
-  ],
-  government_ministry: [
-    { id: 'content', label: 'תוכן ופרסומים', icon: FileText },
-    { id: 'settings', label: 'הגדרות צ׳אט', icon: Settings },
-  ],
-  media_news: [
-    { id: 'content', label: 'תוכן', icon: FileText },
-    { id: 'settings', label: 'הגדרות צ׳אט', icon: Settings },
-  ],
-  local_business: [
-    { id: 'coupons', label: 'הטבות וקופונים', icon: Tag },
-    { id: 'products', label: 'מוצרים', icon: Package },
-    { id: 'content', label: 'תוכן', icon: FileText },
-    { id: 'settings', label: 'הגדרות צ׳אט', icon: Settings },
-  ],
-  tech_creator: [
-    { id: 'coupons', label: 'דילים וקופונים', icon: Tag },
-    { id: 'content', label: 'תוכן', icon: FileText },
-    { id: 'settings', label: 'הגדרות צ׳אט', icon: Settings },
-  ],
+const buildArchetypeTabs = (t: any, isEn: boolean): Record<string, TabSpec[]> => {
+  const tabs: Record<string, TabSpec[]> = {
+    influencer: [
+      { id: 'coupons', label: t.tabPromotions, icon: Tag },
+      { id: 'brands', label: t.tabPartnerships, icon: Store },
+      { id: 'content', label: t.tabContent, icon: FileText },
+      { id: 'settings', label: t.tabChatSettings, icon: Settings },
+    ],
+    brand: [
+      { id: 'coupons', label: t.tabOffersPromos, icon: Tag },
+      { id: 'products', label: t.tabProducts, icon: Package },
+      { id: 'content', label: t.tabContent, icon: FileText },
+      { id: 'settings', label: t.tabChatSettings, icon: Settings },
+    ],
+    service_provider: [
+      { id: 'brands', label: t.tabClients, icon: Users },
+      { id: 'content', label: t.tabContent, icon: FileText },
+      { id: 'settings', label: t.tabChatSettings, icon: Settings },
+    ],
+    government_ministry: [
+      { id: 'content', label: t.tabContentPublications, icon: FileText },
+      { id: 'settings', label: t.tabChatSettings, icon: Settings },
+    ],
+    media_news: [
+      { id: 'content', label: t.tabContent, icon: FileText },
+      { id: 'settings', label: t.tabChatSettings, icon: Settings },
+    ],
+    local_business: [
+      { id: 'coupons', label: t.tabPerksPromos, icon: Tag },
+      { id: 'products', label: t.tabProducts, icon: Package },
+      { id: 'content', label: t.tabContent, icon: FileText },
+      { id: 'settings', label: t.tabChatSettings, icon: Settings },
+    ],
+    tech_creator: [
+      { id: 'coupons', label: t.tabDealsPromos, icon: Tag },
+      { id: 'content', label: t.tabContent, icon: FileText },
+      { id: 'settings', label: t.tabChatSettings, icon: Settings },
+    ],
+  };
+  // b2b_saas is only surfaced in the English archetype set (parity with the
+  // original per-language config; HE b2b_saas falls back to influencer).
+  if (isEn) {
+    tabs.b2b_saas = [
+      { id: 'products', label: t.tabProducts, icon: Package },
+      { id: 'content', label: t.tabContent, icon: FileText },
+      { id: 'settings', label: t.tabChatSettings, icon: Settings },
+    ];
+  }
+  return tabs;
 };
 
-const buildArchetypeLabels = (isEn: boolean): Record<string, { brandsTitle: string; brandsEmpty: string; couponsTitle: string }> => isEn ? {
-  influencer: { brandsTitle: 'Partnerships', brandsEmpty: 'No partnerships yet', couponsTitle: 'Promotions' },
-  brand: { brandsTitle: 'Partners', brandsEmpty: 'No partners yet', couponsTitle: 'Offers & promos' },
-  service_provider: { brandsTitle: 'Clients', brandsEmpty: 'No clients yet', couponsTitle: 'Promotions' },
-  government_ministry: { brandsTitle: 'Units', brandsEmpty: 'No units yet', couponsTitle: '—' },
-  media_news: { brandsTitle: 'Partners', brandsEmpty: 'No partners yet', couponsTitle: 'Promotions' },
-  local_business: { brandsTitle: 'Partners', brandsEmpty: 'No partners yet', couponsTitle: 'Perks & promos' },
-  tech_creator: { brandsTitle: 'Partners', brandsEmpty: 'No partners yet', couponsTitle: 'Deals & promos' },
-  b2b_saas: { brandsTitle: 'Customers', brandsEmpty: 'No customers yet', couponsTitle: '—' },
-} : {
-  influencer: { brandsTitle: 'שיתופי פעולה', brandsEmpty: 'אין שיתופי פעולה עדיין', couponsTitle: 'קופונים' },
-  brand: { brandsTitle: 'שותפים', brandsEmpty: 'אין שותפים עדיין', couponsTitle: 'מבצעים וקופונים' },
-  service_provider: { brandsTitle: 'לקוחות', brandsEmpty: 'אין לקוחות עדיין', couponsTitle: 'קופונים' },
-  government_ministry: { brandsTitle: 'יחידות', brandsEmpty: 'אין יחידות עדיין', couponsTitle: '—' },
-  media_news: { brandsTitle: 'שותפים', brandsEmpty: 'אין שותפים עדיין', couponsTitle: 'קופונים' },
-  local_business: { brandsTitle: 'שותפים', brandsEmpty: 'אין שותפים עדיין', couponsTitle: 'הטבות וקופונים' },
-  tech_creator: { brandsTitle: 'שותפים', brandsEmpty: 'אין שותפים עדיין', couponsTitle: 'דילים וקופונים' },
+const buildArchetypeLabels = (t: any, isEn: boolean): Record<string, { brandsTitle: string; brandsEmpty: string; couponsTitle: string }> => {
+  const labels: Record<string, { brandsTitle: string; brandsEmpty: string; couponsTitle: string }> = {
+    influencer: { brandsTitle: t.tabPartnerships, brandsEmpty: t.abBrandsEmptyPartnerships, couponsTitle: t.tabPromotions },
+    brand: { brandsTitle: t.abBrandsTitlePartners, brandsEmpty: t.abBrandsEmptyPartners, couponsTitle: t.tabOffersPromos },
+    service_provider: { brandsTitle: t.tabClients, brandsEmpty: t.abBrandsEmptyClients, couponsTitle: t.tabPromotions },
+    government_ministry: { brandsTitle: t.abBrandsTitleUnits, brandsEmpty: t.abBrandsEmptyUnits, couponsTitle: t.emDash },
+    media_news: { brandsTitle: t.abBrandsTitlePartners, brandsEmpty: t.abBrandsEmptyPartners, couponsTitle: t.tabPromotions },
+    local_business: { brandsTitle: t.abBrandsTitlePartners, brandsEmpty: t.abBrandsEmptyPartners, couponsTitle: t.tabPerksPromos },
+    tech_creator: { brandsTitle: t.abBrandsTitlePartners, brandsEmpty: t.abBrandsEmptyPartners, couponsTitle: t.tabDealsPromos },
+  };
+  if (isEn) {
+    labels.b2b_saas = { brandsTitle: t.abBrandsTitleCustomers, brandsEmpty: t.abBrandsEmptyCustomers, couponsTitle: t.emDash };
+  }
+  return labels;
 };
 
 interface CouponItem {
@@ -167,6 +137,7 @@ export default function ManagePage({
   const username = resolvedParams.username;
   const { lang } = useDashboardLang(username);
   const isEn = lang === 'en';
+  const t = getDashboardStrings(lang);
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
@@ -215,7 +186,7 @@ export default function ManagePage({
 
       // Set default tab based on archetype (HE bundle is fine here — only
       // used to pick the FIRST tab id, label not shown).
-      const defaultTabs = buildArchetypeTabs(false);
+      const defaultTabs = buildArchetypeTabs(t.manage, false);
       const tabs = defaultTabs[arch] || defaultTabs.influencer;
       setActiveTab(tabs[0].id as TabType);
 
@@ -260,7 +231,7 @@ export default function ManagePage({
     } finally {
       setLoading(false);
     }
-  }, [username, router]);
+  }, [username, router, t]);
 
   useEffect(() => {
     loadData();
@@ -323,7 +294,7 @@ export default function ManagePage({
   };
 
   const handleDeleteCoupon = async (couponId: string) => {
-    if (!confirm('למחוק קופון?')) return;
+    if (!confirm(t.manage.confirmDeleteCoupon)) return;
     try {
       const res = await fetch(`/api/influencer/coupons?username=${username}&id=${couponId}`, {
         method: 'DELETE',
@@ -373,22 +344,22 @@ export default function ManagePage({
         }),
       });
       if (res.ok) {
-        alert(isEn ? 'Settings saved!' : 'הגדרות נשמרו!');
+        alert(t.manage.settingsSaved);
       } else {
-        alert(isEn ? 'Save failed' : 'שגיאה בשמירה');
+        alert(t.manage.saveFailed);
       }
     } catch {
-      alert(isEn ? 'Save failed' : 'שגיאה בשמירה');
+      alert(t.manage.saveFailed);
     } finally {
       setSaving(false);
     }
   };
 
   const handleAddProduct = async () => {
-    const name = prompt('שם המוצר:');
+    const name = prompt(t.manage.promptProductName);
     if (!name) return;
-    const category = prompt('קטגוריה (food, hair_care, face_care, body_care, spices, general):') || 'general';
-    const price = prompt('מחיר (אופציונלי):');
+    const category = prompt(t.manage.promptProductCategory) || 'general';
+    const price = prompt(t.manage.promptProductPrice);
     try {
       const res = await fetch('/api/influencer/content/products', {
         method: 'POST',
@@ -403,7 +374,7 @@ export default function ManagePage({
   };
 
   const handleDeleteProduct = async (productId: string) => {
-    if (!confirm('למחוק מוצר?')) return;
+    if (!confirm(t.manage.confirmDeleteProduct)) return;
     try {
       const res = await fetch(
         `/api/influencer/content/products?accountId=${influencer.id}&productId=${productId}`,
@@ -440,8 +411,8 @@ export default function ManagePage({
 
   // ─── Resolve tabs (language-aware) ───
 
-  const archetypeTabs = buildArchetypeTabs(isEn);
-  const archetypeLabels = buildArchetypeLabels(isEn);
+  const archetypeTabs = buildArchetypeTabs(t.manage, isEn);
+  const archetypeLabels = buildArchetypeLabels(t.manage, isEn);
   const tabs = archetypeTabs[archetype] || archetypeTabs.influencer;
   const labels = archetypeLabels[archetype] || archetypeLabels.influencer;
 
@@ -472,7 +443,7 @@ export default function ManagePage({
     <div className="rounded-xl border p-3 sm:p-4 space-y-3" style={cardStyle}>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Promo code' : 'קוד קופון'}</label>
+          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-2)' }}>{t.manage.couponCodeLabel}</label>
           <input
             type="text"
             value={couponForm.code || ''}
@@ -484,45 +455,45 @@ export default function ManagePage({
           />
         </div>
         <div>
-          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Brand' : 'מותג'}</label>
+          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-2)' }}>{t.manage.couponBrandLabel}</label>
           <input
             type="text"
             value={couponForm.brand_name || ''}
             onChange={e => setCouponForm(f => ({ ...f, brand_name: e.target.value }))}
             className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             style={inputStyle}
-            placeholder={isEn ? 'Brand name' : 'שם המותג'}
+            placeholder={t.manage.couponBrandPlaceholder}
           />
         </div>
       </div>
 
       <div>
-        <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Discount description' : 'תיאור ההנחה'}</label>
+        <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-2)' }}>{t.manage.couponDescriptionLabel}</label>
         <input
           type="text"
           value={couponForm.description || ''}
           onChange={e => setCouponForm(f => ({ ...f, description: e.target.value }))}
           className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           style={inputStyle}
-          placeholder={isEn ? 'e.g. 20% off all products' : 'לדוגמא: 20% הנחה על כל המוצרים'}
+          placeholder={t.manage.couponDescriptionPlaceholder}
         />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Discount type' : 'סוג הנחה'}</label>
+          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-2)' }}>{t.manage.couponDiscountTypeLabel}</label>
           <select
             value={couponForm.discount_type || 'percentage'}
             onChange={e => setCouponForm(f => ({ ...f, discount_type: e.target.value }))}
             className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             style={inputStyle}
           >
-            <option value="percentage">{isEn ? 'Percentage (%)' : 'אחוז (%)'}</option>
-            <option value="fixed">{isEn ? 'Fixed amount ($)' : 'סכום קבוע (₪)'}</option>
+            <option value="percentage">{t.manage.discountTypePercentage}</option>
+            <option value="fixed">{t.manage.discountTypeFixed}</option>
           </select>
         </div>
         <div>
-          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Discount value' : 'ערך הנחה'}</label>
+          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-2)' }}>{t.manage.couponDiscountValueLabel}</label>
           <input
             type="number"
             value={couponForm.discount_value || ''}
@@ -542,7 +513,7 @@ export default function ManagePage({
           className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm btn-primary disabled:opacity-50"
         >
           {savingCoupon ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-          {isEn ? 'Save' : 'שמור'}
+          {t.manage.save}
         </button>
         <button
           onClick={onCancel}
@@ -550,7 +521,7 @@ export default function ManagePage({
           style={{ color: 'var(--dash-text-2)' }}
         >
           <X className="w-3.5 h-3.5" />
-          {isEn ? 'Cancel' : 'ביטול'}
+          {t.manage.cancel}
         </button>
       </div>
     </div>
@@ -592,7 +563,7 @@ export default function ManagePage({
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder={isEn ? 'Search…' : 'חיפוש...'}
+              placeholder={t.manage.searchPlaceholder}
               className="w-full pr-10 pl-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
               style={inputStyle}
             />
@@ -612,7 +583,7 @@ export default function ManagePage({
                 className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl transition-colors btn-primary text-sm"
               >
                 <Plus className="w-4 h-4" />
-                הוסף קופון
+                {t.manage.addCoupon}
               </button>
             </div>
 
@@ -625,8 +596,8 @@ export default function ManagePage({
             {filteredCoupons.length === 0 && !showAddCoupon ? (
               <div className="text-center py-16 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
                 <Tag className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--dash-text-3)' }} />
-                <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--dash-text)' }}>{isEn ? 'No promotions yet' : 'אין קופונים עדיין'}</h3>
-                <p className="mb-6" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Add promotions for the bot to share with visitors.' : 'הוסיפו קופונים שהבוט יציג לעוקבים'}</p>
+                <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--dash-text)' }}>{t.manage.couponsEmptyTitle}</h3>
+                <p className="mb-6" style={{ color: 'var(--dash-text-2)' }}>{t.manage.couponsEmptyBody}</p>
               </div>
             ) : (
               <div className="space-y-3 mt-4">
@@ -681,7 +652,7 @@ export default function ManagePage({
                             <button
                               onClick={() => handleToggleCoupon(coupon)}
                               className="p-1.5 rounded-lg transition-colors"
-                              title={coupon.is_active ? 'כבה' : 'הפעל'}
+                              title={coupon.is_active ? t.manage.toggleOff : t.manage.toggleOn}
                               style={{ color: coupon.is_active ? '#22c55e' : 'var(--dash-text-3)' }}
                             >
                               {coupon.is_active ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
@@ -720,7 +691,7 @@ export default function ManagePage({
                 className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl transition-colors btn-primary text-sm"
               >
                 <Plus className="w-4 h-4" />
-                הוסף
+                {t.manage.add}
               </button>
             </div>
 
@@ -760,7 +731,7 @@ export default function ManagePage({
                         style={{ color: 'var(--dash-text-3)' }}
                       >
                         <ExternalLink className="w-3 h-3" />
-                        אתר
+                        {t.manage.websiteLink}
                       </a>
                     )}
                   </div>
@@ -776,19 +747,19 @@ export default function ManagePage({
             {/* Header with stats */}
             <div className="flex items-center justify-between mb-4 sm:mb-6">
               <div>
-                <h2 className="text-lg sm:text-xl font-bold" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Product catalog' : 'קטלוג מוצרים'}</h2>
+                <h2 className="text-lg sm:text-xl font-bold" style={{ color: 'var(--dash-text)' }}>{t.manage.productCatalogTitle}</h2>
                 <p className="text-sm mt-1" style={{ color: 'var(--dash-text-2)' }}>
-                  {products.length} מוצרים{products.filter((p: any) => p.ai_profile?.whatItDoes).length > 0 && (
+                  {products.length} {t.manage.productsWord}{products.filter((p: any) => p.ai_profile?.whatItDoes).length > 0 && (
                     <span className="inline-flex items-center gap-1 mr-2">
                       <Sparkles className="w-3 h-3" style={{ color: '#a78bfa' }} />
-                      <span style={{ color: '#a78bfa' }}>{products.filter((p: any) => p.ai_profile?.whatItDoes).length} עם פרופיל AI</span>
+                      <span style={{ color: '#a78bfa' }}>{products.filter((p: any) => p.ai_profile?.whatItDoes).length} {t.manage.withAiProfile}</span>
                     </span>
                   )}
                 </p>
               </div>
               <button onClick={handleAddProduct} className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl transition-colors btn-primary text-sm">
                 <Plus className="w-4 h-4" />
-                הוסף מוצר
+                {t.manage.addProduct}
               </button>
             </div>
 
@@ -814,7 +785,7 @@ export default function ManagePage({
                     }}
                   >
                     <ShoppingBag className="w-4 h-4" />
-                    הכל
+                    {t.manage.allCategories}
                     <span className="text-xs opacity-70">{products.length}</span>
                   </button>
                   {categories.map(cat => {
@@ -845,8 +816,8 @@ export default function ManagePage({
             {filteredProducts.length === 0 ? (
               <div className="text-center py-20 rounded-2xl" style={{ background: 'rgba(255,255,255,0.02)' }}>
                 <Package className="w-20 h-20 mx-auto mb-4" style={{ color: 'var(--dash-text-3)', opacity: 0.4 }} />
-                <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--dash-text)' }}>{isEn ? 'No products yet' : 'אין מוצרים עדיין'}</h3>
-                <p style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Add products manually or run a product scan of the site.' : 'הוסיפו מוצרים או הריצו סריקת מוצרים מהאתר'}</p>
+                <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--dash-text)' }}>{t.manage.productsEmptyTitle}</h3>
+                <p style={{ color: 'var(--dash-text-2)' }}>{t.manage.productsEmptyBody}</p>
               </div>
             ) : (
               /* Group by product_line, then render sections */
@@ -912,13 +883,13 @@ export default function ManagePage({
                             {isFeatured && (
                               <span className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg font-medium backdrop-blur-sm"
                                 style={{ background: 'rgba(251,191,36,0.2)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)' }}>
-                                <Star className="w-3 h-3" /> מומלץ
+                                <Star className="w-3 h-3" /> {t.manage.featured}
                               </span>
                             )}
                             {isOnSale && (
                               <span className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg font-medium backdrop-blur-sm"
                                 style={{ background: 'rgba(239,68,68,0.2)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)' }}>
-                                <Flame className="w-3 h-3" /> מבצע
+                                <Flame className="w-3 h-3" /> {t.manage.onSale}
                               </span>
                             )}
                           </div>
@@ -932,13 +903,13 @@ export default function ManagePage({
                             {isFeatured && (
                               <span className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg font-medium"
                                 style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24' }}>
-                                <Star className="w-3 h-3" /> מומלץ
+                                <Star className="w-3 h-3" /> {t.manage.featured}
                               </span>
                             )}
                             {isOnSale && (
                               <span className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg font-medium"
                                 style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171' }}>
-                                <Flame className="w-3 h-3" /> מבצע
+                                <Flame className="w-3 h-3" /> {t.manage.onSale}
                               </span>
                             )}
                           </div>
@@ -1047,7 +1018,7 @@ export default function ManagePage({
                             {lineName}
                           </h3>
                           <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--dash-text-3)' }}>
-                            {lineProducts.length} מוצרים
+                            {lineProducts.length} {t.manage.productsWord}
                           </span>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -1060,7 +1031,7 @@ export default function ManagePage({
                         <div className="flex items-center gap-3 mb-4">
                           <div className="w-1 h-6 rounded-full" style={{ background: 'var(--dash-text-3)' }} />
                           <h3 className="font-bold text-lg" style={{ color: 'var(--dash-text)' }}>
-                            מוצרים נוספים
+                            {t.manage.moreProducts}
                           </h3>
                           <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--dash-text-3)' }}>
                             {noLine.length}
@@ -1081,19 +1052,20 @@ export default function ManagePage({
         {/* ═══ CONTENT TAB ═══ */}
         {activeTab === 'content' && (
           <div>
-            <h2 className="text-xl font-bold mb-6" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Content from posts' : 'תוכן מפוסטים'}</h2>
+            <h2 className="text-xl font-bold mb-6" style={{ color: 'var(--dash-text)' }}>{t.manage.contentTitle}</h2>
 
             {filteredContent.length === 0 ? (
               <div className="text-center py-16 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
                 <FileText className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--dash-text-3)' }} />
-                <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--dash-text)' }}>{isEn ? 'No content yet' : 'אין תוכן עדיין'}</h3>
-                <p style={{ color: 'var(--dash-text-2)' }}>{isEn ? "Content is scraped automatically from your Instagram posts." : 'התוכן נסרק אוטומטית מהפוסטים שלך באינסטגרם'}</p>
+                <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--dash-text)' }}>{t.manage.contentEmptyTitle}</h3>
+                <p style={{ color: 'var(--dash-text-2)' }}>{t.manage.contentEmptyBody}</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredContent.map((item: any) => {
-                  const typeInfo = contentTypeLabels[item.type] || { label: item.type, icon: FileText, color: 'text-gray-400' };
+                  const typeInfo = contentTypeIcons[item.type] || { icon: FileText, color: 'text-gray-400' };
                   const TypeIcon = typeInfo.icon;
+                  const typeLabel = (t.manage.contentTypes as Record<string, string>)[item.type] || item.type;
                   return (
                     <div key={item.id} className="rounded-xl border overflow-hidden transition-all" style={cardStyle}>
                       {item.image_url && (
@@ -1104,7 +1076,7 @@ export default function ManagePage({
                       <div className="p-4">
                         <div className="flex items-center gap-2 mb-2">
                           <TypeIcon className={`w-4 h-4 ${typeInfo.color}`} />
-                          <span className="text-xs" style={{ color: 'var(--dash-text-2)' }}>{typeInfo.label}</span>
+                          <span className="text-xs" style={{ color: 'var(--dash-text-2)' }}>{typeLabel}</span>
                         </div>
                         <h3 className="font-semibold mb-2 line-clamp-2" style={{ color: 'var(--dash-text)' }}>
                           {item.title}
@@ -1124,19 +1096,19 @@ export default function ManagePage({
         {/* ═══ SETTINGS TAB ═══ */}
         {activeTab === 'settings' && (
           <div className="max-w-3xl mx-auto">
-            <h2 className="text-lg sm:text-xl font-bold mb-4 sm:mb-6" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Chat settings' : 'הגדרות צ׳אט'}</h2>
+            <h2 className="text-lg sm:text-xl font-bold mb-4 sm:mb-6" style={{ color: 'var(--dash-text)' }}>{t.manage.chatSettingsTitle}</h2>
 
             <div className="space-y-4 sm:space-y-6">
               <div className="rounded-xl border p-4 sm:p-6" style={cardStyle}>
                 <label className="block text-sm font-medium mb-3" style={{ color: 'var(--dash-text-2)' }}>
-                  הודעת ברכה
+                  {t.manage.greetingLabel}
                 </label>
                 <textarea
                   value={greetingMessage}
                   onChange={e => setGreetingMessage(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   rows={4}
-                  placeholder={isEn ? "Hi! I'm the bot for…" : 'היי! אני הבוט של...'}
+                  placeholder={t.manage.greetingPlaceholder}
                   style={inputStyle}
                 />
               </div>
@@ -1144,14 +1116,14 @@ export default function ManagePage({
               <div className="rounded-xl border p-4 sm:p-6" style={cardStyle}>
                 <div className="flex items-center justify-between mb-4">
                   <label className="block text-sm font-medium" style={{ color: 'var(--dash-text-2)' }}>
-                    שאלות מוצעות
+                    {t.manage.suggestedQuestionsLabel}
                   </label>
                   <button
                     onClick={() => setSuggestedQuestions([...suggestedQuestions, ''])}
                     className="px-3 py-1.5 text-xs rounded transition-colors flex items-center gap-1 btn-primary"
                   >
                     <Plus className="w-3 h-3" />
-                    הוסף שאלה
+                    {t.manage.addQuestion}
                   </button>
                 </div>
 
@@ -1167,7 +1139,7 @@ export default function ManagePage({
                           setSuggestedQuestions(updated);
                         }}
                         className="flex-1 px-4 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        placeholder={`שאלה ${idx + 1}`}
+                        placeholder={`${t.manage.questionPlaceholder} ${idx + 1}`}
                         style={inputStyle}
                       />
                       <button
@@ -1179,7 +1151,7 @@ export default function ManagePage({
                     </div>
                   ))}
                   {suggestedQuestions.length === 0 && (
-                    <p className="text-sm text-center py-4" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'No suggested questions yet' : 'אין שאלות מוצעות'}</p>
+                    <p className="text-sm text-center py-4" style={{ color: 'var(--dash-text-2)' }}>{t.manage.suggestedQuestionsEmpty}</p>
                   )}
                 </div>
               </div>
@@ -1190,9 +1162,9 @@ export default function ManagePage({
                 className="w-full px-6 py-4 disabled:opacity-50 rounded-xl transition-all font-medium flex items-center justify-center gap-2 text-lg btn-primary"
               >
                 {saving ? (
-                  <><Loader2 className="w-5 h-5 animate-spin" />שומר...</>
+                  <><Loader2 className="w-5 h-5 animate-spin" />{t.manage.saving}</>
                 ) : (
-                  <><Save className="w-5 h-5" />{isEn ? 'Save settings' : 'שמור הגדרות'}</>
+                  <><Save className="w-5 h-5" />{t.manage.saveSettings}</>
                 )}
               </button>
             </div>

@@ -3,6 +3,7 @@
 import { useState, useEffect, use, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDashboardLang } from '@/hooks/useDashboardLang';
+import { getDashboardStrings } from '@/lib/i18n/dashboard';
 import {
   AreaChart,
   Area,
@@ -75,17 +76,6 @@ interface InternalAnalytics {
   };
 }
 
-const TOPIC_LABEL: Record<string, string> = {
-  shipment_status: 'סטטוס משלוח',
-  complaint: 'תלונה / מוצר פגום',
-  return_or_exchange: 'החזרה / החלפה',
-  support_request: 'פנייה לתמיכה',
-  coupon: 'קופונים',
-  product_question: 'שאלת מוצר',
-  greeting: 'ברכה',
-  other: 'אחר',
-};
-
 const TOPIC_COLOR: Record<string, string> = {
   shipment_status: '#06b6d4',
   complaint: '#ef4444',
@@ -101,20 +91,6 @@ import type { Influencer } from '@/types';
 
 type DateRange = '7d' | '14d' | '30d' | '90d';
 
-const dateRangeOptions_HE: { value: DateRange; label: string }[] = [
-  { value: '7d', label: '7 ימים' },
-  { value: '14d', label: '14 ימים' },
-  { value: '30d', label: '30 יום' },
-  { value: '90d', label: '90 יום' },
-];
-
-const dateRangeOptions_EN: { value: DateRange; label: string }[] = [
-  { value: '7d', label: '7 days' },
-  { value: '14d', label: '14 days' },
-  { value: '30d', label: '30 days' },
-  { value: '90d', label: '90 days' },
-];
-
 export default function AnalyticsPage({
   params,
 }: {
@@ -124,6 +100,13 @@ export default function AnalyticsPage({
   const username = resolvedParams.username;
   const { lang } = useDashboardLang(username);
   const isEn = lang === 'en';
+  const t = getDashboardStrings(lang);
+  const dateRangeOptions: { value: DateRange; label: string }[] = [
+    { value: '7d', label: t.analytics.range7d },
+    { value: '14d', label: t.analytics.range14d },
+    { value: '30d', label: t.analytics.range30d },
+    { value: '90d', label: t.analytics.range90d },
+  ];
   const router = useRouter();
 
   const [influencer, setInfluencer] = useState<Influencer | null>(null);
@@ -328,7 +311,7 @@ export default function AnalyticsPage({
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
             <BarChart3 className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
-            {isEn ? 'Analytics' : 'אנליטיקס'}
+            {t.analytics.pageTitle}
           </h1>
 
           {/* Date Range Selector */}
@@ -344,7 +327,7 @@ export default function AnalyticsPage({
                 color: 'var(--dash-text)',
               }}
             >
-              {(isEn ? dateRangeOptions_EN : dateRangeOptions_HE).map(opt => (
+              {dateRangeOptions.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
@@ -360,7 +343,7 @@ export default function AnalyticsPage({
           {registry.length > 0 && (
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs whitespace-nowrap" style={{ color: 'var(--dash-text-3)' }}>
-                {isEn ? 'Filter by creator:' : 'סינון לפי משפיענית:'}
+                {t.analytics.filterByCreator}
               </span>
               <button
                 onClick={() => setRefFilter(null)}
@@ -370,7 +353,7 @@ export default function AnalyticsPage({
                   color: !refFilter ? '#fff' : 'var(--dash-text-2)',
                 }}
               >
-                {isEn ? 'All' : 'הכל'}
+                {t.analytics.filterAll}
               </button>
               {registry.map((r) => {
                 const active = refFilter === r.slug.toLowerCase();
@@ -397,7 +380,7 @@ export default function AnalyticsPage({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={isEn ? 'Search conversations (e.g. "leak", "refund")' : 'חיפוש בתוך השיחות (לדוגמה "דולף", "החזר")'}
+              placeholder={t.analytics.searchPlaceholder}
               className="flex-1 bg-transparent outline-none text-sm"
               dir={isEn ? 'ltr' : 'rtl'}
               style={{ color: 'var(--dash-text)' }}
@@ -408,15 +391,18 @@ export default function AnalyticsPage({
                 className="text-xs opacity-60 hover:opacity-100"
                 style={{ color: 'var(--dash-text-2)' }}
               >
-                {isEn ? 'Clear' : 'נקה'}
+                {t.analytics.clear}
               </button>
             )}
           </div>
           {(refFilter || search.trim()) && summary && (
             <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
-              {isEn
-                ? `Filter active — ${summary.sessions.with_message} matching conversations in the last ${dateRange === '7d' ? '7 days' : dateRange === '14d' ? '14 days' : dateRange === '30d' ? '30 days' : '90 days'}`
-                : `סינון פעיל — ${summary.sessions.with_message} שיחות תואמות ב-${dateRange === '7d' ? '7 הימים' : dateRange === '14d' ? '14 הימים' : dateRange === '30d' ? '30 הימים' : '90 הימים'} האחרונים`}
+              {`${t.analytics.filterActiveLabel} — ${summary.sessions.with_message} ${t.analytics.filterMatchingPrefix}${
+                dateRange === '7d' ? t.analytics.rangeWindow7d
+                  : dateRange === '14d' ? t.analytics.rangeWindow14d
+                  : dateRange === '30d' ? t.analytics.rangeWindow30d
+                  : t.analytics.rangeWindow90d
+              }${t.analytics.filterActiveSuffix}`}
             </p>
           )}
         </div>
@@ -432,40 +418,32 @@ export default function AnalyticsPage({
               iconBg: 'rgba(6,182,212,0.15)',
               change: visitorsChange,
               value: formatNumber(summary.visits.unique),
-              label: isEn ? 'Unique visitors' : 'מבקרים ייחודיים',
-              sub: isEn
-                ? `${formatNumber(summary.visits.total)} total page visits`
-                : `${formatNumber(summary.visits.total)} ביקורי דף בסך הכל`,
+              label: t.analytics.cardUniqueVisitors,
+              sub: `${formatNumber(summary.visits.total)} ${t.analytics.cardVisitorsSub}`,
             },
             {
               icon: <MessageCircle className="w-6 h-6 text-blue-400" />,
               iconBg: 'rgba(59,130,246,0.15)',
               change: sessionsChange,
               value: formatNumber(summary.sessions.with_message),
-              label: isEn ? 'Active conversations' : 'שיחות בפועל',
-              sub: isEn
-                ? `out of ${formatNumber(summary.sessions.total)} chat opens`
-                : `מתוך ${formatNumber(summary.sessions.total)} פתיחות צ'אט`,
+              label: t.analytics.cardActiveConversations,
+              sub: `${t.analytics.cardSessionsSubPrefix} ${formatNumber(summary.sessions.total)} ${t.analytics.cardSessionsSubSuffix}`,
             },
             {
               icon: <TrendingUp className="w-6 h-6 text-green-400" />,
               iconBg: 'rgba(34,197,94,0.15)',
               change: userMsgsChange,
               value: formatNumber(summary.messages.user),
-              label: isEn ? 'Customer messages' : 'הודעות מלקוחות',
-              sub: isEn
-                ? `avg ${summary.avg_user_msgs_per_session} per conversation`
-                : `ממוצע ${summary.avg_user_msgs_per_session} לשיחה`,
+              label: t.analytics.cardCustomerMessages,
+              sub: `${t.analytics.cardMessagesSubPrefix} ${summary.avg_user_msgs_per_session} ${t.analytics.cardMessagesSubSuffix}`,
             },
             {
               icon: <Copy className="w-6 h-6 text-purple-400" />,
               iconBg: 'rgba(168,85,247,0.15)',
               change: couponsChange,
               value: formatNumber(summary.conversions.coupon_copies),
-              label: isEn ? 'Coupons copied' : 'קופונים הועתקו',
-              sub: isEn
-                ? `${formatNumber(summary.conversions.product_clicks)} product clicks`
-                : `${formatNumber(summary.conversions.product_clicks)} קליקים על מוצרים`,
+              label: t.analytics.couponsCopied,
+              sub: `${formatNumber(summary.conversions.product_clicks)} ${t.analytics.productClicks}`,
             },
           ].map((card, i) => (
             <div
@@ -526,18 +504,16 @@ export default function AnalyticsPage({
             >
               <h3 className="text-lg font-semibold mb-1 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
                 <BarChart3 className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
-                {isEn ? 'What customers talk about' : 'על מה הלקוחות מדברים'}
+                {t.analytics.topicsTitle}
               </h3>
               <p className="text-xs mb-5" style={{ color: 'var(--dash-text-3)' }}>
-                {isEn
-                  ? `Classified by first message in each conversation (${total} conversations in range)`
-                  : `סיווג לפי ההודעה הראשונה בשיחה (${total} שיחות בטווח)`}
+                {`${t.analytics.topicsSubtitlePrefix} (${total} ${t.analytics.topicsSubtitleCountSuffix})`}
               </p>
               <div className="space-y-3">
                 {entries.map(([topic, count]) => {
                   const pct = total > 0 ? Math.round(((count as number) / total) * 100) : 0;
                   const color = TOPIC_COLOR[topic] || '#6b7280';
-                  const label = TOPIC_LABEL[topic] || topic;
+                  const label = (t.analytics.topicLabels as Record<string, string>)[topic] || topic;
                   return (
                     <div key={topic}>
                       <div className="flex items-center justify-between mb-1.5 text-sm">
@@ -579,7 +555,7 @@ export default function AnalyticsPage({
           >
             <h3 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
               <TrendingUp className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
-              {isEn ? 'Conversations & messages' : 'שיחות והודעות'}
+              {t.analytics.chartConversationsMessages}
             </h3>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
@@ -611,7 +587,7 @@ export default function AnalyticsPage({
                   <Area
                     type="monotone"
                     dataKey="sessions"
-                    name={isEn ? 'Conversations' : 'שיחות'}
+                    name={t.analytics.seriesConversations}
                     stroke="#9334EB"
                     fillOpacity={1}
                     fill="url(#colorSessions)"
@@ -619,7 +595,7 @@ export default function AnalyticsPage({
                   <Area
                     type="monotone"
                     dataKey="messages"
-                    name={isEn ? 'Messages' : 'הודעות'}
+                    name={t.analytics.seriesMessages}
                     stroke="#22c55e"
                     fillOpacity={1}
                     fill="url(#colorMessages)"
@@ -640,7 +616,7 @@ export default function AnalyticsPage({
           >
             <h3 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
               <Package className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
-              {isEn ? 'Coupons & clicks' : 'קופונים וקליקים'}
+              {t.analytics.chartCouponsClicks}
             </h3>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
@@ -659,8 +635,8 @@ export default function AnalyticsPage({
                     labelStyle={{ color: 'var(--dash-text)' }}
                   />
                   <Legend />
-                  <Bar dataKey="couponCopies" name={isEn ? 'Coupons copied' : 'קופונים הועתקו'} fill="#a855f7" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="productClicks" name={isEn ? 'Product clicks' : 'קליקים על מוצרים'} fill="#f97316" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="couponCopies" name={t.analytics.couponsCopied} fill="#a855f7" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="productClicks" name={t.analytics.productClicks} fill="#f97316" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -678,7 +654,7 @@ export default function AnalyticsPage({
         >
           <h3 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
             <Package className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
-            {isEn ? 'Top products' : 'מוצרים מובילים'}
+            {t.analytics.topProductsTitle}
           </h3>
 
           {topProducts.length > 0 ? (
@@ -687,11 +663,11 @@ export default function AnalyticsPage({
                 <thead>
                   <tr className="text-sm" style={{ borderBottom: '1px solid var(--dash-glass-border)', color: 'var(--dash-text-2)' }}>
                     <th className="text-right py-3 px-4">#</th>
-                    <th className="text-right py-3 px-4">{isEn ? 'Product' : 'מוצר'}</th>
-                    <th className="text-right py-3 px-4">{isEn ? 'Brand' : 'מותג'}</th>
-                    <th className="text-center py-3 px-4">{isEn ? 'Clicks' : 'קליקים'}</th>
-                    <th className="text-center py-3 px-4">{isEn ? 'Coupons copied' : 'קופונים הועתקו'}</th>
-                    <th className="text-center py-3 px-4">{isEn ? 'Total activity' : 'סה״כ פעילות'}</th>
+                    <th className="text-right py-3 px-4">{t.analytics.colProduct}</th>
+                    <th className="text-right py-3 px-4">{t.analytics.colBrand}</th>
+                    <th className="text-center py-3 px-4">{t.analytics.colClicks}</th>
+                    <th className="text-center py-3 px-4">{t.analytics.couponsCopied}</th>
+                    <th className="text-center py-3 px-4">{t.analytics.colTotalActivity}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -742,7 +718,7 @@ export default function AnalyticsPage({
           ) : (
             <div className="text-center py-12">
               <Package className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--dash-text-3)' }} />
-              <p style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'No product data in this range' : 'אין נתונים על מוצרים בתקופה זו'}</p>
+              <p style={{ color: 'var(--dash-text-2)' }}>{t.analytics.noProductData}</p>
             </div>
           )}
         </div>
@@ -758,7 +734,7 @@ export default function AnalyticsPage({
           >
             <div className="flex items-center gap-3 mb-2">
               <Users className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
-              <span style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Unique visitors' : 'מבקרים ייחודיים'}</span>
+              <span style={{ color: 'var(--dash-text-2)' }}>{t.analytics.cardUniqueVisitors}</span>
             </div>
             <p className="text-3xl font-bold" style={{ color: 'var(--dash-text)' }}>{formatNumber(summary.visits.unique)}</p>
           </div>
@@ -772,7 +748,7 @@ export default function AnalyticsPage({
           >
             <div className="flex items-center gap-3 mb-2">
               <MessageCircle className="w-6 h-6" style={{ color: 'var(--dash-positive)' }} />
-              <span style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Avg messages per chat' : 'ממוצע הודעות לשיחה'}</span>
+              <span style={{ color: 'var(--dash-text-2)' }}>{t.analytics.avgMessagesPerChat}</span>
             </div>
             <p className="text-3xl font-bold" style={{ color: 'var(--dash-text)' }}>{summary.avg_user_msgs_per_session}</p>
           </div>
@@ -786,48 +762,48 @@ export default function AnalyticsPage({
           >
             <div className="flex items-center gap-3 mb-2">
               <TrendingUp className="w-6 h-6 text-orange-400" />
-              <span style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Conversion rate' : 'שיעור המרה'}</span>
+              <span style={{ color: 'var(--dash-text-2)' }}>{t.analytics.conversionRate}</span>
             </div>
             <p className="text-3xl font-bold" style={{ color: 'var(--dash-text)' }}>
               {summary.sessions.with_message > 0
                 ? Math.round((summary.conversions.coupon_copies / summary.sessions.with_message) * 100)
                 : 0}%
             </p>
-            <p className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>קופונים / שיחות</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>{t.analytics.conversionRateSub}</p>
           </div>
         </div>
 
         {internalSummary && (
           <section className="max-w-6xl mx-auto px-4 sm:px-6 mt-10 space-y-6">
             <div>
-              <h2 className="text-xl font-bold" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Internal analytics' : 'אנליטיקס פנימי'}</h2>
+              <h2 className="text-xl font-bold" style={{ color: 'var(--dash-text)' }}>{t.analytics.internalTitle}</h2>
               <p className="text-sm mt-1" style={{ color: 'var(--dash-text-3)' }}>
-                נתונים שנאספים ישירות מהמערכת שלנו — חוצים adblockers ומקורות חיצוניים.
+                {t.analytics.internalSubtitle}
               </p>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <KpiTile label="חדשים" value={internalSummary.totals.new_visitors.toLocaleString('he-IL')} />
-              <KpiTile label="חוזרים" value={internalSummary.totals.returning_visitors.toLocaleString('he-IL')} />
+              <KpiTile label={t.analytics.internalNew} value={internalSummary.totals.new_visitors.toLocaleString('he-IL')} />
+              <KpiTile label={t.analytics.internalReturning} value={internalSummary.totals.returning_visitors.toLocaleString('he-IL')} />
               <KpiTile label="Bounce Rate" value={`${internalSummary.totals.bounce_rate_pct}%`} />
               <KpiTile
-                label="זמן שיחה ממוצע"
+                label={t.analytics.internalAvgDuration}
                 value={`${Math.round(internalSummary.totals.avg_duration_sec)}s`}
               />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="rounded-2xl p-4 border" style={{ background: 'var(--dash-card)', borderColor: 'var(--dash-border)' }}>
-                <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--dash-text)' }}>פאנל המרה</h3>
+                <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--dash-text)' }}>{t.analytics.funnelTitle}</h3>
                 <ul className="space-y-2 text-sm">
                   {internalSummary.funnel.map((row) => {
                     const top = internalSummary.funnel[0]?.count || 1;
                     const pct = top > 0 ? Math.round((row.count / top) * 100) : 0;
                     const label =
-                      row.stage === 'visits' ? 'ביקורים' :
-                      row.stage === 'sessions' ? 'שיחות' :
-                      row.stage === 'engaged' ? 'שיחות עם אינטראקציה' :
-                      'לידים + פניות תמיכה';
+                      row.stage === 'visits' ? t.analytics.funnelVisits :
+                      row.stage === 'sessions' ? t.analytics.funnelSessions :
+                      row.stage === 'engaged' ? t.analytics.funnelEngaged :
+                      t.analytics.funnelLeads;
                     return (
                       <li key={row.stage}>
                         <div className="flex justify-between mb-1">
@@ -844,13 +820,13 @@ export default function AnalyticsPage({
               </div>
 
               <div className="rounded-2xl p-4 border" style={{ background: 'var(--dash-card)', borderColor: 'var(--dash-border)' }}>
-                <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--dash-text)' }}>יציאות</h3>
+                <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--dash-text)' }}>{t.analytics.exitsTitle}</h3>
                 <div className="h-44">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={[
-                      { label: 'יציאות חיצוניות', value: internalSummary.totals.external_exits },
-                      { label: 'חזרה לאינסטגרם', value: internalSummary.totals.back_to_ig },
-                      { label: 'חזרה לאתר', value: internalSummary.totals.back_to_site },
+                      { label: t.analytics.exitExternal, value: internalSummary.totals.external_exits },
+                      { label: t.analytics.exitBackToIg, value: internalSummary.totals.back_to_ig },
+                      { label: t.analytics.exitBackToSite, value: internalSummary.totals.back_to_site },
                     ]}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--dash-border)" />
                       <XAxis dataKey="label" tick={{ fontSize: 10 }} />
@@ -865,7 +841,7 @@ export default function AnalyticsPage({
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="rounded-2xl p-4 border" style={{ background: 'var(--dash-card)', borderColor: 'var(--dash-border)' }}>
-                <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--dash-text)' }}>מקורות תנועה (Top 10)</h3>
+                <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--dash-text)' }}>{t.analytics.trafficSourcesTitle}</h3>
                 {internalSummary.breakdown.ref_source.length ? (
                   <ul className="space-y-1 text-sm">
                     {internalSummary.breakdown.ref_source.map((s) => (
@@ -876,7 +852,7 @@ export default function AnalyticsPage({
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>אין נתונים</p>
+                  <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>{t.analytics.noData}</p>
                 )}
               </div>
 
@@ -904,8 +880,8 @@ export default function AnalyticsPage({
                 ) : (
                   <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
                     {internalSummary.gsc.provisioning?.gsc_site_url
-                      ? 'אין שאילתות ב-7 הימים האחרונים.'
-                      : 'GSC לא מחובר. צרו קשר עם הצוות לחיבור Search Console.'}
+                      ? t.analytics.gscNoQueries
+                      : t.analytics.gscNotConnected}
                   </p>
                 )}
               </div>

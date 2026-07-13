@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDashboardLang } from '@/hooks/useDashboardLang';
+import { getDashboardStrings } from '@/lib/i18n/dashboard';
 import {
   Briefcase,
   Plus,
@@ -41,17 +42,18 @@ interface Partnership {
   created_at: string;
 }
 
+// Status colors only — user-facing labels come from the i18n catalog (keyed by value).
 const STATUS_OPTIONS = [
-  { value: 'active', label: 'פעיל', label_en: 'Active', color: '#17A34A' },
-  { value: 'in_progress', label: 'בביצוע', label_en: 'In progress', color: '#2663EB' },
-  { value: 'proposal', label: 'הצעה', label_en: 'Proposal', color: '#CB8A04' },
-  { value: 'negotiation', label: 'משא ומתן', label_en: 'Negotiation', color: '#f97316' },
-  { value: 'completed', label: 'הושלם', label_en: 'Completed', color: '#a78bfa' },
-  { value: 'cancelled', label: 'בוטל', label_en: 'Cancelled', color: '#ef4444' },
+  { value: 'active', color: '#17A34A' },
+  { value: 'in_progress', color: '#2663EB' },
+  { value: 'proposal', color: '#CB8A04' },
+  { value: 'negotiation', color: '#f97316' },
+  { value: 'completed', color: '#a78bfa' },
+  { value: 'cancelled', color: '#ef4444' },
 ];
 
-function getStatusConfig(status: string) {
-  return STATUS_OPTIONS.find(s => s.value === status) || { value: status, label: status, color: 'var(--dash-text-3)' };
+function getStatusColor(status: string) {
+  return STATUS_OPTIONS.find(s => s.value === status)?.color || 'var(--dash-text-3)';
 }
 
 export default function PartnershipsPage({
@@ -63,6 +65,8 @@ export default function PartnershipsPage({
   const username = resolvedParams.username;
   const { lang } = useDashboardLang(username);
   const isEn = lang === 'en';
+  const t = getDashboardStrings(lang);
+  const P = t.partnerships;
   const router = useRouter();
 
   const [partnerships, setPartnerships] = useState<Partnership[]>([]);
@@ -85,13 +89,21 @@ export default function PartnershipsPage({
   });
 
   const isServiceProvider = archetype === 'service_provider';
-  const pageTitle = isEn
-    ? (isServiceProvider ? 'Clients' : 'Partnerships')
-    : (isServiceProvider ? 'לקוחות' : 'שיתופי פעולה');
-  const itemLabel = isEn
-    ? (isServiceProvider ? 'Client' : 'Partnership')
-    : (isServiceProvider ? 'לקוח' : 'שת״פ');
+  const pageTitle = isServiceProvider ? P.titleClients : P.titlePartnerships;
+  const newItemLabel = isServiceProvider ? P.newClient : P.newPartnership;
+  const fieldNameLabel = isServiceProvider ? P.fieldClientName : P.fieldBrandName;
+  const emptyTitle = isServiceProvider ? P.emptyClients : P.emptyPartnerships;
+  const emptyHint = isServiceProvider ? P.emptyHintClients : P.emptyHintPartnerships;
+  const addFirstLabel = isServiceProvider ? P.addFirstClient : P.addFirstPartnership;
   const PageIcon = isServiceProvider ? Users : Briefcase;
+  const STATUS_LABELS: Record<string, string> = {
+    active: P.statusActive,
+    in_progress: P.statusInProgress,
+    proposal: P.statusProposal,
+    negotiation: P.statusNegotiation,
+    completed: P.statusCompleted,
+    cancelled: P.statusCancelled,
+  };
 
   useEffect(() => {
     loadData();
@@ -169,7 +181,7 @@ export default function PartnershipsPage({
   }
 
   async function handleDelete(id: string) {
-    if (!confirm(isEn ? `Delete this ${itemLabel.toLowerCase()}?` : `למחוק את ה${itemLabel}?`)) return;
+    if (!confirm(isServiceProvider ? P.confirmDeleteClient : P.confirmDeletePartnership)) return;
     try {
       const res = await fetch(`/api/influencer/partnerships/${id}`, {
         method: 'DELETE',
@@ -224,16 +236,16 @@ export default function PartnershipsPage({
             style={{ background: 'var(--color-primary)', color: '#fff' }}
           >
             <Plus className="w-4 h-4" />
-            {isEn ? `New ${itemLabel.toLowerCase()}` : `${itemLabel} חדש`}
+            {newItemLabel}
           </button>
         </div>
 
         {/* Stats strip */}
         <div className="grid grid-cols-3 gap-3 mb-6">
           {[
-            { label: isEn ? 'Total' : 'סה״כ', value: partnerships.length },
-            { label: isEn ? 'Active' : 'פעילים', value: activeCount },
-            { label: isEn ? 'Total value' : 'שווי כולל', value: totalValue > 0 ? `${isEn ? '$' : '₪'}${totalValue.toLocaleString(isEn ? 'en-US' : 'he-IL')}` : '—' },
+            { label: P.statTotal, value: partnerships.length },
+            { label: P.statActive, value: activeCount },
+            { label: P.statTotalValue, value: totalValue > 0 ? `${isEn ? '$' : '₪'}${totalValue.toLocaleString(isEn ? 'en-US' : 'he-IL')}` : '—' },
           ].map((s, i) => (
             <div key={i} className="glass-card rounded-xl p-3 text-center">
               <div className="text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>{s.label}</div>
@@ -247,12 +259,12 @@ export default function PartnershipsPage({
           <div className="glass-card rounded-2xl p-5 mb-6 animate-slide-up" style={{ border: '1px solid var(--color-primary)' }}>
             <h3 className="font-semibold mb-4 flex items-center gap-2">
               <Plus className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
-              {isEn ? `New ${itemLabel.toLowerCase()}` : `${itemLabel} חדש`}
+              {newItemLabel}
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>
-                  {isEn ? (isServiceProvider ? 'Client name' : 'Brand name') : (isServiceProvider ? 'שם הלקוח' : 'שם המותג')} *
+                  {fieldNameLabel} *
                 </label>
                 <input
                   className="input w-full py-2 px-3 text-sm"
@@ -261,17 +273,17 @@ export default function PartnershipsPage({
                 />
               </div>
               <div>
-                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Status' : 'סטטוס'}</label>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{P.fieldStatus}</label>
                 <select
                   className="input w-full py-2 px-3 text-sm"
                   value={newPartnership.status}
                   onChange={e => setNewPartnership(p => ({ ...p, status: e.target.value }))}
                 >
-                  {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{isEn ? (s as any).label_en : s.label}</option>)}
+                  {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{STATUS_LABELS[s.value]}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Contact' : 'איש קשר'}</label>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{P.fieldContact}</label>
                 <input
                   className="input w-full py-2 px-3 text-sm"
                   value={newPartnership.brand_contact_name}
@@ -279,7 +291,7 @@ export default function PartnershipsPage({
                 />
               </div>
               <div>
-                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Amount' : 'סכום'}</label>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{P.fieldAmount}</label>
                 <input
                   type="number"
                   className="input w-full py-2 px-3 text-sm"
@@ -288,7 +300,7 @@ export default function PartnershipsPage({
                 />
               </div>
               <div className="sm:col-span-2">
-                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Brief / description' : 'בריף / תיאור'}</label>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{P.fieldBrief}</label>
                 <textarea
                   className="input w-full py-2 px-3 text-sm"
                   rows={2}
@@ -297,7 +309,7 @@ export default function PartnershipsPage({
                 />
               </div>
               <div className="sm:col-span-2">
-                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Notes' : 'הערות'}</label>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{P.fieldNotes}</label>
                 <textarea
                   className="input w-full py-2 px-3 text-sm"
                   rows={2}
@@ -308,7 +320,7 @@ export default function PartnershipsPage({
             </div>
             <div className="flex gap-2 mt-4 justify-end">
               <button onClick={() => setIsAdding(false)} className="px-4 py-2 rounded-xl text-sm" style={{ color: 'var(--dash-text-2)' }}>
-                {isEn ? 'Cancel' : 'ביטול'}
+                {P.cancel}
               </button>
               <button
                 onClick={handleAdd}
@@ -317,7 +329,7 @@ export default function PartnershipsPage({
                 style={{ background: 'var(--color-primary)', color: '#fff' }}
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                {isEn ? 'Save' : 'שמירה'}
+                {P.save}
               </button>
             </div>
           </div>
@@ -329,16 +341,16 @@ export default function PartnershipsPage({
             <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-glass-border)' }}>
               <PageIcon className="w-8 h-8" style={{ color: 'var(--color-primary)' }} />
             </div>
-            <h3 className="text-lg font-semibold mb-2">{isEn ? `No ${pageTitle.toLowerCase()} yet` : `אין ${pageTitle} עדיין`}</h3>
+            <h3 className="text-lg font-semibold mb-2">{emptyTitle}</h3>
             <p className="text-sm mb-4" style={{ color: 'var(--dash-text-2)' }}>
-              {isEn ? `Add ${pageTitle.toLowerCase()} so the bot can reference them in conversations.` : `הוסיפו ${pageTitle} כדי שהבוט יוכל לענות עליהם בשיחות`}
+              {emptyHint}
             </p>
             <button
               onClick={() => setIsAdding(true)}
               className="px-4 py-2 rounded-xl text-sm font-medium"
               style={{ background: 'var(--color-primary)', color: '#fff' }}
             >
-              {isEn ? `Add first ${itemLabel.toLowerCase()}` : `הוספת ${itemLabel} ראשון`}
+              {addFirstLabel}
             </button>
           </div>
         ) : (
@@ -346,7 +358,8 @@ export default function PartnershipsPage({
             {partnerships.map((p) => {
               const isExpanded = expandedId === p.id;
               const isEditing = editingId === p.id;
-              const statusCfg = getStatusConfig(p.status);
+              const statusColor = getStatusColor(p.status);
+              const statusLabelText = STATUS_LABELS[p.status] || p.status;
 
               return (
                 <div
@@ -372,9 +385,9 @@ export default function PartnershipsPage({
                             <span className="font-medium" style={{ color: 'var(--dash-text)' }}>{p.brand_name}</span>
                             <span
                               className="text-xs px-2 py-0.5 rounded-full"
-                              style={{ background: statusCfg.color + '20', color: statusCfg.color }}
+                              style={{ background: statusColor + '20', color: statusColor }}
                             >
-                              {statusCfg.label}
+                              {statusLabelText}
                             </span>
                           </div>
                           <div className="flex items-center gap-3 text-xs mt-0.5" style={{ color: 'var(--dash-text-3)' }}>
@@ -422,38 +435,38 @@ export default function PartnershipsPage({
                       <div className="pt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                         {p.brand_contact_email && (
                           <div>
-                            <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Email:' : 'אימייל:'}</span>
+                            <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>{P.detailEmail}</span>
                             <div style={{ color: 'var(--dash-text)' }}>{p.brand_contact_email}</div>
                           </div>
                         )}
                         {p.brand_contact_phone && (
                           <div>
-                            <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Phone:' : 'טלפון:'}</span>
+                            <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>{P.detailPhone}</span>
                             <div style={{ color: 'var(--dash-text)' }}>{p.brand_contact_phone}</div>
                           </div>
                         )}
                         {p.start_date && (
                           <div>
-                            <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Starts:' : 'תחילה:'}</span>
+                            <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>{P.detailStarts}</span>
                             <div style={{ color: 'var(--dash-text)' }}>{new Date(p.start_date).toLocaleDateString('he-IL')}</div>
                           </div>
                         )}
                         {p.end_date && (
                           <div>
-                            <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Ends:' : 'סיום:'}</span>
+                            <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>{P.detailEnds}</span>
                             <div style={{ color: 'var(--dash-text)' }}>{new Date(p.end_date).toLocaleDateString('he-IL')}</div>
                           </div>
                         )}
                       </div>
                       {p.brief && (
                         <div className="text-sm">
-                          <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Brief:' : 'בריף:'}</span>
+                          <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>{P.detailBrief}</span>
                           <p style={{ color: 'var(--dash-text-2)' }}>{p.brief}</p>
                         </div>
                       )}
                       {p.notes && (
                         <div className="text-sm">
-                          <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Notes:' : 'הערות:'}</span>
+                          <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>{P.detailNotes}</span>
                           <p style={{ color: 'var(--dash-text-2)' }}>{p.notes}</p>
                         </div>
                       )}
@@ -466,7 +479,7 @@ export default function PartnershipsPage({
                           style={{ color: 'var(--color-info)' }}
                         >
                           <ExternalLink className="w-3 h-3" />
-                          {isEn ? 'Link' : 'קישור'}
+                          {P.linkLabel}
                         </a>
                       )}
                     </div>
@@ -478,7 +491,7 @@ export default function PartnershipsPage({
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>
-                            {isServiceProvider ? 'שם הלקוח' : 'שם המותג'}
+                            {fieldNameLabel}
                           </label>
                           <input
                             className="input w-full py-2 px-3 text-sm"
@@ -487,17 +500,17 @@ export default function PartnershipsPage({
                           />
                         </div>
                         <div>
-                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Status' : 'סטטוס'}</label>
+                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{P.fieldStatus}</label>
                           <select
                             className="input w-full py-2 px-3 text-sm"
                             value={editForm.status || 'active'}
                             onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))}
                           >
-                            {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{isEn ? (s as any).label_en : s.label}</option>)}
+                            {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{STATUS_LABELS[s.value]}</option>)}
                           </select>
                         </div>
                         <div>
-                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Contact' : 'איש קשר'}</label>
+                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{P.fieldContact}</label>
                           <input
                             className="input w-full py-2 px-3 text-sm"
                             value={editForm.brand_contact_name || ''}
@@ -505,7 +518,7 @@ export default function PartnershipsPage({
                           />
                         </div>
                         <div>
-                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Amount' : 'סכום'}</label>
+                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{P.fieldAmount}</label>
                           <input
                             type="number"
                             className="input w-full py-2 px-3 text-sm"
@@ -514,7 +527,7 @@ export default function PartnershipsPage({
                           />
                         </div>
                         <div>
-                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Email' : 'אימייל'}</label>
+                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{P.fieldEmail}</label>
                           <input
                             className="input w-full py-2 px-3 text-sm"
                             value={editForm.brand_contact_email || ''}
@@ -523,7 +536,7 @@ export default function PartnershipsPage({
                           />
                         </div>
                         <div>
-                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Phone' : 'טלפון'}</label>
+                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{P.fieldPhone}</label>
                           <input
                             className="input w-full py-2 px-3 text-sm"
                             value={editForm.brand_contact_phone || ''}
@@ -532,7 +545,7 @@ export default function PartnershipsPage({
                           />
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Brief / description' : 'בריף / תיאור'}</label>
+                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{P.fieldBrief}</label>
                           <textarea
                             className="input w-full py-2 px-3 text-sm"
                             rows={2}
@@ -541,7 +554,7 @@ export default function PartnershipsPage({
                           />
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Notes' : 'הערות'}</label>
+                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{P.fieldNotes}</label>
                           <textarea
                             className="input w-full py-2 px-3 text-sm"
                             rows={2}
@@ -556,7 +569,7 @@ export default function PartnershipsPage({
                           className="px-3 py-1.5 rounded-lg text-sm"
                           style={{ color: 'var(--dash-text-2)' }}
                         >
-                          ביטול
+                          {P.cancel}
                         </button>
                         <button
                           onClick={() => handleSave(p.id)}
@@ -565,7 +578,7 @@ export default function PartnershipsPage({
                           style={{ background: 'var(--color-primary)', color: '#fff' }}
                         >
                           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                          שמירה
+                          {P.save}
                         </button>
                       </div>
                     </div>

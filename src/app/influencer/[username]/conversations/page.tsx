@@ -3,6 +3,7 @@
 import { useState, useEffect, use, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDashboardLang } from '@/hooks/useDashboardLang';
+import { getDashboardStrings } from '@/lib/i18n/dashboard';
 import {
   MessageCircle,
   Search,
@@ -41,10 +42,10 @@ function detectChannel(threadId: string | null): 'chat' | 'dm' | 'widget' {
   return 'chat';
 }
 
-const CHANNEL_CONFIG: Record<'chat' | 'dm' | 'widget', { label: string; icon: typeof MessageCircle; color: string; bg: string }> = {
-  chat: { label: 'צ׳אט', icon: MessageSquare, color: '#818cf8', bg: 'rgba(129,140,248,0.15)' },
-  dm: { label: 'DM', icon: Instagram, color: '#e879a8', bg: 'rgba(232,121,168,0.15)' },
-  widget: { label: 'וידג׳ט', icon: Globe, color: '#17A34A', bg: 'rgba(23,163,74,0.15)' },
+const CHANNEL_CONFIG: Record<'chat' | 'dm' | 'widget', { icon: typeof MessageCircle; color: string; bg: string }> = {
+  chat: { icon: MessageSquare, color: '#818cf8', bg: 'rgba(129,140,248,0.15)' },
+  dm: { icon: Instagram, color: '#e879a8', bg: 'rgba(232,121,168,0.15)' },
+  widget: { icon: Globe, color: '#17A34A', bg: 'rgba(23,163,74,0.15)' },
 };
 
 export default function ConversationsPage({
@@ -55,8 +56,17 @@ export default function ConversationsPage({
   const resolvedParams = use(params);
   const username = resolvedParams.username;
   const { lang } = useDashboardLang(username);
-  const isEn = lang === 'en';
+  const t = getDashboardStrings(lang);
   const router = useRouter();
+
+  const channelLabel = (ch: Channel) =>
+    ch === 'chat'
+      ? t.conversations.channelChat
+      : ch === 'dm'
+        ? t.conversations.channelDm
+        : ch === 'widget'
+          ? t.conversations.channelWidget
+          : t.conversations.filterAll;
 
   const [influencer, setInfluencer] = useState<Influencer | null>(null);
   const [loading, setLoading] = useState(true);
@@ -248,10 +258,10 @@ export default function ConversationsPage({
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
             <MessageCircle className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
-            {isEn ? 'Conversations' : 'שיחות'}
+            {t.conversations.pageTitle}
           </h1>
           <div className="text-sm" style={{ color: 'var(--dash-text-2)' }}>
-            {sessions.length} {isEn ? 'conversations' : 'שיחות'}
+            {sessions.length} {t.conversations.conversationsLabel}
           </div>
         </div>
 
@@ -262,7 +272,7 @@ export default function ConversationsPage({
             className={`pill transition-all duration-200 ${channelFilter === 'all' ? 'pill-purple' : 'pill-neutral'}`}
           >
             <Filter className="w-3.5 h-3.5 ml-1" />
-            הכל ({sessions.length})
+            {t.conversations.filterAll} ({sessions.length})
           </button>
           {(['chat', 'dm', 'widget'] as const).map(ch => {
             const cfg = CHANNEL_CONFIG[ch];
@@ -282,7 +292,7 @@ export default function ConversationsPage({
                 }}
               >
                 <Icon className="w-3.5 h-3.5 ml-1" />
-                {cfg.label} ({count})
+                {channelLabel(ch)} ({count})
               </button>
             );
           })}
@@ -295,7 +305,7 @@ export default function ConversationsPage({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={isEn ? 'Search conversations…' : 'חיפוש בשיחות...'}
+            placeholder={t.conversations.searchPlaceholder}
             className="input w-full pr-12 pl-4 py-3"
           />
           {searchQuery && (
@@ -354,10 +364,10 @@ export default function ConversationsPage({
                               className="text-xs px-2 py-0.5 rounded-full font-medium"
                               style={{ background: channelCfg.bg, color: channelCfg.color }}
                             >
-                              {channelCfg.label}
+                              {channelLabel(session.channel)}
                             </span>
                             <span className="text-sm font-medium" style={{ color: 'var(--dash-text)' }}>
-                              {session.message_count} הודעות
+                              {session.message_count} {t.conversations.messagesLabel}
                             </span>
                             {isStarred && <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />}
                             {isFlagged && <Flag className="w-3.5 h-3.5 text-red-400 fill-red-400" />}
@@ -461,12 +471,14 @@ export default function ConversationsPage({
                 <MessageCircle className="w-8 h-8" style={{ color: 'var(--color-primary)' }} />
               </div>
               <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--dash-text)' }}>
-                {isEn
-                  ? (searchQuery ? 'No matching results' : 'No conversations yet')
-                  : (searchQuery ? 'לא נמצאו תוצאות' : 'אין שיחות עדיין')}
+                {searchQuery
+                  ? t.conversations.emptyNoResultsTitle
+                  : t.conversations.emptyNoConversationsTitle}
               </h3>
               <p style={{ color: 'var(--dash-text-2)' }}>
-                {searchQuery ? 'נסה לחפש מילים אחרות' : 'שיחות חדשות יופיעו כאן כשהמבקרים ישתמשו בבוט'}
+                {searchQuery
+                  ? t.conversations.emptyNoResultsHint
+                  : t.conversations.emptyNoConversationsHint}
               </p>
             </div>
           )}
@@ -484,7 +496,7 @@ export default function ConversationsPage({
               className="glass-subtle px-6 py-3 rounded-2xl transition-all duration-300 hover:glass-card"
               style={{ color: 'var(--dash-text)' }}
             >
-              {isEn ? 'Load more' : 'טען עוד שיחות'}
+              {t.conversations.loadMore}
             </button>
           </div>
         )}

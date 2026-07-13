@@ -3,6 +3,7 @@
 import { useState, useEffect, use, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDashboardLang } from '@/hooks/useDashboardLang';
+import { getDashboardStrings, type DashboardStrings } from '@/lib/i18n/dashboard';
 import {
   Sparkles,
   Search,
@@ -64,6 +65,7 @@ export default function ProductsPage({
   const { username } = use(params);
   const { lang } = useDashboardLang(username);
   const isEn = lang === 'en';
+  const t = getDashboardStrings(lang);
   const router = useRouter();
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -135,12 +137,12 @@ export default function ProductsPage({
         <div className="flex items-center justify-between mb-3">
           <h1 className="text-xl font-bold flex items-center gap-2">
             <Sparkles className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
-            {isEn ? 'Products & ingredients' : 'מוצרים ורכיבים'}
+            {t.products.heading}
           </h1>
           <div className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
-            {total != null ? `${total.toLocaleString(isEn ? 'en-US' : 'he-IL')} ${isEn ? 'products' : 'מוצרים'}` : ''}
+            {total != null ? `${total.toLocaleString(isEn ? 'en-US' : 'he-IL')} ${t.products.productsCount}` : ''}
             {facets && total != null && total !== facets.total
-              ? ` ${isEn ? 'of' : 'מתוך'} ${facets.total.toLocaleString(isEn ? 'en-US' : 'he-IL')}`
+              ? ` ${t.products.of} ${facets.total.toLocaleString(isEn ? 'en-US' : 'he-IL')}`
               : ''}
           </div>
         </div>
@@ -153,11 +155,9 @@ export default function ProductsPage({
           <div className="flex items-start gap-2 min-w-0">
             <Eye className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-primary)' }} />
             <div className="min-w-0">
-              <div className="text-sm font-medium">{isEn ? 'Preview' : 'תצוגה מקדימה'}</div>
+              <div className="text-sm font-medium">{t.products.previewLabel}</div>
               <div className="text-[11px] mt-0.5" style={{ color: 'var(--dash-text-3)' }}>
-                {isEn
-                  ? "This is what visitors see in the chat. Browse the catalog, filter, and verify everything looks right."
-                  : 'זו התצוגה שהעוקבות רואות בצ׳אט. כאן את יכולה לעבור על הקטלוג, לסנן ולוודא שהכל נראה כמו שצריך.'}
+                {t.products.previewDescription}
               </div>
             </div>
           </div>
@@ -169,7 +169,7 @@ export default function ProductsPage({
             style={{ background: 'var(--color-primary)', color: '#fff' }}
           >
             <ExternalLink className="w-3 h-3" />
-            {isEn ? 'Open in chat' : 'פתחי בצ׳אט'}
+            {t.products.openInChat}
           </a>
         </div>
 
@@ -182,7 +182,7 @@ export default function ProductsPage({
             />
             <input
               className="input w-full py-2.5 pr-10 pl-3 text-sm"
-              placeholder={isEn ? 'Search by name, brand, ingredient…' : 'חיפוש לפי שם, מותג, רכיב…'}
+              placeholder={t.products.searchPlaceholder}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -196,7 +196,7 @@ export default function ProductsPage({
             }}
           >
             <Filter className="w-4 h-4" />
-            {isEn ? 'Filter' : 'סינון'}
+            {t.products.filter}
             {activeFiltersCount > 0 && (
               <span
                 className="text-[10px] px-1.5 rounded-full"
@@ -237,14 +237,14 @@ export default function ProductsPage({
           <div className="glass-card rounded-2xl p-4 mb-4 grid grid-cols-1 sm:grid-cols-3 gap-3 animate-slide-up">
             <div>
               <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>
-                {isEn ? 'Category' : 'קטגוריה'}
+                {t.products.category}
               </label>
               <select
                 className="input w-full py-2 px-3 text-sm"
                 value={activeCategory || ''}
                 onChange={(e) => setActiveCategory(e.target.value || null)}
               >
-                <option value="">{isEn ? 'All' : 'הכל'} ({facets.total})</option>
+                <option value="">{t.products.all} ({facets.total})</option>
                 {facets.categories.map((c) => (
                   <option key={c.value} value={c.value}>
                     {c.value} ({c.count})
@@ -254,14 +254,14 @@ export default function ProductsPage({
             </div>
             <div>
               <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>
-                {isEn ? 'Brand' : 'מותג'}
+                {t.products.brand}
               </label>
               <select
                 className="input w-full py-2 px-3 text-sm"
                 value={activeBrand || ''}
                 onChange={(e) => setActiveBrand(e.target.value || null)}
               >
-                <option value="">{isEn ? 'All' : 'הכל'}</option>
+                <option value="">{t.products.all}</option>
                 {facets.brands.map((b) => (
                   <option key={b.value} value={b.value}>
                     {b.value} ({b.count})
@@ -271,14 +271,14 @@ export default function ProductsPage({
             </div>
             <div>
               <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>
-                {isEn ? 'All claims' : 'כל התגיות'}
+                {t.products.allClaims}
               </label>
               <select
                 className="input w-full py-2 px-3 text-sm"
                 value={activeClaim || ''}
                 onChange={(e) => setActiveClaim(e.target.value || null)}
               >
-                <option value="">{isEn ? 'All' : 'הכל'}</option>
+                <option value="">{t.products.all}</option>
                 {facets.claims.map((c) => (
                   <option key={c.value} value={c.value}>
                     {c.value} ({c.count})
@@ -294,7 +294,7 @@ export default function ProductsPage({
                   style={{ color: 'var(--dash-text-3)' }}
                 >
                   <X className="w-3 h-3" />
-                  {isEn ? 'Clear all filters' : 'נקה את כל הסינונים'}
+                  {t.products.clearFilters}
                 </button>
               </div>
             )}
@@ -310,7 +310,7 @@ export default function ProductsPage({
         {!loading && products.length === 0 && (
           <div className="text-center py-16" style={{ color: 'var(--dash-text-3)' }}>
             <Sparkles className="w-10 h-10 mx-auto mb-3 opacity-40" />
-            <p className="text-sm">{isEn ? 'No matching products' : 'לא נמצאו מוצרים תואמים'}</p>
+            <p className="text-sm">{t.products.emptyMatching}</p>
           </div>
         )}
 
@@ -318,18 +318,18 @@ export default function ProductsPage({
         {!loading && products.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {products.map((p) => (
-              <ProductCard key={p.id} product={p} onClick={() => setSelected(p)} isEn={isEn} />
+              <ProductCard key={p.id} product={p} onClick={() => setSelected(p)} t={t} />
             ))}
           </div>
         )}
       </main>
 
-      {selected && <ProductDetailModal product={selected} onClose={() => setSelected(null)} isEn={isEn} />}
+      {selected && <ProductDetailModal product={selected} onClose={() => setSelected(null)} t={t} />}
     </div>
   );
 }
 
-function ProductCard({ product, onClick, isEn }: { product: Product; onClick: () => void; isEn: boolean }) {
+function ProductCard({ product, onClick, t }: { product: Product; onClick: () => void; t: DashboardStrings }) {
   const promoPercent = product.ai_profile?.promo_percent;
   return (
     <button
@@ -371,7 +371,7 @@ function ProductCard({ product, onClick, isEn }: { product: Product; onClick: ()
             className="text-[10px] px-2 py-0.5 rounded-full font-medium"
             style={{ background: 'var(--color-primary)', color: '#fff' }}
           >
-            {promoPercent}% {isEn ? 'off' : 'הנחה'}
+            {promoPercent}% {t.products.off}
           </span>
         )}
       </div>
@@ -379,7 +379,7 @@ function ProductCard({ product, onClick, isEn }: { product: Product; onClick: ()
   );
 }
 
-function ProductDetailModal({ product, onClose, isEn }: { product: Product; onClose: () => void; isEn: boolean }) {
+function ProductDetailModal({ product, onClose, t }: { product: Product; onClose: () => void; t: DashboardStrings }) {
   const keyDetailed = product.ai_profile?.key_ingredients_detailed || [];
   const inci = product.ingredients || [];
   return (
@@ -448,7 +448,7 @@ function ProductDetailModal({ product, onClose, isEn }: { product: Product; onCl
                 style={{ color: 'var(--color-primary)' }}
               >
                 <ExternalLink className="w-3 h-3" />
-                {isEn ? 'View product on site' : 'לדף המוצר באתר'}
+                {t.products.viewProduct}
               </a>
             )}
           </div>
@@ -469,7 +469,7 @@ function ProductDetailModal({ product, onClose, isEn }: { product: Product; onCl
             {product.description && (
               <div>
                 <h3 className="text-xs font-semibold mb-2 flex items-center gap-1.5" style={{ color: 'var(--dash-text-2)' }}>
-                  <Sparkles className="w-3.5 h-3.5" /> תיאור ויחודיות
+                  <Sparkles className="w-3.5 h-3.5" /> {t.products.descriptionHeading}
                 </h3>
                 <p className="text-sm whitespace-pre-line leading-relaxed" style={{ color: 'var(--dash-text)' }}>
                   {product.description}
@@ -480,7 +480,7 @@ function ProductDetailModal({ product, onClose, isEn }: { product: Product; onCl
             {keyDetailed.length > 0 && (
               <div>
                 <h3 className="text-xs font-semibold mb-2 flex items-center gap-1.5" style={{ color: 'var(--dash-text-2)' }}>
-                  <Beaker className="w-3.5 h-3.5" /> רכיבי מפתח
+                  <Beaker className="w-3.5 h-3.5" /> {t.products.keyIngredients}
                 </h3>
                 <ul className="space-y-1.5 text-sm">
                   {keyDetailed.slice(0, 30).map((k, i) => (
@@ -501,7 +501,7 @@ function ProductDetailModal({ product, onClose, isEn }: { product: Product; onCl
             {product.usage && (
               <div>
                 <h3 className="text-xs font-semibold mb-2" style={{ color: 'var(--dash-text-2)' }}>
-                  {isEn ? 'How to use' : 'אופן השימוש'}
+                  {t.products.howToUse}
                 </h3>
                 <p className="text-sm" style={{ color: 'var(--dash-text)' }}>{product.usage}</p>
               </div>
@@ -513,7 +513,7 @@ function ProductDetailModal({ product, onClose, isEn }: { product: Product; onCl
                   className="text-xs font-semibold cursor-pointer"
                   style={{ color: 'var(--dash-text-2)' }}
                 >
-                  {isEn ? 'Full ingredient list (INCI)' : 'רשימת רכיבים מלאה (INCI)'} — {inci.length}
+                  {t.products.fullIngredients} — {inci.length}
                 </summary>
                 <p className="text-xs mt-2 leading-relaxed" style={{ color: 'var(--dash-text-3)' }} dir="ltr">
                   {inci.join(', ')}

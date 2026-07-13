@@ -372,7 +372,7 @@ export default function SupportPage({
       if (dateTo) url.searchParams.set('to', new Date(dateTo + 'T23:59:59').toISOString());
       const res = await fetch(url.toString());
       if (!res.ok) {
-        alert('הייצוא נכשל — נסי שוב');
+        alert(t.exportFailed);
         return;
       }
       const blob = await res.blob();
@@ -437,7 +437,7 @@ export default function SupportPage({
             <div className="flex items-center gap-2 text-sm">
               <UserCheck className="w-4 h-4" style={{ color: '#883fe2' }} />
               <span style={{ color: 'var(--dash-text, #fff)' }}>
-                מחובר/ת כ:{' '}
+                {t.agentLoggedInAs}{' '}
                 <span className="font-semibold">{agent.display_name}</span>
               </span>
               {agent.is_admin && (
@@ -445,7 +445,7 @@ export default function SupportPage({
                   className="px-1.5 py-0.5 rounded text-[10px] font-semibold"
                   style={{ background: '#883fe2', color: '#fff' }}
                 >
-                  אדמין
+                  {t.adminBadge}
                 </span>
               )}
             </div>
@@ -457,7 +457,7 @@ export default function SupportPage({
                   style={{ background: '#883fe2', color: '#fff' }}
                 >
                   <BarChart3 className="w-3.5 h-3.5" />
-                  אנליטיקה
+                  {t.analyticsBtn}
                 </button>
               )}
               <button
@@ -466,7 +466,7 @@ export default function SupportPage({
                 style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--dash-text-2, #9ca3af)' }}
               >
                 <LogOut className="w-3.5 h-3.5" />
-                התנתק
+                {t.logout}
               </button>
             </div>
           </div>
@@ -490,24 +490,24 @@ export default function SupportPage({
                 background: showFilters ? '#883fe2' : 'rgba(255,255,255,0.06)',
                 color: showFilters ? '#fff' : 'var(--dash-text-2, #9ca3af)',
               }}
-              title="סינון לפי תאריך"
+              title={t.dateFilterTooltip}
             >
               <Calendar className="w-4 h-4" />
-              {dateFrom || dateTo ? 'סינון פעיל' : 'תאריכים'}
+              {dateFrom || dateTo ? t.dateFilterActive : t.dateFilterLabel}
             </button>
             <button
               onClick={handleExport}
               disabled={exporting}
               className="px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5 disabled:opacity-50"
               style={{ background: '#883fe2', color: '#fff' }}
-              title="ייצוא לאקסל"
+              title={t.exportTooltip}
             >
               {exporting ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <Download className="w-4 h-4" />
               )}
-              ייצא לאקסל
+              {t.exportBtn}
             </button>
             <button
               onClick={handleRefresh}
@@ -524,9 +524,9 @@ export default function SupportPage({
         {agent && (
           <div className="flex items-center gap-2 mb-3 flex-wrap">
             {[
-              { key: 'all' as const, label: 'כל הפניות' },
-              { key: 'mine' as const, label: 'בטיפולי' },
-              { key: 'unassigned' as const, label: 'ללא מטפל/ת' },
+              { key: 'all' as const, label: t.ownerAll },
+              { key: 'mine' as const, label: t.ownerMine },
+              { key: 'unassigned' as const, label: t.ownerUnassigned },
             ].map((opt) => (
               <button
                 key={opt.key}
@@ -542,10 +542,10 @@ export default function SupportPage({
             ))}
             <span className="opacity-30 mx-1">|</span>
             {[
-              { key: 'all' as const, label: 'כל הפידבקים', bg: 'rgba(255,255,255,0.06)', fg: 'var(--dash-text-2, #9ca3af)' },
-              { key: 'issue' as const, label: '⚠ בעיה דווחה', bg: '#fbbf24', fg: '#1f2937' },
-              { key: 'positive' as const, label: '✓ פידבק חיובי', bg: '#22c55e', fg: '#fff' },
-              { key: 'pending' as const, label: '⏳ ממתינות לפידבק', bg: '#06b6d4', fg: '#fff' },
+              { key: 'all' as const, label: t.feedbackFilterAll, bg: 'rgba(255,255,255,0.06)', fg: 'var(--dash-text-2, #9ca3af)' },
+              { key: 'issue' as const, label: t.feedbackFilterIssue, bg: '#fbbf24', fg: '#1f2937' },
+              { key: 'positive' as const, label: t.feedbackFilterPositive, bg: '#22c55e', fg: '#fff' },
+              { key: 'pending' as const, label: t.feedbackFilterPending, bg: '#06b6d4', fg: '#fff' },
             ].map((opt) => (
               <button
                 key={opt.key}
@@ -567,7 +567,7 @@ export default function SupportPage({
           <div className="mb-4 p-3 rounded-xl flex items-center gap-3 flex-wrap"
             style={{ background: 'rgba(136,63,226,0.08)', border: '1px solid rgba(136,63,226,0.2)' }}>
             <div className="flex items-center gap-2">
-              <span className="text-xs" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>מתאריך:</span>
+              <span className="text-xs" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>{t.dateFromLabel}</span>
               <input
                 type="date"
                 value={dateFrom}
@@ -578,7 +578,7 @@ export default function SupportPage({
               />
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>עד:</span>
+              <span className="text-xs" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>{t.dateToLabel}</span>
               <input
                 type="date"
                 value={dateTo}
@@ -594,11 +594,11 @@ export default function SupportPage({
                 className="text-xs px-2 py-1 rounded-lg"
                 style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--dash-text-2, #9ca3af)' }}
               >
-                נקה תאריכים
+                {t.clearDates}
               </button>
             )}
             <span className="text-[11px] mr-auto" style={{ color: 'var(--dash-text-3, #6b7280)' }}>
-              הסינון משפיע גם על הייצוא לאקסל.
+              {t.dateFilterExportNote}
             </span>
           </div>
         )}
@@ -623,7 +623,7 @@ export default function SupportPage({
                 onClick={() => setSearch('')}
                 className="p-0.5 rounded opacity-50 hover:opacity-100"
                 style={{ color: 'var(--dash-text-2, #9ca3af)' }}
-                title="נקה"
+                title={t.clearSearch}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -673,7 +673,7 @@ export default function SupportPage({
         {tickets.length === 0 ? (
           <div className="text-center py-16">
             <MessageSquare className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--dash-text-3, #6b7280)' }} />
-            <h2 className="text-xl font-semibold mb-2">אין פניות בסטטוס הזה</h2>
+            <h2 className="text-xl font-semibold mb-2">{t.emptyForStatus}</h2>
           </div>
         ) : (
           <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] gap-4">
@@ -691,6 +691,7 @@ export default function SupportPage({
                   page={page}
                   pageSize={pageSize}
                   total={total}
+                  lang={lang}
                   onChange={(p) => {
                     setPage(p);
                     setSelectedId(null);
@@ -715,7 +716,7 @@ export default function SupportPage({
               ) : (
                 <div className="hidden lg:flex items-center justify-center p-12 rounded-2xl"
                   style={{ background: 'rgba(255,255,255,0.04)' }}>
-                  <p style={{ color: 'var(--dash-text-3, #6b7280)' }}>בחר פנייה לצפייה בפרטים ולעדכון</p>
+                  <p style={{ color: 'var(--dash-text-3, #6b7280)' }}>{t.selectTicketHint}</p>
                 </div>
               )}
             </div>
@@ -805,6 +806,7 @@ function TicketDetail({
   onClose: () => void;
   lang: 'he' | 'en';
 }) {
+  const t = getDashboardStrings(lang).support;
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -910,7 +912,7 @@ function TicketDetail({
         await fetchTicket();
         onChange();
       } else {
-        alert(`שליחה נכשלה: ${data.message || data.error || 'שגיאה'}`);
+        alert(`${t.sendFailed} ${data.message || data.error || t.genericError}`);
       }
     } finally {
       setSendingDirect(false);
@@ -926,7 +928,7 @@ function TicketDetail({
     const txt = directBody.trim();
     if (!txt) return;
     if (txt.length > 900) {
-      alert(`הודעה ארוכה מדי — מקסימום 900 תווים, נשלחו ${txt.length}.`);
+      alert(`${t.messageTooLong} ${txt.length}.`);
       return;
     }
     setSendingDirect(true);
@@ -942,7 +944,7 @@ function TicketDetail({
         await fetchTicket();
         onChange();
       } else {
-        alert(`שליחה נכשלה: ${data.message || data.error || 'שגיאה'}`);
+        alert(`${t.sendFailed} ${data.message || data.error || t.genericError}`);
       }
     } finally {
       setSendingDirect(false);
@@ -952,9 +954,7 @@ function TicketDetail({
   const [deleting, setDeleting] = useState(false);
   const handleDeleteTicket = async () => {
     if (!agent?.is_admin) return;
-    const confirmed = window.confirm(
-      'למחוק את הפנייה לחלוטין?\n\nכולל היסטוריית השיחה, ההערות הפנימיות, וכל הקבצים שהועלו. פעולה לא הפיכה.',
-    );
+    const confirmed = window.confirm(t.deleteConfirm);
     if (!confirmed) return;
     setDeleting(true);
     try {
@@ -966,7 +966,7 @@ function TicketDetail({
         onChange();
         onClose();
       } else {
-        alert(`מחיקה נכשלה: ${data.message || data.error || 'שגיאה'}`);
+        alert(`${t.deleteFailed} ${data.message || data.error || t.genericError}`);
       }
     } finally {
       setDeleting(false);
@@ -991,7 +991,7 @@ function TicketDetail({
         await fetchTicket();
         onChange();
       } else {
-        alert(`שליחה נכשלה: ${data.message || data.error || 'שגיאה'}`);
+        alert(`${t.sendFailed} ${data.message || data.error || t.genericError}`);
       }
     } finally {
       setSendingDirect(false);
@@ -1169,8 +1169,8 @@ function TicketDetail({
         onChange();
         setShowSendDialog(null);
       } else {
-        const msg = data.message || data.error || 'שגיאה';
-        alert(`שליחה נכשלה: ${msg}`);
+        const msg = data.message || data.error || t.genericError;
+        alert(`${t.sendFailed} ${msg}`);
       }
     } finally {
       setSending(false);
@@ -1212,7 +1212,7 @@ function TicketDetail({
           </div>
           <h3 className="text-lg font-semibold">{ticket.customer_name}</h3>
           <p className="text-xs" style={{ color: 'var(--dash-text-3, #6b7280)' }}>
-            התקבלה {formatRelative(ticket.created_at, lang)}
+            {t.receivedPrefix} {formatRelative(ticket.created_at, lang)}
           </p>
         </div>
         <button onClick={onClose} className="lg:hidden" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>
@@ -1240,16 +1240,16 @@ function TicketDetail({
           }}
         >
           <span style={{ color: 'var(--dash-text, #fff)' }}>
-            {ticket.feedback_status === 'positive' && '✓ פידבק חיובי מהלקוחה'}
-            {ticket.feedback_status === 'issue' && '⚠ הלקוחה דיווחה על בעיה'}
-            {ticket.feedback_status === 'pending' && '⏳ ממתין לפידבק לקוחה'}
-            {ticket.feedback_status === 'expired' && '⏱ חלון הפידבק פג'}
+            {ticket.feedback_status === 'positive' && t.feedbackBadgePositive}
+            {ticket.feedback_status === 'issue' && t.feedbackBadgeIssue}
+            {ticket.feedback_status === 'pending' && t.feedbackBadgePending}
+            {ticket.feedback_status === 'expired' && t.feedbackBadgeExpired}
           </span>
           <span className="opacity-70">
             {ticket.feedback_responded_at
-              ? `הגיב/ה ${formatRelative(ticket.feedback_responded_at, lang)}`
+              ? `${t.feedbackRespondedPrefix} ${formatRelative(ticket.feedback_responded_at, lang)}`
               : ticket.feedback_sent_at
-              ? `נשלח ${formatRelative(ticket.feedback_sent_at, lang)}`
+              ? `${t.feedbackSentPrefix} ${formatRelative(ticket.feedback_sent_at, lang)}`
               : ''}
           </span>
         </div>
@@ -1265,16 +1265,16 @@ function TicketDetail({
             <UserCheck className="w-3.5 h-3.5" />
             {ticket.assigned_to ? (
               <span>
-                מטפל/ת: <span className="font-semibold" style={{ color: 'var(--dash-text, #fff)' }}>{ticket.assigned_to}</span>
+                {t.assigneeLabel} <span className="font-semibold" style={{ color: 'var(--dash-text, #fff)' }}>{ticket.assigned_to}</span>
                 {ticket.assigned_agent_id === agent.id && (
                   <span className="mr-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold"
                     style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e' }}>
-                    זה אני
+                    {t.assigneeThatsMe}
                   </span>
                 )}
               </span>
             ) : (
-              <span>ללא מטפל/ת</span>
+              <span>{t.assigneeUnassigned}</span>
             )}
           </div>
           <div className="flex items-center gap-1.5">
@@ -1286,12 +1286,12 @@ function TicketDetail({
                 style={{ background: '#883fe2', color: '#fff' }}
                 title={
                   ticket.assigned_agent_id
-                    ? `משיכה אליי (כרגע אצל ${ticket.assigned_to || 'מישהו אחר'})`
-                    : 'הקצה אליי'
+                    ? `${t.assignPull} (${t.assignPullCurrently} ${ticket.assigned_to || t.someoneElse})`
+                    : t.assignToMe
                 }
               >
                 {assigning && <Loader2 className="w-3 h-3 animate-spin" />}
-                {ticket.assigned_agent_id ? 'משיכה אליי' : 'הקצה אליי'}
+                {ticket.assigned_agent_id ? t.assignPull : t.assignToMe}
               </button>
             )}
             {ticket.assigned_agent_id === agent.id && (
@@ -1302,7 +1302,7 @@ function TicketDetail({
                 style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--dash-text-2, #9ca3af)' }}
               >
                 {assigning && <Loader2 className="w-3 h-3 animate-spin" />}
-                שחרר/י
+                {t.assignRelease}
               </button>
             )}
           </div>
@@ -1317,6 +1317,7 @@ function TicketDetail({
         orderNumber={ticket.order_number}
         view={focusView}
         state={focusState}
+        lang={lang}
         onRefresh={() => void resolveFocus()}
       />
 
@@ -1338,7 +1339,7 @@ function TicketDetail({
         {ticket.order_number && (
           <div className="flex items-center gap-2 text-sm">
             <Package className="w-4 h-4" style={{ color: 'var(--dash-text-2, #9ca3af)' }} />
-            <span>הזמנה: <code>{ticket.order_number}</code></span>
+            <span>{t.orderLabel} <code>{ticket.order_number}</code></span>
             <button
               onClick={() => navigator.clipboard.writeText(ticket.order_number || '')}
               className="text-xs opacity-70 hover:opacity-100"
@@ -1349,17 +1350,17 @@ function TicketDetail({
         )}
         {ticket.brand && (
           <div className="text-sm" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>
-            מותג: <span style={{ color: 'var(--dash-text, #fff)' }}>{ticket.brand}</span>
+            {t.brandLabel} <span style={{ color: 'var(--dash-text, #fff)' }}>{ticket.brand}</span>
           </div>
         )}
         {ticket.ref_source && (
-          <div className="text-xs" style={{ color: '#883fe2' }}>↗ הגיעה דרך: {ticket.ref_source}</div>
+          <div className="text-xs" style={{ color: '#883fe2' }}>{t.arrivedVia} {ticket.ref_source}</div>
         )}
       </div>
 
       {/* Original message */}
       <div>
-        <div className="text-xs mb-1.5" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>הודעה מקורית</div>
+        <div className="text-xs mb-1.5" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>{t.originalMessage}</div>
         <pre className="whitespace-pre-wrap text-sm p-3 rounded-xl font-sans" style={{ background: 'rgba(255,255,255,0.04)' }}>
           {ticket.message}
         </pre>
@@ -1367,7 +1368,7 @@ function TicketDetail({
 
       {/* Status actions */}
       <div className="space-y-2">
-        <div className="text-xs" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>שינוי סטטוס</div>
+        <div className="text-xs" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>{t.changeStatus}</div>
         <div className="flex flex-wrap gap-2">
           {(Object.keys(STATUS_LABEL_HE) as TicketStatus[]).map((s) => {
             const isCurrent = s === ticket.status;
@@ -1399,19 +1400,19 @@ function TicketDetail({
           channel for B2B SaaS; the WhatsApp template flow is retail-only. */}
       {lang !== 'en' && <div className="rounded-xl p-3"
         style={{ background: 'rgba(136,63,226,0.1)', border: '1px solid rgba(136,63,226,0.25)' }}>
-        <div className="text-xs mb-2 font-semibold" style={{ color: '#c084fc' }}>שליחת עדכון ללקוחה (WhatsApp)</div>
+        <div className="text-xs mb-2 font-semibold" style={{ color: '#c084fc' }}>{t.waSectionTitle}</div>
         <div className="flex flex-wrap gap-2">
-          <NotifyButton label="התחלנו לטפל" onClick={() => setShowSendDialog('in_progress')} disabled={!ticket.customer_phone} />
-          <NotifyButton label="צריכים פרטים" onClick={() => setShowSendDialog('awaiting_customer')} disabled={!ticket.customer_phone} />
-          <NotifyButton label="יצא למשלוח" onClick={() => setShowSendDialog('shipped')} disabled={!ticket.customer_phone} />
-          <NotifyButton label="הפנייה טופלה" onClick={() => setShowSendDialog('resolved')} disabled={!ticket.customer_phone} />
+          <NotifyButton label={t.waNotifyInProgress} onClick={() => setShowSendDialog('in_progress')} disabled={!ticket.customer_phone} />
+          <NotifyButton label={t.waNotifyAwaiting} onClick={() => setShowSendDialog('awaiting_customer')} disabled={!ticket.customer_phone} />
+          <NotifyButton label={t.waNotifyShipped} onClick={() => setShowSendDialog('shipped')} disabled={!ticket.customer_phone} />
+          <NotifyButton label={t.waNotifyResolved} onClick={() => setShowSendDialog('resolved')} disabled={!ticket.customer_phone} />
         </div>
         {!ticket.customer_phone && (
-          <p className="text-[11px] mt-2 opacity-70">אין מספר טלפון בפנייה — אי אפשר לשלוח עדכון WhatsApp.</p>
+          <p className="text-[11px] mt-2 opacity-70">{t.waNoPhone}</p>
         )}
         {ticket.last_customer_notified_at && (
           <p className="text-[11px] mt-2 opacity-70">
-            עדכון אחרון נשלח ללקוחה: {formatRelative(ticket.last_customer_notified_at, lang)}
+            {t.waLastUpdatePrefix} {formatRelative(ticket.last_customer_notified_at, lang)}
           </p>
         )}
       </div>}
@@ -1425,31 +1426,31 @@ function TicketDetail({
           <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
             <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: '#15803d' }}>
               <MessageCircle className="w-4 h-4" />
-              שיחה ישירה ללקוחה
+              {t.directTitle}
             </div>
             {serviceWindow ? (
               serviceWindow.withinWindow ? (
                 <span className="text-[11px] px-2 py-0.5 rounded-full"
                   style={{ background: 'rgba(34,197,94,0.2)', color: '#15803d' }}>
-                  ✓ חלון 24 שעות פתוח{serviceWindow.expiresAt ? ` · נסגר ${formatRelative(serviceWindow.expiresAt, lang)}` : ''}
+                  {t.windowOpen}{serviceWindow.expiresAt ? ` · ${t.windowCloses} ${formatRelative(serviceWindow.expiresAt, lang)}` : ''}
                 </span>
               ) : (
                 <span className="text-[11px] px-2 py-0.5 rounded-full flex items-center gap-1"
                   style={{ background: 'rgba(217,119,6,0.15)', color: '#b45309' }}>
                   <AlertTriangle className="w-3 h-3" />
-                  חלון 24 שעות סגור
+                  {t.windowClosed}
                 </span>
               )
             ) : (
-              <span className="text-[11px]" style={{ color: 'var(--dash-text-3)' }}>בודק חלון…</span>
+              <span className="text-[11px]" style={{ color: 'var(--dash-text-3)' }}>{t.windowChecking}</span>
             )}
           </div>
 
           {serviceWindow && !serviceWindow.withinWindow && (
             <p className="text-[11px] mb-2" style={{ color: '#b45309' }}>
-              הלקוחה לא הגיבה ב-24 שעות האחרונות — ההודעה תישלח כתבנית WhatsApp (עד 900 תווים).
+              {t.windowClosedNote}
               {serviceWindow.lastInboundAt && (
-                <> תגובה אחרונה ממנה: {formatRelative(serviceWindow.lastInboundAt, lang)}.</>
+                <> {t.windowLastInboundPrefix} {formatRelative(serviceWindow.lastInboundAt, lang)}.</>
               )}
             </p>
           )}
@@ -1467,8 +1468,8 @@ function TicketDetail({
               }}
               placeholder={
                 serviceWindow?.withinWindow
-                  ? 'הודעה חופשית ללקוחה'
-                  : 'הודעה ללקוחה (תישלח כתבנית WhatsApp — עד 900 תווים)'
+                  ? t.directPlaceholderOpen
+                  : t.directPlaceholderClosed
               }
               disabled={sendingDirect}
               rows={3}
@@ -1493,7 +1494,7 @@ function TicketDetail({
               >
                 {sendingDirect && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 <Send className="w-3.5 h-3.5" />
-                {serviceWindow?.withinWindow ? 'שליחה' : 'שליחה כתבנית'}
+                {serviceWindow?.withinWindow ? t.directSend : t.directSendAsTemplate}
               </button>
             </div>
           </div>
@@ -1511,7 +1512,7 @@ function TicketDetail({
                 }}
               >
                 <ImageIcon className="w-3.5 h-3.5" />
-                {directImage ? directImage.name : 'בחירת תמונה'}
+                {directImage ? directImage.name : t.imagePick}
                 <input
                   type="file"
                   accept="image/*"
@@ -1521,7 +1522,7 @@ function TicketDetail({
                     const f = e.target.files?.[0];
                     if (f) {
                       if (f.size > 10 * 1024 * 1024) {
-                        alert('הקובץ גדול מ-10MB');
+                        alert(t.imageTooLarge);
                         e.target.value = '';
                         return;
                       }
@@ -1536,7 +1537,7 @@ function TicketDetail({
                   className="text-[11px]"
                   style={{ color: 'var(--dash-text-3)' }}
                 >
-                  ביטול
+                  {t.imageCancel}
                 </button>
               )}
             </div>
@@ -1545,7 +1546,7 @@ function TicketDetail({
                 type="text"
                 value={directImageCaption}
                 onChange={(e) => setDirectImageCaption(e.target.value.slice(0, 1024))}
-                placeholder="כיתוב לתמונה (אופציונלי)"
+                placeholder={t.imageCaptionPlaceholder}
                 disabled={sendingDirect}
                 className="w-full text-sm p-2 rounded-lg outline-none"
                 style={{
@@ -1565,7 +1566,7 @@ function TicketDetail({
                 >
                   {sendingDirect && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   <Send className="w-3.5 h-3.5" />
-                  שליחת תמונה
+                  {t.imageSend}
                 </button>
               </div>
             )}
@@ -1576,11 +1577,11 @@ function TicketDetail({
       {/* Editable details */}
       <div className="space-y-3">
         <div>
-          <div className="text-xs mb-1.5" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>הערות פנימיות (לא מוצגות ללקוחה)</div>
+          <div className="text-xs mb-1.5" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>{t.internalNotesLabel}</div>
           <textarea
             value={internalNotes}
             onChange={(e) => setInternalNotes(e.target.value)}
-            placeholder="פרטי טיפול, נציג שטיפל, החלטות..."
+            placeholder={t.internalNotesPlaceholder}
             className="w-full text-sm p-3 rounded-xl outline-none resize-y min-h-[80px]"
             style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--dash-text, #fff)' }}
           />
@@ -1593,7 +1594,7 @@ function TicketDetail({
         {focusState !== 'found' && (
           <div>
             <div className="text-xs mb-1.5" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>
-              מספר משלוח Focus (אופציונלי — אם קיבלת מערוץ אחר)
+              {t.focusTrackingLabel}
             </div>
             <input
               type="text"
@@ -1608,11 +1609,11 @@ function TicketDetail({
         )}
         {(ticket.status === 'resolved' || ticket.status === 'closed') && (
           <div>
-            <div className="text-xs mb-1.5" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>סיכום הטיפול</div>
+            <div className="text-xs mb-1.5" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>{t.resolutionSummaryLabel}</div>
             <textarea
               value={resolutionSummary}
               onChange={(e) => setResolutionSummary(e.target.value)}
-              placeholder="מה נעשה לסגירת הפנייה (יוצג ללקוחה אם תשלחי הודעת WhatsApp 'הפנייה טופלה')"
+              placeholder={t.resolutionSummaryPlaceholder}
               className="w-full text-sm p-3 rounded-xl outline-none resize-y min-h-[60px]"
               style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--dash-text, #fff)' }}
             />
@@ -1625,7 +1626,7 @@ function TicketDetail({
           style={{ background: '#883fe2', color: '#fff' }}
         >
           {savingNote && <Loader2 className="w-4 h-4 animate-spin" />}
-          שמירה
+          {t.saveDetails}
         </button>
       </div>
 
@@ -1634,7 +1635,7 @@ function TicketDetail({
         <div>
           <div className="text-xs mb-2 flex items-center gap-1.5" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>
             <History className="w-3.5 h-3.5" />
-            היסטוריה ושיחה
+            {t.historyTitle}
           </div>
           <ol className="space-y-3 text-xs">
             {history.map((h) => {
@@ -1666,13 +1667,13 @@ function TicketDetail({
                       {isCustomerReply && (
                         <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold"
                           style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e' }}>
-                          תגובה חדשה
+                          {t.historyNewReply}
                         </span>
                       )}
                       {isBrandMessage && (
                         <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold"
                           style={{ background: 'rgba(6,182,212,0.15)', color: '#06b6d4' }}>
-                          נשלח ללקוחה
+                          {t.historySentToCustomer}
                         </span>
                       )}
                     </div>
@@ -1763,7 +1764,7 @@ function TicketDetail({
                         className="inline-block mt-1 text-xs underline"
                         style={{ color: '#883fe2' }}
                       >
-                        קובץ מצורף: {h.attachment_filename || 'קובץ'}
+                        {t.attachmentPrefix} {h.attachment_filename || t.attachmentFallback}
                       </a>
                     )}
                     <div className="opacity-60 mt-0.5">
@@ -1781,6 +1782,7 @@ function TicketDetail({
       {showSendDialog && (
         <SendDialog
           template={showSendDialog}
+          lang={lang}
           ticket={ticket}
           influencer={influencer}
           username={username}
@@ -1798,8 +1800,8 @@ function TicketDetail({
         >
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="text-xs" style={{ color: '#9ca3af' }}>
-              <span className="font-semibold" style={{ color: '#fca5a5' }}>אזור מסוכן</span>
-              <span className="opacity-70"> — מחיקה לחלוטין כולל היסטוריה וקבצים. לא הפיך.</span>
+              <span className="font-semibold" style={{ color: '#fca5a5' }}>{t.dangerZone}</span>
+              <span className="opacity-70">{t.dangerZoneNote}</span>
             </div>
             <button
               onClick={handleDeleteTicket}
@@ -1809,7 +1811,7 @@ function TicketDetail({
             >
               {deleting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               <Trash2 className="w-3.5 h-3.5" />
-              מחיקת פנייה
+              {t.deleteTicket}
             </button>
           </div>
         </div>
@@ -1838,13 +1840,16 @@ function FocusShipmentCard({
   orderNumber: rawOrderNumber,
   view,
   state,
+  lang,
   onRefresh,
 }: {
   orderNumber: string | null;
   view: FocusViewProps | null;
   state: 'idle' | 'loading' | 'found' | 'pending' | 'error';
+  lang: 'he' | 'en';
   onRefresh: () => void;
 }) {
+  const t = getDashboardStrings(lang).support;
   // Order numbers are stored in support_requests.order_number with the
   // exact form the customer typed — sometimes "186870", sometimes
   // "#186870". Strip any leading '#' so we render a single hash in our
@@ -1861,7 +1866,7 @@ function FocusShipmentCard({
         }}>
         <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>
           <Truck className="w-4 h-4" />
-          <span>אין מספר הזמנה בפנייה — אי אפשר לאתר משלוח אוטומטית.</span>
+          <span>{t.focusNoOrder}</span>
         </div>
       </div>
     );
@@ -1878,10 +1883,10 @@ function FocusShipmentCard({
           <Loader2 className="w-5 h-5 animate-spin" style={{ color: '#883fe2' }} />
           <div>
             <div className="text-sm font-semibold" style={{ color: 'var(--dash-text, #fff)' }}>
-              מאתר ב-Focus לפי הזמנה <code dir="ltr">#{orderNumber}</code>...
+              {t.focusLoadingPrefix} <code dir="ltr">#{orderNumber}</code>...
             </div>
             <div className="text-xs mt-0.5" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>
-              מאחזר את מספר המשלוח האמיתי וסטטוס מהמערכת של חברת השילוח.
+              {t.focusLoadingSub}
             </div>
           </div>
         </div>
@@ -1904,10 +1909,10 @@ function FocusShipmentCard({
             </div>
             <div>
               <div className="text-base font-semibold" style={{ color: 'var(--dash-text, #fff)' }}>
-                ההזמנה עדיין לא יצאה למשלוח
+                {t.focusPendingTitle}
               </div>
               <div className="text-xs mt-1" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>
-                Focus עוד לא קיבלו את הזמנה <code dir="ltr">#{orderNumber}</code>. ברגע שהיא תצא — מספר המשלוח יופיע כאן אוטומטית.
+                {t.focusPendingSubA} <code dir="ltr">#{orderNumber}</code>{t.focusPendingSubB}
               </div>
             </div>
           </div>
@@ -1915,7 +1920,7 @@ function FocusShipmentCard({
             onClick={onRefresh}
             className="p-2 rounded-lg flex-shrink-0"
             style={{ color: '#f59e0b' }}
-            title="נסי שוב"
+            title={t.focusRetryTooltip}
           >
             <RefreshCw className="w-4 h-4" />
           </button>
@@ -1936,10 +1941,10 @@ function FocusShipmentCard({
             <Truck className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#ef4444' }} />
             <div>
               <div className="text-sm font-semibold" style={{ color: 'var(--dash-text, #fff)' }}>
-                שגיאה בקבלת סטטוס המשלוח מ-Focus
+                {t.focusErrorTitle}
               </div>
               <div className="text-xs mt-1" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>
-                לחיצה על Refresh תנסה שוב.
+                {t.focusErrorSub}
               </div>
             </div>
           </div>
@@ -1992,7 +1997,7 @@ function FocusShipmentCard({
           <div>
             <div className="text-[11px] uppercase tracking-wide opacity-70"
               style={{ color: 'var(--dash-text-2, #9ca3af)' }}>
-              מספר משלוח Focus
+              {t.focusShipmentNumberLabel}
             </div>
             <div className="flex items-center gap-2">
               <code className="text-2xl font-bold tabular-nums" dir="ltr"
@@ -2002,7 +2007,7 @@ function FocusShipmentCard({
               <button
                 onClick={() => navigator.clipboard.writeText(view.shipmentNumber || '')}
                 className="opacity-60 hover:opacity-100"
-                title="העתק"
+                title={t.focusCopyTooltip}
                 style={{ color: 'var(--dash-text-2, #9ca3af)' }}
               >
                 <Copy className="w-3.5 h-3.5" />
@@ -2010,7 +2015,7 @@ function FocusShipmentCard({
             </div>
             <div className="text-[11px] mt-0.5"
               style={{ color: 'var(--dash-text-3, #6b7280)' }}>
-              הזמנה <code dir="ltr">#{orderNumber}</code> · ↻ אותר אוטומטית
+              {t.focusOrderPrefix} <code dir="ltr">#{orderNumber}</code> · {t.focusAutoResolved}
             </div>
           </div>
         </div>
@@ -2025,7 +2030,7 @@ function FocusShipmentCard({
           <button
             onClick={onRefresh}
             className="p-1 rounded-md opacity-50 hover:opacity-100"
-            title="רענן"
+            title={t.focusRefreshTooltip}
             style={{ color: 'var(--dash-text-2, #9ca3af)' }}
           >
             <RefreshCw className="w-3.5 h-3.5" />
@@ -2038,7 +2043,7 @@ function FocusShipmentCard({
         {view.destinationBranch && (
           <div>
             <div className="opacity-70" style={{ color: 'var(--dash-text-3, #6b7280)' }}>
-              סניף יעד
+              {t.focusDestBranch}
             </div>
             <div className="mt-0.5 font-medium" style={{ color: 'var(--dash-text, #fff)' }}>
               {view.destinationBranch}
@@ -2048,7 +2053,7 @@ function FocusShipmentCard({
         {view.lastUpdate?.date && (
           <div>
             <div className="opacity-70" style={{ color: 'var(--dash-text-3, #6b7280)' }}>
-              עדכון אחרון
+              {t.focusLastUpdate}
             </div>
             <div className="mt-0.5 font-medium tabular-nums" style={{ color: 'var(--dash-text, #fff)' }}>
               {view.lastUpdate.date}{view.lastUpdate.time ? ` ${view.lastUpdate.time}` : ''}
@@ -2058,7 +2063,7 @@ function FocusShipmentCard({
         {view.shipmentDirection && (
           <div>
             <div className="opacity-70" style={{ color: 'var(--dash-text-3, #6b7280)' }}>
-              סוג מסירה
+              {t.focusDeliveryType}
             </div>
             <div className="mt-0.5 font-medium" style={{ color: 'var(--dash-text, #fff)' }}>
               {view.shipmentDirection}
@@ -2078,13 +2083,16 @@ function Pagination({
   page,
   pageSize,
   total,
+  lang,
   onChange,
 }: {
   page: number;
   pageSize: number;
   total: number;
+  lang: 'he' | 'en';
   onChange: (p: number) => void;
 }) {
+  const t = getDashboardStrings(lang).support;
   const lastPage = Math.max(1, Math.ceil(total / pageSize));
   if (lastPage <= 1) return null;
 
@@ -2104,7 +2112,7 @@ function Pagination({
     <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="text-xs" style={{ color: 'var(--dash-text-3, #6b7280)' }}>
-          {fromIdx}–{toIdx} מתוך {total}
+          {fromIdx}–{toIdx} {t.paginationOf} {total}
         </div>
         <div className="flex items-center gap-1">
           <button
@@ -2114,7 +2122,7 @@ function Pagination({
             className="px-3 py-1.5 rounded-lg text-xs font-medium disabled:opacity-40"
             style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--dash-text-2, #9ca3af)' }}
           >
-            ← הקודם
+            {t.paginationPrev}
           </button>
           {pages.map((p, i) => {
             if (p === 'gap') {
@@ -2148,7 +2156,7 @@ function Pagination({
             className="px-3 py-1.5 rounded-lg text-xs font-medium disabled:opacity-40"
             style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--dash-text-2, #9ca3af)' }}
           >
-            הבא →
+            {t.paginationNext}
           </button>
         </div>
       </div>
@@ -2169,6 +2177,7 @@ function AmbiguityBanner({
   onMoved: () => void;
   lang: 'he' | 'en';
 }) {
+  const t = getDashboardStrings(lang).support;
   const [moving, setMoving] = useState<string | null>(null);
   const handleMove = async (targetTicketId: string) => {
     setMoving(targetTicketId);
@@ -2182,7 +2191,7 @@ function AmbiguityBanner({
       if (data.ok) {
         onMoved();
       } else {
-        alert(`העברה נכשלה: ${data.message || data.error || 'שגיאה'}`);
+        alert(`${t.moveFailed} ${data.message || data.error || t.genericError}`);
       }
     } finally {
       setMoving(null);
@@ -2197,7 +2206,7 @@ function AmbiguityBanner({
       <div className="flex items-start gap-1.5 text-[11px]" style={{ color: '#b45309' }}>
         <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-px" />
         <span>
-          זיהוי אוטומטי — באותו חלון נשלחה הודעה גם למותג אחר. אם התגובה לא לטיקט הנוכחי, אפשר להעביר:
+          {t.ambiguityText}
         </span>
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -2215,7 +2224,7 @@ function AmbiguityBanner({
           >
             {moving === alt.ticket_id && <Loader2 className="w-3 h-3 animate-spin" />}
             <span>
-              {alt.brand || 'מותג'} · {alt.customer_name || 'לקוחה'} · {formatRelative(alt.last_outbound_at, lang)}
+              {alt.brand || t.ambiguityBrandFallback} · {alt.customer_name || t.ambiguityCustomerFallback} · {formatRelative(alt.last_outbound_at, lang)}
             </span>
           </button>
         ))}
@@ -2239,73 +2248,74 @@ function NotifyButton({ label, onClick, disabled }: { label: string; onClick: ()
 }
 
 function historyLine(h: HistoryEntry, lang: 'he' | 'en' = 'he'): string {
+  const t = getDashboardStrings(lang).support;
   if (h.action === 'status_change') {
     const fromLabel = h.from_status ? statusLabel(h.from_status as TicketStatus, lang) || h.from_status : '?';
     const toLabel = h.to_status ? statusLabel(h.to_status as TicketStatus, lang) || h.to_status : '?';
-    return `סטטוס: ${fromLabel} → ${toLabel}${h.note ? ` · "${h.note}"` : ''}`;
+    return `${t.historyStatusPrefix} ${fromLabel} → ${toLabel}${h.note ? ` · "${h.note}"` : ''}`;
   }
-  if (h.action === 'note_added') return `הערה פנימית עודכנה`;
+  if (h.action === 'note_added') return t.historyNoteUpdated;
   if (h.action === 'assigned') {
-    if (h.actor === 'system') return `🤖 הקצאה אוטומטית: ${h.note}`;
-    return `הוקצה ל: ${h.note}`;
+    if (h.actor === 'system') return `${t.historyAutoAssigned} ${h.note}`;
+    return `${t.historyAssignedTo} ${h.note}`;
   }
   if (h.action === 'customer_notified') {
     const failed = h.note?.startsWith('Send failed');
     const TEMPLATE_LABEL: Record<string, string> = {
-      support_status_in_progress: 'התחלנו לטפל',
-      support_status_in_progress_v2: 'התחלנו לטפל',
-      support_status_awaiting_customer: 'בקשה לפרטים נוספים',
-      support_status_awaiting_customer_v2: 'בקשה לפרטים נוספים',
-      support_status_shipped: 'יצא למשלוח',
-      support_status_shipped_v2: 'יצא למשלוח',
-      support_status_shipped_v3: 'יצא למשלוח',
-      support_status_shipped_v4: 'יצא למשלוח',
-      support_status_resolved: 'הפנייה טופלה',
-      support_status_resolved_v2: 'הפנייה טופלה',
-      support_freeform_message: 'הודעה חופשית',
-      follower_support_confirmation: 'אישור פתיחת פנייה ללקוחה',
-      brand_support_ticket: 'התראה למותג',
+      support_status_in_progress: t.tmplInProgress,
+      support_status_in_progress_v2: t.tmplInProgress,
+      support_status_awaiting_customer: t.tmplAwaiting,
+      support_status_awaiting_customer_v2: t.tmplAwaiting,
+      support_status_shipped: t.tmplShipped,
+      support_status_shipped_v2: t.tmplShipped,
+      support_status_shipped_v3: t.tmplShipped,
+      support_status_shipped_v4: t.tmplShipped,
+      support_status_resolved: t.tmplResolved,
+      support_status_resolved_v2: t.tmplResolved,
+      support_freeform_message: t.tmplFreeform,
+      follower_support_confirmation: t.tmplFollowerConfirm,
+      brand_support_ticket: t.tmplBrandAlert,
     };
-    const friendly = TEMPLATE_LABEL[h.whatsapp_template_name || ''] || h.whatsapp_template_name || 'הודעה';
-    if (failed) return `ניסיון שליחה נכשל (${friendly}) — ${h.note}`;
-    return `הודעה ללקוחה: ${friendly}`;
+    const friendly = TEMPLATE_LABEL[h.whatsapp_template_name || ''] || h.whatsapp_template_name || t.historyMsgFallback;
+    if (failed) return `${t.historySendAttemptFailed} (${friendly}) — ${h.note}`;
+    return `${t.historyMsgToCustomer} ${friendly}`;
   }
-  if (h.action === 'customer_reply') return `תגובת הלקוחה`;
-  if (h.action === 'reply_moved_out') return `תגובה הועברה לטיקט אחר`;
-  if (h.action === 'reply_moved_in') return `תגובה התקבלה מטיקט אחר`;
+  if (h.action === 'customer_reply') return t.historyCustomerReply;
+  if (h.action === 'reply_moved_out') return t.historyReplyMovedOut;
+  if (h.action === 'reply_moved_in') return t.historyReplyMovedIn;
   if (h.action === 'brand_notified') {
     const failed = h.note?.startsWith('Send failed');
-    if (failed) return `התראה למותג נכשלה — ${h.note}`;
-    return `התראת WhatsApp נשלחה למותג`;
+    if (failed) return `${t.historyBrandAlertFailed} — ${h.note}`;
+    return t.historyBrandAlertSent;
   }
   if (h.action === 'agent_message') {
     const failed = h.note?.startsWith('Send failed');
-    if (failed) return `ניסיון שליחת הודעה חופשית נכשל — ${h.note}`;
-    return `הודעה חופשית ללקוחה`;
+    if (failed) return `${t.historyAgentMsgFailed} — ${h.note}`;
+    return t.historyAgentMsg;
   }
   if (h.action === 'agent_image') {
     const failed = h.note?.startsWith('Send failed');
-    if (failed) return `ניסיון שליחת תמונה נכשל — ${h.note}`;
-    return `תמונה ללקוחה`;
+    if (failed) return `${t.historyAgentImgFailed} — ${h.note}`;
+    return t.historyAgentImg;
   }
   if (h.action === 'shipment_event') {
     const labels: Record<string, string> = {
-      dispatched: 'נקלט אצל חברת השליחויות',
-      in_transit: 'בדרך אל הלקוחה',
-      at_branch: 'הגיע לסניף',
-      out_for_delivery: 'יצא למסירה אחרונה',
-      delivered: 'נמסר ללקוחה ✓',
-      returned: 'הוחזר',
-      cancelled: 'בוטל',
-      failed_delivery: 'מסירה נכשלה',
-      unknown: 'עדכון משלוח',
+      dispatched: t.shipDispatched,
+      in_transit: t.shipInTransit,
+      at_branch: t.shipAtBranch,
+      out_for_delivery: t.shipOutForDelivery,
+      delivered: t.shipDelivered,
+      returned: t.shipReturned,
+      cancelled: t.shipCancelled,
+      failed_delivery: t.shipFailedDelivery,
+      unknown: t.shipUnknown,
     };
     return `🚚 ${labels[h.note || 'unknown'] || labels.unknown}`;
   }
   if (h.action === 'customer_feedback') {
-    if (h.note === 'positive') return '✓ הלקוחה: הכל מצוין';
-    if (h.note === 'issue') return '⚠ הלקוחה דיווחה על בעיה';
-    return 'פידבק לקוחה';
+    if (h.note === 'positive') return t.historyFeedbackPositive;
+    if (h.note === 'issue') return t.feedbackBadgeIssue;
+    return t.historyFeedbackGeneric;
   }
   return h.action;
 }
@@ -2316,6 +2326,7 @@ function historyLine(h: HistoryEntry, lang: 'he' | 'en' = 'he'): string {
 
 function SendDialog({
   template,
+  lang,
   ticket,
   influencer,
   username,
@@ -2324,6 +2335,7 @@ function SendDialog({
   onSend,
 }: {
   template: 'in_progress' | 'awaiting_customer' | 'shipped' | 'resolved';
+  lang: 'he' | 'en';
   ticket: Ticket;
   influencer: Influencer | null;
   username: string;
@@ -2331,14 +2343,16 @@ function SendDialog({
   onClose: () => void;
   onSend: (extra: Record<string, string>) => void;
 }) {
+  const t = getDashboardStrings(lang).support;
+  const etaOptions = [t.sendEta35Days, t.sendEtaThisWeek, t.sendEtaTomorrow, t.sendEta24h];
   const [requestedDetail, setRequestedDetail] = useState('');
   // v4 shipped template adds product name + ETA as variables (the
   // brand can personalise per send). Old v2/v3's hardcoded
   // "המוצר החלופי" / "בימים הקרובים" are now per-send fields.
   const [replacementProduct, setReplacementProduct] = useState('');
-  const [estimatedDelivery, setEstimatedDelivery] = useState('תוך 3-5 ימי עסקים');
+  const [estimatedDelivery, setEstimatedDelivery] = useState<string>(etaOptions[0]);
   const [trackingNumber, setTrackingNumber] = useState(ticket.tracking_number || '');
-  const [resolutionSummary, setResolutionSummary] = useState(ticket.resolution_summary || 'הטיפול הושלם.');
+  const [resolutionSummary, setResolutionSummary] = useState(ticket.resolution_summary || t.sendResolutionDefault);
   const [resolvingTracking, setResolvingTracking] = useState(false);
 
   // Auto-resolve ship_no on dialog open if we're sending the "shipped"
@@ -2368,25 +2382,34 @@ function SendDialog({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [template, ticket.id]);
 
-  const fname = ticket.customer_name?.split(/\s+/)[0] || 'לקוחה';
-  const brand = ticket.brand || influencer?.display_name || 'המותג';
+  const fname = ticket.customer_name?.split(/\s+/)[0] || t.sendCustomerFallback;
+  const brand = ticket.brand || influencer?.display_name || t.sendBrandFallback;
   const code = shortCode(ticket.id);
   // v4 shipped template uses the customer-facing order number (not
   // the internal ticket short code) — strip leading '#' if present.
   const orderRef = (ticket.order_number || '').replace(/^#+/, '').trim() || code;
 
   const preview = useMemo(() => {
+    const en = lang === 'en';
     switch (template) {
       case 'in_progress':
-        return `היי ${fname} 👋\nהפנייה שלך ל-${brand} (#${code}) התקבלה ואנחנו מטפלים בה כעת ✨\nנחזור אליך בהקדם עם עדכון. תודה על הסבלנות 🤍`;
+        return en
+          ? `Hi ${fname} 👋\nYour request to ${brand} (#${code}) has been received and we're on it now ✨\nWe'll get back to you soon with an update. Thanks for your patience 🤍`
+          : `היי ${fname} 👋\nהפנייה שלך ל-${brand} (#${code}) התקבלה ואנחנו מטפלים בה כעת ✨\nנחזור אליך בהקדם עם עדכון. תודה על הסבלנות 🤍`;
       case 'awaiting_customer':
-        return `היי ${fname} 👋\nבנוגע לפנייה שלך ל-${brand} (#${code}) — אנחנו צריכים ממך פרט נוסף כדי להמשיך:\n${requestedDetail || '___'}\n\nאפשר להשיב כאן או דרך טופס הפנייה שמילאת. תודה 🤍`;
+        return en
+          ? `Hi ${fname} 👋\nRegarding your request to ${brand} (#${code}) — we need one more detail from you to continue:\n${requestedDetail || '___'}\n\nYou can reply here or through the request form you filled out. Thanks 🤍`
+          : `היי ${fname} 👋\nבנוגע לפנייה שלך ל-${brand} (#${code}) — אנחנו צריכים ממך פרט נוסף כדי להמשיך:\n${requestedDetail || '___'}\n\nאפשר להשיב כאן או דרך טופס הפנייה שמילאת. תודה 🤍`;
       case 'shipped':
-        return `היי ${fname} 👋\nבנוגע להזמנה ${orderRef} ב-${brand} — נשלח אלייך ${replacementProduct || '___'} אשר יסופק ${estimatedDelivery || '___'}.\nמספר משלוח Focus למעקב: ${trackingNumber || '___'}\nתודה שפנית ל-${brand} 🤍`;
+        return en
+          ? `Hi ${fname} 👋\nRegarding order ${orderRef} at ${brand} — we're sending you ${replacementProduct || '___'}, arriving ${estimatedDelivery || '___'}.\nFocus tracking number: ${trackingNumber || '___'}\nThank you for reaching out to ${brand} 🤍`
+          : `היי ${fname} 👋\nבנוגע להזמנה ${orderRef} ב-${brand} — נשלח אלייך ${replacementProduct || '___'} אשר יסופק ${estimatedDelivery || '___'}.\nמספר משלוח Focus למעקב: ${trackingNumber || '___'}\nתודה שפנית ל-${brand} 🤍`;
       case 'resolved':
-        return `היי ${fname} 👋\nהפנייה שלך ל-${brand} (#${code}) טופלה ✅\n${resolutionSummary}\n\nאם יש משהו נוסף, אנחנו כאן 🤍`;
+        return en
+          ? `Hi ${fname} 👋\nYour request to ${brand} (#${code}) has been resolved ✅\n${resolutionSummary}\n\nIf there's anything else, we're here 🤍`
+          : `היי ${fname} 👋\nהפנייה שלך ל-${brand} (#${code}) טופלה ✅\n${resolutionSummary}\n\nאם יש משהו נוסף, אנחנו כאן 🤍`;
     }
-  }, [template, fname, brand, code, orderRef, requestedDetail, replacementProduct, estimatedDelivery, trackingNumber, resolutionSummary]);
+  }, [lang, template, fname, brand, code, orderRef, requestedDetail, replacementProduct, estimatedDelivery, trackingNumber, resolutionSummary]);
 
   const canSend = useMemo(() => {
     if (template === 'awaiting_customer') return requestedDetail.trim().length > 0;
@@ -2404,18 +2427,18 @@ function SendDialog({
       <div
         className="max-w-lg w-full rounded-2xl p-5 space-y-4 max-h-[calc(100vh-2rem)] overflow-y-auto my-auto"
         style={{ background: '#1f2937', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
-        dir="rtl"
+        dir={lang === 'en' ? 'ltr' : 'rtl'}
       >
-        <h3 className="text-lg font-semibold">שליחת הודעת WhatsApp ללקוחה</h3>
+        <h3 className="text-lg font-semibold">{t.sendDialogTitle}</h3>
 
         {template === 'awaiting_customer' && (
           <div>
-            <div className="text-xs mb-1.5" style={{ color: '#9ca3af' }}>איזה פרט חסר?</div>
+            <div className="text-xs mb-1.5" style={{ color: '#9ca3af' }}>{t.sendWhichDetail}</div>
             <input
               type="text"
               value={requestedDetail}
               onChange={(e) => setRequestedDetail(e.target.value)}
-              placeholder="לדוגמה: תמונה של המוצר הפגום"
+              placeholder={t.sendDetailPlaceholder}
               className="w-full text-sm p-2.5 rounded-xl outline-none"
               style={{ background: 'rgba(255,255,255,0.05)' }}
             />
@@ -2425,30 +2448,30 @@ function SendDialog({
         {template === 'shipped' && (
           <>
             <div>
-              <div className="text-xs mb-1.5" style={{ color: '#9ca3af' }}>שם המוצר החלופי שנשלח</div>
+              <div className="text-xs mb-1.5" style={{ color: '#9ca3af' }}>{t.sendReplacementLabel}</div>
               <input
                 type="text"
                 value={replacementProduct}
                 onChange={(e) => setReplacementProduct(e.target.value)}
-                placeholder="לדוגמה: סרום INTENSIVE 100ml"
+                placeholder={t.sendReplacementPlaceholder}
                 className="w-full text-sm p-2.5 rounded-xl outline-none"
                 style={{ background: 'rgba(255,255,255,0.05)' }}
-                dir="rtl"
+                dir={lang === 'en' ? 'ltr' : 'rtl'}
               />
             </div>
 
             <div>
-              <div className="text-xs mb-1.5" style={{ color: '#9ca3af' }}>זמן הגעה משוער</div>
+              <div className="text-xs mb-1.5" style={{ color: '#9ca3af' }}>{t.sendEtaLabel}</div>
               <input
                 type="text"
                 value={estimatedDelivery}
                 onChange={(e) => setEstimatedDelivery(e.target.value)}
                 className="w-full text-sm p-2.5 rounded-xl outline-none"
                 style={{ background: 'rgba(255,255,255,0.05)' }}
-                dir="rtl"
+                dir={lang === 'en' ? 'ltr' : 'rtl'}
               />
               <div className="flex flex-wrap gap-1.5 mt-2">
-                {['תוך 3-5 ימי עסקים', 'השבוע', 'מחר', 'תוך 24 שעות'].map((opt) => (
+                {etaOptions.map((opt) => (
                   <button
                     key={opt}
                     type="button"
@@ -2467,11 +2490,11 @@ function SendDialog({
 
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <div className="text-xs" style={{ color: '#9ca3af' }}>מספר משלוח Focus</div>
+                <div className="text-xs" style={{ color: '#9ca3af' }}>{t.sendTrackingLabel}</div>
                 {resolvingTracking && (
                   <span className="text-[11px] flex items-center gap-1" style={{ color: '#9ca3af' }}>
                     <Loader2 className="w-3 h-3 animate-spin" />
-                    מאתר ב-Focus...
+                    {t.sendTrackingResolving}
                   </span>
                 )}
               </div>
@@ -2479,14 +2502,14 @@ function SendDialog({
                 type="text"
                 value={trackingNumber}
                 onChange={(e) => setTrackingNumber(e.target.value)}
-                placeholder={resolvingTracking ? 'מאתר...' : '3409393'}
+                placeholder={resolvingTracking ? t.sendTrackingPlaceholder : '3409393'}
                 className="w-full text-sm p-2.5 rounded-xl outline-none"
                 style={{ background: 'rgba(255,255,255,0.05)' }}
                 dir="ltr"
               />
               {!trackingNumber && !resolvingTracking && (
                 <p className="text-[11px] mt-1" style={{ color: '#fbbf24' }}>
-                  לא נמצא מספר משלוח אוטומטית — ייתכן שההזמנה עוד לא יצאה. אפשר להזין ידנית.
+                  {t.sendTrackingNotFound}
                 </p>
               )}
             </div>
@@ -2496,7 +2519,7 @@ function SendDialog({
         {template === 'resolved' && (
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <div className="text-xs" style={{ color: '#9ca3af' }}>סיכום הטיפול</div>
+              <div className="text-xs" style={{ color: '#9ca3af' }}>{t.sendResolutionLabel}</div>
               <div
                 className="text-[11px]"
                 style={{
@@ -2518,19 +2541,19 @@ function SendDialog({
               rows={8}
               className="w-full text-sm p-3 rounded-xl outline-none resize-y min-h-[200px]"
               style={{ background: 'rgba(255,255,255,0.05)' }}
-              placeholder="פירוט מלא של מה שנעשה כדי לסגור את הפנייה — כל הפרטים שהלקוחה צריכה לראות"
+              placeholder={t.sendResolutionPlaceholder}
             />
           </div>
         )}
 
         <div>
-          <div className="text-xs mb-1.5" style={{ color: '#9ca3af' }}>תצוגה מקדימה (כפי שיראה הלקוחה)</div>
+          <div className="text-xs mb-1.5" style={{ color: '#9ca3af' }}>{t.sendPreviewLabel}</div>
           <pre className="whitespace-pre-wrap text-sm p-3 rounded-xl font-sans"
             style={{ background: 'rgba(255,255,255,0.05)' }}>
             {preview}
           </pre>
           <p className="text-[11px] mt-1.5 opacity-60">
-            ההודעה תישלח ל-{ticket.customer_phone}.
+            {t.sendWillBeSentTo}{ticket.customer_phone}.
           </p>
         </div>
 
@@ -2541,7 +2564,7 @@ function SendDialog({
             className="px-4 py-2 rounded-xl text-sm font-medium"
             style={{ background: 'rgba(255,255,255,0.05)', color: '#9ca3af' }}
           >
-            ביטול
+            {t.sendCancel}
           </button>
           <button
             onClick={() => {
@@ -2561,7 +2584,7 @@ function SendDialog({
           >
             {sending && <Loader2 className="w-4 h-4 animate-spin" />}
             <Send className="w-4 h-4" />
-            שלח
+            {t.sendButton}
           </button>
         </div>
       </div>

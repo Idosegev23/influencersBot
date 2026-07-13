@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDashboardLang } from '@/hooks/useDashboardLang';
+import { getDashboardStrings } from '@/lib/i18n/dashboard';
 import {
   Tag,
   Plus,
@@ -35,18 +36,22 @@ interface Coupon {
   created_at: string;
 }
 
-const DISCOUNT_TYPES = [
-  { value: 'percentage', label: '% אחוזים' },
-  { value: 'fixed', label: '₪ סכום קבוע' },
-  { value: 'free_shipping', label: 'משלוח חינם' },
-  { value: 'bogo', label: '1+1' },
-  { value: 'other', label: 'אחר' },
-];
+type CouponStrings = ReturnType<typeof getDashboardStrings>['coupons'];
 
-function formatDiscount(type: string, value: number): string {
+function buildDiscountTypes(c: CouponStrings) {
+  return [
+    { value: 'percentage', label: c.typePercent },
+    { value: 'fixed', label: c.typeFixed },
+    { value: 'free_shipping', label: c.typeFreeShipping },
+    { value: 'bogo', label: c.typeBogo },
+    { value: 'other', label: c.typeOther },
+  ];
+}
+
+function formatDiscount(type: string, value: number, freeShippingLabel: string): string {
   if (type === 'percentage') return `${value}%`;
   if (type === 'fixed') return `₪${value}`;
-  if (type === 'free_shipping') return 'משלוח חינם';
+  if (type === 'free_shipping') return freeShippingLabel;
   if (type === 'bogo') return '1+1';
   return value ? `${value}` : '—';
 }
@@ -63,7 +68,8 @@ export default function CouponsPage({
   const resolvedParams = use(params);
   const username = resolvedParams.username;
   const { lang } = useDashboardLang(username);
-  const isEn = lang === 'en';
+  const t = getDashboardStrings(lang);
+  const DISCOUNT_TYPES = buildDiscountTypes(t.coupons);
   const router = useRouter();
 
   const [coupons, setCoupons] = useState<Coupon[]>([]);
@@ -149,7 +155,7 @@ export default function CouponsPage({
   }
 
   async function handleDelete(id: string) {
-    if (!confirm(isEn ? 'Delete this promotion?' : 'למחוק את הקופון?')) return;
+    if (!confirm(t.coupons.confirmDelete)) return;
     try {
       const res = await fetch(`/api/influencer/coupons?username=${username}&id=${id}`, { method: 'DELETE' });
       if (res.ok) {
@@ -211,7 +217,7 @@ export default function CouponsPage({
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-xl font-bold flex items-center gap-2">
             <Tag className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
-            {isEn ? 'Promotions' : 'קופונים'}
+            {t.coupons.pageTitle}
           </h1>
           <button
             onClick={() => setIsAdding(true)}
@@ -219,16 +225,16 @@ export default function CouponsPage({
             style={{ background: 'var(--color-primary)', color: '#fff' }}
           >
             <Plus className="w-4 h-4" />
-            {isEn ? 'Add promotion' : 'הוספת קופון'}
+            {t.coupons.addPromotion}
           </button>
         </div>
 
         {/* Stats strip */}
         <div className="grid grid-cols-3 gap-3 mb-6">
           {[
-            { label: 'סה״כ', value: coupons.length },
-            { label: 'פעילים', value: activeCoupons.length },
-            { label: 'הועתקו', value: coupons.reduce((s, c) => s + (c.copy_count || 0), 0) },
+            { label: t.coupons.statTotal, value: coupons.length },
+            { label: t.coupons.statActive, value: activeCoupons.length },
+            { label: t.coupons.statCopied, value: coupons.reduce((s, c) => s + (c.copy_count || 0), 0) },
           ].map((s, i) => (
             <div key={i} className="glass-card rounded-xl p-3 text-center">
               <div className="text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>{s.label}</div>
@@ -242,11 +248,11 @@ export default function CouponsPage({
           <div className="glass-card rounded-2xl p-5 mb-6 animate-slide-up" style={{ border: '1px solid var(--color-primary)' }}>
             <h3 className="font-semibold mb-4 flex items-center gap-2">
               <Plus className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
-              {isEn ? 'New promotion' : 'קופון חדש'}
+              {t.coupons.newCoupon}
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Promo code *' : 'קוד קופון *'}</label>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{t.coupons.labelPromoCode}</label>
                 <input
                   className="input w-full py-2 px-3 text-sm"
                   value={newCoupon.code}
@@ -255,16 +261,16 @@ export default function CouponsPage({
                 />
               </div>
               <div>
-                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Brand' : 'מותג'}</label>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{t.coupons.labelBrand}</label>
                 <input
                   className="input w-full py-2 px-3 text-sm"
                   value={newCoupon.brand_name}
                   onChange={e => setNewCoupon(p => ({ ...p, brand_name: e.target.value }))}
-                  placeholder={isEn ? 'Brand name' : 'שם המותג'}
+                  placeholder={t.coupons.placeholderBrandName}
                 />
               </div>
               <div>
-                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Discount type' : 'סוג הנחה'}</label>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{t.coupons.labelDiscountType}</label>
                 <select
                   className="input w-full py-2 px-3 text-sm"
                   value={newCoupon.discount_type}
@@ -276,7 +282,7 @@ export default function CouponsPage({
                 </select>
               </div>
               <div>
-                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Discount value' : 'ערך הנחה'}</label>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{t.coupons.labelDiscountValue}</label>
                 <input
                   type="number"
                   className="input w-full py-2 px-3 text-sm"
@@ -286,16 +292,16 @@ export default function CouponsPage({
                 />
               </div>
               <div className="sm:col-span-2">
-                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Description' : 'תיאור'}</label>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{t.coupons.labelDescription}</label>
                 <input
                   className="input w-full py-2 px-3 text-sm"
                   value={newCoupon.description}
                   onChange={e => setNewCoupon(p => ({ ...p, description: e.target.value }))}
-                  placeholder={isEn ? 'Promo description…' : 'תיאור הקופון...'}
+                  placeholder={t.coupons.placeholderDescription}
                 />
               </div>
               <div className="sm:col-span-2">
-                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Tracking URL' : 'קישור מעקב'}</label>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{t.coupons.labelTrackingUrl}</label>
                 <input
                   className="input w-full py-2 px-3 text-sm"
                   value={newCoupon.tracking_url}
@@ -311,7 +317,7 @@ export default function CouponsPage({
                 className="px-4 py-2 rounded-xl text-sm"
                 style={{ color: 'var(--dash-text-2)' }}
               >
-                {isEn ? 'Cancel' : 'ביטול'}
+                {t.coupons.cancel}
               </button>
               <button
                 onClick={handleAdd}
@@ -320,7 +326,7 @@ export default function CouponsPage({
                 style={{ background: 'var(--color-primary)', color: '#fff' }}
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                {isEn ? 'Save' : 'שמירה'}
+                {t.coupons.save}
               </button>
             </div>
           </div>
@@ -332,14 +338,14 @@ export default function CouponsPage({
             <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-glass-border)' }}>
               <Tag className="w-8 h-8" style={{ color: 'var(--color-primary)' }} />
             </div>
-            <h3 className="text-lg font-semibold mb-2">{isEn ? 'No promotions yet' : 'אין קופונים עדיין'}</h3>
-            <p className="text-sm mb-4" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'Add promotions so the bot can share them in conversations.' : 'הוסיפו קופונים כדי שהבוט ישתף אותם בשיחות'}</p>
+            <h3 className="text-lg font-semibold mb-2">{t.coupons.emptyTitle}</h3>
+            <p className="text-sm mb-4" style={{ color: 'var(--dash-text-2)' }}>{t.coupons.emptyBody}</p>
             <button
               onClick={() => setIsAdding(true)}
               className="px-4 py-2 rounded-xl text-sm font-medium"
               style={{ background: 'var(--color-primary)', color: '#fff' }}
             >
-              הוספת קופון ראשון
+              {t.coupons.addFirstCoupon}
             </button>
           </div>
         ) : (
@@ -361,7 +367,7 @@ export default function CouponsPage({
                     <div className="p-4">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Code' : 'קוד'}</label>
+                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{t.coupons.labelCode}</label>
                           <input
                             className="input w-full py-2 px-3 text-sm"
                             value={editForm.code || ''}
@@ -369,7 +375,7 @@ export default function CouponsPage({
                           />
                         </div>
                         <div>
-                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Brand' : 'מותג'}</label>
+                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{t.coupons.labelBrand}</label>
                           <input
                             className="input w-full py-2 px-3 text-sm"
                             value={editForm.brand_name || ''}
@@ -377,7 +383,7 @@ export default function CouponsPage({
                           />
                         </div>
                         <div>
-                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Discount type' : 'סוג הנחה'}</label>
+                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{t.coupons.labelDiscountType}</label>
                           <select
                             className="input w-full py-2 px-3 text-sm"
                             value={editForm.discount_type || 'percentage'}
@@ -389,7 +395,7 @@ export default function CouponsPage({
                           </select>
                         </div>
                         <div>
-                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Value' : 'ערך'}</label>
+                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{t.coupons.labelValue}</label>
                           <input
                             type="number"
                             className="input w-full py-2 px-3 text-sm"
@@ -398,7 +404,7 @@ export default function CouponsPage({
                           />
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Description' : 'תיאור'}</label>
+                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{t.coupons.labelDescription}</label>
                           <input
                             className="input w-full py-2 px-3 text-sm"
                             value={editForm.description || ''}
@@ -406,7 +412,7 @@ export default function CouponsPage({
                           />
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Tracking URL' : 'קישור מעקב'}</label>
+                          <label className="text-xs mb-1 block" style={{ color: 'var(--dash-text-3)' }}>{t.coupons.labelTrackingUrl}</label>
                           <input
                             className="input w-full py-2 px-3 text-sm"
                             value={editForm.tracking_url || ''}
@@ -421,7 +427,7 @@ export default function CouponsPage({
                           className="px-3 py-1.5 rounded-lg text-sm"
                           style={{ color: 'var(--dash-text-2)' }}
                         >
-                          {isEn ? 'Cancel' : 'ביטול'}
+                          {t.coupons.cancel}
                         </button>
                         <button
                           onClick={() => handleSave(coupon.id)}
@@ -430,7 +436,7 @@ export default function CouponsPage({
                           style={{ background: 'var(--color-primary)', color: '#fff' }}
                         >
                           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                          שמירה
+                          {t.coupons.save}
                         </button>
                       </div>
                     </div>
@@ -448,7 +454,7 @@ export default function CouponsPage({
                               color: 'var(--color-primary)',
                               border: '1px solid rgba(160,148,224,0.25)',
                             }}
-                            title="העתק קוד"
+                            title={t.coupons.tooltipCopyCode}
                           >
                             {copiedId === coupon.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                             {coupon.code}
@@ -457,7 +463,7 @@ export default function CouponsPage({
                           {/* Expired badge */}
                           {isExpired(coupon) && (
                             <span className="ml-2 rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
-                              {isEn ? 'Expired' : 'פג תוקף'}
+                              {t.coupons.expired}
                             </span>
                           )}
 
@@ -474,7 +480,7 @@ export default function CouponsPage({
                             className="text-xs px-2 py-0.5 rounded-full"
                             style={{ background: 'rgba(23,163,74,0.15)', color: '#17A34A' }}
                           >
-                            {formatDiscount(coupon.discount_type, coupon.discount_value)}
+                            {formatDiscount(coupon.discount_type, coupon.discount_value, t.coupons.typeFreeShipping)}
                           </span>
                         </div>
 
@@ -482,7 +488,7 @@ export default function CouponsPage({
                           {/* Stats */}
                           {(coupon.copy_count || 0) > 0 && (
                             <span className="text-xs px-2 py-1 rounded-lg" style={{ color: 'var(--dash-text-3)' }}>
-                              {coupon.copy_count} העתקות
+                              {coupon.copy_count} {t.coupons.copies}
                             </span>
                           )}
 
@@ -490,7 +496,7 @@ export default function CouponsPage({
                           <button
                             onClick={() => handleToggleActive(coupon)}
                             className="p-1.5 rounded-lg transition-all duration-200"
-                            title={coupon.is_active ? 'השבת' : 'הפעל'}
+                            title={coupon.is_active ? t.coupons.tooltipDisable : t.coupons.tooltipEnable}
                           >
                             {coupon.is_active ? (
                               <ToggleRight className="w-5 h-5 text-green-400" />
@@ -532,7 +538,7 @@ export default function CouponsPage({
                               style={{ color: 'var(--color-info)' }}
                             >
                               <LinkIcon className="w-3 h-3" />
-                              קישור
+                              {t.coupons.linkLabel}
                             </a>
                           )}
                         </div>

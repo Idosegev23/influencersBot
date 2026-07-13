@@ -3,7 +3,7 @@
 import { useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDashboardLang } from '@/hooks/useDashboardLang';
-import { dashboardDir } from '@/lib/i18n/dashboard';
+import { dashboardDir, getDashboardStrings } from '@/lib/i18n/dashboard';
 
 export default function InfluencerLoginPage({
   params,
@@ -12,35 +12,13 @@ export default function InfluencerLoginPage({
 }) {
   const { username } = use(params);
   const { lang } = useDashboardLang(username);
-  const isEn = lang === 'en';
   const dir = dashboardDir(lang);
+  const t = getDashboardStrings(lang);
 
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-
-  const t = isEn
-    ? {
-        backToChat: '← Back to chat',
-        title: 'Sign in to admin panel',
-        passwordLabel: 'Password',
-        passwordPlaceholder: 'Enter your password',
-        signingIn: 'Signing in…',
-        signIn: 'Sign in',
-        contactSupport: 'Trouble signing in? Contact support.',
-        defaultError: 'Sign in failed',
-      }
-    : {
-        backToChat: "← חזרה לצ'אט",
-        title: 'כניסה לפאנל ניהול',
-        passwordLabel: 'סיסמה',
-        passwordPlaceholder: 'הזן את הסיסמה שלך',
-        signingIn: 'מתחבר...',
-        signIn: 'התחבר',
-        contactSupport: 'יש בעיה? צור קשר עם התמיכה',
-        defaultError: 'שגיאה בהתחברות',
-      };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,10 +37,10 @@ export default function InfluencerLoginPage({
       if (res.ok) {
         router.push(`/influencer/${username}/dashboard`);
       } else {
-        setError(data.error || t.defaultError);
+        setError(data.error || t.login.defaultError);
       }
     } catch {
-      setError(t.defaultError);
+      setError(t.login.defaultError);
     } finally {
       setLoading(false);
     }
@@ -80,7 +58,7 @@ export default function InfluencerLoginPage({
           className="inline-flex items-center gap-2 text-sm mb-6 cursor-pointer bg-transparent border-none p-0"
           style={{ color: 'var(--dash-text-2)' }}
         >
-          {t.backToChat}
+          {t.login.backToChat}
         </button>
 
         <div
@@ -98,7 +76,7 @@ export default function InfluencerLoginPage({
           </div>
 
           <h1 className="text-2xl font-bold text-center mb-2" style={{ color: 'var(--dash-text)' }}>
-            {t.title}
+            {t.login.title}
           </h1>
           <p className="text-sm text-center mb-6" style={{ color: 'var(--dash-text-2)' }}>
             @{username}
@@ -119,13 +97,13 @@ export default function InfluencerLoginPage({
             )}
 
             <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>
-              {t.passwordLabel}
+              {t.login.passwordLabel}
             </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder={t.passwordPlaceholder}
+              placeholder={t.login.passwordPlaceholder}
               disabled={loading}
               autoFocus
               dir={dir}
@@ -148,12 +126,12 @@ export default function InfluencerLoginPage({
                 fontFamily: 'inherit',
               }}
             >
-              {loading ? t.signingIn : t.signIn}
+              {loading ? t.login.signingIn : t.login.signIn}
             </button>
           </form>
 
           <p className="text-xs text-center mt-4" style={{ color: 'var(--dash-text-3)' }}>
-            {t.contactSupport}
+            {t.login.contactSupport}
           </p>
         </div>
       </div>

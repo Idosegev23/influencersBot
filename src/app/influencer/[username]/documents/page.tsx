@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useDashboardLang } from '@/hooks/useDashboardLang';
+import { getDashboardStrings } from '@/lib/i18n/dashboard';
 import {
   Upload,
   FileText,
@@ -36,6 +37,7 @@ export default function DocumentsPage() {
   const username = params.username as string;
   const { lang } = useDashboardLang(username);
   const isEn = lang === 'en';
+  const t = getDashboardStrings(lang);
 
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -74,7 +76,7 @@ export default function DocumentsPage() {
       }
     } catch (err) {
       console.error('Error loading documents:', err);
-      setError('שגיאה בטעינת המסמכים');
+      setError(t.documents.loadError);
     } finally {
       setIsLoading(false);
     }
@@ -98,14 +100,14 @@ export default function DocumentsPage() {
       const result = await response.json();
 
       if (!response.ok || result.success === false) {
-        throw new Error(result.error || result.details || 'הניתוח נכשל');
+        throw new Error(result.error || result.details || t.documents.parseFailed);
       }
 
       setParseSuccess(true);
       await loadData();
       setTimeout(() => setParseSuccess(false), 5000);
     } catch (err: any) {
-      setUploadError(err.message || 'שגיאה בניתוח המסמך');
+      setUploadError(err.message || t.documents.parseErrorFallback);
     } finally {
       setIsParsing(false);
     }
@@ -135,9 +137,9 @@ export default function DocumentsPage() {
         {/* Header */}
         <div className="flex items-center justify-between animate-slide-up">
           <div>
-            <h1 className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Documents' : 'מאגר מסמכים'}</h1>
+            <h1 className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>{t.documents.pageTitle}</h1>
             <p className="text-sm mt-1" style={{ color: 'var(--dash-text-2)' }}>
-              {isEn ? 'Upload documents to the chatbot knowledge base' : 'העלה מסמכים למאגר המידע של הצ\'אטבוט'}
+              {t.documents.pageSubtitle}
             </p>
           </div>
           <Link
@@ -150,7 +152,7 @@ export default function DocumentsPage() {
             }}
           >
             <ArrowRight className="w-4 h-4" />
-            {isEn ? 'Back' : 'חזרה'}
+            {t.documents.back}
           </Link>
         </div>
 
@@ -161,13 +163,11 @@ export default function DocumentsPage() {
         >
           <div className="flex items-center gap-2">
             <Upload className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
-            <h2 className="font-semibold" style={{ color: 'var(--dash-text)' }}>{isEn ? 'Upload a document' : 'העלאת מסמך למאגר'}</h2>
+            <h2 className="font-semibold" style={{ color: 'var(--dash-text)' }}>{t.documents.uploadTitle}</h2>
           </div>
 
           <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
-            {isEn
-              ? 'The document is auto-analyzed, chunked, and added to the chatbot knowledge base. PDF, Word, Excel, images (up to 10MB).'
-              : 'המסמך ינותח אוטומטית, יפוצל לחלקים ויוזן למאגר הידע של הצ\'אטבוט. PDF, Word, Excel, תמונות (עד 10MB)'}
+            {t.documents.uploadHelp}
           </p>
 
           {/* File uploader */}
@@ -190,9 +190,9 @@ export default function DocumentsPage() {
             >
               <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--color-info)' }} />
               <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--color-info)' }}>{isEn ? 'Parsing and indexing…' : 'מנתח ומאנדקס...'}</p>
+                <p className="text-sm font-medium" style={{ color: 'var(--color-info)' }}>{t.documents.parsingTitle}</p>
                 <p className="text-xs" style={{ color: 'var(--dash-text-2)' }}>
-                  {isEn ? 'The document is going through AI parsing, chunking, and ingestion into the knowledge base.' : 'המסמך עובר ניתוח AI, פיצול לחלקים, והזנה למאגר הידע'}
+                  {t.documents.parsingHelp}
                 </p>
               </div>
             </div>
@@ -206,9 +206,9 @@ export default function DocumentsPage() {
             >
               <CheckCircle2 className="w-5 h-5" style={{ color: 'var(--dash-positive)' }} />
               <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--dash-positive)' }}>{isEn ? 'Document added successfully!' : 'המסמך נוסף למאגר בהצלחה!'}</p>
+                <p className="text-sm font-medium" style={{ color: 'var(--dash-positive)' }}>{t.documents.successTitle}</p>
                 <p className="text-xs" style={{ color: 'var(--dash-text-2)' }}>
-                  {isEn ? 'The content is now retrievable by the chatbot.' : 'התוכן זמין לשליפה בצ\'אטבוט כבר עכשיו'}
+                  {t.documents.successHelp}
                 </p>
               </div>
             </div>
@@ -226,7 +226,7 @@ export default function DocumentsPage() {
                 className="mr-auto text-xs underline transition-all duration-300"
                 style={{ color: 'var(--dash-text-3)' }}
               >
-                {isEn ? 'Close' : 'סגור'}
+                {t.documents.close}
               </button>
             </div>
           )}
@@ -237,11 +237,11 @@ export default function DocumentsPage() {
           <div className="grid grid-cols-2 gap-4 animate-slide-up">
             <div className="metric-card rounded-2xl p-4 text-center transition-all duration-300" style={{ borderColor: 'var(--dash-glass-border)' }}>
               <div className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>{stats.total}</div>
-              <div className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Documents' : 'מסמכים במאגר'}</div>
+              <div className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>{t.documents.statDocuments}</div>
             </div>
             <div className="metric-card rounded-2xl p-4 text-center transition-all duration-300" style={{ borderColor: 'var(--dash-glass-border)' }}>
               <div className="text-2xl font-bold" style={{ color: 'var(--color-info)' }}>{stats.indexed}</div>
-              <div className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>{isEn ? 'Indexed in chatbot' : 'מאונדקסים בצ\'אטבוט'}</div>
+              <div className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>{t.documents.statIndexed}</div>
             </div>
           </div>
         )}
@@ -257,9 +257,9 @@ export default function DocumentsPage() {
         {documents.length === 0 ? (
           <div className="glass-card rounded-2xl p-12 text-center animate-fade-in" style={{ borderColor: 'var(--dash-glass-border)' }}>
             <FileText className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--dash-text-3)' }} />
-            <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>{isEn ? 'No documents yet' : 'אין מסמכים במאגר עדיין'}</p>
+            <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>{t.documents.emptyTitle}</p>
             <p className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>
-              {isEn ? 'Upload a document above and we’ll add it automatically.' : 'העלה מסמך למעלה והמערכת תוסיף אותו אוטומטית'}
+              {t.documents.emptyHelp}
             </p>
           </div>
         ) : (
@@ -290,29 +290,29 @@ export default function DocumentsPage() {
                   {doc.rag_status === 'indexed' && (
                     <span className="pill pill-green flex items-center gap-1">
                       <Database className="w-3 h-3" />
-                      {doc.rag_chunks_count || 0} {isEn ? 'chunks' : 'חלקים'}
+                      {doc.rag_chunks_count || 0} {t.documents.chunks}
                     </span>
                   )}
                   {doc.rag_status === 'processing' && (
                     <span className="pill pill-blue flex items-center gap-1">
                       <Loader2 className="w-3 h-3 animate-spin" />
-                      {isEn ? 'Indexing' : 'מאנדקס'}
+                      {t.documents.statusIndexing}
                     </span>
                   )}
                   {doc.rag_status === 'failed' && (
                     <span className="pill pill-red">
-                      {isEn ? 'Failed' : 'נכשל'}
+                      {t.documents.statusFailed}
                     </span>
                   )}
                   {doc.parsing_status === 'pending' && (
                     <span className="pill pill-amber">
-                      {isEn ? 'Pending' : 'ממתין'}
+                      {t.documents.statusPending}
                     </span>
                   )}
                   {doc.parsing_status === 'processing' && (
                     <span className="pill pill-blue flex items-center gap-1">
                       <Loader2 className="w-3 h-3 animate-spin" />
-                      מנתח
+                      {t.documents.statusParsing}
                     </span>
                   )}
                 </div>
