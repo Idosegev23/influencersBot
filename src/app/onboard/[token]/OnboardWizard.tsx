@@ -94,7 +94,7 @@ export default function OnboardWizard({ token }: { token: string }) {
   }, [phase, jobId]);
 
   async function start() {
-    if (starting || !data?.connected) return;
+    if (starting) return; // the Start button is disabled unless there's at least one source
     setStarting(true);
     setErr('');
     try {
@@ -115,7 +115,8 @@ export default function OnboardWizard({ token }: { token: string }) {
     }
   }
 
-  const canStart = !!data?.connected; // Instagram is the only requirement; the rest is optional.
+  // Start needs at least ONE source — Instagram OR website/tiktok/youtube. Nothing is individually required.
+  const canStart = !!data?.connected || !!website.trim() || !!tiktok.trim() || !!youtube.trim();
   const pct = Math.max(2, Math.min(100, Math.round(progress?.percent ?? 0)));
 
   return (
@@ -159,7 +160,7 @@ export default function OnboardWizard({ token }: { token: string }) {
                 <Field label="שם משתמש טיקטוק" value={tiktok} onChange={setTiktok} placeholder="@username" />
                 <Field label="שם משתמש יוטיוב" value={youtube} onChange={setYoutube} placeholder="@channel" />
               </div>
-              <p className="text-xs text-gray-400 mt-2">כל השדות אופציונליים — מלא/י מה שיש. הדבר היחיד שחובה זה חיבור אינסטגרם.</p>
+              <p className="text-xs text-gray-400 mt-2">הכל אופציונלי — מלא/י מה שיש (מספיק מקור אחד: אינסטגרם, אתר, טיקטוק או יוטיוב).</p>
 
               {err && <div className="text-sm text-red-600 mt-3">{err}</div>}
 
@@ -171,7 +172,7 @@ export default function OnboardWizard({ token }: { token: string }) {
               >
                 {starting ? 'מתחילים…' : 'התחילו לבנות את החשבון שלי 🚀'}
               </button>
-              {!data.connected && <p className="text-center text-xs text-gray-400 mt-2">חברו אינסטגרם כדי להתחיל</p>}
+              {!canStart && <p className="text-center text-xs text-gray-400 mt-2">מלאו לפחות מקור אחד (או חברו אינסטגרם) כדי להתחיל</p>}
             </>
           )}
 

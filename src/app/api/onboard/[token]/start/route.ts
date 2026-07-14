@@ -29,7 +29,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   const tiktok = (body.tiktok || '').trim();
   const youtube = (body.youtube || '').trim();
 
-  // Require a connected Instagram — the account's scannable anchor + login handle.
+  // Instagram is optional. Fetch it if connected — it becomes the account's login
+  // handle + a scan source — but a website / TikTok / YouTube source is enough on its own.
   const { data: conn } = await supabase
     .from('ig_graph_connections')
     .select('ig_username, is_active')
@@ -38,7 +39,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     .order('connected_at', { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (!conn?.ig_username) return NextResponse.json({ error: 'connect_instagram_first' }, { status: 422 });
+  const igHandleRaw = conn?.ig_username ? normalizeIgUsername(conn.ig_username) : '';
+
+  // Require at least ONE source to have something to scan.
+  if (!igHandleRaw && !website && !tiktok && !youtube) {
+    return NextResponse.json({ error: 'need_a_source' }, { status: 422 });
+  }
 
   // ATOMIC claim: only one request may transition draft/filled → starting.
   // The JSON-path predicate is applied to the UPDATE's WHERE (PostgREST), so a
@@ -53,19 +59,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     return NextResponse.json({ error: 'already started' }, { status: 409 });
   }
 
-  const igHandle = normalizeIgUsername(conn.ig_username);
+  const igHandle = igHandleRaw;
   const sources = { instagram: igHandle, website, youtube, tiktok };
-  // ownerWhatsapp / ownerEmail were captured by the admin at link-create time.
+  // Use the IG handle as the account slug when connected; otherwise keep the
+  // admin-created placeholder slug. ownerWhatsapp/ownerEmail come from the admin.
+  const username = igHandle || draft.config?.username;
   const baseConfig = {
     ...draft.config,
-    username: igHandle,
+    username,
     sources,
     onboarding: { ...ob },
   };
 
   const result = await startPipeline({
     accountId: draft.id,
-    username: igHandle,
+    username: igHandle || undefined, // startPipeline anchors on website/youtube/tiktok when no IG
     websiteUrl: website || null,
     youtube: youtube || undefined,
     tiktok: tiktok || undefined,
