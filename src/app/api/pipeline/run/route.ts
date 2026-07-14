@@ -6,6 +6,7 @@ import { loadState } from '@/lib/pipeline/state';
 import { getScanJobsRepo } from '@/lib/db/repositories/scanJobsRepo';
 import { nextStep } from '@/lib/pipeline/types';
 import type { PipelineStep } from '@/lib/pipeline/types';
+import { notifyScanComplete } from '@/lib/pipeline/notify';
 
 export const maxDuration = 600;
 
@@ -45,5 +46,8 @@ export async function POST(req: Request) {
   const next = nextStep(step);
   if (next) { await publishStep({ jobId, step: next, batch: 0 }); return NextResponse.json({ status: 'advanced', next }); }
   await repo.markSucceeded(jobId, { pipeline: 'complete' });
+  // Scan finished — notify the team (and, for onboarding, the client). Awaited (not
+  // fire-and-forget) so it runs before the serverless function freezes; never throws.
+  await notifyScanComplete({ jobId, job, state });
   return NextResponse.json({ status: 'done' });
 }

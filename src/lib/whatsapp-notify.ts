@@ -466,6 +466,44 @@ export async function sendInfluencerWelcome(p: {
   });
 }
 
+// =====================================================================
+// 7) demo_ready_v1 — demo scan finished (team notification)
+//    Category: UTILITY  |  Vars: body {{1}} = brand name, url {{1}} = username slug
+//    Trigger: pipeline completion (notifyScanComplete)
+// =====================================================================
+export async function sendDemoReady(p: {
+  to: string;
+  brandName: string;
+  accountUsername: string;
+}): Promise<WhatsAppSendResult> {
+  return runTemplate({
+    templateName: 'demo_ready_v1',
+    flagName: 'DEMO_READY',
+    to: p.to,
+    bodyParams: [p.brandName],
+    urlButtonParam: p.accountUsername,
+  });
+}
+
+// =====================================================================
+// 8) account_ready_v1 — real/full scan finished (team notification)
+//    Category: UTILITY  |  Vars: body {{1}} = brand name, url {{1}} = username slug
+//    Trigger: pipeline completion (notifyScanComplete)
+// =====================================================================
+export async function sendAccountReady(p: {
+  to: string;
+  brandName: string;
+  accountUsername: string;
+}): Promise<WhatsAppSendResult> {
+  return runTemplate({
+    templateName: 'account_ready_v1',
+    flagName: 'ACCOUNT_READY',
+    to: p.to,
+    bodyParams: [p.brandName],
+    urlButtonParam: p.accountUsername,
+  });
+}
+
 // ---------------------------------------------------------------------
 // Fire-and-forget helper. Use when you want to trigger a template from
 // an API handler without awaiting it (don't block the user's response).
