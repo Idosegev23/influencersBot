@@ -5,6 +5,7 @@ import { NavigationMenu } from '@/components/NavigationMenu';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { useDashboardLang } from '@/hooks/useDashboardLang';
 import { dashboardDir } from '@/lib/i18n/dashboard';
+import FirstRunTutorial from '@/components/FirstRunTutorial';
 
 export default function InfluencerLayout({
   children,
@@ -28,6 +29,9 @@ export default function InfluencerLayout({
 
         {/* Navigation */}
         {showNav && <NavigationMenu />}
+
+        {/* First-run guided tour (self-gates: only for freshly-onboarded accounts) */}
+        {showNav && username && <FirstRunTutorial username={username} />}
 
         {/* Content */}
         <div className="relative z-10 sm:pb-0 pb-14">{children}</div>

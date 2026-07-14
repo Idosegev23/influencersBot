@@ -28,6 +28,7 @@ import { chatbotPersona } from './chatbotPersona';
 import { documents } from './documents';
 import { login } from './login';
 import { manage } from './manage';
+import { tutorial } from './tutorial';
 import { common } from './common';
 
 export type DashboardLang = 'he' | 'en';
@@ -51,6 +52,7 @@ const STRINGS = {
     documents: documents.he,
     login: login.he,
     manage: manage.he,
+    tutorial: tutorial.he,
     common: common.he,
   },
   en: {
@@ -71,6 +73,7 @@ const STRINGS = {
     documents: documents.en,
     login: login.en,
     manage: manage.en,
+    tutorial: tutorial.en,
     common: common.en,
   },
 } as const;
