@@ -28,8 +28,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   const website = (body.website || '').trim();
   const tiktok = (body.tiktok || '').trim();
   const youtube = (body.youtube || '').trim();
-  const whatsapp = (body.whatsapp || '').trim();
-  const email = (body.email || '').trim();
 
   // Require a connected Instagram — the account's scannable anchor + login handle.
   const { data: conn } = await supabase
@@ -57,11 +55,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
 
   const igHandle = normalizeIgUsername(conn.ig_username);
   const sources = { instagram: igHandle, website, youtube, tiktok };
+  // ownerWhatsapp / ownerEmail were captured by the admin at link-create time.
   const baseConfig = {
     ...draft.config,
     username: igHandle,
     sources,
-    onboarding: { ...ob, ownerWhatsapp: whatsapp, ownerEmail: email },
+    onboarding: { ...ob },
   };
 
   const result = await startPipeline({

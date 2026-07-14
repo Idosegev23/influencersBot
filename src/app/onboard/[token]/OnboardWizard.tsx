@@ -40,13 +40,11 @@ export default function OnboardWizard({ token }: { token: string }) {
   const [website, setWebsite] = useState(() => loadSaved(token).website || '');
   const [tiktok, setTiktok] = useState(() => loadSaved(token).tiktok || '');
   const [youtube, setYoutube] = useState(() => loadSaved(token).youtube || '');
-  const [whatsapp, setWhatsapp] = useState(() => loadSaved(token).whatsapp || '');
-  const [email, setEmail] = useState(() => loadSaved(token).email || '');
 
   // Persist fields on every change (survives the IG-connect navigation).
   useEffect(() => {
-    try { localStorage.setItem(`onboard:${token}`, JSON.stringify({ website, tiktok, youtube, whatsapp, email })); } catch { /* ignore */ }
-  }, [token, website, tiktok, youtube, whatsapp, email]);
+    try { localStorage.setItem(`onboard:${token}`, JSON.stringify({ website, tiktok, youtube })); } catch { /* ignore */ }
+  }, [token, website, tiktok, youtube]);
 
   const loadStatus = useCallback(async () => {
     const res = await fetch(`/api/onboard/${token}/status`);
@@ -96,14 +94,14 @@ export default function OnboardWizard({ token }: { token: string }) {
   }, [phase, jobId]);
 
   async function start() {
-    if (starting || !data?.connected || !whatsapp.trim() || !email.trim()) return;
+    if (starting || !data?.connected) return;
     setStarting(true);
     setErr('');
     try {
       const res = await fetch(`/api/onboard/${token}/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ website, tiktok, youtube, whatsapp, email }),
+        body: JSON.stringify({ website, tiktok, youtube }),
       });
       const json = await res.json();
       if (res.status === 422) { setErr('צריך לחבר אינסטגרם קודם'); return; }
@@ -117,7 +115,7 @@ export default function OnboardWizard({ token }: { token: string }) {
     }
   }
 
-  const canStart = !!data?.connected && whatsapp.trim().length > 5 && /\S+@\S+\.\S+/.test(email);
+  const canStart = !!data?.connected; // Instagram is the only requirement; the rest is optional.
   const pct = Math.max(2, Math.min(100, Math.round(progress?.percent ?? 0)));
 
   return (
@@ -160,9 +158,8 @@ export default function OnboardWizard({ token }: { token: string }) {
                 <Field label="אתר אינטרנט" value={website} onChange={setWebsite} placeholder="https://…" />
                 <Field label="שם משתמש טיקטוק" value={tiktok} onChange={setTiktok} placeholder="@username" />
                 <Field label="שם משתמש יוטיוב" value={youtube} onChange={setYoutube} placeholder="@channel" />
-                <Field label="וואטסאפ שלך" value={whatsapp} onChange={setWhatsapp} placeholder="05x-xxxxxxx" required />
-                <Field label="אימייל שלך" value={email} onChange={setEmail} placeholder="you@email.com" required />
               </div>
+              <p className="text-xs text-gray-400 mt-2">כל השדות אופציונליים — מלא/י מה שיש. הדבר היחיד שחובה זה חיבור אינסטגרם.</p>
 
               {err && <div className="text-sm text-red-600 mt-3">{err}</div>}
 
