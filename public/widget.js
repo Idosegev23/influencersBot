@@ -1743,19 +1743,26 @@
       .replace(/"/g, '&quot;');
   }
 
-  // Stamp Bestie attribution onto outbound store/product links so the click
-  // shows up as source "bestie" in the merchant's analytics (Shopify, GA4…).
-  // Only tags absolute http(s) URLs and never overrides utm_* the merchant set.
-  // `content` distinguishes the surface (card vs inline). Returns the URL
-  // unchanged on any parse failure — attribution must never break a click.
+  // Stamp Bestie attribution onto outbound store/product links using a PRIVATE
+  // `bestie_*` param namespace — deliberately NOT utm_*. Using utm_* here hijacked
+  // the merchant's campaign reports: after a Google/Meta ad landing, an internal
+  // product click would carry utm_source=bestie + utm_content=card, and the store's
+  // analytics stitched that onto the ad session — so paid-ad rows showed
+  // content="card"/"complementary" instead of the real ad creative (a self-referral
+  // that overwrote Google's/Meta's utm_content). `bestie_*` never appears in any
+  // UTM/GA report. Bestie's own click/conversion attribution runs on first-party
+  // beacons (recommendations/click + widget_conversions by anon_id), NOT on these
+  // params — nothing downstream reads them back. `content` distinguishes the surface
+  // (card vs inline vs complementary). Returns the URL unchanged on any parse
+  // failure — attribution must never break a click.
   function bestieTag(url, content, medium) {
     if (!url) return url;
     try {
       var u = new URL(url, document.baseURI);
       if (u.protocol !== 'http:' && u.protocol !== 'https:') return url;
-      if (!u.searchParams.has('utm_source')) u.searchParams.set('utm_source', 'bestie');
-      if (!u.searchParams.has('utm_medium')) u.searchParams.set('utm_medium', medium || 'chat');
-      if (content && !u.searchParams.has('utm_content')) u.searchParams.set('utm_content', content);
+      if (!u.searchParams.has('bestie')) u.searchParams.set('bestie', '1');
+      if (medium && !u.searchParams.has('bestie_medium')) u.searchParams.set('bestie_medium', medium);
+      if (content && !u.searchParams.has('bestie_surface')) u.searchParams.set('bestie_surface', content);
       return u.href;
     } catch (e) {
       return url;
