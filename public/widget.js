@@ -426,34 +426,6 @@
   }
   var WIDGET_ATTRIBUTION = captureWidgetAttribution();
 
-  // Was this visitor acquired by an EXTERNAL campaign (Google/Meta/TikTok ad,
-  // email, any utm_campaign)? If so, we must NOT stamp Bestie's utm_* on later
-  // internal clicks — doing that overwrote the visitor's source/utm_content and
-  // stole the conversion into a bestie-labelled row that still carried the ad's
-  // campaign/term (self-referral). Bestie's own attribution runs on first-party
-  // beacons, so excluding these visitors from utm tagging loses nothing.
-  function isExternalAcquisition(a) {
-    a = a || {};
-    var src = String(a.utm_source || '').toLowerCase();
-    return !!(a.gclid || a.fbclid || a.ttclid || a.utm_campaign || (src && src !== 'bestie'));
-  }
-  // Persist the first-touch signal (30d — paid attribution lookback) so it
-  // survives internal navigation, where the landing utm/clid is gone from the URL.
-  var EXT_ATTR_KEY = 'ibot_ext_attr_' + ACCOUNT_ID;
-  (function rememberExternalAcquisition() {
-    try {
-      if (isExternalAcquisition(WIDGET_ATTRIBUTION)) {
-        localStorage.setItem(EXT_ATTR_KEY, String(Date.now() + 30 * 864e5));
-      }
-    } catch (e) { /* */ }
-  })();
-  function visitorFromExternalCampaign() {
-    try {
-      var v = parseInt(localStorage.getItem(EXT_ATTR_KEY) || '0', 10);
-      return !!v && Date.now() < v;
-    } catch (e) { return false; }
-  }
-
   function flushAnalytics() {
     if (FLUSH_TIMER) { clearTimeout(FLUSH_TIMER); FLUSH_TIMER = null; }
     if (!ANALYTICS_TOKEN || EVENT_QUEUE.length === 0) return;
@@ -1771,27 +1743,25 @@
       .replace(/"/g, '&quot;');
   }
 
-  // Surface Bestie as a source in the merchant's UTM report (Shopify, GA4…) by
-  // stamping utm_source=bestie / utm_medium / utm_content=<surface> onto outbound
-  // links — BUT only for visitors Bestie genuinely originated. If the visitor was
-  // acquired by an external campaign (Google/Meta/TikTok, any utm_campaign), we
-  // return the URL untouched: stamping utm_* on their internal click overwrote the
-  // source/utm_content and stole the conversion from the ad (self-referral) — that
-  // was polluting the merchant's utm_content column with "card"/"complementary".
-  // Excluded visitors are still measured by first-party beacons (recommendations/
-  // click + widget_conversions by anon_id). Only tags absolute http(s) URLs and
-  // never overrides utm_* already on the URL. `content` distinguishes the surface
-  // (card vs inline vs complementary). Returns the URL unchanged on any parse
+  // Claim Bestie's channel credit on outbound store/product links by stamping
+  // utm_source=bestie + utm_medium — but DELIBERATELY never utm_content. The
+  // merchant's report keeps per-field values, so omitting utm_content preserves
+  // whatever the visitor arrived with: the Google/Meta ad creative. (Proof: in the
+  // original bug, Meta's utm_campaign/utm_term persisted because Bestie never set
+  // them, while utm_content got clobbered because Bestie *did* set it to
+  // "card"/"complementary".) Taking source/medium credit is fine — Bestie still
+  // shows as a source in the report — it just must not overwrite the content column.
+  // Only tags absolute http(s) URLs and never overrides utm_* already on the URL.
+  // `content` is kept in the signature (call sites pass a surface label) but is
+  // intentionally NOT written to the URL. Returns the URL unchanged on any parse
   // failure — attribution must never break a click.
   function bestieTag(url, content, medium) {
     if (!url) return url;
     try {
       var u = new URL(url, document.baseURI);
       if (u.protocol !== 'http:' && u.protocol !== 'https:') return url;
-      if (visitorFromExternalCampaign()) return url;   // never self-refer over paid/campaign attribution
       if (!u.searchParams.has('utm_source')) u.searchParams.set('utm_source', 'bestie');
       if (!u.searchParams.has('utm_medium')) u.searchParams.set('utm_medium', medium || 'chat');
-      if (content && !u.searchParams.has('utm_content')) u.searchParams.set('utm_content', content);
       return u.href;
     } catch (e) {
       return url;
