@@ -8,7 +8,7 @@ import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { ingestQuote } from '@/lib/crm/quote-ingest';
 import { createQuote, issueQuote, signUrlFor } from '@/lib/crm/quotes';
 import { computeTotals, lineItemsToDeliverables, type LineItem } from '@/lib/crm/pricing';
-import { interpretYesNo, interpretPricing, normalizeAmount, isStateStale, resolveTalent, classifyConfirm } from '@/lib/crm/wa-interpret';
+import { interpretYesNo, interpretPricing, normalizeAmount, isStateStale, resolveTalent, classifyConfirm, normalizeHebrew } from '@/lib/crm/wa-interpret';
 import type { AgentMessageResult } from '@/lib/crm/wa-outcome';
 import { CHAT_MODEL } from '@/lib/openai';
 import { laneModel } from '@/lib/llm/config';
@@ -126,6 +126,10 @@ export async function handleAgentMessage(
         return handlePrices(agent, state, text);
       case 'awaiting_create_confirm':
         return handleCreateConfirm(agent, state, text, waId);
+      case 'awaiting_new_client':
+        return handleNewClientConfirm(agent, state, text, waId);
+      case 'awaiting_client_type':
+        return handleClientType(agent, state, text, waId);
     }
   }
 
@@ -323,6 +327,25 @@ async function applyPricingCommands(agent: WaAgent, commands: any, ctx: Awaited<
 }
 
 /**
+ * Find an existing client of this agent by the name a brief used. Tolerant on purpose: a brief may
+ * say "IMPACT" while the book holds "IMPACT Creative Content & Influencers" (or vice versa), so an
+ * exact match would wrongly look like a brand-new client and nag the agent every time.
+ */
+async function findClientByName(agentId: string, name: string): Promise<string | null> {
+  const n = normalizeHebrew(String(name || '').trim());
+  if (!n || n.length < 2) return null;
+  const { data } = await supabaseAdmin.from('clients').select('id, name').eq('agent_id', agentId);
+  const rows = (data || []) as any[];
+  const exact = rows.find((c) => normalizeHebrew(c.name) === n);
+  if (exact) return exact.id;
+  const part = rows.find((c) => {
+    const cn = normalizeHebrew(c.name);
+    return cn.length >= 2 && (cn.includes(n) || n.includes(cn));
+  });
+  return part?.id || null;
+}
+
+/**
  * Continuity: a brief names the ORDERER (parsed.clientName — e.g. "IMPACT", the agency that sent
  * it) and the CAMPAIGN — neither of which is the BRAND. Resolve-or-create both for this agent and
  * carry them onto the deal, so a signed quote lands under the right client + campaign instead of a
@@ -338,17 +361,9 @@ async function resolveClientAndCampaign(
   let brandId: string | null = null;
   let campaignId: string | null = null;
   try {
-    const clientName = String(parsed?.clientName || '').trim();
-    if (clientName) {
-      const { data: existing } = await supabaseAdmin
-        .from('clients').select('id').eq('agent_id', agent.id).ilike('name', clientName).maybeSingle();
-      if (existing) clientId = (existing as any).id;
-      else {
-        const { data: created } = await supabaseAdmin
-          .from('clients').insert({ agent_id: agent.id, name: clientName, type: 'agency' }).select('id').single();
-        clientId = (created as any)?.id || null;
-      }
-    }
+    // LINK ONLY — a client that isn't in the agent's book yet is never created silently behind
+    // their back; startBrief asks "זוהה לקוח חדש — להוסיף?" first (handleNewClientConfirm).
+    clientId = await findClientByName(agent.id, String(parsed?.clientName || ''));
 
     const campaignName = String(parsed?.campaignName || '').trim();
     if (campaignName) {
@@ -453,12 +468,76 @@ async function startBrief(agent: WaAgent, waId: string, text: string | null, att
 
   // A brief is only DOCUMENTED on arrival. Pricing happens later, on the agent's
   // own terms (a voice note hours/days later) — Bestie does not push to build here.
-  await resetState(agent.id);
-  if (!brief?.suggested_account_id) {
-    return done(`📥 קיבלתי בריף מ-${header}, תיעדתי ✓${detail}\nכשתרצה לתמחר — שלח/י לי (ציין/י את שם המיוצג).`);
+  const talentName = brief?.suggested_account_id ? await accountName(brief.suggested_account_id) : null;
+  const base = talentName
+    ? `📥 קיבלתי בריף מ-${header} עבור ${talentName}, תיעדתי ✓${detail}`
+    : `📥 קיבלתי בריף מ-${header}, תיעדתי ✓${detail}`;
+  const next = talentName
+    ? `כשתרצה — שלח/י תמחור (למשל בהקלטה קולית) ואשאל אם ליצור הצעה.`
+    : `כשתרצה לתמחר — שלח/י לי (ציין/י את שם המיוצג).`;
+
+  // The brief names an ORDERER we don't have in the client book → offer to add it (never add
+  // silently). This is the one question worth asking on arrival: it's the client's first sighting.
+  if (orderer && !(await findClientByName(agent.id, orderer))) {
+    await setState(agent.id, {
+      stage: 'awaiting_new_client',
+      brief_id: briefId,
+      context: { clientName: orderer, contact: parsed?.contactPerson || null },
+    });
+    return needMore(`${base}\n\n🆕 זוהה לקוח חדש: ${orderer} — לא קיים אצלך במאגר. להוסיף? (כן/לא)`);
   }
-  const talentName = await accountName(brief.suggested_account_id);
-  return done(`📥 קיבלתי בריף מ-${header} עבור ${talentName}, תיעדתי ✓${detail}\nכשתרצה — שלח/י תמחור (למשל בהקלטה קולית) ואשאל אם ליצור הצעה.`);
+
+  await resetState(agent.id);
+  return done(`${base}\n${next}`);
+}
+
+/** New-client offer → yes: ask the one field we can't infer (type). Anything unrelated is NOT trapped. */
+async function handleNewClientConfirm(agent: WaAgent, state: any, text: string | null, waId: string): Promise<AgentMessageResult> {
+  const clientName = String(state.context?.clientName || '').trim();
+  const decision = classifyConfirm(text || '');
+  if (decision === 'no') {
+    await resetState(agent.id);
+    return done(`בסדר — ${clientName} לא נוסף למאגר. הבריף תועד ✓`);
+  }
+  if (decision === 'yes') {
+    await setState(agent.id, { stage: 'awaiting_client_type', brief_id: state.brief_id, context: state.context });
+    return needMore(`מעולה. ${clientName} הוא משרד פרסום או מותג?`);
+  }
+  await resetState(agent.id); // a different request — handle it, don't trap it
+  return runBrain(agent, waId, text || '');
+}
+
+/** Create the client (+ the brief's contact person, when it had one). */
+async function handleClientType(agent: WaAgent, state: any, text: string | null, waId: string): Promise<AgentMessageResult> {
+  const clientName = String(state.context?.clientName || '').trim();
+  const t = String(text || '');
+  const isAgency = /משרד|סוכנ|אייג|agency/i.test(t);
+  const isBrand = /מותג|ישיר|brand/i.test(t);
+  if (!isAgency && !isBrand) {
+    await resetState(agent.id); // not an answer to the question — treat as a fresh request
+    return runBrain(agent, waId, text || '');
+  }
+  const type = isAgency ? 'agency' : 'brand';
+  try {
+    const { data: created } = await supabaseAdmin
+      .from('clients').insert({ agent_id: agent.id, name: clientName, type }).select('id').single();
+    const clientId = (created as any)?.id || null;
+
+    const c = state.context?.contact || {};
+    let contactMsg = '';
+    if (clientId && c?.name) {
+      await supabaseAdmin.from('client_contacts').insert({
+        client_id: clientId, name: String(c.name), email: c.email || null, phone: c.phone || null,
+      });
+      contactMsg = `\n👤 איש קשר: ${c.name}${c.email ? ` · ${c.email}` : ''}${c.phone ? ` · ${c.phone}` : ''}`;
+    }
+    await resetState(agent.id);
+    return done(`✅ ${clientName} נוסף כ${type === 'agency' ? 'משרד פרסום' : 'מותג'}${contactMsg}\nמעכשיו כל בריף ממנו ישויך אליו אוטומטית.`);
+  } catch (e) {
+    console.warn('[wa] failed to create client', e);
+    await resetState(agent.id);
+    return fail(`לא הצלחתי להוסיף את ${clientName}. אפשר להוסיף ידנית במסך הלקוחות.`);
+  }
 }
 
 async function handlePrices(agent: WaAgent, state: any, text: string | null): Promise<AgentMessageResult> {
