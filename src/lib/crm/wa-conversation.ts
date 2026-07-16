@@ -167,6 +167,11 @@ async function planFreeform(text: string, ctx: Awaited<ReturnType<typeof loadBra
     const p = (b.parsed_data as any) || {};
     return {
       brief_id: b.id, brand: p.brandName || b.subject || 'מותג',
+      // The ORDERER (who sent the brief — often an agency) is NOT the brand. Keep both so the
+      // router can disambiguate ("the brief from IMPACT" vs "the Banana Republic brief") and answer
+      // client questions.
+      client: p.clientName || null,
+      campaign: p.campaignName || null,
       talent: nameOf(b.suggested_account_id), talent_id: b.suggested_account_id,
       status: b.brief_status, priced: !!b.deal_id,
       deliverables: seedFromParsed(p).map(deliverableLabel),
@@ -315,6 +320,64 @@ async function applyPricingCommands(agent: WaAgent, commands: any, ctx: Awaited<
   return pending.length ? needMore(`צריך השלמה:\n${pending.join('\n')}`) : fail('לא הצלחתי להבין את התמחור. אפשר לנסות שוב?');
 }
 
+/**
+ * Continuity: a brief names the ORDERER (parsed.clientName — e.g. "IMPACT", the agency that sent
+ * it) and the CAMPAIGN — neither of which is the BRAND. Resolve-or-create both for this agent and
+ * carry them onto the deal, so a signed quote lands under the right client + campaign instead of a
+ * bare brand string, and the Campaigns tab fills from the real brief→quote→deal flow.
+ * Best-effort: any failure just yields nulls — it must never block recording the deal.
+ */
+async function resolveClientAndCampaign(
+  agent: WaAgent,
+  parsed: any,
+  brandName: string
+): Promise<{ clientId: string | null; campaignId: string | null }> {
+  let clientId: string | null = null;
+  let brandId: string | null = null;
+  let campaignId: string | null = null;
+  try {
+    const clientName = String(parsed?.clientName || '').trim();
+    if (clientName) {
+      const { data: existing } = await supabaseAdmin
+        .from('clients').select('id').eq('agent_id', agent.id).ilike('name', clientName).maybeSingle();
+      if (existing) clientId = (existing as any).id;
+      else {
+        const { data: created } = await supabaseAdmin
+          .from('clients').insert({ agent_id: agent.id, name: clientName, type: 'agency' }).select('id').single();
+        clientId = (created as any)?.id || null;
+      }
+    }
+
+    const campaignName = String(parsed?.campaignName || '').trim();
+    if (campaignName) {
+      const bn = String(brandName || '').trim();
+      if (bn && bn !== 'מותג') {
+        const { data: b } = await supabaseAdmin
+          .from('brands').select('id').eq('agent_id', agent.id).ilike('name', bn).maybeSingle();
+        if (b) brandId = (b as any).id;
+        else {
+          const { data: nb } = await supabaseAdmin
+            .from('brands').insert({ agent_id: agent.id, name: bn }).select('id').single();
+          brandId = (nb as any)?.id || null;
+        }
+      }
+      const { data: c } = await supabaseAdmin
+        .from('campaigns').select('id').eq('agent_id', agent.id).ilike('name', campaignName).maybeSingle();
+      if (c) campaignId = (c as any).id;
+      else {
+        const { data: nc } = await supabaseAdmin
+          .from('campaigns')
+          .insert({ agent_id: agent.id, name: campaignName, brand_id: brandId, client_id: clientId, status: 'active' })
+          .select('id').single();
+        campaignId = (nc as any)?.id || null;
+      }
+    }
+  } catch (e) {
+    console.warn('[wa] resolveClientAndCampaign failed (deal still records)', e);
+  }
+  return { clientId, campaignId };
+}
+
 /** Resolve the agent's meant deal → return (issuing if needed) its sign link. */
 async function brainDealLink(agent: WaAgent, target: any, ctx: Awaited<ReturnType<typeof loadBrainContext>>): Promise<AgentMessageResult> {
   let dealId: string | null = target?.deal_id || null;
@@ -367,15 +430,28 @@ async function startBrief(agent: WaAgent, waId: string, text: string | null, att
     .maybeSingle();
   const parsed = (brief?.parsed_data as any) || {};
   const brand = parsed?.brandName || 'מותג';
+  // The brief's ORDERER (who sent it — e.g. an agency) is NOT the brand. Show both, plus what we
+  // actually extracted, so the agent can see the rich brief landed rather than guessing.
+  const orderer = String(parsed?.clientName || '').trim();
+  const campaign = String(parsed?.campaignName || '').trim();
+  const dels = (Array.isArray(parsed?.deliverables) ? parsed.deliverables : [])
+    .map((d: any) => `${d?.quantity && d.quantity > 1 ? d.quantity + '× ' : ''}${d?.description || d?.type || ''}`.trim())
+    .filter(Boolean);
+  const header = orderer && orderer !== brand ? `${orderer} · ${brand}` : brand;
+  const extras = [
+    campaign ? `🎯 ${campaign}` : '',
+    dels.length ? `📦 ${dels.join(' + ')}` : '',
+  ].filter(Boolean).join('\n');
+  const detail = extras ? `\n${extras}` : '';
 
   // A brief is only DOCUMENTED on arrival. Pricing happens later, on the agent's
   // own terms (a voice note hours/days later) — Bestie does not push to build here.
   await resetState(agent.id);
   if (!brief?.suggested_account_id) {
-    return done(`📥 קיבלתי בריף מ-${brand}, תיעדתי ✓.\nכשתרצה לתמחר — שלח/י לי (ציין/י את שם המיוצג).`);
+    return done(`📥 קיבלתי בריף מ-${header}, תיעדתי ✓${detail}\nכשתרצה לתמחר — שלח/י לי (ציין/י את שם המיוצג).`);
   }
-  const clientName = await accountName(brief.suggested_account_id);
-  return done(`📥 קיבלתי בריף מ-${brand} עבור ${clientName}, תיעדתי ✓.\nכשתרצה — שלח/י תמחור (למשל בהקלטה קולית) ואשאל אם ליצור הצעה.`);
+  const talentName = await accountName(brief.suggested_account_id);
+  return done(`📥 קיבלתי בריף מ-${header} עבור ${talentName}, תיעדתי ✓${detail}\nכשתרצה — שלח/י תמחור (למשל בהקלטה קולית) ואשאל אם ליצור הצעה.`);
 }
 
 async function handlePrices(agent: WaAgent, state: any, text: string | null): Promise<AgentMessageResult> {
@@ -498,6 +574,8 @@ async function recordDealFromBrief(agent: WaAgent, briefId: string, accountId: s
   const brandName = parsed?.brandName || brief?.subject || 'מותג';
   const clientName = await accountName(accountId);
   const deliverables = briefDeliverablesOf(parsed, lineItems);
+  // Continuity: carry the ORDERER + CAMPAIGN from the brief onto the deal (see helper).
+  const { clientId, campaignId } = await resolveClientAndCampaign(agent, parsed, brandName);
 
   const { data: partnership, error } = await supabaseAdmin
     .from('partnerships')
@@ -505,6 +583,8 @@ async function recordDealFromBrief(agent: WaAgent, briefId: string, accountId: s
       account_id: accountId,
       agent_id: agent.id,
       brand_name: brandName,
+      client_id: clientId,
+      campaign_id: campaignId,
       brand_contact_name: parsed?.contactPerson?.name || null,
       brand_contact_email: parsed?.contactPerson?.email || null,
       brand_contact_phone: parsed?.contactPerson?.phone || null,

@@ -149,6 +149,9 @@ export async function ingestQuote(input: IngestInput): Promise<IngestResult> {
     }
     const res = await parseDocument({ file, documentType: 'quote', language: 'he' });
     parsed = res?.data || null;
+    // Defense in depth: parsed_data is stored with `{...parsed}` below — if the parser ever hands
+    // back an ARRAY, that spread becomes {"0":{...}} and silently hides every extracted field.
+    if (Array.isArray(parsed)) parsed = (parsed as any[]).find((x) => x && typeof x === 'object') || null;
     confidence = res?.confidence || 0;
     model = (res as any)?.model || 'gemini';
   } catch (e: any) {

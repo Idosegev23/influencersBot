@@ -32,10 +32,28 @@ export const GEMINI_INLINE_MIMES = [
 ];
 
 /**
- * Robust JSON parser with multiple fallback strategies.
- * Handles: direct parse, markdown fences, embedded JSON, trailing commas, truncated responses.
+ * Robust JSON parser with multiple fallback strategies + array unwrap.
+ *
+ * Every caller here expects an OBJECT. When the model answers with a single-object ARRAY
+ * ("[{...}]") — which it sometimes does — callers that spread the result (`{...parsed}`) turned it
+ * into {"0":{...}}, so EVERY field silently vanished: a rich brief parsed perfectly but landed with
+ * brandName/clientName/campaignName/deliverables all undefined. Unwrap the array here, once, so no
+ * consumer can hit that again.
  */
 function robustJsonParse(text: string, label: string): any {
+  const out = robustJsonParseRaw(text, label);
+  if (Array.isArray(out)) {
+    const first = out.find((x) => x && typeof x === 'object') || {};
+    console.warn(`[${label}] ⚠️ model returned an ARRAY — unwrapped to its first object`);
+    return first;
+  }
+  return out;
+}
+
+/**
+ * Handles: direct parse, markdown fences, embedded JSON, trailing commas, truncated responses.
+ */
+function robustJsonParseRaw(text: string, label: string): any {
   // 1. Direct parse
   try {
     const parsed = JSON.parse(text);
