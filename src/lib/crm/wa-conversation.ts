@@ -172,6 +172,8 @@ async function planFreeform(text: string, ctx: Awaited<ReturnType<typeof loadBra
       // client questions.
       client: p.clientName || null,
       campaign: p.campaignName || null,
+      // Timing as the brief worded it ("אמצע יולי"), so "מתי זה עולה?" is answerable.
+      timing: p.timeline?.timingText || [p.timeline?.startDate, p.timeline?.endDate].filter(Boolean).join(' → ') || null,
       talent: nameOf(b.suggested_account_id), talent_id: b.suggested_account_id,
       status: b.brief_status, priced: !!b.deal_id,
       deliverables: seedFromParsed(p).map(deliverableLabel),
@@ -437,10 +439,15 @@ async function startBrief(agent: WaAgent, waId: string, text: string | null, att
   const dels = (Array.isArray(parsed?.deliverables) ? parsed.deliverables : [])
     .map((d: any) => `${d?.quantity && d.quantity > 1 ? d.quantity + '× ' : ''}${d?.description || d?.type || ''}`.trim())
     .filter(Boolean);
+  // Real briefs state timing in words ("עלייה יולי + תחילת אוגוסט"), not ISO dates — timingText
+  // carries it verbatim; fall back to exact dates when the brief actually gave them.
+  const timing = String(parsed?.timeline?.timingText || '').trim() ||
+    [parsed?.timeline?.startDate, parsed?.timeline?.endDate].filter(Boolean).join(' → ');
   const header = orderer && orderer !== brand ? `${orderer} · ${brand}` : brand;
   const extras = [
     campaign ? `🎯 ${campaign}` : '',
     dels.length ? `📦 ${dels.join(' + ')}` : '',
+    timing ? `🗓️ ${timing}` : '',
   ].filter(Boolean).join('\n');
   const detail = extras ? `\n${extras}` : '';
 

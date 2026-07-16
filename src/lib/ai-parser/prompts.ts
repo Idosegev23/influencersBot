@@ -44,8 +44,9 @@ const PROMPTS_BY_LANGUAGE: Record<string, Record<DocumentType, string>> = {
   ],
   "specialTerms": ["כל תנאי/זכות/סעיף שאינו תוצר ישיר - זכויות שימוש/קידום, תקופות קידום, בלעדיות, אורגני מול ממומן. כל סעיף כמחרוזת נפרדת"],
   "timeline": {
-    "startDate": "YYYY-MM-DD (string או null)",
-    "endDate": "YYYY-MM-DD (string או null)"
+    "startDate": "YYYY-MM-DD בלבד, ורק אם צוין תאריך מדויק (string או null)",
+    "endDate": "YYYY-MM-DD בלבד, ורק אם צוין תאריך מדויק (string או null)",
+    "timingText": "התזמון כפי שנכתב, מילה במילה, גם אם אינו תאריך מדויק — למשל 'עלייה יולי + תחילת אוגוסט', 'אמצע יולי', 'רבעון 3', 'מיידי' (string או null)"
   },
   "contactPerson": {
     "name": "שם איש קשר (string או null)",
@@ -55,6 +56,7 @@ const PROMPTS_BY_LANGUAGE: Record<string, Record<DocumentType, string>> = {
 }
 
 הנחיות קריטיות:
+0. **תזמון:** בריפים אמיתיים כמעט אף פעם לא נותנים תאריך מדויק אלא ניסוח יחסי ("אמצע יולי", "תחילת אוגוסט", "מיידי"). אל תמציא YYYY-MM-DD ואל תשאיר את התזמון ריק — העתק אותו כלשונו ל-timingText, והשאר startDate/endDate כ-null כשאין תאריך מדויק.
 1. **חלץ כל סעיף בהודעה — אל תשמיט אף אחד.** כל פעילות, פעימה, תזכורת, יום צילום, זכות קידום ותקופת קידום = סעיף נפרד.
 2. מונחים בעברית: "פעימה"=beat (פעילות תוכן); "תזכורת"=reminder; "יום צילום"=photo_day; "זכויות קידום"=usage/promotion rights; "קידום"=paid boost; "אורגני"=organic; "רבעוני/ברבעון"=quarterly (×4 בשנה); "חודשי"=monthly (×12); "שנתי"=annual.
 3. כמויות מתדירות: "פעימה ברבעון" בפעילות שנתית → quantity 4, cadence "רבעוני". "תזכורת חודשית" → quantity 12, cadence "חודשי". "יום צילום ברבעון" → quantity 4, cadence "רבעוני".
@@ -382,8 +384,9 @@ Extract these fields:
     }
   ],
   "timeline": {
-    "startDate": "start date YYYY-MM-DD (string or null)",
-    "endDate": "end date YYYY-MM-DD (string or null)"
+    "startDate": "start date YYYY-MM-DD — only when an exact date is stated (string or null)",
+    "endDate": "end date YYYY-MM-DD — only when an exact date is stated (string or null)",
+    "timingText": "the timing verbatim as written, even when it isn't an exact date — e.g. 'mid-July to early August', 'Q3', 'immediate'. Never invent a YYYY-MM-DD (string or null)"
   },
   "paymentTerms": {
     "milestones": [
