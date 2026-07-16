@@ -82,19 +82,50 @@ export default function CampaignsPage() {
       {loading && <div className="text-sm text-[color:var(--ink-500)]">טוען…</div>}
       <div className="grid gap-3">
         {campaigns.map((cm) => (
-          <div
-            key={cm.id}
-            className="rounded-xl border border-[color:var(--line)] bg-[color:var(--surface-0)] p-4 flex items-center justify-between gap-3"
-          >
-            <div className="min-w-0">
-              <div className="font-semibold text-[color:var(--ink-900)] truncate">{cm.name}</div>
-              <div className="text-[13px] text-[color:var(--ink-500)] truncate">
-                {[cm.brand_name, cm.client_name, cm.season].filter(Boolean).join(' · ') || '—'}
+          <div key={cm.id} className="rounded-xl border border-[color:var(--line)] bg-[color:var(--surface-0)] p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="font-semibold text-[color:var(--ink-900)] truncate">{cm.name}</div>
+                <div className="text-[13px] text-[color:var(--ink-500)] truncate">
+                  {[cm.brand_name, cm.client_name, cm.season].filter(Boolean).join(' · ') || '—'}
+                </div>
               </div>
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-[color:var(--ink-100)] text-[color:var(--ink-600)] shrink-0">
+                {cm.status === 'active' ? 'פעיל' : 'ארכיון'}
+              </span>
             </div>
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-[color:var(--ink-100)] text-[color:var(--ink-600)] shrink-0">
-              {cm.status === 'active' ? 'פעיל' : 'ארכיון'}
-            </span>
+
+            {/* The campaign's actual substance: its deals along quote → signature → active. */}
+            {cm.deals > 0 ? (
+              <div className="mt-3 pt-3 border-t border-[color:var(--line)]">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px]">
+                  <span className="font-semibold text-[color:var(--ink-900)]" dir="ltr">
+                    ₪ {Number(cm.value || 0).toLocaleString('en-US')}
+                  </span>
+                  <span className="text-[color:var(--ink-500)]">{cm.deals} עסקאות</span>
+                  {cm.signed > 0 && (
+                    <span className="text-[color:var(--success)]">✓ {cm.signed} נחתמו</span>
+                  )}
+                  {cm.awaiting_signature > 0 && (
+                    <span className="text-[color:var(--brand)]">⏳ {cm.awaiting_signature} ממתינות לחתימה</span>
+                  )}
+                  {cm.draft > 0 && <span className="text-[color:var(--ink-400)]">{cm.draft} בהכנה</span>}
+                </div>
+                {cm.talents?.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {cm.talents.map((t: string) => (
+                      <span key={t} className="text-[11px] px-2 py-0.5 rounded-full bg-[color:var(--ink-100)] text-[color:var(--ink-600)]">
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="mt-3 pt-3 border-t border-[color:var(--line)] text-[12px] text-[color:var(--ink-400)]">
+                אין עדיין עסקאות בקמפיין
+              </div>
+            )}
           </div>
         ))}
       </div>

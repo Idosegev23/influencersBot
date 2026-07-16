@@ -21,8 +21,13 @@ export async function extractTextFromFile(
     let pageCount: number | undefined;
 
     if (mimeType === 'application/pdf') {
-      // PDF extraction using pdf-parse v1 (simple, serverless-compatible, no canvas needed)
-      const pdfParse = (await import('pdf-parse')).default;
+      // PDF extraction using pdf-parse v1 (simple, serverless-compatible, no canvas needed).
+      // Import the LIB directly, not the package root: pdf-parse's index.js runs a debug block
+      // guarded by `!module.parent`, which is always true under ESM/bundlers — it then tries to
+      // read its own test fixture ('./test/data/05-versions-space.pdf') and throws ENOENT, killing
+      // text extraction for EVERY pdf. That silently left PDFs with no text layer (0 chars) and no
+      // OpenAI fallback, so a brief depended entirely on Gemini vision succeeding.
+      const pdfParse = (await import('pdf-parse/lib/pdf-parse.js')).default;
       const result = await pdfParse(buffer);
       text = result.text || '';
       pageCount = result.numpages;
