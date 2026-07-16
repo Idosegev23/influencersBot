@@ -76,23 +76,57 @@ function drawRtl(page: PDFPage, text: string, yTop: number, size: number, font: 
   drawRight(page, text, page.getWidth() - marginRight, yTop, size, font, color);
   return yTop - size * 1.6;
 }
+/**
+ * Break text into lines that each fit `maxW`. A single word wider than the column (a long URL, a
+ * glued Latin+digit run) is hard-split so it can never bleed past the margin.
+ */
+function wrapLines(text: string, font: PDFFont, size: number, maxW: number): string[] {
+  const out: string[] = [];
+  let line = '';
+  for (const word of String(text).split(/\s+/).filter(Boolean)) {
+    const trial = line ? `${line} ${word}` : word;
+    if (widthOf(font, trial, size) <= maxW) { line = trial; continue; }
+    if (line) { out.push(line); line = ''; }
+    if (widthOf(font, word, size) <= maxW) { line = word; continue; }
+    let chunk = '';
+    for (const ch of word) {
+      if (widthOf(font, chunk + ch, size) > maxW && chunk) { out.push(chunk); chunk = ch; }
+      else chunk += ch;
+    }
+    line = chunk;
+  }
+  if (line) out.push(line);
+  return out;
+}
+
 /** Wrap a long RTL paragraph to a width; returns next y. */
 function drawRtlParagraph(page: PDFPage, text: string, yTop: number, size: number, font: PDFFont, margin: number, color = rgb(0.25, 0.25, 0.32)): number {
-  const maxW = page.getWidth() - margin * 2;
-  const words = text.split(/\s+/);
-  let line = '';
   let y = yTop;
-  for (const word of words) {
-    const trial = line ? `${line} ${word}` : word;
-    if (widthOf(font, trial, size) > maxW && line) {
-      y = drawRtl(page, line, y, size, font, margin, color);
-      line = word;
-    } else {
-      line = trial;
-    }
+  for (const line of wrapLines(text, font, size, page.getWidth() - margin * 2)) {
+    y = drawRtl(page, line, y, size, font, margin, color);
   }
-  if (line) y = drawRtl(page, line, y, size, font, margin, color);
   return y;
+}
+
+/**
+ * One RTL bullet, WRAPPED to the column with a hanging indent (continuation lines sit under the
+ * text, not under the dot). Deliverables are full sentences — drawing them as a single unwrapped
+ * line ran them straight off the page edge. Returns the next y.
+ */
+function drawRtlBullet(
+  page: PDFPage, text: string, yTop: number, size: number, font: PDFFont,
+  margin: number, color: ReturnType<typeof rgb>, dotColor: ReturnType<typeof rgb>
+): number {
+  const W = page.getWidth();
+  const xRight = W - margin - 14;      // right edge of the text (the dot sits to its right)
+  const lines = wrapLines(text, font, size, xRight - margin);
+  let y = yTop;
+  lines.forEach((ln, i) => {
+    if (i === 0) page.drawCircle({ x: W - margin - 4, y: y + 4, size: 2.4, color: dotColor });
+    drawRight(page, ln, xRight, y, size, font, color);
+    y -= size * 1.5;
+  });
+  return y - 5;
 }
 
 function fmtAmount(amount?: number | null, currency?: string | null): string | null {
@@ -117,7 +151,7 @@ export async function generateQuotePdf(q: QuoteContent): Promise<Uint8Array> {
   const bold = await loadFont(pdf, 'Heebo-Bold.ttf');
 
   const W = 595, H = 842, margin = 48, innerW = W - margin * 2;
-  const page = pdf.addPage([W, H]);
+  let page = pdf.addPage([W, H]); // reassigned if wrapped content spills to another page
 
   // ── Header band ──────────────────────────────────────────────
   const bandH = 104;
@@ -193,15 +227,16 @@ export async function generateQuotePdf(q: QuoteContent): Promise<Uint8Array> {
     y -= 2;
     for (const d of q.deliverables) {
       if (!d?.trim()) continue;
-      // bullet dot
-      page.drawCircle({ x: W - margin - 4, y: y + 4, size: 2.4, color: BRAND });
-      drawRight(page, d, W - margin - 14, y, 11.5, reg, rgb(0.24, 0.24, 0.32));
-      y -= 20;
+      // Wrapping makes the block taller, so it can now outgrow the page — spill to a new one
+      // rather than drawing over the footer (the signature stamps onto the LAST page).
+      if (y < 110) { page = pdf.addPage([W, H]); y = H - 64; }
+      y = drawRtlBullet(page, d, y, 11.5, reg, margin, rgb(0.24, 0.24, 0.32), BRAND);
     }
   }
 
   // ── Brief / notes ────────────────────────────────────────────
   if (q.notes?.trim()) {
+    if (y < 150) { page = pdf.addPage([W, H]); y = H - 64; }
     y -= 8;
     page.drawRectangle({ x: margin, y: y + 6, width: innerW, height: 0.8, color: LINE });
     y -= 12;
@@ -209,20 +244,25 @@ export async function generateQuotePdf(q: QuoteContent): Promise<Uint8Array> {
     y = drawRtlParagraph(page, q.notes, y, 10.5, reg, margin, rgb(0.4, 0.4, 0.46));
   }
   if (q.terms?.trim()) {
+    if (y < 130) { page = pdf.addPage([W, H]); y = H - 64; }
     y -= 10;
     y = drawRtl(page, 'תנאים', y, 11, bold, margin, GRAY);
     y = drawRtlParagraph(page, q.terms, y, 10.5, reg, margin);
   }
 
   // ── Agreement footer ─────────────────────────────────────────
+  // Keep the agreement line + the signature block (stamped onto the LAST page) off the strip.
+  if (y < 120) { page = pdf.addPage([W, H]); y = H - 64; }
   y -= 18;
   page.drawRectangle({ x: margin, y: y + 6, width: innerW, height: 0.8, color: LINE });
   y -= 14;
   drawRtlParagraph(page, 'חתימה על הצעה זו מהווה אישור והסכמה לתנאים המפורטים לעיל, ומחליפה חוזה נפרד.', y, 10, reg, margin, GRAY);
 
-  // ── Powered-by footer strip ──────────────────────────────────
-  page.drawRectangle({ x: 0, y: 0, width: W, height: 4, color: BRAND });
-  page.drawText('Powered by Bestie', { x: margin, y: 14, size: 8, font: reg, color: rgb(0.7, 0.7, 0.75) });
+  // ── Powered-by footer strip (every page, so a spilled page isn't naked) ──
+  for (const p of pdf.getPages()) {
+    p.drawRectangle({ x: 0, y: 0, width: W, height: 4, color: BRAND });
+    p.drawText('Powered by Bestie', { x: margin, y: 14, size: 8, font: reg, color: rgb(0.7, 0.7, 0.75) });
+  }
 
   return pdf.save();
 }
