@@ -129,7 +129,11 @@ export async function parseWithGemini(options: ParseOptions): Promise<ParseResul
     const client = getGeminiClient();
     const result = await retryWithBackoff(async () => {
       return await client.models.generateContent({
-        model: MODELS.COMPLEX,
+        // Flash, NOT a PRO/thinking model. Measured on the Banana Republic brief: 3.1-pro-preview
+        // returned the extraction wrapped in an ARRAY ("[{...}]" — which callers spread into
+        // {"0":{...}}, silently losing every field) and burned 2,161 "thinking" tokens on a plain
+        // extraction; 3.5-flash returned a clean object. Structured extraction ≠ reasoning task.
+        model: process.env.AI_PARSER_MODEL || MODELS.CHAT_FAST,
         contents: [{
           role: 'user',
           parts: [
