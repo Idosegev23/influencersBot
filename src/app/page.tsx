@@ -47,6 +47,10 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 /*  Brand tokens                                                       */
 /* ------------------------------------------------------------------ */
 
+// The LDRS lead bucket. service_briefs.account_id is `uuid NOT NULL`, so this
+// must be a real account row — /bestieai posts leads to this same one.
+const LEADS_ACCOUNT_ID = 'de38eac6-d2fb-46a7-ac09-5ec860147ca0';
+
 // Bestie brand tokens — sourced from Figma (Primary-purple) + logo gradient.
 const INDIGO = '#883fe2'; // brand-primary (deep purple)
 const PEACH = '#b497ef';  // brand-soft (lavender highlight from gradient)
@@ -917,7 +921,10 @@ function HowItWorks() {
       num: '01',
       title: 'מחברים חשבון',
       body: 'כניסה אחת לאינסטגרם. בלי קוד, בלי הגדרות, בלי טכנאי.',
-      detail: 'תמיכה ב-OAuth 2.0 ואימות דו-שלבי.',
+      // The product has no 2FA of its own — the previous wording ("תמיכה ב-OAuth
+      // 2.0 ואימות דו-שלבי") read as if it did. Login rides Meta's OAuth, which
+      // carries whatever 2FA the user already has on their own account.
+      detail: 'כניסה דרך OAuth 2.0 הרשמי של Meta — כולל האימות הדו-שלבי שכבר מוגדר בחשבון שלכם.',
     },
     {
       num: '02',
@@ -1017,7 +1024,10 @@ function Faq() {
     },
     {
       q: 'מה עם פרטיות של השיחות והנתונים?',
-      a: 'כל חשבון בסביבה מבודדת לחלוטין (multi-tenant עם Row-Level Security). שיחות מוצפנות בתעבורה, הגישה רק שלכם.',
+      // Was: "multi-tenant עם Row-Level Security". RLS is not enabled on the
+      // chat/account/user tables in production — isolation is enforced in the
+      // application layer, so that is what we say.
+      a: 'כל חשבון מבודד: כל גישה לנתונים מסוננת לפי מזהה החשבון בצד השרת, ומפתחות בסיס הנתונים לעולם לא מגיעים לדפדפן. שיחות מוצפנות בתעבורה, הגישה רק שלכם.',
     },
     {
       q: 'כמה זמן לוקח להקים?',
@@ -1130,7 +1140,7 @@ function CtaForm() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          accountId: 'landing',
+          accountId: LEADS_ACCOUNT_ID,
           serviceName: 'פנייה מדף הנחיתה',
           fullName: form.fullName.trim(),
           email: form.email.trim() || undefined,
@@ -1356,7 +1366,7 @@ function Footer() {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-6 text-sm text-stone-600">
+          <nav aria-label="קישורי תחתית" className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-stone-600">
             <Link href="/admin" className="hover:text-stone-900 transition-colors">
               כניסה למערכת
             </Link>
@@ -1369,7 +1379,16 @@ function Footer() {
             <a href="#faq" className="hover:text-stone-900 transition-colors">
               שאלות
             </a>
-          </div>
+            <Link href="/privacy" className="hover:text-stone-900 transition-colors">
+              מדיניות פרטיות
+            </Link>
+            <Link href="/terms" className="hover:text-stone-900 transition-colors">
+              תנאי שימוש
+            </Link>
+            <Link href="/data-deletion" className="hover:text-stone-900 transition-colors">
+              מחיקת נתונים
+            </Link>
+          </nav>
         </div>
 
         {/* Giant logo */}

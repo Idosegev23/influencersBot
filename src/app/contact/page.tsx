@@ -5,6 +5,17 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ArrowRight, Mail, MessageCircle, Send, Check, Loader2 } from 'lucide-react';
 
+// The LDRS lead bucket — same account /bestieai and the landing form post to.
+const LEADS_ACCOUNT_ID = 'de38eac6-d2fb-46a7-ac09-5ec860147ca0';
+
+const SUBJECT_LABELS: Record<string, string> = {
+  general: 'שאלה כללית',
+  support: 'תמיכה טכנית',
+  business: 'שיתוף פעולה עסקי',
+  feedback: 'משוב והצעות',
+  other: 'אחר',
+};
+
 export default function ContactPage() {
   const [formData, setFormData] = useState({
     name: '',
@@ -18,16 +29,29 @@ export default function ContactPage() {
     e.preventDefault();
     setStatus('loading');
 
+    // Previously this opened a mailto: link and reported success unconditionally
+    // — window.open returns null when blocked rather than throwing, so a blocked
+    // popup silently wiped the message and told the user it had been sent.
     try {
-      const mailtoLink = `mailto:bestie@ldrsgroup.com?subject=${encodeURIComponent(`[${formData.subject}] פנייה מ-${formData.name}`)}&body=${encodeURIComponent(`שם: ${formData.name}\nאימייל: ${formData.email}\n\n${formData.message}`)}`;
-      window.open(mailtoLink, '_blank');
+      const res = await fetch('/api/briefs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId: LEADS_ACCOUNT_ID,
+          serviceName: `פנייה מדף יצירת קשר — ${SUBJECT_LABELS[formData.subject] ?? formData.subject}`,
+          fullName: formData.name.trim(),
+          email: formData.email.trim() || undefined,
+          notes: formData.message.trim(),
+        }),
+      });
+      if (!res.ok) throw new Error('send failed');
 
       setStatus('success');
       setFormData({ name: '', email: '', subject: '', message: '' });
       setTimeout(() => setStatus('idle'), 3000);
     } catch {
       setStatus('error');
-      setTimeout(() => setStatus('idle'), 3000);
+      setTimeout(() => setStatus('idle'), 5000);
     }
   };
 
@@ -178,21 +202,42 @@ export default function ContactPage() {
                 >
                   {status === 'loading' ? (
                     <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
                       שולח...
                     </>
                   ) : status === 'success' ? (
                     <>
-                      <Check className="w-5 h-5" />
+                      <Check className="w-5 h-5" aria-hidden="true" />
                       נשלח בהצלחה!
                     </>
                   ) : (
                     <>
-                      <Send className="w-5 h-5" />
+                      <Send className="w-5 h-5" aria-hidden="true" />
                       שליחה
                     </>
                   )}
                 </button>
+
+                {/* The error state was previously set but never rendered — a
+                    failed send looked identical to an untouched form. */}
+                <p aria-live="polite" className="min-h-[1.25rem] text-sm">
+                  {status === 'error' && (
+                    <span className="text-red-600">
+                      השליחה נכשלה. אפשר לנסות שוב, או לכתוב לנו ישירות ל־
+                      <a
+                        href="mailto:bestie@ldrsgroup.com"
+                        className="underline hover:text-red-700"
+                        dir="ltr"
+                      >
+                        bestie@ldrsgroup.com
+                      </a>
+                      .
+                    </span>
+                  )}
+                  {status === 'success' && (
+                    <span className="text-green-700">קיבלנו את הפנייה — נחזור אליכם בהקדם.</span>
+                  )}
+                </p>
               </div>
             </form>
           </motion.div>

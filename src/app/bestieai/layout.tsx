@@ -1,21 +1,27 @@
 import type { Metadata } from 'next';
 
+// The page body is Hebrew (~3,200 Hebrew characters), so the document must say
+// so: lang="en" / dir="ltr" / locale en_US mis-ordered the Hebrew nav and CTAs
+// and told Google this was an English page.
 export const metadata: Metadata = {
-  title: 'BestieAI — Your content, talking back',
+  // `absolute` opts out of the root "%s | bestieAI" template — the title
+  // already leads with the brand.
+  title: { absolute: 'BestieAI — התוכן שלך, עונה בשבילך' },
   description:
-    'BestieAI scans your Instagram, learns your voice, and answers every DM and website visitor — instantly, accurately, 24/7.',
+    'BestieAI סורק את האינסטגרם שלך, לומד את הקול שלך, ועונה לכל DM ולכל מבקר באתר — מיידית, מדויק, 24/7.',
+  alternates: { canonical: '/bestieai' },
   openGraph: {
-    title: 'BestieAI — Your content, talking back',
+    title: 'BestieAI — התוכן שלך, עונה בשבילך',
     description:
-      'Turn your Instagram content into a smart AI that answers followers, captures leads, and never sleeps.',
+      'הופכים את התוכן שלך ל-AI חכם שעונה לעוקבים, קולט לידים, ולא הולך לישון.',
     type: 'website',
-    locale: 'en_US',
+    locale: 'he_IL',
   },
 };
 
 export default function BestieAILayout({ children }: { children: React.ReactNode }) {
   return (
-    <div dir="ltr" lang="en" style={{ direction: 'ltr' }}>
+    <div dir="rtl" lang="he" style={{ direction: 'rtl' }}>
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       <link

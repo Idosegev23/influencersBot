@@ -8,9 +8,6 @@ import {
   ArrowRight,
   Trash2,
   Download,
-  Loader2,
-  Check,
-  AlertCircle,
   Lock,
   Eye,
   Database,
@@ -80,71 +77,12 @@ const sections = [
 // ============================================
 
 export default function PrivacyPage() {
-  const [email, setEmail] = useState('');
-  const [sessionId, setSessionId] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [tocOpen, setTocOpen] = useState(false);
 
-  const handleDeleteRequest = async () => {
-    if (!email && !sessionId) {
-      setMessage({ type: 'error', text: 'יש להזין אימייל או מזהה שיחה' });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const response = await fetch('/api/gdpr/delete-data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, sessionId }),
-      });
-
-      if (response.ok) {
-        setMessage({ type: 'success', text: 'הבקשה התקבלה בהצלחה. נעבד אותה תוך 30 יום.' });
-        setEmail('');
-        setSessionId('');
-      } else {
-        const data = await response.json();
-        setMessage({ type: 'error', text: data.error || 'שגיאה בעיבוד הבקשה' });
-      }
-    } catch {
-      setMessage({ type: 'error', text: 'שגיאת תקשורת. נסו שוב.' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleExportData = async () => {
-    if (!sessionId) {
-      setMessage({ type: 'error', text: 'יש להזין מזהה שיחה לייצוא נתונים' });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/gdpr/delete-data?sessionId=${sessionId}`);
-
-      if (response.ok) {
-        const data = await response.json();
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `my-data-${sessionId}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-        setMessage({ type: 'success', text: 'הנתונים הורדו בהצלחה' });
-      } else {
-        const data = await response.json();
-        setMessage({ type: 'error', text: data.error || 'לא נמצאו נתונים' });
-      }
-    } catch {
-      setMessage({ type: 'error', text: 'שגיאת תקשורת. נסו שוב.' });
-    } finally {
-      setLoading(false);
-    }
-  };
+  // The delete/export handlers that used to live here POSTed to
+  // /api/gdpr/delete-data, which is admin-gated — every public data subject got
+  // 401 Unauthorized on the one channel this policy documents. Rights requests
+  // now go through /data-deletion, which is public and files a verified request.
 
   const scrollToSection = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -202,9 +140,9 @@ export default function PrivacyPage() {
           </h1>
           <p className="text-lg text-gray-400 mb-2">Privacy Policy</p>
           <div className="flex items-center justify-center gap-3 text-sm text-gray-500">
-            <span>עודכן לאחרונה: מרץ 2026</span>
+            <span>עודכן לאחרונה: יולי 2026</span>
             <span className="w-1 h-1 rounded-full bg-gray-600" />
-            <span>גרסה 2.0</span>
+            <span>גרסה 2.1</span>
           </div>
 
           {/* Trust badges */}
@@ -439,10 +377,24 @@ export default function PrivacyPage() {
               <div className="space-y-4">
                 <div className="p-4 bg-white/[0.03] border border-white/5 rounded-xl">
                   <h5 className="text-white font-medium mb-1">ספקי שירות (Service Providers)</h5>
-                  <p className="text-sm">
-                    אנו עובדים עם ספקים הנחוצים להפעלת השירות: Supabase (בסיס נתונים), Vercel (אחסון אתר),
-                    Upstash (מטמון), OpenAI/Google/Anthropic (AI). כולם כפופים להסכמי עיבוד מידע (DPA).
+                  <p className="text-sm mb-3">
+                    אנו עובדים עם ספקי המשנה הבאים, הנחוצים להפעלת השירות. חלקם ממוקמים מחוץ
+                    לישראל ולאיחוד האירופי, והעברת מידע אליהם מתבצעת על בסיס המנגנונים
+                    המשפטיים המקובלים (לרבות תניות חוזיות סטנדרטיות).
                   </p>
+                  <ul className="text-sm list-disc list-inside space-y-1">
+                    <li><strong className="text-white">Supabase</strong> — בסיס נתונים ואימות</li>
+                    <li><strong className="text-white">Vercel</strong> — אחסון והרצת האתר</li>
+                    <li><strong className="text-white">Upstash</strong> — מטמון והגבלת קצב</li>
+                    <li><strong className="text-white">OpenAI, Google, Anthropic</strong> — עיבוד AI (צ׳אט, ניתוח מסמכים, תמלול)</li>
+                    <li><strong className="text-white">Meta</strong> — Instagram Graph API ו-WhatsApp Cloud API להפעלת ערוצי ההודעות</li>
+                    <li><strong className="text-white">Apify</strong> — איסוף תוכן ציבורי מאינסטגרם</li>
+                    <li><strong className="text-white">Google Workspace</strong> — שמירת פניות שנשלחו דרך טפסי האתר ושליחתן בדוא״ל</li>
+                    <li>
+                      <strong className="text-white">Meta, TikTok, Google Analytics</strong> — מדידת
+                      קמפיינים ופרסום, בכפוף להסכמתך לעוגיות שיווק/אנליטיקה בלבד
+                    </li>
+                  </ul>
                 </div>
                 <div className="p-4 bg-white/[0.03] border border-white/5 rounded-xl">
                   <h5 className="text-white font-medium mb-1">המשפיען הרלוונטי</h5>
@@ -476,7 +428,9 @@ export default function PrivacyPage() {
                 {[
                   { title: 'הצפנה בתעבורה', desc: 'כל התקשורת מוצפנת באמצעות TLS 1.3' },
                   { title: 'הצפנה במנוחה', desc: 'נתונים מוצפנים ב-AES-256 בבסיס הנתונים' },
-                  { title: 'בקרת גישה', desc: 'Row-Level Security (RLS) ברמת בסיס הנתונים' },
+                  // RLS is not enabled on the chat/account/user tables in
+                  // production; isolation is enforced in the application layer.
+                  { title: 'בקרת גישה', desc: 'הפרדה בין חשבונות הנאכפת בשכבת האפליקציה; מפתחות בסיס הנתונים מוגבלים לצד השרת בלבד' },
                   { title: 'הגנה על API', desc: 'Rate limiting, חתימת HMAC, אימות webhook' },
                   { title: 'גיבויים', desc: 'גיבויים יומיים אוטומטיים עם שמירה ל-30 יום' },
                   { title: 'מיקום שרתים', desc: 'שרתים ממוקמים באירופה ובארה"ב (AWS/Vercel)' },
@@ -549,18 +503,27 @@ export default function PrivacyPage() {
           {/* 9. Cookies */}
           <FadeInSection>
             <PolicyCard id="cookies" number="09" title="עוגיות (Cookies)" subtitle="Cookies & Tracking" icon={Cookie}>
-              <p className="mb-4">אנו משתמשים בעוגיות ובטכנולוגיות דומות באופן מינימלי:</p>
+              <p className="mb-4">אנו משתמשים בעוגיות ובטכנולוגיות דומות בשלוש קטגוריות:</p>
               <ul className="list-disc list-inside space-y-2 mb-4">
                 <li>
-                  <strong className="text-white">עוגיות הכרחיות</strong> — נדרשות לתפקוד השירות (אימות, ניהול סשן). לא ניתן לבטלן.
+                  <strong className="text-white">עוגיות הכרחיות</strong> — נדרשות לתפקוד השירות (אימות, ניהול סשן, שמירת בחירת העוגיות שלך). לא ניתן לבטלן.
                 </li>
                 <li>
-                  <strong className="text-white">עוגיות אנליטיקה</strong> — מסייעות לנו להבין כיצד המשתמשים מקיימים אינטראקציה עם השירות. ניתנות לביטול.
+                  <strong className="text-white">עוגיות אנליטיקה</strong> — Google Analytics 4, כדי להבין כיצד המשתמשים מקיימים אינטראקציה עם השירות ולשפר אותו.
+                </li>
+                <li>
+                  <strong className="text-white">עוגיות שיווק</strong> — Meta Pixel ו-TikTok Pixel, למדידת ביצועי קמפיינים ולהצגת פרסום מותאם ברשתות אלה. הן מעבירות ל-Meta ול-TikTok את כתובת ה-IP שלך, את הדפדפן ואת הדף שבו ביקרת.
                 </li>
               </ul>
+              <p className="mb-4">
+                עוגיות אנליטיקה ושיווק <strong className="text-white">אינן נטענות כלל</strong> עד
+                שתמסור הסכמה מפורשת בבאנר העוגיות. בחירה ב&ldquo;הכרחיים בלבד&rdquo; מונעת את
+                טעינתן, ואיננו טוענים אותן לפני שנמסרה בחירה.
+              </p>
               <p>
-                אנו <strong className="text-white">לא</strong> משתמשים בעוגיות פרסום, בעוגיות של צדדים שלישיים למעקב, או בפיקסלים של רשתות חברתיות.
-                ניתן לנהל את העדפות העוגיות דרך הגדרות הדפדפן שלך.
+                הבסיס החוקי לעוגיות שאינן הכרחיות הוא הסכמה. ניתן לשנות או למשוך את ההסכמה בכל
+                עת — נקו את עוגיות האתר בדפדפן כדי שהבאנר יוצג שוב. הסרת ההסכמה מפסיקה את
+                הטעינה של אותם כלים מרגע העדכון ואילך.
               </p>
             </PolicyCard>
           </FadeInSection>
@@ -590,7 +553,7 @@ export default function PrivacyPage() {
 
               <p className="mt-4 text-sm">
                 למימוש זכויותיך, השתמש בטופס <button onClick={() => scrollToSection('gdpr-actions')} className="text-indigo-400 underline hover:text-indigo-300">&quot;מימוש זכויות&quot;</button> בתחתית הדף,
-                או פנה אלינו ישירות בכתובת: <a href="mailto:privacy@leaders.co.il" className="text-indigo-400 hover:text-indigo-300">privacy@leaders.co.il</a>.
+                או פנה אלינו ישירות בכתובת: <a href="mailto:bestie@ldrsgroup.com" className="text-indigo-400 hover:text-indigo-300">bestie@ldrsgroup.com</a>.
                 נענה לבקשתך תוך 30 יום.
               </p>
             </PolicyCard>
@@ -633,8 +596,8 @@ export default function PrivacyPage() {
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="p-4 bg-white/[0.03] border border-white/5 rounded-xl">
                   <h5 className="text-white font-medium text-sm mb-2">אימייל פרטיות</h5>
-                  <a href="mailto:privacy@leaders.co.il" className="text-indigo-400 hover:text-indigo-300 text-sm">
-                    privacy@leaders.co.il
+                  <a href="mailto:bestie@ldrsgroup.com" className="text-indigo-400 hover:text-indigo-300 text-sm">
+                    bestie@ldrsgroup.com
                   </a>
                 </div>
                 <div className="p-4 bg-white/[0.03] border border-white/5 rounded-xl">
@@ -667,74 +630,35 @@ export default function PrivacyPage() {
               </div>
 
               <p className="text-sm text-gray-400 mb-6">
-                השתמש בטופס זה כדי לבקש מחיקת נתונים או לייצא את המידע שלך.
-                ניתן גם לשלוח בקשה ישירות ל-<a href="mailto:privacy@leaders.co.il" className="text-indigo-400 hover:text-indigo-300">privacy@leaders.co.il</a>.
+                למימוש זכות למחיקה, לעיון או לייצוא של המידע שלך — הגישו בקשה בדף מחיקת
+                הנתונים. הבקשה מגיעה לצוות הפרטיות שלנו, ואנו נאמת את זהותכם ונחזור אליכם
+                תוך 30 יום. ניתן גם לשלוח בקשה ישירות ל-
+                <a href="mailto:bestie@ldrsgroup.com" className="text-indigo-400 hover:text-indigo-300">
+                  bestie@ldrsgroup.com
+                </a>
+                .
               </p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">אימייל</label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="your@email.com"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                    dir="ltr"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">מזהה שיחה (אופציונלי)</label>
-                  <input
-                    type="text"
-                    value={sessionId}
-                    onChange={(e) => setSessionId(e.target.value)}
-                    placeholder="session_xxx..."
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                    dir="ltr"
-                  />
-                </div>
-              </div>
-
-              {message && (
-                <div
-                  className={`mb-6 p-4 rounded-xl flex items-center gap-3 ${
-                    message.type === 'success'
-                      ? 'bg-green-500/15 border border-green-500/25 text-green-400'
-                      : 'bg-red-500/15 border border-red-500/25 text-red-400'
-                  }`}
-                >
-                  {message.type === 'success' ? (
-                    <Check className="w-5 h-5 flex-shrink-0" />
-                  ) : (
-                    <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                  )}
-                  {message.text}
-                </div>
-              )}
-
               <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={handleDeleteRequest}
-                  disabled={loading}
-                  className="flex items-center gap-2 px-6 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-medium transition-all disabled:opacity-50 shadow-lg shadow-red-600/20"
+                <Link
+                  href="/data-deletion"
+                  className="flex items-center gap-2 px-6 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-medium transition-all shadow-lg shadow-red-600/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                 >
-                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
-                  בקש מחיקת נתונים
-                </button>
-                <button
-                  onClick={handleExportData}
-                  disabled={loading || !sessionId}
-                  className="flex items-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/15 text-white rounded-xl font-medium transition-all disabled:opacity-50 border border-white/10"
+                  <Trash2 className="w-5 h-5" aria-hidden="true" />
+                  לדף בקשת מחיקת נתונים
+                </Link>
+                <a
+                  href="mailto:bestie@ldrsgroup.com?subject=%D7%91%D7%A7%D7%A9%D7%AA%20%D7%99%D7%99%D7%A6%D7%95%D7%90%20%D7%9E%D7%99%D7%93%D7%A2"
+                  className="flex items-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/15 text-white rounded-xl font-medium transition-all border border-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                 >
-                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
-                  ייצוא הנתונים שלי
-                </button>
+                  <Download className="w-5 h-5" aria-hidden="true" />
+                  בקשת ייצוא מידע
+                </a>
               </div>
 
               <p className="mt-4 text-xs text-gray-500">
-                * בקשות מחיקה מעובדות תוך 30 יום. לייצוא נתונים נדרש מזהה השיחה.
-                מחיקת נתונים היא בלתי הפיכה ותסיר את כל היסטוריית השיחות שלך.
+                * בקשות מעובדות תוך 30 יום. מחיקת נתונים היא בלתי הפיכה ותסיר את היסטוריית
+                השיחות שלך. אם יש בידך מזהה שיחה (session id), ציון שלו בבקשה יזרז את האיתור.
               </p>
             </div>
           </FadeInSection>

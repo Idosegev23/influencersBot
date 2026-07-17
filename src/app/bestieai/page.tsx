@@ -20,14 +20,14 @@ function Navbar() {
     <nav className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-xl border-b border-stone-200/60">
       <div className="max-w-6xl mx-auto flex items-center justify-between px-6 h-16">
         <a href="#hero" className="flex items-center">
-          <Image src="/Logo.png" alt="BestieAI" width={140} height={40} className="h-8 w-auto" />
+          <Image src="/logo.png" alt="BestieAI" width={140} height={40} className="h-8 w-auto" />
         </a>
 
         <div className="hidden md:flex items-center gap-8 text-sm text-stone-500">
           <a href="#problem" className="hover:text-stone-900 transition-colors">הבעיה</a>
           <a href="#how" className="hover:text-stone-900 transition-colors">איך זה עובד</a>
           <a href="#capabilities" className="hover:text-stone-900 transition-colors">מה זה עושה</a>
-          <a href="#cases" className="hover:text-stone-900 transition-colors">סיפורים אמיתיים</a>
+          <a href="#cases" className="hover:text-stone-900 transition-colors">תרחישים</a>
         </div>
 
         <a
@@ -49,7 +49,7 @@ function Navbar() {
           <a href="#problem" onClick={() => setOpen(false)} className="block text-stone-600 text-sm">הבעיה</a>
           <a href="#how" onClick={() => setOpen(false)} className="block text-stone-600 text-sm">איך זה עובד</a>
           <a href="#capabilities" onClick={() => setOpen(false)} className="block text-stone-600 text-sm">מה זה עושה</a>
-          <a href="#cases" onClick={() => setOpen(false)} className="block text-stone-600 text-sm">סיפורים אמיתיים</a>
+          <a href="#cases" onClick={() => setOpen(false)} className="block text-stone-600 text-sm">תרחישים</a>
           <a href="#form" onClick={() => setOpen(false)} className="block text-stone-900 font-semibold text-sm">קבלו דמו חינם</a>
         </div>
       )}
@@ -366,8 +366,8 @@ function UseCases() {
       location: 'תל אביב',
       title: 'העוקבת ששאלה בשלוש בלילה',
       story:
-        'עוקבת צופה ברילס על טיפוח ושולחת DM ליוצרת תוכן, שואלת איזה בדיוק מוצר הוצג. היוצרת ישנה. BestieAI מזהה את הרילס, שולף את התמלול, מזהה את המוצר, ומגיב עם השם, הערה אישית שהיוצרת אמרה עליו, ולינק לרכישה. עד הבוקר נמכרו 14 יחידות דרך הלינק.',
-      tag: 'יוצרת תוכן — 180K עוקבים',
+        'עוקבת צופה ברילס על טיפוח ושולחת DM ליוצרת תוכן, שואלת איזה בדיוק מוצר הוצג. היוצרת ישנה. BestieAI מזהה את הרילס, שולף את התמלול, מזהה את המוצר, ומגיב עם השם, הערה אישית שהיוצרת אמרה עליו, ולינק לרכישה — בלי להעיר אף אחד.',
+      tag: 'יוצרת תוכן',
     },
     {
       time: '09:12',
@@ -382,7 +382,7 @@ function UseCases() {
       time: '23:58',
       period: 'בלילה',
       location: 'ארצי',
-      title: 'Black Friday, אלפיים הודעות בלילה אחד',
+      title: 'Black Friday — כשה-DMs מציפים',
       story:
         'מותג קוסמטיקה מריץ קמפיין מבצע. הפוסט הופך ויראלי. ה-DMs מציפים — "מה ההנחה?", "זה זמין בגוון שלי?", "מתי המבצע נגמר?". BestieAI מטפל בכל הודעה עם מידע מדויק על מוצרים, קופונים פעילים ולינקים לאתר. אף הודעה לא נשארה ללא מענה.',
       tag: 'מותג — e-commerce',
@@ -393,10 +393,10 @@ function UseCases() {
     <section id="cases" className="bg-[#faf9f7] py-24 md:py-32">
       <div className="max-w-6xl mx-auto px-6" dir="rtl">
         <h2 className="font-grotesk text-3xl md:text-5xl font-bold text-stone-900 text-center">
-          סיפורים אמיתיים, תוצאות אמיתיות
+          שלושה תרחישים, אחד לכל סוג חשבון
         </h2>
         <p className="text-stone-500 text-center mt-4">
-          אלה לא תרחישים תיאורטיים. ככה זה נראה בחשבונות פעילים.
+          תרחישים להמחשה של מה שהמערכת עושה היום — לא נתוני לקוח.
         </p>
 
         <div className="mt-16 grid md:grid-cols-3 gap-8">
@@ -627,10 +627,15 @@ function Footer() {
     <footer className="bg-white border-t border-stone-200 py-12">
       <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4" dir="rtl">
         <div className="flex items-center gap-3">
-          <Image src="/Logo.png" alt="BestieAI" width={120} height={34} className="h-7 w-auto" />
+          <Image src="/logo.png" alt="BestieAI" width={120} height={34} className="h-7 w-auto" />
           <span className="text-stone-400 text-sm">by LDRS Group</span>
         </div>
-        <p className="text-stone-400 text-xs">&copy; 2026 BestieAI. All rights reserved.</p>
+        <nav aria-label="קישורי תחתית" className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-stone-500">
+          <a href="/privacy" className="hover:text-stone-900 transition-colors">מדיניות פרטיות</a>
+          <a href="/terms" className="hover:text-stone-900 transition-colors">תנאי שימוש</a>
+          <a href="/data-deletion" className="hover:text-stone-900 transition-colors">מחיקת נתונים</a>
+        </nav>
+        <p className="text-stone-400 text-xs">&copy; {new Date().getFullYear()} BestieAI. All rights reserved.</p>
       </div>
     </footer>
   );

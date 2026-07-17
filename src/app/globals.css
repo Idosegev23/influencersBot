@@ -1592,6 +1592,16 @@ h1, h2, h3, h4, h5, h6 {
   from { transform: translateX(0); }
   to { transform: translateX(calc(-100% - var(--gap))); }
 }
+/* `transform` is not direction-aware. Under dir="rtl" the copies stack leftward
+   from the right edge, so translating further left drains the visible side to
+   blank and pops back each cycle. Feed them in from the left instead. */
+@keyframes marquee-rtl {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(100% + var(--gap))); }
+}
+[dir="rtl"] .animate-marquee {
+  animation-name: marquee-rtl;
+}
 /* Discovery row – pixel-precise infinite scroll */
 @keyframes discovery-scroll {
   from { transform: translateX(0); }
@@ -6516,4 +6526,21 @@ body[data-service-sheet-open] .mobile-bottom-tabs {
 @media (prefers-reduced-motion: reduce) {
   .dpc-loader__icon { transition: none; }
   .dpc-loader__text { animation: none; opacity: 1; }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Reduced motion (WCAG 2.3.3)                                        */
+/*  The public site runs two infinite marquees, a rotating hero mark,  */
+/*  scroll parallax and GSAP particle loops. Honour the OS setting.    */
+/*  JS-driven motion (GSAP/framer-motion) is gated in the components.  */
+/* ------------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

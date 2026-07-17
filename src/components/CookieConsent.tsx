@@ -5,15 +5,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Cookie, X, Check, Settings, Shield } from 'lucide-react';
 import Link from 'next/link';
 
+import { type CookiePreferences, readConsent, writeConsent } from '@/lib/consent';
+
 type ConsentLevel = 'necessary' | 'analytics' | 'all';
-
-interface CookiePreferences {
-  necessary: boolean;
-  analytics: boolean;
-  marketing: boolean;
-}
-
-const CONSENT_COOKIE_NAME = 'cookie_consent';
 
 export default function CookieConsent() {
   const [show, setShow] = useState(false);
@@ -26,8 +20,7 @@ export default function CookieConsent() {
 
   useEffect(() => {
     // Check if consent was already given
-    const consent = localStorage.getItem(CONSENT_COOKIE_NAME);
-    if (!consent) {
+    if (!readConsent()) {
       // Small delay to avoid flash
       const timer = setTimeout(() => setShow(true), 1000);
       return () => clearTimeout(timer);
@@ -51,14 +44,14 @@ export default function CookieConsent() {
         prefs = preferences;
     }
 
-    localStorage.setItem(CONSENT_COOKIE_NAME, JSON.stringify(prefs));
-    document.cookie = `${CONSENT_COOKIE_NAME}=${JSON.stringify(prefs)}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+    // writeConsent notifies AnalyticsLoader, which mounts or withholds the
+    // trackers accordingly. Previously this only wrote to storage.
+    writeConsent(prefs);
     setShow(false);
   };
 
   const saveCustomPreferences = () => {
-    localStorage.setItem(CONSENT_COOKIE_NAME, JSON.stringify(preferences));
-    document.cookie = `${CONSENT_COOKIE_NAME}=${JSON.stringify(preferences)}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+    writeConsent(preferences);
     setShow(false);
   };
 

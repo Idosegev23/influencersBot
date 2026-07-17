@@ -50,6 +50,9 @@ export function Marquee({
         .map((_, i) => (
           <div
             key={i}
+            // Copies 2..n exist only to make the loop seamless. Without this a
+            // screen reader reads the whole list `repeat` times over.
+            aria-hidden={i > 0 || undefined}
             className={cn('flex shrink-0 gap-[var(--gap)]', {
               'animate-marquee flex-row': !vertical,
               'animate-marquee-vertical flex-col': vertical,

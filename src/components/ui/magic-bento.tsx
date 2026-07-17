@@ -97,14 +97,25 @@ const ParticleCard: React.FC<{
     particlesInit.current = true;
   }, [particleCount, glowColor]);
 
-  const clearParticles = useCallback(() => {
+  // `immediate` skips the exit tween — used on unmount, where the card (and its
+  // clones) leave the DOM anyway and a 0.3s tween would outlive the component.
+  const clearParticles = useCallback((immediate = false) => {
     timeoutsRef.current.forEach(clearTimeout);
     timeoutsRef.current = [];
     magRef.current?.kill();
-    particlesRef.current.forEach(p => {
-      gsap.to(p, { scale: 0, opacity: 0, duration: 0.3, ease: 'back.in(1.7)', onComplete: () => p.parentNode?.removeChild(p) });
-    });
+    const dying = particlesRef.current;
     particlesRef.current = [];
+    dying.forEach(p => {
+      // Kill the repeat:-1 drift/opacity tweens first: GSAP keeps ticking them
+      // forever on a detached node, and the infinite opacity tween would also
+      // fight the exit fade below.
+      gsap.killTweensOf(p);
+      if (immediate) {
+        p.remove();
+        return;
+      }
+      gsap.to(p, { scale: 0, opacity: 0, duration: 0.3, ease: 'back.in(1.7)', onComplete: () => p.remove() });
+    });
   }, []);
 
   const animateParticles = useCallback(() => {
@@ -145,7 +156,7 @@ const ParticleCard: React.FC<{
       gsap.fromTo(rip, { scale: 0, opacity: 1 }, { scale: 1, opacity: 0, duration: 0.8, ease: 'power2.out', onComplete: () => rip.remove() });
     };
     el.addEventListener('mouseenter', enter); el.addEventListener('mouseleave', leave); el.addEventListener('mousemove', move); el.addEventListener('click', click);
-    return () => { isHoveredRef.current = false; el.removeEventListener('mouseenter', enter); el.removeEventListener('mouseleave', leave); el.removeEventListener('mousemove', move); el.removeEventListener('click', click); clearParticles(); };
+    return () => { isHoveredRef.current = false; el.removeEventListener('mouseenter', enter); el.removeEventListener('mouseleave', leave); el.removeEventListener('mousemove', move); el.removeEventListener('click', click); gsap.killTweensOf(el); clearParticles(true); };
   }, [animateParticles, clearParticles, disableAnimations, enableTilt, enableMagnetism, clickEffect, glowColor]);
 
   return (
@@ -223,6 +234,7 @@ const MagicBento: React.FC<MagicBentoProps> = ({
 }) => {
   const gridRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth <= MOBILE_BREAKPOINT);
@@ -231,7 +243,16 @@ const MagicBento: React.FC<MagicBentoProps> = ({
     return () => window.removeEventListener('resize', check);
   }, []);
 
-  const noAnim = disableAnimations || isMobile;
+  // WCAG 2.3.3 — the particle/spotlight/tilt machinery is decorative motion.
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const apply = () => setReducedMotion(mq.matches);
+    apply();
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, []);
+
+  const noAnim = disableAnimations || isMobile || reducedMotion;
 
   return (
     <>

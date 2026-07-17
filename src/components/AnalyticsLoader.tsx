@@ -1,6 +1,7 @@
 'use client';
 
 import Script from 'next/script';
+import { useConsent } from '@/lib/consent';
 
 const GA4_ID = process.env.NEXT_PUBLIC_GA4_ID;
 const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
@@ -14,11 +15,20 @@ const TIKTOK_PIXEL_ID = process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID;
  * The dispatcher in src/lib/analytics/track.ts assumes window.gtag,
  * window.fbq, window.ttq exist; loading them here makes that true on every
  * page of the app.
+ *
+ * Consent-gated: nothing loads until the visitor has actively chosen. GA4
+ * follows the "analytics" category; the Meta and TikTok advertising pixels
+ * follow "marketing". No choice yet (null) means no trackers — the privacy
+ * policy tells users these are optional, so they have to actually be optional.
  */
 export function AnalyticsLoader() {
+  const consent = useConsent();
+  const allowAnalytics = consent?.analytics === true;
+  const allowMarketing = consent?.marketing === true;
+
   return (
     <>
-      {GA4_ID && (
+      {GA4_ID && allowAnalytics && (
         <>
           <Script
             id="gtag-loader"
@@ -37,7 +47,7 @@ export function AnalyticsLoader() {
         </>
       )}
 
-      {META_PIXEL_ID && (
+      {META_PIXEL_ID && allowMarketing && (
         <Script id="meta-pixel" strategy="afterInteractive">
           {`
             !function(f,b,e,v,n,t,s)
@@ -54,7 +64,7 @@ export function AnalyticsLoader() {
         </Script>
       )}
 
-      {TIKTOK_PIXEL_ID && (
+      {TIKTOK_PIXEL_ID && allowMarketing && (
         <Script id="tiktok-pixel" strategy="afterInteractive">
           {`
             !function (w, d, t) {
