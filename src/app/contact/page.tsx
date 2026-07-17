@@ -4,9 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ArrowRight, Mail, MessageCircle, Send, Check, Loader2 } from 'lucide-react';
-
-// The LDRS lead bucket — same account /bestieai and the landing form post to.
-const LEADS_ACCOUNT_ID = 'de38eac6-d2fb-46a7-ac09-5ec860147ca0';
+import { LEADS_ACCOUNT_ID } from '@/lib/leads';
 
 const SUBJECT_LABELS: Record<string, string> = {
   general: 'שאלה כללית',

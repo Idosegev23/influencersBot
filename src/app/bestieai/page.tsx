@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
+import { LEADS_ACCOUNT_ID } from '@/lib/leads';
 
 /* ==========================================================================
    BestieAI Landing Page
@@ -505,7 +506,7 @@ function CTAForm() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          accountId: 'de38eac6-d2fb-46a7-ac09-5ec860147ca0',
+          accountId: LEADS_ACCOUNT_ID,
           serviceName: 'BestieAI Landing Page Lead',
           fullName: form.name,
           email: form.email,

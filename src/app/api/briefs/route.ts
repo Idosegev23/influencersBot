@@ -8,6 +8,8 @@ const supabase = createClient(
   process.env.SUPABASE_SECRET_KEY!
 );
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -28,6 +30,19 @@ export async function POST(req: NextRequest) {
 
     if (!accountId || !fullName || !serviceName) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    // account_id is `uuid NOT NULL`. A non-UUID (the landing form sent the
+    // literal string 'landing' for the page's entire life) reaches Postgres as
+    // a 22P02 cast error, surfaces as a generic 500 "Failed to save brief", and
+    // looks identical to an outage — which is exactly why that bug went
+    // unnoticed while every landing lead was dropped. Fail loudly instead.
+    if (typeof accountId !== 'string' || !UUID_RE.test(accountId)) {
+      console.error('[briefs] Rejected non-UUID accountId:', accountId);
+      return NextResponse.json(
+        { error: `accountId must be a UUID, received: ${String(accountId).slice(0, 40)}` },
+        { status: 400 }
+      );
     }
 
     // 1. Save to DB

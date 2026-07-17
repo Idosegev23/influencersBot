@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { Marquee } from '@/components/ui/marquee';
 import MagicBento from '@/components/ui/magic-bento';
+import { LEADS_ACCOUNT_ID } from '@/lib/leads';
 import {
   MessageSquare,
   Code2,
@@ -46,10 +47,6 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 /* ------------------------------------------------------------------ */
 /*  Brand tokens                                                       */
 /* ------------------------------------------------------------------ */
-
-// The LDRS lead bucket. service_briefs.account_id is `uuid NOT NULL`, so this
-// must be a real account row — /bestieai posts leads to this same one.
-const LEADS_ACCOUNT_ID = 'de38eac6-d2fb-46a7-ac09-5ec860147ca0';
 
 // Bestie brand tokens — sourced from Figma (Primary-purple) + logo gradient.
 const INDIGO = '#883fe2'; // brand-primary (deep purple)

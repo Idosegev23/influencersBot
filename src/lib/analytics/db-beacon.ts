@@ -65,7 +65,17 @@ export function flush(): void {
     clearTimeout(state.timer);
     state.timer = null;
   }
-  if (!state.accountId || state.events.length === 0) return;
+  if (state.events.length === 0) return;
+
+  // No accountId means nothing configured this beacon (every public marketing
+  // page — setAnalyticsContext is only called from /chat/[username]). The old
+  // guard returned here *before* the splice below, so the queue was never
+  // drained and grew unbounded for the whole session. We still can't send these
+  // — the endpoint requires an accountId — so drop them instead of hoarding.
+  if (!state.accountId) {
+    state.events.length = 0;
+    return;
+  }
 
   const body = JSON.stringify({
     accountId: state.accountId,
