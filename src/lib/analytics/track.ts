@@ -14,6 +14,7 @@
 
 import type { AnalyticsEventName, EventParams, GlobalParams } from './types';
 import { configureDbBeacon, enqueueDbEvent, flush as flushDbBeacon } from './db-beacon';
+import { sanitizeTrackedPath } from './surface';
 
 declare global {
   interface Window {
@@ -275,7 +276,7 @@ function buildGlobals(): GlobalParams {
     client_id: getClientId(),
     session_id: _sessionId,
     account_id: _accountId,
-    current_path: window.location.pathname + window.location.search,
+    current_path: sanitizeTrackedPath(window.location.pathname + window.location.search),
     current_tab: _currentTab,
     is_conference: !!(
       attribution.source === 'conf' ||

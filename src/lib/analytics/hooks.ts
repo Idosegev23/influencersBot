@@ -23,6 +23,7 @@ import {
   startSession,
   track,
 } from './track';
+import { sanitizeTrackedPath } from './surface';
 
 export function useAutoAnalytics() {
   const pathname = usePathname();
@@ -43,7 +44,7 @@ export function useAutoAnalytics() {
     track('client_init', { is_new: !returning, visit_count: visitCount });
 
     track('page_load', {
-      path: window.location.pathname + window.location.search,
+      path: sanitizeTrackedPath(window.location.pathname + window.location.search),
       referrer: document.referrer || null,
     });
 
@@ -107,8 +108,10 @@ export function useAutoAnalytics() {
   useEffect(() => {
     if (!pathname) return;
     if (lastPathRef.current && lastPathRef.current !== pathname) {
-      track('route_change', { from_path: lastPathRef.current, to_path: pathname });
-      track('page_load', { path: pathname, referrer: lastPathRef.current });
+      const fromPath = sanitizeTrackedPath(lastPathRef.current);
+      const toPath = sanitizeTrackedPath(pathname);
+      track('route_change', { from_path: fromPath, to_path: toPath });
+      track('page_load', { path: toPath, referrer: fromPath });
     }
     lastPathRef.current = pathname;
   }, [pathname]);
@@ -129,7 +132,7 @@ export function useAutoAnalytics() {
       for (const threshold of [25, 50, 75, 100]) {
         if (pct >= threshold && !marks.has(threshold)) {
           marks.add(threshold);
-          track('scroll_depth', { path: pathname, depth_pct: threshold });
+          track('scroll_depth', { path: sanitizeTrackedPath(pathname), depth_pct: threshold });
         }
       }
     };
