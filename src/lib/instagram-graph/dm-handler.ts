@@ -24,6 +24,7 @@ import {
 } from './client';
 import { applyActiveCouponFilter } from '@/lib/coupons/active-filter';
 import { claimDmMessage, resolveSenderIdentity, formatContactLabel } from './dm-guards';
+import { runEscalationCheck } from '@/engines/escalation/dispatch';
 
 // ============================================
 // Types
@@ -242,6 +243,17 @@ export async function processInstagramGraphDM(
     }).catch(err => {
       console.error('[IG Graph DM] Rich cards error (non-blocking):', err.message);
     });
+
+    // 6d. Escalation check — fire-and-forget, never blocks the DM reply. Runs
+    // before the save so the prior-message lookup excludes the current message,
+    // mirroring the chat/widget handlers. No-op unless ESCALATION_ENABLED and
+    // the account's config.escalation.enabled are both on.
+    runEscalationCheck({
+      accountId,
+      sessionId: sessionUUID,
+      userMessage: messageText,
+      source: 'dm',
+    }).catch((e: any) => console.error('[escalation] dm hook failed:', e?.message || e));
 
     // 7. Save messages + update session
     const msgCount = (session?.message_count || 0) + 2;

@@ -9,7 +9,7 @@ export interface EscalationInput {
   accountId: string;
   sessionId: string | null;
   userMessage: string;
-  source: 'chat' | 'widget';
+  source: 'chat' | 'widget' | 'dm';
 }
 
 export interface EscalationDeps {
