@@ -2,46 +2,53 @@
 
 import Script from 'next/script';
 import { useConsent } from '@/lib/consent';
+import type { AnalyticsSurface } from '@/lib/analytics/surface';
 
-const GA4_ID = process.env.NEXT_PUBLIC_GA4_ID;
+// Two GA4 properties, one per surface (Yoav keeps them separate):
+//   - marketing site → the dedicated marketing tag
+//   - /chat/[username] → the existing account-chat tag (NEXT_PUBLIC_GA4_ID)
+// The marketing id is not a secret (it ships in the page anyway); hardcode a
+// default so it works without a new Vercel env, but allow an env override.
+const GA4_CHAT_ID = process.env.NEXT_PUBLIC_GA4_ID;
+const GA4_MARKETING_ID = process.env.NEXT_PUBLIC_GA4_ID_MARKETING || 'G-DX1NJYE82Z';
+
 const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
 const TIKTOK_PIXEL_ID = process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID;
 
 /**
- * Mounts gtag.js (GA4), Meta Pixel and TikTok Pixel via next/script. Each
- * snippet is injected only when its env id is present, so dev / staging
- * without an id stays silent.
- *
- * The dispatcher in src/lib/analytics/track.ts assumes window.gtag,
- * window.fbq, window.ttq exist; loading them here makes that true on every
- * page of the app.
+ * Mounts gtag.js (GA4), Meta Pixel and TikTok Pixel via next/script. The parent
+ * (AnalyticsClient) only renders this on the marketing site and the account
+ * chat — never on admin, dashboards, or [token] pages — and passes which of the
+ * two it is. GA4 loads the surface's own property; loading exactly one tag per
+ * page keeps the marketing and chat GA4 properties clean and unambiguous.
  *
  * Consent-gated: nothing loads until the visitor has actively chosen. GA4
  * follows the "analytics" category; the Meta and TikTok advertising pixels
- * follow "marketing". No choice yet (null) means no trackers — the privacy
- * policy tells users these are optional, so they have to actually be optional.
+ * follow "marketing". No choice yet (null) means no trackers.
  */
-export function AnalyticsLoader() {
+export function AnalyticsLoader({ surface }: { surface: AnalyticsSurface }) {
   const consent = useConsent();
   const allowAnalytics = consent?.analytics === true;
   const allowMarketing = consent?.marketing === true;
 
+  const ga4Id = surface === 'marketing' ? GA4_MARKETING_ID : GA4_CHAT_ID;
+
   return (
     <>
-      {GA4_ID && allowAnalytics && (
+      {ga4Id && allowAnalytics && (
         <>
           <Script
-            id="gtag-loader"
+            id={`gtag-loader-${ga4Id}`}
             strategy="afterInteractive"
-            src={`https://www.googletagmanager.com/gtag/js?id=${GA4_ID}`}
+            src={`https://www.googletagmanager.com/gtag/js?id=${ga4Id}`}
           />
-          <Script id="gtag-init" strategy="afterInteractive">
+          <Script id={`gtag-init-${ga4Id}`} strategy="afterInteractive">
             {`
               window.dataLayer = window.dataLayer || [];
               function gtag(){dataLayer.push(arguments);}
               window.gtag = gtag;
               gtag('js', new Date());
-              gtag('config', '${GA4_ID}');
+              gtag('config', '${ga4Id}');
             `}
           </Script>
         </>

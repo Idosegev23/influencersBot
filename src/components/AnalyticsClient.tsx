@@ -30,7 +30,7 @@ export function AnalyticsClient() {
   return (
     <>
       <AutoAnalytics />
-      <AnalyticsLoader />
+      <AnalyticsLoader surface={surface} />
     </>
   );
 }
