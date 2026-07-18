@@ -17,7 +17,7 @@ import {
   Smartphone,
   Globe,
 } from 'lucide-react';
-import { getInfluencerByUsername } from '@/lib/supabase';
+import { fetchInfluencerByUsername } from '@/lib/influencer/client';
 import type { Influencer } from '@/types';
 
 // Simple QR Code SVG Generator
@@ -146,7 +146,7 @@ export default function SharePage({
         }
 
         // Load influencer data
-        const inf = await getInfluencerByUsername(username);
+        const inf = await fetchInfluencerByUsername(username);
         if (!inf) {
           router.push(`/influencer/${username}`);
           return;

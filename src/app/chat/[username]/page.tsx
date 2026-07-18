@@ -28,7 +28,8 @@ import {
   Compass,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { getInfluencerByUsername, getBrandsByInfluencer, getContentByInfluencer, type Brand } from '@/lib/supabase';
+import type { Brand } from '@/lib/supabase';
+import { fetchInfluencerByUsername } from '@/lib/influencer/client';
 import type { DiscoveryCategoryAvailability } from '@/lib/discovery/types';
 
 const DiscoveryTab = dynamic(() => import('@/components/chat/discovery/DiscoveryTab'), { ssr: false });
@@ -692,20 +693,20 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   useEffect(() => {
     async function loadData() {
       try {
-        const inf = await getInfluencerByUsername(username);
+        const inf = await fetchInfluencerByUsername(username);
         if (!inf) {
           setNotFound(true);
           return;
         }
-        
+
         setInfluencer(inf);
         applyTheme(inf.theme);
-        
+
         // Load brands and content
-        const [brandsData, cont] = await Promise.all([
-          getBrandsByInfluencer(inf.id),
-          getContentByInfluencer(inf.id),
-        ]);
+        const brandsRes = await fetch(`/api/chat/brands?username=${encodeURIComponent(username)}`);
+        const { brands: brandsData = [], content: cont = [] } = brandsRes.ok
+          ? await brandsRes.json()
+          : {};
         console.log('[Chat Page] Loaded brands:', brandsData.length, brandsData.map(b => ({ name: b.brand_name, coupon: b.coupon_code })));
         setBrands(brandsData);
         setContent(cont);

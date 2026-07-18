@@ -31,7 +31,7 @@ import {
   AlertTriangle,
   Trash2,
 } from 'lucide-react';
-import { getInfluencerByUsername, supabase } from '@/lib/supabase';
+import { fetchInfluencerByUsername } from '@/lib/influencer/client';
 import type { Influencer } from '@/types';
 import { useDashboardLang } from '@/hooks/useDashboardLang';
 import { getDashboardStrings } from '@/lib/i18n/dashboard';
@@ -273,7 +273,7 @@ export default function SupportPage({
           }
         }
 
-        const inf = await getInfluencerByUsername(username);
+        const inf = await fetchInfluencerByUsername(username);
         if (!inf) {
           router.push(`/influencer/${username}`);
           return;
@@ -870,31 +870,13 @@ function TicketDetail({
     return () => clearInterval(id);
   }, [fetchTicket]);
 
-  // Realtime push: subscribe to INSERTs on support_ticket_history for
-  // this ticket. When a customer reply lands (via the WhatsApp webhook
-  // or the /reply/<token> page) or another agent appends a row, refresh
-  // the panel within ~50ms. Falls back to the 15s poll silently if the
-  // websocket can't connect.
-  useEffect(() => {
-    const channel = supabase
-      .channel(`support_ticket_history_${ticketId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'support_ticket_history',
-          filter: `ticket_id=eq.${ticketId}`,
-        },
-        () => {
-          fetchTicket(true).catch(() => {});
-        },
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [ticketId, fetchTicket]);
+  // There used to be a Realtime postgres_changes subscription here for ~50ms
+  // refreshes. It required anon SELECT on support_ticket_history, which is what
+  // left every account's ticket history world-readable. Realtime scopes reads
+  // with RLS via auth.uid(), and influencers authenticate by cookie rather than
+  // Supabase Auth, so there is no policy that admits them and only them — the
+  // subscription cannot be secured as-is. The 15s poll above is the fallback the
+  // original code already documented; it is now the only path.
 
   const handleSendDirectText = async () => {
     const txt = directBody.trim();

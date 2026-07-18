@@ -15,7 +15,7 @@ import {
   AlertTriangle,
   Trash2,
 } from 'lucide-react';
-import { getInfluencerByUsername } from '@/lib/supabase';
+import { fetchInfluencerByUsername } from '@/lib/influencer/client';
 import type { Influencer } from '@/types';
 import { useDashboardLang } from '@/hooks/useDashboardLang';
 import { getDashboardStrings, dashboardDir } from '@/lib/i18n/dashboard';
@@ -60,7 +60,7 @@ export default function SettingsPage({
           return;
         }
 
-        const inf = await getInfluencerByUsername(username);
+        const inf = await fetchInfluencerByUsername(username);
         if (!inf) {
           router.push(`/influencer/${username}`);
           return;

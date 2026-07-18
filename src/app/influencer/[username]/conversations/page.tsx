@@ -21,10 +21,7 @@ import {
   MessageSquare,
   Filter,
 } from 'lucide-react';
-import {
-  getInfluencerByUsername,
-} from '@/lib/supabase';
-import { supabase } from '@/lib/supabase';
+import { fetchInfluencerByUsername } from '@/lib/influencer/client';
 import { formatRelativeTime } from '@/lib/utils';
 import type { Influencer, ChatSession, ChatMessage } from '@/types';
 
@@ -78,36 +75,24 @@ export default function ConversationsPage({
   const [flaggedSessions, setFlaggedSessions] = useState<Set<string>>(new Set());
   const [starredSessions, setStarredSessions] = useState<Set<string>>(new Set());
 
-  const loadSessions = useCallback(async (accountId: string, offset = 0) => {
-    const { data: rawSessions, error } = await supabase
-      .from('chat_sessions')
-      .select('*')
-      .eq('account_id', accountId)
-      .order('created_at', { ascending: false })
-      .range(offset, offset + 49);
+  // Sessions + their messages come from the server — the browser has no direct
+  // database access. Pass `q` to search within this account's messages.
+  const loadSessions = useCallback(async (offset = 0, q = ''): Promise<SessionWithMessages[]> => {
+    const url = new URL('/api/influencer/conversations', window.location.origin);
+    url.searchParams.set('username', username);
+    if (offset) url.searchParams.set('offset', String(offset));
+    if (q) url.searchParams.set('q', q);
 
-    if (error || !rawSessions) return [];
+    const res = await fetch(url.toString());
+    if (!res.ok) return [];
 
-    // Batch-fetch last 2 messages per session for preview
-    const sessionsWithMessages: SessionWithMessages[] = await Promise.all(
-      rawSessions.map(async (s) => {
-        const { data: msgs } = await supabase
-          .from('chat_messages')
-          .select('id, session_id, role, content, created_at')
-          .eq('session_id', s.id)
-          .order('created_at', { ascending: true })
-          .limit(50);
-
-        return {
-          ...s,
-          messages: msgs || [],
-          channel: detectChannel(s.thread_id),
-        };
-      })
-    );
-
-    return sessionsWithMessages;
-  }, []);
+    const { sessions: rawSessions } = await res.json();
+    return (rawSessions ?? []).map((s: any) => ({
+      ...s,
+      messages: s.messages ?? [],
+      channel: detectChannel(s.thread_id),
+    }));
+  }, [username]);
 
   useEffect(() => {
     async function loadData() {
@@ -119,7 +104,7 @@ export default function ConversationsPage({
           return;
         }
 
-        const inf = await getInfluencerByUsername(username);
+        const inf = await fetchInfluencerByUsername(username);
         if (!inf) {
           router.push(`/influencer/${username}`);
           return;
@@ -127,7 +112,7 @@ export default function ConversationsPage({
 
         setInfluencer(inf);
 
-        const data = await loadSessions(inf.id);
+        const data = await loadSessions();
         setSessions(data);
 
         const savedFlags = localStorage.getItem(`flagged_${inf.id}`);
@@ -150,57 +135,14 @@ export default function ConversationsPage({
       if (!influencer) return;
 
       if (!searchQuery.trim()) {
-        const data = await loadSessions(influencer.id);
+        const data = await loadSessions();
         setSessions(data);
         return;
       }
 
       setIsSearching(true);
       try {
-        // Search in messages
-        const { data: matchingMsgs } = await supabase
-          .from('chat_messages')
-          .select('session_id')
-          .ilike('content', `%${searchQuery}%`)
-          .limit(100);
-
-        if (!matchingMsgs || matchingMsgs.length === 0) {
-          setSessions([]);
-          return;
-        }
-
-        const sessionIds = [...new Set(matchingMsgs.map(m => m.session_id))];
-
-        const { data: rawSessions } = await supabase
-          .from('chat_sessions')
-          .select('*')
-          .eq('account_id', influencer.id)
-          .in('id', sessionIds)
-          .order('created_at', { ascending: false });
-
-        if (!rawSessions) {
-          setSessions([]);
-          return;
-        }
-
-        const results: SessionWithMessages[] = await Promise.all(
-          rawSessions.map(async (s) => {
-            const { data: msgs } = await supabase
-              .from('chat_messages')
-              .select('id, session_id, role, content, created_at')
-              .eq('session_id', s.id)
-              .order('created_at', { ascending: true })
-              .limit(50);
-
-            return {
-              ...s,
-              messages: msgs || [],
-              channel: detectChannel(s.thread_id),
-            };
-          })
-        );
-
-        setSessions(results);
+        setSessions(await loadSessions(0, searchQuery));
       } catch (error) {
         console.error('Error searching:', error);
       } finally {
@@ -490,7 +432,7 @@ export default function ConversationsPage({
             <button
               onClick={async () => {
                 if (!influencer) return;
-                const more = await loadSessions(influencer.id, sessions.length);
+                const more = await loadSessions(sessions.length);
                 setSessions(prev => [...prev, ...more]);
               }}
               className="glass-subtle px-6 py-3 rounded-2xl transition-all duration-300 hover:glass-card"

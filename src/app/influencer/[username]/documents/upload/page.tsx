@@ -22,7 +22,7 @@ import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
-import { getInfluencerByUsername } from '@/lib/supabase';
+import { fetchInfluencerByUsername } from '@/lib/influencer/client';
 import {
   FileUploader,
   type UploadedFile,
@@ -73,7 +73,7 @@ export default function DocumentUploadPage({
   // Resolve accountId from username
   useEffect(() => {
     async function loadAccount() {
-      const inf = await getInfluencerByUsername(username);
+      const inf = await fetchInfluencerByUsername(username);
       if (inf) setAccountId(inf.id);
     }
     loadAccount();

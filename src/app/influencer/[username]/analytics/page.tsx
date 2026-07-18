@@ -29,13 +29,8 @@ import {
   ArrowUpRight,
   ArrowDownRight,
 } from 'lucide-react';
-import {
-  getInfluencerByUsername,
-  getDailyStats,
-  getTopProducts,
-  type DailyStats,
-  type TopProduct,
-} from '@/lib/supabase';
+import type { DailyStats, TopProduct } from '@/lib/supabase';
+import { fetchInfluencerByUsername } from '@/lib/influencer/client';
 
 // New accurate analytics shape — matches /api/influencer/[username]/analytics.
 // Replaces the legacy AnalyticsSummary which conflated sessions with
@@ -161,7 +156,7 @@ export default function AnalyticsPage({
         }
 
         // Load influencer data
-        const inf = await getInfluencerByUsername(username);
+        const inf = await fetchInfluencerByUsername(username);
         if (!inf) {
           router.push(`/influencer/${username}`);
           return;
@@ -197,18 +192,29 @@ export default function AnalyticsPage({
           }
         };
 
-        const [summaryData, prevSummaryData, dailyData, topProds, internalData] = await Promise.all([
+        const fetchDaily = async (from: Date, to: Date) => {
+          const url = new URL(
+            `/api/influencer/${encodeURIComponent(username)}/analytics/daily`,
+            window.location.origin,
+          );
+          url.searchParams.set('from', from.toISOString());
+          url.searchParams.set('to', to.toISOString());
+          const res = await fetch(url.toString());
+          if (!res.ok) return { dailyStats: [] as DailyStats[], topProducts: [] as TopProduct[] };
+          return res.json() as Promise<{ dailyStats: DailyStats[]; topProducts: TopProduct[] }>;
+        };
+
+        const [summaryData, prevSummaryData, daily, internalData] = await Promise.all([
           fetchAnalytics(startDate, endDate),
           fetchAnalytics(prevStartDate, prevEndDate),
-          getDailyStats(inf.id, startDate, endDate),
-          getTopProducts(inf.id, startDate, endDate, 5),
+          fetchDaily(startDate, endDate),
           fetchInternal(),
         ]);
 
         setSummary(summaryData);
         setPreviousSummary(prevSummaryData);
-        setDailyStats(dailyData);
-        setTopProducts(topProds);
+        setDailyStats(daily.dailyStats);
+        setTopProducts(daily.topProducts);
         setInternalSummary(internalData);
       } catch (error) {
         console.error('Error loading data:', error);

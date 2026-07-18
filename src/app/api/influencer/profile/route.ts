@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getInfluencerByUsername } from '@/lib/supabase';
+import { sanitizeInfluencerForClient } from '@/lib/influencer/sanitize';
 
 /**
  * GET /api/influencer/profile?username=...
- * Get account profile data — wrapper around accounts table
+ *
+ * The browser's only route to account data. Client components used to call
+ * getInfluencerByUsername() directly, which reached Postgres with the public
+ * anon key and handed the caller accounts.* — password hash and all. This runs
+ * server-side with the service role and returns a sanitized projection.
+ *
+ * Unauthenticated on purpose: the public chat page renders for anonymous
+ * visitors. sanitizeInfluencerForClient is therefore the only thing standing
+ * between accounts.* and the open internet — keep it that way.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -14,25 +23,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'username required' }, { status: 400 });
     }
 
-    const supabase = await createClient();
+    const influencer = await getInfluencerByUsername(username);
 
-    const { data: account, error } = await supabase
-      .from('accounts')
-      .select('id, instagram_username, config, status, type, created_at')
-      .eq('instagram_username', username)
-      .single();
-
-    if (error || !account) {
+    if (!influencer) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
 
+    const safe = sanitizeInfluencerForClient(influencer as any)!;
+
+    // `account` mirrors what chatbot-settings and the instagram page already read.
     return NextResponse.json({
-      id: account.id,
-      username: account.instagram_username,
-      displayName: account.config?.display_name || account.instagram_username,
-      type: account.type,
-      status: account.status,
-      config: account.config || {},
+      account: {
+        id: safe.id,
+        username: safe.username,
+        displayName: safe.display_name,
+        type: safe.type,
+        status: safe.is_active ? 'active' : 'inactive',
+      },
+      influencer: safe,
     });
   } catch (error) {
     console.error('[Profile] GET error:', error);
