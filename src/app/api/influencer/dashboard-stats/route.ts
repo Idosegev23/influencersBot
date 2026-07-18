@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { supabase, getInfluencerByUsername } from '@/lib/supabase';
+import { verifySessionToken, influencerSubject } from '@/lib/auth/session-token';
 
 async function checkAuth(username: string): Promise<boolean> {
   const cookieStore = await cookies();
   const authCookie = cookieStore.get(`influencer_session_${username}`);
-  return authCookie?.value === 'authenticated';
+  return verifySessionToken(authCookie?.value, influencerSubject(username));
 }
 
 export async function GET(req: NextRequest) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { getInfluencerBySubdomain, getInfluencerByUsername } from '@/lib/supabase';
 import { verifyPassword } from '@/lib/utils';
+import { signSessionToken, verifySessionToken, influencerSubject } from '@/lib/auth/session-token';
 
 const COOKIE_PREFIX = 'influencer_session_';
 
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
     const cookieStore = await cookies();
     const session = cookieStore.get(`${COOKIE_PREFIX}${username}`);
 
-    if (session?.value === 'authenticated') {
+    if (verifySessionToken(session?.value, influencerSubject(username))) {
       const influencer = await getInfluencerByUsername(username);
       return NextResponse.json({
         authenticated: true,
@@ -124,7 +125,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    response.cookies.set(`${COOKIE_PREFIX}${influencer.username}`, 'authenticated', {
+    response.cookies.set(`${COOKIE_PREFIX}${influencer.username}`, signSessionToken(influencerSubject(influencer.username)), {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',

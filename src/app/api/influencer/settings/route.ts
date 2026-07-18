@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { verifySessionToken, influencerSubject } from '@/lib/auth/session-token';
 
 const COOKIE_PREFIX = 'influencer_session_';
 
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
     // ── Auth: verify influencer session cookie ──
     const cookieStore = await cookies();
     const session = cookieStore.get(`${COOKIE_PREFIX}${username}`);
-    if (session?.value !== 'authenticated') {
+    if (!verifySessionToken(session?.value, influencerSubject(username))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

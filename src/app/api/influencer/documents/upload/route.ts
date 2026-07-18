@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { supabase, getInfluencerByUsername } from '@/lib/supabase';
 import { getCurrentUser, checkPermission, isAccountOwner } from '@/lib/auth/middleware';
+import { verifySessionToken, influencerSubject } from '@/lib/auth/session-token';
 
 // Allow longer execution for large files (max 5 minutes on Pro plan)
 export const maxDuration = 300;
@@ -12,7 +13,7 @@ export const maxDuration = 300;
 async function checkAuth(username: string): Promise<boolean> {
   const cookieStore = await cookies();
   const authCookie = cookieStore.get(`influencer_session_${username}`);
-  return authCookie?.value === 'authenticated';
+  return verifySessionToken(authCookie?.value, influencerSubject(username));
 }
 
 export async function POST(request: NextRequest) {

@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { verifySessionToken, ADMIN_SUBJECT } from '@/lib/auth/session-token';
 
 const COOKIE_NAME = 'bestieai_admin_session';
 
@@ -17,6 +18,6 @@ const COOKIE_NAME = 'bestieai_admin_session';
 export async function requireAdminAuth(): Promise<NextResponse | null> {
   const cookieStore = await cookies();
   const session = cookieStore.get(COOKIE_NAME);
-  if (session?.value === 'authenticated') return null;
+  if (verifySessionToken(session?.value, ADMIN_SUBJECT)) return null;
   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 }

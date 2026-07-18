@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { supabase as supabaseAdmin } from '@/lib/supabase';
+import { signSessionToken, ADMIN_SUBJECT } from '@/lib/auth/session-token';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '123456';
 const ADMIN_COOKIE = 'bestieai_admin_session';
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
       role: 'admin',
       redirect: '/admin/dashboard',
     });
-    res.cookies.set(ADMIN_COOKIE, 'authenticated', {
+    res.cookies.set(ADMIN_COOKIE, signSessionToken(ADMIN_SUBJECT), {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',

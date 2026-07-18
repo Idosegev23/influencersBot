@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { getInfluencerByUsername } from '@/lib/supabase';
 import { runBackgroundScrape } from '@/lib/background-scraper';
 import { getProgress } from '@/lib/scraping-progress';
+import { verifySessionToken, ADMIN_SUBJECT } from '@/lib/auth/session-token';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '123456';
 
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
     // Check admin authentication
     const cookieStore = await cookies();
     const adminCookie = cookieStore.get('bestieai_admin_session');
-    const isAdminCookie = adminCookie?.value === 'authenticated';
+    const isAdminCookie = verifySessionToken(adminCookie?.value, ADMIN_SUBJECT);
     const isAdminPassword = adminPassword === ADMIN_PASSWORD;
     
     if (!isAdminCookie && !isAdminPassword) {

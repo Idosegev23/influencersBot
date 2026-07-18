@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { getInfluencerByUsername } from '@/lib/supabase';
 import { runBackgroundScrape } from '@/lib/background-scraper';
 import { getProgress } from '@/lib/scraping-progress';
+import { verifySessionToken, ADMIN_SUBJECT, influencerSubject } from '@/lib/auth/session-token';
 
 const COOKIE_PREFIX = 'influencer_session_';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
@@ -17,7 +18,7 @@ async function checkAuth(username: string): Promise<boolean> {
   try {
     const cookieStore = await cookies();
     const authCookie = cookieStore.get(`${COOKIE_PREFIX}${username}`);
-    return authCookie?.value === 'authenticated';
+    return verifySessionToken(authCookie?.value, influencerSubject(username));
   } catch (error) {
     console.error('Error checking auth:', error);
     return false;
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
     // Check authentication (influencer or admin)
     const cookieStore = await cookies();
     const adminCookie = cookieStore.get('bestieai_admin_session');
-    const isAdmin = adminCookie?.value === 'authenticated';
+    const isAdmin = verifySessionToken(adminCookie?.value, ADMIN_SUBJECT);
     const isAuth = await checkAuth(username);
     
     if (!isAuth && !isAdmin) {

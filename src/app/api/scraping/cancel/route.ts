@@ -6,13 +6,14 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
+import { verifySessionToken, ADMIN_SUBJECT } from '@/lib/auth/session-token';
 
 const ADMIN_COOKIE_NAME = 'bestieai_admin_session';
 
 async function checkAdminAuth(): Promise<boolean> {
   const cookieStore = await cookies();
   const session = cookieStore.get(ADMIN_COOKIE_NAME);
-  return session?.value === 'authenticated';
+  return verifySessionToken(session?.value, ADMIN_SUBJECT);
 }
 
 export async function DELETE(request: Request) {

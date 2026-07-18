@@ -9,6 +9,7 @@ import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, getInfluencerByUsername } from '@/lib/supabase';
 import { getAgentSession } from '@/lib/auth/agent-auth';
+import { verifySessionToken, influencerSubject } from '@/lib/auth/session-token';
 
 /**
  * בודק אם יש cookie auth למשפיען (או session של support agent על אותו חשבון)
@@ -16,7 +17,7 @@ import { getAgentSession } from '@/lib/auth/agent-auth';
 export async function checkInfluencerAuth(username: string): Promise<boolean> {
   const cookieStore = await cookies();
   const authCookie = cookieStore.get(`influencer_session_${username}`);
-  if (authCookie?.value === 'authenticated') return true;
+  if (verifySessionToken(authCookie?.value, influencerSubject(username))) return true;
   // Allow support-agent sessions as a valid auth for the account.
   const agent = await getAgentSession(username);
   return !!agent;

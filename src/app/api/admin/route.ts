@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { hashPassword, verifyPassword } from '@/lib/utils';
+import { signSessionToken, verifySessionToken, ADMIN_SUBJECT } from '@/lib/auth/session-token';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '123456';
 const COOKIE_NAME = 'bestieai_admin_session';
@@ -11,7 +12,7 @@ export async function GET() {
     const cookieStore = await cookies();
     const session = cookieStore.get(COOKIE_NAME);
 
-    if (session?.value === 'authenticated') {
+    if (verifySessionToken(session?.value, ADMIN_SUBJECT)) {
       return NextResponse.json({ authenticated: true });
     }
 
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
 
     if (password === ADMIN_PASSWORD) {
       const response = NextResponse.json({ success: true });
-      response.cookies.set(COOKIE_NAME, 'authenticated', {
+      response.cookies.set(COOKIE_NAME, signSessionToken(ADMIN_SUBJECT), {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',

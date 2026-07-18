@@ -3,12 +3,13 @@ import { cookies } from 'next/headers';
 import { supabase, getInfluencerByUsername } from '@/lib/supabase';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { getCurrentUser, checkPermission, getAgentInfluencerAccounts } from '@/lib/auth/middleware';
+import { verifySessionToken, influencerSubject } from '@/lib/auth/session-token';
 
 // Check influencer authentication
 async function checkAuth(username: string): Promise<boolean> {
   const cookieStore = await cookies();
   const authCookie = cookieStore.get(`influencer_session_${username}`); // FIX: Match /api/influencer/auth cookie name
-  return authCookie?.value === 'authenticated';
+  return verifySessionToken(authCookie?.value, influencerSubject(username));
 }
 
 // GET - List partnerships for an influencer with filters

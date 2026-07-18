@@ -8,6 +8,7 @@ import {
 } from '@/lib/supabase';
 import { generateGreetingAndQuestions } from '@/lib/openai';
 import { requireAuth } from '@/lib/auth/api-helpers';
+import { verifySessionToken, influencerSubject } from '@/lib/auth/session-token';
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,9 +26,9 @@ export async function POST(req: NextRequest) {
 
     // Check authentication (legacy)
     const cookieStore = await cookies();
-    const authCookie = cookieStore.get(`influencer_auth_${username}`);
+    const authCookie = cookieStore.get(`influencer_session_${username}`);
 
-    if (!authCookie || authCookie.value !== 'authenticated') {
+    if (!verifySessionToken(authCookie?.value, influencerSubject(username))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
