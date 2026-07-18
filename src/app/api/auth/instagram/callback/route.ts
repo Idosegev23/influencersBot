@@ -201,7 +201,15 @@ async function exchangeCodeForToken(code: string, redirectUri: string): Promise<
     throw new Error(`Token exchange failed: ${errorMsg}`);
   }
 
-  return response.json();
+  // Meta returns user_id as a JSON *number* that exceeds Number.MAX_SAFE_INTEGER,
+  // so response.json() silently rounds it (…074 → …070) and every later Graph
+  // call on that id 400s ("does not exist"). Parse the raw text and quote the
+  // integer so it survives as the exact string the interface (and the DB column
+  // ig_business_account_id) already expect. Idempotent if it's already a string.
+  const raw = await response.text();
+  return JSON.parse(
+    raw.replace(/("user_id"\s*:\s*)(\d+)/, '$1"$2"'),
+  ) as ShortLivedTokenResponse;
 }
 
 /**
