@@ -48,8 +48,24 @@ export async function discoverSitemapUrls(siteUrl: string, bounds?: SitemapBound
   const perFetchMs = bounds?.perFetchMs ?? 8000;
   const start = Date.now();
 
-  const origin = new URL(siteUrl).origin;
-  const host = new URL(siteUrl).host;
+  const parsedUrl = new URL(siteUrl);
+  const origin = parsedUrl.origin;
+  const host = parsedUrl.host;
+
+  // Region/section awareness: a regional site URL like https://www.lenovo.com/il/en/
+  // means the caller wants ISRAEL / English pages — NOT the whole global site. A
+  // multi-country sitemap index (…-dz-fr.xml, …-il-en.xml, …-us-en.xml, processed in
+  // file order) would otherwise fill the crawl budget with the FIRST country listed
+  // and never reach the requested one. So restrict discovery to this path prefix.
+  // Empty / "/" prefix ⇒ no restriction (whole-site behaviour, unchanged).
+  const prefixSegs = parsedUrl.pathname.split('/').filter(Boolean);
+  const prefixPath = prefixSegs.length ? '/' + prefixSegs.join('/') : '';
+  // Joined forms (il-en / il_en / il/en) used to recognise the matching per-region
+  // CHILD sitemap by name, so we fetch it before the wall-clock/URL budget runs out.
+  const childTokens = prefixSegs.length >= 2
+    ? [prefixSegs.join('-'), prefixSegs.join('_'), prefixSegs.join('/')]
+    : [];
+
   const seen = new Set<string>();
   const out = new Set<string>();
   const queue = [`${origin}/sitemap.xml`, `${origin}/sitemap_index.xml`];
@@ -65,16 +81,29 @@ export async function discoverSitemapUrls(siteUrl: string, bounds?: SitemapBound
     processed++;
     const $ = cheerio.load(xml, { xmlMode: true });
     // nested sitemaps (including .gz children)
+    const children: string[] = [];
     $('sitemap > loc').each((_, el) => {
       const u = $(el).text().trim();
-      if (u) queue.push(u);
+      if (u) children.push(u);
     });
+    if (children.length) {
+      // When the region prefix names the child sitemaps (…-il-en.xml), queue ONLY the
+      // matching ones. If none match (naming doesn't encode the region), fall back to
+      // all children — the page-URL prefix filter below still keeps only in-region pages.
+      const matched = childTokens.length
+        ? children.filter(c => { const lc = c.toLowerCase(); return childTokens.some(t => lc.includes(t)); })
+        : [];
+      for (const c of (matched.length ? matched : children)) queue.push(c);
+    }
     // page urls
     $('url > loc').each((_, el) => {
       if (out.size >= maxUrls) return false; // stop iterating this doc
       const u = $(el).text().trim();
       try {
-        if (u && new URL(u).host === host) out.add(u);
+        const pu = new URL(u);
+        if (pu.host !== host) return;
+        if (prefixPath && !pu.pathname.startsWith(prefixPath)) return; // wrong region — skip
+        out.add(u);
       } catch {
         /* skip malformed */
       }
