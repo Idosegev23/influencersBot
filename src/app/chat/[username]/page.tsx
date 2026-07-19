@@ -1762,7 +1762,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           disabled={isTyping || isStreamActive}
                           extraPill={
                             (influencer.tabs || defaultTabsForLang((influencer as any).language)).some((t: { id: string }) => t.id === 'discover')
-                              ? { label: 'גלו עוד', onClick: () => setActiveTab('discover') }
+                              ? { label: (influencer as any).language === 'en' ? 'Discover more' : 'גלו עוד', onClick: () => setActiveTab('discover') }
                               : undefined
                           }
                         />
