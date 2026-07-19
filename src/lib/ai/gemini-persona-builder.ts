@@ -259,10 +259,11 @@ const OUTPUT_SCHEMA = `{
 
 export async function buildPersonaWithGemini(
   preprocessedData: PreprocessedData,
-  profileData?: any
+  profileData?: any,
+  language: 'he' | 'en' = 'he'
 ): Promise<GeminiPersonaOutput> {
   const inputData = prepareInputData(preprocessedData, profileData);
-  const fullPrompt = buildFullPrompt(inputData);
+  const fullPrompt = buildFullPrompt(inputData, language);
   const inputSize = JSON.stringify(inputData).length;
 
   let text: string | null = null;
@@ -423,14 +424,32 @@ async function tryGemini(fullPrompt: string, inputSize: number): Promise<string 
 // Build Full Prompt
 // ============================================
 
-function buildFullPrompt(inputData: any): string {
-  return `${PERSONA_BUILDER_PROMPT}
+// English output override. The authoring prompt is written in Hebrew for internal
+// convenience; when the account language is 'en' we force every emitted field VALUE
+// to English (same approach as the chatbot runtime's LANG_DIRECTIVE_EN).
+const LANG_DIRECTIVE_EN = `<output_language>
+CRITICAL OVERRIDE: Produce EVERY field value in the output JSON in ENGLISH only.
+The authoring instructions below are written in Hebrew for internal convenience, but
+all persona content you output — identity, voice, tone, knowledge map, boundaries,
+product names and descriptions, quotes and examples, every string in the JSON — MUST
+be natural English. Do NOT output Hebrew. If a source is in Hebrew, translate it.
+</output_language>
+
+`;
+
+function buildFullPrompt(inputData: any, language: 'he' | 'en' = 'he'): string {
+  const isEn = language === 'en';
+  // Neutralize the Hebrew-only clause in the output contract when building English.
+  const promptBody = isEn
+    ? PERSONA_BUILDER_PROMPT.replace('כל התוכן בעברית בלבד.', 'כל התוכן באנגלית בלבד (English only).')
+    : PERSONA_BUILDER_PROMPT;
+  return `${isEn ? LANG_DIRECTIVE_EN : ''}${promptBody}
 
 נתונים מעובדים:
 ${JSON.stringify(inputData, null, 2)}
 
 החזר JSON בלבד בפורמט הבא (ללא טקסט נוסף, ללא markdown fences):
-${OUTPUT_SCHEMA}`;
+${OUTPUT_SCHEMA}${isEn ? '\n\nREMINDER: All JSON field VALUES must be written in English, not Hebrew.' : ''}`;
 }
 
 // ============================================
@@ -704,7 +723,8 @@ export async function savePersonaToDatabase(
   accountId: string,
   persona: GeminiPersonaOutput,
   preprocessedData: PreprocessedData,
-  geminiRawOutput: string
+  geminiRawOutput: string,
+  language: 'he' | 'en' = 'he'
 ): Promise<void> {
   console.log('[PersonaBuilder] Saving persona to database...');
 
@@ -723,9 +743,9 @@ export async function savePersonaToDatabase(
       account_id: accountId,
 
       // Required fields
-      name: persona.identity.who || 'משפיען',
-      tone: typeof persona.voice.tone === 'string' ? persona.voice.tone : 'ידידותי',
-      language: 'he',
+      name: persona.identity.who || (language === 'en' ? 'Brand' : 'משפיען'),
+      tone: typeof persona.voice.tone === 'string' ? persona.voice.tone : (language === 'en' ? 'friendly' : 'ידידותי'),
+      language,
 
       // Enhanced fields
       voice_rules: voiceRulesForDB,

@@ -43,7 +43,7 @@ The exploration of the current code established:
 
 4. **`persona-build` step** (`src/lib/pipeline/steps/persona-build.ts`): `select('config, language')`, and pass `account.language` into `buildPersonaWithGemini` + `savePersonaToDatabase`. (The website-only branch already honors language via `persona-from-website.ts:26` — no change there.)
 
-5. **`rag-ingest` step / `rag/enrich.ts`**: when the account language is `'en'`, pass `skipTranslation: true` + `skipSyntheticQueries: true` so no Hebrew summary/query text is bolted onto English chunks. (Uses the existing skip-flags — no new enrich logic.)
+5. ~~`rag-ingest` step / `rag/enrich.ts`~~ — **DROPPED after implementation check.** The QStash pipeline's `rag-ingest` step calls `ingestAllForAccount` directly and **never invokes** `enrichAccountChunks` / `addHebrewSummaries` (that Hebrew-summary path only runs in the legacy `content-processor-orchestrator` and standalone scripts). So no Hebrew text is bolted onto pipeline-ingested chunks — Lenovo's RAG chunks stay raw English with no change needed.
 
 6. **`/admin/add` form** (`src/app/admin/add/page.tsx`): add a small **Language** selector (`he` | `en`, default `he`) next to the archetype selector, and include `language` in the start-pipeline payload (`:210-223`).
 

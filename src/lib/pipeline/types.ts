@@ -17,6 +17,7 @@ export interface PipelineOptions {
   maxPages: number | null; // null = all sitemap urls
   postsLimit: number;
   isDemo: boolean;
+  language?: 'he' | 'en'; // account output language: dashboard + chat + widget + persona. Default 'he'. Written to accounts.language in create-account.
   archetype?: string; // brand | influencer | service_provider | ... (applied in finalize)
   scanMode?: 'quote' | 'full'; // quote = bounded pre-sales demo scan; undefined/full = current behaviour
   categories?: { pathPattern: string; cap: number }[]; // selected path slices for quote mode; undefined = full scope

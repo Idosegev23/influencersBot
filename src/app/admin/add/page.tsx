@@ -46,6 +46,7 @@ export default function AddAccountPage() {
   const [youtube, setYoutube] = useState('');
   const [tiktok, setTiktok] = useState('');
   const [archetype, setArchetype] = useState('brand');
+  const [language, setLanguage] = useState<'he' | 'en'>('he');
   const [isDemo, setIsDemo] = useState(true);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [postsLimit, setPostsLimit] = useState('');
@@ -212,6 +213,7 @@ export default function AddAccountPage() {
           accountId: data.accountId,
           websiteUrl: site || undefined,
           isDemo,
+          language,
           transcribe,
           archetype,
           maxPages: maxPages ? Number(maxPages) : null,
@@ -604,6 +606,23 @@ export default function AddAccountPage() {
               <option value="media_news">מדיה/חדשות (media_news)</option>
               <option value="tech_creator">יוצר טק (tech_creator)</option>
             </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-sm font-semibold mr-2" style={{ color: '#1f2937' }}>
+              שפת החשבון <span className="font-normal" style={{ color: '#817a6c' }}>(language)</span>
+            </label>
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value as 'he' | 'en')}
+              className="neon-input w-full"
+            >
+              <option value="he">עברית (he)</option>
+              <option value="en">English (en)</option>
+            </select>
+            <p className="text-xs" style={{ color: '#817a6c' }}>
+              קובע את שפת הדשבורד, הצ'אט, הווידג'ט והפרסונה. (en גם מכריח פרסונה באנגלית)
+            </p>
           </div>
 
           <label className="flex items-center gap-3 cursor-pointer select-none">

@@ -31,10 +31,11 @@ export async function personaBuildStep(ctx: StepContext): Promise<StepResult> {
 
   const { data: account } = await supabase
     .from('accounts')
-    .select('config')
+    .select('config, language')
     .eq('id', ctx.accountId)
     .single();
 
+  const language = account?.language === 'en' ? 'en' : 'he';
   const cfg = account?.config as any;
   const profileData = cfg
     ? {
@@ -46,7 +47,7 @@ export async function personaBuildStep(ctx: StepContext): Promise<StepResult> {
       }
     : undefined;
 
-  const newPersona = await buildPersonaWithGemini(preprocessedData, profileData);
+  const newPersona = await buildPersonaWithGemini(preprocessedData, profileData, language);
 
   await savePersonaToDatabase(
     supabase,
@@ -54,6 +55,7 @@ export async function personaBuildStep(ctx: StepContext): Promise<StepResult> {
     newPersona,
     preprocessedData,
     JSON.stringify(newPersona),
+    language,
   );
 
   return { status: 'advance' };

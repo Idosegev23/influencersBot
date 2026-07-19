@@ -10,12 +10,13 @@ export interface StartPipelineInput {
   username?: string;
   websiteUrl?: string | null;
   isDemo?: boolean;
+  language?: 'he' | 'en';
   transcribe?: boolean;
   maxPages?: number | null;
   postsLimit?: number;
   archetype?: string;
   scanMode?: 'full' | 'quote';
-  categories?: unknown;
+  categories?: { pathPattern: string; cap: number }[];
   youtube?: string;
   tiktok?: string;
   enrichSources?: ('instagram' | 'website' | 'youtube' | 'tiktok')[];
@@ -36,6 +37,7 @@ export async function startPipeline(input: StartPipelineInput): Promise<StartPip
     username,
     websiteUrl,
     isDemo = true,
+    language, // undefined = don't touch accounts.language (preserves existing lang on re-scan; DB default 'he' on first insert)
     transcribe = true,
     maxPages = null,
     postsLimit = DEFAULT_SCAN_CONFIG.postsLimit,
@@ -82,7 +84,7 @@ export async function startPipeline(input: StartPipelineInput): Promise<StartPip
     counts: {},
     cursors: {},
     websiteUrl: websiteUrl || undefined,
-    options: { transcribe, maxPages, postsLimit, isDemo, archetype, scanMode, categories, youtube, tiktok, hasIg, enrichSources },
+    options: { transcribe, maxPages, postsLimit, isDemo, language, archetype, scanMode, categories, youtube, tiktok, hasIg, enrichSources },
   };
   await saveState(job.id, state);
   await publishStep({ jobId: job.id, step: 'create-account', batch: 0 });
