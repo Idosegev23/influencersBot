@@ -78,7 +78,12 @@ export async function finalizeStep(ctx: StepContext): Promise<StepResult> {
       if (!widget.coverImage) {
         const res = await fetch(ctx.state.websiteUrl, {
           signal: AbortSignal.timeout(4000),
-          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; bestieAI/1.0)' },
+          // Realistic browser UA so Akamai/Cloudflare-protected sites return the
+          // real HTML (for og:image cover extraction) instead of a 403 challenge.
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          },
         });
         const html = await res.text();
         const og =

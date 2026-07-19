@@ -4,7 +4,16 @@ async function fetchXml(url: string, timeoutMs: number): Promise<string | null> 
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const r = await fetch(url, { headers: { 'user-agent': 'BestieBot/1.0' }, signal: ctrl.signal });
+    // Use a realistic browser UA: many corporate sites (Akamai/Cloudflare bot
+    // protection, e.g. lenovo.com) return 403 to bot-marker UAs, which silently
+    // zeroes out sitemap discovery. Public, robots-allowed pages only.
+    const r = await fetch(url, {
+      headers: {
+        'user-agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+      signal: ctrl.signal,
+    });
     if (!r.ok) return null;
     return await r.text();
   } catch {
