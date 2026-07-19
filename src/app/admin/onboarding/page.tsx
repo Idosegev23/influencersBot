@@ -12,6 +12,7 @@ export default function OnboardingLinkPage() {
   const [clientName, setClientName] = useState('');
   const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
+  const [language, setLanguage] = useState<'he' | 'en'>('he');
   const [creating, setCreating] = useState(false);
   const [link, setLink] = useState('');
   const [copied, setCopied] = useState(false);
@@ -31,7 +32,7 @@ export default function OnboardingLinkPage() {
       const res = await fetch('/api/admin/onboarding/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientName, email, mobile }),
+        body: JSON.stringify({ clientName, email, mobile, language }),
       });
       const json = await res.json();
       if (!res.ok || !json.link) { setErr('יצירת הקישור נכשלה'); return; }
@@ -48,7 +49,7 @@ export default function OnboardingLinkPage() {
   }
 
   function reset() {
-    setLink(''); setClientName(''); setEmail(''); setMobile(''); setErr('');
+    setLink(''); setClientName(''); setEmail(''); setMobile(''); setLanguage('he'); setErr('');
   }
 
   if (!authed) return <div className="p-8 text-gray-400">טוען…</div>;
@@ -69,6 +70,28 @@ export default function OnboardingLinkPage() {
           <Field label="שם הלקוח" value={clientName} onChange={setClientName} placeholder="למשל: דנה כהן / המותג" required />
           <Field label="אימייל" value={email} onChange={setEmail} placeholder="client@email.com" type="email" />
           <Field label="נייד (וואטסאפ)" value={mobile} onChange={setMobile} placeholder="05x-xxxxxxx" type="tel" />
+
+          <div className="block">
+            <span className="text-xs font-semibold text-[#374151]">שפת דף האונבורדינג של הלקוח</span>
+            <div className="mt-1 flex gap-2">
+              {([['he', 'עברית'], ['en', 'English']] as const).map(([code, label]) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => setLanguage(code)}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold border transition"
+                  style={
+                    language === code
+                      ? { background: BRAND, color: '#fff', borderColor: BRAND }
+                      : { background: '#fff', color: '#374151', borderColor: '#e5e7eb' }
+                  }
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {err && <div className="text-sm text-red-600">{err}</div>}
           <button
             onClick={create}

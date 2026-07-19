@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { onboardStrings, type OnboardLang } from '@/lib/i18n/onboard';
 
 interface StatusData {
   accountName: string;
@@ -29,7 +30,9 @@ function loadSaved(token: string): Record<string, string> {
   try { return JSON.parse(localStorage.getItem(`onboard:${token}`) || '{}'); } catch { return {}; }
 }
 
-export default function OnboardWizard({ token }: { token: string }) {
+export default function OnboardWizard({ token, lang }: { token: string; lang: OnboardLang }) {
+  const t = onboardStrings[lang];
+
   const [data, setData] = useState<StatusData | null>(null);
   const [phase, setPhase] = useState<'loading' | 'form' | 'scanning' | 'done' | 'error'>('loading');
   const [jobId, setJobId] = useState<string | null>(null);
@@ -104,12 +107,12 @@ export default function OnboardWizard({ token }: { token: string }) {
         body: JSON.stringify({ website, tiktok, youtube }),
       });
       const json = await res.json();
-      if (res.status === 422) { setErr('צריך לחבר אינסטגרם קודם'); return; }
-      if (!res.ok || !json.jobId) { setErr('משהו השתבש, נסו שוב'); return; }
+      if (res.status === 422) { setErr(t.errors.needIg); return; }
+      if (!res.ok || !json.jobId) { setErr(t.errors.generic); return; }
       setJobId(json.jobId);
       setPhase('scanning');
     } catch {
-      setErr('משהו השתבש, נסו שוב');
+      setErr(t.errors.generic);
     } finally {
       setStarting(false);
     }
@@ -120,7 +123,7 @@ export default function OnboardWizard({ token }: { token: string }) {
   const pct = Math.max(2, Math.min(100, Math.round(progress?.percent ?? 0)));
 
   return (
-    <div dir="rtl" style={{ direction: 'rtl' }} className="min-h-screen w-full flex items-center justify-center p-4">
+    <div dir={t.dir} style={{ direction: t.dir }} className="min-h-screen w-full flex items-center justify-center p-4">
       <div className="fixed inset-0 -z-10" style={{ background: `radial-gradient(1200px 600px at 50% -10%, ${BRAND}22, transparent), linear-gradient(180deg,#0b0b12,#141021)` }} />
       <div className="w-full max-w-lg">
         {/* Brand */}
@@ -132,35 +135,35 @@ export default function OnboardWizard({ token }: { token: string }) {
         </div>
 
         <div className="rounded-3xl p-7 shadow-2xl" style={{ background: 'rgba(255,255,255,0.98)' }}>
-          {phase === 'loading' && <div className="py-16 text-center text-gray-400">טוען…</div>}
+          {phase === 'loading' && <div className="py-16 text-center text-gray-400">{t.loading}</div>}
 
           {phase === 'form' && data && (
             <>
-              <h1 className="text-2xl font-extrabold text-gray-900">שמחים שהצטרפת, {data.accountName} 🎉</h1>
-              <p className="text-sm text-gray-500 mt-1 mb-6">כמה פרטים אחרונים ומתחילים לבנות לך עוזר AI חכם.</p>
+              <h1 className="text-2xl font-extrabold text-gray-900">{t.form.heading(data.accountName)}</h1>
+              <p className="text-sm text-gray-500 mt-1 mb-6">{t.form.subtitle}</p>
 
               {/* Instagram connect */}
               <div className="rounded-2xl border border-gray-200 p-4 mb-4">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-sm font-semibold text-gray-900">חשבון אינסטגרם</div>
+                  <div className="text-sm font-semibold text-gray-900">{t.form.igLabel}</div>
                   {data.connected ? (
-                    <span className="text-sm font-medium text-green-600">מחובר — @{data.igUsername} ✓</span>
+                    <span className="text-sm font-medium text-green-600">{t.form.igConnected(data.igUsername || '')}</span>
                   ) : (
                     <a href={data.connectUrl} className="px-4 py-2 rounded-xl text-sm font-semibold text-white" style={{ background: BRAND }}>
-                      חבר/י אינסטגרם
+                      {t.form.igConnect}
                     </a>
                   )}
                 </div>
-                {!data.connected && <p className="text-xs text-gray-400 mt-2">מתחברים פעם אחת — כדי שהבוט ילמד את התוכן שלך ויענה לעוקבים.</p>}
+                {!data.connected && <p className="text-xs text-gray-400 mt-2">{t.form.igHint}</p>}
               </div>
 
               {/* Fields */}
               <div className="space-y-3">
-                <Field label="אתר אינטרנט" value={website} onChange={setWebsite} placeholder="https://…" />
-                <Field label="שם משתמש טיקטוק" value={tiktok} onChange={setTiktok} placeholder="@username" />
-                <Field label="שם משתמש יוטיוב" value={youtube} onChange={setYoutube} placeholder="@channel" />
+                <Field label={t.form.website} value={website} onChange={setWebsite} placeholder="https://…" />
+                <Field label={t.form.tiktok} value={tiktok} onChange={setTiktok} placeholder="@username" />
+                <Field label={t.form.youtube} value={youtube} onChange={setYoutube} placeholder="@channel" />
               </div>
-              <p className="text-xs text-gray-400 mt-2">הכל אופציונלי — מלא/י מה שיש (מספיק מקור אחד: אינסטגרם, אתר, טיקטוק או יוטיוב).</p>
+              <p className="text-xs text-gray-400 mt-2">{t.form.optionalHint}</p>
 
               {err && <div className="text-sm text-red-600 mt-3">{err}</div>}
 
@@ -170,16 +173,16 @@ export default function OnboardWizard({ token }: { token: string }) {
                 className="w-full mt-6 py-3 rounded-2xl text-white font-bold text-base disabled:opacity-40 transition"
                 style={{ background: BRAND }}
               >
-                {starting ? 'מתחילים…' : 'התחילו לבנות את החשבון שלי 🚀'}
+                {starting ? t.form.startingBtn : t.form.startBtn}
               </button>
-              {!canStart && <p className="text-center text-xs text-gray-400 mt-2">מלאו לפחות מקור אחד (או חברו אינסטגרם) כדי להתחיל</p>}
+              {!canStart && <p className="text-center text-xs text-gray-400 mt-2">{t.form.canStartHint}</p>}
             </>
           )}
 
           {phase === 'scanning' && (
             <div className="py-4 text-center">
-              <h1 className="text-2xl font-extrabold text-gray-900">בונים את החשבון שלך…</h1>
-              <p className="text-sm text-gray-500 mt-1 mb-6">סורקים את כל התוכן ובונים את הפרסונה. זה יכול לקחת כמה שעות — אפשר לסגור את הדף.</p>
+              <h1 className="text-2xl font-extrabold text-gray-900">{t.scanning.heading}</h1>
+              <p className="text-sm text-gray-500 mt-1 mb-6">{t.scanning.subtitle}</p>
               <div className="h-3 rounded-full bg-gray-100 overflow-hidden">
                 <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: BRAND }} />
               </div>
@@ -188,28 +191,28 @@ export default function OnboardWizard({ token }: { token: string }) {
                 {typeof progress?.completedSteps === 'number' && typeof progress?.totalSteps === 'number'
                   ? ` · ${progress.completedSteps}/${progress.totalSteps}` : ''}
               </div>
-              <p className="text-xs text-gray-400 mt-6">כשנסיים — נשלח לך הודעת וואטסאפ ומייל עם קישור לבסטי שלך.</p>
+              <p className="text-xs text-gray-400 mt-6">{t.scanning.notify}</p>
             </div>
           )}
 
           {phase === 'done' && (
             <div className="py-8 text-center">
               <div className="text-5xl mb-3">🎉</div>
-              <h1 className="text-2xl font-extrabold text-gray-900">הכל מוכן!</h1>
-              <p className="text-sm text-gray-500 mt-2">שלחנו לך לוואטסאפ ולמייל קישור לבסטי שלך. נתראה שם!</p>
+              <h1 className="text-2xl font-extrabold text-gray-900">{t.done.heading}</h1>
+              <p className="text-sm text-gray-500 mt-2">{t.done.subtitle}</p>
             </div>
           )}
 
           {phase === 'error' && (
             <div className="py-8 text-center">
               <div className="text-5xl mb-3">⚠️</div>
-              <h1 className="text-2xl font-extrabold text-gray-900">משהו השתבש בסריקה</h1>
-              <p className="text-sm text-gray-500 mt-2">הצוות שלנו קיבל התראה ויטפל בזה — נחזור אליך בהקדם.</p>
+              <h1 className="text-2xl font-extrabold text-gray-900">{t.error.heading}</h1>
+              <p className="text-sm text-gray-500 mt-2">{t.error.subtitle}</p>
             </div>
           )}
         </div>
 
-        <p className="text-center text-xs text-white/40 mt-5">מאובטח · BestieAI © LDRS</p>
+        <p className="text-center text-xs text-white/40 mt-5">{t.footer}</p>
       </div>
     </div>
   );

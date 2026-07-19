@@ -14,8 +14,11 @@ export async function POST(req: NextRequest) {
   const denied = await requireAdminAuth();
   if (denied) return denied;
 
-  const { clientName, email, mobile } = await req.json().catch(() => ({}));
+  const { clientName, email, mobile, language } = await req.json().catch(() => ({}));
   if (!clientName?.trim()) return NextResponse.json({ error: 'clientName required' }, { status: 400 });
+  // Language the client sees on /onboard/<token>. Admin picks it at creation;
+  // anything other than 'en' falls back to Hebrew.
+  const onboardLanguage = language === 'en' ? 'en' : 'he';
 
   const name = clientName.trim();
   const token = newOnboardingToken();
@@ -39,6 +42,7 @@ export async function POST(req: NextRequest) {
           clientName: name,
           ownerEmail: (email || '').trim(),
           ownerWhatsapp: mobile ? toWaId(String(mobile)) : '',
+          language: onboardLanguage,
           createdAt: now,
         },
       },
