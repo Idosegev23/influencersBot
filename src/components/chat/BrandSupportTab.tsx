@@ -409,7 +409,7 @@ export default function BrandSupportTab({
   }
 
   return (
-    <div className={`h-full overflow-y-auto ${isMobile ? 'pb-32' : 'pb-8'}`} dir="rtl">
+    <div className={`h-full overflow-y-auto ${isMobile ? 'pb-32' : 'pb-8'}`} dir={isEn ? 'ltr' : 'rtl'}>
       <div className="px-4 py-6">
         <div className={`mx-auto support-flow-container ${isMobile ? 'max-w-2xl' : 'max-w-[700px]'}`}>
 
@@ -475,7 +475,7 @@ export default function BrandSupportTab({
                     onKeyDown={(e) => { if (e.key === 'Enter') lookupShipment(); }}
                     placeholder={t.orderNumPh}
                     className="w-full bg-transparent border-0 outline-none font-['Heebo:Light',sans-serif] font-light text-[18px] leading-[22.4px] text-[#0c1013] placeholder:text-[#676767] text-right"
-                    dir="rtl"
+                    dir={isEn ? 'ltr' : 'rtl'}
                   />
                 </div>
                 <button
@@ -685,7 +685,7 @@ export default function BrandSupportTab({
                       value={searchQuery}
                       onChange={e => setSearchQuery(e.target.value)}
                       placeholder={t.searchProduct}
-                      dir="rtl"
+                      dir={isEn ? 'ltr' : 'rtl'}
                     />
                     <span className="support-search-icon" aria-hidden />
                   </div>
