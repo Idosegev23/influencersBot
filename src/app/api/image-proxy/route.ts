@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
 
     // Validate URL domain if provided
     if (imageUrl) {
-      const allowedDomains = ['instagram.com', 'cdninstagram.com', 'fbcdn.net', 'scontent'];
+      const allowedDomains = ['instagram.com', 'cdninstagram.com', 'fbcdn.net', 'scontent', 'ytimg.com', 'youtube.com', 'ggpht.com'];
       const isAllowed = allowedDomains.some(domain => imageUrl.includes(domain));
       if (!isAllowed) {
         return NextResponse.json({ error: 'Invalid image domain' }, { status: 400 });
