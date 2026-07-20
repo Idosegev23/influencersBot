@@ -20,6 +20,7 @@ interface DiscoveryTabProps {
   onAskInChat: (message: string, enrichedData?: string) => void;
   onCategoryOpened?: () => void;
   influencerType?: string;
+  language?: string;
 }
 
 /** Max sections to show initially */
@@ -27,7 +28,9 @@ const INITIAL_VISIBLE = 5;
 
 /** Pinterest masonry layout for all rows */
 
-export default function DiscoveryTab({ username, influencerName, sessionId, initialCategory, onAskInChat, onCategoryOpened, influencerType }: DiscoveryTabProps) {
+export default function DiscoveryTab({ username, influencerName, sessionId, initialCategory, onAskInChat, onCategoryOpened, influencerType, language }: DiscoveryTabProps) {
+  const isEn = (language || 'he').toLowerCase() === 'en';
+  const dir = isEn ? 'ltr' : 'rtl';
   // Media/News accounts get a completely different discovery layout
   if (influencerType === 'media_news') {
     return (
@@ -163,13 +166,13 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
     <div ref={scrollContainerRef} className="h-full overflow-y-auto" style={{ backgroundColor: '#f8f9fb' }}>
       <div className="max-w-[700px] mx-auto">
         {/* Header */}
-        <div className="px-5 pt-5 pb-3 flex items-center justify-between" dir="rtl">
+        <div className="px-5 pt-5 pb-3 flex items-center justify-between" dir={dir}>
           <div>
             <h1 className="font-bold text-[20px] tracking-tight" style={{ color: '#191c1e' }}>
-              גלו
+              {isEn ? 'Discover' : 'גלו'}
             </h1>
             <p className="text-[13px] font-medium" style={{ color: '#444749' }}>
-              הבחירות של {influencerName}
+              {isEn ? `Handpicked by ${influencerName}` : `הבחירות של ${influencerName}`}
             </p>
           </div>
         </div>
@@ -178,7 +181,7 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
         {loading && (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <Loader2 className="w-6 h-6 animate-spin" style={{ color: '#c4b5fd' }} />
-            <p className="text-[13px]" style={{ color: '#9ca3af' }}>טוען תוכן...</p>
+            <p className="text-[13px]" style={{ color: '#9ca3af' }}>{isEn ? 'Loading content…' : 'טוען תוכן...'}</p>
           </div>
         )}
 
@@ -202,6 +205,7 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
                 items={row.items}
                 onItemClick={handleItemClick}
                 layout={idx % 2 === 0 ? 'masonry' : 'scroll'}
+                dir={dir}
               />
             ))}
 
@@ -211,9 +215,9 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
                 onClick={() => setShowAll(true)}
                 className="w-full py-3 rounded-2xl text-[13px] font-bold transition-colors active:scale-[0.98]"
                 style={{ backgroundColor: '#f3f0ff', color: '#7c3aed' }}
-                dir="rtl"
+                dir={dir}
               >
-                הצג עוד {rows.length - INITIAL_VISIBLE} קטגוריות
+                {isEn ? `Show ${rows.length - INITIAL_VISIBLE} more categories` : `הצג עוד ${rows.length - INITIAL_VISIBLE} קטגוריות`}
               </button>
             )}
           </div>
@@ -222,7 +226,7 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
         {/* Empty */}
         {!loading && rows.length === 0 && !error && (
           <div className="px-5 py-16 text-center">
-            <p className="text-[13px]" style={{ color: '#9ca3af' }}>אין רשימות זמינות כרגע</p>
+            <p className="text-[13px]" style={{ color: '#9ca3af' }}>{isEn ? 'No lists available right now' : 'אין רשימות זמינות כרגע'}</p>
           </div>
         )}
 
@@ -232,7 +236,7 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
             onClick={() => setShowQuestions(!showQuestions)}
             className="w-full flex items-center justify-between p-4 bg-white rounded-2xl active:scale-[0.98] transition-all"
             style={{ border: '1px solid #f0f0f0', boxShadow: '0 4px 16px rgba(0,0,0,0.04)' }}
-            dir="rtl"
+            dir={dir}
           >
             <div className="flex items-center gap-4">
               <div
@@ -247,7 +251,7 @@ export default function DiscoveryTab({ username, influencerName, sessionId, init
                 </span>
               </div>
               <span className="font-bold text-[14px]" style={{ color: '#191c1e' }}>
-                שאלות שתמיד רציתם לשאול
+                {isEn ? 'Questions you always wanted to ask' : 'שאלות שתמיד רציתם לשאול'}
               </span>
             </div>
             <span

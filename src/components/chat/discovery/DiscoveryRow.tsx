@@ -11,6 +11,7 @@ interface DiscoveryRowProps {
   onItemClick: (item: DiscoveryItem, categoryTitle: string, categorySlug: string) => void;
   slug: string;
   layout: 'masonry' | 'scroll';
+  dir?: 'ltr' | 'rtl';
 }
 
 function getThumb(item: DiscoveryItem) {
@@ -30,10 +31,10 @@ function getThumb(item: DiscoveryItem) {
 const RIGHT_PATTERN: Array<'tall' | 'short'> = ['tall', 'short', 'tall'];
 const LEFT_PATTERN: Array<'tall' | 'short'> = ['short', 'tall', 'short'];
 
-export function DiscoveryRow({ title, subtitle, color, items, onItemClick, slug, layout }: DiscoveryRowProps) {
+export function DiscoveryRow({ title, subtitle, color, items, onItemClick, slug, layout, dir = 'rtl' }: DiscoveryRowProps) {
   if (layout === 'scroll') {
     return (
-      <section className="space-y-3" dir="rtl">
+      <section className="space-y-3" dir={dir}>
         <div className="px-5">
           <SectionHeader title={title} subtitle={subtitle} color={color} />
         </div>
@@ -58,7 +59,7 @@ export function DiscoveryRow({ title, subtitle, color, items, onItemClick, slug,
   });
 
   return (
-    <section className="space-y-3" dir="rtl">
+    <section className="space-y-3" dir={dir}>
       <SectionHeader title={title} subtitle={subtitle} color={color} />
       <div className="flex gap-[10px]">
         {/* Right column (first in RTL) */}

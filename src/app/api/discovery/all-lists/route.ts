@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
 
     const { data: account } = await supabase
       .from('accounts')
-      .select('id, config')
+      .select('id, config, language')
       .eq('config->>username', username)
       .eq('status', 'active')
       .maybeSingle();
@@ -42,6 +42,7 @@ export async function GET(req: NextRequest) {
     const accountId = account.id;
     const influencerName = account.config?.display_name || account.config?.username || username;
     const archetype = account.config?.archetype;
+    const isEn = (account as any).language === 'en'; // English accounts get the English category chrome
 
     // government_ministry archetype: discover feed is built from scraped pages
     // (instagram_bio_websites), not from Instagram posts. Different data source,
@@ -94,8 +95,8 @@ export async function GET(req: NextRequest) {
         if (available) {
           result.push({
             slug: cat.slug,
-            title: resolveCategoryTitle(cat.titleTemplate, influencerName),
-            subtitle: resolveCategoryTitle(cat.subtitle, influencerName),
+            title: resolveCategoryTitle(isEn && cat.titleTemplateEn ? cat.titleTemplateEn : cat.titleTemplate, influencerName),
+            subtitle: resolveCategoryTitle(isEn && cat.subtitleEn ? cat.subtitleEn : cat.subtitle, influencerName),
             icon: cat.icon,
             type: cat.type,
             color: cat.color,

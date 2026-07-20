@@ -6,6 +6,8 @@ export interface DiscoveryCategory {
   slug: string;
   titleTemplate: string;       // "5 הסרטונים הכי ויראליים של {name}"
   subtitle: string;            // "לפי צפיות"
+  titleTemplateEn?: string;    // English variant (for accounts.language==='en')
+  subtitleEn?: string;         // English variant
   icon: string;                // lucide icon name
   type: 'data_driven' | 'ai_generated' | 'interactive';
   color: string;               // hex color for card accent

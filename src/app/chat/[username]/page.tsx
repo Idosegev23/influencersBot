@@ -3001,6 +3001,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   sessionId={sessionId || undefined}
                   initialCategory={initialDiscoverySlug}
                   influencerType={influencer.influencer_type}
+                  language={(influencer as any).language || 'he'}
                   onAskInChat={async (message, enrichedData) => {
                     setActiveTab('chat');
                     maybeShowLeadPopup();
