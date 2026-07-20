@@ -71,6 +71,10 @@ export async function youtubeScanStep(ctx: StepContext): Promise<StepResult> {
             type: 'video',
             caption: [v.title, v.description].filter(Boolean).join('\n').slice(0, 5000),
             media_urls: [v.url],
+            // Store a real image so content/discovery cards don't try to render the
+            // watch URL as an <img> (broken "?"). Prefer the API thumbnail; fall back
+            // to YouTube's always-valid CDN thumbnail derived from the video id.
+            thumbnail_url: v.thumbnail || `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`,
             views_count: capInt4(v.views),
             posted_at: toPostedAt(v.publishDate),
           },

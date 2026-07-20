@@ -25,6 +25,7 @@ export interface YoutubeVideo {
   url: string;
   title?: string;
   description?: string;
+  thumbnail?: string;
   views?: number;
   lengthSeconds?: number;
   publishedTime?: string;
@@ -78,6 +79,7 @@ export async function getYoutubeVideos(handleOrUrl: string, limit = 30): Promise
         url: v.url,
         title: v.title,
         description: v.description,
+        thumbnail: v.thumbnail,
         views: v.viewCountInt,
         lengthSeconds: v.lengthSeconds,
         publishedTime: v.publishedTime,
