@@ -2553,6 +2553,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   username={username}
                   brandName={influencer.display_name}
                   isMobile={isMobile}
+                  language={(influencer as any).language || 'he'}
                   coupons={brands.map(b => ({ brand_name: b.brand_name, coupon_code: b.coupon_code, description: b.description, category: b.category }))}
                   initialDetails={supportPrefill?.details}
                   initialProblemType={supportProblemParam}

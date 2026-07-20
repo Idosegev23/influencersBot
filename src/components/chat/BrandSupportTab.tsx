@@ -44,6 +44,8 @@ interface BrandSupportTabProps {
   initialMode?: 'support' | 'tracking';
   sessionId?: string | null;
   refSource?: string | null;
+  /** Account language ('he'/'en'); drives all copy + direction. Default 'he'. */
+  language?: string;
 }
 
 interface ShipmentStatus {
@@ -65,13 +67,13 @@ interface ShipmentStatus {
 /* ------------------------------------------------------------------ */
 
 const PROBLEM_TYPES = [
-  { id: 'damaged', label: 'מוצר פגום', sublabel: 'הגיע שבור או ניזוק', icon: 'problem-damaged' },
-  { id: 'wrong_item', label: 'מוצר שגוי', sublabel: 'קיבלתי מוצר אחר', icon: 'problem-wrong' },
-  { id: 'shipping', label: 'בעיית משלוח', sublabel: 'לא הגיע / איחר', icon: 'problem-shipping' },
-  { id: 'coupon', label: 'בעיה בקופון', sublabel: 'קוד לא עובד', icon: 'problem-coupon' },
-  { id: 'payment', label: 'בעיה בתשלום', sublabel: 'חיוב כפול / שגיאה', icon: 'problem-payment' },
-  { id: 'quality', label: 'איכות מוצר', sublabel: 'לא מתאים לציפיות', icon: 'problem-quality' },
-  { id: 'other', label: 'אחר', sublabel: 'פנייה כללית', icon: 'problem-other' },
+  { id: 'damaged', label: 'מוצר פגום', sublabel: 'הגיע שבור או ניזוק', labelEn: 'Damaged product', sublabelEn: 'Arrived broken or damaged', icon: 'problem-damaged' },
+  { id: 'wrong_item', label: 'מוצר שגוי', sublabel: 'קיבלתי מוצר אחר', labelEn: 'Wrong item', sublabelEn: 'Received a different product', icon: 'problem-wrong' },
+  { id: 'shipping', label: 'בעיית משלוח', sublabel: 'לא הגיע / איחר', labelEn: 'Shipping issue', sublabelEn: "Didn't arrive / delayed", icon: 'problem-shipping' },
+  { id: 'coupon', label: 'בעיה בקופון', sublabel: 'קוד לא עובד', labelEn: 'Coupon problem', sublabelEn: "Code doesn't work", icon: 'problem-coupon' },
+  { id: 'payment', label: 'בעיה בתשלום', sublabel: 'חיוב כפול / שגיאה', labelEn: 'Payment issue', sublabelEn: 'Double charge / error', icon: 'problem-payment' },
+  { id: 'quality', label: 'איכות מוצר', sublabel: 'לא מתאים לציפיות', labelEn: 'Product quality', sublabelEn: "Didn't meet expectations", icon: 'problem-quality' },
+  { id: 'other', label: 'אחר', sublabel: 'פנייה כללית', labelEn: 'Other', sublabelEn: 'General inquiry', icon: 'problem-other' },
 ] as const;
 
 type ProblemTypeId = typeof PROBLEM_TYPES[number]['id'];
@@ -114,8 +116,46 @@ function iconFor(cat: string): string {
 /* ------------------------------------------------------------------ */
 
 export default function BrandSupportTab({
-  accountId, username, brandName, isMobile, coupons = [], initialDetails, initialProblemType, initialCouponCode, enableShipmentTracking, initialMode, sessionId, refSource,
+  accountId, username, brandName, isMobile, coupons = [], initialDetails, initialProblemType, initialCouponCode, enableShipmentTracking, initialMode, sessionId, refSource, language,
 }: BrandSupportTabProps) {
+  const isEn = (language || 'he').toLowerCase() === 'en';
+  const t = isEn ? {
+    productIssueTab: 'Product issue', shipmentTab: 'Shipment status',
+    orderStatus: 'Order status', enterOrderNum: 'Enter the order number from your purchase confirmation',
+    orderNumPh: 'Order number', checkStatus: 'Check status', notFoundTitle: 'Not found',
+    notFoundLead: "This order wasn't found in the shipping system yet",
+    shipNumLabel: 'Tracking number', delivered: 'Delivered', returned: 'Returned', canceled: 'Canceled', inTransit: 'In transit',
+    routeHistory: 'Route history', shipProblemCta: 'Shipping problem? Open a request',
+    productIssueTitle: 'Product issue', whichProduct: 'Which product would you like to report?',
+    searchProduct: 'Search product', generalInquiry: 'General inquiry', noSpecificProduct: 'No specific product',
+    productsCount: (n: number) => `${n} products`, noProducts: 'No products found',
+    whatProblem: 'What went wrong?', pickProblem: 'Choose the issue you ran into',
+    back: 'Back', openRequest: 'Open a request', fillDetails: "Fill in the details and we'll get back to you soon",
+    fullNamePh: 'Full name', phonePh: 'Phone number', orderOptPh: 'Order number (optional)', describePh: 'Describe the issue',
+    submit: 'Submit request', successTitle: 'Your request was sent!',
+    successBody: (b: string) => `The ${b} team will get back to you soon`, close: 'Close',
+    errRequired: 'Please fill in all required fields', errSend: 'Error sending the request',
+    errEnterOrder: 'Please enter an order number', errDigits: 'The number must contain digits only', errConn: 'A connection error occurred with the shipping service',
+    ctxProduct: 'Product', ctxLink: 'Link', ctxProblemType: 'Issue type', ctxCoupon: 'Coupon', ctxDetails: 'Details', ctxOther: 'Other',
+  } : {
+    productIssueTab: 'בעיה במוצר', shipmentTab: 'סטטוס משלוח',
+    orderStatus: 'סטטוס הזמנה', enterOrderNum: 'הזיני את מספר ההזמנה מאישור הרכישה',
+    orderNumPh: 'מספר הזמנה', checkStatus: 'בדיקת סטטוס', notFoundTitle: 'לא נמצא',
+    notFoundLead: 'ההזמנה הזו עדיין לא נמצאה במערכת השילוח',
+    shipNumLabel: 'מספר משלוח', delivered: 'נמסר', returned: 'הוחזר', canceled: 'בוטל', inTransit: 'בדרך',
+    routeHistory: 'היסטוריית המסלול', shipProblemCta: 'יש בעיה במשלוח? פתחי פנייה',
+    productIssueTitle: 'בעיה במוצר', whichProduct: 'על איזה מוצר תרצו לדווח?',
+    searchProduct: 'חיפוש מוצר', generalInquiry: 'פנייה כללית', noSpecificProduct: 'ללא מוצר ספציפי',
+    productsCount: (n: number) => `${n} מוצרים`, noProducts: 'לא נמצאו מוצרים',
+    whatProblem: 'מה הבעיה?', pickProblem: 'בחרי את הבעיה שנתקלת בה',
+    back: 'חזרה', openRequest: 'פתיחת פנייה', fillDetails: 'מלאו את הפרטים ונחזור אליכם בהקדם',
+    fullNamePh: 'שם מלא', phonePh: 'מספר טלפון', orderOptPh: 'מספר הזמנה (אופציונלי)', describePh: 'תיאור הבעיה',
+    submit: 'שלח פנייה', successTitle: 'הפנייה נשלחה בהצלחה!',
+    successBody: (b: string) => `צוות ${b} יחזור אליכם בהקדם`, close: 'סגור',
+    errRequired: 'נא למלא את כל השדות החובה', errSend: 'שגיאה בשליחת הפנייה',
+    errEnterOrder: 'נא להזין מספר הזמנה', errDigits: 'המספר צריך להכיל ספרות בלבד', errConn: 'אירעה שגיאה בחיבור לשירות המשלוחים',
+    ctxProduct: 'מוצר', ctxLink: 'קישור', ctxProblemType: 'סוג בעיה', ctxCoupon: 'קופון', ctxDetails: 'פירוט', ctxOther: 'אחר',
+  };
   // Deep-link prefill: if the URL named a valid problem type (e.g. ?problem=coupon)
   // we skip the product + type pickers and drop the visitor straight on the form
   // with the type locked in. Validated against PROBLEM_TYPES so a junk param falls
@@ -148,13 +188,13 @@ export default function BrandSupportTab({
   const lookupShipment = useCallback(async () => {
     const raw = trackingNumber.trim();
     if (!raw) {
-      setTrackingError('נא להזין מספר הזמנה');
+      setTrackingError(t.errEnterOrder);
       return;
     }
 
     const cleaned = raw.replace(/^#+/, '').replace(/\s+/g, '');
     if (!/^\d+$/.test(cleaned)) {
-      setTrackingError('המספר צריך להכיל ספרות בלבד');
+      setTrackingError(t.errDigits);
       return;
     }
 
@@ -187,7 +227,7 @@ export default function BrandSupportTab({
       // panel renders with the "maybe order# / maybe shipment#" hints.
       setTrackingStatus(orderData as ShipmentStatus);
     } catch {
-      setTrackingError('אירעה שגיאה בחיבור לשירות המשלוחים');
+      setTrackingError(t.errConn);
     } finally {
       setTrackingLoading(false);
     }
@@ -283,7 +323,7 @@ export default function BrandSupportTab({
   // Submit
   const handleSubmit = async () => {
     if (!form.name || !form.phone || !form.details) {
-      setError('נא למלא את כל השדות החובה');
+      setError(t.errRequired);
       return;
     }
     setSubmitting(true);
@@ -293,15 +333,16 @@ export default function BrandSupportTab({
       // Build detailed problem message with context
       const parts: string[] = [];
       if (selectedProduct) {
-        parts.push(`מוצר: ${selectedProduct.name_he || selectedProduct.name}`);
-        if (selectedProduct.product_url) parts.push(`קישור: ${selectedProduct.product_url}`);
+        parts.push(`${t.ctxProduct}: ${selectedProduct.name_he || selectedProduct.name}`);
+        if (selectedProduct.product_url) parts.push(`${t.ctxLink}: ${selectedProduct.product_url}`);
       }
-      const typeLabel = PROBLEM_TYPES.find(t => t.id === selectedType)?.label || 'אחר';
-      parts.push(`סוג בעיה: ${typeLabel}`);
+      const pt = PROBLEM_TYPES.find(p => p.id === selectedType);
+      const typeLabel = (isEn ? pt?.labelEn : pt?.label) || t.ctxOther;
+      parts.push(`${t.ctxProblemType}: ${typeLabel}`);
       if (selectedCoupon) {
-        parts.push(`קופון: ${selectedCoupon.coupon_code} (${selectedCoupon.brand_name})`);
+        parts.push(`${t.ctxCoupon}: ${selectedCoupon.coupon_code} (${selectedCoupon.brand_name})`);
       }
-      parts.push(`פירוט: ${form.details}`);
+      parts.push(`${t.ctxDetails}: ${form.details}`);
 
       // Defensive fallback — if the prop is null but localStorage has
       // a ref for this username, use it. Production data showed 873/1014
@@ -334,10 +375,10 @@ export default function BrandSupportTab({
         }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'שגיאה בשליחת הפנייה');
+      if (!response.ok) throw new Error(data.error || t.errSend);
       setStep('success');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'שגיאה בשליחת הפנייה');
+      setError(err instanceof Error ? err.message : t.errSend);
     } finally {
       setSubmitting(false);
     }
@@ -385,7 +426,7 @@ export default function BrandSupportTab({
                 }}
               >
                 <AlertCircle className="w-[18px] h-[18px]" strokeWidth={2} />
-                <span className="font-['Heebo:Regular',sans-serif] text-[14px] leading-[21px]">בעיה במוצר</span>
+                <span className="font-['Heebo:Regular',sans-serif] text-[14px] leading-[21px]">{t.productIssueTitle}</span>
               </button>
               <button
                 type="button"
@@ -397,7 +438,7 @@ export default function BrandSupportTab({
                 }}
               >
                 <Truck className="w-[18px] h-[18px]" strokeWidth={2} />
-                <span className="font-['Heebo:Regular',sans-serif] text-[14px] leading-[21px]">סטטוס משלוח</span>
+                <span className="font-['Heebo:Regular',sans-serif] text-[14px] leading-[21px]">{t.shipmentTab}</span>
               </button>
             </div>
           )}
@@ -415,10 +456,10 @@ export default function BrandSupportTab({
                   Focus shipment# before showing "not found". */}
               <div className="mb-4 px-3 flex flex-col items-end gap-[2px]">
                 <h2 className="font-['Heebo:SemiBold',sans-serif] font-semibold text-[24px] leading-[28px] text-[#0c1013] text-right">
-                  סטטוס הזמנה
+                  {t.orderStatus}
                 </h2>
                 <p className="font-['Heebo:Regular',sans-serif] text-[18px] leading-[24px] text-[#676767] text-right">
-                  הזיני את מספר ההזמנה מאישור הרכישה
+                  {t.enterOrderNum}
                 </p>
               </div>
 
@@ -432,7 +473,7 @@ export default function BrandSupportTab({
                     value={trackingNumber}
                     onChange={(e) => setTrackingNumber(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') lookupShipment(); }}
-                    placeholder="מספר הזמנה"
+                    placeholder={t.orderNumPh}
                     className="w-full bg-transparent border-0 outline-none font-['Heebo:Light',sans-serif] font-light text-[18px] leading-[22.4px] text-[#0c1013] placeholder:text-[#676767] text-right"
                     dir="rtl"
                   />
@@ -450,7 +491,7 @@ export default function BrandSupportTab({
                   {trackingLoading ? (
                     <Loader2 className="w-[18px] h-[18px] animate-spin" />
                   ) : (
-                    <span className="font-['Heebo:Regular',sans-serif] text-[18px] leading-[22.4px]">בדיקת סטטוס</span>
+                    <span className="font-['Heebo:Regular',sans-serif] text-[18px] leading-[22.4px]">{t.checkStatus}</span>
                   )}
                 </button>
                 {trackingError && (
@@ -473,7 +514,7 @@ export default function BrandSupportTab({
                         <div className="w-[56px] h-[56px] mx-auto rounded-[14px] flex items-center justify-center mb-4 bg-[#f1e9fd]">
                           <Search className="w-7 h-7 text-[#883fe2]" />
                         </div>
-                        <h3 className="font-['Heebo:SemiBold',sans-serif] font-semibold text-[20px] leading-[24px] text-[#0c1013] mb-2 text-center">לא נמצא</h3>
+                        <h3 className="font-['Heebo:SemiBold',sans-serif] font-semibold text-[20px] leading-[24px] text-[#0c1013] mb-2 text-center">{t.notFoundTitle}</h3>
                         <p className="font-['Heebo:Regular',sans-serif] text-[14px] leading-[21px] text-[#676767] mb-4 text-center">{trackingStatus.statusText}</p>
 
                         {/* The lookup tries both order# and shipment# — if
@@ -483,7 +524,7 @@ export default function BrandSupportTab({
                           <div className="flex gap-2 items-start mb-2">
                             <AlertCircle className="w-[18px] h-[18px] text-[#b45309] flex-shrink-0 mt-[2px]" />
                             <p className="font-['Heebo:SemiBold',sans-serif] font-semibold text-[14px] leading-[20px] text-[#92400e]">
-                              ההזמנה הזו עדיין לא נמצאה במערכת השילוח
+                              {t.notFoundLead}
                             </p>
                           </div>
                           <ul className="font-['Heebo:Regular',sans-serif] text-[13px] leading-[20px] text-[#7c2d12] pr-6 list-disc text-right space-y-1">
@@ -513,7 +554,7 @@ export default function BrandSupportTab({
                                 <Package className="w-[20px] h-[20px] text-[#883fe2]" strokeWidth={1.6} />
                               </div>
                               <div className="flex flex-col">
-                                <span className="font-['Heebo:Light',sans-serif] font-light text-[12px] leading-[16px] text-[#676767]">מספר משלוח</span>
+                                <span className="font-['Heebo:Light',sans-serif] font-light text-[12px] leading-[16px] text-[#676767]">{t.shipNumLabel}</span>
                                 <span className="font-['Heebo:SemiBold',sans-serif] font-semibold text-[18px] leading-[22px] text-[#0c1013] tabular-nums">
                                   {trackingStatus.shipmentNumber}
                                 </span>
@@ -529,10 +570,10 @@ export default function BrandSupportTab({
                                 color: '#ffffff',
                               }}
                             >
-                              {trackingStatus.isDelivered ? <><CheckCircle className="w-[14px] h-[14px]" /> <span className="font-['Heebo:Regular',sans-serif] text-[14px]">נמסר</span></>
-                              : trackingStatus.isReturned ? <span className="font-['Heebo:Regular',sans-serif] text-[14px]">הוחזר</span>
-                              : trackingStatus.isCanceled ? <span className="font-['Heebo:Regular',sans-serif] text-[14px]">בוטל</span>
-                              : <><Truck className="w-[14px] h-[14px]" /> <span className="font-['Heebo:Regular',sans-serif] text-[14px]">בדרך</span></>}
+                              {trackingStatus.isDelivered ? <><CheckCircle className="w-[14px] h-[14px]" /> <span className="font-['Heebo:Regular',sans-serif] text-[14px]">{t.delivered}</span></>
+                              : trackingStatus.isReturned ? <span className="font-['Heebo:Regular',sans-serif] text-[14px]">{t.returned}</span>
+                              : trackingStatus.isCanceled ? <span className="font-['Heebo:Regular',sans-serif] text-[14px]">{t.canceled}</span>
+                              : <><Truck className="w-[14px] h-[14px]" /> <span className="font-['Heebo:Regular',sans-serif] text-[14px]">{t.inTransit}</span></>}
                             </div>
                           </div>
 
@@ -562,7 +603,7 @@ export default function BrandSupportTab({
                         {trackingStatus.history && trackingStatus.history.length > 0 && (
                           <div className="bg-white rounded-[20px] p-[20px] mb-[12px]">
                             <div className="font-['Heebo:Regular',sans-serif] text-[14px] text-[#676767] mb-[16px] text-right">
-                              היסטוריית המסלול
+                              {t.routeHistory}
                             </div>
                             <div className="relative">
                               <div className="absolute right-[7px] top-2 bottom-2 w-px bg-[#f1e9fd]" />
@@ -611,7 +652,7 @@ export default function BrandSupportTab({
                           className="w-full h-[52px] flex items-center justify-center px-[20px] rounded-[60px] transition-opacity active:opacity-90"
                           style={{ background: '#ffffff', color: '#883fe2', border: '1px solid #f1e9fd' }}
                         >
-                          <span className="font-['Heebo:Regular',sans-serif] text-[18px] leading-[22.4px]">יש בעיה במשלוח? פתחי פנייה</span>
+                          <span className="font-['Heebo:Regular',sans-serif] text-[18px] leading-[22.4px]">{t.shipProblemCta}</span>
                         </button>
                       </>
                     )}
@@ -632,8 +673,8 @@ export default function BrandSupportTab({
                 exit={{ opacity: 0, x: -20 }}
               >
                 <div className="mb-4 px-3">
-                  <h2 className="support-title">בעיה במוצר</h2>
-                  <p className="support-subtitle">על איזה מוצר תרצו לדווח?</p>
+                  <h2 className="support-title">{t.productIssueTitle}</h2>
+                  <p className="support-subtitle">{t.whichProduct}</p>
                 </div>
 
                 {/* Search pill */}
@@ -643,7 +684,7 @@ export default function BrandSupportTab({
                       type="text"
                       value={searchQuery}
                       onChange={e => setSearchQuery(e.target.value)}
-                      placeholder="חיפוש מוצר"
+                      placeholder={t.searchProduct}
                       dir="rtl"
                     />
                     <span className="support-search-icon" aria-hidden />
@@ -666,8 +707,8 @@ export default function BrandSupportTab({
                     />
                   </div>
                   <div className="support-card-text">
-                    <p className="support-card-title">פנייה כללית</p>
-                    <p className="support-card-subtitle">ללא מוצר ספציפי</p>
+                    <p className="support-card-title">{t.generalInquiry}</p>
+                    <p className="support-card-subtitle">{t.noSpecificProduct}</p>
                   </div>
                 </button>
 
@@ -697,7 +738,7 @@ export default function BrandSupportTab({
                               <p className="support-card-title">
                                 {CATEGORY_LABELS[cat] || cat.replace(/_/g, ' ')}
                               </p>
-                              <p className="support-card-subtitle">{items.length} מוצרים</p>
+                              <p className="support-card-subtitle">{t.productsCount(items.length)}</p>
                             </div>
                           </button>
                           <AnimatePresence>
@@ -779,7 +820,7 @@ export default function BrandSupportTab({
                 )}
 
                 {filtered.length === 0 && searchQuery && (
-                  <p className="text-center text-sm mt-6" style={{ color: '#999' }}>לא נמצאו מוצרים</p>
+                  <p className="text-center text-sm mt-6" style={{ color: '#999' }}>{t.noProducts}</p>
                 )}
               </motion.div>
             )}
@@ -794,14 +835,14 @@ export default function BrandSupportTab({
               >
                 <div className="mb-4 px-3 flex items-start justify-between">
                   <div>
-                    <h2 className="support-title">מה הבעיה?</h2>
-                    <p className="support-subtitle">בחרי את הבעיה שנתקלת בה</p>
+                    <h2 className="support-title">{t.whatProblem}</h2>
+                    <p className="support-subtitle">{t.pickProblem}</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => setStep('product')}
                     className="support-back-btn"
-                    aria-label="חזרה"
+                    aria-label={t.back}
                   >
                     <span className="support-back-icon" aria-hidden />
                   </button>
@@ -848,8 +889,8 @@ export default function BrandSupportTab({
                           />
                         </div>
                         <div className="problem-type-text">
-                          <p>{type.label}</p>
-                          <p>{type.sublabel}</p>
+                          <p>{isEn ? type.labelEn : type.label}</p>
+                          <p>{isEn ? type.sublabelEn : type.sublabel}</p>
                         </div>
                       </button>
                     ))}
@@ -868,14 +909,14 @@ export default function BrandSupportTab({
               >
                 <div className="mb-4 px-3 flex items-start justify-between">
                   <div>
-                    <h2 className="support-title">פתיחת פנייה</h2>
-                    <p className="support-subtitle">מלאו את הפרטים ונחזור אליכם בהקדם</p>
+                    <h2 className="support-title">{t.openRequest}</h2>
+                    <p className="support-subtitle">{t.fillDetails}</p>
                   </div>
                   <button
                     type="button"
                     onClick={goBack}
                     className="support-back-btn"
-                    aria-label="חזרה"
+                    aria-label={t.back}
                   >
                     <span className="support-back-icon" aria-hidden />
                   </button>
@@ -909,7 +950,7 @@ export default function BrandSupportTab({
                           aria-hidden
                         />
                       </div>
-                      <p>{PROBLEM_TYPES.find(t => t.id === selectedType)?.label}</p>
+                      <p>{(() => { const p = PROBLEM_TYPES.find(p => p.id === selectedType); return isEn ? p?.labelEn : p?.label; })()}</p>
                     </div>
                   )}
 
@@ -955,28 +996,28 @@ export default function BrandSupportTab({
                       type="text"
                       value={form.name}
                       onChange={e => setForm({ ...form, name: e.target.value })}
-                      placeholder="שם מלא"
+                      placeholder={t.fullNamePh}
                       className="support-form-input"
                     />
                     <input
                       type="tel"
                       value={form.phone}
                       onChange={e => setForm({ ...form, phone: e.target.value.replace(/\D/g, '') })}
-                      placeholder="מספר טלפון"
+                      placeholder={t.phonePh}
                       className="support-form-input"
                     />
                     <input
                       type="text"
                       value={form.order}
                       onChange={e => setForm({ ...form, order: e.target.value })}
-                      placeholder="מספר הזמנה (אופציונלי)"
+                      placeholder={t.orderOptPh}
                       className="support-form-input"
                     />
                   </div>
                   <textarea
                     value={form.details}
                     onChange={e => setForm({ ...form, details: e.target.value })}
-                    placeholder="תיאור הבעיה"
+                    placeholder={t.describePh}
                     className="support-form-textarea"
                   />
                 </div>
@@ -987,7 +1028,7 @@ export default function BrandSupportTab({
                   disabled={submitting || !form.name || !form.phone || !form.details}
                   className={`support-cta mt-8 ${submitting || !form.name || !form.phone || !form.details ? 'support-cta--disabled' : 'support-cta--enabled'}`}
                 >
-                  {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'שלח פנייה'}
+                  {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : t.submit}
                 </button>
               </motion.div>
             )}
@@ -1004,13 +1045,13 @@ export default function BrandSupportTab({
                   <CheckCircle className="w-8 h-8 text-white" />
                 </div>
                 <h3 className="text-[22px] font-bold mb-2" style={{ color: '#1a1a2e' }}>
-                  הפנייה נשלחה בהצלחה!
+                  {t.successTitle}
                 </h3>
                 <p className="text-[15px] mb-8" style={{ color: '#888' }}>
-                  צוות {brandName} יחזור אליכם בהקדם
+                  {t.successBody(brandName)}
                 </p>
                 <button onClick={reset} className="problem-btn-submit px-10">
-                  סגור
+                  {t.close}
                 </button>
               </motion.div>
             )}
