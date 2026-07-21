@@ -131,19 +131,29 @@ export async function GET(
     return NextResponse.json({ error: 'db error' }, { status: 500 });
   }
 
-  // Quick aggregate for the filter pills — small extra query but lets
-  // us show counts per status without forcing the client to fetch all.
-  const { data: agg } = await supabase
-    .from('support_requests')
-    .select('status', { count: 'exact', head: false })
-    .eq('account_id', influencer.id);
+  // Counts for the filter pills. These MUST use exact head-counts (count
+  // only, no rows returned) — the previous version fetched every row and
+  // counted the array in JS, which silently capped at PostgREST's default
+  // 1000-row limit, so `counts.all` (and per-status counts) stuck at 1000
+  // for high-volume accounts even when thousands of tickets existed.
+  const countFor = (status?: string) => {
+    let cq = supabase
+      .from('support_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('account_id', influencer.id);
+    if (status) cq = cq.eq('status', status);
+    return cq;
+  };
+  const statusList = [...VALID_STATUSES];
+  const [allCount, ...statusCounts] = await Promise.all([
+    countFor(),
+    ...statusList.map((s) => countFor(s)),
+  ]);
 
-  const counts: Record<string, number> = { all: 0 };
-  for (const row of agg || []) {
-    const s = (row as any).status as string;
-    counts.all = (counts.all || 0) + 1;
-    counts[s] = (counts[s] || 0) + 1;
-  }
+  const counts: Record<string, number> = { all: allCount.count || 0 };
+  statusList.forEach((s, i) => {
+    counts[s] = statusCounts[i].count || 0;
+  });
 
   return NextResponse.json({
     tickets: data || [],
