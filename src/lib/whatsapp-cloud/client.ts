@@ -220,6 +220,92 @@ export async function sendMediaByLink(params: {
 }
 
 // -----------------------------------------------------------------------
+// Send: interactive reply buttons (max 3) — 24h service-window message.
+// -----------------------------------------------------------------------
+export interface InteractiveButton { id: string; title: string; }        // title<=20, id<=256
+export interface InteractiveRow { id: string; title: string; description?: string; } // title<=24, desc<=72, id<=200
+export interface InteractiveSection { title?: string; rows: InteractiveRow[]; }        // <=10 rows total
+
+export async function sendInteractiveButtons(params: {
+  to: string;
+  body: string;                 // <=1024
+  buttons: InteractiveButton[]; // max 3
+  header?: string;
+  footer?: string;
+}): Promise<WhatsAppSendResult> {
+  const { phoneNumberId } = getConfig();
+  const to = toWaId(params.to);
+  const interactive: any = {
+    type: 'button',
+    body: { text: params.body },
+    action: {
+      buttons: params.buttons.slice(0, 3).map((b) => ({
+        type: 'reply',
+        reply: { id: b.id, title: b.title },
+      })),
+    },
+  };
+  if (params.header) interactive.header = { type: 'text', text: params.header };
+  if (params.footer) interactive.footer = { text: params.footer };
+
+  const { ok, data } = await graphFetch(`/${phoneNumberId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to,
+      type: 'interactive',
+      interactive,
+    }),
+  });
+  return parseSendResponse(ok, data);
+}
+
+// -----------------------------------------------------------------------
+// Send: interactive sectioned list (single button opens it) — 24h window.
+// -----------------------------------------------------------------------
+export async function sendInteractiveList(params: {
+  to: string;
+  body: string;                 // <=4096
+  buttonLabel: string;          // <=20
+  sections: InteractiveSection[]; // <=10 rows total
+  header?: string;
+  footer?: string;
+}): Promise<WhatsAppSendResult> {
+  const { phoneNumberId } = getConfig();
+  const to = toWaId(params.to);
+  const interactive: any = {
+    type: 'list',
+    body: { text: params.body },
+    action: {
+      button: params.buttonLabel,
+      sections: params.sections.map((s) => ({
+        ...(s.title ? { title: s.title } : {}),
+        rows: s.rows.map((r) => ({
+          id: r.id,
+          title: r.title,
+          ...(r.description ? { description: r.description } : {}),
+        })),
+      })),
+    },
+  };
+  if (params.header) interactive.header = { type: 'text', text: params.header };
+  if (params.footer) interactive.footer = { text: params.footer };
+
+  const { ok, data } = await graphFetch(`/${phoneNumberId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to,
+      type: 'interactive',
+      interactive,
+    }),
+  });
+  return parseSendResponse(ok, data);
+}
+
+// -----------------------------------------------------------------------
 // Mark inbound message as read (shows blue ticks on the user's side)
 // -----------------------------------------------------------------------
 export async function markAsRead(waMessageId: string): Promise<boolean> {
