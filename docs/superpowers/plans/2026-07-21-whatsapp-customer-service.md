@@ -3017,13 +3017,16 @@ function toResult(o: NormalizedOrder): OrderLookupResult & { lineItems: Normaliz
   };
 }
 
-async function focusEnrich(config: any, trackingNumber: string | null): Promise<FocusCustomerStatusView | null> {
+// NOTE: Focus P2 reference is the ORDER NUMBER, not tracking_number. Live-verified
+// 2026-07-22 (Argania master 10004, Studio Pasha 10681): QuickShop tracking_number is
+// empty; Focus resolves the shipment by order_number as the scoped P2 reference.
+async function focusEnrich(config: any, orderNumber: string | null): Promise<FocusCustomerStatusView | null> {
   const sp = config?.shipment_provider;
-  if (!sp?.enabled || sp.type !== 'focus' || !sp.host || !trackingNumber) return null;
+  if (!sp?.enabled || sp.type !== 'focus' || !sp.host || !orderNumber) return null;
   try {
     return await getFocusShipmentStatus({
       host: sp.host,
-      reference: trackingNumber,
+      reference: orderNumber,
       customerCode: sp.expected_master_customer_id,
       expectedMasterCustomerId: sp.expected_master_customer_id,
     });
@@ -3069,7 +3072,7 @@ export async function lookupOrder(accountId: string, orderNumber: string, sender
   };
 
   const result = toResult(normalized);
-  const shipment = await focusEnrich(config, normalized.trackingNumber);
+  const shipment = await focusEnrich(config, normalized.orderNumber);
   // `kind:'found'` is the discriminator; `result.status` carries the REAL order status (from toResult).
   return { ...result, shipment, kind: 'found' };
 }
