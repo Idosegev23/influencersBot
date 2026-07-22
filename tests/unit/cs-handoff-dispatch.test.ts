@@ -74,4 +74,32 @@ describe('runCsHandoffCheck', () => {
     );
     expect(r).toEqual({ escalated: false, deduped: true });
   });
+
+  it('force bypasses re-detection and escalates even on a message with no trigger keywords', async () => {
+    const { runCsHandoffCheck } = await import('@/engines/escalation/dispatch');
+    const pauseBot = vi.fn();
+    const sendEmail = vi.fn().mockResolvedValue({ success: true });
+    const sb = makeSupabase({
+      config: { escalation: { enabled: true, recipients: [{ name: 'Rep', email: 'rep@brand.co' }] } },
+    });
+    const r = await runCsHandoffCheck(
+      { accountId: 'a1', chatSessionId: 'cs1', ticketId: 't1', waId: '972501234567', userMessage: 'מתי יגיע?', force: true },
+      { supabase: sb as any, sendEmail: sendEmail as any, pauseBot: pauseBot as any, now: () => 0 },
+    );
+    expect(r.escalated).toBe(true);
+    expect(pauseBot).toHaveBeenCalled();
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('force still respects the ESCALATION_ENABLED flag gate', async () => {
+    process.env.ESCALATION_ENABLED = 'false';
+    const { runCsHandoffCheck } = await import('@/engines/escalation/dispatch');
+    const pauseBot = vi.fn();
+    const r = await runCsHandoffCheck(
+      { accountId: 'a1', chatSessionId: 'cs1', ticketId: 't1', waId: '972501234567', userMessage: 'anything', force: true },
+      { supabase: makeSupabase() as any, sendEmail: vi.fn() as any, pauseBot: pauseBot as any, now: () => 0 },
+    );
+    expect(r).toEqual({ escalated: false, skipped: 'flag_off' });
+    expect(pauseBot).not.toHaveBeenCalled();
+  });
 });
