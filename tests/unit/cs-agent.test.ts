@@ -126,13 +126,35 @@ describe('runCsTurn (brain-led loop)', () => {
     if (res.reply.kind === 'text') expect(res.reply.body).toBe('מדובר ב-Argania (argania-oil.co.il)?');
   });
 
-  it('escalate tool short-circuits → reply {kind:none}', async () => {
-    handlers['escalate_to_human'] = vi.fn().mockResolvedValue({ ok: true, escalated: true });
-    callModel.mockResolvedValueOnce({ toolCalls: [{ id: 'tc1', name: 'escalate_to_human', args: { reason: 'x' } }], text: null });
+  // Live-observed 2026-07-22: a shopper reported a damaged product, the brain escalated correctly —
+  // but the tool path returned {kind:'none'} so the customer got SILENCE. A hand-off must still ack
+  // THIS turn: the loop no longer short-circuits, so the model composes an empathetic closing.
+  it('escalate tool → does NOT go silent; the model composes an empathetic hand-off ack (text reply)', async () => {
+    handlers['escalate_to_human'] = vi.fn().mockResolvedValue({ ok: true, escalated: true, data: { handed_off: true } });
+    callModel
+      .mockResolvedValueOnce({ toolCalls: [{ id: 'tc1', name: 'escalate_to_human', args: { reason: 'מוצר פגום' } }], text: null })
+      .mockResolvedValueOnce({ toolCalls: [], text: 'אוי עידו, אני ממש מצטערת שזה קרה 😔 העברתי את זה לנציג/ה שיטפלו בהקדם.' });
     store['972501112222'] = bound();
     const { runCsTurn } = await import('@/lib/cs/cs-agent');
-    const res = await runCsTurn(job('אני רוצה נציג'), { callModel });
-    expect(res.reply.kind).toBe('none');
+    const res = await runCsTurn(job('הקרם הגיע פתוח ונזל'), { callModel });
+    expect(handlers['escalate_to_human']).toHaveBeenCalled();
+    expect(res.reply.kind).toBe('text');
+    if (res.reply.kind === 'text') expect(res.reply.body).toContain('נציג');
+  });
+
+  it('escalate then empty model text → falls back to the empathetic hand-off ack, NEVER the rephrase fallback', async () => {
+    handlers['escalate_to_human'] = vi.fn().mockResolvedValue({ ok: true, escalated: true, data: { handed_off: true } });
+    callModel
+      .mockResolvedValueOnce({ toolCalls: [{ id: 'tc1', name: 'escalate_to_human', args: {} }], text: null })
+      .mockResolvedValueOnce({ toolCalls: [], text: '' });
+    store['972501112222'] = bound();
+    const { runCsTurn } = await import('@/lib/cs/cs-agent');
+    const res = await runCsTurn(job('נזק במשלוח'), { callModel });
+    expect(res.reply.kind).toBe('text');
+    if (res.reply.kind === 'text') {
+      expect(res.reply.body).toContain('נציג');
+      expect(res.reply.body).not.toContain('לנסח שוב');
+    }
   });
 
   it('MAX_ITERS safety net: model NEVER stops calling tools → loop terminates after exactly 5 iters with the rephrase fallback', async () => {

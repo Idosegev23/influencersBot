@@ -196,29 +196,32 @@ export async function runCsTurn(job: CsJob, depsOverride?: Partial<CsAgentDeps>)
   const history = session.active_chat_session_id ? await loadHistory(session.active_chat_session_id) : [];
   const messages: CsChatMessage[] = [...history, { role: 'user', content: userMessage }];
   let finalText: string | null = null;
+  let handedOff = false; // escalate_to_human fired this turn → pause FUTURE turns, but still ack THIS one
 
   for (let iter = 0; iter < MAX_ITERS; iter++) {
     const turn = await deps.callModel({ system, messages, tools: CS_TOOL_DEFS });
     if (!turn.toolCalls?.length) { finalText = turn.text; break; }
     messages.push({ role: 'assistant', content: turn.text, tool_calls: turn.toolCalls.map((tc) => ({ id: tc.id, type: 'function', function: { name: tc.name, arguments: JSON.stringify(tc.args) } })) });
 
-    let escalated = false;
     for (const tc of turn.toolCalls) {
       const tool = toolMap.get(tc.name);
       let result: CsToolResult = { ok: false, data: { reason: 'unknown_tool' } };
       if (tool) { try { result = await tool.handler(tc.args, ctx); } catch (e) { result = { ok: false, data: { reason: 'tool_error' } }; console.warn('[cs-agent] tool threw', tc.name, e); } }
       if (result.bind) session = await applyBind(session, ctx, result.bind);
       if (result.learnedName) session = await applyLearnedName(session, ctx, result.learnedName);
-      if (result.escalated) escalated = true;
+      if (result.escalated) handedOff = true;
       messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result.data ?? { ok: result.ok }) });
     }
-    if (escalated) return { reply: { kind: 'none' }, phase: session.phase };
+    // Do NOT short-circuit on a hand-off. escalate_to_human pauses the bot for FUTURE turns, but the
+    // shopper who just reported a problem must get a reply NOW, not silence — so let the loop run one
+    // more iteration and let the model compose a brief empathetic hand-off ack from the tool result.
   }
 
-  // 6/7) Persist + reply. No CS tool ever returns an interactive payload (purely conversational —
-  // see file header), so the reply here is always a text body (never 'none' — that short-circuits
-  // earlier, at the escalated-tool branch above), so an assistant entry is always available to append.
-  const replyBody = stripSuggestions(finalText || 'סליחה, אפשר לנסח שוב? 🙏');
+  // 6/7) Persist + reply. No CS tool returns an interactive payload (purely conversational — see file
+  // header), so the reply is always text. On a hand-off, if the model produced no closing text we fall
+  // back to an empathetic ack — NEVER the rephrase fallback, which reads as nonsense after an escalation.
+  const HANDOFF_ACK = 'אני מעבירה את זה לנציג/ה אנושי/ת שיחזרו אליך בהקדם 🙏';
+  const replyBody = stripSuggestions(finalText || (handedOff ? HANDOFF_ACK : 'סליחה, אפשר לנסח שוב? 🙏'));
   if (replyBody) recentTurns.push({ role: 'assistant', text: replyBody });
   await saveCsSession(session, { context: { ...(session.context || {}), recentTurns: recentTurns.slice(-8) }, last_activity_at: new Date().toISOString() });
   if (session.active_chat_session_id) await persistTurn(session.active_chat_session_id, userMessage, replyBody);
