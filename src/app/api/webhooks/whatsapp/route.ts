@@ -29,6 +29,7 @@ import { routeInboundToTicket } from '@/lib/support/route-inbound';
 import { toWaId, sendReaction, sendTyping } from '@/lib/whatsapp-cloud/client';
 import { publishDrain } from '@/lib/crm/wa-queue';
 import { enqueueAgentMessage } from '@/lib/crm/wa-agent-queue';
+import { routeInboundToCustomerService } from '@/lib/cs/route-inbound-cs';
 
 export const runtime = 'nodejs';          // need crypto + Buffer
 export const dynamic = 'force-dynamic';   // never cache
@@ -269,19 +270,32 @@ async function processWebhook(payload: any): Promise<void> {
         // one. Skips the Itamar handoff sender and agent senders — those
         // flows have their own handling above. Best-effort: errors are
         // swallowed because the raw message is already persisted.
+        let ticketMatch: string | null = null;
         if (!isItamarSender(waId) && !handledAsAgent) {
           try {
-            await routeInboundToTicket({
+            const res = await routeInboundToTicket({
               waId,
               textBody,
               contextId: msg.context?.id ?? null,
               waMessageId: msg.id,
               contactId: contact.id,
             });
+            ticketMatch = extractTicketId(res);
           } catch (err) {
             console.error('[whatsapp webhook] support routing failed', err);
           }
         }
+
+        // 4th branch — unknown sender, no open ticket → customer-service bot.
+        await maybeRouteCs({
+          isItamar: isItamarSender(waId),
+          handledAsAgent,
+          ticketId: ticketMatch,
+          waId,
+          contactId: contact.id,
+          msg,
+          textBody,
+        });
       }
 
       // -----------------------------------------------------------------
@@ -372,4 +386,43 @@ async function maybeEnqueueAgentJob(args: { waId: string; msg: any; textBody: st
   try { await publishDrain(agentId); }
   catch (e) { console.error('[whatsapp webhook] publishDrain failed (queued; next trigger will drain)', e); }
   return true;
+}
+
+/**
+ * Capture routeInboundToTicket's return. Its real signature is
+ * { ticketId: string | null; matchedBy?: string; ambiguous?: boolean } — we only need ticketId.
+ * Null-safe: a void/undefined/null return (or a shape without ticketId) means "no ticket matched".
+ */
+export function extractTicketId(
+  res: { ticketId?: string | null; matchedBy?: string | null; ambiguous?: boolean } | null | undefined,
+): string | null {
+  return res?.ticketId ?? null;
+}
+
+/**
+ * The customer-service 4th branch. Reached only when the inbound is NOT Itamar, NOT a registered
+ * agent, and did NOT match an open support ticket — the unknown-sender slot that used to dead-end.
+ * Claims the message into the CS queue/worker pipeline. Best-effort: the raw message is already
+ * persisted to whatsapp_messages, so a failure here just leaves it for manual triage.
+ */
+export async function maybeRouteCs(args: {
+  isItamar: boolean;
+  handledAsAgent: boolean;
+  ticketId: string | null;
+  waId: string;
+  contactId: string | null;
+  msg: any;
+  textBody: string | null;
+}): Promise<void> {
+  if (args.isItamar || args.handledAsAgent || args.ticketId) return;
+  try {
+    await routeInboundToCustomerService({
+      waId: args.waId,
+      contactId: args.contactId,
+      msg: args.msg,
+      textBody: args.textBody,
+    });
+  } catch (err) {
+    console.error('[whatsapp webhook] CS routing failed', err);
+  }
 }
