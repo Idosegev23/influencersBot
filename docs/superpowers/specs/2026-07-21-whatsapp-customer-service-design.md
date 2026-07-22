@@ -30,7 +30,7 @@ Everything happens inside WhatsApp.
 
 | Brand | Platform | Orders API | Shipping | First? |
 |---|---|---|---|---|
-| **Argania** | **QuickShop** | ✅ `qs_live_…` key (auto-identifies shop) | Focus (same provider as LA BEAUTÉ) — pending Argania master-customer-id | ✅ **v1** |
+| **Argania** | **QuickShop** | ✅ `qs_live_…` key (auto-identifies shop) | ✅ Focus master `10004`, `lookup_mode:p2` — **live-tested 2026-07-22** | ✅ **v1** |
 | LA BEAUTÉ | Shopify | Needs Admin API token (not yet available) | Focus (live, master `10038`, `lookup_mode:p2`) | deferred |
 | Studio Pasha | QuickShop | Has key (not yet supplied) | — | after Argania |
 
@@ -280,12 +280,15 @@ on one before relying on the admin UI.
 
 ### 7.5 Shipping
 
-- **QuickShop (Argania):** the order's `tracking_number` / `tracking_url` give tracking immediately.
-  **Focus enrichment (same provider as LA BEAUTÉ)** added when Argania's `master_customer_id` is
-  supplied → set `config.shipment_provider = { type:'focus', host, enabled, lookup_mode,
-  expected_master_customer_id }` and pass the order's `tracking_number` as the Focus reference into
-  `getFocusShipmentStatus` (`src/lib/shipment/focus-client.ts:89`). No new code — pure config.
-- **LA BEAUTÉ:** Focus already live.
+- **QuickShop (Argania) — ✅ CONFIRMED live-tested 2026-07-22 (config-only, zero code):** Argania's
+  QuickShop `tracking_number` is **empty on all orders**; shipping comes from **Focus** (same provider
+  as LA BEAUTÉ) via the **QuickShop `order_number` as the P2 reference**. Test: master **10004**,
+  `lookup_mode:'p2'` → 8/8 recent orders resolved (Focus returned master=10004 + a real ship_no, e.g.
+  order `27021` → ship_no `3803549`). Set `config.shipment_provider = { type:'focus',
+  host:'focusdelivery.co.il', enabled:true, lookup_mode:'p2', expected_master_customer_id:10004 }` and
+  pass the order's `order_number` as the Focus `reference` into `getFocusShipmentStatus`
+  (`src/lib/shipment/focus-client.ts:89`). **Not** the QuickShop `tracking_number` (it's empty).
+- **LA BEAUTÉ:** Focus already live (`10038`, `lookup_mode:p2`).
 
 ---
 
@@ -459,8 +462,9 @@ integration (or the shared `manual_token` adapter) unlocks *all* QuickShop brand
 5. Confirm the key has (or can get) **`webhooks:write`** scope — else register the webhook in the
    QuickShop dashboard manually.
 
-**Argania shipping (fast-follow):**
-6. Argania **Focus `master_customer_id`** (+ confirm `lookup_mode`) — same provider as LA BEAUTÉ, config only.
+**Argania shipping — ✅ RESOLVED (config-only, live-tested 2026-07-22):**
+6. Argania **Focus master `10004`, `lookup_mode:'p2'`** (`order_number` = P2 reference). 8/8 orders
+   resolved. Just set `config.shipment_provider` (§7.5). No further input needed.
 
 **Deferred (LA BEAUTÉ):**
 7. Shopify **Admin API token** (`read_orders`, `read_customers`, `read_fulfillments`) + shop domain.
