@@ -29,7 +29,7 @@ export function buildBrandConfirmButtons(candidate: BrandCandidate): CsReply {
   const label = candidate.domain ? `${candidate.displayName} (${candidate.domain})` : candidate.displayName;
   return {
     kind: 'buttons',
-    body: `מדובר ב-${label}?`,
+    body: clip(`מדובר ב-${label}?`, 1024),
     buttons: [
       { id: 'confirm_yes', title: clip('כן', 20) },
       { id: 'confirm_no', title: clip('לא, מותג אחר', 20) },
@@ -57,7 +57,7 @@ export function buildThreadReentryList(
 export function buildSingleThreadButtons(brandName: string, topic: string): CsReply {
   return {
     kind: 'buttons',
-    body: `ממשיכים עם ${brandName} – ${topic}?`,
+    body: clip(`ממשיכים עם ${brandName} – ${topic}?`, 1024),
     buttons: [
       { id: 'reentry_continue', title: clip('כן, ממשיכים', 20) },
       { id: 'reentry_other', title: clip('משהו אחר', 20) },
