@@ -1,29 +1,70 @@
+import { supabase } from '@/lib/supabase';
+import { toWaId } from '@/lib/whatsapp-cloud/client';
+
+const TERMINAL = new Set(['resolved', 'closed', 'cancelled']);
+
 /**
- * Placeholder for the Phase-D CS ticket lifecycle (Task D1 — open/attach a `whatsapp_cs`
- * support_requests thread per shopper+brand, plus history append-only log).
- * This stub exists only so `src/lib/cs/tools/index.ts` (Task C4) can resolve its dynamic
- * `import('@/lib/cs/cs-ticket')` — Vitest/Vite's import-analysis needs the module to exist on
- * disk even for a dynamic import before `vi.mock('@/lib/cs/cs-ticket', ...)` can intercept it
- * (same issue Task A7 hit with `wa-cs-worker.ts`, resolved by Task A8's `cs-agent.ts` stub).
- * The tool tests mock this module entirely. Do NOT deploy C4 to production before D1 replaces
- * this with the real ticket lifecycle.
+ * Every bound CS conversation opens (or re-attaches to) a support_request thread.
+ * Discriminator is `source='whatsapp_cs'` (support_requests has no channel/topic column).
  */
-export interface OpenOrAttachCsTicketInput {
+export async function openOrAttachCsTicket(input: {
   accountId: string;
   waId: string;
   customerPhone: string;
-  customerName?: string | null;
+  customerName: string | null;
   topic?: string;
+}): Promise<{ ticketId: string }> {
+  const wa = toWaId(input.customerPhone || input.waId);
+
+  const { data: rows } = await supabase
+    .from('support_requests')
+    .select('id, status, customer_phone')
+    .eq('account_id', input.accountId)
+    .eq('source', 'whatsapp_cs')
+    .order('updated_at', { ascending: false })
+    .limit(20);
+
+  const match = (rows || []).find(
+    (t: any) => t.customer_phone && toWaId(t.customer_phone) === wa && !TERMINAL.has(t.status),
+  );
+  if (match) return { ticketId: match.id };
+
+  const { data: inserted, error } = await supabase
+    .from('support_requests')
+    .insert({
+      account_id: input.accountId,
+      customer_name: input.customerName || 'לקוח/ה',      // NOT NULL
+      customer_phone: input.customerPhone,
+      message: input.topic || 'פנייה בוואטסאפ',            // NOT NULL
+      status: 'new',
+      source: 'whatsapp_cs',
+      metadata: { channel: 'whatsapp_cs', topic: input.topic || null },
+    })
+    .select('id')
+    .single();
+
+  if (error || !inserted) {
+    throw new Error(`openOrAttachCsTicket failed: ${error?.message || 'no row returned'}`);
+  }
+  return { ticketId: inserted.id };
 }
 
-export interface OpenOrAttachCsTicketResult {
+export async function appendCsTicketHistory(input: {
   ticketId: string;
-}
-
-export async function openOrAttachCsTicket(input: OpenOrAttachCsTicketInput): Promise<OpenOrAttachCsTicketResult> {
-  throw new Error(`openOrAttachCsTicket not implemented (Task D1 pending) — accountId=${input?.accountId}`);
-}
-
-export async function appendCsTicketHistory(ticketId: string, entry: unknown): Promise<void> {
-  throw new Error(`appendCsTicketHistory not implemented (Task D1 pending) — ticketId=${ticketId}`);
+  accountId: string;
+  action: string;
+  actor: string;
+  note?: string;
+  body_text?: string;
+  whatsapp_message_id?: string | null;
+}): Promise<void> {
+  await supabase.from('support_ticket_history').insert({
+    ticket_id: input.ticketId,
+    account_id: input.accountId,
+    action: input.action,
+    actor: input.actor,
+    note: input.note ?? null,
+    body_text: input.body_text ?? null,
+    whatsapp_message_id: input.whatsapp_message_id ?? null,
+  });
 }
