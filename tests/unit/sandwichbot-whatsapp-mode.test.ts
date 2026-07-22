@@ -1,4 +1,30 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// Mock OpenAI client for this test
+vi.mock('openai', () => {
+  const MockOpenAI = vi.fn(() => ({
+    chat: {
+      completions: {
+        create: vi.fn(),
+      },
+    },
+  }));
+  return { default: MockOpenAI };
+});
+
+// Mock supabase for this test
+vi.mock('@/lib/supabase', () => ({
+  supabase: {
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          single: vi.fn(async () => ({ data: null, error: null })),
+        })),
+      })),
+    })),
+  },
+}));
+
 import { modeUsesDmEnrichment } from '@/lib/chatbot/sandwichBot';
 import { resolveArchetypeMode } from '@/lib/chatbot/archetypes';
 
