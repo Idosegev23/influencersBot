@@ -61,6 +61,13 @@ describe('lookupOrder', () => {
     expect(await lookupOrder('acc-1', '1042', '972501234567')).toEqual({ kind: 'unverified' });
   });
 
+  it('a config whatsapp_cs.test_numbers master bypasses phone-verify (reveals despite mismatch)', async () => {
+    H.row = row(); H.pull = pull({ customerPhone: '0509999999' });
+    H.config = { whatsapp_cs: { test_numbers: ['0559749242'] } };
+    const out = await lookupOrder('acc-1', '1042', '972559749242');
+    expect(out.kind).toBe('found');
+  });
+
   it('reveals when the order has no phone (guest checkout)', async () => {
     H.row = row({ customer_phone: null }); H.pull = pull({ customerPhone: null });
     const out = await lookupOrder('acc-1', '1042', '972501234567');

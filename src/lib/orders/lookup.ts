@@ -6,6 +6,7 @@ import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { getConnector } from './connectors/registry';
 import { findBrandOrderByNumber, findBrandOrdersByPhone, upsertBrandOrder, type BrandOrderRow } from './brand-orders';
 import { phoneMatches } from './phone-verify';
+import { toWaId } from '@/lib/whatsapp-cloud/client';
 import type { NormalizedLineItem, NormalizedOrder, OrderConnectorCreds, StorePlatform } from './connectors/types';
 import type { OrderLookupResult } from '@/lib/shopify/order-lookup';
 import { getFocusShipmentStatus, type FocusCustomerStatusView } from '@/lib/shipment/focus-client';
@@ -72,6 +73,15 @@ async function focusEnrich(config: any, orderNumber: string | null): Promise<Foc
   }
 }
 
+// Master/test WhatsApp numbers (config.whatsapp_cs.test_numbers[]) bypass the best-effort
+// phone-verify so QA can inspect ANY order. NOT a customer-facing path — an explicit allowlist.
+function isTestNumber(config: any, senderPhone: string): boolean {
+  const list = config?.whatsapp_cs?.test_numbers;
+  if (!Array.isArray(list) || list.length === 0) return false;
+  const s = toWaId(senderPhone);
+  return list.some((n: any) => toWaId(String(n)) === s);
+}
+
 export async function lookupOrder(accountId: string, orderNumber: string, senderPhone: string): Promise<OrderLookupOutcome> {
   const row = await findBrandOrderByNumber(accountId, orderNumber);
   if (!row || !row.source_platform) return { kind: 'not_found' };
@@ -93,7 +103,7 @@ export async function lookupOrder(accountId: string, orderNumber: string, sender
   }
 
   const orderPhone = fresh?.customerPhone ?? row.customer_phone;
-  if (!phoneMatches(orderPhone, senderPhone)) return { kind: 'unverified' };
+  if (!isTestNumber(config, senderPhone) && !phoneMatches(orderPhone, senderPhone)) return { kind: 'unverified' };
 
   const normalized: NormalizedOrder = fresh ?? {
     orderNumber: row.order_number || orderNumber,
