@@ -53,6 +53,18 @@ describe('runCsDrain / processOneCsInbound', () => {
     expect(sendText).toHaveBeenCalledTimes(2);
     expect(sendText.mock.calls[0][0]).toMatchObject({ to: 'x', body: 'שלום' });
     expect(release).toHaveBeenCalledWith('x');
+    // Canonical invariant: the reply is sent BEFORE the done guard is set, so a crash
+    // between them re-processes instead of losing the reply.
+    expect(sendText.mock.invocationCallOrder[0]).toBeLessThan(redisSetNx.mock.invocationCallOrder[0]);
+  });
+
+  it('leaves the item un-guarded when all 3 send attempts fail (re-processable)', async () => {
+    sendText.mockResolvedValue({ success: false });
+    runCsTurn.mockResolvedValue({ reply: { kind: 'text', body: 'שלום' }, phase: 'onboarding' });
+    const { processOneCsInbound } = await import('@/lib/cs/wa-cs-worker');
+    await processOneCsInbound({ waId: 'x', msg: { id: 'm5' }, textBody: 'hi' });
+    expect(sendText).toHaveBeenCalledTimes(3);
+    expect(redisSetNx).not.toHaveBeenCalled();
   });
 
   it('done-guard short-circuits an already-processed wamid', async () => {
