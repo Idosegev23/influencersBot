@@ -142,13 +142,19 @@ const escalateTool: CsTool = {
   async handler(args, ctx): Promise<CsToolResult> {
     if (!ctx.chatSessionId || !ctx.accountId) return { ok: false, data: { reason: 'not_bound' } };
     const reason = String(args?.reason || '').slice(0, 200);
-    // GATE: pause the bot for this thread, then notify (force=true → skip re-detection, brain already decided).
-    const { pauseBot } = await import('@/lib/handoff/bot-pause');            // Phase D (D3)
-    await pauseBot(ctx.chatSessionId, `escalate:${reason}`);
+    // Notify FIRST (force=true → skip re-detection, brain already decided), THEN decide whether to pause.
+    let outcome: any = null;
     try {
       const { runCsHandoffCheck } = await import('@/engines/escalation/dispatch'); // Phase D (D4)
-      await runCsHandoffCheck({ accountId: ctx.accountId, chatSessionId: ctx.chatSessionId, ticketId: ctx.ticketId, waId: ctx.waId, userMessage: reason, force: true });
+      outcome = await runCsHandoffCheck({ accountId: ctx.accountId, chatSessionId: ctx.chatSessionId, ticketId: ctx.ticketId, waId: ctx.waId, userMessage: reason, force: true });
     } catch (e) { console.warn('[cs-tools] escalation notify failed', e); }
+    // Pause UNLESS escalation is switched off for this brand. If it's off (skipped disabled/flag_off) no
+    // human is coming, so pausing would drop the shopper into silence — keep the bot answering instead.
+    // On success, error, or dedup we prefer to pause (fail-closed: an escalation must not reach the bot).
+    const disabled = outcome?.skipped === 'disabled' || outcome?.skipped === 'flag_off';
+    if (disabled) return { ok: true, data: { handed_off: false, reason: 'handoff_disabled' } };
+    const { pauseBot } = await import('@/lib/handoff/bot-pause');            // Phase D (D3)
+    await pauseBot(ctx.chatSessionId, `escalate:${reason}`);
     return { ok: true, escalated: true, data: { handed_off: true } };
   },
 };

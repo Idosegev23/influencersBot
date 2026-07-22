@@ -57,9 +57,22 @@ describe('routeInboundToTicket — Strategy 3 excludes CS-owned tickets', () => 
     expect(H.applied.some((a: any) => a.kind === 'insert')).toBe(false);
   });
 
-  it('still matches a NON-CS ticket for the same phone (legacy support flow intact)', async () => {
+  it('does NOT claim an auto_escalation catch-net ticket (bot/handoff-owned) → returns null', async () => {
+    // resumeBot never resolves the auto_escalation ticket, so a lingering status='new' row must not
+    // absorb later inbound via a bare phone match (would re-create the "stuck" bug post-resume).
+    H.candidates = [
+      { id: 'esc-1', account_id: 'acc-1', customer_phone: '972559749242', status: 'new', updated_at: '2026-07-22T18:10:00Z', source: 'auto_escalation' },
+    ];
+    const { routeInboundToTicket } = await import('@/lib/support/route-inbound');
+    const res = await routeInboundToTicket(input());
+    expect(res.ticketId).toBeNull();
+    expect(H.applied.some((a: any) => a.kind === 'insert')).toBe(false);
+  });
+
+  it('skips BOTH bot-owned sources but still matches a NON-CS ticket for the same phone', async () => {
     H.candidates = [
       { id: 'cs-1', account_id: 'acc-1', customer_phone: '972559749242', status: 'in_progress', updated_at: '2026-07-22T18:05:00Z', source: 'whatsapp_cs' },
+      { id: 'esc-1', account_id: 'acc-1', customer_phone: '972559749242', status: 'new', updated_at: '2026-07-22T18:04:00Z', source: 'auto_escalation' },
       { id: 'sup-2', account_id: 'acc-2', customer_phone: '972559749242', status: 'new', updated_at: '2026-07-22T17:00:00Z', source: 'whatsapp' },
     ];
     const { routeInboundToTicket } = await import('@/lib/support/route-inbound');

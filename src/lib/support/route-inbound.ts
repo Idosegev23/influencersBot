@@ -42,6 +42,16 @@ interface RouteInput {
 const TERMINAL_STATUSES = new Set(['resolved', 'closed', 'cancelled']);
 const RECENT_OUTBOUND_WINDOW_MS = 24 * 60 * 60 * 1000;
 
+// Ticket sources OWNED by the Bestie CS bot / handoff engine (not the legacy support flow):
+//   • whatsapp_cs     — the per-conversation ticket the CS bot opens (transcript lives in chat_messages)
+//   • auto_escalation — the handoff catch-net the escalation engine inserts (status stays 'new'; resumeBot
+//                       never resolves it)
+// Strategy 3 (bare phone match) must NEVER claim either: while the bot owns the thread it would starve
+// runCsTurn (the "stuck" bug), and a lingering auto_escalation ticket would keep sinking messages long
+// after the bot is resumed. Strategies 1/2 still route replies to these AFTER a human takes over — they
+// key off OUR outbound support_ticket_history rows, which only exist post-takeover (intended).
+const BOT_OWNED_SOURCES = new Set(['whatsapp_cs', 'auto_escalation']);
+
 type MatchedBy = 'context' | 'recent_outbound' | 'phone';
 type Alternative = {
   ticket_id: string;
@@ -135,14 +145,11 @@ export async function routeInboundToTicket(
   }
 
   // ── Strategy 3: most recent non-terminal ticket for this phone ──────
-  // EXCLUDE whatsapp_cs tickets. Those belong to the Bestie CS bot, which owns the entire
-  // conversation and keeps its transcript in chat_messages (NOT support_ticket_history). The
-  // CS bot opens exactly one support_request per conversation, so a bare phone match here would
-  // wrongly claim every follow-up the shopper sends — starving the bot (the message never reaches
-  // runCsTurn, so the thread appears "stuck"). Skipping them lets the webhook fall through to the
+  // EXCLUDE bot-owned ticket sources (BOT_OWNED_SOURCES: whatsapp_cs + auto_escalation) — see that
+  // constant's comment. A bare phone match on either would starve the CS bot (the "stuck" bug) or
+  // sink messages into a stale escalation ticket. Skipping them lets the webhook fall through to the
   // CS 4th branch (maybeRouteCs). Strategies 1/2 above are unaffected: they key off our OUTBOUND
-  // rows in support_ticket_history, which a CS thread only gains once a human takes it over via the
-  // ticket UI — at which point routing replies to that ticket is exactly what we want.
+  // rows in support_ticket_history, which a CS/handoff thread only gains once a human takes it over.
   const { data: candidates } = await supabase
     .from('support_requests')
     .select('id, account_id, customer_phone, status, updated_at, source')
@@ -154,7 +161,7 @@ export async function routeInboundToTicket(
       (t) =>
         t.customer_phone &&
         toWaId(t.customer_phone) === input.waId &&
-        t.source !== 'whatsapp_cs' &&
+        !BOT_OWNED_SOURCES.has(t.source) &&
         !TERMINAL_STATUSES.has(t.status),
     );
     if (ticket) {

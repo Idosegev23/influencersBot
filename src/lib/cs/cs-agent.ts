@@ -106,6 +106,24 @@ async function applyLearnedName(session: CsSessionRow, ctx: CsToolCtx, name: str
   return { ...session, customer_name: clean, version: session.version + 1 };
 }
 
+// While the bot is paused (a human took over), still surface the shopper's message to that human:
+// to chat_messages (the transcript the resumed bot + inbox read) and, when a ticket is bound, as a
+// customer_reply on its history (the support-inbox surface — mirrors what route-inbound recorded
+// before whatsapp_cs/auto_escalation tickets were excluded from its phone match). Best-effort.
+async function recordPausedInbound(session: CsSessionRow, userMessage: string): Promise<void> {
+  try {
+    if (session.active_chat_session_id) {
+      await supabaseAdmin.from('chat_messages').insert({ session_id: session.active_chat_session_id, role: 'user', content: userMessage });
+    }
+  } catch (e) { console.warn('[cs-agent] paused-inbound chat_messages write failed', e); }
+  try {
+    if (session.active_ticket_id && session.active_account_id) {
+      const { appendCsTicketHistory } = await import('@/lib/cs/cs-ticket'); // Phase D (D1)
+      await appendCsTicketHistory({ ticketId: session.active_ticket_id, accountId: session.active_account_id, action: 'customer_reply', actor: 'customer', note: userMessage, body_text: userMessage });
+    }
+  } catch (e) { console.warn('[cs-agent] paused-inbound ticket append failed', e); }
+}
+
 // Persist the turn to chat_messages + bump message_count (mirror widget-chat-handler.ts).
 async function persistTurn(chatSessionId: string, userMessage: string, assistantText: string): Promise<void> {
   const { data: sess } = await supabaseAdmin.from('chat_sessions').select('message_count').eq('id', chatSessionId).single();
@@ -132,10 +150,15 @@ export async function runCsTurn(job: CsJob, depsOverride?: Partial<CsAgentDeps>)
     : [];
   recentTurns.push({ role: 'user', text: userMessage });
 
-  // 2) Pause guard — a human owns this thread; the bot stays silent until manual resume.
+  // 2) Pause guard — a human owns this thread; the bot stays silent until manual resume. It must
+  //    still RECORD the shopper's message so the human sees it: route-inbound no longer files
+  //    whatsapp_cs/auto_escalation tickets, so nothing else captures a paused-thread inbound.
   if (session.active_chat_session_id) {
     const { isBotPaused } = await import('@/lib/handoff/bot-pause'); // Phase D (D3)
-    if (await isBotPaused(session.active_chat_session_id)) return { reply: { kind: 'none' }, phase: session.phase };
+    if (await isBotPaused(session.active_chat_session_id)) {
+      await recordPausedInbound(session, userMessage);
+      return { reply: { kind: 'none' }, phase: session.phase };
+    }
   }
 
   // 3) Code backstop — guarantee escalation even if the brain misses the cue. FAILS CLOSED:

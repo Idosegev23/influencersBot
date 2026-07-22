@@ -98,4 +98,15 @@ describe('CS tools', () => {
     expect(r.escalated).toBe(true);
   });
 
+  // A brand with escalation switched off has no human coming — pausing would drop the shopper into
+  // silence. So when the handoff is skipped (disabled/flag_off), the tool must NOT pause the bot.
+  it('escalate_to_human does NOT pause when escalation is disabled for the brand (no silent black hole)', async () => {
+    runCsHandoffCheck.mockResolvedValueOnce({ escalated: false, skipped: 'disabled' });
+    const r = await (await tool('escalate_to_human')).handler({ reason: 'refund' }, ctx({ accountId: 'acc-1', chatSessionId: 'cs-1', ticketId: 't1' }));
+    expect(runCsHandoffCheck).toHaveBeenCalled();
+    expect(pauseBot).not.toHaveBeenCalled();
+    expect(r.escalated).toBeUndefined();
+    expect((r.data as any).handed_off).toBe(false);
+  });
+
 });

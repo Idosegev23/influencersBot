@@ -33,8 +33,11 @@ vi.mock('@/engines/escalation/dispatch', () => ({ runCsHandoffCheck: (...a: any[
 // the contact record was patched with the learned name (the generic chain below handles every
 // other table the same way it always did).
 const contactsUpdate = vi.fn().mockReturnValue({ eq: async () => ({ data: null }) });
+// Capture inserts per table so the paused-inbound recording test can assert the shopper's message
+// was written to chat_messages + the ticket history (see recordPausedInbound in cs-agent.ts).
+const inserted: Record<string, any[]> = {};
 vi.mock('@/lib/supabase', () => ({
-  supabase: { from: (table: string) => { const c: any = {}; c.select = () => c; c.eq = () => c; c.in = () => c; c.order = () => c; c.limit = () => c; c.single = async () => ({ data: null }); c.maybeSingle = async () => ({ data: null }); c.insert = async () => ({ data: null }); c.update = table === 'whatsapp_contacts' ? contactsUpdate : () => ({ eq: async () => ({ data: null }) }); c.then = (r: any) => r({ data: [] }); return c; } },
+  supabase: { from: (table: string) => { const c: any = {}; c.select = () => c; c.eq = () => c; c.in = () => c; c.order = () => c; c.limit = () => c; c.single = async () => ({ data: null }); c.maybeSingle = async () => ({ data: null }); c.insert = async (row: any) => { (inserted[table] ||= []).push(row); return { data: null }; }; c.update = table === 'whatsapp_contacts' ? contactsUpdate : () => ({ eq: async () => ({ data: null }) }); c.then = (r: any) => r({ data: [] }); return c; } },
 }));
 
 const job = (textBody: string) => ({ waId: '972501112222', msg: { id: 'w1' }, textBody, contactId: 'c1' } as any);
@@ -42,15 +45,19 @@ const bound = () => ({ wa_id: '972501112222', contact_id: 'c1', phase: 'serving'
 const callModel = vi.fn();
 
 describe('runCsTurn (brain-led loop)', () => {
-  beforeEach(() => { store = {}; for (const k in handlers) delete handlers[k]; vi.clearAllMocks(); isBotPaused.mockResolvedValue(false); detectHandoff.mockReturnValue({ triggered: false, triggers: [], severity: 'low', reason: '' }); runCsHandoffCheck.mockResolvedValue({ escalated: true }); });
+  beforeEach(() => { store = {}; for (const k in handlers) delete handlers[k]; for (const k in inserted) delete inserted[k]; vi.clearAllMocks(); isBotPaused.mockResolvedValue(false); detectHandoff.mockReturnValue({ triggered: false, triggers: [], severity: 'low', reason: '' }); runCsHandoffCheck.mockResolvedValue({ escalated: true }); });
 
-  it('paused thread → {kind:none}, model NOT called', async () => {
+  it('paused thread → {kind:none}, model NOT called, but the inbound IS recorded for the human', async () => {
     isBotPaused.mockResolvedValue(true);
     store['972501112222'] = bound();
     const { runCsTurn } = await import('@/lib/cs/cs-agent');
     const res = await runCsTurn(job('היי'), { callModel });
     expect(res.reply.kind).toBe('none');
     expect(callModel).not.toHaveBeenCalled();
+    // route-inbound no longer files whatsapp_cs/auto_escalation tickets, so the paused thread must
+    // record the shopper's message itself: to the transcript + the bound ticket's history.
+    expect(inserted['chat_messages']).toContainEqual(expect.objectContaining({ session_id: 'cs-1', role: 'user', content: 'היי' }));
+    expect(inserted['support_ticket_history']).toContainEqual(expect.objectContaining({ ticket_id: 't1', action: 'customer_reply', actor: 'customer' }));
   });
 
   it('detectHandoff backstop fires → runCsHandoffCheck + handoff ack, model NOT called', async () => {
