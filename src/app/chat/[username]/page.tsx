@@ -2320,10 +2320,15 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                       const active = visible.filter(b => b.coupon_code).sort(sortFn);
                       const recommendations = visible.filter(b => !b.coupon_code && b.link).sort(sortFn);
 
-                      // All categories (for the chip row) — built from full set, sorted by usage
+                      // All categories (for the chip row) — sorted by usage.
+                      // Count ONLY brands that actually render (a coupon, or a linked
+                      // recommendation). Counting bare partnerships too made a chip show
+                      // e.g. "בית ומטבח 8" while filtering by it yielded "no results"
+                      // (those partnerships carry a category but no coupon_code and no link).
                       const categoryCounts = new Map<string, number>();
                       for (const b of brands) {
                         if (!b.category) continue;
+                        if (!b.coupon_code && !b.link) continue;
                         categoryCounts.set(b.category, (categoryCounts.get(b.category) || 0) + 1);
                       }
                       const sortedCats = [...categoryCounts.entries()]

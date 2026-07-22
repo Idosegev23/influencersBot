@@ -545,18 +545,46 @@ function prepareInputData(preprocessedData: PreprocessedData, profileData?: any)
 // Parse Response — handles both old and new schema
 // ============================================
 
+/**
+ * Extract the first balanced {...} object, ignoring any prose/fences/trailing
+ * characters around it. LLMs (esp. Gemini) sometimes append stray text after the
+ * closing brace, which a naive JSON.parse rejects with "Unexpected non-whitespace
+ * character after JSON" — that used to discard a perfectly good persona and save
+ * the "לא הצלחנו לזהות" stub instead. Quote/escape aware so braces inside strings
+ * don't break the balance count.
+ */
+function extractJsonObject(s: string): string {
+  const start = s.indexOf('{');
+  if (start === -1) return s;
+  let depth = 0, inStr = false, esc = false;
+  for (let i = start; i < s.length; i++) {
+    const ch = s[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === '\\') esc = true;
+      else if (ch === '"') inStr = false;
+    } else if (ch === '"') inStr = true;
+    else if (ch === '{') depth++;
+    else if (ch === '}' && --depth === 0) return s.slice(start, i + 1);
+  }
+  return s.slice(start); // unbalanced — best effort
+}
+
 function parsePersonaResponse(text: string): GeminiPersonaOutput {
   let jsonText = text.trim();
 
-  // Remove markdown code blocks if present
-  if (jsonText.startsWith('```json')) {
-    jsonText = jsonText.replace(/```json\n?/, '').replace(/\n?```$/, '');
-  } else if (jsonText.startsWith('```')) {
-    jsonText = jsonText.replace(/```\n?/, '').replace(/\n?```$/, '');
-  }
+  // Strip markdown code fences independently at start/end — a closing ``` or
+  // trailing prose can appear even when the opening fence is absent.
+  jsonText = jsonText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
 
   try {
-    const parsed = JSON.parse(jsonText);
+    // Tolerate leading/trailing non-JSON: fall back to the first balanced object.
+    let parsed: any;
+    try {
+      parsed = JSON.parse(jsonText);
+    } catch {
+      parsed = JSON.parse(extractJsonObject(jsonText));
+    }
 
     // Handle GPT-5.4 alternate key names (persona → identity, voice_style → voice)
     const normalized = normalizeSchema(parsed);
