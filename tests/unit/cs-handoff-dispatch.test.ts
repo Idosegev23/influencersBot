@@ -13,7 +13,18 @@ function makeSupabase(opts: { config?: any; recent?: any[] } = {}) {
       ctx.limit = () => ctx;
       ctx.single = async () =>
         table === 'accounts' ? { data: { config: opts.config ?? {} }, error: null } : { data: null, error: null };
-      ctx.insert = async (row: any) => { inserts.push({ table, row }); return { data: null, error: null }; };
+      ctx.insert = async (row: any) => {
+        // Mirror the real `support_requests.customer_name` NOT NULL (no default) constraint:
+        // PostgREST/Postgres would reject a null insert with 23502, not silently succeed.
+        if (table === 'support_requests' && (row.customer_name === null || row.customer_name === undefined)) {
+          return {
+            data: null,
+            error: { code: '23502', message: 'null value in column "customer_name" violates not-null constraint' },
+          };
+        }
+        inserts.push({ table, row });
+        return { data: null, error: null };
+      };
       ctx.then = (resolve: any) =>
         resolve({ data: table === 'support_requests' ? (opts.recent ?? []) : [], error: null });
       return ctx;
@@ -63,6 +74,12 @@ describe('runCsHandoffCheck', () => {
     const audit = sb.inserts.find((i: any) => i.table === 'support_requests');
     expect(audit.row.source).toBe('auto_escalation');
     expect(audit.row.metadata.escalation.origin).toBe('whatsapp_cs');
+    // Regression: `customer_name` is NOT NULL with no default in prod. The mock `.insert` above
+    // rejects a null customer_name the way PostgREST/Postgres would (23502), so this assertion
+    // also proves the insert didn't silently no-op — the audit row (dedup key + support-inbox
+    // surface) actually landed.
+    expect(typeof audit.row.customer_name).toBe('string');
+    expect(audit.row.customer_name.length).toBeGreaterThan(0);
   });
 
   it('dedups a second alert inside the window', async () => {

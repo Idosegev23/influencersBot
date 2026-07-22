@@ -123,7 +123,7 @@ export async function runEscalationCheck(
   // 8) auditable record (also powers dedup)
   await supabase.from('support_requests').insert({
     account_id: input.accountId,
-    customer_name: null,
+    customer_name: phone || 'לקוח/ה', // NOT NULL — mirrors cs-ticket.ts's `input.customerName || 'לקוח/ה'`
     customer_phone: phone,
     message: input.userMessage,
     session_id: input.sessionId,
@@ -282,7 +282,7 @@ export async function runCsHandoffCheck(
   // 4) audit row — also the in-app surface (shows in the support inbox) + powers dedup
   await supabase.from('support_requests').insert({
     account_id: input.accountId,
-    customer_name: null,
+    customer_name: input.waId, // NOT NULL — waId is a real, traceable identifier (the WhatsApp phone)
     customer_phone: input.waId,
     message: input.userMessage,
     session_id: input.chatSessionId,
