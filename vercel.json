@@ -108,6 +108,10 @@
     {
       "path": "/api/cron/cs-drain-sweep",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/quickshop-order-sync",
+      "schedule": "*/10 * * * *"
     }
   ]
 }
