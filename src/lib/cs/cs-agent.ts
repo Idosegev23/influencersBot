@@ -11,7 +11,7 @@ import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { loadCsSession, createCsSession, saveCsSession, type CsSessionRow, type CsPhase } from '@/lib/cs/cs-session';
 import { getCsTools, CS_TOOL_DEFS } from '@/lib/cs/tools';
 import type { CsToolCtx, CsToolResult, OpenAIFunctionDef, WaInteractive } from '@/lib/cs/tools/types';
-import { buildCsSystemPrompt, buildContextDigest, stripSuggestions } from '@/lib/cs/cs-context';
+import { buildCsSystemPrompt, buildContextDigest, stripSuggestions, type CsRecentTurn } from '@/lib/cs/cs-context';
 import { laneModel } from '@/lib/llm/config';
 import { toWaId } from '@/lib/whatsapp-cloud/client';
 import type { CsJob } from '@/lib/cs/wa-cs-queue';
@@ -117,6 +117,15 @@ export async function runCsTurn(job: CsJob, depsOverride?: Partial<CsAgentDeps>)
   const userMessage = (job.textBody || '').trim();
   let session = (await loadCsSession(waId)) || (await createCsSession(waId, job.contactId ?? null));
 
+  // Lightweight pre-bind memory (Task C6 follow-up, closes an opus-review finding): chat_messages
+  // history only exists AFTER bind_brand, so pre-bind onboarding turns (greeting → "which brand?" →
+  // disambiguation) would otherwise have zero cross-turn memory. Ride a capped recent-exchange
+  // list on session.context — appended here at turn start, appended again + persisted at turn end.
+  const recentTurns: CsRecentTurn[] = Array.isArray((session.context as any)?.recentTurns)
+    ? [...(session.context as any).recentTurns]
+    : [];
+  recentTurns.push({ role: 'user', text: userMessage });
+
   // 2) Pause guard — a human owns this thread; the bot stays silent until manual resume.
   if (session.active_chat_session_id) {
     const { isBotPaused } = await import('@/lib/handoff/bot-pause'); // Phase D (D3)
@@ -180,10 +189,13 @@ export async function runCsTurn(job: CsJob, depsOverride?: Partial<CsAgentDeps>)
     if (interactive) break; // an interactive tool supplied the reply
   }
 
-  // 6/7) Persist + reply.
-  await saveCsSession(session, { last_activity_at: new Date().toISOString() });
+  // 6/7) Persist + reply. The reply here is always 'interactive' or a text body (never 'none' —
+  // that short-circuits earlier, at the escalated-tool branch above), so an assistant entry is
+  // always available to append.
+  const replyBody = interactive ? interactive.body : stripSuggestions(finalText || 'סליחה, אפשר לנסח שוב? 🙏');
+  if (replyBody) recentTurns.push({ role: 'assistant', text: replyBody });
+  await saveCsSession(session, { context: { ...(session.context || {}), recentTurns: recentTurns.slice(-8) }, last_activity_at: new Date().toISOString() });
   if (interactive) return { reply: interactive, phase: session.phase };
-  const body = stripSuggestions(finalText || 'סליחה, אפשר לנסח שוב? 🙏');
-  if (session.active_chat_session_id) await persistTurn(session.active_chat_session_id, userMessage, body);
-  return { reply: { kind: 'text', body }, phase: session.phase };
+  if (session.active_chat_session_id) await persistTurn(session.active_chat_session_id, userMessage, replyBody);
+  return { reply: { kind: 'text', body: replyBody }, phase: session.phase };
 }

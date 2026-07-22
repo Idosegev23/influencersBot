@@ -8,11 +8,18 @@ export function stripSuggestions(text: string): string {
   return (text || '').replace(/<<SUGGESTIONS>>[\s\S]*?<<\/SUGGESTIONS>>/g, '').trim();
 }
 
+export interface CsRecentTurn { role: 'user' | 'assistant'; text: string; }
+
 export interface CsContextDigest {
   knownName: string | null;
   boundBrand: string | null; // brand display name, or null when unbound
   warm: boolean;             // last activity < 45 min
   openThreads: Array<{ ticketId: string; brand: string; topic: string }>;
+  // Lightweight pre-bind memory (Task C6 follow-up): the last few exchanges, persisted on
+  // whatsapp_cs_sessions.context.recentTurns by cs-agent.ts. chat_messages history only exists
+  // AFTER bind_brand, so pre-bind onboarding turns (greeting → "which brand?" → disambiguation)
+  // would otherwise have zero cross-turn memory. Harmless to include post-bind too.
+  recentTurns: CsRecentTurn[];
 }
 
 export async function buildContextDigest(
@@ -25,7 +32,8 @@ export async function buildContextDigest(
     const cfg = (data as any)?.config || {};
     boundBrand = cfg.display_name || cfg.username || null;
   }
-  return { knownName: session.customer_name, boundBrand, warm: isWarm(session), openThreads };
+  const recentTurns = Array.isArray((session.context as any)?.recentTurns) ? (session.context as any).recentTurns : [];
+  return { knownName: session.customer_name, boundBrand, warm: isWarm(session), openThreads, recentTurns };
 }
 
 /**
@@ -48,6 +56,14 @@ export async function buildCsSystemPrompt(input: {
 
   if (digest.boundBrand) lines.push(`מותג פעיל: ${digest.boundBrand} — כל הכלים מכוונים אליו.`);
   else lines.push('טרם נבחר מותג — שאל/י לאיזה מותג לפנות, קרא/י ל-resolve_brand, ובאישור הלקוח/ה ל-bind_brand.');
+
+  // Pre-bind onboarding turns have no chat_messages history (it only exists after bind_brand) —
+  // this short, clearly-labeled block is the only cross-turn memory available in that window
+  // (name attempt, brand mentioned, candidates shown). Harmless to keep post-bind too.
+  if (digest.recentTurns && digest.recentTurns.length) {
+    lines.push('\n--- השיחה עד כה (זיכרון קצר, לפני קישור מותג) ---');
+    for (const t of digest.recentTurns) lines.push(`${t.role === 'user' ? 'לקוח/ה' : 'את/ה'}: ${t.text}`);
+  }
 
   if (digest.warm) lines.push('שיחה חמה (פחות מ-45 דק׳) — המשך/י ברצף בלי לחזור על שאלות פתיחה.');
   if (digest.openThreads.length === 1) {

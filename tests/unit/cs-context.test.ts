@@ -12,7 +12,7 @@ vi.mock('@/lib/supabase', () => ({
   supabase: { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: { config: { display_name: 'Argania' } } }) }) }) }) },
 }));
 
-const digest = (over: any = {}) => ({ knownName: null, boundBrand: null, warm: false, openThreads: [], ...over });
+const digest = (over: any = {}) => ({ knownName: null, boundBrand: null, warm: false, openThreads: [], recentTurns: [], ...over });
 
 describe('cs-context', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -37,6 +37,20 @@ describe('cs-context', () => {
     expect(searchContentByQuery).toHaveBeenCalledWith('acc-1', 'איך משתמשים בשמן?');
     expect(buildPersonalityFromDB).toHaveBeenCalledWith('acc-1');
     expect(p).toContain('שמן ארגן'); // RAG snippet injected
+  });
+
+  it('pre-bind prompt: recentTurns from context.recentTurns are included for onboarding continuity', async () => {
+    const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
+    const p = await buildCsSystemPrompt({
+      accountId: null,
+      userMessage: 'כן, זה המותג',
+      digest: digest({ recentTurns: [
+        { role: 'user', text: 'קוראים לי דנה, אני מחפשת את ארגניה' },
+        { role: 'assistant', text: 'מצאתי את Argania — לאשר?' },
+      ] }),
+    });
+    expect(p).toContain('קוראים לי דנה, אני מחפשת את ארגניה');
+    expect(p).toContain('מצאתי את Argania — לאשר?');
   });
 
   it('digest drives greeting/re-entry hints (known name, warm, ≥2 threads → show_list)', async () => {

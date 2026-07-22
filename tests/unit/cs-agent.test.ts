@@ -132,6 +132,33 @@ describe('runCsTurn (brain-led loop)', () => {
     if (res.reply.kind === 'text') expect(res.reply.body).toBe('סליחה, אפשר לנסח שוב? 🙏');
   });
 
+  it('recentTurns memory: plain-text turn persists {user, assistant} to session.context.recentTurns', async () => {
+    callModel.mockResolvedValue({ toolCalls: [], text: 'שלום! איך אפשר לעזור?' });
+    const { runCsTurn } = await import('@/lib/cs/cs-agent');
+    await runCsTurn(job('היי, קוראים לי דנה'), { callModel });
+    expect(store['972501112222'].context.recentTurns).toEqual([
+      { role: 'user', text: 'היי, קוראים לי דנה' },
+      { role: 'assistant', text: 'שלום! איך אפשר לעזור?' },
+    ]);
+  });
+
+  it('recentTurns memory: caps at the last 8 entries (4 exchanges), dropping the oldest first', async () => {
+    const priorTurns = Array.from({ length: 8 }, (_, i) => ({ role: i % 2 === 0 ? 'user' : 'assistant', text: `msg${i}` }));
+    store['972501112222'] = {
+      wa_id: '972501112222', contact_id: 'c1', phase: 'onboarding',
+      active_account_id: null, active_ticket_id: null, active_chat_session_id: null,
+      customer_name: null, context: { recentTurns: priorTurns }, last_activity_at: new Date().toISOString(), version: 3,
+    };
+    callModel.mockResolvedValue({ toolCalls: [], text: 'תשובה חדשה' });
+    const { runCsTurn } = await import('@/lib/cs/cs-agent');
+    await runCsTurn(job('הודעה חדשה'), { callModel });
+    const turns = store['972501112222'].context.recentTurns;
+    expect(turns).toHaveLength(8);
+    expect(turns[0]).toEqual({ role: 'user', text: 'msg2' }); // oldest 2 (msg0, msg1) dropped
+    expect(turns[6]).toEqual({ role: 'user', text: 'הודעה חדשה' });
+    expect(turns[7]).toEqual({ role: 'assistant', text: 'תשובה חדשה' });
+  });
+
   it('learnedName side-effect → session.customer_name + whatsapp_contacts.profile_name updated', async () => {
     handlers['learn_name'] = vi.fn().mockResolvedValue({ ok: true, learnedName: 'דנה' });
     callModel
