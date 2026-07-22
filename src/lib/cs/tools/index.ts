@@ -43,6 +43,22 @@ const resolveBrandTool: CsTool = {
   },
 };
 
+const rememberNameTool: CsTool = {
+  def: { type: 'function', function: {
+    name: 'remember_name',
+    description: "Save the shopper's name the FIRST time they tell you it (any language) so you can greet them by name and never ask again. Call this as soon as you learn it — e.g. they reply \"קוראים לי דנה\" or just \"דנה\". Don't call it if you already know their name.",
+    parameters: { type: 'object', properties: { name: { type: 'string', description: "the shopper's name exactly as they gave it" } }, required: ['name'] },
+  } },
+  async handler(args, _ctx): Promise<CsToolResult> {
+    const name = String(args?.name || '').trim();
+    if (!name) return { ok: false, data: { reason: 'empty_name' } };
+    // The `learnedName` signal is applied by the agent loop (applyLearnedName in cs-agent.ts):
+    // it persists to whatsapp_cs_sessions.customer_name + whatsapp_contacts.profile_name, so the
+    // name survives across turns and the prompt then instructs Bestie to greet by name.
+    return { ok: true, learnedName: name, data: { saved: true, name } };
+  },
+};
+
 const lookupOrderTool: CsTool = {
   def: { type: 'function', function: {
     name: 'lookup_order',
@@ -141,7 +157,7 @@ const escalateTool: CsTool = {
 // list/buttons menu for brand selection is absurd. Disambiguation happens in prose
 // (resolve_brand → confirm/clarify in plain text), never via show_buttons/show_list.
 const TOOLS: CsTool[] = [
-  resolveBrandTool, bindBrandTool, lookupOrderTool, lookupOrdersByPhoneTool,
+  resolveBrandTool, bindBrandTool, rememberNameTool, lookupOrderTool, lookupOrdersByPhoneTool,
   listOpenThreadsTool, openOrAttachTicketTool, escalateTool,
 ];
 export function getCsTools(): CsTool[] { return TOOLS; }

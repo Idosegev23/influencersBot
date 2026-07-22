@@ -135,9 +135,17 @@ export async function routeInboundToTicket(
   }
 
   // ── Strategy 3: most recent non-terminal ticket for this phone ──────
+  // EXCLUDE whatsapp_cs tickets. Those belong to the Bestie CS bot, which owns the entire
+  // conversation and keeps its transcript in chat_messages (NOT support_ticket_history). The
+  // CS bot opens exactly one support_request per conversation, so a bare phone match here would
+  // wrongly claim every follow-up the shopper sends — starving the bot (the message never reaches
+  // runCsTurn, so the thread appears "stuck"). Skipping them lets the webhook fall through to the
+  // CS 4th branch (maybeRouteCs). Strategies 1/2 above are unaffected: they key off our OUTBOUND
+  // rows in support_ticket_history, which a CS thread only gains once a human takes it over via the
+  // ticket UI — at which point routing replies to that ticket is exactly what we want.
   const { data: candidates } = await supabase
     .from('support_requests')
-    .select('id, account_id, customer_phone, status, updated_at')
+    .select('id, account_id, customer_phone, status, updated_at, source')
     .order('updated_at', { ascending: false })
     .limit(50);
 
@@ -146,6 +154,7 @@ export async function routeInboundToTicket(
       (t) =>
         t.customer_phone &&
         toWaId(t.customer_phone) === input.waId &&
+        t.source !== 'whatsapp_cs' &&
         !TERMINAL_STATUSES.has(t.status),
     );
     if (ticket) {

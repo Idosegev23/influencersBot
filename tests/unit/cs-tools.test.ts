@@ -38,16 +38,25 @@ const tool = async (name: string) => {
 describe('CS tools', () => {
   beforeEach(() => { vi.clearAllMocks(); H.account = null; H.threads = []; openOrAttachCsTicket.mockResolvedValue({ ticketId: 'ticket-1' }); runCsHandoffCheck.mockResolvedValue({ escalated: true }); });
 
-  it('CS_TOOL_DEFS exposes exactly the 7 conversational tools — NO show_buttons/show_list (pure-text CS, no menu widgets)', async () => {
+  it('CS_TOOL_DEFS exposes exactly the 8 conversational tools — NO show_buttons/show_list (pure-text CS, no menu widgets)', async () => {
     const { CS_TOOL_DEFS, getCsTools } = await import('@/lib/cs/tools');
     const names = CS_TOOL_DEFS.map((d) => d.function.name).sort();
-    expect(names).toEqual(['bind_brand', 'escalate_to_human', 'list_open_threads', 'lookup_order', 'lookup_orders_by_phone', 'open_or_attach_ticket', 'resolve_brand']);
+    expect(names).toEqual(['bind_brand', 'escalate_to_human', 'list_open_threads', 'lookup_order', 'lookup_orders_by_phone', 'open_or_attach_ticket', 'remember_name', 'resolve_brand']);
     expect(names).not.toContain('show_buttons');
     expect(names).not.toContain('show_list');
     expect(CS_TOOL_DEFS.every((d) => d.type === 'function')).toBe(true);
     // getCsTools() (what the agent loop actually dispatches against) must agree — the brain
     // literally cannot emit a menu because no tool implementing one is ever registered.
     expect(getCsTools().map((t) => t.def.function.name).sort()).toEqual(names);
+  });
+
+  it('remember_name returns the learnedName signal (the agent loop persists it) — and rejects empty', async () => {
+    const ok = await (await tool('remember_name')).handler({ name: '  דנה  ' }, ctx());
+    expect(ok.ok).toBe(true);
+    expect(ok.learnedName).toBe('דנה'); // trimmed
+    const empty = await (await tool('remember_name')).handler({ name: '   ' }, ctx());
+    expect(empty.ok).toBe(false);
+    expect(empty.learnedName).toBeUndefined();
   });
 
   it('resolve_brand passes returning-memory preferAccountIds and maps candidates', async () => {

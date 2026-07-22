@@ -72,6 +72,24 @@ describe('cs-context', () => {
     expect(p).toContain('labeaute.co.il');
   });
 
+  // Live-test fix (issue ב, 2026-07-22): the bot went straight to the brand question and never
+  // asked the shopper's name. When the name is unknown the prompt must DIRECT (not merely permit)
+  // asking for it, and wire the remember_name tool so it's captured once. When known, greet by name.
+  it('unknown-name prompt: directs asking the name and calls remember_name to capture it', async () => {
+    const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
+    const p = await buildCsSystemPrompt({ accountId: null, userMessage: 'היי', digest: digest() });
+    expect(p).toMatch(/איך קוראים/); // asks for the name
+    expect(p).toMatch(/remember_name/); // wires the capture tool
+  });
+
+  it('known-name prompt: greets by name and does not re-ask', async () => {
+    const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
+    const p = await buildCsSystemPrompt({ accountId: null, userMessage: 'היי', digest: digest({ knownName: 'דנה' }) });
+    expect(p).toContain('דנה');
+    expect(p).toMatch(/אל תשאל\/י שוב לשם/);
+    expect(p).not.toMatch(/remember_name/); // no need to capture again
+  });
+
   it('bound prompt: injects brand persona + RAG (searchContentByQuery scoped to the account)', async () => {
     const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
     const p = await buildCsSystemPrompt({ accountId: 'acc-1', userMessage: 'איך משתמשים בשמן?', digest: digest({ boundBrand: 'Argania' }) });
