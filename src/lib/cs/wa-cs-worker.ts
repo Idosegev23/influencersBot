@@ -1,6 +1,7 @@
 import { acquireCsLock, releaseCsLock } from '@/lib/cs/wa-cs-locks';
 import { dequeueCsMessage, csQueueLength, type CsJob } from '@/lib/cs/wa-cs-queue';
 import { publishCsDrain } from '@/lib/cs/wa-cs-publish';
+import { runCsTurn, type CsTurnResult } from '@/lib/cs/cs-agent';
 import { sendText, sendInteractiveButtons, sendInteractiveList, sendReaction } from '@/lib/whatsapp-cloud/client';
 import { redisGet, redisSetNx } from '@/lib/redis';
 
@@ -19,13 +20,12 @@ export async function processOneCsInbound(job: CsJob): Promise<string | null> {
   const doneKey = `cs:wa:${job.msg?.id}:done`;
   try { if (job.msg?.id && (await redisGet(doneKey))) return null; } catch { /* ignore */ }
 
-  const { runCsTurn } = await import('@/lib/cs/cs-agent');
   const turn = await runCsTurn(job);
   const reply = turn.reply;
-  if (!reply || reply.kind === 'none') return turn.phase;
+  if (!reply || reply.kind === 'none') return null;
 
   // Meta can return {success:false} WITHOUT throwing on 429/503 → retry the SEND 3x.
-  let sent = { success: false } as { success: boolean };
+  let sent: { success: boolean; wa_message_id?: string } = { success: false };
   for (let i = 0; i < 3; i++) {
     try {
       if (reply.kind === 'text') {
@@ -49,7 +49,7 @@ export async function processOneCsInbound(job: CsJob): Promise<string | null> {
     console.error('[cs-worker] reply delivery FAILED after 3 retries', job.msg?.id);
     if (job.msg?.id) void Promise.resolve(sendReaction({ to: job.waId, messageId: job.msg.id, emoji: '⚠️' })).catch(() => {});
   }
-  return turn.phase;
+  return sent.success ? (sent.wa_message_id ?? null) : null;
 }
 
 /**
