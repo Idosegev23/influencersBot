@@ -123,18 +123,29 @@ export async function runCsTurn(job: CsJob, depsOverride?: Partial<CsAgentDeps>)
     if (await isBotPaused(session.active_chat_session_id)) return { reply: { kind: 'none' }, phase: session.phase };
   }
 
-  // 3) Code backstop — guarantee escalation even if the brain misses the cue.
+  // 3) Code backstop — guarantee escalation even if the brain misses the cue. FAILS CLOSED:
+  // detectHandoff itself may throw (unknown Phase-D wiring, bad config, etc) — in that case we
+  // genuinely don't know it's an escalation, so we proceed to the model. But once detectHandoff
+  // HAS decided this is a known escalation, that decision is final — a known escalation must
+  // never reach the model just because the pause/notify dispatch (runCsHandoffCheck) failed.
+  let handoff: { triggered: boolean; [k: string]: any } | null = null;
   try {
     const { detectHandoff } = await import('@/engines/escalation/detect'); // Phase D (D2)
     const cfg = await escalationConfig(session.active_account_id);
-    const d = detectHandoff(userMessage, await priorUserTexts(session.active_chat_session_id), { enabledTriggers: cfg?.triggers, lowConfidenceThreshold: cfg?.lowConfidenceThreshold });
-    if (d.triggered && session.active_account_id && session.active_chat_session_id) {
+    handoff = detectHandoff(userMessage, await priorUserTexts(session.active_chat_session_id), { enabledTriggers: cfg?.triggers, lowConfidenceThreshold: cfg?.lowConfidenceThreshold });
+  } catch (e) {
+    console.warn('[cs-agent] detectHandoff failed — treating as unknown, proceeding to the model', e);
+  }
+  if (handoff?.triggered && session.active_account_id && session.active_chat_session_id) {
+    try {
       const { runCsHandoffCheck } = await import('@/engines/escalation/dispatch'); // Phase D (D4)
       await runCsHandoffCheck({ accountId: session.active_account_id, chatSessionId: session.active_chat_session_id, ticketId: session.active_ticket_id, waId, userMessage, force: true });
-      await saveCsSession(session, { last_activity_at: new Date().toISOString() });
-      return { reply: { kind: 'text', body: 'אני מעבירה אותך לנציג/ה אנושי/ת שיחזרו אליך בהקדם 🙏' }, phase: session.phase };
+    } catch (e) {
+      console.error('[cs-agent] runCsHandoffCheck failed — still handing off; a known escalation must never fall through to the model', e);
     }
-  } catch (e) { console.warn('[cs-agent] handoff backstop failed', e); }
+    try { await saveCsSession(session, { last_activity_at: new Date().toISOString() }); } catch (e) { console.warn('[cs-agent] session touch after handoff failed', e); }
+    return { reply: { kind: 'text', body: 'אני מעבירה אותך לנציג/ה אנושי/ת שיחזרו אליך בהקדם 🙏' }, phase: session.phase };
+  }
 
   // 4) Build the brand-grounded system prompt (persona + RAG + re-entry digest — NO scripted menu).
   const openThreads = await loadOpenThreads(waId);

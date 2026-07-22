@@ -29,8 +29,12 @@ vi.mock('@/engines/escalation/detect', () => ({ detectHandoff: (...a: any[]) => 
 const runCsHandoffCheck = vi.fn().mockResolvedValue({ escalated: true });
 vi.mock('@/engines/escalation/dispatch', () => ({ runCsHandoffCheck: (...a: any[]) => runCsHandoffCheck(...a) }));
 
+// Spy on whatsapp_contacts updates specifically, so the learnedName side-effect test can assert
+// the contact record was patched with the learned name (the generic chain below handles every
+// other table the same way it always did).
+const contactsUpdate = vi.fn().mockReturnValue({ eq: async () => ({ data: null }) });
 vi.mock('@/lib/supabase', () => ({
-  supabase: { from: () => { const c: any = {}; c.select = () => c; c.eq = () => c; c.in = () => c; c.order = () => c; c.limit = () => c; c.single = async () => ({ data: null }); c.maybeSingle = async () => ({ data: null }); c.insert = async () => ({ data: null }); c.update = () => ({ eq: async () => ({ data: null }) }); c.then = (r: any) => r({ data: [] }); return c; } },
+  supabase: { from: (table: string) => { const c: any = {}; c.select = () => c; c.eq = () => c; c.in = () => c; c.order = () => c; c.limit = () => c; c.single = async () => ({ data: null }); c.maybeSingle = async () => ({ data: null }); c.insert = async () => ({ data: null }); c.update = table === 'whatsapp_contacts' ? contactsUpdate : () => ({ eq: async () => ({ data: null }) }); c.then = (r: any) => r({ data: [] }); return c; } },
 }));
 
 const job = (textBody: string) => ({ waId: '972501112222', msg: { id: 'w1' }, textBody, contactId: 'c1' } as any);
@@ -56,6 +60,18 @@ describe('runCsTurn (brain-led loop)', () => {
     const res = await runCsTurn(job('אני רוצה החזר כספי'), { callModel });
     expect(runCsHandoffCheck).toHaveBeenCalledWith(expect.objectContaining({ accountId: 'acc-1', chatSessionId: 'cs-1', force: true }));
     expect(res.reply.kind).toBe('text');
+    expect(callModel).not.toHaveBeenCalled();
+  });
+
+  it('fails CLOSED: detectHandoff triggered but runCsHandoffCheck REJECTS → still returns the handoff ack, model NOT called', async () => {
+    detectHandoff.mockReturnValue({ triggered: true, triggers: ['legal'], severity: 'critical', reason: 'legal' });
+    runCsHandoffCheck.mockRejectedValue(new Error('notify/pause dispatch failed'));
+    store['972501112222'] = bound();
+    const { runCsTurn } = await import('@/lib/cs/cs-agent');
+    const res = await runCsTurn(job('אני אתבע אתכם'), { callModel });
+    expect(runCsHandoffCheck).toHaveBeenCalled();
+    expect(res.reply.kind).toBe('text');
+    if (res.reply.kind === 'text') expect(res.reply.body).toContain('נציג');
     expect(callModel).not.toHaveBeenCalled();
   });
 
@@ -104,5 +120,27 @@ describe('runCsTurn (brain-led loop)', () => {
     const { runCsTurn } = await import('@/lib/cs/cs-agent');
     const res = await runCsTurn(job('אני רוצה נציג'), { callModel });
     expect(res.reply.kind).toBe('none');
+  });
+
+  it('MAX_ITERS safety net: model NEVER stops calling tools → loop terminates after exactly 5 iters with the rephrase fallback', async () => {
+    handlers['some_tool'] = vi.fn().mockResolvedValue({ ok: true, data: { info: 'ok' } });
+    callModel.mockResolvedValue({ toolCalls: [{ id: 'tc', name: 'some_tool', args: {} }], text: null });
+    const { runCsTurn } = await import('@/lib/cs/cs-agent');
+    const res = await runCsTurn(job('משהו'), { callModel });
+    expect(callModel).toHaveBeenCalledTimes(5);
+    expect(res.reply.kind).toBe('text');
+    if (res.reply.kind === 'text') expect(res.reply.body).toBe('סליחה, אפשר לנסח שוב? 🙏');
+  });
+
+  it('learnedName side-effect → session.customer_name + whatsapp_contacts.profile_name updated', async () => {
+    handlers['learn_name'] = vi.fn().mockResolvedValue({ ok: true, learnedName: 'דנה' });
+    callModel
+      .mockResolvedValueOnce({ toolCalls: [{ id: 'tc1', name: 'learn_name', args: {} }], text: null })
+      .mockResolvedValueOnce({ toolCalls: [], text: 'נעים להכיר, דנה!' });
+    store['972501112222'] = bound();
+    const { runCsTurn } = await import('@/lib/cs/cs-agent');
+    await runCsTurn(job('קוראים לי דנה'), { callModel });
+    expect(store['972501112222'].customer_name).toBe('דנה');
+    expect(contactsUpdate).toHaveBeenCalledWith({ profile_name: 'דנה' });
   });
 });
