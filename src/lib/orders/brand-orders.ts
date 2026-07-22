@@ -27,10 +27,25 @@ export interface BrandOrderRow {
   updated_at: string;
 }
 
-// Upsert conflict target. order_number is NOT NULL in brand_orders (migration 068): every connector
-// (QuickShop/Shopify) always produces a NormalizedOrder.orderNumber, so a row without one is never
-// ingested — a NULL here would be distinct in the unique index and silently duplicate instead of upsert.
+// Upsert conflict target. order_number is NOT NULL in brand_orders (migration 068), but the NOT NULL
+// constraint is only a backstop: it rejects a true SQL NULL, not an empty string or the literal text
+// "undefined"/"null" that a connector can emit (e.g. QuickShop's String(undefined) when the source field
+// is absent). Those garbage-but-non-null values still satisfy the constraint and would collide with a
+// real row under the (account_id, order_number) conflict key, silently overwriting it. hasValidOrderNumber()
+// below is the real guard — it runs before every upsert and skips rows that would corrupt the cache.
 const CONFLICT = 'account_id,order_number';
+
+/** True only for a usable order_number: a non-empty string that isn't the literal "undefined"/"null"
+ *  a connector can produce via String(missingField). Rows that fail this are skipped, not upserted —
+ *  see the CONFLICT comment above for why the NOT NULL constraint alone isn't enough. */
+function hasValidOrderNumber(order: Pick<NormalizedOrder, 'orderNumber'> | null | undefined): boolean {
+  const n = order?.orderNumber;
+  if (typeof n !== 'string') return false;
+  const trimmed = n.trim();
+  if (trimmed === '') return false;
+  const lower = trimmed.toLowerCase();
+  return lower !== 'undefined' && lower !== 'null';
+}
 
 function baseRow(accountId: string, o: NormalizedOrder, platform: StorePlatform): Record<string, unknown> {
   return {
@@ -54,17 +69,32 @@ function baseRow(accountId: string, o: NormalizedOrder, platform: StorePlatform)
   };
 }
 
-/** Detail upsert (live pull + webhook) — writes line_items. */
-export async function upsertBrandOrder(accountId: string, order: NormalizedOrder, platform: StorePlatform): Promise<void> {
+/** Detail upsert (live pull + webhook) — writes line_items.
+ *  Returns false (and skips the DB call entirely) when order.orderNumber is missing/empty/garbage —
+ *  never throws for this case, so a drain loop can log-and-continue instead of crashing. */
+export async function upsertBrandOrder(accountId: string, order: NormalizedOrder, platform: StorePlatform): Promise<boolean> {
+  if (!hasValidOrderNumber(order)) {
+    console.warn('[upsertBrandOrder] skipped: invalid orderNumber', { accountId, externalId: order?.externalId, orderNumber: order?.orderNumber });
+    return false;
+  }
   const row = { ...baseRow(accountId, order, platform), line_items: order.lineItems ?? null };
   const { error } = await supabaseAdmin.from('brand_orders').upsert(row, { onConflict: CONFLICT });
   if (error) throw new Error(`upsertBrandOrder failed: ${error.message}`);
+  return true;
 }
 
-/** Summary batch upsert (backfill) — OMITS line_items so any previously fetched detail is preserved. */
+/** Summary batch upsert (backfill) — OMITS line_items so any previously fetched detail is preserved.
+ *  Rows with an invalid orderNumber are filtered out BEFORE the DB call, so one bad row never aborts
+ *  the whole batch; the returned count reflects only the rows actually upserted. */
 export async function upsertBrandOrders(accountId: string, orders: NormalizedOrder[], platform: StorePlatform): Promise<number> {
   if (!orders.length) return 0;
-  const rows = orders.map((o) => baseRow(accountId, o, platform)); // no line_items key
+  const valid = orders.filter((o) => {
+    const ok = hasValidOrderNumber(o);
+    if (!ok) console.warn('[upsertBrandOrders] skipped: invalid orderNumber', { accountId, externalId: o?.externalId, orderNumber: o?.orderNumber });
+    return ok;
+  });
+  if (!valid.length) return 0;
+  const rows = valid.map((o) => baseRow(accountId, o, platform)); // no line_items key
   const { error } = await supabaseAdmin.from('brand_orders').upsert(rows, { onConflict: CONFLICT });
   if (error) throw new Error(`upsertBrandOrders failed: ${error.message}`);
   return rows.length;
