@@ -30,10 +30,10 @@ describe('brand-resolver', () => {
     expect(brands.map((b) => b.accountId).sort()).toEqual(['acc-argania', 'acc-labeaute']);
   });
 
-  it('exact alias → single', async () => {
+  it('exact alias still ranks the right brand first (brain-led: kind is multi — both enabled brands come back)', async () => {
     const { resolveBrand } = await import('@/lib/cs/brand-resolver');
     const r = await resolveBrand('ארגניה');
-    expect(r.kind).toBe('single');
+    expect(r.kind).toBe('multi');
     expect(r.candidates[0].accountId).toBe('acc-argania');
   });
 
@@ -44,10 +44,10 @@ describe('brand-resolver', () => {
     expect(r.candidates.map((c) => c.accountId)).toContain('acc-argania');
   });
 
-  it('gibberish → none', async () => {
+  it('gibberish still returns the whole small roster (brain-led: no score gate) — never none while brands are enabled', async () => {
     const { resolveBrand } = await import('@/lib/cs/brand-resolver');
     const r = await resolveBrand('zzzzqqq-not-a-brand');
-    expect(r.kind).toBe('none');
-    expect(r.candidates).toEqual([]);
+    expect(r.kind).toBe('multi');
+    expect(r.candidates.map((c) => c.accountId).sort()).toEqual(['acc-argania', 'acc-labeaute']);
   });
 });

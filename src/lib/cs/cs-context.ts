@@ -2,6 +2,7 @@ import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { buildPersonalityFromDB } from '@/lib/chatbot/personality-wrapper';
 import { searchContentByQuery, formatMetadataForAI } from '@/lib/chatbot/hybrid-retrieval';
 import { isWarm, type CsSessionRow } from '@/lib/cs/cs-session';
+import { listCsEnabledBrands, MAX_INLINE } from '@/lib/cs/brand-resolver';
 
 // The brain always appends <<SUGGESTIONS>>…; a WhatsApp channel MUST strip it before sending.
 export function stripSuggestions(text: string): string {
@@ -54,8 +55,23 @@ export async function buildCsSystemPrompt(input: {
   if (digest.knownName) lines.push(`שם הלקוח/ה: ${digest.knownName}. אל תשאל/י שוב לשם.`);
   else lines.push('שם הלקוח/ה עדיין לא ידוע — אפשר לשאול פעם אחת, בטבעיות.');
 
-  if (digest.boundBrand) lines.push(`מותג פעיל: ${digest.boundBrand} — כל הכלים מכוונים אליו.`);
-  else lines.push('טרם נבחר מותג — שאל/י לאיזה מותג לפנות, קרא/י ל-resolve_brand, ובאישור הלקוח/ה ל-bind_brand.');
+  if (digest.boundBrand) {
+    lines.push(`מותג פעיל: ${digest.boundBrand} — כל הכלים מכוונים אליו.`);
+  } else {
+    lines.push('טרם נבחר מותג — שאל/י לאיזה מותג לפנות, קרא/י ל-resolve_brand, ובאישור הלקוח/ה ל-bind_brand.');
+    // Brain-led brand matching: hand the LLM the CS-enabled roster directly so it can match
+    // "ארגן"→Argania, "פאשה"→Studio Pasha, typos, Hebrew/English straight from context — resolve_brand
+    // / show_list are then only needed for genuine ambiguity, not as the primary matching path.
+    try {
+      const brands = await listCsEnabledBrands();
+      if (brands.length) {
+        lines.push('\n--- מותגים זמינים שאת/ה משרת/ת (בחר/י את זה שהלקוח/ה מתכוון/ת אליו, ואז קרא/י ל-bind_brand; resolve_brand/show_list רק אם עדיין לא ברור) ---');
+        for (const b of brands.slice(0, MAX_INLINE)) {
+          lines.push(`${b.displayName} — ${b.domain || b.username || '—'}`);
+        }
+      }
+    } catch { /* brand roster optional — resolve_brand tool still covers this if the fetch fails */ }
+  }
 
   // Pre-bind onboarding turns have no chat_messages history (it only exists after bind_brand) —
   // this short, clearly-labeled block is the only cross-turn memory available in that window

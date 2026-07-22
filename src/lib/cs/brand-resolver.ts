@@ -5,7 +5,7 @@ export interface BrandCandidate {
   displayName: string;
   username: string;
   domain: string | null;
-  score: number; // 0..1 fuzzy similarity
+  score: number; // 0..1 fuzzy similarity — informational only: used to rank/narrow, never to gate.
 }
 
 export interface BrandResolution {
@@ -13,10 +13,16 @@ export interface BrandResolution {
   candidates: BrandCandidate[];
 }
 
-// Confidence cut-offs for the disambiguation policy (§6.3).
-const MATCH_THRESHOLD = 0.34; // below this a term is not a candidate at all
-const SINGLE_THRESHOLD = 0.62; // one candidate this strong AND clear of #2 → confirm directly
-const MAX_MULTI = 5; // interactive list cap
+// Brain-led sizing. The whole CS feature is brain-led — brand matching should be too: the LLM
+// natively handles "ארגן"→Argania, "פאשה"→Studio Pasha, typos, and Hebrew/English. Code's job is
+// to hand it CS-enabled candidates, not gatekeep with a hard similarity threshold.
+//   - MAX_INLINE: at or below this many CS-enabled brands, return the WHOLE roster — no score
+//     gate at all. The query is irrelevant to narrowing at this scale; the brain reads the full
+//     list (injected into the system prompt too, see cs-context.ts) and disambiguates itself.
+//   - TOP_K: once the roster exceeds MAX_INLINE, fuzzy-narrow to this many by trigram score so the
+//     prompt/tool payload stays bounded. This is a shortlist, never a hard threshold cutoff.
+export const MAX_INLINE = 25;
+export const TOP_K = 12;
 
 function normalize(s: string): string {
   return (s || '')
@@ -59,14 +65,16 @@ function toCandidate(row: any): BrandCandidate {
   };
 }
 
-// Vocabulary strings a query is matched against for one brand.
+// Vocabulary strings a query is ranked against for one brand. `aliases` is OPTIONAL — an extra
+// signal when a brand has hand-picked nicknames configured, never a dependency: display_name /
+// username / domain alone are always enough for a brand to be findable and bindable.
 function vocabularyOf(row: any): string[] {
   const cfg = row.config || {};
   const cs = cfg.whatsapp_cs || {};
   const vocab: string[] = [];
   if (cfg.display_name) vocab.push(cfg.display_name);
   if (cfg.username) vocab.push(cfg.username);
-  if (Array.isArray(cs.aliases)) vocab.push(...cs.aliases);
+  if (Array.isArray(cs.aliases)) vocab.push(...cs.aliases); // optional extra signal, never required
   const domain = cfg.widget?.domain || cfg.domain;
   if (domain) vocab.push(String(domain).replace(/\.[a-z.]+$/i, '')); // strip TLD
   return vocab.filter(Boolean);
@@ -84,47 +92,50 @@ async function fetchCsEnabledRows(): Promise<any[]> {
   return (data as any[]) || [];
 }
 
-// Vocabulary source for callers that need the full CS-enabled brand list
-// (e.g. building an admin picker). Scores are always 0 here — no query to match against.
+// Shared loader for both resolveBrand() and the unbound system-prompt injection (cs-context.ts) —
+// DRY: one DB-scoped source of truth for "which brands is Bestie CS allowed to talk about".
+// Scores are always 0 here — there's no query to rank against yet.
 export async function listCsEnabledBrands(): Promise<BrandCandidate[]> {
   const rows = await fetchCsEnabledRows();
   return rows.map(toCandidate);
+}
+
+// Returning-memory preference (§6.3 step #1) wins near-ties (within 0.05 score); otherwise raw
+// fuzzy score orders the list. This ordering is informational for the brain — never a gate — but
+// it does guarantee a previously-engaged brand isn't silently dropped by the TOP_K narrowing below.
+function orderCandidates(candidates: BrandCandidate[], prefer: Set<string>): BrandCandidate[] {
+  return [...candidates].sort((a, b) => {
+    const ap = prefer.has(a.accountId) ? 1 : 0;
+    const bp = prefer.has(b.accountId) ? 1 : 0;
+    if (Math.abs(a.score - b.score) < 0.05 && ap !== bp) return bp - ap;
+    return b.score - a.score;
+  });
 }
 
 export async function resolveBrand(
   query: string,
   opts?: { preferAccountIds?: string[] },
 ): Promise<BrandResolution> {
-  const q = normalize(query);
-  if (!q) return { kind: 'none', candidates: [] };
-
   const rows = await fetchCsEnabledRows();
+  if (rows.length === 0) return { kind: 'none', candidates: [] };
+
+  const q = normalize(query);
   const prefer = new Set(opts?.preferAccountIds || []);
+  const scored: BrandCandidate[] = rows.map((row) => {
+    const c = toCandidate(row);
+    c.score = q ? Math.max(0, ...vocabularyOf(row).map((v) => trigramSimilarity(q, v))) : 0;
+    return c;
+  });
 
-  const scored: BrandCandidate[] = rows
-    .map((row) => {
-      const best = Math.max(0, ...vocabularyOf(row).map((v) => trigramSimilarity(q, v)));
-      const c = toCandidate(row);
-      c.score = best;
-      return c;
-    })
-    .filter((c) => c.score >= MATCH_THRESHOLD)
-    .sort((a, b) => {
-      // Returning-memory preference wins ties (and near-ties within 0.05).
-      const ap = prefer.has(a.accountId) ? 1 : 0;
-      const bp = prefer.has(b.accountId) ? 1 : 0;
-      if (Math.abs(a.score - b.score) < 0.05 && ap !== bp) return bp - ap;
-      return b.score - a.score;
-    })
-    .slice(0, MAX_MULTI);
-
-  if (scored.length === 0) return { kind: 'none', candidates: [] };
-
-  const top = scored[0];
-  const second = scored[1];
-  const clearLead = !second || top.score - second.score >= 0.12;
-  if (scored.length === 1 || (top.score >= SINGLE_THRESHOLD && clearLead)) {
-    return { kind: 'single', candidates: [top] };
+  // Small roster: hand the brain EVERYTHING, no score gate — it disambiguates from the shopper's
+  // message and conversation context far better than a code-side trigram threshold ever could.
+  if (scored.length <= MAX_INLINE) {
+    const candidates = orderCandidates(scored, prefer);
+    return { kind: candidates.length === 1 ? 'single' : 'multi', candidates };
   }
-  return { kind: 'multi', candidates: scored };
+
+  // Large roster: fuzzy-narrow to a bounded shortlist so the prompt/tool payload stays small — a
+  // top-K cut by score, never a hard threshold that could exclude the brand the shopper meant.
+  const candidates = orderCandidates(scored, prefer).slice(0, TOP_K);
+  return { kind: candidates.length === 1 ? 'single' : 'multi', candidates };
 }

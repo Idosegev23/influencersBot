@@ -8,8 +8,26 @@ vi.mock('@/lib/chatbot/hybrid-retrieval', () => ({
   searchContentByQuery: (...a: any[]) => searchContentByQuery(...a),
   formatMetadataForAI: (...a: any[]) => formatMetadataForAI(...a),
 }));
+
+// CS-enabled brands the unbound prompt should inject (brain-led matching, task C5). Also backs the
+// single-row account lookup buildContextDigest would use for boundBrand (unused by these tests, but
+// harmless to keep working).
+const ENABLED_ROWS = [
+  { id: 'acc-argania', config: { username: 'argania', display_name: 'Argania', whatsapp_cs: { enabled: true }, widget: { domain: 'argania-oil.co.il' } } },
+  { id: 'acc-labeaute', config: { username: 'labeaute', display_name: 'LA BEAUTÉ', whatsapp_cs: { enabled: true }, domain: 'labeaute.co.il' } },
+];
 vi.mock('@/lib/supabase', () => ({
-  supabase: { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: { config: { display_name: 'Argania' } } }) }) }) }) },
+  supabase: {
+    from: () => {
+      const ctx: any = {};
+      ctx.select = () => ctx;
+      ctx.eq = () => ctx;
+      ctx.filter = () => ctx;
+      ctx.single = async () => ({ data: { config: { display_name: 'Argania' } } });
+      ctx.then = (resolve: any) => resolve({ data: ENABLED_ROWS, error: null });
+      return ctx;
+    },
+  },
 }));
 
 const digest = (over: any = {}) => ({ knownName: null, boundBrand: null, warm: false, openThreads: [], recentTurns: [], ...over });
@@ -29,6 +47,17 @@ describe('cs-context', () => {
     expect(p).toMatch(/מותג/);
     expect(searchContentByQuery).not.toHaveBeenCalled();
     expect(buildPersonalityFromDB).not.toHaveBeenCalled();
+  });
+
+  // (b) Brain-led contract: the unbound prompt lists the CS-enabled roster directly (name + domain)
+  // so the LLM can match "ארגן"→Argania etc. straight from context, not just via the resolve_brand tool.
+  it('unbound prompt: includes the CS-enabled brands (name + domain) for direct brain matching', async () => {
+    const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
+    const p = await buildCsSystemPrompt({ accountId: null, userMessage: 'היי, יש לכם שמן ארגן?', digest: digest() });
+    expect(p).toContain('Argania');
+    expect(p).toContain('argania-oil.co.il');
+    expect(p).toContain('LA BEAUTÉ');
+    expect(p).toContain('labeaute.co.il');
   });
 
   it('bound prompt: injects brand persona + RAG (searchContentByQuery scoped to the account)', async () => {
