@@ -43,6 +43,31 @@ Object.defineProperty(navigator, 'clipboard', {
   },
 });
 
+// Mock OpenAI client for tests
+vi.mock('openai', () => {
+  const MockOpenAI = vi.fn(() => ({
+    chat: {
+      completions: {
+        create: vi.fn(),
+      },
+    },
+  }));
+  return { default: MockOpenAI };
+});
+
+// Mock supabase for tests
+vi.mock('@/lib/supabase', () => ({
+  supabase: {
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          single: vi.fn(async () => ({ data: null, error: null })),
+        })),
+      })),
+    })),
+  },
+}));
+
 
 
 

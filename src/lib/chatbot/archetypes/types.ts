@@ -108,7 +108,7 @@ export interface ArchetypeInput {
   modelTier?: 'nano' | 'standard' | 'full'; // From decision engine modelStrategy
   personalityConfig?: any; // Pre-loaded personality config (avoids DB call in archetype)
   previousResponseId?: string | null; // OpenAI Responses API: chain context across turns
-  mode?: 'widget' | 'social' | 'dm'; // Widget = sales-oriented, Social = engagement, DM = Instagram direct messages
+  mode?: 'widget' | 'social' | 'dm' | 'whatsapp'; // Widget = sales, Social = engagement, DM = IG, WhatsApp = CS
   widgetConfig?: any; // Widget-specific config from accounts.config.widget (prompt overrides, FAQ, etc.)
   // Proactive conversation enrichment
   suggestedClarifications?: string[]; // From understanding engine — questions to ask when ambiguous

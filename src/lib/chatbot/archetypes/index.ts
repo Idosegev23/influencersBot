@@ -19,6 +19,14 @@ import { createMindsetArchetype } from './mindset';
 import { createInteriorArchetype } from './interior';
 import { createGeneralArchetype } from './general';
 
+// Collapse the WhatsApp CS mode to 'dm' for archetype prompt assembly. baseArchetype.ts:726 only
+// branches on 'dm', so mapping here applies DM 1:1 prompt behaviour WITHOUT editing baseArchetype.
+export function resolveArchetypeMode(
+  mode?: 'widget' | 'social' | 'dm' | 'whatsapp',
+): 'widget' | 'social' | 'dm' | undefined {
+  return mode === 'whatsapp' ? 'dm' : mode;
+}
+
 // ============================================
 // Archetype Factory
 // ============================================
@@ -128,7 +136,7 @@ export async function processWithArchetype(
     modelTier?: 'nano' | 'standard' | 'full';
     personalityConfig?: any;
     previousResponseId?: string | null;
-    mode?: 'widget' | 'social' | 'dm';
+    mode?: 'widget' | 'social' | 'dm' | 'whatsapp';
     widgetConfig?: any;
     suggestedClarifications?: string[];
     activeCoupons?: Array<{ brand_name: string; coupon_code: string; description?: string }>;
@@ -179,7 +187,7 @@ export async function processWithArchetype(
     modelTier: context.modelTier,
     personalityConfig: context.personalityConfig,
     previousResponseId: context.previousResponseId,
-    mode: context.mode,
+    mode: resolveArchetypeMode(context.mode),
     widgetConfig: context.widgetConfig,
     suggestedClarifications: context.suggestedClarifications,
     activeCoupons: context.activeCoupons,

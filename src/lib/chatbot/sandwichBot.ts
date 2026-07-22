@@ -17,6 +17,12 @@ import { scrubTermsFromKB } from '@/lib/coupons/kb-scrub';
 import { getAllCouponCodes, getValidCouponCodes } from '@/lib/coupons/active-filter';
 import { stripCouponContentFromKB } from '@/lib/coupons/coupon-content-filter';
 
+// A WhatsApp CS thread is a 1:1 DM-style conversation, so it takes the SAME RAG-enrichment ordering
+// as an Instagram DM. Exported so the dm-parity decision is unit-testable (no source grep).
+export function modeUsesDmEnrichment(mode?: 'widget' | 'social' | 'dm' | 'whatsapp'): boolean {
+  return mode === 'dm' || mode === 'whatsapp';
+}
+
 // Fallback suggestions per archetype when LLM omits <<SUGGESTIONS>>
 const ARCHETYPE_FALLBACK_SUGGESTIONS: Record<string, string> = {
   cooking: 'מתכון מהיר|טיפ למטבח|מה הכי שווה לנסות?',
@@ -51,7 +57,7 @@ export interface SandwichBotInput {
   onToken?: (token: string) => void; // Real-time streaming callback
   personalityConfig?: any; // Pre-loaded personality (avoids DB call)
   previousResponseId?: string | null; // OpenAI Responses API: chain context
-  mode?: 'widget' | 'social' | 'dm'; // Widget = sales-oriented, Social = engagement, DM = Instagram direct messages
+  mode?: 'widget' | 'social' | 'dm' | 'whatsapp'; // Widget = sales, Social = engagement, DM = IG direct, WhatsApp = CS (DM-like 1:1)
   widgetConfig?: any; // Widget-specific config from accounts.config.widget
   fromSuggestion?: boolean; // Suggestion click — check DB cache for pre-generated response
   chunkId?: string; // Direct chunk ID from content feed — skip RAG search, inject chunk directly
@@ -186,7 +192,7 @@ export class SandwichBot {
       if (shouldEnrich) {
         const contextParts: string[] = [];
 
-        if (input.mode === 'dm') {
+        if (modeUsesDmEnrichment(input.mode)) {
           const recentUserMsgs = (input.conversationHistory || [])
             .filter(m => m.role === 'user')
             .slice(-3);
