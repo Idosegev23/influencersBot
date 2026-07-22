@@ -104,6 +104,10 @@
     {
       "path": "/api/cron/wa-drain-sweep",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/cs-drain-sweep",
+      "schedule": "* * * * *"
     }
   ]
 }
