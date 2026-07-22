@@ -67,12 +67,12 @@ provisioned for nobody. Argania is the first brand we can build **end-to-end tod
 |---|---|---|
 | D1 | Scale posture | Multi-tenant, config-driven, no hardcoding. Runtime scalable now; provisioning scalable later. |
 | D2 | Order data | Unified internal store `brand_orders` fed by per-platform **connectors** (pull + webhook). Read-only. |
-| D3 | Brand routing | **Always ask** "who are you?" + "which brand?" (original vision). Scalable via fuzzy match over **CS-enabled brands only** + WhatsApp interactive list + explicit confirm + returning-customer memory. |
+| D3 | Brand routing | **The brain asks** "who are you?" + "which brand?" in its own voice (original vision), calling `resolve_brand` over **CS-enabled brands only**; uses `show_list` when ambiguous; binds via `bind_brand` only after confirmation. Returning-customer memory injected as `preferAccountIds`. |
 | D4 | Verification | **Best-effort phone match**: verify when the order carries a phone; allow when it does not. No email step. |
 | D5 | Bot action scope | **Read + advise + escalate.** No store writes by the bot. |
 | D6 | Handoff | **Full takeover**, built on the approved handoff spec (`bot_paused` on `chat_sessions`, `config.escalation`, `detectHandoff`). |
 | D7 | Tickets | **Every** CS conversation opens a `support_request` (documentation); **escalation only on triggers**. |
-| D8 | Brain | Reuse **SandwichBot** with a new `mode:'whatsapp'`, UI envelopes stripped. **Not** the stubbed Engine v2. |
+| D8 | Brain & conversation | **Bestie's LLM leads the whole conversation as a tool-calling loop** (not a scripted FSM). Reuse SandwichBot persona+RAG with `mode:'whatsapp'`; the brain calls tools (`resolve_brand`, `lookup_order`, `escalate_to_human`, …); **deterministic gates (phone-verify, brand isolation) enforced in the tool code**. UI envelopes stripped. **Not** the stubbed Engine v2. |
 | D9 | Threads | Identity = `wa_id`. A "thread" = a `support_request` (brand × inquiry). Adaptive re-entry; warm session (< 45 min) continues silently. |
 
 ---
@@ -93,33 +93,40 @@ Shopper → Bestie WhatsApp number
         │
         ▼  EXISTING pattern: Redis FIFO queue + QStash drain worker  (per wa_id)
         ▼
-   ┌──────────────── CS Orchestrator — FSM (whatsapp_cs_sessions) ────────────────┐
-   │ greeting → awaiting_name → awaiting_brand → brand_confirm → in_service        │
-   │            (returning customer → adaptive re-entry menu, §6)                  │
-   │   brand resolved → open/attach support_request (thread) → bind chat_session   │
-   └───────────────────────────────┬──────────────────────────────────────────────┘
-                                    ▼
-   ┌───────────── Bestie brain: SandwichBot(mode='whatsapp') + order intent ───────┐
-   │  • general Q&A  → persona + RAG (product info, how-to-use)                     │
-   │  • order intent → lookupOrder(accountId, orderNumber, senderPhone)            │
-   │       → connector (QuickShop / Shopify) → brand_orders → phone verify         │
-   │       → items + status + tracking (+ Focus enrichment if configured)          │
-   │  • handoff trigger → detectHandoff → bot_paused + notify brand recipients      │
-   └───────────────────────────────┬──────────────────────────────────────────────┘
-                                    ▼  strip <<PRODUCTS/INTENT/ACTION/SUGGESTIONS>>
-                                    ▼  sendText (interactive list/buttons where useful)
+   ┌──────────── CS Agent — brain-led tool-calling loop (Bestie brain) ─────────────┐
+   │  Bestie's LLM runs the WHOLE conversation in its own voice, grounded in the     │
+   │  brand persona + RAG. Lightweight state per wa_id (whatsapp_cs_sessions):        │
+   │  bound brand? · known name? · bot_paused? — these are HINTS, not a script.      │
+   │                                                                                 │
+   │  The brain decides what to say and which TOOL to call:                          │
+   │   • resolve_brand(query) / bind_brand(id) → fuzzy match over CS-enabled brands   │
+   │   • lookup_order(orderNumber) / lookup_orders_by_phone() → items+status+tracking │
+   │   • open_or_attach_ticket(topic) · escalate_to_human(reason)                     │
+   │   • show_buttons(...) / show_list(...) → WhatsApp interactive UI when helpful    │
+   │  General product / how-to questions → answered directly from injected RAG.       │
+   │                                                                                 │
+   │  CODE-ENFORCED GATES (never left to the LLM): phone-verify inside lookup_order;  │
+   │  account_id scoping on every read; bind_brand validates CS-enabled; escalate     │
+   │  sets bot_paused; detectHandoff ALSO runs in code as a backstop trigger.         │
+   └───────────────────────────────┬─────────────────────────────────────────────────┘
+                                    ▼  strip <<SUGGESTIONS>> (+ any other UI envelopes)
+                                    ▼  sendText / interactive message
                                  Shopper
 ```
 
 **Net-new components** (everything else is reuse):
 1. `routeInboundToCustomerService` — the 4th branch.
-2. **CS Orchestrator FSM** + table `whatsapp_cs_sessions`.
-3. **Brand resolver** (fuzzy match over CS-enabled brands + interactive disambiguation).
+2. **CS agent loop** (tool-calling orchestrator around the Bestie brain) + lightweight
+   state table `whatsapp_cs_sessions` (bound brand / known name / paused — not an FSM script).
+3. **CS tools** — `resolve_brand`, `bind_brand`, `lookup_order`, `lookup_orders_by_phone`,
+   `list_open_threads`, `open_or_attach_ticket`, `escalate_to_human`, `show_buttons`/`show_list`.
+   Each tool enforces its own code-level gate (verify, scoping, CS-enabled check).
 4. **Order layer** — `brand_orders` store, connector registry, QuickShop adapter, Shopify adapter
-   (thin wrapper over existing `lookupShopifyOrder`), `lookupOrder()` facade.
+   (thin wrapper over existing `lookupShopifyOrder`), `lookupOrder()` facade (behind `lookup_order`).
 5. **QuickShop order webhook** receiver + **backfill/sync** job.
-6. **WhatsApp interactive-message** send support in the Cloud client.
-7. **`lookup_order` capability** wired into the CS service turn.
+6. **WhatsApp interactive-message** send support in the Cloud client (behind `show_buttons`/`show_list`).
+7. **Tool-calling loop** around the SandwichBot brain: persona + RAG injected, tools dispatched,
+   final text stripped of `<<SUGGESTIONS>>` and sent.
 8. **WA channel binding** into the handoff pause mechanism (Bestie inbox reply → out same number).
 
 ---
@@ -141,15 +148,22 @@ engine already relies on — no new infra.
 
 ---
 
-## 6. Identity, Threads & Re-entry (the service core)
+## 6. Conversation Model — Bestie leads, tools act (the service core)
 
-**Identity is permanent and keyed on `wa_id`.** The shopper's **name is asked once** and stored on
-`whatsapp_contacts`. A **thread = a `support_request`** (brand × inquiry). A shopper may have
-several open threads across several brands simultaneously. No new "threads" table — the ticket *is*
-the thread.
+**Bestie's LLM runs the entire conversation** — there is no scripted state machine gating the brain.
+Each turn the brain is given: the brand persona + RAG, the **lightweight state** (known name?, bound
+brand?, paused?), a **context digest** (the shopper's open threads + time since last activity), and
+the **CS tool set**. It decides what to say — in its own voice — and which tool to call. The
+deterministic operations live in the tools; the *conversation* lives in the brain.
 
-**Adaptive re-entry** — when a returning shopper sends a message, the orchestrator picks the
-lightest correct prompt:
+**Identity is permanent and keyed on `wa_id`.** The shopper's **name is learned once** (the brain
+asks naturally, or lifts it from the WhatsApp profile / opening message) and stored on
+`whatsapp_contacts`. A **thread = a `support_request`** (brand × inquiry); a shopper may have several
+open threads across brands at once. No new "threads" table — the ticket *is* the thread.
+
+**Adaptive re-entry** — the brain receives a digest of the returning shopper's open threads + how
+long since the last message, and greets accordingly. These are *target behaviours the brain produces
+from context*, not hard-coded prompts:
 
 | Shopper state | Bestie behaviour |
 |---|---|
@@ -158,28 +172,32 @@ lightest correct prompt:
 | **1 open thread** | `היי דנה 👋 ממשיכים עם LA BEAUTÉ – מוצר פגום? [כן, ממשיכים] [משהו אחר]` |
 | **≥2 open threads** | Interactive list: `במה נמשיך?` → `Argania · שאלה על מוצר` / `LA BEAUTÉ · מוצר פגום` / `➕ פנייה חדשה` |
 
-**Same brand, same vs new inquiry:** if an open ticket exists for `(contact, brand)`, Bestie offers
-to continue it (default yes); "זה משהו אחר" opens a new thread/ticket for the same brand. Closed
-tickets → a new message starts a new thread, but Bestie still knows the history.
+**Same brand, same vs new inquiry:** when an open ticket exists for `(contact, brand)`, the brain
+offers to continue it (default yes), or opens a fresh thread if the shopper says it's something else.
+Closed tickets → a new message starts a new thread, but the brain still has the history.
 
-**Mid-conversation brand switch:** the shopper can say "רגע, שאלה על ארגניה" at any time; the
-orchestrator detects switch intent, keeps the current thread open, confirms the switch
-(`[עוברים לארגניה]`), and rebinds `active_account_id`. Nothing is lost.
+**Mid-conversation brand switch:** the shopper can switch brands at any time; the brain recognises it
+and calls `bind_brand` for the new brand (keeping the previous thread open), then continues. Nothing
+is lost. All binding goes through the tool, which enforces the CS-enabled check + `account_id` scoping.
 
-### Brand resolution (scalable "always ask which brand")
+### Brand resolution (the `resolve_brand` / `bind_brand` tools)
 
-The resolvable set is **only brands with `config.whatsapp_cs.enabled = true`** — a small, slowly
-growing set, not all 10k accounts. Resolution order:
+Exposed to the brain as `resolve_brand(query)` → ranked candidates, then a separate
+`bind_brand(accountId)` once the shopper confirms. The resolvable set is **only brands with
+`config.whatsapp_cs.enabled = true`** — a small, slowly growing set, not all 10k accounts.
+`resolve_brand` internals + how the brain uses them:
 
-1. **Returning memory** — brands this contact already engaged (`whatsapp_contacts` memory / open
-   threads) offered first.
+1. **Returning memory** — brands this contact already engaged (open/closed `whatsapp_cs` tickets)
+   are passed as `preferAccountIds` and win near-ties.
 2. **Fuzzy match** — Postgres `pg_trgm` similarity over a per-account search vocabulary:
    `config.username`, `config.display_name`, `config.whatsapp_cs.aliases[]`, and the widget domain.
    (Hebrew + English + common misspellings.)
-3. **Disambiguate** — 0 matches → ask for the brand name or site; 1 strong match → confirm with a
-   Yes/No button; 2–N → a WhatsApp **interactive list** of the top matches (never a wall of text).
-4. **Confirm before binding** — `מדובר ב-Argania (argania-oil.co.il)?` guards against wrong-brand
-   data leakage.
+3. **Disambiguate (brain-phrased)** — `resolve_brand` returns 0/1/N candidates; the brain phrases the
+   reply in its own voice: 0 → ask for the brand name or site; 1 → confirm; 2–N → call `show_list`
+   with the top matches (never a wall of text).
+4. **`bind_brand` only after confirmation** — a separate tool call the brain makes once the shopper
+   confirms; `bind_brand` validates CS-enabled and scopes all later reads by `account_id`, guarding
+   against wrong-brand data leakage.
 
 ---
 
@@ -301,9 +319,11 @@ Reuse `2026-07-19-human-handoff-and-bot-takeover-design.md` verbatim where possi
 - **Pause state:** `chat_sessions.bot_paused / bot_paused_at / bot_paused_reason` (each thread binds
   a `chat_session`, so the per-conversation pause applies directly). Read on every bot turn via
   `isBotPaused()`.
-- **Triggers:** `detectHandoff` (extends the escalation detector) — explicit human request, refund /
-  return / defective-product intent, frustration/anger, legal, repeated failure, `low_confidence`.
-  Each toggleable via `config.escalation.triggers`.
+- **Triggers (two paths, both set `bot_paused`):** (a) the brain calls `escalate_to_human(reason)`
+  when it judges it can't help; (b) code backstop `detectHandoff` (extends the escalation detector)
+  runs on every user message — explicit human request, refund / return / defective-product intent,
+  frustration/anger, legal, repeated failure, `low_confidence`. Each toggleable via
+  `config.escalation.triggers`. The code path guarantees escalation even if the brain misses a cue.
 - **On trigger:** set `bot_paused = true`, open/flag the ticket, **notify the brand's configured
   recipients** (`config.escalation.recipients`) by email + in-app (WhatsApp recipient channel is
   reserved in that spec, still not wired).
@@ -318,18 +338,21 @@ Reuse `2026-07-19-human-handoff-and-bot-takeover-design.md` verbatim where possi
 
 ## 10. State & Data Model
 
-### 10.1 New table — `whatsapp_cs_sessions` (the FSM)
+### 10.1 New table — `whatsapp_cs_sessions` (lightweight per-shopper state)
+
+Not an FSM script — only the state the brain-led loop needs between turns.
+
 | column | type | meaning |
 |---|---|---|
 | `wa_id` | text pk | shopper WhatsApp id (E.164 digits) |
 | `contact_id` | uuid fk → whatsapp_contacts | |
-| `stage` | text | `greeting\|awaiting_name\|awaiting_brand\|brand_confirm\|in_service\|escalated\|paused` |
+| `phase` | text | coarse analytics hint: `onboarding` \| `serving` (does **not** gate the brain) |
 | `active_account_id` | uuid null | currently bound brand |
 | `active_ticket_id` | uuid null → support_requests | current thread |
 | `active_chat_session_id` | uuid null → chat_sessions | brain history + `bot_paused` |
-| `customer_name` | text null | asked once |
-| `context` | jsonb | scratch (pending disambiguation candidates, last order ref, etc.) |
-| `last_activity_at` | timestamptz | warm/cold decision (45 min) |
+| `customer_name` | text null | learned once |
+| `context` | jsonb | scratch (pending brand candidates, last order ref, etc.) |
+| `last_activity_at` | timestamptz | warm/cold re-entry signal (45 min) |
 | `version` | int | optimistic locking (mirror `crm_agent_wa_state`) |
 
 ### 10.2 New table — `brand_orders` (the unified store)
@@ -414,10 +437,11 @@ integration (or the shared `manual_token` adapter) unlocks *all* QuickShop brand
 
 ## 14. Testing Strategy
 
-- **Unit:** brand resolver (fuzzy match, 0/1/N disambiguation, alias + Hebrew/English); QuickShop
-  adapter `normalizeWebhook` + `pull` mapping; `lookupOrder` phone-verify branches (phone present/
-  match/mismatch/absent); FSM transitions incl. warm/cold re-entry & mid-brand switch;
-  `detectHandoff` triggers (word-boundary safe).
+- **Unit:** brand resolver (fuzzy match, 0/1/N disambiguation, alias + Hebrew/English,
+  `preferAccountIds` near-tie); QuickShop adapter `normalizeWebhook` + `pull` mapping; `lookupOrder`
+  phone-verify branches (phone present/match/mismatch/absent); **tool dispatch + brain-loop state
+  transitions** (bind-brand side effects, order-intent intercept, warm/cold re-entry, mid-brand
+  switch); each CS tool's code gate; `detectHandoff` + `escalate_to_human` triggers (word-boundary safe).
 - **Integration:** inbound webhook → CS branch → queue → worker → reply (mock WA client); QuickShop
   webhook HMAC verify → `brand_orders` upsert; handoff pause → Bestie-inbox reply → outbound.
 - **Manual (Argania):** real order number → items + status + tracking; unknown number; escalation →
