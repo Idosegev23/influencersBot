@@ -105,12 +105,18 @@ describe('runCsTurn (brain-led loop)', () => {
     expect(store['972501112222'].phase).toBe('serving');
   });
 
-  it('interactive tool short-circuits → reply IS the interactive payload', async () => {
-    handlers['show_buttons'] = vi.fn().mockResolvedValue({ ok: true, interactive: { kind: 'buttons', body: 'מדובר ב-Argania?', buttons: [{ id: 'yes', title: 'כן' }] } });
-    callModel.mockResolvedValueOnce({ toolCalls: [{ id: 'tc1', name: 'show_buttons', args: {} }], text: null });
+  // Pure-conversational contract: no CS tool emits an interactive payload anymore, so the loop
+  // always keeps iterating on tool calls until the model produces plain text — even after a
+  // resolve_brand call, the reply is text (the brain's own prose confirm), never {kind:'buttons'}.
+  it('no tool short-circuits into an interactive reply — resolve_brand → the model\'s own prose confirmation is the reply', async () => {
+    handlers['resolve_brand'] = vi.fn().mockResolvedValue({ ok: true, data: { kind: 'single', candidates: [{ accountId: 'acc-1', name: 'Argania', domain: 'argania-oil.co.il' }] } });
+    callModel
+      .mockResolvedValueOnce({ toolCalls: [{ id: 'tc1', name: 'resolve_brand', args: { query: 'ארגניה' } }], text: null })
+      .mockResolvedValueOnce({ toolCalls: [], text: 'מדובר ב-Argania (argania-oil.co.il)?' });
     const { runCsTurn } = await import('@/lib/cs/cs-agent');
     const res = await runCsTurn(job('ארגניה'), { callModel });
-    expect(res.reply.kind).toBe('buttons');
+    expect(res.reply.kind).toBe('text');
+    if (res.reply.kind === 'text') expect(res.reply.body).toBe('מדובר ב-Argania (argania-oil.co.il)?');
   });
 
   it('escalate tool short-circuits → reply {kind:none}', async () => {

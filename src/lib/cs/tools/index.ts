@@ -32,7 +32,7 @@ async function openCsThreads(waId: string): Promise<Array<{ ticketId: string; br
 const resolveBrandTool: CsTool = {
   def: { type: 'function', function: {
     name: 'resolve_brand',
-    description: "Fuzzy-match the shopper's brand mention (Hebrew/English/misspelling) against the CS-enabled brands. Returns ranked candidates. Call BEFORE bind_brand; when 2+ candidates, present them with show_list.",
+    description: "Fuzzy-match the shopper's FREE-TEXT brand mention (Hebrew/English/misspelling) against the CS-enabled brands — this is what lets a roster of thousands of brands narrow to a shortlist. Returns ranked candidates. Call BEFORE bind_brand. When there's a clear best match, CONFIRM it in a plain-text sentence (e.g. \"מדובר ב-Argania (argania-oil.co.il)?\") and wait for the shopper's free-text yes/no. When 2+ candidates are close, ASK a clarifying question in prose (e.g. \"יש לי כמה — התכוונת ל-X או ל-Y?\") — NEVER a button/list menu.",
     parameters: { type: 'object', properties: { query: { type: 'string', description: 'the brand name or site the shopper mentioned' } }, required: ['query'] },
   } },
   async handler(args, ctx) {
@@ -82,48 +82,10 @@ const listOpenThreadsTool: CsTool = {
   },
 };
 
-const clip = (s: string, n: number) => (s.length <= n ? s : s.slice(0, n - 1) + '…');
-const showButtonsTool: CsTool = {
-  def: { type: 'function', function: {
-    name: 'show_buttons',
-    description: 'Render up to 3 tappable reply buttons (e.g. Yes/No, brand confirm, continue/other). Use for a small fixed choice instead of typing.',
-    parameters: { type: 'object', properties: {
-      body: { type: 'string' },
-      buttons: { type: 'array', maxItems: 3, items: { type: 'object', properties: { id: { type: 'string' }, title: { type: 'string' } }, required: ['id', 'title'] } },
-      header: { type: 'string' }, footer: { type: 'string' },
-    }, required: ['body', 'buttons'] },
-  } },
-  async handler(args): Promise<CsToolResult> {
-    const buttons = (Array.isArray(args?.buttons) ? args.buttons : []).slice(0, 3).map((b: any) => ({ id: String(b.id), title: clip(String(b.title), 20) }));
-    return { ok: true, interactive: { kind: 'buttons', body: String(args?.body || ''), buttons, header: args?.header, footer: args?.footer } };
-  },
-};
-
-const showListTool: CsTool = {
-  def: { type: 'function', function: {
-    name: 'show_list',
-    description: 'Render a tappable WhatsApp list (e.g. brand disambiguation, thread re-entry). Up to 10 rows total.',
-    parameters: { type: 'object', properties: {
-      body: { type: 'string' }, buttonLabel: { type: 'string' },
-      sections: { type: 'array', items: { type: 'object', properties: {
-        title: { type: 'string' },
-        rows: { type: 'array', items: { type: 'object', properties: { id: { type: 'string' }, title: { type: 'string' }, description: { type: 'string' } }, required: ['id', 'title'] } },
-      }, required: ['rows'] } },
-    }, required: ['body', 'sections'] },
-  } },
-  async handler(args): Promise<CsToolResult> {
-    const sections = (Array.isArray(args?.sections) ? args.sections : []).map((s: any) => ({
-      ...(s.title ? { title: clip(String(s.title), 24) } : {}),
-      rows: (Array.isArray(s.rows) ? s.rows : []).map((r: any) => ({ id: String(r.id), title: clip(String(r.title), 24), ...(r.description ? { description: clip(String(r.description), 72) } : {}) })),
-    }));
-    return { ok: true, interactive: { kind: 'list', body: String(args?.body || ''), buttonLabel: clip(String(args?.buttonLabel || 'בחירה'), 20), sections } };
-  },
-};
-
 const bindBrandTool: CsTool = {
   def: { type: 'function', function: {
     name: 'bind_brand',
-    description: 'Bind the conversation to a brand AFTER the shopper confirms. Validates the brand is CS-enabled, opens/attaches its support ticket, and scopes ALL later reads to it.',
+    description: 'Bind the conversation to a brand AFTER the shopper confirms in free text (e.g. replies "כן"/"נכון" to your prose confirmation) — never call this before a confirmation. Validates the brand is CS-enabled, opens/attaches its support ticket, and scopes ALL later reads to it.',
     parameters: { type: 'object', properties: { accountId: { type: 'string' } }, required: ['accountId'] },
   } },
   async handler(args, ctx): Promise<CsToolResult> {
@@ -175,9 +137,12 @@ const escalateTool: CsTool = {
   },
 };
 
+// NO menu/widget tools here by design — Bestie CS must scale to ~10,000 brands, where a
+// list/buttons menu for brand selection is absurd. Disambiguation happens in prose
+// (resolve_brand → confirm/clarify in plain text), never via show_buttons/show_list.
 const TOOLS: CsTool[] = [
   resolveBrandTool, bindBrandTool, lookupOrderTool, lookupOrdersByPhoneTool,
-  listOpenThreadsTool, openOrAttachTicketTool, escalateTool, showButtonsTool, showListTool,
+  listOpenThreadsTool, openOrAttachTicketTool, escalateTool,
 ];
 export function getCsTools(): CsTool[] { return TOOLS; }
 export const CS_TOOL_DEFS: OpenAIFunctionDef[] = TOOLS.map((t) => t.def);

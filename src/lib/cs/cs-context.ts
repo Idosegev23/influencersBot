@@ -51,6 +51,7 @@ export async function buildCsSystemPrompt(input: {
   const lines: string[] = [];
   lines.push('את/ה Bestie — שירות הלקוחות של המותגים בוואטסאפ. דבר/י בעברית, בגובה העיניים, קצר וברור, בקול המותג.');
   lines.push('כללי ליבה: אל תמציא/י פרטי הזמנה או מדיניות — השתמש/י בכלים (tools). אל תחשוף/י פרטי הזמנה לפני אימות טלפון (הכלי lookup_order עושה זאת). אם אינך יכול/ה לעזור או שהלקוח/ה מבקש/ת אדם — הפעל/י escalate_to_human.');
+  lines.push('שיחה חופשית בלבד: אין כפתורים ואין רשימות בחירה (WhatsApp interactive) — כל תגובה היא טקסט רגיל. כל בחירה (מותג, המשך פנייה) נעשית בשיחה טבעית: את/ה שואל/ת, הלקוח/ה עונ/ה בטקסט חופשי, ואת/ה מבין/ה, מאשר/ת בפרוזה וממשיכ/ה.');
 
   if (digest.knownName) lines.push(`שם הלקוח/ה: ${digest.knownName}. אל תשאל/י שוב לשם.`);
   else lines.push('שם הלקוח/ה עדיין לא ידוע — אפשר לשאול פעם אחת, בטבעיות.');
@@ -58,14 +59,19 @@ export async function buildCsSystemPrompt(input: {
   if (digest.boundBrand) {
     lines.push(`מותג פעיל: ${digest.boundBrand} — כל הכלים מכוונים אליו.`);
   } else {
-    lines.push('טרם נבחר מותג — שאל/י לאיזה מותג לפנות, קרא/י ל-resolve_brand, ובאישור הלקוח/ה ל-bind_brand.');
+    lines.push(
+      'טרם נבחר מותג — שאל/י בשיחה טבעית לאיזה מותג/עסק הלקוח/ה צריך/ה עזרה (למשל: "לאיזה מותג / עם איזה עסק אתה צריך עזרה?"). ' +
+      'קרא/י ל-resolve_brand עם התשובה החופשית שקיבלת (זה מה שמאפשר להתמודד עם אלפי מותגים בלי תפריט). ' +
+      'כשיש התאמה טובה אחת — אשר/י אותה בפרוזה (למשל: "מדובר ב-Argania (argania-oil.co.il)?") וקרא/י ל-bind_brand רק אחרי שהלקוח/ה מאשר/ת בטקסט חופשי ("כן"/"נכון"/וכו׳). ' +
+      'כשיש כמה מועמדים קרובים — שאל/י שאלת הבהרה בפרוזה (למשל: "יש לי כמה — התכוונת ל-X או ל-Y?"). לעולם אל תציג/י תפריט, כפתורים או רשימה — רק משפטים.'
+    );
     // Brain-led brand matching: hand the LLM the CS-enabled roster directly so it can match
     // "ארגן"→Argania, "פאשה"→Studio Pasha, typos, Hebrew/English straight from context — resolve_brand
-    // / show_list are then only needed for genuine ambiguity, not as the primary matching path.
+    // is then mainly needed once the roster is too large to inline (large-scale narrowing).
     try {
       const brands = await listCsEnabledBrands();
       if (brands.length) {
-        lines.push('\n--- מותגים זמינים שאת/ה משרת/ת (בחר/י את זה שהלקוח/ה מתכוון/ת אליו, ואז קרא/י ל-bind_brand; resolve_brand/show_list רק אם עדיין לא ברור) ---');
+        lines.push('\n--- מותגים זמינים שאת/ה משרת/ת (בחר/י את זה שהלקוח/ה מתכוון/ת אליו, אשר/י בפרוזה, ואז קרא/י ל-bind_brand; אם הרשימה גדולה מדי / הלקוח/ה מזכיר/ה משהו שלא כאן — הישענ/י על resolve_brand) ---');
         for (const b of brands.slice(0, MAX_INLINE)) {
           lines.push(`${b.displayName} — ${b.domain || b.username || '—'}`);
         }
@@ -84,9 +90,10 @@ export async function buildCsSystemPrompt(input: {
   if (digest.warm) lines.push('שיחה חמה (פחות מ-45 דק׳) — המשך/י ברצף בלי לחזור על שאלות פתיחה.');
   if (digest.openThreads.length === 1) {
     const t = digest.openThreads[0];
-    lines.push(`פנייה פתוחה אחת: ${t.brand} · ${t.topic}. הצע/י בעדינות להמשיך אותה (show_buttons: "כן, ממשיכים" / "משהו אחר").`);
+    lines.push(`פנייה פתוחה אחת: ${t.brand} · ${t.topic}. שאל/י בפרוזה אם ממשיכים אותה או שזה משהו חדש (למשל: "יש לך פנייה פתוחה אצל ${t.brand} בנושא ${t.topic} — נמשיך בה או שזה משהו אחר?") — בלי כפתורים, רק טקסט.`);
   } else if (digest.openThreads.length >= 2) {
-    lines.push(`יש ${digest.openThreads.length} פניות פתוחות — הצג/י אותן עם show_list כדי לבחור (כולל שורת "➕ פנייה חדשה").`);
+    const list = digest.openThreads.map((t) => `${t.brand} (${t.topic})`).join(', ');
+    lines.push(`יש ${digest.openThreads.length} פניות פתוחות: ${list}. שאל/י בפרוזה איזו מהן להמשיך, או שזו פנייה חדשה לגמרי — בלי רשימה או תפריט, רק בשיחה טבעית.`);
   }
 
   if (accountId) {

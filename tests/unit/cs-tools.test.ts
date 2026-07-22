@@ -38,11 +38,16 @@ const tool = async (name: string) => {
 describe('CS tools', () => {
   beforeEach(() => { vi.clearAllMocks(); H.account = null; H.threads = []; openOrAttachCsTicket.mockResolvedValue({ ticketId: 'ticket-1' }); runCsHandoffCheck.mockResolvedValue({ escalated: true }); });
 
-  it('CS_TOOL_DEFS exposes all 9 tools as OpenAI function defs', async () => {
-    const { CS_TOOL_DEFS } = await import('@/lib/cs/tools');
+  it('CS_TOOL_DEFS exposes exactly the 7 conversational tools — NO show_buttons/show_list (pure-text CS, no menu widgets)', async () => {
+    const { CS_TOOL_DEFS, getCsTools } = await import('@/lib/cs/tools');
     const names = CS_TOOL_DEFS.map((d) => d.function.name).sort();
-    expect(names).toEqual(['bind_brand', 'escalate_to_human', 'list_open_threads', 'lookup_order', 'lookup_orders_by_phone', 'open_or_attach_ticket', 'resolve_brand', 'show_buttons', 'show_list']);
+    expect(names).toEqual(['bind_brand', 'escalate_to_human', 'list_open_threads', 'lookup_order', 'lookup_orders_by_phone', 'open_or_attach_ticket', 'resolve_brand']);
+    expect(names).not.toContain('show_buttons');
+    expect(names).not.toContain('show_list');
     expect(CS_TOOL_DEFS.every((d) => d.type === 'function')).toBe(true);
+    // getCsTools() (what the agent loop actually dispatches against) must agree — the brain
+    // literally cannot emit a menu because no tool implementing one is ever registered.
+    expect(getCsTools().map((t) => t.def.function.name).sort()).toEqual(names);
   });
 
   it('resolve_brand passes returning-memory preferAccountIds and maps candidates', async () => {
@@ -84,9 +89,4 @@ describe('CS tools', () => {
     expect(r.escalated).toBe(true);
   });
 
-  it('show_buttons returns an interactive reply (≤3 buttons, titles clipped)', async () => {
-    const r = await (await tool('show_buttons')).handler({ body: 'מדובר ב-Argania?', buttons: [{ id: 'yes', title: 'כן' }, { id: 'no', title: 'לא' }] }, ctx());
-    expect(r.interactive?.kind).toBe('buttons');
-    if (r.interactive?.kind === 'buttons') expect(r.interactive.buttons).toHaveLength(2);
-  });
 });

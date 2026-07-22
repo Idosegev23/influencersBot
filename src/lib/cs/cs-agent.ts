@@ -1,16 +1,19 @@
 /**
  * THE HEART of Bestie CS: the brain-led tool-calling loop (Task C6). There is NO FSM — the whole
  * conversation runs as one loop where the model emits tool_calls, we dispatch them via the CS
- * tools (Task C4), feed results back, and repeat until the model produces a final reply or an
- * interactive tool supplies one directly. Security/data gates live INSIDE the tools; this loop
- * only honors their signals (bind/learnedName/interactive/escalated) and persists the turn.
+ * tools (Task C4), feed results back, and repeat until the model produces a final text reply.
+ * Bestie CS is PURELY CONVERSATIONAL — no button/list menu tools exist (scales to ~10,000 brands,
+ * where a picker menu for brand selection is absurd), so every reply here is free text; the
+ * brain disambiguates the brand via resolve_brand + a prose confirm/clarify. Security/data gates
+ * live INSIDE the tools; this loop only honors their signals (bind/learnedName/escalated) and
+ * persists the turn.
  */
 import OpenAI from 'openai';
 import { randomUUID } from 'node:crypto';
 import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { loadCsSession, createCsSession, saveCsSession, type CsSessionRow, type CsPhase } from '@/lib/cs/cs-session';
 import { getCsTools, CS_TOOL_DEFS } from '@/lib/cs/tools';
-import type { CsToolCtx, CsToolResult, OpenAIFunctionDef, WaInteractive } from '@/lib/cs/tools/types';
+import type { CsToolCtx, CsToolResult, OpenAIFunctionDef } from '@/lib/cs/tools/types';
 import { buildCsSystemPrompt, buildContextDigest, stripSuggestions, type CsRecentTurn } from '@/lib/cs/cs-context';
 import { laneModel } from '@/lib/llm/config';
 import { toWaId } from '@/lib/whatsapp-cloud/client';
@@ -19,6 +22,9 @@ import type { CsJob } from '@/lib/cs/wa-cs-queue';
 export interface CsTurnResult {
   reply:
     | { kind: 'text'; body: string }
+    // 'buttons'/'list' are kept in the type for wa-cs-worker.ts's dispatch (still supports sending
+    // them harmlessly) but are UNREACHABLE from this loop — no CS tool emits an interactive reply
+    // anymore (purely conversational brand selection; see the file-header comment).
     | { kind: 'buttons'; body: string; buttons: any[]; header?: string; footer?: string }
     | { kind: 'list'; body: string; buttonLabel: string; sections: any[]; header?: string; footer?: string }
     | { kind: 'none' };
@@ -167,7 +173,6 @@ export async function runCsTurn(job: CsJob, depsOverride?: Partial<CsAgentDeps>)
   const history = session.active_chat_session_id ? await loadHistory(session.active_chat_session_id) : [];
   const messages: CsChatMessage[] = [...history, { role: 'user', content: userMessage }];
   let finalText: string | null = null;
-  let interactive: WaInteractive | null = null;
 
   for (let iter = 0; iter < MAX_ITERS; iter++) {
     const turn = await deps.callModel({ system, messages, tools: CS_TOOL_DEFS });
@@ -181,21 +186,18 @@ export async function runCsTurn(job: CsJob, depsOverride?: Partial<CsAgentDeps>)
       if (tool) { try { result = await tool.handler(tc.args, ctx); } catch (e) { result = { ok: false, data: { reason: 'tool_error' } }; console.warn('[cs-agent] tool threw', tc.name, e); } }
       if (result.bind) session = await applyBind(session, ctx, result.bind);
       if (result.learnedName) session = await applyLearnedName(session, ctx, result.learnedName);
-      if (result.interactive) interactive = result.interactive;
       if (result.escalated) escalated = true;
       messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result.data ?? { ok: result.ok }) });
     }
     if (escalated) return { reply: { kind: 'none' }, phase: session.phase };
-    if (interactive) break; // an interactive tool supplied the reply
   }
 
-  // 6/7) Persist + reply. The reply here is always 'interactive' or a text body (never 'none' —
-  // that short-circuits earlier, at the escalated-tool branch above), so an assistant entry is
-  // always available to append.
-  const replyBody = interactive ? interactive.body : stripSuggestions(finalText || 'סליחה, אפשר לנסח שוב? 🙏');
+  // 6/7) Persist + reply. No CS tool ever returns an interactive payload (purely conversational —
+  // see file header), so the reply here is always a text body (never 'none' — that short-circuits
+  // earlier, at the escalated-tool branch above), so an assistant entry is always available to append.
+  const replyBody = stripSuggestions(finalText || 'סליחה, אפשר לנסח שוב? 🙏');
   if (replyBody) recentTurns.push({ role: 'assistant', text: replyBody });
   await saveCsSession(session, { context: { ...(session.context || {}), recentTurns: recentTurns.slice(-8) }, last_activity_at: new Date().toISOString() });
-  if (interactive) return { reply: interactive, phase: session.phase };
   if (session.active_chat_session_id) await persistTurn(session.active_chat_session_id, userMessage, replyBody);
   return { reply: { kind: 'text', body: replyBody }, phase: session.phase };
 }

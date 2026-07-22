@@ -49,6 +49,18 @@ describe('cs-context', () => {
     expect(buildPersonalityFromDB).not.toHaveBeenCalled();
   });
 
+  // Pure-conversational contract (no WhatsApp menu widgets — must scale to ~10,000 brands): the
+  // prompt must explicitly forbid buttons/lists and describe a prose confirm/clarify flow instead.
+  it('prompt is purely conversational: no buttons/lists, resolve_brand → prose confirm → bind_brand only after free-text confirmation', async () => {
+    const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
+    const p = await buildCsSystemPrompt({ accountId: null, userMessage: 'היי', digest: digest() });
+    expect(p).toMatch(/אין כפתורים ואין רשימות/);
+    expect(p).not.toMatch(/show_buttons/);
+    expect(p).not.toMatch(/show_list/);
+    expect(p).toMatch(/bind_brand/);
+    expect(p).toMatch(/אשר/); // confirm-in-prose guidance
+  });
+
   // (b) Brain-led contract: the unbound prompt lists the CS-enabled roster directly (name + domain)
   // so the LLM can match "ארגן"→Argania etc. straight from context, not just via the resolve_brand tool.
   it('unbound prompt: includes the CS-enabled brands (name + domain) for direct brain matching', async () => {
@@ -82,11 +94,24 @@ describe('cs-context', () => {
     expect(p).toContain('מצאתי את Argania — לאשר?');
   });
 
-  it('digest drives greeting/re-entry hints (known name, warm, ≥2 threads → show_list)', async () => {
+  it('digest drives greeting/re-entry hints (known name, warm, ≥2 threads → prose re-entry, NOT show_list)', async () => {
     const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
     const p = await buildCsSystemPrompt({ accountId: null, userMessage: 'היי', digest: digest({ knownName: 'דנה', warm: true, openThreads: [{ ticketId: 't1', brand: 'Argania', topic: 'x' }, { ticketId: 't2', brand: 'LA BEAUTÉ', topic: 'y' }] }) });
     expect(p).toContain('דנה');
     expect(p).toMatch(/חמה|warm|45/);
-    expect(p).toMatch(/show_list/);
+    expect(p).not.toMatch(/show_list/);
+    expect(p).not.toMatch(/show_buttons/);
+    expect(p).toContain('Argania');
+    expect(p).toContain('LA BEAUTÉ');
+    expect(p).toMatch(/בפרוזה/); // re-entry choice is phrased in prose, from the injected digest
+  });
+
+  it('digest drives greeting/re-entry hints (single open thread → prose continue/other, NOT show_buttons)', async () => {
+    const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
+    const p = await buildCsSystemPrompt({ accountId: null, userMessage: 'היי', digest: digest({ openThreads: [{ ticketId: 't1', brand: 'Argania', topic: 'משלוח' }] }) });
+    expect(p).toContain('Argania');
+    expect(p).toContain('משלוח');
+    expect(p).not.toMatch(/show_buttons/);
+    expect(p).toMatch(/בפרוזה/);
   });
 });
