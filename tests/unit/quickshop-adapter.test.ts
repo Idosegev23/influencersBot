@@ -50,9 +50,11 @@ describe('quickShopConnector', () => {
       name: 'Argan Oil', sku: 'AO-1', quantity: 2, price: '49.50', total: '99.00', imageUrl: 'https://img/1',
     });
     expect(order!.lineItems[1].sku).toBeNull();
-    // read-only: never a mutating verb
-    const [, init] = (global.fetch as any).mock.calls[0];
+    // read-only: never a mutating verb; verify URL + auth header
+    const [url, init] = (global.fetch as any).mock.calls[0];
     expect(init?.method ?? 'GET').toBe('GET');
+    expect(url).toContain('/api/v1/orders/ord_123');
+    expect(init?.headers?.['X-API-Key']).toBe('qs_live_TEST');
   });
 
   it('pull() returns null on 404', async () => {
@@ -75,6 +77,10 @@ describe('quickShopConnector', () => {
     expect(orders[0].lineItems).toEqual([]);        // summary → no items
     expect(orders[0].total).toBe('50');             // number coerced to string
     expect(next).toBe('2');                          // next page number
+    // verify paginated URL + auth header
+    const [url, init] = (global.fetch as any).mock.calls[0];
+    expect(url).toContain('/api/v1/orders?page=');
+    expect(init?.headers?.['X-API-Key']).toBe('qs_live_TEST');
   });
 
   it('normalizeWebhook() maps {event,data} detail body → NormalizedOrder', () => {
