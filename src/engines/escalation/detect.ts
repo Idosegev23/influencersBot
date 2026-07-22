@@ -1,4 +1,10 @@
-import type { EscalationVerdict, EscalationTrigger, EscalationSeverity } from './types';
+import type {
+  EscalationVerdict,
+  EscalationTrigger,
+  EscalationSeverity,
+  HandoffTrigger,
+  HandoffDetection,
+} from './types';
 
 const LEGAL = [
   // NOTE: bare 'עוד' ("more") was here and fired on every "ספרו לי עוד" — it was
@@ -97,26 +103,97 @@ export function detectEscalation(
 }
 
 /**
- * Placeholder for the Phase-D `detectHandoff` (Task D2 — the CS-loop's code backstop: unifies
- * `detectEscalation`'s config-driven `enabledTriggers`/`lowConfidenceThreshold` gating with a
- * `{triggered,...}` return shape). This stub exists only so `src/lib/cs/cs-agent.ts` (Task C6) can
- * resolve its dynamic `import('@/engines/escalation/detect')` — Vitest/Vite's import-analysis
- * needs the named export to exist on disk even for a dynamic import before
- * `vi.mock('@/engines/escalation/detect', ...)` can intercept it (same issue Task A7 hit with
- * `wa-cs-worker.ts`, resolved there by Task A8's `cs-agent.ts` stub). cs-agent's tests mock this
- * module entirely. Do NOT deploy C6 to production before D2 replaces this with the real detector.
+ * Task D2: the CS-loop's code backstop `detectHandoff`. Reuses `detectEscalation`'s
+ * module-scoped word lists (`LEGAL`/`ABUSE`/`HUMAN_STRONG`/`HUMAN_MANAGER`/`REQUEST_CUE`/
+ * `NEGATIVE`) and its unicode word-boundary-safe `hasAny` matcher, adding CS-specific triggers
+ * (refund/return, defective product, repeated failure, low confidence) plus per-trigger
+ * `enabledTriggers` toggling driven by `EscalationConfig.triggers`.
  */
-export interface HandoffVerdict {
-  triggered: boolean;
-  triggers: EscalationTrigger[];
-  severity: EscalationSeverity | 'low';
-  reason: string;
-}
+const REFUND_RETURN = [
+  'החזר', 'החזר כספי', 'זיכוי', 'להחזיר', 'החזרה', 'ביטול הזמנה', 'לבטל הזמנה',
+  'כסף בחזרה', 'refund', 'return', 'money back', 'chargeback', 'cancel order',
+];
+const DEFECTIVE = [
+  'פגום', 'פגומה', 'שבור', 'שבורה', 'מקולקל', 'מקולקלת', 'התקלקל', 'לא עובד',
+  'לא עובדת', 'לא תקין', 'defective', 'broken', 'damaged', 'not working', 'faulty',
+];
+const REPEATED_FAILURE = [
+  'עוד פעם', 'פעם שלישית', 'שוב אותה', 'שוב אותו', 'עדיין לא', 'כמה פעמים',
+  'again and again', 'third time', 'still not', 'still broken', 'still waiting',
+];
+// Handoff-local additions to the shared NEGATIVE list (plural surface forms of 'גרוע'/'גרועה'
+// that detectEscalation's word list doesn't include). Purely additive — does not modify the
+// shared NEGATIVE const, so detectEscalation's behavior/tests are unaffected.
+const NEGATIVE_EXTRA = ['גרועים', 'גרועות'];
+
+const HANDOFF_LABEL: Record<HandoffTrigger, string> = {
+  human_demand: 'דרישה מפורשת לנציג אנושי',
+  refund_return: 'בקשת החזר / החזרה',
+  defective_product: 'מוצר פגום',
+  frustration: 'תסכול / כעס',
+  legal: 'איום בתביעה / פנייה משפטית',
+  abuse: 'התנהגות פוגענית / קללות',
+  repeated_failure: 'כשל חוזר בטיפול',
+  low_confidence: 'הבוט אינו בטוח בתשובה',
+};
+
+const SEV_RANK: Record<'low' | 'medium' | 'high', number> = { low: 1, medium: 2, high: 3 };
+const TRIGGER_SEVERITY: Record<HandoffTrigger, 'low' | 'medium' | 'high'> = {
+  legal: 'high',
+  abuse: 'high',
+  human_demand: 'high',
+  refund_return: 'medium',
+  defective_product: 'medium',
+  repeated_failure: 'medium',
+  frustration: 'low',
+  low_confidence: 'low',
+};
 
 export function detectHandoff(
   message: string,
-  priorUserMessages: string[] = [],
-  opts?: { enabledTriggers?: EscalationTrigger[]; lowConfidenceThreshold?: number },
-): HandoffVerdict {
-  throw new Error(`detectHandoff not implemented (Task D2 pending) — message="${(message || '').slice(0, 20)}"`);
+  priorUserTexts: string[] = [],
+  opts?: {
+    enabledTriggers?: Partial<Record<HandoffTrigger, boolean>>;
+    lowConfidenceThreshold?: number;
+    confidence?: number;
+  },
+): HandoffDetection {
+  const msg = message || '';
+  const on = (t: HandoffTrigger) => opts?.enabledTriggers?.[t] !== false;
+  const found: HandoffTrigger[] = [];
+
+  if (on('legal') && hasAny(msg, LEGAL)) found.push('legal');
+  if (on('abuse') && hasAny(msg, ABUSE)) found.push('abuse');
+  const humanDemand =
+    hasAny(msg, HUMAN_STRONG) || (hasAny(msg, HUMAN_MANAGER) && hasAny(msg, REQUEST_CUE));
+  if (on('human_demand') && humanDemand) found.push('human_demand');
+  if (on('refund_return') && hasAny(msg, REFUND_RETURN)) found.push('refund_return');
+  if (on('defective_product') && hasAny(msg, DEFECTIVE)) found.push('defective_product');
+  if (on('repeated_failure') && hasAny(msg, REPEATED_FAILURE)) found.push('repeated_failure');
+
+  const isNegative = (t: string) => hasAny(t, NEGATIVE) || hasAny(t, NEGATIVE_EXTRA);
+  const currentNegative = isNegative(msg);
+  const priorNegative = priorUserTexts.some(isNegative);
+  if (on('frustration') && currentNegative && priorNegative) found.push('frustration');
+
+  if (
+    on('low_confidence') &&
+    typeof opts?.confidence === 'number' &&
+    typeof opts?.lowConfidenceThreshold === 'number' &&
+    opts.confidence < opts.lowConfidenceThreshold
+  ) {
+    found.push('low_confidence');
+  }
+
+  let severity: 'low' | 'medium' | 'high' = 'low';
+  for (const t of found) {
+    if (SEV_RANK[TRIGGER_SEVERITY[t]] > SEV_RANK[severity]) severity = TRIGGER_SEVERITY[t];
+  }
+
+  return {
+    triggered: found.length > 0,
+    triggers: found,
+    severity,
+    reason: found.map((t) => HANDOFF_LABEL[t]).join(' + '),
+  };
 }
