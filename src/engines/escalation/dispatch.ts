@@ -144,3 +144,26 @@ export async function runEscalationCheck(
 
   return { escalated: true, reason: verdict.reason, recipientsNotified: notified };
 }
+
+/**
+ * Placeholder for the Phase-D CS handoff dispatch (Task D4 — brand-notify + bot-pause wiring for
+ * `escalate_to_human`, force-mode skips re-detection since the brain already decided). This stub
+ * exists only so `src/lib/cs/tools/index.ts` (Task C4) can resolve its dynamic
+ * `import('@/engines/escalation/dispatch')` — Vitest/Vite's import-analysis needs the named
+ * export to exist on disk even for a dynamic import before
+ * `vi.mock('@/engines/escalation/dispatch', ...)` can intercept it (same issue Task A7 hit with
+ * `wa-cs-worker.ts`, resolved by Task A8's `cs-agent.ts` stub). The tool tests mock this module
+ * entirely. Do NOT deploy C4 to production before D4 replaces this with the real handoff dispatch.
+ */
+export interface CsHandoffCheckInput {
+  accountId: string;
+  chatSessionId: string | null;
+  ticketId?: string | null;
+  waId?: string;
+  userMessage: string;
+  force?: boolean;
+}
+
+export async function runCsHandoffCheck(input: CsHandoffCheckInput): Promise<EscalationOutcome> {
+  throw new Error(`runCsHandoffCheck not implemented (Task D4 pending) — accountId=${input?.accountId}`);
+}
