@@ -180,7 +180,9 @@ export async function runCsHandoffCheck(
   input: CsHandoffInput,
   depsOverride?: Partial<CsHandoffDeps>,
 ): Promise<EscalationOutcome> {
-  if (process.env.ESCALATION_ENABLED !== 'true') return { escalated: false, skipped: 'flag_off' };
+  // CS handoff defaults ON — opt-in is per-account via config.escalation.enabled (below).
+  // ESCALATION_ENABLED is only a global kill-switch: set it to 'false' to disable everywhere.
+  if (process.env.ESCALATION_ENABLED === 'false') return { escalated: false, skipped: 'flag_off' };
 
   const deps: CsHandoffDeps = {
     supabase: depsOverride?.supabase ?? (await import('@/lib/supabase')).supabase,

@@ -46,6 +46,16 @@ describe('runCsHandoffCheck', () => {
     expect(r).toEqual({ escalated: false, skipped: 'flag_off' });
   });
 
+  it('defaults ON when ESCALATION_ENABLED is unset (no env var needed to enable)', async () => {
+    delete process.env.ESCALATION_ENABLED;
+    const { runCsHandoffCheck } = await import('@/engines/escalation/dispatch');
+    const r = await runCsHandoffCheck(
+      { accountId: 'a1', chatSessionId: 'cs1', ticketId: 't1', waId: '972501234567', userMessage: 'החזר כספי' },
+      { supabase: makeSupabase() as any, sendEmail: vi.fn() as any, pauseBot: vi.fn() as any, now: () => 0 },
+    );
+    expect(r.skipped).not.toBe('flag_off');
+  });
+
   it('does nothing when no trigger fires', async () => {
     const { runCsHandoffCheck } = await import('@/engines/escalation/dispatch');
     const pauseBot = vi.fn();
