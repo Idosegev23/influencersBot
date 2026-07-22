@@ -5,6 +5,7 @@ import { registerConnector } from './registry';
 
 const QUICKSHOP_BASE = 'https://my-quickshop.com/api/v1';
 const QUICKSHOP_TIMEOUT_MS = 8000;
+const QUICKSHOP_PULL_RETRY_DELAY_MS = 300;
 
 // ---- Wire types (Appendix A) ----
 export interface QuickShopPagination {
@@ -103,16 +104,30 @@ export const quickShopConnector: OrderConnector = {
   installMode: 'manual_token',
   supportsDirectLookup: false, // no working order_number filter → resolve via brand_orders
 
+  // This single order-detail read is what backs the "what's in my order?" answer. The backfill
+  // stores summaries only (no line_items), so a lone transient failure here (network blip, 5xx,
+  // rate-limit) drops line_items to empty and the bot tells the shopper it can't see the products —
+  // even when the order plainly has them (live-observed 2026-07-22, Argania #26841). So retry ONCE
+  // on a transient failure. A genuine 404 (order truly gone) returns null immediately — no retry.
   async pull(creds, ref) {
     if (!ref.id) return null; // QuickShop detail lookup is by id only
-    const res = await qsFetch(creds, `/orders/${encodeURIComponent(ref.id)}`);
-    if (!res.ok) {
-      if (res.status !== 404) console.warn('[quickshop.pull] non-OK', res.status);
-      return null;
+    const path = `/orders/${encodeURIComponent(ref.id)}`;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await qsFetch(creds, path);
+        if (res.ok) {
+          const detail = (await res.json().catch(() => null)) as QuickShopOrderDetail | null;
+          if (!detail || !detail.id) return null;
+          return mapDetail(detail);
+        }
+        if (res.status === 404) return null; // genuine not-found — retrying cannot help
+        console.warn('[quickshop.pull] non-OK', res.status, `(attempt ${attempt + 1}/2)`);
+      } catch (e) {
+        console.warn('[quickshop.pull] fetch error', (e as Error).message, `(attempt ${attempt + 1}/2)`);
+      }
+      if (attempt === 0) await new Promise((r) => setTimeout(r, QUICKSHOP_PULL_RETRY_DELAY_MS));
     }
-    const detail = (await res.json().catch(() => null)) as QuickShopOrderDetail | null;
-    if (!detail || !detail.id) return null;
-    return mapDetail(detail);
+    return null;
   },
 
   async list(creds, cursor) {

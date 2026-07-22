@@ -57,9 +57,28 @@ describe('quickShopConnector', () => {
     expect(init?.headers?.['X-API-Key']).toBe('qs_live_TEST');
   });
 
-  it('pull() returns null on 404', async () => {
+  it('pull() returns null on a genuine 404 WITHOUT retrying (single fetch)', async () => {
     (global.fetch as any).mockResolvedValue({ ok: false, status: 404, headers: { get: () => null }, text: async () => '' });
     expect(await quickShopConnector.pull(creds, { id: 'missing' })).toBeNull();
+    expect((global.fetch as any).mock.calls).toHaveLength(1); // 404 is definitive — no retry
+  });
+
+  // Regression lock (live-observed 2026-07-22, Argania #26841): a lone transient pull failure dropped
+  // line_items to empty and the bot said it couldn't see the products. The detail read now retries once.
+  it('pull() retries ONCE on a transient 5xx, then succeeds with line_items', async () => {
+    (global.fetch as any)
+      .mockResolvedValueOnce({ ok: false, status: 503, headers: { get: () => null }, text: async () => '' })
+      .mockResolvedValueOnce({ ok: true, status: 200, headers: { get: () => null }, json: async () => detail });
+    const order = await quickShopConnector.pull(creds, { id: 'ord_123' });
+    expect(order).not.toBeNull();
+    expect(order!.lineItems).toHaveLength(2);              // items recovered on the retry
+    expect((global.fetch as any).mock.calls).toHaveLength(2); // exactly one retry
+  });
+
+  it('pull() retries ONCE on a thrown network error, then returns null when both attempts fail', async () => {
+    (global.fetch as any).mockRejectedValue(new Error('network down'));
+    expect(await quickShopConnector.pull(creds, { id: 'ord_123' })).toBeNull();
+    expect((global.fetch as any).mock.calls).toHaveLength(2); // attempt + one retry, then give up
   });
 
   it('list() maps a paginated summary page and exposes next cursor', async () => {
