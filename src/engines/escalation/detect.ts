@@ -95,3 +95,28 @@ export function detectEscalation(
 
   return { escalate, severity, reason: buildReason(triggers), triggers };
 }
+
+/**
+ * Placeholder for the Phase-D `detectHandoff` (Task D2 — the CS-loop's code backstop: unifies
+ * `detectEscalation`'s config-driven `enabledTriggers`/`lowConfidenceThreshold` gating with a
+ * `{triggered,...}` return shape). This stub exists only so `src/lib/cs/cs-agent.ts` (Task C6) can
+ * resolve its dynamic `import('@/engines/escalation/detect')` — Vitest/Vite's import-analysis
+ * needs the named export to exist on disk even for a dynamic import before
+ * `vi.mock('@/engines/escalation/detect', ...)` can intercept it (same issue Task A7 hit with
+ * `wa-cs-worker.ts`, resolved there by Task A8's `cs-agent.ts` stub). cs-agent's tests mock this
+ * module entirely. Do NOT deploy C6 to production before D2 replaces this with the real detector.
+ */
+export interface HandoffVerdict {
+  triggered: boolean;
+  triggers: EscalationTrigger[];
+  severity: EscalationSeverity | 'low';
+  reason: string;
+}
+
+export function detectHandoff(
+  message: string,
+  priorUserMessages: string[] = [],
+  opts?: { enabledTriggers?: EscalationTrigger[]; lowConfidenceThreshold?: number },
+): HandoffVerdict {
+  throw new Error(`detectHandoff not implemented (Task D2 pending) — message="${(message || '').slice(0, 20)}"`);
+}
