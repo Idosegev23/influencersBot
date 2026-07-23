@@ -34,11 +34,28 @@ const ARCHETYPE_FALLBACK_SUGGESTIONS: Record<string, string> = {
   general: 'ספרי לי עוד|יש קופון?|מה חדש?',
 };
 
+// English fallbacks for `accounts.language === 'en'` accounts — the LLM output is
+// already forced to English via baseArchetype's LANG_DIRECTIVE_EN, but when the
+// LLM omits <<SUGGESTIONS>> the fallback below is what reaches the user, so it must
+// match the account language (else English demos leak Hebrew suggestion pills).
+const ARCHETYPE_FALLBACK_SUGGESTIONS_EN: Record<string, string> = {
+  cooking: 'Quick recipe|Kitchen tip|What should I try?',
+  skincare: 'Skincare routine|Recommended product|Skin tip',
+  fashion: 'What should I wear?|New trend|Outfit idea',
+  fitness: 'Quick workout|Fitness tip|Training plan',
+  coupons: 'Active offers|What\'s new|Any discount?',
+  news: 'What\'s hot now?|Latest updates|What\'s new?',
+  general: 'Tell me more|What\'s new?|Any tips?',
+};
+
 // Patterns that indicate "what's new?" intent for news accounts
 const HOT_TOPIC_INTENT_PATTERNS = /מה חדש|מה קורה|חדשות|מה הטרנד|מה חם|טרנד|מה קרה|עדכונים|מה היה היום|ספרו לי/;
 
-function getArchetypeFallbackSuggestions(archetype: string): string {
-  return ARCHETYPE_FALLBACK_SUGGESTIONS[archetype] || ARCHETYPE_FALLBACK_SUGGESTIONS.general;
+function getArchetypeFallbackSuggestions(archetype: string, language?: string): string {
+  const table = (language || 'he').toLowerCase() === 'en'
+    ? ARCHETYPE_FALLBACK_SUGGESTIONS_EN
+    : ARCHETYPE_FALLBACK_SUGGESTIONS;
+  return table[archetype] || table.general;
 }
 
 // ============================================
@@ -427,7 +444,7 @@ export class SandwichBot {
     // Suggestion fallback: if LLM didn't produce <<SUGGESTIONS>>, add basic ones
     // ==========================================
     if (!finalResponse.includes('<<SUGGESTIONS>>')) {
-      const fallbackSuggestions = getArchetypeFallbackSuggestions(classification.primaryArchetype);
+      const fallbackSuggestions = getArchetypeFallbackSuggestions(classification.primaryArchetype, accountLanguage);
       finalResponse += `\n<<SUGGESTIONS>>${fallbackSuggestions}<</SUGGESTIONS>>`;
       console.log('   → Added fallback suggestions (LLM omitted them)');
     }
