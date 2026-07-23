@@ -110,7 +110,14 @@ describe('lookupOrder', () => {
 });
 
 describe('lookupOrdersByPhone', () => {
-  beforeEach(() => { H.row = null; vi.mocked(findBrandOrdersByPhone).mockClear(); });
+  beforeEach(() => { H.row = null; H.pull = null; H.config = {}; vi.mocked(findBrandOrdersByPhone).mockClear(); });
+
+  it('enriches recent by-phone orders with line items via a lazy pull (so the bot can show contents)', async () => {
+    vi.mocked(findBrandOrdersByPhone).mockResolvedValueOnce([row({ order_number: '1042', line_items: null })] as any);
+    H.pull = pull(); // the /orders/{id} detail pull returns line items (1× Argan Oil)
+    const out = await lookupOrdersByPhone('acc-1', '972501234567');
+    expect(out[0].itemSummary).toContain('Argan Oil');
+  });
 
   it('returns [] when no orders match the phone', async () => {
     vi.mocked(findBrandOrdersByPhone).mockResolvedValueOnce([]);

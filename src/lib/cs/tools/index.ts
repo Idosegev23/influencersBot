@@ -76,7 +76,7 @@ const lookupOrderTool: CsTool = {
 const lookupOrdersByPhoneTool: CsTool = {
   def: { type: 'function', function: {
     name: 'lookup_orders_by_phone',
-    description: "Proactively find the shopper's recent orders for the bound brand by their WhatsApp phone, so they need not type a number.",
+    description: "Proactively find the shopper's recent orders for the bound brand by their WhatsApp phone (no order number needed). Each order carries its number, status (incl. cancelled/refunded), total, and — for the recent ones — an itemSummary of WHAT'S IN IT; present the contents too, and if an order is cancelled/refunded say so plainly (don't imply it's on the way).",
     parameters: { type: 'object', properties: {} },
   } },
   async handler(_args, ctx) {

@@ -133,15 +133,36 @@ export async function lookupOrder(accountId: string, orderNumber: string, sender
   return { ...result, shipment, kind: 'found' };
 }
 
+// How many of the most-recent by-phone orders to lazy-enrich with line items. The backfill stores
+// summaries WITHOUT line_items (they only come from a per-order /orders/{id} detail pull), so a bare
+// by-phone list can say "here are your orders" but not WHAT's in them. Enrich the recent few (parallel,
+// bounded for cost) so the bot can show each order's contents; the pull result is cached for next time.
+const BY_PHONE_ENRICH = 5;
+
 export async function lookupOrdersByPhone(accountId: string, senderPhone: string): Promise<OrderLookupResult[]> {
   const rows = await findBrandOrdersByPhone(accountId, senderPhone);
-  return rows.map((r: BrandOrderRow) => ({
+  if (!rows.length) return [];
+  const sorted = [...rows].sort((a, b) => (Date.parse(b.placed_at || '') || 0) - (Date.parse(a.placed_at || '') || 0));
+  const config = await loadConfig(accountId);
+
+  const items: (NormalizedLineItem[] | null)[] = await Promise.all(sorted.map(async (r, i) => {
+    if (r.line_items?.length) return r.line_items;               // already cached
+    if (i >= BY_PHONE_ENRICH || !r.source_platform || !r.external_id) return null;
+    try {
+      const platform = r.source_platform as StorePlatform;
+      const fresh = await getConnector(platform).pull(credsFor(platform, config), { id: r.external_id || undefined, orderNumber: r.order_number || undefined });
+      if (fresh?.lineItems?.length) { try { await upsertBrandOrder(accountId, fresh, platform); } catch { /* cache best-effort */ } return fresh.lineItems; }
+    } catch { /* fall back to a summary row */ }
+    return null;
+  }));
+
+  return sorted.map((r: BrandOrderRow, i) => ({
     found: true,
     orderNumber: r.order_number || undefined,
     status: displayStatus(r.status, r.fulfillment_status),
     placedAt: r.placed_at || undefined,
     total: r.total || undefined,
-    itemSummary: r.line_items ? itemSummary(r.line_items) : undefined,
+    itemSummary: items[i]?.length ? itemSummary(items[i]!) : undefined,
     trackingNumbers: r.tracking_number ? [r.tracking_number] : undefined,
     trackingUrls: r.tracking_url ? [r.tracking_url] : undefined,
   }));
