@@ -40,11 +40,22 @@ function itemSummary(items: NormalizedLineItem[]): string | undefined {
     + (items.length > 4 ? `, +${items.length - 4} more` : '');
 }
 
+// A terminal ORDER status (cancelled/refunded) must NOT be masked by the fulfillment status: a
+// cancelled order is "unfulfilled" too, and reporting "unfulfilled" reads to the shopper as "not
+// shipped yet / on its way" — the opposite of the truth. So surface the order status when terminal,
+// otherwise fall back to fulfillment status (the useful signal for a live order). Live-observed
+// 2026-07-23: cancelled orders were reported to a shopper as "not shipped yet".
+const TERMINAL_ORDER_STATUS = new Set(['cancelled', 'canceled', 'refunded', 'voided']);
+function displayStatus(orderStatus: string | null | undefined, fulfillmentStatus: string | null | undefined): string | undefined {
+  if (orderStatus && TERMINAL_ORDER_STATUS.has(orderStatus.toLowerCase())) return orderStatus;
+  return fulfillmentStatus || orderStatus || undefined;
+}
+
 function toResult(o: NormalizedOrder): OrderLookupResult & { lineItems: NormalizedLineItem[] } {
   return {
     found: true,
     orderNumber: o.orderNumber,
-    status: o.fulfillmentStatus || o.status || undefined,
+    status: displayStatus(o.status, o.fulfillmentStatus),
     placedAt: o.placedAt || undefined,
     total: o.total || undefined,
     itemSummary: itemSummary(o.lineItems),
@@ -127,7 +138,7 @@ export async function lookupOrdersByPhone(accountId: string, senderPhone: string
   return rows.map((r: BrandOrderRow) => ({
     found: true,
     orderNumber: r.order_number || undefined,
-    status: r.fulfillment_status || r.status || undefined,
+    status: displayStatus(r.status, r.fulfillment_status),
     placedAt: r.placed_at || undefined,
     total: r.total || undefined,
     itemSummary: r.line_items ? itemSummary(r.line_items) : undefined,

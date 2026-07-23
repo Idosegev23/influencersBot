@@ -56,6 +56,13 @@ describe('lookupOrder', () => {
     expect((out as any).status).toBe('fulfilled');
   });
 
+  it('single lookup surfaces a cancelled order status over the (masking) fulfillment status', async () => {
+    H.row = row(); H.pull = pull({ status: 'cancelled', fulfillmentStatus: 'unfulfilled' });
+    const out = await lookupOrder('acc-1', '1042', '972501234567');
+    expect(out.kind).toBe('found');
+    expect((out as any).status).toBe('cancelled');
+  });
+
   it('returns unverified when the order phone does not match the sender', async () => {
     H.row = row(); H.pull = pull({ customerPhone: '0509999999' });
     expect(await lookupOrder('acc-1', '1042', '972501234567')).toEqual({ kind: 'unverified' });
@@ -127,5 +134,15 @@ describe('lookupOrdersByPhone', () => {
     expect(out.map((o) => o.orderNumber)).toEqual(['1042', '1043']);
     expect(out[1].status).toBe('open'); // falls back to row.status when fulfillment_status is null
     expect(findBrandOrdersByPhone).toHaveBeenCalledWith('acc-1', '972501234567');
+  });
+
+  // Regression (live 2026-07-23): a CANCELLED order was reported as "not shipped yet" because
+  // fulfillment_status='unfulfilled' masked status='cancelled'. Terminal order status must win.
+  it('surfaces a CANCELLED order status instead of masking it with fulfillment', async () => {
+    vi.mocked(findBrandOrdersByPhone).mockResolvedValueOnce([
+      row({ order_number: '16689', status: 'cancelled', fulfillment_status: 'unfulfilled' }),
+    ] as any);
+    const out = await lookupOrdersByPhone('acc-1', '972501234567');
+    expect(out[0].status).toBe('cancelled');
   });
 });
