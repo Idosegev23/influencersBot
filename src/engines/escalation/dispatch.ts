@@ -219,17 +219,23 @@ export async function runCsHandoffCheck(
       });
   if (!detection.triggered) return { escalated: false };
 
-  // dedup: one alert per chat session per window
+  // dedup: one alert per conversation per window. A bound CS conversation has its OWN ticket
+  // (input.ticketId); we flag THAT ticket instead of spawning a separate auto_escalation ticket.
+  // Spawning one per handoff is what produced TWO tickets for a single conversation, so every
+  // customer status-notification doubled. So when a ticket exists dedup keys off ITS
+  // metadata.last_handoff_at; otherwise (pre-bind / widget / chat) off a recent auto_escalation row.
   const dedupeMin = escalationConfig.dedupeMinutes ?? 15;
-  const sinceIso = new Date(deps.now() - dedupeMin * 60 * 1000).toISOString();
-  const { data: recent } = await supabase
-    .from('support_requests')
-    .select('id')
-    .eq('session_id', input.chatSessionId)
-    .eq('source', 'auto_escalation')
-    .gte('created_at', sinceIso)
-    .limit(1);
-  if (recent && recent.length > 0) return { escalated: false, deduped: true };
+  const sinceMs = deps.now() - dedupeMin * 60 * 1000;
+  const sinceIso = new Date(sinceMs).toISOString();
+  if (input.ticketId) {
+    const { data: existing } = await supabase.from('support_requests').select('metadata').eq('id', input.ticketId).maybeSingle();
+    const lastHandoff = (existing?.metadata as any)?.last_handoff_at;
+    if (lastHandoff && Date.parse(lastHandoff) >= sinceMs) return { escalated: false, deduped: true };
+  } else {
+    const { data: recent } = await supabase
+      .from('support_requests').select('id').eq('session_id', input.chatSessionId).eq('source', 'auto_escalation').gte('created_at', sinceIso).limit(1);
+    if (recent && recent.length > 0) return { escalated: false, deduped: true };
+  }
 
   // 1) pause the bot for this thread
   await deps.pauseBot(input.chatSessionId, `handoff:${detection.triggers.join(',')}`);
@@ -281,28 +287,38 @@ export async function runCsHandoffCheck(
     channels.push({ channel: 'admin_fallback', success: true });
   }
 
-  // 4) audit row — also the in-app surface (shows in the support inbox) + powers dedup
-  await supabase.from('support_requests').insert({
-    account_id: input.accountId,
-    customer_name: input.waId, // NOT NULL — waId is a real, traceable identifier (the WhatsApp phone)
-    customer_phone: input.waId,
-    message: input.userMessage,
-    session_id: input.chatSessionId,
-    status: 'new',
-    source: 'auto_escalation',
-    metadata: {
-      escalation: {
-        severity: detection.severity,
-        reason: detection.reason,
-        triggers: detection.triggers,
-        detected_at: new Date(deps.now()).toISOString(),
-        recipients_notified: notified,
-        channels,
-        origin: 'whatsapp_cs',
-        ticket_id: input.ticketId,
-      },
-    },
-  });
+  // 4) record the escalation. When a bound CS conversation ticket exists, FLAG THAT TICKET (one
+  // ticket per conversation → customer notifications never double). Otherwise create the standalone
+  // auto_escalation surface (pre-bind / widget / chat). Either way it powers dedup + the support inbox.
+  const escalation = {
+    severity: detection.severity,
+    reason: detection.reason,
+    triggers: detection.triggers,
+    detected_at: new Date(deps.now()).toISOString(),
+    recipients_notified: notified,
+    channels,
+    origin: 'whatsapp_cs',
+    ticket_id: input.ticketId,
+  };
+  if (input.ticketId) {
+    const { data: existing } = await supabase.from('support_requests').select('metadata').eq('id', input.ticketId).maybeSingle();
+    const prevMeta = ((existing?.metadata as any) || {}) as Record<string, any>;
+    await supabase.from('support_requests').update({
+      metadata: { ...prevMeta, escalated: true, last_handoff_at: new Date(deps.now()).toISOString(), escalation },
+      updated_at: new Date(deps.now()).toISOString(),
+    }).eq('id', input.ticketId);
+  } else {
+    await supabase.from('support_requests').insert({
+      account_id: input.accountId,
+      customer_name: input.waId, // NOT NULL — waId is a real, traceable identifier (the WhatsApp phone)
+      customer_phone: input.waId,
+      message: input.userMessage,
+      session_id: input.chatSessionId,
+      status: 'new',
+      source: 'auto_escalation',
+      metadata: { escalation },
+    });
+  }
 
   return { escalated: true, reason: detection.reason, recipientsNotified: notified };
 }
