@@ -163,9 +163,22 @@ export async function PUT(
     return NextResponse.json({ error: writeErr.message }, { status: 500 });
   }
 
+  // Connecting a QuickShop store with a FRESH key → kick off a full order backfill in the background
+  // so the whole order history is cached (the sync cron only keeps the recent ~1000 fresh, and
+  // QuickShop has no order_number filter, so an order must be in brand_orders to be found). Best-effort.
+  let backfillQueued = false;
+  if (platform === 'quickshop' && next.enabled === true) {
+    const freshKey = typeof body.api_key === 'string' && body.api_key.trim() !== '' && !body.api_key.startsWith('••••');
+    if (freshKey) {
+      try { backfillQueued = (await (await import('@/lib/orders/enqueue-backfill')).enqueueOrdersBackfill(accountId)).queued; }
+      catch (e) { console.warn('[integrations] backfill enqueue failed', (e as Error).message); }
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     platform,
+    backfillQueued,
     integration: {
       ...next,
       api_token: maskToken(next.api_token),

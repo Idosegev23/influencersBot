@@ -24,6 +24,7 @@ export default function StoreConnectionForm({ accountId }: { accountId: string }
   const [loaded, setLoaded] = useState<Record<string, any>>({});
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [test, setTest] = useState<{ running: boolean; ok?: boolean; message?: string }>({ running: false });
+  const [backfill, setBackfill] = useState<{ running: boolean; msg?: string }>({ running: false });
 
   useEffect(() => {
     fetch(`/api/admin/accounts/${accountId}/integrations`)
@@ -63,9 +64,22 @@ export default function StoreConnectionForm({ accountId }: { accountId: string }
       const d = await res.json();
       setLoaded((prev) => ({ ...prev, [platform]: d.integration }));
       setStatus('saved');
+      // Connecting a fresh QuickShop key auto-starts a full order backfill in the background.
+      if (d.backfillQueued) setBackfill({ running: false, msg: 'משיכת כל ההזמנות התחילה ברקע (עד כמה דקות)' });
       // Connect + verify: auto-test right after a successful save.
       void runTest();
     } catch { setStatus('error'); }
+  }
+
+  async function runBackfill() {
+    setBackfill({ running: true });
+    try {
+      const res = await fetch(`/api/admin/accounts/${accountId}/integrations/backfill`, { method: 'POST' });
+      const d = await res.json().catch(() => ({}));
+      setBackfill({ running: false, msg: d.ok ? 'משיכת כל ההזמנות התחילה ברקע — כל ההיסטוריה תיכנס תוך כמה דקות.' : (d.error || 'נכשל') });
+    } catch {
+      setBackfill({ running: false, msg: 'הפעלה נכשלה' });
+    }
   }
 
   async function runTest() {
@@ -145,11 +159,18 @@ export default function StoreConnectionForm({ accountId }: { accountId: string }
           style={{ padding: '8px 16px', borderRadius: 8, background: '#fff', color: '#111', fontSize: 13, border: '1px solid #d1d5db', opacity: (test.running || !hasToken) ? 0.5 : 1, cursor: 'pointer' }}>
           {test.running ? 'בודק…' : 'בדוק חיבור'}
         </button>
+        {!isShopify && (
+          <button type="button" onClick={runBackfill} disabled={backfill.running || !hasToken} title="מושך את כל היסטוריית ההזמנות ל-cache (מתרחש גם אוטומטית בחיבור חדש)"
+            style={{ padding: '8px 16px', borderRadius: 8, background: '#fff', color: '#111', fontSize: 13, border: '1px solid #d1d5db', opacity: (backfill.running || !hasToken) ? 0.5 : 1, cursor: 'pointer' }}>
+            {backfill.running ? 'מפעיל…' : 'משוך את כל ההזמנות'}
+          </button>
+        )}
         {status === 'saved' && test.ok === undefined && <span style={{ color: '#16a34a', fontSize: 12 }}>נשמר ✓</span>}
         {status === 'error' && <span style={{ color: '#ef4444', fontSize: 12 }}>שגיאת שמירה</span>}
         {test.message && (
           <span style={{ fontSize: 12, color: test.ok ? '#16a34a' : '#ef4444' }}>{test.message}</span>
         )}
+        {backfill.msg && <span style={{ fontSize: 12, color: '#7c3aed' }}>{backfill.msg}</span>}
       </div>
     </div>
   );
