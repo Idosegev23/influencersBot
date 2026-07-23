@@ -52,6 +52,13 @@ const RECENT_OUTBOUND_WINDOW_MS = 24 * 60 * 60 * 1000;
 // key off OUR outbound support_ticket_history rows, which only exist post-takeover (intended).
 const BOT_OWNED_SOURCES = new Set(['whatsapp_cs', 'auto_escalation']);
 
+// A bot-owned ticket only leaves the CS bot's hands when a HUMAN genuinely replies on it. These are
+// the human-takeover history actions; an automated `customer_notified` status ping is NOT one of them.
+// (Live-observed 2026-07-23: an awaiting_customer status template on a CS ticket created a
+// customer_notified outbound row, and Strategy 2 then routed the shopper's next message to the ticket
+// instead of the bot — silent no-response. So bot-owned tickets match Strategies 1/2 ONLY on a human action.)
+const HUMAN_TAKEOVER = new Set(['agent_message', 'agent_image']);
+
 type MatchedBy = 'context' | 'recent_outbound' | 'phone';
 type Alternative = {
   ticket_id: string;
@@ -78,7 +85,7 @@ export async function routeInboundToTicket(
   const { data: rawOutbounds } = await supabase
     .from('support_ticket_history')
     .select(
-      'ticket_id, account_id, created_at, support_requests!inner(customer_phone, brand, customer_name)',
+      'ticket_id, account_id, created_at, action, support_requests!inner(customer_phone, brand, customer_name, source)',
     )
     .in('action', ['customer_notified', 'agent_message', 'agent_image'])
     .not('whatsapp_message_id', 'is', null)
@@ -88,11 +95,13 @@ export async function routeInboundToTicket(
 
   // Filter to outbounds that match this phone, dedup per ticket (keep
   // the most recent outbound per ticket_id since the array is already
-  // ordered by created_at desc).
+  // ordered by created_at desc). Bot-owned tickets are excluded unless a HUMAN
+  // took over (see HUMAN_TAKEOVER) — an automated customer_notified must not steal the thread.
   const recentByTicket = new Map<string, Alternative>();
   for (const r of (rawOutbounds || []) as any[]) {
     const phone = r.support_requests?.customer_phone;
     if (!phone || toWaId(phone) !== input.waId) continue;
+    if (BOT_OWNED_SOURCES.has(r.support_requests?.source) && !HUMAN_TAKEOVER.has(r.action)) continue;
     if (!recentByTicket.has(r.ticket_id)) {
       recentByTicket.set(r.ticket_id, {
         ticket_id: r.ticket_id,
@@ -116,11 +125,15 @@ export async function routeInboundToTicket(
   if (input.contextId) {
     const { data: histRow } = await supabase
       .from('support_ticket_history')
-      .select('ticket_id, account_id')
+      .select('ticket_id, account_id, action, support_requests!inner(source)')
       .eq('whatsapp_message_id', input.contextId)
       .maybeSingle();
 
-    if (histRow?.ticket_id) {
+    // Skip a bot-owned ticket the shopper replied to UNLESS a human took it over — else the CS bot owns it.
+    const botOwnedNoTakeover = histRow
+      && BOT_OWNED_SOURCES.has((histRow as any).support_requests?.source)
+      && !HUMAN_TAKEOVER.has((histRow as any).action);
+    if (histRow?.ticket_id && !botOwnedNoTakeover) {
       // context.id is deterministic — even when other brands have
       // outbounds in the window, ambiguous=false here.
       const meta: RoutingMeta = {

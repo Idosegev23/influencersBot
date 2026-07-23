@@ -81,4 +81,32 @@ describe('routeInboundToTicket — Strategy 3 excludes CS-owned tickets', () => 
     expect(res.matchedBy).toBe('phone');
     expect(H.applied.some((a: any) => a.kind === 'insert')).toBe(true); // reply appended to the real ticket
   });
+
+  // Strategy 2 (recent_outbound): a bot-owned ticket must NOT be claimed via an automated
+  // customer_notified status ping — that stole the shopper's next reply from the bot (live 2026-07-23).
+  it('Strategy 2 does NOT claim a bot-owned ticket via an automated customer_notified (→ CS handles)', async () => {
+    H.outbounds = [{ ticket_id: 'cs-1', account_id: 'acc-1', created_at: '2026-07-23T06:10:00Z', action: 'customer_notified',
+      support_requests: { customer_phone: '972559749242', brand: null, customer_name: null, source: 'whatsapp_cs' } }];
+    const { routeInboundToTicket } = await import('@/lib/support/route-inbound');
+    const res = await routeInboundToTicket(input());
+    expect(res.ticketId).toBeNull();
+  });
+
+  it('Strategy 2 DOES claim a bot-owned ticket after a human agent_message (genuine takeover)', async () => {
+    H.outbounds = [{ ticket_id: 'cs-1', account_id: 'acc-1', created_at: '2026-07-23T06:10:00Z', action: 'agent_message',
+      support_requests: { customer_phone: '972559749242', brand: 'Argania', customer_name: 'עידו', source: 'whatsapp_cs' } }];
+    const { routeInboundToTicket } = await import('@/lib/support/route-inbound');
+    const res = await routeInboundToTicket(input());
+    expect(res.ticketId).toBe('cs-1');
+    expect(res.matchedBy).toBe('recent_outbound');
+  });
+
+  it('Strategy 2 still claims a NON-bot ticket via customer_notified (legacy reply-routing intact)', async () => {
+    H.outbounds = [{ ticket_id: 'sup-9', account_id: 'acc-2', created_at: '2026-07-23T06:10:00Z', action: 'customer_notified',
+      support_requests: { customer_phone: '972559749242', brand: 'X', customer_name: 'Y', source: 'whatsapp' } }];
+    const { routeInboundToTicket } = await import('@/lib/support/route-inbound');
+    const res = await routeInboundToTicket(input());
+    expect(res.ticketId).toBe('sup-9');
+    expect(res.matchedBy).toBe('recent_outbound');
+  });
 });
