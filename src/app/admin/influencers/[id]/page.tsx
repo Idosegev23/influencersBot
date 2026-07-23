@@ -3,6 +3,7 @@
 import { use, useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import EscalationContactsForm from './EscalationContactsForm';
+import StoreConnectionForm from './StoreConnectionForm';
 import SourcesPanel from './SourcesPanel';
 import MetaApiConsole from '@/components/admin/meta-review/MetaApiConsole';
 
@@ -777,6 +778,8 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
       </div>
 
       <SourcesPanel accountId={id} />
+
+      <StoreConnectionForm accountId={id} />
 
       <EscalationContactsForm accountId={id} />
 

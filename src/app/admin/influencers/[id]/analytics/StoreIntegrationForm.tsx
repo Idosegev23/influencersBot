@@ -42,17 +42,20 @@ export default function StoreIntegrationForm({ accountId }: { accountId: string 
     setShopDomain(cfg.shop_domain || '');
     setEnabled(cfg.enabled === true);
     setHasToken(!!cfg.has_token);
-    setApiToken(cfg.api_token || ''); // masked value from server
+    setApiToken(cfg.api_token || cfg.api_key || cfg.admin_api_token || ''); // masked value from server (per platform)
   }, [platform, loaded]);
 
   async function save() {
     setSaving(true);
     setSaved(false);
     try {
+      // QuickShop's key persists under `api_key`; Shopify/other under `api_token`. Sending the wrong
+      // field silently no-ops (buildIntegrationPatch only reads api_key for quickshop).
+      const tokenField = platform === 'quickshop' ? { api_key: apiToken } : { api_token: apiToken };
       const res = await fetch(`/api/admin/accounts/${accountId}/integrations`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform, shop_domain: shopDomain, api_token: apiToken, enabled }),
+        body: JSON.stringify({ platform, shop_domain: shopDomain, ...tokenField, enabled }),
       });
       if (res.ok) {
         const d = await res.json();
