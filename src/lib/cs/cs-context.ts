@@ -21,6 +21,10 @@ export interface CsContextDigest {
   // AFTER bind_brand, so pre-bind onboarding turns (greeting → "which brand?" → disambiguation)
   // would otherwise have zero cross-turn memory. Harmless to include post-bind too.
   recentTurns: CsRecentTurn[];
+  // The bound brand's customer-service policy (free text on config.whatsapp_cs.policy) — the brain
+  // must follow it. This is the v1 "policy engine": a per-brand rulebook injected into the prompt.
+  // A future brand-management screen will populate it (upload a file or type it); null when unset.
+  policy: string | null;
 }
 
 export async function buildContextDigest(
@@ -28,13 +32,16 @@ export async function buildContextDigest(
   openThreads: Array<{ ticketId: string; brand: string; topic: string }>,
 ): Promise<CsContextDigest> {
   let boundBrand: string | null = null;
+  let policy: string | null = null;
   if (session.active_account_id) {
     const { data } = await supabaseAdmin.from('accounts').select('config').eq('id', session.active_account_id).single();
     const cfg = (data as any)?.config || {};
     boundBrand = cfg.display_name || cfg.username || null;
+    const p = cfg.whatsapp_cs?.policy;
+    policy = typeof p === 'string' && p.trim() ? p : null;
   }
   const recentTurns = Array.isArray((session.context as any)?.recentTurns) ? (session.context as any).recentTurns : [];
-  return { knownName: session.customer_name, boundBrand, warm: isWarm(session), openThreads, recentTurns };
+  return { knownName: session.customer_name, boundBrand, warm: isWarm(session), openThreads, recentTurns, policy };
 }
 
 /**
@@ -61,6 +68,12 @@ export async function buildCsSystemPrompt(input: {
 
   if (digest.boundBrand) {
     lines.push(`מותג פעיל: ${digest.boundBrand} — כל הכלים מכוונים אליו.`);
+    if (digest.policy) {
+      lines.push(
+        `\n--- מדיניות שירות הלקוחות של ${digest.boundBrand} (חובה לפעול לפיה) ---\n${digest.policy.slice(0, 3000)}\n` +
+        'כללי המדיניות מנחים אותך ישירות וגוברים על הרגלים כלליים — אך לעולם אינם עוקפים אימות טלפון (lookup_order) או האיסור לכתוב לחנות (read-only). אם מקרה אינו מכוסה במדיניות — הפעל/י שיקול דעת או הסלמה לאדם.'
+      );
+    }
   } else {
     lines.push(
       'טרם נבחר מותג — שאל/י בשיחה טבעית לאיזה מותג/עסק הלקוח/ה צריך/ה עזרה (למשל: "לאיזה מותג / עם איזה עסק אתה צריך עזרה?"). ' +

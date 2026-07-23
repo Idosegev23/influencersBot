@@ -30,7 +30,7 @@ vi.mock('@/lib/supabase', () => ({
   },
 }));
 
-const digest = (over: any = {}) => ({ knownName: null, boundBrand: null, warm: false, openThreads: [], recentTurns: [], ...over });
+const digest = (over: any = {}) => ({ knownName: null, boundBrand: null, warm: false, openThreads: [], recentTurns: [], policy: null, ...over });
 
 describe('cs-context', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -88,6 +88,22 @@ describe('cs-context', () => {
     expect(p).toContain('דנה');
     expect(p).toMatch(/אל תשאל\/י שוב לשם/);
     expect(p).not.toMatch(/remember_name/); // no need to capture again
+  });
+
+  // v1 "policy engine": a per-brand rulebook on config.whatsapp_cs.policy is injected into the
+  // bound prompt so the brain aligns to it — reinforcing (never overriding) verify + read-only.
+  it('bound prompt: injects the brand CS policy when set + reinforces the invariants', async () => {
+    const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
+    const p = await buildCsSystemPrompt({ accountId: 'acc-1', userMessage: 'הקרם הגיע פתוח', digest: digest({ boundBrand: 'Argania', policy: 'מוצר שהגיע פגום: בקש/י תמונה ואז הסלמה עם פרטי ההזמנה.' }) });
+    expect(p).toContain('מדיניות שירות הלקוחות של Argania');
+    expect(p).toContain('בקש/י תמונה');
+    expect(p).toMatch(/read-only|לכתוב לחנות/);
+  });
+
+  it('bound prompt: no policy block when the brand has no policy set', async () => {
+    const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
+    const p = await buildCsSystemPrompt({ accountId: 'acc-1', userMessage: 'היי', digest: digest({ boundBrand: 'Argania', policy: null }) });
+    expect(p).not.toContain('מדיניות שירות הלקוחות');
   });
 
   it('bound prompt: injects brand persona + RAG (searchContentByQuery scoped to the account)', async () => {
