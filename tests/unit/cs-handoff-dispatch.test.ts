@@ -122,6 +122,20 @@ describe('runCsHandoffCheck', () => {
     expect(audit.row.customer_name.length).toBeGreaterThan(0);
   });
 
+  // Escalation tickets were "laconic": customer_name was the phone and there was no transcript.
+  it('enriches the escalation with the learned name + a transcript field (not just the phone)', async () => {
+    const { runCsHandoffCheck } = await import('@/engines/escalation/dispatch');
+    const sb = makeSupabase({ config: { escalation: { enabled: true, recipients: [{ email: 'r@b.co' }] } } });
+    await runCsHandoffCheck(
+      { accountId: 'a1', chatSessionId: 'cs1', ticketId: null, waId: '972501234567', userMessage: 'המוצר הגיע פגום', customerName: 'עידו', force: true },
+      { supabase: sb as any, sendEmail: vi.fn().mockResolvedValue({ success: true }) as any, pauseBot: vi.fn() as any, now: () => 0 },
+    );
+    const audit = sb.inserts.find((i: any) => i.table === 'support_requests');
+    expect(audit.row.customer_name).toBe('עידו');
+    expect(audit.row.metadata.escalation.customer_name).toBe('עידו');
+    expect(Array.isArray(audit.row.metadata.escalation.transcript)).toBe(true);
+  });
+
   it('dedups a second alert inside the window (keys off the ticket last_handoff_at)', async () => {
     const { runCsHandoffCheck } = await import('@/engines/escalation/dispatch');
     const sb = makeSupabase({ config: { escalation: { enabled: true } }, ticket: { metadata: { last_handoff_at: new Date(0).toISOString() } } });

@@ -177,7 +177,7 @@ export async function runCsTurn(job: CsJob, depsOverride?: Partial<CsAgentDeps>)
   if (handoff?.triggered && session.active_account_id && session.active_chat_session_id) {
     try {
       const { runCsHandoffCheck } = await import('@/engines/escalation/dispatch'); // Phase D (D4)
-      await runCsHandoffCheck({ accountId: session.active_account_id, chatSessionId: session.active_chat_session_id, ticketId: session.active_ticket_id, waId, userMessage, force: true });
+      await runCsHandoffCheck({ accountId: session.active_account_id, chatSessionId: session.active_chat_session_id, ticketId: session.active_ticket_id, waId, userMessage, customerName: session.customer_name, force: true });
     } catch (e) {
       console.error('[cs-agent] runCsHandoffCheck failed — still handing off; a known escalation must never fall through to the model', e);
     }

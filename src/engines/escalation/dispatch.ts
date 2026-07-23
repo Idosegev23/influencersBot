@@ -134,6 +134,8 @@ export async function runEscalationCheck(
         severity: verdict.severity,
         reason: verdict.reason,
         triggers: verdict.triggers,
+        customer_phone: phone,
+        transcript: prior.slice(-8), // whole recent conversation for the human, not just the trigger line
         detected_at: new Date(deps.now()).toISOString(),
         recipients_notified: notified,
         channels,
@@ -151,6 +153,7 @@ export interface CsHandoffInput {
   ticketId: string | null;
   waId: string;
   userMessage: string;
+  customerName?: string | null; // learned shopper name — enriches the ticket + email (else the waId)
   confidence?: number;
   force?: boolean; // brain-initiated escalate_to_human → skip detection, always escalate (still flag/dedup gated)
 }
@@ -197,8 +200,11 @@ export async function runCsHandoffCheck(
   const escalationConfig = (config.escalation || {}) as EscalationConfig;
   if (escalationConfig.enabled === false) return { escalated: false, skipped: 'disabled' };
 
-  // prior user texts from the bound thread (frustration needs history)
+  // Prior messages from the bound thread: user-only feeds frustration detection; the FULL transcript
+  // (both roles) enriches the escalation ticket + email so the human sees the whole conversation —
+  // the order looked up, the exact complaint — instead of a one-line reason.
   let priorUserTexts: string[] = [];
+  let transcript: { role: string; content: string }[] = [];
   if (input.chatSessionId) {
     const { data: msgs } = await supabase
       .from('chat_messages')
@@ -206,7 +212,8 @@ export async function runCsHandoffCheck(
       .eq('session_id', input.chatSessionId)
       .order('created_at', { ascending: false })
       .limit(8);
-    priorUserTexts = (msgs || []).reverse().filter((m: any) => m.role === 'user').map((m: any) => m.content);
+    transcript = (msgs || []).reverse().map((m: any) => ({ role: m.role, content: m.content }));
+    priorUserTexts = transcript.filter((m) => m.role === 'user').map((m) => m.content);
   }
 
   // force (from the escalate_to_human tool — the brain already decided) → skip detection, always escalate.
@@ -267,9 +274,10 @@ export async function runCsHandoffCheck(
       brandName,
       reason: detection.reason,
       severity: detection.severity === 'high' ? 'critical' : 'high',
+      customerName: input.customerName || null,
       customerPhone: input.waId,
       userMessage: input.userMessage,
-      lastMessages: [],
+      lastMessages: transcript.slice(-6),
       sessionId: input.chatSessionId,
     });
     const res = await deps.sendEmail({ to: emailTargets, subject, html });
@@ -290,10 +298,14 @@ export async function runCsHandoffCheck(
   // 4) record the escalation. When a bound CS conversation ticket exists, FLAG THAT TICKET (one
   // ticket per conversation → customer notifications never double). Otherwise create the standalone
   // auto_escalation surface (pre-bind / widget / chat). Either way it powers dedup + the support inbox.
+  const customerName = (input.customerName && input.customerName.trim()) || input.waId;
   const escalation = {
     severity: detection.severity,
     reason: detection.reason,
     triggers: detection.triggers,
+    customer_name: customerName,
+    customer_phone: input.waId,
+    transcript: transcript.slice(-8), // the whole recent conversation for the human
     detected_at: new Date(deps.now()).toISOString(),
     recipients_notified: notified,
     channels,
@@ -301,16 +313,22 @@ export async function runCsHandoffCheck(
     ticket_id: input.ticketId,
   };
   if (input.ticketId) {
-    const { data: existing } = await supabase.from('support_requests').select('metadata').eq('id', input.ticketId).maybeSingle();
+    const { data: existing } = await supabase.from('support_requests').select('metadata, customer_name').eq('id', input.ticketId).maybeSingle();
     const prevMeta = ((existing?.metadata as any) || {}) as Record<string, any>;
-    await supabase.from('support_requests').update({
+    const patch: Record<string, any> = {
       metadata: { ...prevMeta, escalated: true, last_handoff_at: new Date(deps.now()).toISOString(), escalation },
       updated_at: new Date(deps.now()).toISOString(),
-    }).eq('id', input.ticketId);
+    };
+    // Upgrade a placeholder/phone ticket name to the learned name so the inbox shows who it is.
+    const cur = (existing as any)?.customer_name;
+    if (input.customerName && input.customerName.trim() && (!cur || cur === 'לקוח/ה' || cur === input.waId)) {
+      patch.customer_name = input.customerName.trim();
+    }
+    await supabase.from('support_requests').update(patch).eq('id', input.ticketId);
   } else {
     await supabase.from('support_requests').insert({
       account_id: input.accountId,
-      customer_name: input.waId, // NOT NULL — waId is a real, traceable identifier (the WhatsApp phone)
+      customer_name: customerName, // learned name when known, else the waId (NOT NULL, traceable)
       customer_phone: input.waId,
       message: input.userMessage,
       session_id: input.chatSessionId,
