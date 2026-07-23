@@ -20,6 +20,15 @@ export async function processOneCsInbound(job: CsJob): Promise<string | null> {
   const doneKey = `cs:wa:${job.msg?.id}:done`;
   try { if (job.msg?.id && (await redisGet(doneKey))) return null; } catch { /* ignore */ }
 
+  // Materialize an inbound image (download → data URL for the multimodal brain + a durable copy for the
+  // escalation/inbox) before the brain runs — the CS analog of the CRM worker's materializeInbound.
+  if (job?.msg?.type === 'image' && !job.image) {
+    try {
+      const { materializeCsImage } = await import('@/lib/cs/cs-media');
+      job.image = (await materializeCsImage(job.msg)) ?? undefined;
+    } catch (e) { console.warn('[cs-worker] image materialize failed', e); }
+  }
+
   const turn = await runCsTurn(job);
   const reply = turn.reply;
   if (!reply || reply.kind === 'none') return null;

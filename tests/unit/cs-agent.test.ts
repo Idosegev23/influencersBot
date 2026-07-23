@@ -205,4 +205,26 @@ describe('runCsTurn (brain-led loop)', () => {
     expect(store['972501112222'].customer_name).toBe('דנה');
     expect(contactsUpdate).toHaveBeenCalledWith({ profile_name: 'דנה' });
   });
+
+  // Multimodal image inbound: the brain must SEE the photo — the user message becomes a content-part
+  // array (text + image_url data URL), and the caption is the text stand-in for persistence/escalation.
+  it('image inbound → model gets multimodal content (text + image_url); text turns stay plain strings', async () => {
+    callModel.mockResolvedValue({ toolCalls: [], text: 'אני רואה שהקרם הגיע פתוח — מצטערת מאוד 😔' });
+    const imgJob = { waId: '972501112222', msg: { id: 'w1', type: 'image', image: { id: 'm1', caption: 'הקרם הגיע פתוח' } }, textBody: null, contactId: 'c1',
+      image: { dataUrl: 'data:image/jpeg;base64,AAAA', url: 'https://store/x.jpg', caption: 'הקרם הגיע פתוח', mime: 'image/jpeg' } } as any;
+    const { runCsTurn } = await import('@/lib/cs/cs-agent');
+    const res = await runCsTurn(imgJob, { callModel });
+    const sent = (callModel.mock.calls[0][0] as any).messages;
+    const last = sent[sent.length - 1];
+    expect(Array.isArray(last.content)).toBe(true);
+    expect(last.content[0]).toEqual({ type: 'text', text: '[תמונה] הקרם הגיע פתוח' });
+    expect(last.content[1].type).toBe('image_url');
+    expect(last.content[1].image_url.url).toContain('base64');
+    expect(res.reply.kind).toBe('text');
+
+    callModel.mockClear();
+    await runCsTurn(job('היי'), { callModel });
+    const sent2 = (callModel.mock.calls[0][0] as any).messages;
+    expect(typeof sent2[sent2.length - 1].content).toBe('string');
+  });
 });

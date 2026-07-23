@@ -4,6 +4,7 @@
  * A single drain worker (holding the per-wa_id lock) pops these one-by-one in arrival order.
  */
 import { redisRPush, redisLPopCount, redisLLen, redisSetNx } from '@/lib/redis';
+import type { CsImage } from './cs-media';
 
 export interface CsJob {
   waId: string;
@@ -11,6 +12,7 @@ export interface CsJob {
   textBody: string | null;  // pre-extracted (text/button/interactive title)
   contactId?: string | null;
   attempt?: number;
+  image?: CsImage;          // worker-populated (materializeCsImage) for image inbounds — NOT enqueued to Redis
 }
 
 const qKey = (waId: string) => `cs:wa:${waId}:q`;

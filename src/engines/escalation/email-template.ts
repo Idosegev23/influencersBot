@@ -6,6 +6,7 @@ export interface EscalationEmailParts {
   customerPhone?: string | null;
   userMessage: string;
   lastMessages: { role: string; content: string }[];
+  imageUrl?: string | null; // durable URL of a photo the shopper sent — embedded as evidence
   sessionId?: string | null;
 }
 
@@ -41,6 +42,7 @@ export function buildEscalationEmail(p: EscalationEmailParts): { subject: string
         <div style="background:#f9fafb;border-radius:8px;padding:12px;">
           <b>הקשר אחרון:</b>${history || '<div>—</div>'}
         </div>
+        ${p.imageUrl ? `<div style="margin-top:12px;"><b>תמונה שצירף/ה הלקוח/ה:</b><br/><a href="${esc(p.imageUrl)}"><img src="${esc(p.imageUrl)}" alt="תמונה מהלקוח" style="max-width:100%;border-radius:8px;margin-top:6px;border:1px solid #e5e7eb;"/></a></div>` : ''}
         <p style="font-size:12px;color:#9ca3af;margin-top:16px;">מזהה שיחה: ${esc(p.sessionId || '—')} · BestieAI</p>
       </div>
     </div>

@@ -31,7 +31,9 @@ export interface CsTurnResult {
   phase: CsPhase;
 }
 
-interface CsChatMessage { role: 'user' | 'assistant' | 'tool'; content: string | null; tool_calls?: any[]; tool_call_id?: string; }
+// content is `string` for text turns and an OpenAI multimodal content-part array (text + image_url)
+// for an image turn, so the brain literally SEES the shopper's photo.
+interface CsChatMessage { role: 'user' | 'assistant' | 'tool'; content: string | any[] | null; tool_calls?: any[]; tool_call_id?: string; }
 interface CsModelTurn { toolCalls: Array<{ id: string; name: string; args: any }>; text: string | null; }
 export interface CsAgentDeps {
   callModel(params: { system: string; messages: CsChatMessage[]; tools: OpenAIFunctionDef[] }): Promise<CsModelTurn>;
@@ -138,7 +140,10 @@ async function persistTurn(chatSessionId: string, userMessage: string, assistant
 export async function runCsTurn(job: CsJob, depsOverride?: Partial<CsAgentDeps>): Promise<CsTurnResult> {
   const deps: CsAgentDeps = { callModel: depsOverride?.callModel ?? defaultCallModel };
   const waId = job.waId;
-  const userMessage = (job.textBody || '').trim();
+  // Image inbound: userMessage is a short text stand-in (caption or a marker) used for persistence,
+  // detectHandoff and the escalation transcript; the ACTUAL photo is threaded to the model below.
+  const img = job.image;
+  const userMessage = (img ? (img.caption ? `[תמונה] ${img.caption}` : '[הלקוח/ה שלח/ה תמונה]') : (job.textBody || '')).trim();
   let session = (await loadCsSession(waId)) || (await createCsSession(waId, job.contactId ?? null));
 
   // Lightweight pre-bind memory (Task C6 follow-up, closes an opus-review finding): chat_messages
@@ -177,7 +182,7 @@ export async function runCsTurn(job: CsJob, depsOverride?: Partial<CsAgentDeps>)
   if (handoff?.triggered && session.active_account_id && session.active_chat_session_id) {
     try {
       const { runCsHandoffCheck } = await import('@/engines/escalation/dispatch'); // Phase D (D4)
-      await runCsHandoffCheck({ accountId: session.active_account_id, chatSessionId: session.active_chat_session_id, ticketId: session.active_ticket_id, waId, userMessage, customerName: session.customer_name, force: true });
+      await runCsHandoffCheck({ accountId: session.active_account_id, chatSessionId: session.active_chat_session_id, ticketId: session.active_ticket_id, waId, userMessage, customerName: session.customer_name, imageUrl: img?.url ?? null, force: true });
     } catch (e) {
       console.error('[cs-agent] runCsHandoffCheck failed — still handing off; a known escalation must never fall through to the model', e);
     }
@@ -191,10 +196,14 @@ export async function runCsTurn(job: CsJob, depsOverride?: Partial<CsAgentDeps>)
   const system = await buildCsSystemPrompt({ accountId: session.active_account_id, userMessage, digest });
 
   // 5) Tool-calling loop.
-  const ctx: CsToolCtx = { waId, accountId: session.active_account_id, chatSessionId: session.active_chat_session_id, ticketId: session.active_ticket_id, customerName: session.customer_name, senderPhone: waId };
+  const ctx: CsToolCtx = { waId, accountId: session.active_account_id, chatSessionId: session.active_chat_session_id, ticketId: session.active_ticket_id, customerName: session.customer_name, senderPhone: waId, lastImageUrl: img?.url ?? null };
   const toolMap = new Map(getCsTools().map((t) => [t.def.function.name, t]));
   const history = session.active_chat_session_id ? await loadHistory(session.active_chat_session_id) : [];
-  const messages: CsChatMessage[] = [...history, { role: 'user', content: userMessage }];
+  // Image turn → multimodal content (text + image_url) so the brain sees the photo; text turn → string.
+  const userContent: any = img?.dataUrl
+    ? [{ type: 'text', text: userMessage }, { type: 'image_url', image_url: { url: img.dataUrl } }]
+    : userMessage;
+  const messages: CsChatMessage[] = [...history, { role: 'user', content: userContent }];
   let finalText: string | null = null;
   let handedOff = false; // escalate_to_human fired this turn → pause FUTURE turns, but still ack THIS one
 

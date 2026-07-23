@@ -154,6 +154,7 @@ export interface CsHandoffInput {
   waId: string;
   userMessage: string;
   customerName?: string | null; // learned shopper name — enriches the ticket + email (else the waId)
+  imageUrl?: string | null;     // durable URL of a photo the shopper sent → attached to the ticket + email
   confidence?: number;
   force?: boolean; // brain-initiated escalate_to_human → skip detection, always escalate (still flag/dedup gated)
 }
@@ -278,6 +279,7 @@ export async function runCsHandoffCheck(
       customerPhone: input.waId,
       userMessage: input.userMessage,
       lastMessages: transcript.slice(-6),
+      imageUrl: input.imageUrl || null,
       sessionId: input.chatSessionId,
     });
     const res = await deps.sendEmail({ to: emailTargets, subject, html });
@@ -305,6 +307,7 @@ export async function runCsHandoffCheck(
     triggers: detection.triggers,
     customer_name: customerName,
     customer_phone: input.waId,
+    image_url: input.imageUrl || null, // the shopper's photo (durable URL) for the support inbox
     transcript: transcript.slice(-8), // the whole recent conversation for the human
     detected_at: new Date(deps.now()).toISOString(),
     recipients_notified: notified,

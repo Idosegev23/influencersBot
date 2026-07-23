@@ -12,6 +12,7 @@ export interface CsToolCtx {
   ticketId: string | null;
   customerName: string | null;
   senderPhone: string;           // = waId (E.164)
+  lastImageUrl?: string | null;  // durable URL of an image the shopper sent THIS turn → attached to escalation
 }
 
 export interface CsToolResult {

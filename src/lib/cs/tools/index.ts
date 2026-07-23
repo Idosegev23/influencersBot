@@ -146,7 +146,7 @@ const escalateTool: CsTool = {
     let outcome: any = null;
     try {
       const { runCsHandoffCheck } = await import('@/engines/escalation/dispatch'); // Phase D (D4)
-      outcome = await runCsHandoffCheck({ accountId: ctx.accountId, chatSessionId: ctx.chatSessionId, ticketId: ctx.ticketId, waId: ctx.waId, userMessage: reason, customerName: ctx.customerName, force: true });
+      outcome = await runCsHandoffCheck({ accountId: ctx.accountId, chatSessionId: ctx.chatSessionId, ticketId: ctx.ticketId, waId: ctx.waId, userMessage: reason, customerName: ctx.customerName, imageUrl: ctx.lastImageUrl, force: true });
     } catch (e) { console.warn('[cs-tools] escalation notify failed', e); }
     // Pause UNLESS escalation is switched off for this brand. If it's off (skipped disabled/flag_off) no
     // human is coming, so pausing would drop the shopper into silence — keep the bot answering instead.
