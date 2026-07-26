@@ -16,12 +16,12 @@
 | 4 | Abandoned carts recovered | 21.1% recovered; **Bestie touched 2 of them** | 33.1% recovered; **Bestie touched 0** |
 | 5 | Deflection (of support-intent conversations) | **48.9%** (131 / 268); ₪ NOT MEASURED | **29.4%** (5 / 17) ⚠ n small; ₪ NOT MEASURED |
 | 6 | Time to first response / to close | first response **NOT MEASURED**; close median **55.9h** | first response **NOT MEASURED**; close **NOT MEASURED** (0 resolved) |
-| 7 | Escalation rate | bot gave up **0.2%**; any human touch **25.0%**; reasons **NOT MEASURED** | **2.6%** / **20.0%**; reasons **NOT MEASURED** |
+| 7 | Escalation rate | bot gave up **0.2%**; any human touch **25.0%**; reasons: human_demand 3, sustained_anger 1, legal 1 | **2.6%** / **20.0%**; sustained_anger 3, human_demand 3 |
 | 8 | Answer accuracy | **NOT MEASURED** — no sampling process exists | **NOT MEASURED** |
 | 9 | Setup time | **0.5 days** to first answered message; staff-hours NOT MEASURED | **0.1 days**; staff-hours NOT MEASURED |
 | 10 | Client's own usage | **NOT MEASURED** — no login/visit log exists | **NOT MEASURED** |
 
-**Four of ten are fully measured. Three are partially measured. Three cannot be measured at all today.**
+**Five of ten are fully measured. Two are partially measured. Three cannot be measured at all today.**
 
 ---
 
@@ -156,7 +156,25 @@ Pasha has resolved no tickets since going live on 2026-06-08 — 23 open. That i
 
 Ticket sources — Argania: 220 legacy/unlabelled, 124 `widget_support_urgent`, 98 `widget_support`, 7 `whatsapp_cs`, 4 `auto_escalation`. Pasha: 9 `widget_support`, 8 urgent, 3 `auto_escalation`, 2 `whatsapp_cs`, 1 `widget_lead`.
 
-**"On what" — NOT MEASURED.** The escalation detector classifies a reason at runtime and then discards it; `support_requests` has no reason column. Yoav called this the honesty metric and the most precise map of where to invest development. It is currently the least instrumented of the ten.
+**"On what" — now MEASURED, and it needed no new collection.** The detector was
+already emitting both a human sentence (`reason`) and a categorical verdict
+(`triggers`) into `metadata.escalation`, where neither could be grouped. Promoting
+them recovered the whole history:
+
+| Trigger | Argania | Pasha |
+|---|---|---|
+| `human_demand` — the shopper explicitly asked for a person | 3 | 3 |
+| `sustained_anger` | 1 | 3 |
+| `legal` — threat of a lawsuit | 1 | 0 |
+
+Small numbers, but the shape is the point: **the most common reason the bot hands
+over is that the shopper asked it to**, not that it failed to answer. That is a
+different development priority than "the bot cannot answer X".
+
+The free-text `reason` is also now a column (`support_requests.escalation_reason`)
+for the support inbox, but it does not group — the WhatsApp path writes narrative
+sentences ("הלקוחה מדווחת שפריט ששולם בהזמנה 39266 לא הגיע"), so the metric reports
+triggers.
 
 ## 8. Answer accuracy
 
@@ -189,7 +207,7 @@ Ticket sources — Argania: 220 legacy/unlabelled, 124 `widget_support_urgent`, 
 ## The three things that would change the picture most
 
 1. **Get the Bestie snippet onto the QuickShop thank-you page.** It unlocks the `assisted` tier — the "talked, then bought" number that is the actual claim, and the only one currently invisible.
-2. **Persist the escalation reason** (one column, the classifier already runs). It converts metric 7 from a bare rate into the development map Yoav described.
+2. ~~**Persist the escalation reason.**~~ **Done** — the reason and the categorical trigger were already being written into `metadata.escalation` and are now groupable columns, with the history backfilled.
 3. **Instrument real response latency.** One timestamp at send time turns metric 6 from unmeasurable into the metric with the most dramatic and least-measured improvement.
 
 ## Sources

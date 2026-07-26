@@ -129,6 +129,7 @@ export async function runEscalationCheck(
     session_id: input.sessionId,
     status: 'new',
     source: 'auto_escalation',
+    escalation_reason: escalationReason(verdict),
     metadata: {
       escalation: {
         severity: verdict.severity,
@@ -145,6 +146,19 @@ export async function runEscalationCheck(
   });
 
   return { escalated: true, reason: verdict.reason, recipientsNotified: notified };
+}
+
+/**
+ * Metric 7's "on what". The detector has always computed a reason and buried it
+ * in metadata.escalation.reason, where it cannot be grouped or indexed — which is
+ * why the escalation breakdown read "not measured". This lifts it to a column.
+ * Every support_requests write on the escalation path must use it.
+ */
+export function escalationReason(e: { reason?: string | null } | null | undefined): string | null {
+  const r = e?.reason;
+  if (typeof r !== 'string') return null;
+  const trimmed = r.trim();
+  return trimmed === '' ? null : trimmed;
 }
 
 export interface CsHandoffInput {
@@ -320,6 +334,7 @@ export async function runCsHandoffCheck(
     const prevMeta = ((existing?.metadata as any) || {}) as Record<string, any>;
     const patch: Record<string, any> = {
       metadata: { ...prevMeta, escalated: true, last_handoff_at: new Date(deps.now()).toISOString(), escalation },
+      escalation_reason: escalationReason(detection),
       updated_at: new Date(deps.now()).toISOString(),
     };
     // Upgrade a placeholder/phone ticket name to the learned name so the inbox shows who it is.
@@ -337,6 +352,7 @@ export async function runCsHandoffCheck(
       session_id: input.chatSessionId,
       status: 'new',
       source: 'auto_escalation',
+      escalation_reason: escalationReason(detection),
       metadata: { escalation },
     });
   }

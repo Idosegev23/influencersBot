@@ -22,7 +22,7 @@ Every number is computed by the same code that feeds the dashboards. A metric wi
 | 6a | Time to close (median) | 55.9h |
 | 7 | Bot gave up | 0.2% |
 | 7a | Any human touch | 24.9% |
-| 7b | Escalation reasons | **NOT MEASURED** — escalation_reason not yet recorded on any ticket |
+| 7b | Escalation reasons | human_demand: 3, sustained_anger: 1, legal: 1 (n=5 — low confidence) |
 | 8 | Answer accuracy | **NOT MEASURED** — no sampling process — separate project |
 | 9 | Setup time | 0.5 day(s) (n=1 — low confidence) |
 | 9a | Setup staff-hours | **NOT MEASURED** — never recorded |

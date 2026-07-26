@@ -197,14 +197,8 @@ create or replace function value_proof_summary(
      where s.account_id = p_account_id and m.created_at between p_since and p_until
        and m.role <> 'user' and (m.metadata ? 'latency_ms')
   ),
-  reasons as (
-    select coalesce(json_agg(row_to_json(r)), '[]'::json) j from (
-      select escalation_reason reason, count(*)::int n
-        from support_requests
-       where account_id = p_account_id and created_at between p_since and p_until
-         and escalation_reason is not null
-       group by 1 order by 2 desc) r
-  ),
+  -- Metric 7's "on what" groups by TRIGGERS (categorical), not by the free-text
+  -- reason — see value_proof_escalation_reasons at the bottom of this file.
   visits as (
     select count(*)::int n
       from events
@@ -238,7 +232,7 @@ create or replace function value_proof_summary(
     'tickets_resolved',   (select resolved from tick),
     'close_seconds_p50',  (select close_p50 from tick),
     'handoffs',           (select count(*)::int from chat_handoffs where account_id = p_account_id),
-    'escalation_reasons', (select j from reasons),
+    'escalation_reasons', value_proof_escalation_reasons(p_account_id, p_since, p_until),
     'latency_samples',    (select n from lat),
     'latency_p50_ms',     (select p50 from lat),
     'carts',              (select row_to_json(cart) from cart),
@@ -272,3 +266,32 @@ create or replace function value_proof_aov(
   where account_id = p_account_id and subject_kind = 'order'
     and amount > 0 and occurred_at between t0.eff and p_until;
 $$;
+
+-- Metric 7's "on what". The detector emits both a human sentence (`reason`,
+-- surfaced in the support inbox and now also in support_requests.escalation_reason)
+-- and a categorical verdict (`triggers`: human_demand / sustained_anger / legal).
+-- Only the categorical one groups into a development map, so that is what the
+-- metric reports.
+create or replace function value_proof_escalation_reasons(
+  p_account_id uuid,
+  p_since      timestamptz,
+  p_until      timestamptz
+) returns json language sql stable as $$
+  select coalesce(json_agg(row_to_json(r)), '[]'::json) from (
+    select t.trigger as reason, count(*)::int n
+      from support_requests s
+      cross join lateral jsonb_array_elements_text(
+        case when jsonb_typeof((s.metadata->'escalation'->'triggers')::jsonb) = 'array'
+             then (s.metadata->'escalation'->'triggers')::jsonb
+             else '[]'::jsonb end
+      ) t(trigger)
+     where s.account_id = p_account_id and s.created_at between p_since and p_until
+     group by 1 order by 2 desc
+  ) r;
+$$;
+
+-- Backfill: the reason was always in metadata, just not groupable.
+update support_requests
+   set escalation_reason = nullif(btrim(metadata->'escalation'->>'reason'), '')
+ where escalation_reason is null
+   and metadata->'escalation'->>'reason' is not null;
