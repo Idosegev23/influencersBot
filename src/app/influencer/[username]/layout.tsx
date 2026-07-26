@@ -7,6 +7,7 @@ import { ThemeProvider } from '@/components/ThemeProvider';
 import { useDashboardLang } from '@/hooks/useDashboardLang';
 import { dashboardDir } from '@/lib/i18n/dashboard';
 import FirstRunTutorial from '@/components/FirstRunTutorial';
+import DashboardAssistant from '@/components/bestie/DashboardAssistant';
 
 export default function InfluencerLayout({
   children,
@@ -54,6 +55,9 @@ export default function InfluencerLayout({
 
         {/* Content */}
         <div className="relative z-10 sm:pb-0 pb-14">{children}</div>
+
+        {/* Bestie, for the brand. Same gate as the nav — never on the login screen. */}
+        {showNav && username && <DashboardAssistant username={username} />}
       </div>
     </ThemeProvider>
   );
