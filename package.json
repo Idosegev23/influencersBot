@@ -11,6 +11,7 @@
     "check:env": "npx tsx scripts/check-env.ts",
     "bestie:kb": "npx tsx scripts/bestie-kb.ts",
     "bestie:verify": "npx tsx scripts/bestie-kb-verify.ts",
+    "bestie:e2e": "npx tsx scripts/bestie-lead-e2e.ts",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
