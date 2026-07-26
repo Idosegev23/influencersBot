@@ -504,6 +504,46 @@ export async function sendAccountReady(p: {
   });
 }
 
+// =====================================================================
+// Bestie lead funnel — bestie_lead_intro_v1 / _nudge_24h_v1 / _nudge_72h_v1
+//    Category: MARKETING  |  Vars: body {{1}} = lead first name
+//    Buttons: quick replies (no params). The tap is an inbound message, and
+//    that inbound is what opens the 24h window — so these templates exist to
+//    earn a reply, not to say everything.
+//    Trigger: POST /api/leads/meta-ads (intro), the nudge cron (nudges)
+// =====================================================================
+export async function sendBestieLeadIntro(p: {
+  to: string;
+  bodyParams: string[];   // [firstName] — build via introTemplateParams()
+}): Promise<WhatsAppSendResult> {
+  return runTemplate({
+    templateName: 'bestie_lead_intro_v1',
+    flagName: 'BESTIE_LEAD_INTRO',
+    to: p.to,
+    bodyParams: p.bodyParams,
+  });
+}
+
+export type BestieNudgeKind = 'nudge_24h' | 'nudge_72h';
+
+export async function sendBestieLeadNudge(p: {
+  to: string;
+  kind: BestieNudgeKind;
+  bodyParams: string[];
+}): Promise<WhatsAppSendResult> {
+  const byKind = {
+    nudge_24h: { templateName: 'bestie_lead_nudge_24h_v1', flagName: 'BESTIE_LEAD_NUDGE_24H' },
+    nudge_72h: { templateName: 'bestie_lead_nudge_72h_v1', flagName: 'BESTIE_LEAD_NUDGE_72H' },
+  }[p.kind];
+
+  return runTemplate({
+    templateName: byKind.templateName,
+    flagName: byKind.flagName,
+    to: p.to,
+    bodyParams: p.bodyParams,
+  });
+}
+
 // ---------------------------------------------------------------------
 // Fire-and-forget helper. Use when you want to trigger a template from
 // an API handler without awaiting it (don't block the user's response).
