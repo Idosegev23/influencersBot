@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - **The boundary (spec §5.1):** Bestie answers about **Bestie** — the product's surface, not its engine, not other customers. Phase 1 enforced this at ingest; **this phase must enforce it in the system prompt.**
-- **Never invent a price.** `content/bestie-kb/pricing.md` deliberately contains no figure. Any price not in retrieved knowledge is not stated — the bot says a person will confirm. This is the highest-stakes rule in the phase: a number Bestie says is a commitment someone has to honour.
+- **Bestie never states a price — by policy, not because knowledge is missing** (spec §6.2). No figure, no range, no "starting from", no confirming a number the lead floated. Pricing happens with a salesperson. `content/bestie-kb/pricing.md` contains no numbers and never should; do not "complete" it. This is the highest-stakes rule in the phase: a number Bestie says is a commitment someone has to honour.
 - **No consent gate.** Every lead in the form is messaged. Ido's decision, recorded in spec §3.1. Do not add an opt-in check.
 - **Templates (already submitted, PENDING):** `bestie_lead_intro_v1`, `bestie_lead_nudge_24h_v1`, `bestie_lead_nudge_72h_v1`. Language `he`, category `MARKETING`, body param `{{1}}` = lead first name, quick-reply buttons. Template **parameters** must not contain `\n`, `\t`, or 5+ consecutive spaces — `runTemplate()` in `src/lib/whatsapp-notify.ts` already sanitises.
 - **Handoff recipients (exact):** `kfir@ldrsgroup.com`, `roei@ldrsgroup.com`, `itamar@ldrsgroup.com`, `cto@ldrsgroup.com`, `yoav@ldrsgroup.com`.
@@ -1266,6 +1266,5 @@ used only inside the agent and its tools.
   2026-07-26. Check before Task 4 Step 6.
 - **`META_LEADS_WEBHOOK_SECRET` must be set in Vercel** (`e5UkkR7CQKu4K9fQDmqn0MKCnO0JwG-g`).
   Until then leads land `verified=false`.
-- **Real prices** in `content/bestie-kb/pricing.md`, then `npm run bestie:kb`.
-  Without them Bestie routes every pricing question to a person — correct, but it
-  hands sales work that the bot could have done.
+Pricing is **not** on this list. Bestie routing every price question to a
+salesperson is the intended end state (spec §6.2), not a gap to close later.

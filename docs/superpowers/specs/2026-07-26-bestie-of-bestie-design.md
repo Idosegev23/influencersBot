@@ -59,6 +59,7 @@ Recorded so implementation does not re-litigate them.
 | Surface B capability | Explains and links. Does not act. |
 | Surface B location | The brand's dashboard (`/influencer/[username]/*`). |
 | Knowledge refresh trigger | Manual (`npm run bestie:kb`). |
+| Pricing | **Never stated by Bestie.** Sales only. See §6.2. |
 | Consent gate | **None.** See §3.1. |
 
 ### 3.1 Accepted risks
@@ -163,9 +164,15 @@ it is talking to.
 
 She says so, and offers a human. She does not guess.
 
-This matters most for price. A sales bot that invents a number creates a commitment a person then
-has to honour or walk back, and the customer heard it from the company. Any price not present in
-the knowledge base is not spoken — the answer is that a person will confirm it.
+### 6.2 Price is never spoken — by policy
+
+Bestie states **no** prices. Not a figure, not a range, not "starting from", and not a confirmation
+of a number the customer floated. Pricing happens with a salesperson (Ido, 2026-07-26).
+
+This is a deliberate policy rather than knowledge that is missing, and the difference matters for
+implementation: `content/bestie-kb/pricing.md` contains no numbers **and never should**. Nobody
+should later "complete" it. A price the bot says is a commitment someone has to honour or walk
+back, and the customer heard it from the company.
 
 ## 7. Surface A — Meta leads to WhatsApp
 
