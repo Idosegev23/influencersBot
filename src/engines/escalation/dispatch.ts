@@ -3,6 +3,7 @@ import { sendEmail } from '@/lib/email';
 import { detectEscalation, detectHandoff } from './detect';
 import { resolveRecipients } from './recipients';
 import { buildEscalationEmail } from './email-template';
+import { summarizeHandoff } from './summarize';
 import type { EscalationConfig } from './types';
 
 export interface EscalationInput {
@@ -88,6 +89,8 @@ export async function runEscalationCheck(
   const brandName = config.brandName || config.username || 'Account';
   const phone = extractPhone(input.userMessage);
   const lastMessages = prior.slice(-3);
+  // Executive summary (סיכום מנהלים) of the conversation for the human — best-effort.
+  const summary = await summarizeHandoff({ transcript: prior, reason: verdict.reason, brandName, customerName: phone });
 
   // 6) email
   const emailTargets = recipients.flatMap((r) => (r.email ? [r.email] : []));
@@ -100,6 +103,7 @@ export async function runEscalationCheck(
       severity: verdict.severity ?? 'high',
       customerPhone: phone,
       userMessage: input.userMessage,
+      summary,
       lastMessages,
       sessionId: input.sessionId,
     });
@@ -134,6 +138,7 @@ export async function runEscalationCheck(
       escalation: {
         severity: verdict.severity,
         reason: verdict.reason,
+        summary, // AI executive summary (סיכום מנהלים) for the support inbox
         triggers: verdict.triggers,
         customer_phone: phone,
         transcript: prior.slice(-8), // whole recent conversation for the human, not just the trigger line
@@ -281,6 +286,8 @@ export async function runCsHandoffCheck(
   // 3) notify configured recipients (email) + never-silent fallback
   const recipients = await resolveRecipients(supabase, input.accountId, escalationConfig);
   const brandName = config.brandName || config.username || 'Account';
+  // Executive summary (סיכום מנהלים) of the whole conversation for the human taking over — best-effort.
+  const summary = await summarizeHandoff({ transcript, reason: detection.reason, brandName, customerName: input.customerName, hasImage: !!input.imageUrl });
   const emailTargets = recipients.flatMap((r) => (r.email ? [r.email] : []));
   let notified = 0;
   const channels: any[] = [];
@@ -292,6 +299,7 @@ export async function runCsHandoffCheck(
       customerName: input.customerName || null,
       customerPhone: input.waId,
       userMessage: input.userMessage,
+      summary,
       lastMessages: transcript.slice(-6),
       imageUrl: input.imageUrl || null,
       sessionId: input.chatSessionId,
@@ -318,6 +326,7 @@ export async function runCsHandoffCheck(
   const escalation = {
     severity: detection.severity,
     reason: detection.reason,
+    summary, // AI executive summary (סיכום מנהלים) for the support inbox
     triggers: detection.triggers,
     customer_name: customerName,
     customer_phone: input.waId,

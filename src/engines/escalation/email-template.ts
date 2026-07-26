@@ -5,6 +5,7 @@ export interface EscalationEmailParts {
   customerName?: string | null;
   customerPhone?: string | null;
   userMessage: string;
+  summary?: string | null;  // AI executive summary (סיכום מנהלים) of the whole conversation
   lastMessages: { role: string; content: string }[];
   imageUrl?: string | null; // durable URL of a photo the shopper sent — embedded as evidence
   sessionId?: string | null;
@@ -36,6 +37,7 @@ export function buildEscalationEmail(p: EscalationEmailParts): { subject: string
       <div style="background:#fff;padding:24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;">
         <p style="font-size:16px;color:#111;"><b>סיבת האסקלציה:</b> ${esc(p.reason)}</p>
         <p style="font-size:15px;color:#111;"><b>לקוח/ה:</b> ${esc(name)} · <b>טלפון:</b> ${esc(phone)}</p>
+        ${p.summary ? `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 14px;margin:12px 0;"><b style="color:#1d4ed8;">סיכום מנהלים:</b><br/><span style="color:#111;line-height:1.6;">${esc(p.summary)}</span></div>` : ''}
         <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px;margin:12px 0;">
           <b>ההודעה שהפעילה את ההתראה:</b><br/>${esc(p.userMessage)}
         </div>
