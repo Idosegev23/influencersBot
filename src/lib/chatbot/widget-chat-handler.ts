@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/server';
 import { processSandwichMessageWithMetadata } from './sandwichBot';
 import { runEscalationCheck } from '@/engines/escalation/dispatch';
 import { buildPersonalityFromDB } from './personality-wrapper';
+import { turnTimings } from '@/lib/analytics/value-proof/timings';
 import { updateRollingSummary, shouldUpdateSummary } from './conversation-memory';
 import { getRecommendations, type ProductRecommendation } from '@/lib/recommendations/engine';
 import {
@@ -80,6 +81,10 @@ export interface WidgetChatResult {
 
 export async function processWidgetMessage(params: WidgetChatParams): Promise<WidgetChatResult> {
   const { accountId, message, onToken } = params;
+  // Metric 6b: stamped at receipt, because both message rows are written together
+  // AFTER the model replies — letting created_at default collapses the measurable
+  // latency to under a second. See src/lib/analytics/value-proof/timings.ts.
+  const turnReceivedAt = Date.now();
   const supabase = await createClient();
 
   // 1. Get or create session
@@ -396,11 +401,14 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
 
   // 6. Save messages + update session state (parallel)
   const msgCount = (session?.message_count || 0) + 2;
+  const timings = turnTimings(turnReceivedAt, Date.now());
   await Promise.all([
     supabase.from('chat_messages').insert({
       session_id: sessionId,
       role: 'user',
       content: message,
+      // Explicit: the default now() stamps this AFTER the model responded.
+      created_at: timings.userCreatedAt,
     }),
     supabase.from('chat_messages').insert({
       session_id: sessionId,
@@ -409,6 +417,7 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
       // Phase 2: persist the turn's parsed envelope so the next turn can
       // look it up for objection injection. Always nullable.
       intent: turnIntent || null,
+      metadata: { latency_ms: timings.latencyMs },
     }),
     supabase
       .from('chat_sessions')
