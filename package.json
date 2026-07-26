@@ -9,6 +9,7 @@
     "lint": "eslint",
     "type-check": "tsc --noEmit",
     "check:env": "npx tsx scripts/check-env.ts",
+    "bestie:kb": "npx tsx scripts/bestie-kb.ts",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
