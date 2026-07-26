@@ -2,8 +2,16 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
     {
+      "path": "/api/cron/bestie-lead-nudge",
+      "schedule": "0 * * * *"
+    },
+    {
       "path": "/api/cron/quickshop-cart-sync",
       "schedule": "17 * * * *"
+    },
+    {
+      "path": "/api/cron/value-proof-refresh",
+      "schedule": "40 2 * * *"
     },
     {
       "path": "/api/cron/poll-gmail",
