@@ -30,6 +30,7 @@ import { toWaId, sendReaction, sendTyping } from '@/lib/whatsapp-cloud/client';
 import { publishDrain } from '@/lib/crm/wa-queue';
 import { enqueueAgentMessage } from '@/lib/crm/wa-agent-queue';
 import { routeInboundToCustomerService } from '@/lib/cs/route-inbound-cs';
+import { maybeRouteBestieLead } from '@/lib/bestie/route-inbound-lead';
 
 export const runtime = 'nodejs';          // need crypto + Buffer
 export const dynamic = 'force-dynamic';   // never cache
@@ -285,6 +286,26 @@ async function processWebhook(payload: any): Promise<void> {
             console.error('[whatsapp webhook] support routing failed', err);
           }
         }
+
+        // 5th branch — a Meta lead replying to us. Must precede CS: both see an
+        // unknown sender, and a lead asking about Bestie is not a shopper asking
+        // about a brand. Best-effort like the others; the raw message is already
+        // persisted, so a failure here just leaves it for the CS branch.
+        let claimedAsLead = false;
+        try {
+          claimedAsLead = (await maybeRouteBestieLead({
+            isItamar: isItamarSender(waId),
+            handledAsAgent,
+            ticketId: ticketMatch,
+            waId,
+            contactId: contact.id,
+            msg,
+            textBody,
+          })).claimed;
+        } catch (err) {
+          console.error('[whatsapp webhook] Bestie lead routing failed', err);
+        }
+        if (claimedAsLead) continue;
 
         // 4th branch — unknown sender, no open ticket → customer-service bot.
         await maybeRouteCs({
