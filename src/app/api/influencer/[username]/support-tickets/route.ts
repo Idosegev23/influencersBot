@@ -70,6 +70,7 @@ export async function GET(
       `
       id, account_id, customer_name, customer_phone, message, brand,
       order_number, product_id, status, created_at, updated_at,
+      source, escalation_reason,
       ref_source, internal_notes, assigned_to, assigned_agent_id,
       last_customer_notified_at,
       tracking_number, resolution_summary, resolved_at,

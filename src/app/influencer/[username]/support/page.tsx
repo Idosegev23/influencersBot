@@ -73,6 +73,19 @@ interface Ticket {
   feedback_sent_at?: string | null;
   feedback_responded_at?: string | null;
   products?: { name: string; coupon_code: string | null; brand: string | null } | null;
+  // Escalation surface (from support_requests.source / escalation_reason / metadata.escalation).
+  source?: string | null;
+  escalation_reason?: string | null;
+  metadata?: {
+    escalation?: {
+      severity?: string | null;
+      reason?: string | null;
+      summary?: string | null;
+      transcript?: { role: string; content: string }[] | null;
+      image_url?: string | null;
+      triggers?: string[] | null;
+    } | null;
+  } | null;
 }
 
 interface RoutingAlternative {
@@ -748,6 +761,7 @@ function TicketList({
         const c = STATUS_COLOR[t.status];
         const Icon = STATUS_ICON[t.status];
         const isSelected = selectedId === t.id;
+        const isEscalation = t.source === 'auto_escalation' || !!t.escalation_reason;
         return (
           <button
             key={t.id}
@@ -762,6 +776,14 @@ function TicketList({
               <div className="flex items-center gap-2 min-w-0">
                 <User className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--dash-text-2, #9ca3af)' }} />
                 <span className="font-medium truncate">{t.customer_name}</span>
+                {isEscalation && (
+                  <span
+                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0"
+                    style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171' }}
+                  >
+                    🚨 הסלמה
+                  </span>
+                )}
               </div>
               <span
                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0"
@@ -772,7 +794,7 @@ function TicketList({
               </span>
             </div>
             <p className="text-sm line-clamp-2 mb-2" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>
-              {t.message}
+              {isEscalation ? (t.escalation_reason || t.message) : t.message}
             </p>
             <div className="flex items-center justify-between text-[11px]" style={{ color: 'var(--dash-text-3, #6b7280)' }}>
               <span>{formatRelative(t.created_at, lang)}</span>
@@ -1201,6 +1223,64 @@ function TicketDetail({
           <ChevronLeft className="w-5 h-5" />
         </button>
       </div>
+
+      {/* Escalation panel — the whole picture for the human: reason, executive summary, transcript, photo */}
+      {(ticket.escalation_reason || ticket.metadata?.escalation) && (() => {
+        const esc = ticket.metadata?.escalation || {};
+        const sev = String(esc.severity || '').toLowerCase();
+        const sevColor = sev === 'critical' ? '#ef4444' : sev === 'high' ? '#f59e0b' : '#a855f7';
+        const sevLabel = sev === 'critical' ? 'קריטי' : sev === 'high' ? 'דחוף' : (esc.severity || '');
+        const reason = ticket.escalation_reason || esc.reason;
+        const transcript = Array.isArray(esc.transcript) ? esc.transcript : [];
+        return (
+          <div className="rounded-xl p-4 space-y-3" style={{ background: 'rgba(239,68,68,0.07)', border: `1px solid ${sevColor}55` }}>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold" style={{ color: sevColor }}>🚨 הסלמה לנציג/ה</span>
+              {sevLabel && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded font-bold" style={{ background: `${sevColor}22`, color: sevColor }}>{sevLabel}</span>
+              )}
+            </div>
+            {reason && (
+              <div>
+                <div className="text-[11px] font-semibold mb-0.5" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>סיבה</div>
+                <div className="text-sm" style={{ color: 'var(--dash-text, #fff)' }}>{reason}</div>
+              </div>
+            )}
+            {esc.summary && (
+              <div>
+                <div className="text-[11px] font-semibold mb-0.5" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>סיכום מנהלים</div>
+                <div className="text-sm whitespace-pre-wrap leading-relaxed" style={{ color: 'var(--dash-text, #fff)' }}>{esc.summary}</div>
+              </div>
+            )}
+            {esc.image_url && (
+              <div>
+                <div className="text-[11px] font-semibold mb-1" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>תמונה שצירף/ה הלקוח/ה</div>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <a href={esc.image_url} target="_blank" rel="noreferrer">
+                  <img src={esc.image_url} alt="תמונה מהלקוח" className="rounded-lg max-w-full" style={{ maxHeight: 260, border: '1px solid rgba(255,255,255,0.1)' }} />
+                </a>
+              </div>
+            )}
+            {transcript.length > 0 && (
+              <div>
+                <div className="text-[11px] font-semibold mb-1" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>תמליל השיחה</div>
+                <div className="space-y-1.5">
+                  {transcript.map((m, i) => (
+                    <div
+                      key={i}
+                      className="text-sm rounded-lg px-3 py-1.5 whitespace-pre-wrap"
+                      style={{ background: m.role === 'user' ? 'rgba(34,197,94,0.10)' : 'rgba(6,182,212,0.08)', maxWidth: '92%', marginInlineStart: m.role === 'user' ? 0 : 'auto' }}
+                    >
+                      <span className="text-[10px] font-bold block mb-0.5" style={{ color: 'var(--dash-text-3, #6b7280)' }}>{m.role === 'user' ? 'לקוח/ה' : 'בסטי'}</span>
+                      {m.content}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Feedback badge — visible after delivered template was sent */}
       {ticket.feedback_status && (
