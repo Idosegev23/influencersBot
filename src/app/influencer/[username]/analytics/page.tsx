@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, use, useMemo } from 'react';
+import ValueProofBlock from './ValueProofBlock';
 import { useRouter } from 'next/navigation';
 import { useDashboardLang } from '@/hooks/useDashboardLang';
 import { getDashboardStrings } from '@/lib/i18n/dashboard';
@@ -894,6 +895,9 @@ export default function AnalyticsPage({
             </div>
           </section>
         )}
+
+        {/* Proof of value — the seven brand-facing metrics, plus a branded export. */}
+        <ValueProofBlock username={username} days={parseInt(dateRange) || 30} />
       </main>
     </div>
   );
