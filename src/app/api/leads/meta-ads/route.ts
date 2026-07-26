@@ -58,16 +58,26 @@ export async function POST(req: NextRequest) {
 
     const expected = process.env.META_LEADS_WEBHOOK_SECRET;
     const provided = req.headers.get('x-bestie-secret');
+    const verified = Boolean(expected && provided === expected);
 
-    // Once the secret is configured, a wrong one is a hard reject — that is the
-    // whole point of setting it. Before it is configured we accept but flag.
-    if (expected && provided !== expected) {
-      return NextResponse.json(
-        { ok: false, error: 'bad or missing X-Bestie-Secret header' },
-        { status: 401 }
+    // Deliberately NOT a 401.
+    //
+    // Rejecting an unverified post would mean that the day the Make scenario is
+    // edited and loses this header, every real lead is refused and gone — and it
+    // looks identical to a quiet week. This codebase has already paid that
+    // price once: the landing form 500'd on every submission and captured zero
+    // leads for its entire life before anyone noticed.
+    //
+    // So an unverified payload is always STORED and never ACTED ON: no WhatsApp,
+    // no lead record, no email. Nothing can be lost, and nothing can be
+    // triggered by someone who found the URL.
+    if (!verified) {
+      console.warn(
+        '[meta-ads] UNVERIFIED payload stored, no action taken.',
+        expected ? 'X-Bestie-Secret missing or wrong — check the Make HTTP module.'
+                 : 'META_LEADS_WEBHOOK_SECRET is not configured on this deployment.'
       );
     }
-    const verified = Boolean(expected && provided === expected);
 
     const headers: Record<string, string> = {};
     for (const name of SAFE_HEADERS) {
