@@ -24,6 +24,7 @@ export type AccountArchetype =
   | 'media_news'
   | 'local_business'
   | 'tech_creator'
+  | 'saas_product'
   | 'default';
 
 export interface ArchetypeConfig {
@@ -242,6 +243,40 @@ export const ARCHETYPE_CONFIGS: Record<AccountArchetype, ArchetypeConfig> = {
       document: 3,
     },
     docCap: 4,
+  },
+
+  /**
+   * SaaS product that has no scraped assets of its own (Bestie).
+   * Every chunk is hand-authored knowledge_base — product surface and commercial
+   * facts. There is no website scrape, no catalog, no Instagram. So knowledge_base
+   * carries the whole answer and gets both the top weight and a wide cap: a
+   * "where do I click" reply needs the screen's entry plus its neighbours, and a
+   * cap of 4 (the influencer default) truncates exactly the part that matters.
+   */
+  saas_product: {
+    typeWeights: {
+      knowledge_base: +0.30,
+      document: +0.05,
+      website: 0,
+      post: -0.10,
+      transcription: -0.10,
+      product: -0.10,
+      coupon: -0.20, // Bestie has none; a stray one must never surface
+      partnership: -0.10,
+      highlight: -0.10,
+    },
+    typeCaps: {
+      knowledge_base: 12,
+      document: 3,
+      website: 2,
+      post: 0,
+      transcription: 0,
+      product: 0,
+      coupon: 0,
+      partnership: 0,
+      highlight: 0,
+    },
+    docCap: 6,
   },
 
   /**
