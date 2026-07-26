@@ -14,7 +14,7 @@
 | 2 | Conversation conversion rate | **9.5%** (161 / 1,703) | **22.4%** (17 / 76) ⚠ n small |
 | 3 | AOV with vs without chat | **−4.8%** (₪165.0 vs ₪173.3) | **−21.2%** (₪159.6 vs ₪202.5) ⚠ n=17 |
 | 4 | Abandoned carts recovered | 21.1% recovered; **Bestie touched 20 of them** | 33.1% recovered; **Bestie touched 0** |
-| 5 | Deflection | **82.0%** (1,487 / 1,813); ₪ NOT MEASURED | **87.0%** (100 / 115); ₪ NOT MEASURED |
+| 5 | Deflection (of support-intent conversations) | **48.9%** (131 / 268); ₪ NOT MEASURED | **29.4%** (5 / 17) ⚠ n small; ₪ NOT MEASURED |
 | 6 | Time to first response / to close | first response **NOT MEASURED**; close median **55.9h** | first response **NOT MEASURED**; close **NOT MEASURED** (0 resolved) |
 | 7 | Escalation rate | bot gave up **0.2%**; any human touch **25.0%**; reasons **NOT MEASURED** | **2.6%** / **20.0%**; reasons **NOT MEASURED** |
 | 8 | Answer accuracy | **NOT MEASURED** — no sampling process exists | **NOT MEASURED** |
@@ -90,15 +90,33 @@ This is the metric Yoav called the easiest to explain and the easiest to prove. 
 
 ## 5. Deflection — closed without a human
 
+**The denominator is support-intent conversations, not all conversations.** Most Argania
+conversations are product advice — "which shampoo for curly hair" — and would never have become a
+support ticket. Counting them as deflected tickets, and then multiplying by a cost per ticket,
+manufactures a saving that never existed.
+
+Support intent is identified from `chat_messages.intent.topic`, which the bot already records on
+every classified turn: orders, delivery, returns, refunds, faults, cancellations, tracking,
+payment. 268 of Argania's 1,291 topic-tagged sessions (20.8%) are support-shaped.
+
 | | Argania | Pasha |
 |---|---|---|
-| Conversations | 1,813 | 115 |
-| Produced a support ticket | 326 | 15 |
-| **Closed with no human** | **1,487 = 82.0%** | **100 = 87.0%** |
+| Support-intent conversations | 268 | 17 |
+| Escalated to a human | 137 | 12 |
+| **Closed with no human** | **131 = 48.9%** | **5 = 29.4%** ⚠ n=17 |
 
-**In ₪: NOT MEASURED.** Cost per ticket has no source in any API and must come from the brands. Once supplied, Argania's 1,487 deflections multiply directly against it.
+**In ₪: NOT MEASURED.** Cost per ticket has no source in any API and must come from the brands.
+When supplied, it multiplies **131** for Argania — not 1,487.
 
-**Upper bound, not exact:** `chat_handoffs` has 0 rows because the handoff/takeover feature was never built. Any conversation a human quietly picked up outside the ticket flow is currently counted as deflected.
+**Two limits on this number:**
+- It covers only sessions carrying a classified topic (1,291 of Argania's 1,813). Extrapolated to
+  all conversations, roughly 380 are support-intent, of which roughly 185 were deflected.
+- `chat_handoffs` has 0 rows because the handoff/takeover feature was never built, so a
+  conversation a human quietly picked up outside the ticket flow still counts as deflected.
+
+**Corrected 2026-07-26.** An earlier version of this report put deflection at 82.0% / 87.0% by
+counting every conversation without a ticket. That inflated the shekel multiplier eleven-fold.
+48.9% is the number that survives a customer's finance team; 82% is not.
 
 ## 6. Time to first response and time to close
 

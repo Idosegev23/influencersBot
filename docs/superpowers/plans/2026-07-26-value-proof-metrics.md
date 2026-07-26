@@ -19,6 +19,7 @@
 - Phone normalization MUST delegate to the existing `toWaId` from `@/lib/whatsapp-cloud/client`. Do not write new phone-parsing rules.
 - **Attribution excludes non-sales rows:** any order with `total = 0` or `raw->>'utm_source' = 'pos'` is never attributed and never counts in a denominator. Measured consequence of omitting this: the `influenced` tier reported 132 orders on Argania of which 120 were ₪0 and 122 were POS.
 - **Three tiers are never summed into one number without the per-tier breakdown displayed alongside.**
+- **Deflection's denominator is support-intent conversations only**, matched on `chat_messages.intent.topic`. Counting every ticket-free conversation put Argania at 82.0% instead of the real 48.9%, and inflated the shekel multiplier from 131 to 1,487.
 - **Every comparison is period-matched.** A comparison whose windows cannot be matched returns `measured: false`, never a number.
 - `n < 30` sets `lowConfidence: true`; the UI prints `n` next to every percentage.
 - Commit after every task. Commit straight to `main` and push — no branch, no PR. Stage only the files the task touched.
@@ -1444,7 +1445,9 @@ describe('buildValueProof', () => {
       influenced: { n: 12, revenue: 2320 }, none: { n: 8984, revenue: 1533472 },
     },
     conversations: 1703,
-    deflected: 1487,
+    deflected: 131,
+    support_intent: 268,
+    topic_tagged: 1291,
     tickets: 446,
     auto_escalations: 4,
     handoffs: 0,
@@ -1467,10 +1470,19 @@ describe('buildValueProof', () => {
     expect(out.revenue.total.basis).toContain('direct');
   });
 
+  it('an account with no classified topics cannot report deflection at all', () => {
+    const untagged = { ...raw, support_intent: 0, topic_tagged: 0 };
+    const out = buildValueProof(untagged, { audience: 'admin', costPerTicket: 12 });
+    expect(out.deflection.rate.measured).toBe(false);
+    expect(out.deflection.rate.basis).toContain('no classified topics');
+    expect(out.deflection.value_ils.measured).toBe(false);
+  });
+
   it('deflection in shekels is not measured until cost per ticket is supplied', () => {
     expect(buildValueProof(raw, { audience: 'admin', costPerTicket: null }).deflection.value_ils.measured).toBe(false);
     const withCost = buildValueProof(raw, { audience: 'admin', costPerTicket: 12 });
-    expect(withCost.deflection.value_ils.value).toBe(1487 * 12);
+    expect(withCost.deflection.value_ils.value).toBe(131 * 12);
+    expect(withCost.deflection.rate.value).toBeCloseTo(131 / 268, 4);
   });
 
   it('first-response latency is not measured when there are no latency samples', () => {
@@ -1618,12 +1630,21 @@ export function buildValueProof(
       platformBaseline: notMeasured('QuickShop /abandoned-carts returns recovered_at=null on every row') as Metric<number>,
     },
 
+    // Denominator is SUPPORT-INTENT conversations, never all traffic — see the
+    // global constraints. An account whose sessions carry no classified topics
+    // cannot be measured here at all, and says so.
     deflection: {
-      rate: raw.conversations > 0
-        ? metric(raw.deflected / raw.conversations, raw.conversations, `upper bound — chat_handoffs has ${raw.handoffs} rows`)
-        : notMeasured('no conversations in window') as Metric<number>,
-      value_ils: opts.costPerTicket && opts.costPerTicket > 0
-        ? metric(raw.deflected * opts.costPerTicket, raw.deflected, `deflected x cost per ticket (₪${opts.costPerTicket}, brand-supplied)`)
+      rate: raw.support_intent > 0
+        ? metric(raw.deflected / raw.support_intent, raw.support_intent,
+            `support-intent conversations closed with no ticket — upper bound, chat_handoffs has ${raw.handoffs} rows`)
+        : notMeasured(
+            raw.topic_tagged > 0
+              ? 'no support-intent conversations in window'
+              : 'no classified topics on any session — support intent cannot be identified',
+          ) as Metric<number>,
+      value_ils: opts.costPerTicket && opts.costPerTicket > 0 && raw.support_intent > 0
+        ? metric(raw.deflected * opts.costPerTicket, raw.deflected,
+            `deflected support-intent conversations x cost per ticket (₪${opts.costPerTicket}, brand-supplied)`)
         : notMeasured('cost per ticket not supplied by the brand') as Metric<number>,
     },
 
@@ -1707,11 +1728,29 @@ create or replace function value_proof_summary(
       from support_requests
      where account_id = p_account_id and created_at between p_since and p_until
   ),
-  deflect as (
-    select count(*)::int n from chat_sessions s
+  -- Deflection counts SUPPORT-INTENT conversations only. Product-advice chats
+  -- ("which shampoo for curly hair") would never have reached a human, so
+  -- counting them as deflected tickets and multiplying by a cost per ticket
+  -- invents a saving. Measured 2026-07-26: the naive denominator gave 82.0%
+  -- for Argania; the real figure is 48.9%.
+  support_intent as (
+    select distinct s.id sid
+      from chat_messages m join chat_sessions s on s.id = m.session_id
      where s.account_id = p_account_id and s.created_at between p_since and p_until
-       and exists (select 1 from chat_messages m where m.session_id = s.id and m.role = 'user')
-       and not exists (select 1 from support_requests r where r.session_id = s.id)
+       and m.intent->>'topic' ~ 'הזמנ|משלוח|שירות לקוחות|החזר|זיכוי|תקלה|פגום|ביטול|מעקב|חבילה|שליח|תשלום|אשראי'
+  ),
+  deflect as (
+    select count(*)::int total,
+           count(*) filter (
+             where not exists (select 1 from support_requests r where r.session_id = si.sid)
+           )::int n
+      from support_intent si
+  ),
+  tagged as (
+    select count(distinct s.id)::int n
+      from chat_messages m join chat_sessions s on s.id = m.session_id
+     where s.account_id = p_account_id and s.created_at between p_since and p_until
+       and m.intent->>'topic' is not null
   ),
   attr as (
     select tier, count(*)::int n, coalesce(sum(amount), 0) revenue
@@ -1780,6 +1819,8 @@ create or replace function value_proof_summary(
     ),
     'conversations',      (select n from conv),
     'deflected',          (select n from deflect),
+    'support_intent',     (select total from deflect),
+    'topic_tagged',       (select n from tagged),
     'tickets',            (select total from tick),
     'auto_escalations',   (select gave_up from tick),
     'tickets_resolved',   (select resolved from tick),
@@ -1804,7 +1845,7 @@ Apply with `apply_migration`, name `value_proof_summary_rpc`, then:
 select value_proof_summary('c68ef2bd-f294-4c8c-83dc-abd5f9cbf6d1', '2026-06-12', now());
 ```
 
-Expected: `conversations` ≈ 1,703; `deflected` ≈ 1,400+; `attributed.direct.n` ≈ 149; `carts.recovered_7d` > 1,000; `latency_samples` = 0; `escalation_reasons` = `[]`. If `attributed` has a null entry for a tier with no rows, that is correct — `buildValueProof` turns it into `measured: false`.
+Expected: `conversations` ≈ 1,703; `support_intent` ≈ 268 and `deflected` ≈ 131 (NOT ~1,487 — that would mean the support-intent predicate did not apply); `attributed.direct.n` ≈ 149; `carts.recovered_7d` > 1,000; `latency_samples` = 0; `escalation_reasons` = `[]`. If `attributed` has a null entry for a tier with no rows, that is correct — `buildValueProof` turns it into `measured: false`.
 
 Note the `json_object_agg` left-join: a tier with zero rows yields `{"n":null,"revenue":null}`, and `buildValueProof` treats `n === 0` or a missing tier as not-measured. Confirm `tierRevenue` handles the null case — if the RPC returns `n: null`, coerce with `(t.n || 0) === 0`.
 
@@ -1950,7 +1991,7 @@ npx tsx scripts/value-proof-report.ts 36705ad6-4f82-46af-95e1-fb5ea6f4a44f --sin
 
 - [ ] **Step 3: Acceptance — reconcile every number against independent SQL**
 
-For each generated report, write a standalone SQL query per row (not reusing the RPC) and compare. The reference values from the hand-measured baseline in `docs/reports/2026-07-26-value-proof-argania-pasha.md` are: Argania — attributed ₪26,899 / 161 orders, conversion 9.5%, AOV −4.8%, cart recovery 21.1%, deflection 82.0%, close median 55.9h, gave-up 0.2%, any-human 25.0%, setup 1 day. Pasha — ₪2,713 / 17 orders, conversion 22.4%, AOV −21.2%, cart recovery 33.1%, deflection 87.0%, setup 0 days.
+For each generated report, write a standalone SQL query per row (not reusing the RPC) and compare. The reference values from the hand-measured baseline in `docs/reports/2026-07-26-value-proof-argania-pasha.md` are: Argania — attributed ₪26,899 / 161 orders, conversion 9.5%, AOV −4.8%, cart recovery 21.1%, deflection 48.9% of 268 support-intent, close median 55.9h, gave-up 0.2%, any-human 25.0%, setup 1 day. Pasha — ₪2,713 / 17 orders, conversion 22.4%, AOV −21.2%, cart recovery 33.1%, deflection 29.4% of 17 support-intent, setup 0 days.
 
 **A report that does not reconcile fails this task.** Fix the code, not the report.
 
@@ -2613,7 +2654,7 @@ import { buildValueProof } from '@/lib/analytics/value-proof/metrics';
 const raw = {
   window: { since: '2026-06-12T00:00:00Z', until: '2026-07-26T00:00:00Z' },
   attributed: { direct: { n: 149, revenue: 24579 }, assisted: { n: 0, revenue: 0 }, influenced: { n: 12, revenue: 2320 }, none: { n: 8984, revenue: 1533472 } },
-  conversations: 1703, deflected: 1487, tickets: 446, auto_escalations: 4, handoffs: 0,
+  conversations: 1703, deflected: 131, support_intent: 268, topic_tagged: 1291, tickets: 446, auto_escalations: 4, handoffs: 0,
   escalation_reasons: [], tickets_resolved: 386, close_seconds_p50: 201240, latency_samples: 0,
   carts: { with_email: 7959, recovered_7d: 1676, recovered_7d_value: 507356, bestie_touched: 20 },
   aov: { bestie: 165.0, other: 173.3, bestie_n: 149, other_n: 8996 },
@@ -2875,7 +2916,7 @@ Expected: PASS, 3 tests.
 
 - [ ] **Step 6: Verify end to end**
 
-Set the value to 12 in Argania's settings, reload `/influencer/argania_group/analytics`, and confirm the deflection-in-shekels metric changes from **לא נמדד** to roughly ₪17,844 (1,487 × 12). Clear the field and confirm it returns to לא נמדד — not to ₪0.
+Set the value to 12 in Argania's settings, reload `/influencer/argania_group/analytics`, and confirm the deflection-in-shekels metric changes from **לא נמדד** to roughly ₪1,572 (131 × 12). Clear the field and confirm it returns to לא נמדד — not to ₪0.
 
 - [ ] **Step 7: Full suite and commit**
 

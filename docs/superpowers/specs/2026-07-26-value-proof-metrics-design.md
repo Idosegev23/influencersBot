@@ -107,9 +107,9 @@ code**, because the flattering number is the one you get by default.
 | 2 | Conversation conversion rate | Metric 1 order count ÷ conversations with ≥1 user message | `chat_sessions` + `widget_sessions` | — |
 | 3 | AOV with vs without | Attributed AOV vs AOV of all other orders, **period- and source-matched** | `brand_orders` | — |
 | 4 | Abandoned carts recovered | Cart is recovered when its email places a later paid non-POS order (24h / 7d / 30d reported); split by whether a bestie touch occurred near the abandonment | QuickShop `/abandoned-carts` + `brand_orders` | sync to local table; platform baseline unavailable (§1.2) |
-| 5 | Deflection | Conversations with ≥1 user message that produced no `support_request` and no handoff — in % and ₪ | `chat_sessions` ⟂ `support_requests` | ₪ per ticket (brand-supplied) |
+| 5 | Deflection | **Support-intent** conversations that produced no `support_request` and no handoff, ÷ all support-intent conversations — in % and ₪ | `chat_messages.intent.topic` ⟂ `support_requests` | ₪ per ticket (brand-supplied) |
 | 6 | Time to close | `created_at`→`resolved_at` on tickets | existing | pre-Bestie baseline |
-| 6b | Time to first response | Model send time minus user send time | **needs new instrumentation** | `chat_messages.created_at` is a *write* time (§3.2) |
+| 6b | Time to first response | Model send time minus user send time | **needs new instrumentation** | `chat_messages.created_at` is a *write* time (§3.3) |
 | 7 | Escalation rate **and on what** | Escalations ÷ conversations, broken down by reason | `support_requests.source` | **reason taxonomy** |
 | 8 | Answer accuracy | 100 conversations/month sampled; wrong / misleading / partial / correct | `chat_messages` | rating tool — **out of scope** |
 | 9 | Setup time | `accounts.created_at` → first answered message, in days | existing | staff-hours (manual) |
@@ -143,7 +143,28 @@ naive `influenced` match on Argania returned 132 orders, of which 120 were ₪0 
 in-store and replacement records, not sales. Including them inflates the order count 11× while
 adding ₪0 of revenue. The same exclusion applies to the order side of cart-recovery matching.
 
-### 3.2 First-response latency is not currently measurable
+### 3.2 Deflection's denominator is support intent, not all traffic
+
+Discovered while defining cost per ticket. Counting every ticket-free conversation as a deflected
+ticket put Argania at **82.0%** and Pasha at **87.0%**. But most Argania conversations are product
+advice ("which shampoo for curly hair") that would never have reached a human. Multiplying those by
+a cost per ticket invents a saving.
+
+The denominator is therefore **support-intent conversations only**, identified from
+`chat_messages.intent.topic` — a field the bot already writes on every classified turn (2,539 of
+Argania's 7,410 assistant messages carry it). Support-shaped topics are orders, delivery, returns,
+refunds, faults, cancellations, tracking and payment. Measured: 268 of Argania's 1,291 topic-tagged
+sessions (20.8%) are support-intent, of which 137 escalated and **131 were deflected — 48.9%**.
+Pasha: 17 support-intent, 12 escalated, 5 deflected.
+
+The shekel multiplier is **131, not 1,487** — an eleven-fold difference, and the difference between
+a number a customer's finance team accepts and one they dismantle in a minute.
+
+Implementation note: the topic is free-text LLM output, not a controlled vocabulary, so the
+classifier is a keyword predicate over it. The predicate is a constant in one place, versioned with
+the code, and `measured: false` applies to any account whose sessions carry no topics at all.
+
+### 3.3 First-response latency is not currently measurable
 
 `chat_messages.created_at` records when a row was **written**, not when the message was sent. Of
 1,354 Argania sessions with a user→assistant pair, **1,022 (75%) show the assistant row written
