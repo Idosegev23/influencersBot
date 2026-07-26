@@ -39,7 +39,8 @@ So the asset has to be authored rather than harvested. Once it exists, it serves
 - Auto-generated demos. The `quote` scan mode exists and would fit here, but is deferred.
 - Per-customer WhatsApp numbers. One number: Bestie's own.
 - Surface B taking actions. v1 points; it does not change settings. See §8.
-- The internal `/admin/*` screens. Surface B covers the 23 customer screens only.
+- The internal `/admin/*` screens. Surface B covers the 25 customer screens under
+  `src/app/influencer/` only.
 
 **Note on scope size.** This spec covers three subsystems that could each stand alone. That was
 raised during design and Ido chose a single spec deliberately. It is therefore written in phases
@@ -129,7 +130,7 @@ Both are markdown under `content/bestie-kb/`, ingested into `document_chunks` wi
 ### 5.3 Seeding and refresh
 
 The product-surface knowledge has a natural spine already in the repo: `src/lib/i18n/dashboard/`
-is 16 files and ~2,468 lines covering the dashboard **screen by screen**, near 1:1 with the route
+is 20 files and 2,468 lines covering the dashboard **screen by screen**, near 1:1 with the route
 tree, in Hebrew and English, including button labels. It is maintained by whoever ships a feature,
 because a feature without labels does not ship.
 
