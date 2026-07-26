@@ -118,6 +118,10 @@ export async function refreshAccountAttribution(
       subject_kind: 'order',
       subject_id: o.id,
       tier: a.tier,
+      // Stored so the AOV baseline can exclude the same rows attribution does.
+      // Without it the baseline includes ₪0 records and in-store POS sales
+      // (Argania POS AOV ₪29), which drags the comparison and flatters Bestie.
+      attributable: isAttributableOrder({ amount: o.amount, utmSource: o.utmSource }),
       match_key: a.matchKey,
       touch_at: a.touchAt === null ? null : new Date(a.touchAt).toISOString(),
       lag_sec: a.lagSec,
@@ -141,6 +145,7 @@ export async function refreshAccountAttribution(
       subject_kind: 'cart',
       subject_id: c.id,
       tier: a.tier,
+      attributable: true,
       match_key: a.matchKey,
       touch_at: a.touchAt === null ? null : new Date(a.touchAt).toISOString(),
       lag_sec: a.lagSec,

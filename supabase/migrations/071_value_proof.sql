@@ -172,15 +172,10 @@ create or replace function value_proof_summary(
        and occurred_at between p_since and p_until
      group by tier
   ),
-  aovs as (
-    select coalesce(avg(amount) filter (where tier <> 'none'), 0) bestie,
-           coalesce(avg(amount) filter (where tier = 'none'), 0)  other,
-           count(*) filter (where tier <> 'none')::int bestie_n,
-           count(*) filter (where tier = 'none')::int  other_n
-      from bestie_attribution
-     where account_id = p_account_id and subject_kind = 'order'
-       and occurred_at between p_since and p_until and amount > 0
-  ),
+  -- AOV comes from its own function because both sides must share an EFFECTIVE
+  -- window: max(requested since, first attributed order). Asking for "all time"
+  -- otherwise pits the bestie side (which starts 2026-06-12) against a baseline
+  -- reaching back to January, turning a real -4.8% into -0.3%.
   cart as (
     select count(*) filter (where c.email_norm is not null)::int with_email,
            count(*) filter (where a.recovered_at is not null
@@ -247,8 +242,33 @@ create or replace function value_proof_summary(
     'latency_samples',    (select n from lat),
     'latency_p50_ms',     (select p50 from lat),
     'carts',              (select row_to_json(cart) from cart),
-    'aov',                (select row_to_json(aovs) from aovs),
+    'aov',                value_proof_aov(p_account_id, p_since, p_until),
     'setup_days',         (select days from setup),
     'dashboard_visits',   (select n from visits)
   );
+$$;
+
+-- AOV with a shared effective window (see the note in value_proof_summary).
+create or replace function value_proof_aov(
+  p_account_id uuid,
+  p_since      timestamptz,
+  p_until      timestamptz
+) returns json language sql stable as $$
+  with t0 as (
+    select greatest(p_since, coalesce(min(occurred_at), p_since)) eff
+      from bestie_attribution
+     where account_id = p_account_id and subject_kind = 'order'
+       and tier <> 'none' and amount > 0
+       and occurred_at between p_since and p_until
+  )
+  select json_build_object(
+    'bestie',   coalesce(avg(amount) filter (where tier <> 'none'), 0),
+    'other',    coalesce(avg(amount) filter (where tier = 'none'), 0),
+    'bestie_n', count(*) filter (where tier <> 'none')::int,
+    'other_n',  count(*) filter (where tier = 'none')::int,
+    'from',     (select eff from t0)
+  )
+  from bestie_attribution, t0
+  where account_id = p_account_id and subject_kind = 'order'
+    and amount > 0 and occurred_at between t0.eff and p_until;
 $$;

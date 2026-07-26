@@ -10,15 +10,15 @@
 
 | # | Metric | Argania | Studio Pasha |
 |---|---|---|---|
-| 1 | Revenue in conversations | **₪26,899** / 161 orders | **₪2,713** / 17 orders |
-| 2 | Conversation conversion rate | **9.5%** (161 / 1,703) | **22.4%** (17 / 76) ⚠ n small |
-| 3 | AOV with vs without chat | **−4.8%** (₪165.0 vs ₪173.3) | **−21.2%** (₪159.6 vs ₪202.5) ⚠ n=17 |
-| 4 | Abandoned carts recovered | 21.1% recovered; **Bestie touched 20 of them** | 33.1% recovered; **Bestie touched 0** |
+| 1 | Revenue in conversations | **₪26,663** / 160 orders | **₪2,713** / 17 orders |
+| 2 | Conversation conversion rate | **8.8%** | **22.4%** ⚠ n small |
+| 3 | AOV with vs without chat | **−10.3%** (₪167 vs ₪186) | **−24.2%** (₪160 vs ₪211) ⚠ n=17 |
+| 4 | Abandoned carts recovered | 21.1% recovered; **Bestie touched 2 of them** | 33.1% recovered; **Bestie touched 0** |
 | 5 | Deflection (of support-intent conversations) | **48.9%** (131 / 268); ₪ NOT MEASURED | **29.4%** (5 / 17) ⚠ n small; ₪ NOT MEASURED |
 | 6 | Time to first response / to close | first response **NOT MEASURED**; close median **55.9h** | first response **NOT MEASURED**; close **NOT MEASURED** (0 resolved) |
 | 7 | Escalation rate | bot gave up **0.2%**; any human touch **25.0%**; reasons **NOT MEASURED** | **2.6%** / **20.0%**; reasons **NOT MEASURED** |
 | 8 | Answer accuracy | **NOT MEASURED** — no sampling process exists | **NOT MEASURED** |
-| 9 | Setup time | **1 day** to first answered message; staff-hours NOT MEASURED | **0 days**; staff-hours NOT MEASURED |
+| 9 | Setup time | **0.5 days** to first answered message; staff-hours NOT MEASURED | **0.1 days**; staff-hours NOT MEASURED |
 | 10 | Client's own usage | **NOT MEASURED** — no login/visit log exists | **NOT MEASURED** |
 
 **Four of ten are fully measured. Three are partially measured. Three cannot be measured at all today.**
@@ -45,7 +45,7 @@ Attribution is reported in three separate tiers. They are never summed into a si
 | Tier | What it proves | Argania | Pasha |
 |---|---|---|---|
 | `direct` — order carries `utm_source=bestie` | The bot produced the click that led to the order | **149 orders · ₪24,579 · AOV ₪165.0** (since 2026-06-12) | **17 orders · ₪2,713 · AOV ₪159.6** (since 2026-07-23) |
-| `influenced` — customer's phone/email touched a conversation ≤7d before ordering | Bestie was in the loop, not necessarily the cause | **12 orders · ₪2,320 · AOV ₪193.3** | 0 |
+| `influenced` — customer's phone/email touched a conversation ≤7d before ordering | Bestie was in the loop, not necessarily the cause | **10 orders · ₪1,927 · AOV ₪192.7** | 0 |
 | `assisted` — same `anon_id` conversed then ordered ≤24h | Talked, then bought without clicking a bot link | **NOT MEASURED** | **NOT MEASURED** |
 
 **Why `assisted` is empty:** it needs the visitor's anonymous id to appear on the order, which requires the Bestie snippet to fire on the store's thank-you page. Every widget page-view we have recorded on Argania is `/`, `/products`, `/product/…`, `/pages/…`, `/shops/argania` — **no checkout or thank-you path at all**. The most valuable version of this metric is the one we currently cannot see.
@@ -65,10 +65,17 @@ Compared inside the same window in which Bestie was live, so the effect measured
 
 | | Bestie orders | All other orders | Delta |
 |---|---|---|---|
-| Argania (from 2026-06-12) | ₪165.0 (n=149) | ₪173.3 (n=8,996) | **−4.8%** |
-| Pasha (from 2026-07-23) | ₪159.6 (n=17) | ₪202.5 (n=26) | **−21.2%** |
+| Argania (from 2026-06-12) | ₪167 (n=160) | ₪186 (n=8,376) | **−10.3%** |
+| Pasha (from 2026-07-23) | ₪160 (n=17) | ₪211 (n=25) | **−24.2%** |
 
-**The upsell claim does not hold on this data — it currently trends the other way.** Argania's −4.8% is small enough to be noise; Pasha's −21.2% rests on 17 orders and cannot carry weight either. But neither points up.
+Both sides exclude ₪0 records and in-store POS sales. That matters: Argania's POS
+orders average ₪29, and leaving them in the baseline drags it from ₪186 down to
+₪173 and flatters Bestie to −4.8%. Comparing online chat-attributed orders against
+a baseline containing counter sales is not a like-for-like comparison.
+
+**The upsell claim does not hold on this data — it trends clearly the other way.**
+Pasha's −24.2% rests on 17 orders and cannot carry weight, but Argania's −10.3%
+over 160 orders is beyond noise.
 
 Worth knowing: an earlier read of this compared bestie AOV against **all-time** site AOV and produced **+2.5%** for Argania. That comparison was invalid — the Bestie window starts 2026-06-12. The flattering number is the one you get by default here, which is why the build enforces period-matched comparison in code.
 
@@ -84,7 +91,13 @@ Recovery was therefore derived independently: a cart counts as recovered if the 
 | **≤7d** | **21.1% (1,676, ₪507,356)** | **33.1% (2,123, ₪856,675)** |
 | ≤30d | 29.1% (2,313, ₪695,058) | 38.1% (2,443, ₪1,011,599) |
 
-**Bestie's share of that: 20 recovered carts on Argania, 0 on Pasha.** Roughly 1% of Argania's recovered carts had a Bestie touch near the abandonment. QuickShop's own reminder emails go to essentially every cart, so the recovery above is the platform's, not ours.
+**Bestie's share of that: 2 recovered carts on Argania, 0 on Pasha.** A cart counts
+as Bestie-recovered only when a Bestie conversation lands **between** the
+abandonment and the recovering order — that is the recovery story. An earlier count
+of 20 used a looser rule that also accepted conversations from before the
+abandonment, which measures "we happened to talk to someone who then abandoned",
+not recovery. QuickShop's own reminder emails go to essentially every cart, so the
+recovery above is the platform's, not ours.
 
 This is the metric Yoav called the easiest to explain and the easiest to prove. Right now it proves that **Bestie is not yet in the cart-recovery loop at all** — which is an opportunity, not a result.
 
@@ -167,8 +180,8 @@ Ticket sources — Argania: 220 legacy/unlabelled, 124 `widget_support_urgent`, 
 
 ## What this report does not say
 
-1. It does not say Bestie generated ₪26,899 of *incremental* revenue for Argania. It says ₪26,899 of orders are attributable to a Bestie touch. Some of those customers would have bought anyway; nothing here separates the two.
-2. It does not say Bestie recovered carts. On Argania it touched 20 of 1,676 recovered carts; on Pasha, none.
+1. It does not say Bestie generated ₪26,663 of *incremental* revenue for Argania. It says ₪26,663 of orders are attributable to a Bestie touch. Some of those customers would have bought anyway; nothing here separates the two.
+2. It does not say Bestie recovered carts. On Argania it touched 2 of 1,676 recovered carts; on Pasha, none.
 3. It does not say the bot answers in N seconds. That number is not currently measurable.
 4. It does not say the bot is accurate. That has not been measured at all.
 5. Every percentage on Pasha rests on n ≤ 76 and several on n = 17.
@@ -186,3 +199,19 @@ Ticket sources — Argania: 220 legacy/unlabelled, 124 `widget_support_urgent`, 
 - QuickShop `GET /api/v1/analytics` — shop-level 30-day totals (Argania: 2,126 orders, ₪294,976, AOV ₪138.75)
 - `chat_sessions` / `chat_messages` / `widget_sessions` / `widget_events` / `support_requests` / `chat_handoffs` / `chat_leads` / `widget_message_feedback`
 - Design spec: `docs/superpowers/specs/2026-07-26-value-proof-metrics-design.md`
+
+## Revision note — 2026-07-26, after the pipeline shipped
+
+The numbers above were first computed by hand, then recomputed by the production
+pipeline (`value_proof_summary` + `buildValueProof`). Four moved, and in every case
+the pipeline is the stricter and more defensible of the two:
+
+| | By hand | Pipeline | Why the pipeline is right |
+|---|---|---|---|
+| Argania `influenced` | 12 orders | **10** | Two were in-store POS sales above ₪50 |
+| Argania AOV delta | −4.8% | **−10.3%** | Baseline now excludes ₪0 and POS records, as the Bestie side already did |
+| Argania carts touched | 20 | **2** | The touch must fall between abandonment and purchase |
+| Setup time | 1 day / 0 days | **0.5 / 0.1 days** | Actual elapsed time, not a difference of calendar dates |
+
+`direct` revenue, cart-recovery rate and recovered value, deflection, time-to-close
+and the escalation rates reconciled exactly.
