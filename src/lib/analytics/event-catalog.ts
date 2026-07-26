@@ -24,6 +24,9 @@ export const EVENT_CATALOG: Record<string, EventDef> = {
   // Session lifecycle
   session_start: { category: 'session', surface: 'shared' },
   session_end: { category: 'session', surface: 'shared' },
+  // Brand-user dashboard visit — metric 10. Written server-side from the brand
+  // dashboard layout; never emitted by a public surface.
+  dashboard_visit: { category: 'session', surface: 'shared' },
 
   // Chat engagement
   chat_message_sent: { category: 'engagement', surface: 'chat' },

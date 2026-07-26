@@ -573,6 +573,48 @@
     } catch (e) { /* */ }
   }
 
+  // ---- purchase beacon (metric 1, `assisted` tier) ----
+  // Three ways to learn an order number, in priority order. All are opt-in: with
+  // none of them present nothing fires, and the assisted tier stays honestly
+  // empty rather than guessed at.
+  //   1. the host page posts {type:'bestieai:order_placed', orderNumber}
+  //   2. config.conversion = { pathPattern, orderSelector }
+  //   3. nothing — no detection
+  var CONVERSION_REPORTED = false;
+  function reportConversion(orderNumber) {
+    try {
+      var num = String(orderNumber == null ? '' : orderNumber).replace(/^#/, '').trim();
+      if (!num || CONVERSION_REPORTED) return;
+      CONVERSION_REPORTED = true;
+      behaviorTrack('widget_conversion_detected', { order_number: num });
+      flushBehavior(); // a thank-you page is often the last page of the session
+    } catch (e) { /* never break the host page */ }
+  }
+
+  try {
+    window.addEventListener('message', function (ev) {
+      try {
+        var d = ev && ev.data;
+        if (d && d.type === 'bestieai:order_placed') reportConversion(d.orderNumber || d.order_number);
+      } catch (e2) { /* */ }
+    });
+  } catch (e) { /* */ }
+
+  function detectConversionFromPage(conf) {
+    try {
+      if (!conf || !conf.pathPattern) return;
+      if (!new RegExp(conf.pathPattern).test(location.pathname + location.search)) return;
+      var text = '';
+      if (conf.orderSelector) {
+        var el = document.querySelector(conf.orderSelector);
+        text = el ? (el.textContent || '') : '';
+      }
+      if (!text) text = document.body ? (document.body.textContent || '') : '';
+      var m = text.match(/#?(\d{3,})/);
+      if (m) reportConversion(m[1]);
+    } catch (e) { /* */ }
+  }
+
   // ---- scroll_depth — throttled sampling of max scroll %, final value on pagehide ----
   var SCROLL_MAX_PCT = 0;
   var SCROLL_LAST_SAMPLE_AT = 0;
@@ -3197,6 +3239,7 @@
   // context (Shopify cart enrichment above is out of scope here — Phase C
   // covers live cart tracking; this is a passive load-time snapshot only).
   trackPageView();
+  detectConversionFromPage(config && config.conversion);
   try {
     if (pageContext && pageContext.product && pageContext.product.name) {
       behaviorTrack('product_view', {

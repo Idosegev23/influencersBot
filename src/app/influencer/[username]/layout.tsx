@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { usePathname, useParams } from 'next/navigation';
 import { NavigationMenu } from '@/components/NavigationMenu';
 import { ThemeProvider } from '@/components/ThemeProvider';
@@ -18,6 +19,24 @@ export default function InfluencerLayout({
   const { lang } = useDashboardLang(username);
   const dir = dashboardDir(lang);
   const showNav = !pathname.endsWith('/login');
+
+  // Metric 10 — the brand opening its own system. Once per browser session, not
+  // per navigation, so the number means "visits" and not "clicks". Never blocks
+  // the render, and the login screen is excluded.
+  useEffect(() => {
+    if (!username || !showNav) return;
+    const key = `bestie_dash_visit_${username}`;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, '1');
+    } catch { /* private mode — fall through and record once per load */ }
+    fetch(`/api/influencer/dashboard-visit?username=${encodeURIComponent(username)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: pathname }),
+      keepalive: true,
+    }).catch(() => { /* fire-and-forget */ });
+  }, [username, showNav, pathname]);
 
   return (
     <ThemeProvider>
