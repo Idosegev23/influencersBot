@@ -11,12 +11,72 @@
  * between screens without a reload. That is what makes it feel like someone
  * looking at the screen with you rather than documentation.
  */
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 
 interface Turn {
   role: 'user' | 'assistant';
   content: string;
+}
+
+// Bestie's actual brand (brand-book/bestie-brand-book-source.html), not a
+// generic indigo: a brand-facing assistant that does not look like the product
+// reads as something bolted on.
+const BRAND = {
+  purple: '#883FE2',
+  purpleLight: '#B497EF',
+  ink: '#17092E',
+  gradient: 'linear-gradient(135deg,#883FE2,#B497EF)',
+};
+
+/**
+ * Render a reply with real links.
+ *
+ * The model is told to emit [label](/influencer/...) — but it will sometimes
+ * just paste the bare path, and a customer who has to copy a path out of a chat
+ * bubble has been given homework, not an answer. So both forms are linkified.
+ */
+const MD_LINK = /\[([^\]]+)\]\((\/[^\s)]+)\)/g;
+const BARE_PATH = /(?<![\w([])(\/influencer\/[\w[\]._-]+(?:\/[\w[\]._-]+)*)/g;
+
+function renderRich(text: string, onNavigate: () => void): ReactNode[] {
+  const out: ReactNode[] = [];
+  let key = 0;
+
+  const linkStyle: React.CSSProperties = {
+    color: BRAND.purple, fontWeight: 600, textDecoration: 'underline',
+    textUnderlineOffset: 3, cursor: 'pointer',
+  };
+
+  const pushLinkified = (chunk: string) => {
+    let last = 0;
+    for (const m of chunk.matchAll(BARE_PATH)) {
+      const at = m.index ?? 0;
+      if (at > last) out.push(chunk.slice(last, at));
+      out.push(
+        <a key={`b${key++}`} href={m[1]} onClick={onNavigate} style={linkStyle}>
+          {m[1]}
+        </a>
+      );
+      last = at + m[1].length;
+    }
+    if (last < chunk.length) out.push(chunk.slice(last));
+  };
+
+  let cursor = 0;
+  for (const m of text.matchAll(MD_LINK)) {
+    const at = m.index ?? 0;
+    if (at > cursor) pushLinkified(text.slice(cursor, at));
+    out.push(
+      <a key={`m${key++}`} href={m[2]} onClick={onNavigate} style={linkStyle}>
+        {m[1]}
+      </a>
+    );
+    cursor = at + m[0].length;
+  }
+  if (cursor < text.length) pushLinkified(text.slice(cursor));
+
+  return out;
 }
 
 const STARTERS = [
@@ -81,8 +141,9 @@ export default function DashboardAssistant({ username }: { username: string }) {
         style={{
           position: 'fixed', bottom: 20, left: 20, zIndex: 60,
           width: 56, height: 56, borderRadius: 999, border: 'none', cursor: 'pointer',
-          background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff',
-          fontSize: 24, boxShadow: '0 8px 24px rgba(99,102,241,.4)',
+          background: BRAND.gradient, color: '#fff',
+          fontSize: 26, boxShadow: '0 8px 28px rgba(136,63,226,.45)',
+          fontFamily: 'Heebo, system-ui, sans-serif',
         }}
       >
         ✦
@@ -100,13 +161,14 @@ export default function DashboardAssistant({ username }: { username: string }) {
         background: 'var(--dash-card, #fff)', color: 'var(--dash-text, #111)',
         borderRadius: 16, overflow: 'hidden',
         border: '1px solid var(--dash-border, rgba(0,0,0,.08))',
-        boxShadow: '0 20px 60px rgba(0,0,0,.25)',
+        boxShadow: '0 20px 60px rgba(23,9,46,.28)',
+        fontFamily: 'Heebo, system-ui, sans-serif',
       }}
     >
       <div
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '12px 16px', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff',
+          padding: '12px 16px', background: BRAND.gradient, color: '#fff',
         }}
       >
         <div>
@@ -151,15 +213,13 @@ export default function DashboardAssistant({ username }: { username: string }) {
             style={{
               margin: '8px 0', padding: '10px 12px', borderRadius: 12, fontSize: 14,
               whiteSpace: 'pre-wrap', lineHeight: 1.5,
-              background: t.role === 'user'
-                ? 'linear-gradient(135deg,#6366f1,#8b5cf6)'
-                : 'var(--dash-bg-soft, rgba(0,0,0,.04))',
+              background: t.role === 'user' ? BRAND.gradient : 'var(--dash-bg-soft, rgba(0,0,0,.04))',
               color: t.role === 'user' ? '#fff' : 'inherit',
               marginInlineStart: t.role === 'user' ? 40 : 0,
               marginInlineEnd: t.role === 'user' ? 0 : 40,
             }}
           >
-            {t.content}
+            {t.role === 'assistant' ? renderRich(t.content, () => setOpen(false)) : t.content}
           </div>
         ))}
 
@@ -186,7 +246,7 @@ export default function DashboardAssistant({ username }: { username: string }) {
           disabled={busy || !input.trim()}
           style={{
             padding: '10px 16px', borderRadius: 10, border: 'none', cursor: 'pointer',
-            background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff',
+            background: BRAND.gradient, color: '#fff',
             opacity: busy || !input.trim() ? 0.5 : 1, fontWeight: 600,
           }}
         >
