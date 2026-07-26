@@ -97,8 +97,33 @@ export function attributeOrder(order: AttributableOrder, index: TouchIndex): Att
   return NONE;
 }
 
-/** Carts carry only an email, so they can only reach the influenced tier. */
-export function attributeCart(cart: AttributableCart, index: TouchIndex): Attribution {
-  const at = latestTouch(index.byEmail.get(cart.email || ''), cart.occurredAt, INFLUENCED_WINDOW_MS);
-  return at === null ? NONE : resolved('influenced', 'email', at, cart.occurredAt);
+/**
+ * Cart attribution asks a DIFFERENT question from order attribution, and getting
+ * it backwards is easy: for an order the touch must PRECEDE the purchase, but the
+ * cart-recovery story is abandon → Bestie talks to them → they buy. So the touch
+ * has to land BETWEEN the abandonment and the recovery order.
+ *
+ * Requiring a touch before the abandonment instead (the first implementation)
+ * measured "did we happen to talk to this person before they abandoned", which is
+ * not recovery at all.
+ *
+ * An unrecovered cart cannot have been recovered by anyone, so it is never
+ * attributed. Carts carry only an email, so `influenced` is the only reachable tier.
+ */
+export function attributeCart(
+  cart: AttributableCart,
+  index: TouchIndex,
+  recoveredAt: number | null
+): Attribution {
+  if (recoveredAt === null) return NONE;
+  const times = index.byEmail.get(cart.email || '');
+  if (!times) return NONE;
+
+  let best: number | null = null;
+  for (const t of times) {
+    if (t < cart.occurredAt) continue;   // before abandonment — not a recovery touch
+    if (t > recoveredAt) continue;       // after the purchase — did not cause it
+    if (best === null || t > best) best = t;
+  }
+  return best === null ? NONE : resolved('influenced', 'email', best, recoveredAt);
 }

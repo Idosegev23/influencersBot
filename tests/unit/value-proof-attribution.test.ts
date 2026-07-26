@@ -64,9 +64,33 @@ describe('attribution tiers', () => {
     expect(isAttributableOrder({ amount: 120, utmSource: null })).toBe(true);
   });
 
-  it('carts attribute on email only, within the influenced window', () => {
-    const idx = buildTouchIndex([touch({ email: 'dana@example.com' })]);
-    expect(attributeCart({ id: 'c1', occurredAt: T0 + DAY, amount: 300, email: 'dana@example.com' }, idx).tier).toBe('influenced');
-    expect(attributeCart({ id: 'c2', occurredAt: T0 + DAY, amount: 300, email: 'other@example.com' }, idx).tier).toBe('none');
+  it('a cart is attributed only when the touch lands BETWEEN abandonment and recovery', () => {
+    const cart = { id: 'c1', occurredAt: T0, amount: 300, email: 'dana@example.com' };
+    const recoveredAt = T0 + 2 * DAY;
+
+    // touch after the abandonment and before the purchase — this is recovery
+    const during = buildTouchIndex([touch({ touchAt: T0 + DAY, email: 'dana@example.com' })]);
+    const a = attributeCart(cart, during, recoveredAt);
+    expect(a.tier).toBe('influenced');
+    expect(a.touchAt).toBe(T0 + DAY);
+
+    // touch BEFORE the abandonment — talking to someone who then abandoned is
+    // not recovering them
+    const before = buildTouchIndex([touch({ touchAt: T0 - DAY, email: 'dana@example.com' })]);
+    expect(attributeCart(cart, before, recoveredAt).tier).toBe('none');
+
+    // touch AFTER the purchase — cannot have caused it
+    const after = buildTouchIndex([touch({ touchAt: recoveredAt + DAY, email: 'dana@example.com' })]);
+    expect(attributeCart(cart, after, recoveredAt).tier).toBe('none');
+  });
+
+  it('an unrecovered cart is never attributed, whoever touched it', () => {
+    const idx = buildTouchIndex([touch({ touchAt: T0 + DAY, email: 'dana@example.com' })]);
+    expect(attributeCart({ id: 'c1', occurredAt: T0, amount: 300, email: 'dana@example.com' }, idx, null).tier).toBe('none');
+  });
+
+  it('a cart with a different email is not attributed', () => {
+    const idx = buildTouchIndex([touch({ touchAt: T0 + DAY, email: 'dana@example.com' })]);
+    expect(attributeCart({ id: 'c2', occurredAt: T0, amount: 300, email: 'other@example.com' }, idx, T0 + 2 * DAY).tier).toBe('none');
   });
 });
