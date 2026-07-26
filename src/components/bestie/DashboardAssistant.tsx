@@ -47,11 +47,12 @@ export default function DashboardAssistant({ username }: { username: string }) {
     setBusy(true);
 
     try {
-      const res = await fetch('/api/bestie/dashboard', {
+      // username goes in the QUERY STRING, not the body: requireInfluencerAuth
+      // reads it via extractUsername(), which only looks at searchParams.
+      const res = await fetch(`/api/bestie/dashboard?username=${encodeURIComponent(username)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          username,
           message: text,
           currentPath: pathname,
           history: turns.slice(-8),

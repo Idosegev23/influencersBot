@@ -16,8 +16,8 @@ vi.mock('@/lib/bestie/dashboard/dashboard-agent', () => ({ runDashboardTurn: h.t
 
 import { POST } from '@/app/api/bestie/dashboard/route';
 
-const post = (body: any) =>
-  POST(new Request('https://x/api/bestie/dashboard', {
+const post = (body: any, username = 'argania') =>
+  POST(new Request(`https://x/api/bestie/dashboard?username=${username}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -72,5 +72,17 @@ describe('POST /api/bestie/dashboard', () => {
   it('rejects an empty message before touching auth or the brain', async () => {
     expect((await post({ username: 'argania', message: '   ' })).status).toBe(400);
     expect(h.turn).not.toHaveBeenCalled();
+  });
+
+  it('passes the request through so auth can read ?username= from the URL', async () => {
+    // Regression: the widget originally sent username in the BODY, and this
+    // suite passed anyway because it mocks requireInfluencerAuth — the mock hid
+    // the real contract (extractUsername reads searchParams only). Live traffic
+    // got "Username required" on every call.
+    h.auth.mockClear();
+    await post({ message: 'x' }, 'studiopasha_fashion');
+    const reqPassedToAuth = (h.auth.mock.calls[0] as any)[0];
+    expect(new URL(reqPassedToAuth.url).searchParams.get('username'))
+      .toBe('studiopasha_fashion');
   });
 });
