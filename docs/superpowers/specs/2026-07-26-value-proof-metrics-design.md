@@ -44,12 +44,18 @@ on links the bot emits, orders originating from a bot link are **already tagged*
 - Argania: **149 orders** since 2026-06-12, AOV ₪165.0, ≈₪24,579
 - Studio Pasha: **17 orders** since 2026-07-23, AOV ₪159.6, ≈₪2,713
 
-**Finding B — QuickShop exposes abandoned carts, including its own recovery baseline.**
-`GET /api/v1/abandoned-carts` returns 200 (undocumented in our notes until now). Argania: **7,991
+**Finding B — QuickShop exposes abandoned carts.**
+`GET /api/v1/abandoned-carts` returns 200 (undocumented in our notes until now). Argania: **7,993
 carts**, each row `{ id, email, items[], subtotal, checkout_step, reminder_count,
-reminder_sent_at, recovered_at, created_at, updated_at }`. `recovered_at` + `reminder_count` give
-us the brand's *own* baseline recovery rate for free — the "vs baseline, vs control" Yoav asked
-for, with nothing to request from the brand.
+reminder_sent_at, recovered_at, created_at, updated_at }`.
+
+**Corrected 2026-07-26 by measurement:** the initial reading assumed `recovered_at` would hand us
+the brand's own recovery baseline. It does not. Across all **14,416** carts pulled from both stores
+(7,993 Argania + 6,423 Pasha), `recovered_at` is **null on every row** and `reminder_count ≥ 1` on
+99.9% of them — the endpoint appears to serve only *unrecovered* carts. Recovery must therefore be
+**derived by us**: a cart is recovered when the same email places a later paid, non-POS order.
+Measured that way (≤7d window): Argania 21.1%, Pasha 33.1%. Bestie touched 20 of Argania's 1,676
+recovered carts and 0 of Pasha's.
 
 `GET /api/v1/analytics` also returns shop-wide period totals (Argania last 30d: 2,126 orders,
 ₪294,976, AOV ₪138.75, 16,282 customers, top products) — the store-level denominator for metric 2.
@@ -100,9 +106,10 @@ code**, because the flattering number is the one you get by default.
 | 1 | Revenue in conversations | Order ≤24h after a bestie touch, touch strictly precedes order | `brand_orders` × touch ledger | `anon_id` beacon (tier `assisted` only) |
 | 2 | Conversation conversion rate | Metric 1 order count ÷ conversations with ≥1 user message | `chat_sessions` + `widget_sessions` | — |
 | 3 | AOV with vs without | Attributed AOV vs AOV of all other orders, **period- and source-matched** | `brand_orders` | — |
-| 4 | Abandoned carts recovered | `recovered_at` with a bestie touch, vs `recovered_at` from reminders only, vs never recovered | QuickShop `/abandoned-carts` | sync to local table |
+| 4 | Abandoned carts recovered | Cart is recovered when its email places a later paid non-POS order (24h / 7d / 30d reported); split by whether a bestie touch occurred near the abandonment | QuickShop `/abandoned-carts` + `brand_orders` | sync to local table; platform baseline unavailable (§1.2) |
 | 5 | Deflection | Conversations with ≥1 user message that produced no `support_request` and no handoff — in % and ₪ | `chat_sessions` ⟂ `support_requests` | ₪ per ticket (brand-supplied) |
-| 6 | Time to first response / to close | user→assistant gap from `chat_messages`; `created_at`→`resolved_at` on tickets | existing | pre-Bestie baseline |
+| 6 | Time to close | `created_at`→`resolved_at` on tickets | existing | pre-Bestie baseline |
+| 6b | Time to first response | Model send time minus user send time | **needs new instrumentation** | `chat_messages.created_at` is a *write* time (§3.2) |
 | 7 | Escalation rate **and on what** | Escalations ÷ conversations, broken down by reason | `support_requests.source` | **reason taxonomy** |
 | 8 | Answer accuracy | 100 conversations/month sampled; wrong / misleading / partial / correct | `chat_messages` | rating tool — **out of scope** |
 | 9 | Setup time | `accounts.created_at` → first answered message, in days | existing | staff-hours (manual) |
@@ -131,6 +138,24 @@ user-authored message**: a `chat_sessions` row having at least one `chat_message
 `role='user'`, or a `widget_sessions` row with `sent_message = true`. Sessions that only loaded or
 opened the widget are not conversations and are excluded from every denominator.
 
+**Attributable orders exclude `total = 0` and `utm_source = 'pos'`.** Discovered by measurement: the
+naive `influenced` match on Argania returned 132 orders, of which 120 were ₪0 and 122 were POS —
+in-store and replacement records, not sales. Including them inflates the order count 11× while
+adding ₪0 of revenue. The same exclusion applies to the order side of cart-recovery matching.
+
+### 3.2 First-response latency is not currently measurable
+
+`chat_messages.created_at` records when a row was **written**, not when the message was sent. Of
+1,354 Argania sessions with a user→assistant pair, **1,022 (75%) show the assistant row written
+under one second after the user row** — impossible for a real model response, and evidence that both
+rows are persisted together after the turn completes. Any latency number derived from these
+timestamps is fiction.
+
+Metric 6b therefore requires **new capture**: record the user send time and the model send time on
+the assistant message (e.g. `chat_messages.metadata.latency_ms`, written at response time). Until
+that lands, metric 6b reports `measured: false`. This gap was not identified during design and was
+found only by measuring.
+
 **D2 — Every comparison is period-matched and traffic-source-matched.** Otherwise the measured
 effect belongs to the campaign, not to Bestie. See §1.3.
 
@@ -144,7 +169,7 @@ feature was never built; it does not mean 0% escalation.
 Principle: **minimum new capture, maximum derived layer**, so all 1,921 existing conversations and
 32,079 existing orders are attributed retroactively on day one.
 
-### 4.1 New capture — 2 tables, 1 column, 1 event type
+### 4.1 New capture — 2 tables, 1 column, 1 metadata field, 1 event type
 
 1. **`brand_abandoned_carts`** — mirror of QuickShop `/abandoned-carts`. New cron
    `/api/cron/quickshop-cart-sync`, modeled on the existing `/api/cron/quickshop-order-sync`.
@@ -156,20 +181,24 @@ Principle: **minimum new capture, maximum derived layer**, so all 1,921 existing
    new client-side capture, and the only one at risk (§4.4).
 3. **`support_requests.escalation_reason text`** — metric 7's "on what". The escalation detector
    already classifies; it simply never persists the classification.
-4. **`dashboard_visit`** event type added to `EVENT_CATALOG`
+4. **Response latency on the assistant message** — write `latency_ms` into
+   `chat_messages.metadata` at response time (§3.2). One field, at the single point where the
+   assistant row is already being inserted. Unlocks metric 6b going forward; historical latency
+   stays unmeasured.
+5. **`dashboard_visit`** event type added to `EVENT_CATALOG`
    (`src/lib/analytics/event-catalog.ts`, category `session`, surface `shared`), written
    server-side from the brand dashboard layout → metric 10. No new table.
 
 ### 4.2 Derived layer — zero new writes, fully backfillable
 
-5. **`bestie_conversation_touches`** (view) — UNION over `chat_sessions`, `widget_sessions`,
+6. **`bestie_conversation_touches`** (view) — UNION over `chat_sessions`, `widget_sessions`,
    `support_requests`, `whatsapp_cs_sessions`, projecting
    `(account_id, touch_at, surface, session_id, anon_id, phone_norm, email_norm)`. This is the
    spine: it makes every past conversation attributable without having captured anything new.
-6. **`bestie_order_attribution`** and **`bestie_cart_attribution`** — computed tables
+7. **`bestie_order_attribution`** and **`bestie_cart_attribution`** — computed tables
    `(account_id, subject_id, tier, touch_at, lag_sec, computed_at)`. Refreshed nightly and
    on demand. Tier resolution order per D1.
-7. **RPC `value_proof_summary(p_account_id uuid, p_since timestamptz, p_until timestamptz)`**
+8. **RPC `value_proof_summary(p_account_id uuid, p_since timestamptz, p_until timestamptz)`**
    returning one jsonb document with all metric blocks. Same pattern as the existing
    `widget_analytics_summary` RPC, which was written specifically to dodge PostgREST's 1,000-row
    fetch cap — the same cap would silently truncate 26K orders here.
