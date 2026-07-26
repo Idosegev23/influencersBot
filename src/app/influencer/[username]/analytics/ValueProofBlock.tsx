@@ -8,11 +8,15 @@
 
 import { useEffect, useState } from 'react';
 import ValueProofView, { type ValueProofData } from '@/components/value-proof/ValueProofView';
+import CostPerTicketPrompt from './CostPerTicketPrompt';
 import '@/components/value-proof/value-proof.css';
 
 export default function ValueProofBlock({ username, days }: { username: string; days: number }) {
   const [data, setData] = useState<ValueProofData | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'failed'>('loading');
+  // Bumped after the brand saves a cost per ticket, so the shekel metric flips
+  // from "not measured" to a number without a page reload.
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -26,7 +30,7 @@ export default function ValueProofBlock({ username, days }: { username: string; 
       })
       .catch(() => { if (alive) setState('failed'); });
     return () => { alive = false; };
-  }, [username, days]);
+  }, [username, days, reload]);
 
   // A failed load stays silent rather than putting an error card in the middle
   // of the brand's dashboard — the rest of the page is unaffected.
@@ -47,7 +51,24 @@ export default function ValueProofBlock({ username, days }: { username: string; 
       </div>
       {state === 'loading'
         ? <div className="text-sm opacity-60" dir="rtl">טוען…</div>
-        : data ? <ValueProofView data={data} audience="brand" /> : null}
+        : data ? (
+          <>
+            <ValueProofView data={data} audience="brand" />
+            {/* Shown only when deflection itself is measurable — otherwise the
+                shekel figure has no count to multiply and the prompt is noise. */}
+            {data.deflection.rate.measured && (
+              <CostPerTicketPrompt
+                username={username}
+                // value_ils = deflected × cost, and its n IS the deflected count,
+                // so dividing recovers the cost the brand entered.
+                current={data.deflection.value_ils.measured && data.deflection.value_ils.n > 0
+                  ? Math.round(((data.deflection.value_ils.value as number) / data.deflection.value_ils.n) * 100) / 100
+                  : null}
+                onSaved={() => setReload((r) => r + 1)}
+              />
+            )}
+          </>
+        ) : null}
     </section>
   );
 }
