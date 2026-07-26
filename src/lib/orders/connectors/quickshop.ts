@@ -161,4 +161,73 @@ export const quickShopConnector: OrderConnector = {
   },
 };
 
+// ---- Abandoned carts ----
+// GET /abandoned-carts is not part of the OrderConnector interface (only QuickShop
+// exposes it), so it ships as a named export rather than a connector method.
+// Observed 2026-07-26 across 14,416 rows on two stores: recovered_at is ALWAYS
+// null and reminder_count >= 1 on 99.9% — the endpoint serves unrecovered carts
+// only. Recovery is therefore derived downstream, not read from here.
+export interface QuickShopAbandonedCart {
+  id: string;
+  email?: string | null;
+  items?: unknown[] | null;
+  subtotal?: string | number | null;
+  checkout_step?: string | null;
+  reminder_count?: number | null;
+  reminder_sent_at?: string | null;
+  recovered_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface NormalizedCart {
+  externalId: string;
+  email: string | null;
+  items: unknown[];
+  subtotal: string | null;
+  checkoutStep: string | null;
+  reminderCount: number;
+  reminderSentAt: string | null;
+  recoveredAt: string | null;
+  abandonedAt: string | null;
+  raw: unknown;
+}
+
+function mapCart(c: QuickShopAbandonedCart): NormalizedCart {
+  return {
+    externalId: String(c.id),
+    email: c.email ?? null,
+    items: Array.isArray(c.items) ? c.items : [],
+    subtotal: asString(c.subtotal ?? null),
+    checkoutStep: c.checkout_step ?? null,
+    reminderCount: Number(c.reminder_count ?? 0) || 0,
+    reminderSentAt: c.reminder_sent_at ?? null,
+    recoveredAt: c.recovered_at ?? null,
+    abandonedAt: c.created_at ?? null,
+    raw: c,
+  };
+}
+
+export async function listAbandonedCarts(
+  creds: OrderConnectorCreds,
+  cursor?: string
+): Promise<{ carts: NormalizedCart[]; next?: string }> {
+  const page = cursor ? parseInt(cursor, 10) : 1;
+  const res = await qsFetch(creds, `/abandoned-carts?page=${page}&limit=100`);
+  if (!res.ok) throw new Error(`quickshop abandoned-carts failed: ${res.status}`);
+
+  // Same rate-limit courtesy as list(): 100 req/min per key, and a full Argania
+  // backfill is ~80 pages.
+  const remaining = Number(res.headers.get('X-RateLimit-Remaining') ?? '99');
+  const resetSec = Number(res.headers.get('X-RateLimit-Reset') ?? '0');
+  if (remaining <= 1 && resetSec > 0) {
+    await new Promise((r) => setTimeout(r, Math.min(resetSec, 60) * 1000));
+  }
+
+  const body = (await res.json()) as QuickShopListResponse<QuickShopAbandonedCart>;
+  const carts = (body.data || []).map(mapCart);
+  const next = body.meta?.pagination?.has_next ? String(page + 1) : undefined;
+  return { carts, next };
+}
+
 registerConnector(quickShopConnector);
