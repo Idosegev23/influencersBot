@@ -10,6 +10,7 @@
     "type-check": "tsc --noEmit",
     "check:env": "npx tsx scripts/check-env.ts",
     "bestie:kb": "npx tsx scripts/bestie-kb.ts",
+    "bestie:verify": "npx tsx scripts/bestie-kb-verify.ts",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
