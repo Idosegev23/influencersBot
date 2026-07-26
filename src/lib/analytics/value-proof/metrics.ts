@@ -12,11 +12,16 @@
 import { LOW_CONFIDENCE_N, type Metric } from './types';
 
 export function metric<T>(value: T | null, n: number, basis: string): Metric<T> {
-  if (value === null || value === undefined) return notMeasured(basis) as Metric<T>;
+  if (value === null || value === undefined) return notMeasured<T>(basis);
   return { value, n, measured: true, lowConfidence: n < LOW_CONFIDENCE_N, basis };
 }
 
-export function notMeasured(basis: string): Metric<never> {
+/**
+ * Generic so callers get a Metric of the right shape without casting. The value
+ * is always null — that is the whole point: an unmeasured metric must be
+ * distinguishable from a measured zero.
+ */
+export function notMeasured<T = number>(basis: string): Metric<T> {
   return { value: null, n: 0, measured: false, lowConfidence: false, basis };
 }
 
@@ -29,9 +34,9 @@ export interface Comparison { withChat: number; without: number; deltaPct: numbe
  */
 export function matchedComparison(a: ComparisonSide, b: ComparisonSide, basis: string): Metric<Comparison> {
   if (a.from !== b.from) {
-    return notMeasured(`${basis} — windows not matched (${a.from} vs ${b.from})`) as unknown as Metric<Comparison>;
+    return notMeasured<Comparison>(`${basis} — windows not matched (${a.from} vs ${b.from})`);
   }
-  if (!(b.value > 0)) return notMeasured(`${basis} — no comparison baseline`) as unknown as Metric<Comparison>;
+  if (!(b.value > 0)) return notMeasured<Comparison>(`${basis} — no comparison baseline`);
   return metric<Comparison>(
     { withChat: a.value, without: b.value, deltaPct: (a.value / b.value - 1) * 100 },
     Math.min(a.n, b.n),
@@ -85,12 +90,12 @@ export function buildValueProof(
   };
   const tierRevenue = (tier: TierKey): Metric<number> => {
     const t = tierRows(tier);
-    if (t.n === 0) return notMeasured(`${tier} tier — no attributable rows in window`) as unknown as Metric<number>;
+    if (t.n === 0) return notMeasured(`${tier} tier — no attributable rows in window`);
     return metric(t.revenue, t.n, `${tier} tier`);
   };
   const tierOrders = (tier: TierKey): Metric<number> => {
     const t = tierRows(tier);
-    if (t.n === 0) return notMeasured(`${tier} tier — no attributable rows in window`) as unknown as Metric<number>;
+    if (t.n === 0) return notMeasured(`${tier} tier — no attributable rows in window`);
     return metric(t.n, t.n, `${tier} tier`);
   };
 
@@ -117,7 +122,7 @@ export function buildValueProof(
 
     conversion: conversations > 0
       ? metric(attributedOrders / conversations, conversations, 'attributed orders / conversations with >=1 user message')
-      : notMeasured('no conversations in window') as unknown as Metric<number>,
+      : notMeasured('no conversations in window'),
 
     aov: matchedComparison(
       { value: num(raw?.aov?.bestie), n: num(raw?.aov?.bestie_n), from: since },
@@ -128,15 +133,15 @@ export function buildValueProof(
     carts: {
       recoveryRate: cartsWithEmail > 0
         ? metric(num(raw.carts.recovered_7d) / cartsWithEmail, cartsWithEmail, 'derived: same email placed a paid non-POS order within 7d')
-        : notMeasured('no carts with an email') as unknown as Metric<number>,
+        : notMeasured('no carts with an email'),
       recoveredValue: cartsWithEmail > 0
         ? metric(num(raw.carts.recovered_7d_value), num(raw.carts.recovered_7d), 'cart subtotal of carts recovered within 7d')
-        : notMeasured('no carts with an email') as unknown as Metric<number>,
+        : notMeasured('no carts with an email'),
       bestieTouched: cartsWithEmail > 0
         ? metric(num(raw.carts.bestie_touched), num(raw.carts.recovered_7d), 'recovered carts with a Bestie touch between abandonment and purchase')
-        : notMeasured('no carts with an email') as unknown as Metric<number>,
+        : notMeasured('no carts with an email'),
       // QuickShop never populates recovered_at (14,416 rows checked 2026-07-26).
-      platformBaseline: notMeasured('QuickShop /abandoned-carts returns recovered_at=null on every row') as unknown as Metric<number>,
+      platformBaseline: notMeasured('QuickShop /abandoned-carts returns recovered_at=null on every row'),
     },
 
     // Denominator is SUPPORT-INTENT conversations, never all traffic. An account
@@ -149,11 +154,11 @@ export function buildValueProof(
             num(raw?.topic_tagged) > 0
               ? 'no support-intent conversations in window'
               : 'no classified topics on any session — support intent cannot be identified',
-          ) as unknown as Metric<number>,
+          ),
       value_ils: opts.costPerTicket && opts.costPerTicket > 0 && supportIntent > 0
         ? metric(num(raw.deflected) * opts.costPerTicket, num(raw.deflected),
             `deflected support-intent conversations x cost per ticket (₪${opts.costPerTicket}, brand-supplied)`)
-        : notMeasured('cost per ticket not supplied by the brand') as unknown as Metric<number>,
+        : notMeasured('cost per ticket not supplied by the brand'),
     },
 
     responseTime: {
@@ -161,38 +166,38 @@ export function buildValueProof(
       // are sub-second, which is impossible for a real model response.
       firstResponse: num(raw?.latency_samples) > 0
         ? metric(num(raw.latency_p50_ms), num(raw.latency_samples), 'median metadata.latency_ms on assistant messages')
-        : notMeasured('no latency_ms samples yet — chat_messages timestamps are write times') as unknown as Metric<number>,
+        : notMeasured('no latency_ms samples yet — chat_messages timestamps are write times'),
       timeToClose: num(raw?.tickets_resolved) > 0
         ? metric(num(raw.close_seconds_p50), num(raw.tickets_resolved), 'median ticket created_at -> resolved_at')
-        : notMeasured('no resolved tickets in window') as unknown as Metric<number>,
+        : notMeasured('no resolved tickets in window'),
     },
 
     escalation: {
       gaveUpRate: conversations > 0
         ? metric(num(raw.auto_escalations) / conversations, conversations, "support_requests where source='auto_escalation'")
-        : notMeasured('no conversations in window') as unknown as Metric<number>,
+        : notMeasured('no conversations in window'),
       anyHumanRate: conversations > 0
         ? metric(num(raw.tickets) / conversations, conversations, 'any support ticket / conversations')
-        : notMeasured('no conversations in window') as unknown as Metric<number>,
+        : notMeasured('no conversations in window'),
       byReason: (raw?.escalation_reasons || []).length > 0
         ? metric(
             raw.escalation_reasons,
             raw.escalation_reasons.reduce((s: number, r: any) => s + num(r.n), 0),
             'support_requests.escalation_reason',
           )
-        : notMeasured('escalation_reason not yet recorded on any ticket') as unknown as Metric<Array<{ reason: string; n: number }>>,
+        : notMeasured<Array<{ reason: string; n: number }>>('no escalation triggers recorded in window'),
     },
   };
 
   if (opts.audience === 'admin') {
-    summary.accuracy = notMeasured('no sampling process — separate project') as unknown as Metric<number>;
+    summary.accuracy = notMeasured('no sampling process — separate project');
     summary.setup = {
       days: metric(num(raw?.setup_days), 1, 'accounts.created_at -> first answered message'),
-      staffHours: notMeasured('never recorded') as unknown as Metric<number>,
+      staffHours: notMeasured('never recorded'),
     };
     summary.clientUsage = num(raw?.dashboard_visits) > 0
       ? metric(num(raw.dashboard_visits), num(raw.dashboard_visits), 'dashboard_visit events in window')
-      : notMeasured('no dashboard_visit events recorded yet') as unknown as Metric<number>;
+      : notMeasured('no dashboard_visit events recorded yet');
   }
 
   return summary;

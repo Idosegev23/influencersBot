@@ -17,6 +17,7 @@ import {
 import { KpiCard } from '@/components/admin/KpiCard';
 import { Card } from '@/components/ui/card';
 import WidgetTab from './WidgetTab';
+import ValueProofTab from './ValueProofTab';
 
 interface AccountListItem {
   id: string;
@@ -109,7 +110,7 @@ export default function AdminAnalyticsPage({ params }: { params: Promise<{ id: s
   const { id } = use(params);
   const router = useRouter();
   const [range, setRange] = useState<Range>('30');
-  const [tab, setTab] = useState<'overview' | 'widget'>('overview');
+  const [tab, setTab] = useState<'overview' | 'widget' | 'valueProof'>('overview');
   const [data, setData] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -218,14 +219,18 @@ export default function AdminAnalyticsPage({ params }: { params: Promise<{ id: s
 
         {error && <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm">{error}</div>}
 
-        {currentAccount?.has_widget && (
-          <div className="flex gap-2 border-b border-gray-200">
-            <TabButton active={tab === 'overview'} onClick={() => setTab('overview')}>סקירה כללית</TabButton>
+        {/* Value proof applies to every account; the widget tab only to widget accounts. */}
+        <div className="flex gap-2 border-b border-gray-200">
+          <TabButton active={tab === 'overview'} onClick={() => setTab('overview')}>סקירה כללית</TabButton>
+          {currentAccount?.has_widget && (
             <TabButton active={tab === 'widget'} onClick={() => setTab('widget')}>ווידג׳ט</TabButton>
-          </div>
-        )}
+          )}
+          <TabButton active={tab === 'valueProof'} onClick={() => setTab('valueProof')}>הוכחת ערך</TabButton>
+        </div>
 
-        {tab === 'widget' && currentAccount?.has_widget ? (
+        {tab === 'valueProof' ? (
+          <ValueProofTab accountId={id} days={Number(range)} />
+        ) : tab === 'widget' && currentAccount?.has_widget ? (
           <WidgetTab accountId={id} days={Number(range)} domain={currentAccount?.widget_domain || null} />
         ) : (
         <>
