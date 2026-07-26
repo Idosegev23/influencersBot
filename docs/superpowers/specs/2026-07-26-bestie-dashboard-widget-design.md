@@ -179,19 +179,28 @@ available the day the decision changes.
    other's conversations, tickets or metrics — and no tool exposes an account selector to the model.
 2. **Every emitted link resolves.** Routes are asserted against the real route tree; a link to a
    deleted screen fails the build, not the customer.
-3. **No write path exists.** No tool mutates any table. Asserted, not assumed.
+3. **No write path exists — with no exceptions.** No tool mutates any table, including escalation,
+   which emails rather than filing (§9). Asserted by snapshotting row counts around a full run, not
+   assumed.
 4. **Knowledge gaps are real.** Every gap traces to actual failed conversations for that account —
    never invented, never borrowed from another account.
 5. **The boundary holds.** Questions about other clients or how the system is built are refused.
 6. **Health checks are true.** Each finding is reproducible from current account state.
 
-## 9. Open
+## 9. Escalation
 
-**Where does an escalation from this surface go?** The lead funnel emails five salespeople. A brand
-stuck inside the product is not a sales lead and must not land in that inbox. This needs a
-destination — a support ticket on their own account, a different recipient list, or the existing
-handoff flow — and it is the one decision still outstanding. It does not block the plan's early
-tasks, but it does block shipping.
+A brand stuck inside the product is not a sales lead and must not reach the funnel's five
+recipients. It emails **two people** instead (Ido, 2026-07-26):
+
+- `yoav@ldrsgroup.com`
+- `cto@ldrsgroup.com`
+
+Email only — **no ticket row, no record written anywhere.** That preserves §8.3 without an
+exception: this surface has no write path at all, which is a far easier property to keep true over
+time than "no writes except one".
+
+The email carries the brand, the screen they were on, and the conversation, so whoever picks it up
+does not have to ask the customer to start over.
 
 ---
 

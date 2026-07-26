@@ -1111,46 +1111,83 @@ git commit -m "feat(bestie): dashboard assistant widget"
 
 ---
 
-### Task 11: Escalation destination
+### Task 11: Escalation by email
 
-Spec §9 — the one decision left open. **Default chosen here; confirm with Ido before shipping.**
+Spec §9. A stuck brand emails **two people** — not the funnel's five, and not a ticket anywhere.
+Email-only is what keeps §8.3 exception-free: this surface writes nothing at all.
 
 **Files:**
-- Modify: `src/lib/bestie/dashboard/tools.ts` (add `open_bestie_support_ticket`)
+- Create: `src/lib/bestie/dashboard/escalation.ts`
+- Modify: `src/lib/bestie/dashboard/tools.ts` (register `escalate_to_bestie_team`)
 - Test: `tests/unit/bestie-dashboard-escalation.test.ts`
 
-**Default:** a support ticket on **Bestie's own account** (`config.username = 'bestie'`), not on the
-brand's account and not to the five sales recipients. A stuck paying customer is not a lead, and the
-brand's own ticket queue is for *their* customers. Bestie now has a real account with a working
-support screen, so brands become Bestie's own support queue — which is what they are.
-
-This is the **one exception** to zero-writes, and it is deliberately narrow: it creates a support
-request and nothing else. It touches no account setting, no knowledge, no content.
+**Interfaces:**
+- Consumes: `sendEmail` from `@/lib/email` (`{ to: string | string[]; subject: string; html: string }`).
+- Produces:
+  - `export const DASHBOARD_ESCALATION_RECIPIENTS: string[]`
+  - `export function buildDashboardEscalationEmail(p: { brandUsername: string; currentRoute: string | null; message: string; transcript: Array<{ role: string; text: string }> }): { subject: string; html: string }`
+  - `export async function sendDashboardEscalation(p: {...}): Promise<{ success: boolean }>`
 
 - [ ] **Step 1: Write the failing test**
 
 ```typescript
 import { describe, it, expect } from 'vitest';
-import { buildBestieSupportTicket } from '@/lib/bestie/dashboard/tools';
+import {
+  buildDashboardEscalationEmail,
+  DASHBOARD_ESCALATION_RECIPIENTS,
+} from '@/lib/bestie/dashboard/escalation';
 
-describe('buildBestieSupportTicket', () => {
-  it('files against the bestie account, not the brand', () => {
-    const t = buildBestieSupportTicket({
-      bestieAccountId: 'BESTIE', brandUsername: 'argania',
-      brandAccountId: 'ARGANIA', message: 'הבוט לא עונה',
-    });
-    expect(t.account_id).toBe('BESTIE');
-    expect(t.account_id).not.toBe('ARGANIA');
+const p = {
+  brandUsername: 'argania',
+  currentRoute: '/influencer/[username]/chatbot-settings',
+  message: 'הבוט לא עונה בוואטסאפ',
+  transcript: [
+    { role: 'user', text: 'הבוט לא עונה' },
+    { role: 'assistant', text: 'בוא נבדוק את החיבור' },
+  ],
+};
+
+describe('dashboard escalation', () => {
+  it('goes to exactly the two people Ido named', () => {
+    expect(DASHBOARD_ESCALATION_RECIPIENTS).toEqual([
+      'yoav@ldrsgroup.com',
+      'cto@ldrsgroup.com',
+    ]);
   });
 
-  it('names the brand so whoever picks it up knows who is stuck', () => {
-    const t = buildBestieSupportTicket({
-      bestieAccountId: 'BESTIE', brandUsername: 'argania',
-      brandAccountId: 'ARGANIA', message: 'הבוט לא עונה',
+  it('never reaches the sales funnel recipients', async () => {
+    // A stuck paying customer is not a lead.
+    const { SALES_RECIPIENTS } = await import('@/lib/bestie/handoff-email');
+    for (const sales of SALES_RECIPIENTS) {
+      if (sales === 'yoav@ldrsgroup.com' || sales === 'cto@ldrsgroup.com') continue;
+      expect(DASHBOARD_ESCALATION_RECIPIENTS).not.toContain(sales);
+    }
+  });
+
+  it('names the brand in the subject so it is actionable from a notification', () => {
+    expect(buildDashboardEscalationEmail(p).subject).toContain('argania');
+  });
+
+  it('carries the screen they were on and the conversation', () => {
+    const { html } = buildDashboardEscalationEmail(p);
+    expect(html).toContain('chatbot-settings');
+    expect(html).toContain('הבוט לא עונה');
+    expect(html).toContain('בוא נבדוק את החיבור');
+  });
+
+  it('escapes text so a brand cannot inject markup', () => {
+    const { html } = buildDashboardEscalationEmail({
+      ...p, message: '<script>alert(1)</script>',
     });
-    expect(t.brand).toBe('argania');
-    expect(t.message).toContain('הבוט לא עונה');
-    expect(t.source).toBe('dashboard_assistant');
+    expect(html).not.toContain('<script>');
+  });
+
+  it('survives no route and an empty transcript', () => {
+    const { subject, html } = buildDashboardEscalationEmail({
+      ...p, currentRoute: null, transcript: [],
+    });
+    expect(subject).toBeTruthy();
+    expect(html).toBeTruthy();
   });
 });
 ```
@@ -1158,23 +1195,46 @@ describe('buildBestieSupportTicket', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/unit/bestie-dashboard-escalation.test.ts`
-Expected: FAIL — `buildBestieSupportTicket` is not exported.
+Expected: FAIL — cannot resolve `@/lib/bestie/dashboard/escalation`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Export a pure `buildBestieSupportTicket(...)` returning the `support_requests` row, plus a thin tool
-that inserts it. Keep the row builder pure so the destination is asserted without a database.
+Mirror `src/lib/bestie/handoff-email.ts`: pinned recipient constant, everything escaped, `sendEmail`
+imported lazily. Open the file with:
+
+```typescript
+/**
+ * A brand stuck inside the product.
+ *
+ * Email only — no ticket, no row, nothing written. That is what lets this whole
+ * surface claim "no write path" with no exception to remember, which is a far
+ * easier property to keep true than "no writes except one".
+ *
+ * Two recipients, not the lead funnel's five: a paying customer with a problem
+ * is not a sales lead and must not land in that inbox.
+ */
+```
+
+Register the tool in `tools.ts` as `escalate_to_bestie_team` with parameters
+`{ summary: string }` only — **no account selector** (Task 6's test covers it).
 
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run tests/unit/bestie-dashboard-escalation.test.ts`
-Expected: PASS — 2 tests.
+Expected: PASS — 6 tests.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Update Task 6's tool list**
+
+`DASHBOARD_TOOL_DEFS` now has six entries. Update the expected array in
+`tests/unit/bestie-dashboard-tools.test.ts` to include `escalate_to_bestie_team`, and confirm the
+mutating-verb test still passes (it does — the name contains no mutating verb, and the tool writes
+nothing).
+
+- [ ] **Step 6: Commit**
 
 ```bash
-git add src/lib/bestie/dashboard/tools.ts tests/unit/bestie-dashboard-escalation.test.ts
-git commit -m "feat(bestie): stuck brands file a ticket on Bestie's own account"
+git add src/lib/bestie/dashboard/escalation.ts src/lib/bestie/dashboard/tools.ts tests/unit/bestie-dashboard-escalation.test.ts tests/unit/bestie-dashboard-tools.test.ts
+git commit -m "feat(bestie): stuck brands email yoav and cto — no ticket, no write"
 ```
 
 ---
@@ -1194,7 +1254,7 @@ git commit -m "feat(bestie): stuck brands file a ticket on Bestie's own account"
 | §7 widget-only delivery | 10 (nothing else built) |
 | §8.1 no cross-account read | 6, 8, 9 |
 | §8.2 every link resolves | 5 |
-| §8.3 no write path | 6, 9 (Task 11 is the one narrow exception) |
+| §8.3 no write path, no exceptions | 6, 9, 11 (escalation emails rather than filing) |
 | §8.4 gaps are real | 3 |
 | §8.5 boundary holds | 7, 10 |
 | §8.6 health findings true | 4 |
@@ -1213,6 +1273,9 @@ to Task 7, and built by Task 8. `HealthFinding.route` and `KnowledgeGap` feed `b
 
 ## Blockers before shipping
 
-- **Task 11's destination needs Ido's confirmation.** A ticket on Bestie's own account is the
-  default this plan chose, not a decision he made.
-- Everything else is buildable now — Phases 1 and 2 shipped, and no external approval is involved.
+None. Phases 1 and 2 are shipped, the escalation destination is decided (§9), and nothing here waits
+on an external approval.
+
+Note for Task 9: because escalation emails rather than files, the row-count snapshot must come out
+**identical** even on a run that escalates. If it does not, something in this surface is writing when
+it should not be.
