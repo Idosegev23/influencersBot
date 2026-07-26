@@ -39,6 +39,9 @@ export default function SettingsPage({
   const [greetingMessage, setGreetingMessage] = useState('');
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
   const [newQuestion, setNewQuestion] = useState('');
+  // Cost of handling one support ticket (ILS). Empty = not supplied, which keeps
+  // the shekel value of deflection reported as "not measured" rather than ₪0.
+  const [costPerTicket, setCostPerTicket] = useState<string>('');
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingText, setEditingText] = useState('');
 
@@ -76,6 +79,8 @@ export default function SettingsPage({
         }
 
         // Load suggested questions: config first, then fallback to persona topics
+        const existingCost = (inf as any)?.config?.support?.cost_per_ticket;
+        if (typeof existingCost === 'number') setCostPerTicket(String(existingCost));
         const configQuestions = inf.suggested_questions
           || (inf as any).config?.suggested_questions
           || [];
@@ -120,6 +125,7 @@ export default function SettingsPage({
           username,
           greeting_message: greetingMessage,
           suggested_questions: suggestedQuestions,
+          cost_per_ticket: costPerTicket.trim() === '' ? null : Number(costPerTicket),
         }),
       });
 
@@ -386,6 +392,30 @@ export default function SettingsPage({
               </button>
             </div>
           )}
+        </div>
+
+        {/* ──── Cost per support ticket ──── */}
+        <div className="glass-card rounded-2xl p-6">
+          <h2 className="text-base font-semibold mb-1">עלות טיפול בפנייה</h2>
+          <p className="text-xs opacity-70 leading-relaxed mb-4 max-w-xl">
+            כמה עולה לכם שאדם מטפל בפנייה אחת, בשקלים. המספר הזה שלכם — הוא מה שהופך את
+            הפניות שנחסכו לשקלים בדוח הוכחת הערך. אפשר לחשב אותו כעלות חודשית של שירות
+            הלקוחות חלקי מספר הפניות בחודש. כל עוד השדה ריק, החיסכון מוצג כ״לא נמדד״
+            ולא כאפס.
+          </p>
+          <div className="flex items-center gap-2 max-w-[220px]">
+            <span className="text-sm opacity-70">₪</span>
+            <input
+              type="number"
+              min={0}
+              step="0.5"
+              inputMode="decimal"
+              className="input flex-1 py-2.5 px-4 text-sm"
+              value={costPerTicket}
+              onChange={(e) => setCostPerTicket(e.target.value)}
+              placeholder="12"
+            />
+          </div>
         </div>
 
         {/* ──── Preview ──── */}

@@ -88,6 +88,19 @@ export async function POST(req: NextRequest) {
     if (body.phone_number !== undefined) {
       updatedConfig.phone_number = body.phone_number;
     }
+    // Cost of handling one support ticket, in ILS. Brand-supplied on purpose:
+    // no API exposes it, and a number the brand entered itself is a number the
+    // brand cannot dispute when deflection is converted into shekels.
+    // null clears it, which returns the shekel metric to "not measured" — never
+    // to ₪0, which would read as "Bestie saved nothing".
+    if (body.cost_per_ticket !== undefined) {
+      const rawCost = body.cost_per_ticket;
+      const valid = rawCost === null || (typeof rawCost === 'number' && Number.isFinite(rawCost) && rawCost >= 0);
+      if (valid) {
+        updatedConfig.support = { ...(currentConfig.support || {}), cost_per_ticket: rawCost };
+      }
+    }
+
     if (body.whatsapp_enabled !== undefined) {
       updatedConfig.whatsapp_enabled = body.whatsapp_enabled;
     }
