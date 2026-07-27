@@ -11,8 +11,9 @@
  * between screens without a reload. That is what makes it feel like someone
  * looking at the screen with you rather than documentation.
  */
-import { useState, useRef, useEffect, type ReactNode } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import ReactMarkdown from 'react-markdown';
 
 interface Turn {
   role: 'user' | 'assistant';
@@ -32,60 +33,17 @@ const BRAND = {
   wordmark: '/brand/bestie-wordmark.svg',
 };
 
+const BARE_PATH = /(?<!\]\()(?<![\w([])(\/influencer\/[\w[\]._-]+(?:\/[\w[\]._-]+)*)/g;
+
 /**
- * Render a reply with real links.
+ * The model is told to emit [label](/influencer/...) but sometimes pastes a bare
+ * path, and react-markdown will not linkify one. Wrapping it here means the
+ * renderer only ever has to deal with real markdown links.
  *
- * The model is told to emit [label](/influencer/...) — but it will sometimes
- * just paste the bare path, and a customer who has to copy a path out of a chat
- * bubble has been given homework, not an answer. So both forms are linkified.
+ * The lookbehind skips paths already inside a link so they are not wrapped twice.
  */
-const MD_LINK = /\[([^\]]+)\]\((\/[^\s)]+)\)/g;
-const BARE_PATH = /(?<![\w([])(\/influencer\/[\w[\]._-]+(?:\/[\w[\]._-]+)*)/g;
-
-function renderRich(text: string, go: (href: string) => void): ReactNode[] {
-  const out: ReactNode[] = [];
-  let key = 0;
-
-  const linkStyle: React.CSSProperties = {
-    color: BRAND.purple, fontWeight: 600, textDecoration: 'underline',
-    textUnderlineOffset: 3, cursor: 'pointer',
-  };
-
-  // preventDefault + router.push: a plain <a> is a full page load, which
-  // remounts the layout and throws away the conversation — so the very link
-  // Bestie offers would destroy the context it was answering in.
-  const link = (k: string, href: string, label: string) => (
-    <a
-      key={k}
-      href={href}
-      onClick={e => { e.preventDefault(); go(href); }}
-      style={linkStyle}
-    >
-      {label}
-    </a>
-  );
-
-  const pushLinkified = (chunk: string) => {
-    let last = 0;
-    for (const m of chunk.matchAll(BARE_PATH)) {
-      const at = m.index ?? 0;
-      if (at > last) out.push(chunk.slice(last, at));
-      out.push(link(`b${key++}`, m[1], m[1]));
-      last = at + m[1].length;
-    }
-    if (last < chunk.length) out.push(chunk.slice(last));
-  };
-
-  let cursor = 0;
-  for (const m of text.matchAll(MD_LINK)) {
-    const at = m.index ?? 0;
-    if (at > cursor) pushLinkified(text.slice(cursor, at));
-    out.push(link(`m${key++}`, m[2], m[1]));
-    cursor = at + m[0].length;
-  }
-  if (cursor < text.length) pushLinkified(text.slice(cursor));
-
-  return out;
+export function linkifyBarePaths(text: string): string {
+  return text.replace(BARE_PATH, '[$1]($1)');
 }
 
 const STARTERS = [
@@ -326,7 +284,8 @@ export default function DashboardAssistant({ username }: { username: string }) {
           <div
             style={{
               padding: '10px 12px', borderRadius: 12, fontSize: 14,
-              whiteSpace: 'pre-wrap', lineHeight: 1.5,
+              lineHeight: 1.6,
+              whiteSpace: t.role === 'user' ? 'pre-wrap' : 'normal',
               background: t.role === 'user' ? BRAND.gradient : 'var(--dash-bg-soft, rgba(0,0,0,.04))',
               color: t.role === 'user' ? '#fff' : 'inherit',
               flex: 1,
@@ -334,7 +293,63 @@ export default function DashboardAssistant({ username }: { username: string }) {
               marginInlineEnd: t.role === 'user' ? 0 : 20,
             }}
           >
-            {t.role === 'assistant' ? renderRich(t.content, go) : t.content}
+            {t.role === 'assistant' ? (
+              <ReactMarkdown
+                components={{
+                  // Client-side navigation, so following a link never remounts
+                  // the layout and throws away this conversation.
+                  a: ({ href, children }) => (
+                    <a
+                      href={href}
+                      onClick={e => {
+                        if (href?.startsWith('/')) { e.preventDefault(); go(href); }
+                      }}
+                      style={{
+                        color: BRAND.purple, fontWeight: 600, textDecoration: 'underline',
+                        textUnderlineOffset: 3, cursor: 'pointer',
+                      }}
+                    >
+                      {children}
+                    </a>
+                  ),
+                  p: ({ children }) => <p style={{ margin: '0 0 8px' }}>{children}</p>,
+                  strong: ({ children }) => (
+                    <strong style={{ fontWeight: 700, color: BRAND.ink }}>{children}</strong>
+                  ),
+                  ol: ({ children }) => (
+                    <ol style={{ margin: '4px 0 8px', paddingInlineStart: 20, display: 'grid', gap: 6 }}>
+                      {children}
+                    </ol>
+                  ),
+                  ul: ({ children }) => (
+                    <ul style={{ margin: '4px 0 8px', paddingInlineStart: 18, display: 'grid', gap: 4 }}>
+                      {children}
+                    </ul>
+                  ),
+                  li: ({ children }) => <li style={{ lineHeight: 1.5 }}>{children}</li>,
+                  code: ({ children }) => (
+                    <code
+                      style={{
+                        background: 'rgba(136,63,226,.10)', borderRadius: 5,
+                        padding: '1px 5px', fontSize: 13, fontFamily: 'ui-monospace, monospace',
+                      }}
+                    >
+                      {children}
+                    </code>
+                  ),
+                  h1: ({ children }) => <div style={{ fontWeight: 700, margin: '6px 0 4px' }}>{children}</div>,
+                  h2: ({ children }) => <div style={{ fontWeight: 700, margin: '6px 0 4px' }}>{children}</div>,
+                  h3: ({ children }) => <div style={{ fontWeight: 700, margin: '6px 0 4px' }}>{children}</div>,
+                  hr: () => (
+                    <hr style={{ border: 0, borderTop: '1px solid rgba(136,63,226,.18)', margin: '10px 0' }} />
+                  ),
+                }}
+              >
+                {linkifyBarePaths(t.content)}
+              </ReactMarkdown>
+            ) : (
+              t.content
+            )}
           </div>
           </div>
         ))}

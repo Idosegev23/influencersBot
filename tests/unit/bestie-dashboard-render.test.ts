@@ -1,45 +1,39 @@
+/**
+ * Replies are markdown, rendered by react-markdown. The one thing it will not
+ * do is linkify a bare path, so that is pre-processed — and that pre-processing
+ * is what these pin. If it drifts, replies quietly degrade to unclickable paths.
+ */
 import { describe, it, expect } from 'vitest';
+import { linkifyBarePaths } from '@/components/bestie/DashboardAssistant';
 
-// The renderer is JSX-internal, so assert the patterns it relies on. If these
-// drift, replies silently degrade to unclickable paths — which is exactly the
-// bug this was written for.
-const MD_LINK = /\[([^\]]+)\]\((\/[^\s)]+)\)/g;
-const BARE_PATH = /(?<![\w([])(\/influencer\/[\w[\]._-]+(?:\/[\w[\]._-]+)*)/g;
-
-const mdMatches = (s: string) => [...s.matchAll(MD_LINK)].map(m => [m[1], m[2]]);
-const bareMatches = (s: string) => [...s.matchAll(BARE_PATH)].map(m => m[1]);
-
-describe('reply link patterns', () => {
-  it('extracts a markdown link the model was told to emit', () => {
-    expect(mdMatches('אפשר מכאן: [שיחות](/influencer/argania_group/conversations)'))
-      .toEqual([['שיחות', '/influencer/argania_group/conversations']]);
-  });
-
-  it('still catches a bare path when the model ignores the format', () => {
+describe('linkifyBarePaths', () => {
+  it('wraps a bare path so markdown renders it as a link', () => {
     // The exact reply Ido got: a raw path, unclickable.
-    expect(bareMatches('כנסי מכאן: /influencer/argania_group/conversations'))
-      .toEqual(['/influencer/argania_group/conversations']);
+    expect(linkifyBarePaths('כנסי מכאן: /influencer/argania_group/conversations'))
+      .toBe('כנסי מכאן: [/influencer/argania_group/conversations](/influencer/argania_group/conversations)');
   });
 
-  it('handles a username with underscores and a nested route', () => {
-    expect(bareMatches('/influencer/studiopasha_fashion/documents/upload'))
-      .toEqual(['/influencer/studiopasha_fashion/documents/upload']);
+  it('leaves an existing markdown link alone', () => {
+    const already = '[שיחות](/influencer/argania_group/conversations)';
+    expect(linkifyBarePaths(already)).toBe(already);
   });
 
-  it('does not linkify a path already inside a markdown link', () => {
-    const text = '[שיחות](/influencer/argania_group/conversations)';
-    // The markdown pass consumes it first; the bare pass only sees leftovers.
-    const consumed = text.replace(MD_LINK, '');
-    expect(bareMatches(consumed)).toEqual([]);
+  it('handles usernames with underscores and nested routes', () => {
+    expect(linkifyBarePaths('/influencer/studiopasha_fashion/documents/upload'))
+      .toBe('[/influencer/studiopasha_fashion/documents/upload](/influencer/studiopasha_fashion/documents/upload)');
   });
 
-  it('leaves ordinary text alone', () => {
-    expect(bareMatches('אין כאן שום נתיב')).toEqual([]);
-    expect(mdMatches('טקסט רגיל לגמרי')).toEqual([]);
+  it('wraps several paths in one reply', () => {
+    const out = linkifyBarePaths('קודם /influencer/a/coupons ואז /influencer/a/products');
+    expect(out.match(/\]\(/g)).toHaveLength(2);
   });
 
-  it('picks up several links in one reply', () => {
-    const text = 'קודם /influencer/a/coupons ואז /influencer/a/products';
-    expect(bareMatches(text)).toHaveLength(2);
+  it('leaves ordinary text untouched', () => {
+    expect(linkifyBarePaths('אין כאן שום נתיב')).toBe('אין כאן שום נתיב');
+  });
+
+  it('does not touch markdown the renderer already handles', () => {
+    const md = '**מודגש**\n\n1. פריט\n2. פריט\n\n- תבליט';
+    expect(linkifyBarePaths(md)).toBe(md);
   });
 });
