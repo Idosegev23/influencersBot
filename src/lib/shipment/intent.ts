@@ -23,6 +23,13 @@ const INTENT_PATTERNS: RegExp[] = [
   // unreliable so we don't use them.
   /(מעקב|לעקוב|עוקב(ת|ים)?)\s.*?(הזמנה|משלוח|חבילה|אחרי\s+ה?(הזמנה|משלוח|חבילה))/,
   /track(?:ing)?/i,
+  // English framings. The Hebrew set was thorough while English had only
+  // "track", so an English-language account got no order-status path at all
+  // for the most natural phrasings.
+  /where(?:'s| is)?\s+my\s+(order|package|parcel|delivery|shipment)/i,
+  /(status|update)\s+(of|on)\s+my\s+(order|shipment|delivery)/i,
+  /when\s+(will|does|is)\s+(my\s+)?(order|package|delivery|it)\s+.*?(arrive|come|ship|deliver)/i,
+  /(order|package|parcel|delivery)\s+(hasn't|has not|didn't|did not)\s+(arrived|come)/i,
   // "the order/shipment is late / didn't arrive yet"
   /(הזמנה|משלוח|חבילה).*?(לא הגיע|לא הגיעה|מאחר|מאחרת)/,
   /(לא הגיע|לא הגיעה).*?(הזמנה|משלוח|חבילה)/,

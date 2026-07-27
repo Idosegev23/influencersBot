@@ -15,6 +15,10 @@ import { buildPersonalityFromDB } from './personality-wrapper';
 import { turnTimings } from '@/lib/analytics/value-proof/timings';
 import { updateRollingSummary, shouldUpdateSummary } from './conversation-memory';
 import { getRecommendations, type ProductRecommendation } from '@/lib/recommendations/engine';
+import { resolveOrderStatusTurn, isShipmentLookupEnabled } from '@/lib/shipment/order-status-reply';
+import { maybeFileAutoTicket } from '@/lib/support/file-auto-ticket';
+import { alreadyTriedOfficialChannels } from '@/lib/support/auto-ticket';
+import { isBroadOpeningQuestion } from './broad-question';
 import {
   stripIntent,
   stripProducts,
@@ -172,6 +176,44 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
     });
   }
 
+  // 3b. ORDER STATUS QUICK PATH — same resolver the /chat page uses.
+  // The widget had no order path at all while carrying ~2/3 of live traffic, so
+  // "where's my order?" fell through to the LLM, which has no order data and
+  // could only recite the support phone number.
+  const shipmentCfg = (config as any)?.shipment_provider;
+  if (isShipmentLookupEnabled(shipmentCfg)) {
+    try {
+      const outcome = await resolveOrderStatusTurn({
+        accountId,
+        shipmentCfg,
+        message,
+        awaitingNumber: session?.state === 'OrderStatus.AwaitingNumber',
+        isEnglish: accountResult?.language === 'en',
+      });
+      if (outcome.handled && outcome.answer) {
+        const timings = turnTimings(turnReceivedAt, Date.now());
+        onToken?.(outcome.answer);
+        await Promise.all([
+          supabase.from('chat_messages').insert({
+            session_id: sessionId, role: 'user', content: message, created_at: timings.userCreatedAt,
+          }),
+          supabase.from('chat_messages').insert({
+            session_id: sessionId, role: 'assistant', content: outcome.answer,
+            metadata: { latency_ms: timings.latencyMs },
+          }),
+          supabase.from('chat_sessions').update({
+            state: outcome.nextState || 'Idle',
+            message_count: (session?.message_count || 0) + 2,
+          }).eq('id', sessionId),
+        ]);
+        return { response: outcome.answer, sessionId: sessionId!, products: [], intent: null, action: null };
+      }
+    } catch (err: any) {
+      // Never block the turn on the lookup — fall through to the normal bot.
+      console.error('[WidgetChat] order status path failed (non-fatal):', err?.message);
+    }
+  }
+
   // 4. Fetch product recommendations (fire parallel, non-blocking if fails)
   let recommendationBlock = '';
   let recommendedProducts: ProductRecommendation[] = [];
@@ -321,6 +363,13 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
       previousResponseId: session?.last_response_id || null,
       mode: 'widget',
       widgetConfig: widgetConfigWithRecs,
+      // Parity with the /chat page. The widget already gets product links via
+      // the recommendation block above, so productCatalogBlock is deliberately
+      // NOT passed here — it would duplicate the same URLs in the prompt.
+      supportChannelsExhausted: alreadyTriedOfficialChannels(
+        [...conversationHistory.filter((m: any) => m.role === 'user').map((m: any) => m.content), message].join('\n'),
+      ),
+      isBroadOpeningQuestion: isBroadOpeningQuestion(message, conversationHistory.length),
       onToken: (token: string) => {
         fullText += token;
         onToken?.(token);
@@ -443,6 +492,16 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
     userMessage: message,
     source: 'widget',
   }).catch((e: any) => console.error('[escalation] widget hook failed:', e?.message || e));
+
+  // Auto-file a support ticket when the visitor has a real service problem and
+  // left something actionable. Same opt-in gate and same one-per-session dedup
+  // as the /chat page — a customer who switches surfaces mid-issue must not
+  // generate two tickets. Fire-and-forget; never blocks the response.
+  maybeFileAutoTicket({
+    accountId,
+    sessionId: sessionId!,
+    latestUserMessage: message,
+  }).catch((e: any) => console.error('[auto-ticket] widget hook failed:', e?.message || e));
 
   return {
     response: fullText,

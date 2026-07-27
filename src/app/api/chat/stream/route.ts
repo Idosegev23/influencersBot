@@ -49,6 +49,7 @@ import { maybeFileAutoTicket } from '@/lib/support/file-auto-ticket';
 import { alreadyTriedOfficialChannels } from '@/lib/support/auto-ticket';
 import { loadProductLinkCatalog, selectRelevantProducts, renderProductCatalogBlock } from '@/lib/recommendations/product-links';
 import { isBroadOpeningQuestion } from '@/lib/chatbot/broad-question';
+import { resolveOrderStatusTurn } from '@/lib/shipment/order-status-reply';
 import { 
   decide, 
   getUIDirectivesSummary, 
@@ -573,71 +574,20 @@ export async function POST(req: NextRequest) {
               return;
             }
 
-            // We have a number. Resolve it against our OWN order store first:
-            // customers type the order number from their confirmation email, and
-            // Focus resolves those through a P2 lookup (reference + master customer
-            // code) — not the P1 ship_no path. Querying P1 with an order number
-            // returns "not found" for every store whose numbers aren't Focus ship_nos.
-            //
-            // PRIVACY: order numbers here are short and sequential, so this branch is
-            // enumerable by an anonymous visitor. It therefore answers with SHIPMENT
-            // STATUS ONLY — never customer name, address, or line items. See the
-            // no_public_order_details policy in engines/policy.
+            // We have a number — hand off to the shared resolver so this surface
+            // and the widget stay identical. See lib/shipment/order-status-reply.ts
+            // for the brand_orders-then-Focus-P2 order and the status-only privacy
+            // rule; this block only renders the result as SSE events.
             try {
-              const { findBrandOrderByNumber } = await import('@/lib/orders/brand-orders');
-              const { getFocusShipmentStatus } = await import('@/lib/shipment/focus-client');
-              const expectedMaster = shipmentCfg.expected_master_customer_id
-                ? Number(shipmentCfg.expected_master_customer_id)
-                : undefined;
-
-              let orderRow: Awaited<ReturnType<typeof findBrandOrderByNumber>> = null;
-              try {
-                orderRow = await findBrandOrderByNumber(accountId, numToUse);
-              } catch (e) {
-                console.warn('[Stream] brand_orders lookup failed:', (e as Error).message);
-              }
-
-              const view = shipmentCfg.type === 'focus'
-                ? await getFocusShipmentStatus({
-                    host: shipmentCfg.host || 'focusdelivery.co.il',
-                    // Recognised as one of our order numbers → scoped P2 lookup.
-                    // Otherwise treat it as a Focus ship_no from the shipping email.
-                    ...(orderRow
-                      ? { reference: orderRow.order_number, customerCode: expectedMaster }
-                      : { shipmentNumber: numToUse }),
-                    expectedMasterCustomerId: expectedMaster,
-                  })
-                : { found: false, statusText: 'ספק משלוחים לא נתמך עדיין', errorMessage: null } as any;
-
-              let answer: string;
-              const isEn = (influencer as any).language === 'en';
-              if (!view.found && !orderRow) {
-                answer = isEn
-                  ? `I couldn't find an order with number ${numToUse}. ${view.errorMessage || 'Maybe the number is off?'} Please double-check or contact customer support.`
-                  : `לא הצלחתי למצוא הזמנה עם מספר ${numToUse}. ${view.errorMessage || 'אולי המספר שגוי?'} בדקי שוב או צרי קשר עם שירות הלקוחות.`;
-              } else if (!view.found && orderRow) {
-                // The order exists on our side but the courier has no record yet —
-                // the normal state between "paid" and "handed to Focus". Saying
-                // "not found" here reads as "your order vanished", which is wrong.
-                const placed = orderRow.placed_at
-                  ? new Date(orderRow.placed_at).toLocaleDateString('he-IL')
-                  : null;
-                answer = isEn
-                  ? `Order ${numToUse} is in our system${placed ? ` (placed ${placed})` : ''}, but the courier hasn't picked it up yet, so there's no tracking status. It usually updates within 1-2 business days.`
-                  : [
-                      `📦 הזמנה ${numToUse} נמצאת אצלנו במערכת${placed ? ` (בוצעה ב-${placed})` : ''}.`,
-                      'היא עדיין לא נקלטה אצל חברת השילוח, ולכן אין עדיין סטטוס מעקב — זה בדרך כלל מתעדכן תוך 1-2 ימי עסקים.',
-                    ].join('\n');
-              } else {
-                const lines: string[] = [`📦 הזמנה ${orderRow?.order_number || view.shipmentNumber || numToUse}`, `סטטוס: ${view.statusText}`];
-                if (view.lastUpdate?.date) lines.push(`עודכן: ${view.lastUpdate.date} ${view.lastUpdate.time || ''}`.trim());
-                if (view.destinationBranch) lines.push(`סניף יעד: ${view.destinationBranch}`);
-                if (view.shipmentDirection) lines.push(`כיוון: ${view.shipmentDirection}`);
-                if (view.isDelivered) lines.push('✅ נמסר');
-                else if (view.isReturned) lines.push('↩️ הוחזר לסניף');
-                else if (view.isCanceled) lines.push('❌ בוטל');
-                answer = lines.join('\n');
-              }
+              const outcome = await resolveOrderStatusTurn({
+                accountId,
+                shipmentCfg,
+                message: displayMessage,
+                awaitingNumber: awaitingShipNumber,
+                isEnglish: (influencer as any).language === 'en',
+              });
+              if (!outcome.handled || !outcome.answer) throw new Error('order status not handled');
+              const answer = outcome.answer;
 
               controller.enqueue(encodeEvent({
                 type: 'meta',
@@ -646,7 +596,7 @@ export async function POST(req: NextRequest) {
                 decisionId: `shipping_${Date.now()}`,
                 sessionId: currentSessionId,
                 anonId,
-                uiDirectives: { shipmentStatus: view, showInputPlaceholder: null },
+                uiDirectives: { showInputPlaceholder: null },
                 stateTransition: { from: session?.state || 'Idle', to: 'Idle' },
               }));
               controller.enqueue(encodeEvent({ type: 'delta', text: answer }));
@@ -658,9 +608,9 @@ export async function POST(req: NextRequest) {
               }));
               await Promise.all([
                 saveChatMessage(currentSessionId, 'user', displayMessage),
-                saveChatMessage(currentSessionId, 'assistant', answer),
+                saveChatMessage(currentSessionId, 'assistant', answer, { latency_ms: Date.now() - startedAt }),
                 supabase.from('chat_sessions')
-                  .update({ state: 'Idle', updated_at: new Date().toISOString() })
+                  .update({ state: outcome.nextState || 'Idle', updated_at: new Date().toISOString() })
                   .eq('id', currentSessionId),
               ]);
               controller.close();
