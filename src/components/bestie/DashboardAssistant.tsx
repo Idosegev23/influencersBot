@@ -12,7 +12,7 @@
  * looking at the screen with you rather than documentation.
  */
 import { useState, useRef, useEffect, type ReactNode } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 interface Turn {
   role: 'user' | 'assistant';
@@ -42,7 +42,7 @@ const BRAND = {
 const MD_LINK = /\[([^\]]+)\]\((\/[^\s)]+)\)/g;
 const BARE_PATH = /(?<![\w([])(\/influencer\/[\w[\]._-]+(?:\/[\w[\]._-]+)*)/g;
 
-function renderRich(text: string, onNavigate: () => void): ReactNode[] {
+function renderRich(text: string, go: (href: string) => void): ReactNode[] {
   const out: ReactNode[] = [];
   let key = 0;
 
@@ -51,16 +51,26 @@ function renderRich(text: string, onNavigate: () => void): ReactNode[] {
     textUnderlineOffset: 3, cursor: 'pointer',
   };
 
+  // preventDefault + router.push: a plain <a> is a full page load, which
+  // remounts the layout and throws away the conversation — so the very link
+  // Bestie offers would destroy the context it was answering in.
+  const link = (k: string, href: string, label: string) => (
+    <a
+      key={k}
+      href={href}
+      onClick={e => { e.preventDefault(); go(href); }}
+      style={linkStyle}
+    >
+      {label}
+    </a>
+  );
+
   const pushLinkified = (chunk: string) => {
     let last = 0;
     for (const m of chunk.matchAll(BARE_PATH)) {
       const at = m.index ?? 0;
       if (at > last) out.push(chunk.slice(last, at));
-      out.push(
-        <a key={`b${key++}`} href={m[1]} onClick={onNavigate} style={linkStyle}>
-          {m[1]}
-        </a>
-      );
+      out.push(link(`b${key++}`, m[1], m[1]));
       last = at + m[1].length;
     }
     if (last < chunk.length) out.push(chunk.slice(last));
@@ -70,11 +80,7 @@ function renderRich(text: string, onNavigate: () => void): ReactNode[] {
   for (const m of text.matchAll(MD_LINK)) {
     const at = m.index ?? 0;
     if (at > cursor) pushLinkified(text.slice(cursor, at));
-    out.push(
-      <a key={`m${key++}`} href={m[2]} onClick={onNavigate} style={linkStyle}>
-        {m[1]}
-      </a>
-    );
+    out.push(link(`m${key++}`, m[2], m[1]));
     cursor = at + m[0].length;
   }
   if (cursor < text.length) pushLinkified(text.slice(cursor));
@@ -89,17 +95,77 @@ const STARTERS = [
   { label: 'איך משנים…', message: 'איך משנים את האישיות של הבוט?' },
 ];
 
+/**
+ * Conversation state survives two different things, and they need two different
+ * mechanisms.
+ *
+ * Moving between screens is handled by the layout: this component is mounted in
+ * layout.tsx, which App Router keeps alive across client-side navigation — so
+ * React state simply persists, provided nothing triggers a full page load.
+ *
+ * A manual refresh, a back button, or closing and reopening the tab is not
+ * covered by that, and losing a conversation to one F5 is the kind of thing
+ * people only forgive once. Hence sessionStorage — scoped per account so two
+ * brands open in two tabs never see each other's chat, and session-scoped
+ * because this is a working conversation, not history worth keeping forever.
+ */
+const storeKey = (username: string) => `bestie_dash_chat_${username}`;
+
+function loadSaved(username: string): { turns: Turn[]; open: boolean } {
+  try {
+    const raw = sessionStorage.getItem(storeKey(username));
+    if (!raw) return { turns: [], open: false };
+    const parsed = JSON.parse(raw);
+    return {
+      turns: Array.isArray(parsed?.turns) ? parsed.turns : [],
+      open: Boolean(parsed?.open),
+    };
+  } catch {
+    return { turns: [], open: false };
+  }
+}
+
 export default function DashboardAssistant({ username }: { username: string }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  const [restored, setRestored] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Restore after mount, never during render: sessionStorage does not exist on
+  // the server and reading it in the initial state would break hydration.
+  useEffect(() => {
+    const saved = loadSaved(username);
+    setTurns(saved.turns);
+    setOpen(saved.open);
+    setRestored(true);
+  }, [username]);
+
+  // Persist only after the restore has run, or the first write would clobber
+  // the saved conversation with the empty initial state.
+  useEffect(() => {
+    if (!restored) return;
+    try {
+      sessionStorage.setItem(storeKey(username), JSON.stringify({ turns: turns.slice(-40), open }));
+    } catch { /* private mode — the conversation just will not survive a reload */ }
+  }, [turns, open, restored, username]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [turns, busy]);
+
+  /** Client-side navigation, so the layout — and this conversation — survives. */
+  function go(href: string) {
+    router.push(href);
+  }
+
+  function clearChat() {
+    setTurns([]);
+    try { sessionStorage.removeItem(storeKey(username)); } catch { /* ignore */ }
+  }
 
   async function send(message: string) {
     const text = message.trim();
@@ -192,13 +258,28 @@ export default function DashboardAssistant({ username }: { username: string }) {
             </span>
           </span>
         </div>
-        <button
-          onClick={() => setOpen(false)}
-          aria-label="סגור"
-          style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer' }}
-        >
-          ×
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          {turns.length > 0 && (
+            <button
+              onClick={clearChat}
+              aria-label="שיחה חדשה"
+              title="שיחה חדשה"
+              style={{
+                background: 'rgba(255,255,255,.18)', border: 'none', color: '#fff',
+                fontSize: 12, cursor: 'pointer', borderRadius: 8, padding: '4px 8px',
+              }}
+            >
+              שיחה חדשה
+            </button>
+          )}
+          <button
+            onClick={() => setOpen(false)}
+            aria-label="סגור"
+            style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer' }}
+          >
+            ×
+          </button>
+        </div>
       </div>
 
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
@@ -253,7 +334,7 @@ export default function DashboardAssistant({ username }: { username: string }) {
               marginInlineEnd: t.role === 'user' ? 0 : 20,
             }}
           >
-            {t.role === 'assistant' ? renderRich(t.content, () => setOpen(false)) : t.content}
+            {t.role === 'assistant' ? renderRich(t.content, go) : t.content}
           </div>
           </div>
         ))}
