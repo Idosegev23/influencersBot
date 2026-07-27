@@ -45,6 +45,10 @@ import {
 
 import { understandMessageFast } from '@/engines/understanding';
 import { runEscalationCheck } from '@/engines/escalation/dispatch';
+import { maybeFileAutoTicket } from '@/lib/support/file-auto-ticket';
+import { alreadyTriedOfficialChannels } from '@/lib/support/auto-ticket';
+import { loadProductLinkCatalog, selectRelevantProducts, renderProductCatalogBlock } from '@/lib/recommendations/product-links';
+import { isBroadOpeningQuestion } from '@/lib/chatbot/broad-question';
 import { 
   decide, 
   getUIDirectivesSummary, 
@@ -484,14 +488,17 @@ export async function POST(req: NextRequest) {
         // or ask the customer for the number (and wait for the next turn).
         const shipmentCfg = (influencer as any)?._rawConfig?.shipment_provider;
         if (shipmentCfg?.enabled === true) {
-          const { detectShipmentIntent } = await import('@/lib/shipment/intent');
+          const { detectShipmentIntent, extractOrderNumber } = await import('@/lib/shipment/intent');
           const intent = detectShipmentIntent(displayMessage);
           // If the user previously asked about status and we asked for a
           // number, this turn is just a number → treat as continuation.
           const awaitingShipNumber = session?.state === 'OrderStatus.AwaitingNumber';
           if (intent.isOrderStatus || awaitingShipNumber) {
+            // Same extractor as the intent detector — never re-declare the pattern
+            // here. A second, stricter copy of it is what made this branch loop:
+            // it re-asked for a number the customer had already sent.
             const numToUse = intent.shipmentNumber
-              || (awaitingShipNumber ? (displayMessage.match(/\b(\d{6,12})\b/)?.[1] || null) : null);
+              || (awaitingShipNumber ? extractOrderNumber(displayMessage) : null);
 
             // For accounts that opt in to support_redirect_to_tab, route
             // bare "where's my order?" intents to the tracking tab where
@@ -566,31 +573,63 @@ export async function POST(req: NextRequest) {
               return;
             }
 
-            // We have a number — look up the status. Pass through the
-            // account's expected_master_customer_id so we drop responses
-            // that belong to a different brand at Focus (their PULL API
-            // does global ship_no lookup with no customer scoping).
+            // We have a number. Resolve it against our OWN order store first:
+            // customers type the order number from their confirmation email, and
+            // Focus resolves those through a P2 lookup (reference + master customer
+            // code) — not the P1 ship_no path. Querying P1 with an order number
+            // returns "not found" for every store whose numbers aren't Focus ship_nos.
+            //
+            // PRIVACY: order numbers here are short and sequential, so this branch is
+            // enumerable by an anonymous visitor. It therefore answers with SHIPMENT
+            // STATUS ONLY — never customer name, address, or line items. See the
+            // no_public_order_details policy in engines/policy.
             try {
+              const { findBrandOrderByNumber } = await import('@/lib/orders/brand-orders');
               const { getFocusShipmentStatus } = await import('@/lib/shipment/focus-client');
               const expectedMaster = shipmentCfg.expected_master_customer_id
                 ? Number(shipmentCfg.expected_master_customer_id)
                 : undefined;
+
+              let orderRow: Awaited<ReturnType<typeof findBrandOrderByNumber>> = null;
+              try {
+                orderRow = await findBrandOrderByNumber(accountId, numToUse);
+              } catch (e) {
+                console.warn('[Stream] brand_orders lookup failed:', (e as Error).message);
+              }
+
               const view = shipmentCfg.type === 'focus'
                 ? await getFocusShipmentStatus({
                     host: shipmentCfg.host || 'focusdelivery.co.il',
-                    shipmentNumber: numToUse,
+                    // Recognised as one of our order numbers → scoped P2 lookup.
+                    // Otherwise treat it as a Focus ship_no from the shipping email.
+                    ...(orderRow
+                      ? { reference: orderRow.order_number, customerCode: expectedMaster }
+                      : { shipmentNumber: numToUse }),
                     expectedMasterCustomerId: expectedMaster,
                   })
-                : { found: false, statusText: 'spec ספק משלוחים לא נתמך עדיין', errorMessage: null } as any;
+                : { found: false, statusText: 'ספק משלוחים לא נתמך עדיין', errorMessage: null } as any;
 
               let answer: string;
               const isEn = (influencer as any).language === 'en';
-              if (!view.found) {
+              if (!view.found && !orderRow) {
                 answer = isEn
                   ? `I couldn't find an order with number ${numToUse}. ${view.errorMessage || 'Maybe the number is off?'} Please double-check or contact customer support.`
                   : `לא הצלחתי למצוא הזמנה עם מספר ${numToUse}. ${view.errorMessage || 'אולי המספר שגוי?'} בדקי שוב או צרי קשר עם שירות הלקוחות.`;
+              } else if (!view.found && orderRow) {
+                // The order exists on our side but the courier has no record yet —
+                // the normal state between "paid" and "handed to Focus". Saying
+                // "not found" here reads as "your order vanished", which is wrong.
+                const placed = orderRow.placed_at
+                  ? new Date(orderRow.placed_at).toLocaleDateString('he-IL')
+                  : null;
+                answer = isEn
+                  ? `Order ${numToUse} is in our system${placed ? ` (placed ${placed})` : ''}, but the courier hasn't picked it up yet, so there's no tracking status. It usually updates within 1-2 business days.`
+                  : [
+                      `📦 הזמנה ${numToUse} נמצאת אצלנו במערכת${placed ? ` (בוצעה ב-${placed})` : ''}.`,
+                      'היא עדיין לא נקלטה אצל חברת השילוח, ולכן אין עדיין סטטוס מעקב — זה בדרך כלל מתעדכן תוך 1-2 ימי עסקים.',
+                    ].join('\n');
               } else {
-                const lines: string[] = [`📦 הזמנה ${view.shipmentNumber}`, `סטטוס: ${view.statusText}`];
+                const lines: string[] = [`📦 הזמנה ${orderRow?.order_number || view.shipmentNumber || numToUse}`, `סטטוס: ${view.statusText}`];
                 if (view.lastUpdate?.date) lines.push(`עודכן: ${view.lastUpdate.date} ${view.lastUpdate.time || ''}`.trim());
                 if (view.destinationBranch) lines.push(`סניף יעד: ${view.destinationBranch}`);
                 if (view.shipmentDirection) lines.push(`כיוון: ${view.shipmentDirection}`);
@@ -1030,6 +1069,12 @@ export async function POST(req: NextRequest) {
             content: m.content,
           }));
 
+        // Buyable-product links. Kicked off here and awaited at the sandwich
+        // call so the DB round-trip overlaps the rest of the pre-flight work
+        // instead of adding to time-to-first-token.
+        const productCatalogPromise = loadProductLinkCatalog(accountId)
+          .catch(() => [] as Awaited<ReturnType<typeof loadProductLinkCatalog>>);
+
         // --- Memory V2: Prepend rolling summary + token budget ---
         // Check global flag OR per-account override (cached 5 min)
         let memoryV2Active = process.env.MEMORY_V2_ENABLED === 'true';
@@ -1228,6 +1273,16 @@ export async function POST(req: NextRequest) {
             cachedConfidence: cachedRAG?.confidence,
             // Proactive enrichment (Steps 1-4)
             suggestedClarifications: understanding.suggestedClarifications?.length ? understanding.suggestedClarifications : undefined,
+            // Look across the whole conversation, not just this turn: the
+            // customer usually says "nobody answers" once, up front, and then
+            // keeps describing the problem.
+            supportChannelsExhausted: alreadyTriedOfficialChannels(
+              [...(conversationHistory || []).filter(m => m.role === 'user').map(m => m.content), displayMessage].join('\n'),
+            ),
+            productCatalogBlock: renderProductCatalogBlock(
+              selectRelevantProducts(await productCatalogPromise, displayMessage),
+            ) || undefined,
+            isBroadOpeningQuestion: isBroadOpeningQuestion(displayMessage, conversationHistory.length),
             activeCoupons: activeCoupons.length > 0 ? activeCoupons : undefined,
             conversationTopics: conversationTopics.length > 0 ? conversationTopics : undefined,
             couponCodeWhitelist,
@@ -1326,10 +1381,21 @@ export async function POST(req: NextRequest) {
             source: 'chat',
           }).catch((e: any) => console.error('[escalation] chat hook failed:', e?.message || e));
 
+          // Auto-file a support ticket when the customer has a real service
+          // problem AND left something we can act on. Deterministic and off the
+          // hot path — the LLM was reciting the support phone number instead of
+          // capturing the pending issue (49 of 75 service conversations on
+          // Argania produced no ticket at all, 2026-07-21 → 07-27).
+          maybeFileAutoTicket({
+            accountId,
+            sessionId: currentSessionId,
+            latestUserMessage: displayMessage,
+          }).catch((e: any) => console.error('[auto-ticket] chat hook failed:', e?.message || e));
+
           try {
             await Promise.all([
               saveChatMessage(currentSessionId, 'user', displayMessage),
-              saveChatMessage(currentSessionId, 'assistant', fullText),
+              saveChatMessage(currentSessionId, 'assistant', fullText, { latency_ms: latencyMs }),
               responseId
                 ? supabase
                     .from('chat_sessions')

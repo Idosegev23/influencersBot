@@ -873,11 +873,20 @@ export async function getChatMessages(sessionId: string): Promise<ChatMessage[]>
 export async function saveChatMessage(
   sessionId: string,
   role: 'user' | 'assistant',
-  content: string
+  content: string,
+  /** Per-message metadata, e.g. { latency_ms }. Only the widget handler used to
+   *  record latency, so the main chat route's response times were invisible —
+   *  measured coverage on Argania was 100 of 1,024 assistant messages. */
+  metadata?: Record<string, unknown> | null
 ): Promise<ChatMessage | null> {
   const { data, error } = await supabase
     .from('chat_messages')
-    .insert({ session_id: sessionId, role, content })
+    .insert({
+      session_id: sessionId,
+      role,
+      content,
+      ...(metadata && Object.keys(metadata).length ? { metadata } : {}),
+    })
     .select()
     .single();
 

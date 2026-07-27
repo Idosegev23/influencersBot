@@ -132,7 +132,15 @@ async function generateChips(ctx: ChipsContext): Promise<string[] | null> {
         : `Generate ${targetCount} short English chips as conversation starters for a brand website chat. Each chip is a question (max 6 words) an anonymous visitor would tap to start a chat. They must feel native to the brand and the page type the visitor is on.`)
     : (ctx.mode === 'follow_up'
         ? `אתה מייצר ${targetCount} צ'יפסים קצרים בעברית להמשך שיחה בצ'אט באתר מסחרי. כל צ'יפ הוא שאלה/בקשה קצרה (עד 6 מילים) שהמבקר/ת היה/יתה מקליק/ה עכשיו אחרי תשובת הבוט. תכוון/י לדיוק על הקשר השיחה.`
-        : `אתה מייצר ${targetCount} צ'יפסים קצרים בעברית בתור שאלות פתיחה לצ'אט באתר מותג. כל צ'יפ הוא שאלה (עד 6 מילים) שלקוח/ה אנונימי/ת היה/יתה מקליק/ה כדי להתחיל שיחה. הם צריכים להרגיש native למותג ולסוג העמוד שהמבקר/ת רואה.`)) + noCouponsRule;
+        : `אתה מייצר ${targetCount} צ'יפסים קצרים בעברית בתור שאלות פתיחה לצ'אט באתר מותג. כל צ'יפ הוא שאלה (עד 6 מילים) שלקוח/ה אנונימי/ת היה/יתה מקליק/ה כדי להתחיל שיחה. הם צריכים להרגיש native למותג ולסוג העמוד שהמבקר/ת רואה.`))
+    + (ctx.mode === 'follow_up' ? '' : (chipLang === 'en'
+        ? ' CRITICAL — the chips must cover DIFFERENT intents, not variations of one question. Across the set include at most ONE broad "what suits X" question; the rest must be concrete: a specific product or bundle, a practical question (shipping, usage, ingredients), or order help. Near-duplicate chips are a failure.'
+        // Measured on Argania: 4 near-identical broad chips ("what suits dry
+        // hair?" / "...curly hair?" / "...after straightening?") opened 73% of
+        // conversations and 63.7% of those ended after a single exchange —
+        // materially worse than free-typed openers (49.3%).
+        : ' קריטי — הצ\'יפים חייבים לכסות כוונות שונות, לא וריאציות של אותה שאלה. לכל היותר צ\'יפ אחד רחב מסוג "מה מתאים ל...", וכל השאר קונקרטיים: מוצר או מארז ספציפי, שאלה פרקטית (משלוח, אופן שימוש, רכיבים), או עזרה בהזמנה. צ\'יפים כמעט-זהים זה כישלון.'))
+    + noCouponsRule;
 
   const input =
     ctx.mode === 'follow_up'

@@ -139,6 +139,9 @@ export async function processWithArchetype(
     mode?: 'widget' | 'social' | 'dm' | 'whatsapp';
     widgetConfig?: any;
     suggestedClarifications?: string[];
+    supportChannelsExhausted?: boolean;
+    productCatalogBlock?: string;
+    isBroadOpeningQuestion?: boolean;
     activeCoupons?: Array<{ brand_name: string; coupon_code: string; description?: string }>;
     conversationTopics?: string[];
   }
@@ -190,6 +193,9 @@ export async function processWithArchetype(
     mode: resolveArchetypeMode(context.mode),
     widgetConfig: context.widgetConfig,
     suggestedClarifications: context.suggestedClarifications,
+    supportChannelsExhausted: context.supportChannelsExhausted,
+    productCatalogBlock: context.productCatalogBlock,
+    isBroadOpeningQuestion: context.isBroadOpeningQuestion,
     activeCoupons: context.activeCoupons,
     conversationTopics: context.conversationTopics,
   });

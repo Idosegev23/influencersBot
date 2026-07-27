@@ -84,6 +84,13 @@ export interface SandwichBotInput {
   cachedConfidence?: number;
   // Proactive conversation enrichment (from understanding engine + stream/route)
   suggestedClarifications?: string[]; // Questions to ask when intent is ambiguous
+  /** Customer reports the brand's phone/email went unanswered — suppresses the
+   *  "contact customer support" boilerplate for the rest of the conversation. */
+  supportChannelsExhausted?: boolean;
+  /** Pre-rendered buyable-product block so recommendations carry a real link. */
+  productCatalogBlock?: string;
+  /** Opener was a broad category question (usually a starter chip). */
+  isBroadOpeningQuestion?: boolean;
   activeCoupons?: Array<{ brand_name: string; coupon_code: string; description?: string }>; // Available coupons for proactive mention
   conversationTopics?: string[]; // Topics from rolling_summary for deepening
   // Attribution scoping — when set, post-filter the KB so only coupons
@@ -421,6 +428,9 @@ export class SandwichBot {
         mode: input.mode,
         widgetConfig: input.widgetConfig,
         suggestedClarifications: input.suggestedClarifications,
+        supportChannelsExhausted: input.supportChannelsExhausted,
+        productCatalogBlock: input.productCatalogBlock,
+        isBroadOpeningQuestion: input.isBroadOpeningQuestion,
         activeCoupons: couponsDisabled ? undefined : input.activeCoupons,
         conversationTopics: input.conversationTopics,
       }

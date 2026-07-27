@@ -516,6 +516,39 @@ export abstract class BaseArchetype {
       );
     }
 
+    // Step 1b: The customer already tried the official channels and got nothing.
+    // Repeating the phone number at them is the single most damaging pattern we
+    // measured in the Argania log — "אני מנסה לתפוס אתכם כבר עשרה ימים" answered
+    // with "אפשר לפנות בטלפון 03-5515559". Hard rule, not a suggestion.
+    if (input.supportChannelsExhausted) {
+      sections.push(
+        `\n🚨 חוק ברזל לשיחה הזו — הלקוח/ה כבר ניסה/תה ליצור קשר עם שירות הלקוחות ולא קיבל/ה מענה:
+• אסור בהחלט לתת שוב מספר טלפון, כתובת מייל, שעות פעילות או "פנה/י לשירות הלקוחות". זה בדיוק מה שכבר לא עבד, וזה נתפס כזלזול.
+• במקום זה: הכר/י בתסכול במשפט אחד קצר, ואמור/י בבירור שהפנייה נרשמת ומועברת לצוות שיחזור אליו/ה ישירות.
+• אם עדיין אין לנו דרך לחזור אליו/ה — בקש/י פרט אחד בלבד: מספר טלפון לחזרה או מספר הזמנה. בקשה אחת, לא רשימה.
+• אל תבטיח/י זמן תגובה מדויק.`
+      );
+    }
+
+    // Step 1c: Buyable product links. Without this the model gives an accurate
+    // recommendation and leaves the customer to find the product themselves.
+    if (input.productCatalogBlock) {
+      sections.push(input.productCatalogBlock);
+    }
+
+    // Step 1d: Broad opener → one diagnostic question, not a catalogue dump.
+    // On Argania, broad category openers that got an immediate generic answer
+    // ended after a single exchange 63.7% of the time; the conversations that
+    // asked back ("נשירה או יובש?") ran ~5 turns and reached a real recommendation.
+    if (input.isBroadOpeningQuestion) {
+      sections.push(
+        `\n🎯 השאלה הפותחת רחבה (למשל "מה מתאים לשיער יבש?") ואין עדיין מספיק מידע להמלצה מדויקת:
+• פתח/י בשאלת אבחון אחת קצרה וממוקדת שתחדד את הצורך (למשל: מה הכי מפריע — יובש, נשירה, פריז או נפח?). שאלה אחת בלבד, לא שאלון.
+• אפשר לצרף משפט קצר של כיוון ראשוני לפני השאלה, אבל בלי לשפוך את כל הקטלוג.
+• ברגע שיש תשובה — תן/י המלצה קונקרטית עם קישור לרכישה.`
+      );
+    }
+
     // Step 2+3: Active coupons for proactive mention in response + suggestions
     if (input.accountContext?.couponsDisabled) {
       // coupons_disabled account: the KB is already stripped of coupon

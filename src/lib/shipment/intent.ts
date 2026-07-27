@@ -28,7 +28,36 @@ const INTENT_PATTERNS: RegExp[] = [
   /(לא הגיע|לא הגיעה).*?(הזמנה|משלוח|חבילה)/,
 ];
 
-const NUMBER_PATTERN = /\b(\d{6,12})\b/;
+// Order/shipment numbers run 4-12 digits. The lower bound matters: store order
+// numbers are commonly 4-5 digits (Argania: ALL 26,177 orders are 4- or 5-digit),
+// while Focus shipment numbers are longer. A 6-digit floor here silently made the
+// order-status flow unreachable for those stores — the bot asked for a number,
+// the customer sent it, and the same question came back. Live-observed 2026-07-26/27.
+const NUMBER_PATTERN = /\b(\d{4,12})\b/g;
+
+// Israeli phone shapes, so a customer pasting a callback number isn't sent through
+// an order lookup that can only answer "no such order" (live-observed: "0512018226").
+//   0XXXXXXXX / 0XXXXXXXXX  → landline (03-5515559) and mobile (050-1234567)
+//   972XXXXXXXX(X)          → the same numbers in +972 form
+const PHONE_SHAPES: RegExp[] = [/^0\d{8,9}$/, /^972\d{8,9}$/];
+
+function looksLikePhone(digits: string): boolean {
+  return PHONE_SHAPES.some((re) => re.test(digits));
+}
+
+/**
+ * First number in the message that could plausibly be an order/shipment number.
+ * Skips phone-shaped runs so "0503222225 תחזרו אליי" doesn't become a lookup.
+ * Exported so callers never re-declare the pattern — the duplicated copy in the
+ * chat stream route is exactly how the 6-digit floor survived a fix in one place.
+ */
+export function extractOrderNumber(message: string): string | null {
+  const text = (message || '').trim();
+  for (const m of text.matchAll(NUMBER_PATTERN)) {
+    if (!looksLikePhone(m[1])) return m[1];
+  }
+  return null;
+}
 
 export interface ShipmentIntentResult {
   isOrderStatus: boolean;
@@ -43,9 +72,9 @@ export function detectShipmentIntent(message: string): ShipmentIntentResult {
   // Even without obvious intent words, a bare number on a short message
   // (≤ 4 words) is almost certainly a shipment number reply.
   const wordCount = text.split(/\s+/).filter(Boolean).length;
-  const numberMatch = text.match(NUMBER_PATTERN);
+  const orderNumber = extractOrderNumber(text);
 
-  const isShortNumberOnly = wordCount <= 4 && !!numberMatch;
+  const isShortNumberOnly = wordCount <= 4 && !!orderNumber;
 
   if (!matchesIntent && !isShortNumberOnly) {
     return { isOrderStatus: false, shipmentNumber: null, reference: null };
@@ -53,7 +82,7 @@ export function detectShipmentIntent(message: string): ShipmentIntentResult {
 
   return {
     isOrderStatus: true,
-    shipmentNumber: numberMatch ? numberMatch[1] : null,
+    shipmentNumber: orderNumber,
     reference: null,
   };
 }

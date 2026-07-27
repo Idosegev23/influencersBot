@@ -112,6 +112,12 @@ export interface ArchetypeInput {
   widgetConfig?: any; // Widget-specific config from accounts.config.widget (prompt overrides, FAQ, etc.)
   // Proactive conversation enrichment
   suggestedClarifications?: string[]; // From understanding engine — questions to ask when ambiguous
+  /** Customer says the brand's phone/email went unanswered — stop reciting them. */
+  supportChannelsExhausted?: boolean;
+  /** Buyable products (name + URL) the model may link to. Pre-rendered block. */
+  productCatalogBlock?: string;
+  /** Opener was a broad category question — ask one diagnostic question first. */
+  isBroadOpeningQuestion?: boolean;
   activeCoupons?: Array<{ brand_name: string; coupon_code: string; description?: string }>; // For proactive coupon hints
   conversationTopics?: string[]; // From rolling_summary — recurring topics for deepening
 }
