@@ -21,6 +21,12 @@ const BRAND = {
   ink: '#17092E',
 };
 
+// Absolute, not relative: the widget config is consumed by the embed script on
+// third-party sites, where a "/brand/..." path resolves against THEIR domain.
+const SITE = (process.env.NEXT_PUBLIC_APP_URL || 'https://bestie.ldrsgroup.com').replace(/\/$/, '');
+const ICON = `${SITE}/brand/bestie-icon.svg`;
+const WORDMARK = `${SITE}/brand/bestie-wordmark.svg`;
+
 async function main() {
   const { createClient } = await import('../src/lib/supabase/server');
   const { hashPassword } = await import('../src/lib/utils');
@@ -45,7 +51,12 @@ async function main() {
     header_label: 'עוזרת AI לעסקים',
     chat_subtitle: 'שאלו אותי כל דבר על בסטי — מה היא עושה, איך משתמשים בה, ומה יש בכל מסך',
     greeting_message: 'היי, אני בסטי. שאלו אותי כל דבר על המערכת ואראה לכם בדיוק איפה ומה ללחוץ.',
-    website_url: 'https://bestie.ldrsgroup.com',
+    website_url: SITE,
+
+    // The brand mark, finally wired up. Both keys because different screens
+    // read different ones (chat page vs widget config vs admin list).
+    avatar_url: ICON,
+    profile_pic_url: ICON,
 
     theme: {
       style: 'elegant',
@@ -67,6 +78,7 @@ async function main() {
       domain: 'bestie.ldrsgroup.com',
       position: 'bottom-right',
       primaryColor: BRAND.purple,
+      coverImage: WORDMARK,
       placeholder: 'שאלו אותי על בסטי…',
       welcomeMessage:
         'היי! אני בסטי 👋 אני עונה על כל שאלה על המוצר — מה הוא עושה, למי הוא מתאים, ואיך משתמשים בו.',

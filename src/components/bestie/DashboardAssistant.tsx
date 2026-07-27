@@ -27,6 +27,9 @@ const BRAND = {
   purpleLight: '#B497EF',
   ink: '#17092E',
   gradient: 'linear-gradient(135deg,#883FE2,#B497EF)',
+  // Shipped in public/brand/ since April and referenced by nothing until now.
+  icon: '/brand/bestie-icon.svg',
+  wordmark: '/brand/bestie-wordmark.svg',
 };
 
 /**
@@ -140,13 +143,15 @@ export default function DashboardAssistant({ username }: { username: string }) {
         aria-label="פתח את בסטי"
         style={{
           position: 'fixed', bottom: 20, left: 20, zIndex: 60,
-          width: 56, height: 56, borderRadius: 999, border: 'none', cursor: 'pointer',
-          background: BRAND.gradient, color: '#fff',
-          fontSize: 26, boxShadow: '0 8px 28px rgba(136,63,226,.45)',
-          fontFamily: 'Heebo, system-ui, sans-serif',
+          width: 60, height: 60, borderRadius: 999, border: 'none', cursor: 'pointer',
+          background: '#fff', padding: 8,
+          boxShadow: '0 8px 28px rgba(136,63,226,.42), 0 0 0 1px rgba(136,63,226,.14)',
+          display: 'grid', placeItems: 'center',
         }}
       >
-        ✦
+        {/* The mark carries its own gradient, so it sits on white rather than
+            on the brand gradient — layering both muddies it. */}
+        <img src={BRAND.icon} alt="בסטי" style={{ width: '100%', height: '100%' }} />
       </button>
     );
   }
@@ -171,9 +176,21 @@ export default function DashboardAssistant({ username }: { username: string }) {
           padding: '12px 16px', background: BRAND.gradient, color: '#fff',
         }}
       >
-        <div>
-          <div style={{ fontWeight: 700 }}>בסטי</div>
-          <div style={{ fontSize: 12, opacity: 0.85 }}>שואלים אותי כל דבר על המערכת</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span
+            style={{
+              width: 36, height: 36, borderRadius: 999, background: '#fff',
+              display: 'grid', placeItems: 'center', padding: 5, flexShrink: 0,
+            }}
+          >
+            <img src={BRAND.icon} alt="" style={{ width: '100%', height: '100%' }} />
+          </span>
+          <span>
+            <span style={{ display: 'block', fontWeight: 700, lineHeight: 1.2 }}>בסטי</span>
+            <span style={{ display: 'block', fontSize: 12, opacity: 0.85 }}>
+              שואלים אותי כל דבר על המערכת
+            </span>
+          </span>
         </div>
         <button
           onClick={() => setOpen(false)}
@@ -187,6 +204,11 @@ export default function DashboardAssistant({ username }: { username: string }) {
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
         {turns.length === 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <img
+              src={BRAND.wordmark}
+              alt="Bestie"
+              style={{ height: 26, width: 'auto', alignSelf: 'center', margin: '4px 0 10px', opacity: 0.9 }}
+            />
             <p style={{ fontSize: 14, opacity: 0.7, margin: '0 0 4px' }}>
               אני רואה את החשבון שלך ואת המסך שאתה נמצא בו. אפשר להתחיל מכאן:
             </p>
@@ -208,18 +230,31 @@ export default function DashboardAssistant({ username }: { username: string }) {
         )}
 
         {turns.map((t, i) => (
+          <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', margin: '10px 0' }}>
+            {t.role === 'assistant' && (
+              <span
+                style={{
+                  width: 26, height: 26, borderRadius: 999, background: '#fff', flexShrink: 0,
+                  display: 'grid', placeItems: 'center', padding: 3, marginTop: 2,
+                  boxShadow: '0 0 0 1px rgba(136,63,226,.16)',
+                }}
+              >
+                <img src={BRAND.icon} alt="" style={{ width: '100%', height: '100%' }} />
+              </span>
+            )}
           <div
-            key={i}
             style={{
-              margin: '8px 0', padding: '10px 12px', borderRadius: 12, fontSize: 14,
+              padding: '10px 12px', borderRadius: 12, fontSize: 14,
               whiteSpace: 'pre-wrap', lineHeight: 1.5,
               background: t.role === 'user' ? BRAND.gradient : 'var(--dash-bg-soft, rgba(0,0,0,.04))',
               color: t.role === 'user' ? '#fff' : 'inherit',
+              flex: 1,
               marginInlineStart: t.role === 'user' ? 40 : 0,
-              marginInlineEnd: t.role === 'user' ? 0 : 40,
+              marginInlineEnd: t.role === 'user' ? 0 : 20,
             }}
           >
             {t.role === 'assistant' ? renderRich(t.content, () => setOpen(false)) : t.content}
+          </div>
           </div>
         ))}
 
