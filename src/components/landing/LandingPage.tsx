@@ -336,7 +336,7 @@ function MouseParallaxMark() {
         width={820}
         height={820}
         priority
-        className="w-[260px] sm:w-[340px] md:w-[440px] lg:w-[560px] h-auto drop-shadow-[0_30px_60px_rgba(136,63,226,0.25)]"
+        className="w-[170px] sm:w-[240px] md:w-[380px] lg:w-[520px] h-auto drop-shadow-[0_30px_60px_rgba(136,63,226,0.25)]"
       />
     </motion.div>
   );
@@ -363,7 +363,7 @@ function Hero({ t, d }: { t: LandingStrings; d: Dirs }) {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1, ease: EASE }}
-            className="lg:col-span-7 order-2 lg:order-1"
+            className="lg:col-span-7 order-1 lg:order-1"
             dir={d.dir}
           >
             <motion.div
@@ -388,7 +388,17 @@ function Hero({ t, d }: { t: LandingStrings; d: Dirs }) {
               <span className="relative inline-block">
                 <span className="relative z-10">{t.hero.titleHighlight}</span>
                 <svg
-                  className="absolute -bottom-1 inset-x-0 w-full h-[0.5em] z-0"
+                  className="absolute inset-x-0 w-full z-0"
+                  /* Hebrew has no descenders, so the stroke can ride close to the
+                     baseline. Latin does, and at these display sizes the same
+                     offset cut through the bottom of "talks" and collided with
+                     the line below. Both values are in em so they track the
+                     clamped font size instead of drifting at one breakpoint. */
+                  style={
+                    d.rtl
+                      ? { bottom: '-0.04em', height: '0.5em' }
+                      : { bottom: '-0.17em', height: '0.34em' }
+                  }
                   viewBox="0 0 400 40"
                   preserveAspectRatio="none"
                   aria-hidden
@@ -406,7 +416,10 @@ function Hero({ t, d }: { t: LandingStrings; d: Dirs }) {
                 </svg>
               </span>
               <br />
-              <span className="text-stone-400">{t.hero.titleTail}</span>
+              {/* stone-400 on #faf7f2 is ~2.3:1 and read as disabled rather than
+                  deliberate. stone-500 clears the 3:1 large-text threshold and
+                  still recedes behind the two lines above it. */}
+              <span className="text-stone-500">{t.hero.titleTail}</span>
             </h1>
 
             <motion.p
@@ -445,42 +458,22 @@ function Hero({ t, d }: { t: LandingStrings; d: Dirs }) {
                 {t.hero.ctaSecondary}
               </a>
             </motion.div>
-
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.7 }}
-              className="mt-5 text-xs text-stone-400 tracking-wide"
-            >
-              {t.hero.fineprint}
-            </motion.p>
           </motion.div>
 
           <motion.div
             initial={{ opacity: 0, scale: 0.85 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 1.2, delay: 0.3, ease: EASE }}
-            className="lg:col-span-5 order-1 lg:order-2 flex justify-center lg:justify-end"
+            /* order-2 on mobile is the whole point: with the mark first, the
+               mark plus the cookie bar filled the entire phone viewport and the
+               headline, subtext and CTA all sat below the fold. Anyone arriving
+               from a bio link saw a logo and a consent prompt. */
+            className="lg:col-span-5 order-2 lg:order-2 flex justify-center lg:justify-end"
           >
             <MouseParallaxMark />
           </motion.div>
         </div>
       </div>
-
-      {/* Scroll hint */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1.6 }}
-        className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-[10px] tracking-[0.3em] uppercase text-stone-400"
-      >
-        <span>{t.hero.scrollHint}</span>
-        <motion.span
-          animate={{ y: [0, 6, 0] }}
-          transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-          className="w-px h-5 bg-stone-400"
-        />
-      </motion.div>
     </section>
   );
 }
@@ -555,8 +548,7 @@ function InteractiveDemo({ t, d }: { t: LandingStrings; d: Dirs }) {
             {t.demo.titleLead}
             <br />
             <span
-              className="bg-clip-text text-transparent"
-              style={{ backgroundImage: `linear-gradient(95deg, ${INDIGO}, ${PEACH})` }}
+              style={{ color: INDIGO }}
             >
               {t.demo.titleHighlight}
             </span>
@@ -674,7 +666,7 @@ function InteractiveDemo({ t, d }: { t: LandingStrings; d: Dirs }) {
               </div>
             </div>
 
-            <p className="mt-4 text-xs text-stone-400 text-center flex items-center justify-center gap-2">
+            <p className="mt-4 text-xs text-stone-600 text-center flex items-center justify-center gap-2">
               <span className="w-4 h-px bg-stone-300" />
               {t.demo.disclaimer}
               <span className="w-4 h-px bg-stone-300" />
@@ -726,7 +718,6 @@ function DMShowcase({ t, d }: { t: LandingStrings; d: Dirs }) {
   return (
     <section className="relative bg-[#faf7f2] py-20 md:py-24 overflow-hidden border-y border-stone-200/60">
       <div className="max-w-7xl mx-auto px-5 md:px-8 mb-10" dir={d.dir}>
-        <Eyebrow className="text-stone-500">{t.dmShowcase.eyebrow}</Eyebrow>
         <h2
           className="mt-4 font-black tracking-[-0.03em] leading-[0.95] text-stone-900 max-w-3xl"
           style={{ fontSize: 'clamp(2rem, 5vw, 3.5rem)' }}
@@ -789,7 +780,6 @@ function MomentOfRecognition({ t, d }: { t: LandingStrings; d: Dirs }) {
       </motion.div>
 
       <div className="relative max-w-7xl mx-auto px-5 md:px-8" dir={d.dir}>
-        <Eyebrow className="text-stone-400">{t.recognition.eyebrow}</Eyebrow>
 
         <div className="mt-10 grid md:grid-cols-12 gap-8 items-start">
           <motion.div
@@ -874,7 +864,7 @@ function Capabilities({ t, d }: { t: LandingStrings; d: Dirs }) {
   return (
     <section id="capabilities" className="relative bg-[#faf7f2] py-28 md:py-40">
       <div className="max-w-7xl mx-auto px-5 md:px-8" dir={d.dir}>
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-14 md:mb-20">
+        <div className="mb-14 md:mb-20 max-w-3xl">
           <div>
             <Eyebrow className="text-stone-500">{t.capabilities.eyebrow}</Eyebrow>
             <h2
@@ -884,29 +874,28 @@ function Capabilities({ t, d }: { t: LandingStrings; d: Dirs }) {
               {t.capabilities.titleLead}
               <br />
               <span
-                className="bg-clip-text text-transparent"
-                style={{ backgroundImage: `linear-gradient(95deg, ${INDIGO}, ${PEACH})` }}
+                style={{ color: INDIGO }}
               >
                 {t.capabilities.titleHighlight}
               </span>
             </h2>
           </div>
-          <p className="text-stone-500 text-sm leading-relaxed max-w-sm md:text-end">
+          <p className="mt-6 text-stone-600 leading-relaxed max-w-[58ch]">
             {t.capabilities.note}
           </p>
         </div>
 
         <MagicBento
           cards={cards}
-          textAutoHide={true}
-          enableStars={true}
+          textAutoHide={false}
+          enableStars={false}
           enableSpotlight={true}
           enableBorderGlow={true}
-          enableTilt={true}
-          enableMagnetism={true}
-          clickEffect={true}
-          spotlightRadius={300}
-          particleCount={10}
+          enableTilt={false}
+          enableMagnetism={false}
+          clickEffect={false}
+          spotlightRadius={260}
+          particleCount={0}
           glowColor={BRAND_RGB}
         />
       </div>
@@ -923,7 +912,6 @@ function HowItWorks({ t, d }: { t: LandingStrings; d: Dirs }) {
     <section id="how" className="relative bg-white py-28 md:py-40">
       <div className="max-w-7xl mx-auto px-5 md:px-8" dir={d.dir}>
         <div className="mb-20 max-w-3xl">
-          <Eyebrow className="text-stone-500">{t.howItWorks.eyebrow}</Eyebrow>
           <h2
             className="mt-5 font-black tracking-[-0.03em] leading-[0.9] text-stone-900"
             style={{ fontSize: 'clamp(2.25rem, 6vw, 5.5rem)' }}
@@ -931,8 +919,7 @@ function HowItWorks({ t, d }: { t: LandingStrings; d: Dirs }) {
             {t.howItWorks.titleLead}
             <br />
             <span
-              className="bg-clip-text text-transparent"
-              style={{ backgroundImage: `linear-gradient(95deg, ${INDIGO}, ${PEACH})` }}
+              style={{ color: INDIGO }}
             >
               {t.howItWorks.titleHighlight}
             </span>
@@ -959,11 +946,8 @@ function HowItWorks({ t, d }: { t: LandingStrings; d: Dirs }) {
               >
                 <div className="relative">
                   <span
-                    className="font-black tracking-[-0.05em] leading-none block bg-clip-text text-transparent"
-                    style={{
-                      fontSize: 'clamp(4rem, 9vw, 9rem)',
-                      backgroundImage: `linear-gradient(145deg, ${INDIGO} 0%, #a78bfa 50%, ${PEACH} 100%)`,
-                    }}
+                    className="font-black tracking-[-0.05em] leading-none block text-stone-200"
+                    style={{ fontSize: 'clamp(4rem, 9vw, 9rem)' }}
                   >
                     {/* Step numbers are digits, not copy — generated, never translated. */}
                     {String(i + 1).padStart(2, '0')}
@@ -979,7 +963,7 @@ function HowItWorks({ t, d }: { t: LandingStrings; d: Dirs }) {
                     {s.title}
                   </h3>
                   <p className="mt-4 text-lg text-stone-600 leading-relaxed">{s.body}</p>
-                  <p className="mt-4 text-xs tracking-wide uppercase text-stone-400 flex items-center gap-2">
+                  <p className="mt-4 text-xs tracking-wide uppercase text-stone-600 flex items-center gap-2">
                     <span className="w-5 h-px bg-stone-300" />
                     {s.detail}
                   </p>
@@ -1004,7 +988,6 @@ function Faq({ t, d }: { t: LandingStrings; d: Dirs }) {
     <section id="faq" className="bg-[#faf7f2] py-28 md:py-40">
       <div className="max-w-7xl mx-auto px-5 md:px-8 grid md:grid-cols-12 gap-10 md:gap-20" dir={d.dir}>
         <div className="md:col-span-5 md:sticky md:top-32 md:self-start">
-          <Eyebrow className="text-stone-500">{t.faq.eyebrow}</Eyebrow>
           <h2
             className="mt-5 font-black tracking-[-0.03em] leading-[0.9] text-stone-900"
             style={{ fontSize: 'clamp(2.25rem, 5vw, 4.5rem)' }}
@@ -1012,8 +995,7 @@ function Faq({ t, d }: { t: LandingStrings; d: Dirs }) {
             {t.faq.titleLead}
             <br />
             <span
-              className="bg-clip-text text-transparent"
-              style={{ backgroundImage: `linear-gradient(95deg, ${INDIGO}, ${PEACH})` }}
+              style={{ color: INDIGO }}
             >
               {t.faq.titleHighlight}
             </span>
@@ -1152,8 +1134,7 @@ function CtaForm({ t, d }: { t: LandingStrings; d: Dirs }) {
             {t.cta.titleLead}
             <br />
             <span
-              className="bg-clip-text text-transparent"
-              style={{ backgroundImage: `linear-gradient(100deg, #e6f7ff, ${PEACH}, #c8bef6, ${INDIGO})` }}
+              style={{ color: PEACH }}
             >
               {t.cta.titleHighlight}
             </span>
@@ -1315,7 +1296,6 @@ function Footer({ t, d }: { t: LandingStrings; d: Dirs }) {
       <div className="max-w-7xl mx-auto px-5 md:px-8" dir={d.dir}>
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-8 pb-12 border-b border-stone-300/60">
           <div className="max-w-md">
-            <Eyebrow className="text-stone-500">{t.footer.eyebrow}</Eyebrow>
             <p className="mt-5 text-stone-700 text-xl leading-snug font-semibold">
               {t.footer.quote}
             </p>

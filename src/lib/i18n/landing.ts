@@ -54,8 +54,6 @@ const he = {
       'ובוואטסאפ — בקול שלכם, בעברית, מסביב לשעון.',
     ctaPrimary: 'מעוניינים לשמוע עוד',
     ctaSecondary: 'נסו דמו חי',
-    fineprint: 'ללא כרטיס אשראי · ללא קוד · ללא התחייבות',
-    scrollHint: 'scroll',
   },
 
   /* ---------------------------------------------------------------- */
@@ -98,7 +96,6 @@ const he = {
   /*  DM marquee                                                       */
   /* ---------------------------------------------------------------- */
   dmShowcase: {
-    eyebrow: 'בזמן שאתם ישנים',
     title: 'שיחות אמיתיות שהבוט מטפל בהן.',
     rowOne: [
       { q: 'היי, ראיתי את הרילס על הסרום — איזה מותג זה?', a: 'זה סרום ויטמין C, הצגתי אותו בסטורי ביום שלישי. רוצה לינק?', tag: 'טיפוח' },
@@ -122,7 +119,6 @@ const he = {
   /*  Moment of recognition                                            */
   /* ---------------------------------------------------------------- */
   recognition: {
-    eyebrow: 'רגע של כנות',
     titleLead: 'חמישים אלף עוקבים.',
     titleTail: 'שלוש־מאות הודעות ביום.',
     bodyOne: 'כל אחת מהן יכולה להיות שת״פ, רכישה, לקוחה לחיים.',
@@ -178,7 +174,6 @@ const he = {
   /*  How it works                                                     */
   /* ---------------------------------------------------------------- */
   howItWorks: {
-    eyebrow: 'איך זה עובד',
     titleLead: 'שלושה שלבים.',
     titleHighlight: 'ללא טכנאי.',
     steps: [
@@ -207,7 +202,6 @@ const he = {
   /*  FAQ                                                              */
   /* ---------------------------------------------------------------- */
   faq: {
-    eyebrow: 'שאלות',
     titleLead: 'מה כולם',
     titleHighlight: 'שואלים.',
     note: 'לא מצאתם תשובה? השאירו פרטים בטופס למטה.',
@@ -281,7 +275,6 @@ const he = {
   /*  Footer                                                           */
   /* ---------------------------------------------------------------- */
   footer: {
-    eyebrow: 'קולופון',
     quote: '"הכי טוב ב-DM — התחושה שמישהו באמת הקשיב."',
     navLabel: 'קישורי תחתית',
     links: [
@@ -326,14 +319,10 @@ const en: LandingStrings = {
     titleHighlight: 'talks',
     titleTail: 'back.',
     subtitle:
-      'BestieAI reads every post, reel and story you have published. It ' +
-      'transcribes your videos, crawls your site, and builds an AI that answers ' +
-      'your followers on Instagram, on your website, and on WhatsApp — in your ' +
-      'voice, around the clock.',
+      'BestieAI learns your voice from everything you have published, then ' +
+      'answers your followers on Instagram, your site and WhatsApp. Around the clock.',
     ctaPrimary: 'See it on your content',
     ctaSecondary: 'Try the live demo',
-    fineprint: 'No credit card · No code · No commitment',
-    scrollHint: 'scroll',
   },
 
   demo: {
@@ -344,58 +333,56 @@ const en: LandingStrings = {
       'These are not scripts. The bot writes a fresh reply every time, grounded ' +
       'in the creator’s actual content.',
     chromeLabel: 'your_brand · Direct',
-    disclaimer: 'Sample replies — your real bot is wired to your own content',
+    disclaimer: 'Sample replies. Your real bot is wired to your own content',
     entries: [
       {
         tag: 'Beauty',
-        q: 'Hey! Saw your reel about the face serum — what brand is that?',
+        q: 'Hey! Saw your reel about the face serum. What brand is that?',
         a: 'That’s the Argania vitamin C serum. I showed it in Tuesday’s story and I’ve been using it for three months now. Code BESTIE15 gets you 15% off. Want me to send the link?',
       },
       {
         tag: 'Fashion',
         q: 'Where did you get the dress from yesterday’s post?',
-        a: 'It’s Zara, from the new collection — I dropped the link in my pinned "This week’s picks" highlight. There’s a black version too if you prefer that.',
+        a: 'It’s Zara, from the new collection. I dropped the link in my pinned "This week’s picks" highlight. There’s a black version too if you prefer that.',
       },
       {
         tag: 'Partnerships',
-        q: 'Hi, I’m with Brand X — we’d love to collaborate. What are your rates?',
-        a: 'Lovely to hear from you. Rates and contracts go through my manager — I’m passing you to sara@ldrs.co. Could you send over a short brief with your goals?',
+        q: 'Hi, I’m with Brand X and we’d love to collaborate. What are your rates?',
+        a: 'Lovely to hear from you. Rates and contracts go through my manager, so I’m passing you to sara@ldrs.co. Could you send over a short brief with your goals?',
       },
       {
         tag: 'Food',
         q: 'When are you posting the chocolate cake recipe you promised?',
-        a: 'It went up in Monday’s post — I also saved it to my "Recipes" highlight. The one thing that matters: butter at 20°C, not 22, and don’t whip it longer than 3 minutes.',
+        a: 'It went up in Monday’s post. I also saved it to my "Recipes" highlight. The one thing that matters: butter at 20°C, not 22, and don’t whip it longer than 3 minutes.',
       },
     ],
   },
 
   dmShowcase: {
-    eyebrow: 'While you sleep',
     title: 'Real conversations it handles on its own.',
     rowOne: [
-      { q: 'Saw your reel about the serum — what brand is it?', a: 'It’s a vitamin C serum, I showed it in Tuesday’s story. Want the link?', tag: 'Beauty' },
+      { q: 'Saw your reel about the serum. What brand is it?', a: 'It’s a vitamin C serum, I showed it in Tuesday’s story. Want the link?', tag: 'Beauty' },
       { q: 'Got a quick dinner recipe you’d recommend?', a: 'My "Recipes" highlight has a 15-minute pasta everyone loves.', tag: 'Food' },
       { q: 'Where is the dress from your last post?', a: 'ZARA, new collection. Link is in the "This week’s picks" highlight.', tag: 'Fashion' },
       { q: 'Is there a discount code for this brand?', a: 'Yes! Code BESTIE15 gets you 15% off, valid through the end of the month.', tag: 'Promos' },
-      { q: 'Which face cream do you recommend for dry skin?', a: 'The one from my reel two weeks ago — shea butter base. Made exactly for dryness.', tag: 'Beauty' },
+      { q: 'Which face cream do you recommend for dry skin?', a: 'The one from my reel two weeks ago, the shea butter one. Made exactly for dryness.', tag: 'Beauty' },
       { q: 'Are you coming to the Tel Aviv event?', a: 'Yes, speaking Thursday at 18:00. All the details are in my highlight.', tag: 'Events' },
     ],
     rowTwo: [
-      { q: 'How do you fit workouts around small kids?', a: 'I did a whole post on it — search "an ordinary morning" in my feed.', tag: 'Parenting' },
-      { q: 'Best exercise for a quick morning session?', a: '15 minutes, no equipment — it’s in Sunday’s story.', tag: 'Fitness' },
+      { q: 'How do you fit workouts around small kids?', a: 'I did a whole post on it. Search "an ordinary morning" in my feed.', tag: 'Parenting' },
+      { q: 'Best exercise for a quick morning session?', a: '15 minutes, no equipment, it’s in Sunday’s story.', tag: 'Fitness' },
       { q: 'Are you working with this brand?', a: 'Yes, a disclosed partnership. They gave my followers an exclusive code.', tag: 'Partnerships' },
-      { q: 'Where are the earrings from your story?', a: 'Shani Arieli’s new collection — the credit is tagged in the story.', tag: 'Fashion' },
+      { q: 'Where are the earrings from your story?', a: 'Shani Arieli’s new collection. The credit is tagged in the story.', tag: 'Fashion' },
       { q: 'Loved your book pick, do you have more?', a: 'My "Reading" highlight has 12 recommendations from the past year.', tag: 'Picks' },
       { q: 'Do you run online workshops?', a: 'Next one is Monday, sign-up through the link in my bio.', tag: 'Events' },
     ],
   },
 
   recognition: {
-    eyebrow: 'A moment of honesty',
     titleLead: 'Fifty thousand followers.',
     titleTail: 'Three hundred messages a day.',
     bodyOne: 'Any one of them could be a partnership, a sale, a customer for life.',
-    bodyTwo: 'There are 24 hours in a day — and you are not a machine.',
+    bodyTwo: 'There are 24 hours in a day, and you are not a machine.',
     punchline: 'Now you have a bestie.',
   },
 
@@ -410,7 +397,7 @@ const en: LandingStrings = {
       {
         label: 'Chatbot',
         title: 'A chatbot that sounds like you',
-        description: '12 archetypes — beauty, fashion, food, fitness, parenting, promos and more. Your tone, your humour and your hard limits are built into the bot.',
+        description: '12 archetypes: beauty, fashion, food, fitness, parenting, promos and more. Your tone, your humour and your hard limits are built into the bot.',
       },
       {
         label: 'Website',
@@ -420,12 +407,12 @@ const en: LandingStrings = {
       {
         label: 'Documents',
         title: 'Contract and brief parsing',
-        description: 'PDF, image or Word — the AI pulls out amounts, dates, terms and deadlines. Multi-model fallback chain. 4 languages.',
+        description: 'PDF, image or Word. The AI pulls out amounts, dates, terms and deadlines. Multi-model fallback chain. 4 languages.',
       },
       {
         label: 'Dashboard',
         title: 'A full management dashboard',
-        description: 'Analytics, partnerships, revenue, promo codes, documents, conversation history and persona — all in one place.',
+        description: 'Analytics, partnerships, revenue, promo codes, documents, conversation history and persona, all in one place.',
       },
       {
         label: 'Instagram',
@@ -435,36 +422,34 @@ const en: LandingStrings = {
       {
         label: 'WhatsApp',
         title: 'WhatsApp notifications',
-        description: 'Weekly digest, welcome messages, support — over the official WhatsApp Cloud API.',
+        description: 'Weekly digest, welcome messages, support. All over the official WhatsApp Cloud API.',
       },
     ],
   },
 
   howItWorks: {
-    eyebrow: 'How it works',
     titleLead: 'Three steps.',
     titleHighlight: 'No engineer.',
     steps: [
       {
         title: 'Connect your account',
         body: 'One Instagram login. No code, no configuration, no technician.',
-        detail: 'Sign-in through Meta’s official OAuth 2.0 — including whatever two-factor you already have on your own account.',
+        detail: 'Sign-in through Meta’s official OAuth 2.0, including whatever two-factor you already have on your own account.',
       },
       {
         title: 'The AI learns you',
-        body: 'Posts, reels, stories and highlights are scanned and transcribed. The persona is built from the content itself — your style, your products, your promo codes, and the things you will not do.',
+        body: 'Posts, reels, stories and highlights are scanned and transcribed. The persona is built from the content itself: your style, your products, your promo codes, and the things you will not do.',
         detail: 'Re-scans every 24 hours. Hebrew, English, Arabic, Russian.',
       },
       {
         title: 'The bot goes live',
-        body: 'It answers in DMs, on your site and on WhatsApp — in your voice, around the clock.',
+        body: 'It answers in DMs, on your site and on WhatsApp, in your voice, around the clock.',
         detail: 'Weekly conversation summary by email. Anything unclear is escalated for review.',
       },
     ],
   },
 
   faq: {
-    eyebrow: 'FAQ',
     titleLead: 'What everyone',
     titleHighlight: 'asks.',
     note: 'Did not find your answer? Leave your details in the form below.',
@@ -475,7 +460,7 @@ const en: LandingStrings = {
       },
       {
         q: 'What happens when the bot is not sure?',
-        a: 'It does not invent an answer. It flags the conversation, alerts you, you reply — and it learns. The same question never comes back twice.',
+        a: 'It does not invent an answer. It flags the conversation, alerts you, you reply, and it learns. The same question never comes back twice.',
       },
       {
         q: 'What about privacy of conversations and data?',
@@ -493,7 +478,7 @@ const en: LandingStrings = {
     titleLead: 'Want to see',
     titleHighlight: 'it on your content?',
     lead:
-      'Leave your details — we will come back within 24 hours with a demo built ' +
+      'Leave your details and we will come back within 24 hours with a demo built ' +
       'on your own content. No spam, no hard sell, no newsletter you did not ask for.',
     responseTime: 'Average response: 4 hours during business hours.',
 
@@ -521,13 +506,12 @@ const en: LandingStrings = {
 
     successTitle: 'Got it.',
     successSubtitle: 'Talk soon.',
-    successBody: 'We will be back to you within 24 hours — usually much sooner.',
+    successBody: 'We will be back to you within 24 hours, usually much sooner.',
 
     serviceName: 'Landing page enquiry (English)',
   },
 
   footer: {
-    eyebrow: 'Colophon',
     quote: '"The best part of a DM is the feeling that someone actually listened."',
     navLabel: 'Footer links',
     links: [

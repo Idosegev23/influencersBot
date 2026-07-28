@@ -71,8 +71,16 @@ export default function CookieConsent() {
   }, []);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const path = window.location.pathname;
+    // The English landing page has no account behind it, so the /chat lookup
+    // below never matched and an English visitor was shown a Hebrew banner.
+    if (/^\/en(\/|$)/.test(path)) {
+      setLang('en');
+      return;
+    }
     // On an account chat page (/chat/<username>), localize to the account language.
-    const m = typeof window !== 'undefined' && window.location.pathname.match(/^\/chat\/([^/?#]+)/);
+    const m = path.match(/^\/chat\/([^/?#]+)/);
     if (!m) return;
     fetch(`/api/account/language?username=${encodeURIComponent(m[1])}`)
       .then((r) => r.json())
@@ -119,7 +127,7 @@ export default function CookieConsent() {
           className="fixed bottom-0 left-0 right-0 z-50 p-4"
           dir={dir}
         >
-          <div className="max-w-4xl mx-auto bg-gray-900/95 backdrop-blur-xl border border-gray-700 rounded-2xl shadow-2xl overflow-hidden">
+          <div className="max-w-5xl mx-auto bg-gray-900/95 backdrop-blur-xl border border-gray-700 rounded-2xl shadow-2xl overflow-hidden">
             <AnimatePresence mode="wait">
               {!showSettings ? (
                 <motion.div
@@ -127,53 +135,45 @@ export default function CookieConsent() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="p-6"
+                  className="px-4 py-3 md:px-5 md:py-3"
                 >
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-indigo-500/20 flex items-center justify-center flex-shrink-0">
-                      <Cookie className="w-6 h-6 text-indigo-400" />
+                  <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-5">
+                    <Cookie className="hidden md:block w-5 h-5 text-indigo-400 shrink-0" />
+                    <p className="flex-1 text-xs leading-relaxed text-gray-300">
+                      <span className="font-semibold text-white">{t.title}</span>{' '}
+                      {t.desc}{' '}
+                      <Link href="/privacy" className="text-indigo-400 hover:underline">
+                        {t.privacy}
+                      </Link>
+                      .
+                    </p>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => saveConsent('all')}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition-colors"
+                      >
+                        {t.acceptAll}
+                      </button>
+                      <button
+                        onClick={() => saveConsent('necessary')}
+                        className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-xs font-medium transition-colors"
+                      >
+                        {t.necessaryOnly}
+                      </button>
+                      <button
+                        onClick={() => setShowSettings(true)}
+                        className="px-3 py-2 text-gray-400 hover:text-white text-xs transition-colors"
+                      >
+                        {t.settings}
+                      </button>
+                      <button
+                        onClick={() => setShow(false)}
+                        aria-label={t.necessaryOnly}
+                        className="text-gray-500 hover:text-white transition-colors ms-1"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
                     </div>
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-white mb-2">
-                        {t.title}
-                      </h3>
-                      <p className="text-sm text-gray-400 mb-4">
-                        {t.desc}{' '}
-                        <Link href="/privacy" className="text-indigo-400 hover:underline">
-                          {t.privacy}
-                        </Link>
-                        .
-                      </p>
-                      <div className="flex flex-wrap gap-3">
-                        <button
-                          onClick={() => saveConsent('all')}
-                          className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-medium transition-colors"
-                        >
-                          <Check className="w-4 h-4" />
-                          {t.acceptAll}
-                        </button>
-                        <button
-                          onClick={() => saveConsent('necessary')}
-                          className="flex items-center gap-2 px-5 py-2.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
-                        >
-                          <Shield className="w-4 h-4" />
-                          {t.necessaryOnly}
-                        </button>
-                        <button
-                          onClick={() => setShowSettings(true)}
-                          className="flex items-center gap-2 px-5 py-2.5 text-gray-400 hover:text-white transition-colors"
-                        >
-                          <Settings className="w-4 h-4" />
-                          {t.settings}
-                        </button>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setShow(false)}
-                      className="text-gray-500 hover:text-white transition-colors"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
                   </div>
                 </motion.div>
               ) : (
