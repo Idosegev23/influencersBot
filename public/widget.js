@@ -39,6 +39,14 @@
   var messages = [];
   var isLoading = false;
   var thinkingText = null;
+  // render() rebuilds the whole panel via innerHTML, so every entry animation
+  // inside it replays on every rebuild — and one reply triggers 4-6 rebuilds
+  // (thinking, first delta, cards, action, stream end, chips). These two guards
+  // make the entry animations play once instead of once per rebuild: the panel
+  // slides up only on open, and a message row slides in only the first time it
+  // is painted.
+  var panelPainted = false;
+  var animatedUpTo = 0;
   // Smart starter chips (Phase 1): page-aware quick prompts shown above the input
   // until the visitor sends their first message. After each bot turn we refetch
   // follow-up chips. Empty array = render nothing.
@@ -736,7 +744,7 @@
           if (data && Array.isArray(data.chips) && data.chips.length) {
             chips = data.chips;
             // Only repaint if the chat panel is open — chips never show in closed state.
-            if (isOpen) render();
+            if (isOpen) scheduleRender();
           }
         })
         .catch(function () { /* fail silently — chips are optional */ });
@@ -1277,6 +1285,7 @@
     chips = [];
     ratings = {};
     pendingAction = null;
+    animatedUpTo = 0;       // fresh thread → let the new welcome slide in
     view = 'chat';
     fetchChips('initial');
     render();
@@ -1421,6 +1430,7 @@
 
   // ---- Closed state: blob only ----
   function renderClosed() {
+    panelPainted = false;   // next open should slide the panel up again
     container.innerHTML =
       '<div id="ibot-trigger" style="' +
       'width:60px;height:60px;cursor:pointer;' +
@@ -1444,17 +1454,27 @@
   // ---- Open state: chat panel ----
   function renderOpen() {
     var pc = config.primaryColor; // per-widget color
+    // The composer is destroyed and rebuilt by the innerHTML swap below, which
+    // used to throw away whatever the visitor was mid-way through typing if a
+    // reply landed while they typed. Carry the text and caret across.
+    var prevInput = document.getElementById('ibot-input');
+    var carriedValue = prevInput ? prevInput.value : '';
+    var carriedStart = prevInput ? prevInput.selectionStart : null;
+    var carriedEnd = prevInput ? prevInput.selectionEnd : null;
+
     // Build messages HTML
     var msgsHtml = '';
     for (var mi = 0; mi < messages.length; mi++) {
       var m = messages[mi];
       var isUser = m.role === 'user';
       var isLast = mi === messages.length - 1;
+      // Only rows never painted before get the slide-in.
+      var rowAnim = mi >= animatedUpTo ? 'animation:ibot-msg-in 0.3s ease-out;' : '';
       var isEmpty = !m.content && isLoading && isLast;
 
       // Phase 1: structured product cards rendered as their own row inside the chat.
       if (m.role === 'cards' && Array.isArray(m.products) && m.products.length) {
-        msgsHtml += renderCardsRow(m.products, m.layout || 'stack', pc);
+        msgsHtml += renderCardsRow(m.products, m.layout || 'stack', pc, rowAnim);
         continue;
       }
 
@@ -1466,7 +1486,7 @@
             '<span style="width:6px;height:6px;border-radius:50%;background:#676767;animation:ibot-bounce 1.2s ease-in-out 0.15s infinite;"></span>' +
             '<span style="width:6px;height:6px;border-radius:50%;background:#676767;animation:ibot-bounce 1.2s ease-in-out 0.3s infinite;"></span>';
         msgsHtml +=
-          '<div style="display:flex;justify-content:flex-end;margin-bottom:12px;animation:ibot-msg-in 0.3s ease-out;">' +
+          '<div style="display:flex;justify-content:flex-end;margin-bottom:12px;' + rowAnim + '">' +
           '<div style="display:flex;align-items:flex-end;gap:8px;max-width:85%;">' +
           '<div style="width:20px;height:20px;flex-shrink:0;">' +
           avatarHtml(20) + '</div>' +
@@ -1480,7 +1500,7 @@
       if (isUser) {
         // User bubble: primary color, rounded-30px, right-aligned (flex-start in RTL)
         msgsHtml +=
-          '<div style="display:flex;justify-content:flex-start;margin-bottom:12px;animation:ibot-msg-in 0.3s ease-out;">' +
+          '<div style="display:flex;justify-content:flex-start;margin-bottom:12px;' + rowAnim + '">' +
           '<div style="max-width:82%;padding:9px 12px;' + BUBBLE_RADIUS + 'font-size:16px;line-height:1.5;' +
           'background:' + pc + ';color:#fff;word-break:break-word;">' +
           formatMessage(m.content, true) +
@@ -1503,7 +1523,7 @@
         // while the text streams in, and the render() on stream end drops it.
         var streamingGlow = isLast && isLoading ? ' class="ibot-glow"' : '';
         msgsHtml +=
-          '<div style="display:flex;flex-direction:column;align-items:flex-end;margin-bottom:12px;animation:ibot-msg-in 0.3s ease-out;">' +
+          '<div style="display:flex;flex-direction:column;align-items:flex-end;margin-bottom:12px;' + rowAnim + '">' +
           '<div style="display:flex;align-items:flex-end;gap:8px;max-width:85%;">' +
           '<div style="width:20px;height:20px;flex-shrink:0;">' +
           avatarHtml(20) + '</div>' +
@@ -1521,6 +1541,9 @@
       msgsHtml += renderActionCard(pendingAction, pc);
     }
 
+    // Every row above has now been painted, so none of them animate again.
+    animatedUpTo = messages.length;
+
     var isMobile = window.innerWidth < 640;
 
     // Panel dimensions per Figma
@@ -1528,14 +1551,16 @@
       ? mobilePanelStyle()
       : 'width:400px;height:auto;max-height:min(680px, calc(100vh - 80px));border-radius:18px;position:relative;';
 
+    // Slide the panel up on open only — not on every rebuild.
+    var panelAnim = panelPainted ? '' : 'animation:ibot-slide-up 0.35s cubic-bezier(0.34,1.56,0.64,1);';
+
     container.innerHTML =
       (isMobile ? mobileBackdropHtml() : '') +
       // Main panel
       '<div id="ibot-panel" style="' + panelStyle +
       'background:var(--ibot-panel-bg);' +
       'display:flex;flex-direction:column;overflow:hidden;' +
-      'box-shadow:0 8px 40px rgba(0,0,0,0.15);' +
-      'animation:ibot-slide-up 0.35s cubic-bezier(0.34,1.56,0.64,1);">' +
+      'box-shadow:0 8px 40px rgba(0,0,0,0.15);' + panelAnim + '">' +
 
       // ---- Header (v4.2: cover+logo on welcome, compact bar in chat) ----
       headerHtml(pc, isMobile) +
@@ -1668,9 +1693,18 @@
     // Remember the first real tap on the composer so the keyboard stays up
     // while chatting, but never pops on open (WhatsApp behaviour).
     inputEl.onfocus = function () { inputTouched = true; };
+    // Put back whatever was being typed when this rebuild happened, caret included.
+    if (carriedValue) {
+      inputEl.value = carriedValue;
+      if (carriedStart !== null) {
+        try { inputEl.setSelectionRange(carriedStart, carriedEnd); } catch (e) { /* */ }
+      }
+    }
     // Desktop: always focus (no keyboard to pop). Mobile: only re-focus once the
     // user has tapped the input themselves — never on the initial open.
     if (window.innerWidth >= 640 || inputTouched) inputEl.focus();
+
+    panelPainted = true;
   }
 
   // ============================================
@@ -1737,7 +1771,7 @@
                 }
               }
               widgetTrack('widget_message_received', { length: clean.length });
-              render();
+              scheduleRender();
               // Refresh follow-up chips for the next visitor tap. Non-blocking.
               var lastUserMsg = '';
               for (var ui = messages.length - 1; ui >= 0; ui--) {
@@ -1755,7 +1789,7 @@
                 var event = JSON.parse(lines[i]);
                 if (event.type === 'thinking' && event.text) {
                   thinkingText = event.text;
-                  render();
+                  scheduleRender();
                 } else if (event.type === 'delta' && event.text) {
                   fullText += event.text;
                   // Strip all three envelope types while streaming so partial
@@ -1798,7 +1832,7 @@
                       products: event.products,
                       layout: event.layout || 'stack',
                     });
-                    render();
+                    scheduleRender();
                   }
                 } else if (event.type === 'action' && event.action) {
                   // Concierge action — the bot inferred the visitor wants to do
@@ -1810,7 +1844,7 @@
                     type: event.action.type || null,
                     has_prefill: !!event.action.prefill,
                   });
-                  render();
+                  scheduleRender();
                 } else if (event.type === 'error') {
                   messages[messages.length - 1].content = event.message || locale.errorMessage;
                   isLoading = false;
@@ -1919,7 +1953,7 @@
   }
 
   // ---- Product cards row (inside messages) ----
-  function renderCardsRow(products, layout, pc) {
+  function renderCardsRow(products, layout, pc, rowAnim) {
     var isCompare = layout === 'compare';
     var cardWidth = isCompare ? '47%' : '180px';
     var cardsHtml = '';
@@ -1984,7 +2018,7 @@
     }
     if (!cardsHtml) return '';
     return (
-      '<div style="display:flex;justify-content:flex-end;margin-bottom:12px;animation:ibot-msg-in 0.3s ease-out;">' +
+      '<div style="display:flex;justify-content:flex-end;margin-bottom:12px;' + (rowAnim || '') + '">' +
       '<div style="display:flex;gap:8px;overflow-x:auto;width:100%;padding-bottom:4px;direction:' + locale.dir + ';' +
       '-webkit-overflow-scrolling:touch;scrollbar-width:none;">' +
       cardsHtml +
@@ -2617,6 +2651,20 @@
   // bubble innerHTML on each one caused visible flicker even with surgical
   // updates. RAF naturally batches to 60fps and respects browser paint timing.
   // ============================================
+  // A single reply fires several state changes in quick succession — `done`,
+  // `cards`, `action`, then the follow-up chips landing — and each one used to
+  // rebuild the whole panel. Coalescing to one rebuild per animation frame turns
+  // a burst into a single repaint, the same way scheduleStreamPaint does for
+  // streaming tokens.
+  var _renderRAF = null;
+  function scheduleRender() {
+    if (_renderRAF) return;
+    _renderRAF = requestAnimationFrame(function () {
+      _renderRAF = null;
+      render();
+    });
+  }
+
   var _streamRAF = null;
   function scheduleStreamPaint() {
     if (_streamRAF) return;
