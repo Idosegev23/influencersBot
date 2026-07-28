@@ -803,6 +803,37 @@
   var styleEl = document.createElement('style');
   document.head.appendChild(styleEl);
 
+  // Derive the 3-stop palette for the "thinking" glow ring from the widget's
+  // primary color, so the animation stays on-brand for every account instead of
+  // hardcoding one gradient. Saturation/lightness are clamped so washed-out or
+  // near-black brand colors still read as a glow.
+  function glowStops() {
+    var hex = String(config.primaryColor || '').trim().replace('#', '');
+    if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    var h = 265, s = 0.9, l = 0.68;
+    if (/^[0-9a-f]{6}$/i.test(hex)) {
+      var r = parseInt(hex.slice(0, 2), 16) / 255;
+      var g = parseInt(hex.slice(2, 4), 16) / 255;
+      var b = parseInt(hex.slice(4, 6), 16) / 255;
+      var max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+      l = (max + min) / 2;
+      if (d === 0) { h = 265; s = 0.9; }
+      else {
+        s = d / (1 - Math.abs(2 * l - 1));
+        if (max === r) h = 60 * (((g - b) / d) % 6);
+        else if (max === g) h = 60 * ((b - r) / d + 2);
+        else h = 60 * ((r - g) / d + 4);
+        if (h < 0) h += 360;
+      }
+    }
+    var sPct = Math.round(Math.max(70, Math.min(95, s * 100)));
+    var lPct = Math.round(Math.max(58, Math.min(76, l * 100)));
+    function stop(shift) {
+      return 'hsl(' + Math.round((h + shift + 360) % 360) + ' ' + sPct + '% ' + lPct + '%)';
+    }
+    return [stop(0), stop(38), stop(-42)];
+  }
+
   function applyLocaleAssets() {
     // Google Font for the resolved locale — loaded once.
     if (!fontLinkEl) {
@@ -815,8 +846,12 @@
     // in its inline styles, so flipping darkMode = repainting the whole widget
     // without re-rendering individual blocks.
     var t = theme();
+    var glow = glowStops();
     var vars =
       '#ibot-widget-container{' +
+      '--ibot-glow-1:' + glow[0] + ';' +
+      '--ibot-glow-2:' + glow[1] + ';' +
+      '--ibot-glow-3:' + glow[2] + ';' +
       '--ibot-surface:' + t.surface + ';' +
       '--ibot-surface-alt:' + t.surfaceAlt + ';' +
       '--ibot-panel-bg:' + t.panelBg + ';' +
@@ -840,6 +875,35 @@
       '@keyframes ibot-bounce{0%,80%,100%{transform:translateY(0);}40%{transform:translateY(-5px);}}' +
       '@keyframes ibot-msg-in{from{opacity:0;transform:translateX(10px);}to{opacity:1;transform:translateX(0);}}' +
       '@keyframes ibot-fade-in{from{opacity:0;}to{opacity:1;}}' +
+
+      // ---- Thinking glow: a light travels around the bubble's perimeter while
+      // the bot thinks or streams. The conic gradient's start angle is animated
+      // via @property (browsers without it get a static ring + the breathing
+      // fallback below, which is still a legible "working" state).
+      '@property --ibot-glow-angle{syntax:"<angle>";inherits:false;initial-value:0deg;}' +
+      '@keyframes ibot-glow-spin{to{--ibot-glow-angle:360deg;}}' +
+      '@keyframes ibot-glow-breathe{0%,100%{opacity:0.35;}50%{opacity:1;}}' +
+      '@keyframes ibot-glow-breathe-soft{0%,100%{opacity:0.12;}50%{opacity:0.45;}}' +
+      '#ibot-widget-container .ibot-glow{position:relative;}' +
+      '#ibot-widget-container .ibot-glow::before,#ibot-widget-container .ibot-glow::after{' +
+        'content:"";position:absolute;border-radius:inherit;pointer-events:none;' +
+        'background:conic-gradient(from var(--ibot-glow-angle),' +
+          'transparent 0deg,var(--ibot-glow-1) 26deg,var(--ibot-glow-2) 52deg,' +
+          'var(--ibot-glow-3) 82deg,transparent 118deg,transparent 360deg);' +
+        'animation:ibot-glow-spin 2.6s linear infinite;}' +
+      // Crisp 1.5px ring: paint the full rounded rect, then mask out everything
+      // inside the padding box so only the border band survives.
+      '#ibot-widget-container .ibot-glow::before{inset:-1.5px;padding:1.5px;' +
+        '-webkit-mask:linear-gradient(#000,#000) content-box,linear-gradient(#000,#000);' +
+        'mask:linear-gradient(#000,#000) content-box,linear-gradient(#000,#000);' +
+        '-webkit-mask-composite:xor;mask-composite:exclude;}' +
+      // Soft halo bleeding just past the bubble; sits behind the opaque bubble
+      // background so only the outer spill shows.
+      '#ibot-widget-container .ibot-glow::after{inset:-2px;filter:blur(7px);opacity:0.5;z-index:-1;}' +
+      '@media (prefers-reduced-motion:reduce){' +
+        '#ibot-widget-container .ibot-glow::before{animation:ibot-glow-breathe 2.6s ease-in-out infinite;}' +
+        '#ibot-widget-container .ibot-glow::after{animation:ibot-glow-breathe-soft 2.6s ease-in-out infinite;}}' +
+
       '#ibot-widget-container *{box-sizing:border-box;font-family:"' + locale.font + '",system-ui,-apple-system,sans-serif;}' +
       '#ibot-widget-container input:focus,#ibot-widget-container textarea:focus,#ibot-widget-container select:focus{outline:none;}' +
       '#ibot-widget-container ::-webkit-scrollbar{width:4px;}' +
@@ -1399,7 +1463,7 @@
           '<div style="display:flex;align-items:flex-end;gap:8px;max-width:85%;">' +
           '<div style="width:20px;height:20px;flex-shrink:0;">' +
           avatarHtml(20) + '</div>' +
-          '<div style="padding:9px 12px;border-radius:30px;font-size:16px;' +
+          '<div class="ibot-glow" style="padding:9px 12px;border-radius:30px;font-size:16px;' +
           'background:var(--ibot-surface);color:#000;display:flex;gap:4px;align-items:center;">' +
           indicatorContent +
           '</div></div></div>';
@@ -1428,12 +1492,15 @@
         // text directly without re-rendering the whole panel (which caused
         // visible flicker, scroll jumps, and input focus loss on every token).
         var streamingId = isLast && isLoading ? ' id="ibot-streaming-bubble"' : '';
+        // Same travelling ring as the thinking dots — it carries on uninterrupted
+        // while the text streams in, and the render() on stream end drops it.
+        var streamingGlow = isLast && isLoading ? ' class="ibot-glow"' : '';
         msgsHtml +=
           '<div style="display:flex;flex-direction:column;align-items:flex-end;margin-bottom:12px;animation:ibot-msg-in 0.3s ease-out;">' +
           '<div style="display:flex;align-items:flex-end;gap:8px;max-width:85%;">' +
           '<div style="width:20px;height:20px;flex-shrink:0;">' +
           avatarHtml(20) + '</div>' +
-          '<div' + streamingId + ' style="padding:9px 12px;border-radius:30px;font-size:16px;line-height:1.5;' +
+          '<div' + streamingId + streamingGlow + ' style="padding:9px 12px;border-radius:30px;font-size:16px;line-height:1.5;' +
           'background:var(--ibot-bot-bubble-bg);color:var(--ibot-bot-bubble-text);word-break:break-word;">' +
           formatMessage(m.content, false) +
           '</div></div>' + ratingRow + '</div>';
