@@ -6,8 +6,8 @@ import Image from 'next/image';
 /* ==========================================================================
    BestieAI — Widget Install Guide (public, client-facing)
    Hebrew-first, RTL, warm light palette, no emojis. Material Symbols icons.
-   Brand language mirrors /bestieai landing: warm white #faf9f7, stone text,
-   indigo-500 accent, rounded-2xl cards, soft blurred blobs.
+   Brand language: warm white #faf9f7, stone text, indigo-500 accent,
+   rounded-2xl cards, soft blurred blobs.
 
    Personalization (optional):
      /install?id=ACCOUNT_UUID&name=BrandName

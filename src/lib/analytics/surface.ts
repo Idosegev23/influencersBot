@@ -17,6 +17,9 @@ export type AnalyticsSurface = 'marketing' | 'chat' | 'none';
 /** Public marketing routes (exact match, trailing slash ignored). */
 const MARKETING_EXACT = new Set([
   '/',
+  // The English landing page. Without this entry it resolves to 'none' and the
+  // whole English funnel reports zero traffic while looking perfectly healthy.
+  '/en',
   '/contact',
   '/privacy',
   '/terms',

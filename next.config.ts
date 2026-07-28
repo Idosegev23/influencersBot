@@ -53,6 +53,20 @@ const nextConfig: NextConfig = {
     // internal API routes with query strings (INVALID_IMAGE_OPTIMIZE_REQUEST).
     unoptimized: true,
   },
+  async redirects() {
+    return [
+      {
+        // /bestieai was a second, older landing page for the same product. It
+        // was orphaned (nothing linked to it) but still in the sitemap, so
+        // Google had it indexed and split ranking signals with "/". Deleting it
+        // outright would 404 every one of those results; this hands the ranking
+        // to the page that replaced it.
+        source: '/bestieai',
+        destination: '/',
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     // Security headers WITHOUT X-Frame-Options and with relaxed CSP (for embeddable routes)
     const headersWithoutFrame = securityHeaders
