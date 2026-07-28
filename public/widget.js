@@ -1286,6 +1286,13 @@
   // Render
   // ============================================
 
+  // Chat-bubble geometry: a capsule with one corner squared off, so a bubble
+  // reads as speech rather than as a pill. The flat corner sits at block-end +
+  // inline-start — for the bot that is the edge its avatar sits against, for the
+  // visitor it is their own outer edge. Logical corners, so RTL and LTR both
+  // come out right without a direction branch.
+  var BUBBLE_RADIUS = 'border-radius:30px;border-end-start-radius:6px;';
+
   function render() {
     // Mobile: lock the host page's scroll while the chat is open (full-screen
     // takeover on phones) so the site doesn't scroll behind it — and, when the
@@ -1463,7 +1470,7 @@
           '<div style="display:flex;align-items:flex-end;gap:8px;max-width:85%;">' +
           '<div style="width:20px;height:20px;flex-shrink:0;">' +
           avatarHtml(20) + '</div>' +
-          '<div class="ibot-glow" style="padding:9px 12px;border-radius:30px;font-size:16px;' +
+          '<div class="ibot-glow" style="padding:9px 12px;' + BUBBLE_RADIUS + 'font-size:16px;' +
           'background:var(--ibot-surface);color:#000;display:flex;gap:4px;align-items:center;">' +
           indicatorContent +
           '</div></div></div>';
@@ -1474,7 +1481,7 @@
         // User bubble: primary color, rounded-30px, right-aligned (flex-start in RTL)
         msgsHtml +=
           '<div style="display:flex;justify-content:flex-start;margin-bottom:12px;animation:ibot-msg-in 0.3s ease-out;">' +
-          '<div style="max-width:82%;padding:9px 12px;border-radius:30px;font-size:16px;line-height:1.5;' +
+          '<div style="max-width:82%;padding:9px 12px;' + BUBBLE_RADIUS + 'font-size:16px;line-height:1.5;' +
           'background:' + pc + ';color:#fff;word-break:break-word;">' +
           formatMessage(m.content, true) +
           '</div></div>';
@@ -1500,7 +1507,7 @@
           '<div style="display:flex;align-items:flex-end;gap:8px;max-width:85%;">' +
           '<div style="width:20px;height:20px;flex-shrink:0;">' +
           avatarHtml(20) + '</div>' +
-          '<div' + streamingId + streamingGlow + ' style="padding:9px 12px;border-radius:30px;font-size:16px;line-height:1.5;' +
+          '<div' + streamingId + streamingGlow + ' style="padding:9px 12px;' + BUBBLE_RADIUS + 'font-size:16px;line-height:1.5;' +
           'background:var(--ibot-bot-bubble-bg);color:var(--ibot-bot-bubble-text);word-break:break-word;">' +
           formatMessage(m.content, false) +
           '</div></div>' + ratingRow + '</div>';
