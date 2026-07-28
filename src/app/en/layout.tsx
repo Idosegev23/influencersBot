@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
 
-const TITLE = 'BestieAI — Your content talks back';
+// Value first, brand last: this is what shows in the tab, the search result and
+// the social card. No em-dash here either, for the same reason as the body copy.
+const TITLE = 'Your content talks back | BestieAI';
 const DESCRIPTION =
   'BestieAI reads your Instagram, learns your voice, and answers every DM and ' +
-  'every visitor on your site — instantly, accurately, 24/7.';
+  'every visitor on your site, instantly and accurately, 24/7.';
 
 /**
  * The root layout declares `lang="he" dir="rtl"` on <html> and a canonical of
