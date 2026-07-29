@@ -212,6 +212,13 @@ export async function middleware(request: NextRequest) {
     if (pathname.startsWith('/api/widget')) {
       config = RATE_LIMITS.widget;
       prefix = 'widget';
+    } else if (pathname.startsWith('/api/wa/')) {
+      // Fetched by Meta's servers, not by a browser: when Bestie sends product cards, WhatsApp
+      // pulls every card's header image from /api/wa/product-image. Those fetches all arrive from
+      // a handful of Meta IPs, so the default (admin, 20/min) would 429 them and the cards would
+      // silently arrive with no photo.
+      config = RATE_LIMITS.widget;
+      prefix = 'wa';
     } else if (pathname.startsWith('/api/chat')) {
       config = RATE_LIMITS.chat;
       prefix = 'chat';

@@ -1,6 +1,6 @@
 import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { toWaId } from '@/lib/whatsapp-cloud/client';
-import type { CsTool, CsToolCtx, CsToolResult, OpenAIFunctionDef } from './types';
+import type { CsProductCard, CsTool, CsToolCtx, CsToolResult, OpenAIFunctionDef } from './types';
 
 const TERMINAL_TICKET = new Set(['resolved', 'closed', 'cancelled']);
 function phoneVariants(waId: string): string[] {
@@ -159,12 +159,137 @@ const escalateTool: CsTool = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Product cards (WhatsApp parity with the widget's product cards).
+//
+// TWO tools on purpose: search_products finds candidates and hands the model a URL-FREE list,
+// then the model decides in prose and calls show_products with the refs it actually featured.
+// Splitting them is what keeps the prose and the cards in sync — the model can talk about two
+// products and card exactly those two, instead of us guessing from a top-N.
+// ---------------------------------------------------------------------------
+const MAX_CARDS = 3;
+
+// Per-brand opt-in. OFF unless explicitly enabled, so switching a brand's cards off is one
+// config edit and never a deploy (mirrors config.support.auto_ticket_enabled).
+async function productsEnabled(accountId: string): Promise<boolean> {
+  const { data } = await supabaseAdmin.from('accounts').select('config').eq('id', accountId).single();
+  return (data as any)?.config?.whatsapp_cs?.products_enabled === true;
+}
+
+// Both product tools share the same two gates; neither may run before a brand is bound
+// (an unbound search would have no account to scope to and could surface a rival's catalog).
+async function productGate(ctx: CsToolCtx): Promise<CsToolResult | null> {
+  if (!ctx.accountId) return { ok: false, data: { reason: 'no_brand_bound' } };
+  if (!(await productsEnabled(ctx.accountId))) return { ok: false, data: { reason: 'products_disabled' } };
+  return null;
+}
+
+const searchProductsTool: CsTool = {
+  def: { type: 'function', function: {
+    name: 'search_products',
+    description: "Find products from the bound brand's catalog that fit what the shopper described (a need, a use, a budget, or a product they named). Returns a short candidate list with a `ref` for each. Call this when the shopper asks what suits them, asks about a product, or asks what you sell — NOT during a complaint, a damaged-delivery report, or any escalation. After you get the list, write your recommendation in prose and call show_products with the refs you actually featured.",
+    parameters: { type: 'object', properties: {
+      query: { type: 'string', description: "what the shopper is looking for, in their own words (e.g. 'שיער יבש ומתולתל')" },
+      limit: { type: 'number', description: 'how many candidates to consider (1-8, default 5)' },
+    }, required: ['query'] },
+  } },
+  async handler(args, ctx): Promise<CsToolResult> {
+    const gated = await productGate(ctx);
+    if (gated) return gated;
+    const query = String(args?.query || '').trim();
+    if (!query) return { ok: false, data: { reason: 'empty_query' } };
+    const limit = Math.min(8, Math.max(1, Number(args?.limit) || 5));
+
+    const { getRecommendations, isValidProductUrl } = await import('@/lib/recommendations/engine');
+    let products: any[] = [];
+    try {
+      const res = await getRecommendations({
+        accountId: ctx.accountId!,
+        sessionId: ctx.chatSessionId ?? undefined,
+        conversationContext: query,
+        maxResults: limit,
+        strategy: 'auto',
+      });
+      products = res.products || [];
+    } catch (e) {
+      console.warn('[cs-tools] getRecommendations failed', e);
+      return { ok: false, data: { reason: 'search_failed' } };
+    }
+
+    // A card needs BOTH a real detail page and an image. The engine already drops category URLs,
+    // but re-check here so an unsendable product never becomes a ref the model can feature.
+    // `why` is carried alongside its own product — reading it back by index would mis-pair it
+    // with a neighbour as soon as anything above it is filtered out.
+    const kept = products
+      .filter((p) => p?.imageUrl && isValidProductUrl(p?.productUrl) && String(p?.nameHe || p?.name || '').trim())
+      .map((p) => ({
+        card: {
+          productId: p.id,
+          name: String(p.nameHe || p.name).trim(),
+          price: typeof p.price === 'number' ? p.price : null,
+          originalPrice: typeof p.originalPrice === 'number' ? p.originalPrice : null,
+          isOnSale: p.isOnSale === true,
+          productUrl: p.productUrl,
+          imageUrl: p.imageUrl,
+        } as CsProductCard,
+        why: p.recommendedFor || p.aiWhy || undefined,
+      }));
+
+    ctx.productCandidates = kept.map((k) => k.card);
+    if (!kept.length) return { ok: true, data: { products: [], note: 'no_matching_products' } };
+
+    // URL-free by design: the model never sees productUrl/imageUrl, so it cannot paste a raw link
+    // into the prose — the card carries the link. It also keeps the tool result small.
+    return { ok: true, data: {
+      products: kept.map(({ card, why }, i) => ({
+        ref: `p${i + 1}`,
+        name: card.name,
+        price: card.price,
+        ...(card.isOnSale && card.originalPrice ? { originalPrice: card.originalPrice, onSale: true } : {}),
+        why,
+      })),
+    } };
+  },
+};
+
+const showProductsTool: CsTool = {
+  def: { type: 'function', function: {
+    name: 'show_products',
+    description: `Send the shopper a visual card (photo + name + price + a button linking straight to the product page) for up to ${MAX_CARDS} products you just recommended. Pass the refs from search_products — only refs from THIS turn are valid. Call it in the same turn as your prose, and mention those products by name in the prose so the text and the cards match. Never write the product URL yourself; the card carries it.`,
+    parameters: { type: 'object', properties: {
+      refs: { type: 'array', items: { type: 'string' }, description: `refs from search_products, e.g. ["p1","p3"] — max ${MAX_CARDS}` },
+    }, required: ['refs'] },
+  } },
+  async handler(args, ctx): Promise<CsToolResult> {
+    const gated = await productGate(ctx);
+    if (gated) return gated;
+    const candidates = ctx.productCandidates || [];
+    if (!candidates.length) return { ok: false, data: { reason: 'call_search_products_first' } };
+
+    const refs = Array.isArray(args?.refs) ? args.refs.map((r: any) => String(r).trim().toLowerCase()) : [];
+    const picked: CsProductCard[] = [];
+    const seen = new Set<string>();
+    for (const ref of refs) {
+      const idx = Number(ref.replace(/^p/, '')) - 1;
+      const c = candidates[idx];
+      if (!c || seen.has(c.productId)) continue;   // unknown/duplicate refs are dropped, not fatal
+      seen.add(c.productId);
+      picked.push(c);
+      if (picked.length >= MAX_CARDS) break;       // WhatsApp has no multi-card message; each card is
+    }                                              // its own send, so a hard cap keeps the thread sane.
+    if (!picked.length) return { ok: false, data: { reason: 'no_matching_refs' } };
+
+    return { ok: true, cards: picked, data: { sent: picked.map((p) => ({ name: p.name, price: p.price })) } };
+  },
+};
+
 // NO menu/widget tools here by design — Bestie CS must scale to ~10,000 brands, where a
 // list/buttons menu for brand selection is absurd. Disambiguation happens in prose
 // (resolve_brand → confirm/clarify in plain text), never via show_buttons/show_list.
 const TOOLS: CsTool[] = [
   resolveBrandTool, bindBrandTool, rememberNameTool, lookupOrderTool, lookupOrdersByPhoneTool,
   listOpenThreadsTool, openOrAttachTicketTool, escalateTool,
+  searchProductsTool, showProductsTool,
 ];
 export function getCsTools(): CsTool[] { return TOOLS; }
 export const CS_TOOL_DEFS: OpenAIFunctionDef[] = TOOLS.map((t) => t.def);

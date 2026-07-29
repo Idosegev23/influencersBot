@@ -38,10 +38,12 @@ const tool = async (name: string) => {
 describe('CS tools', () => {
   beforeEach(() => { vi.clearAllMocks(); H.account = null; H.threads = []; openOrAttachCsTicket.mockResolvedValue({ ticketId: 'ticket-1' }); runCsHandoffCheck.mockResolvedValue({ escalated: true }); });
 
-  it('CS_TOOL_DEFS exposes exactly the 8 conversational tools — NO show_buttons/show_list (pure-text CS, no menu widgets)', async () => {
+  // show_products is NOT a menu widget: a product card sends no reply payload back, so it never
+  // becomes something the shopper has to choose from. The no-menu rule still holds.
+  it('CS_TOOL_DEFS exposes exactly the 10 conversational tools — NO show_buttons/show_list (pure-text CS, no menu widgets)', async () => {
     const { CS_TOOL_DEFS, getCsTools } = await import('@/lib/cs/tools');
     const names = CS_TOOL_DEFS.map((d) => d.function.name).sort();
-    expect(names).toEqual(['bind_brand', 'escalate_to_human', 'list_open_threads', 'lookup_order', 'lookup_orders_by_phone', 'open_or_attach_ticket', 'remember_name', 'resolve_brand']);
+    expect(names).toEqual(['bind_brand', 'escalate_to_human', 'list_open_threads', 'lookup_order', 'lookup_orders_by_phone', 'open_or_attach_ticket', 'remember_name', 'resolve_brand', 'search_products', 'show_products']);
     expect(names).not.toContain('show_buttons');
     expect(names).not.toContain('show_list');
     expect(CS_TOOL_DEFS.every((d) => d.type === 'function')).toBe(true);

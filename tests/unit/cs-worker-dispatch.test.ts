@@ -15,6 +15,9 @@ vi.mock('@/lib/whatsapp-cloud/client', () => ({
 const runCsTurn = vi.fn();
 vi.mock('@/lib/cs/cs-agent', () => ({ runCsTurn: (...a: any[]) => runCsTurn(...a) }));
 
+const sendCards = vi.fn().mockResolvedValue(0);
+vi.mock('@/lib/cs/cs-product-cards', () => ({ sendProductCards: (...a: any[]) => sendCards(...a) }));
+
 // Redis: done-guard fresh by default.
 vi.mock('@/lib/redis', () => ({
   redisSetNx: vi.fn().mockResolvedValue(true),
@@ -85,5 +88,38 @@ describe('processOneCsInbound dispatch', () => {
     expect(sendReaction).toHaveBeenCalledWith(expect.objectContaining({ emoji: '⚠️' }));
     // done-guard is written ONLY after a confirmed send — never on a total failure (so it re-processes).
     expect(redisSetNx).not.toHaveBeenCalledWith('cs:wa:wamid-1:done', expect.anything(), expect.anything());
+  });
+
+  // --- product cards ---
+
+  const cards = [{ productId: 'p-1', name: 'מרכך קיק', price: 45.9, originalPrice: null, isOnSale: false, productUrl: 'https://x/product/a', imageUrl: 'https://cdn/a.webp' }];
+
+  it('cards are sent AFTER the text, so the prose leads and the cards illustrate it', async () => {
+    runCsTurn.mockResolvedValue({ reply: { kind: 'text', body: 'ממליצה על זה 👇' }, phase: 'serving', cards });
+    sendText.mockResolvedValue({ success: true, wa_message_id: 'out-1' });
+    const { processOneCsInbound } = await import('@/lib/cs/wa-cs-worker');
+    const id = await processOneCsInbound(job);
+    expect(sendText).toHaveBeenCalledWith(expect.objectContaining({ body: 'ממליצה על זה 👇' }));
+    expect(sendCards).toHaveBeenCalledWith('972500000000', cards);
+    expect(sendCards.mock.invocationCallOrder[0]).toBeGreaterThan(sendText.mock.invocationCallOrder[0]);
+    expect(id).toBe('out-1');
+  });
+
+  it('a card failure never fails the turn — the answer already landed', async () => {
+    runCsTurn.mockResolvedValue({ reply: { kind: 'text', body: 'ממליצה על זה 👇' }, phase: 'serving', cards });
+    sendText.mockResolvedValue({ success: true, wa_message_id: 'out-1' });
+    sendCards.mockRejectedValue(new Error('every card bounced'));
+    const { processOneCsInbound } = await import('@/lib/cs/wa-cs-worker');
+    const id = await processOneCsInbound(job);
+    expect(id).toBe('out-1');
+    expect(sendReaction).toHaveBeenCalledWith(expect.objectContaining({ emoji: '✅' }));
+  });
+
+  it('no cards are sent when the text itself could not be delivered', async () => {
+    runCsTurn.mockResolvedValue({ reply: { kind: 'text', body: 'ממליצה על זה 👇' }, phase: 'serving', cards });
+    sendText.mockResolvedValue({ success: false, error: { code: 500, type: 'x', message: 'down' } });
+    const { processOneCsInbound } = await import('@/lib/cs/wa-cs-worker');
+    await processOneCsInbound(job);
+    expect(sendCards).not.toHaveBeenCalled();
   });
 });

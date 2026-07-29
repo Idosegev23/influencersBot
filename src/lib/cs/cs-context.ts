@@ -124,6 +124,22 @@ export async function buildCsSystemPrompt(input: {
       const rag = formatMetadataForAI(hits).slice(0, 4000);
       if (rag.trim()) lines.push(`\n--- ידע רלוונטי מהמותג (RAG) ---\n${rag}`);
     } catch { /* RAG optional */ }
+    // Product cards are per-brand opt-in, and so is the guidance: a brand with cards switched off
+    // must not get a prompt telling Bestie to reach for tools that will only refuse.
+    try {
+      const { data: acct } = await supabaseAdmin.from('accounts').select('config').eq('id', accountId).single();
+      if ((acct as any)?.config?.whatsapp_cs?.products_enabled === true) {
+        lines.push(
+          '\n--- כרטיסי מוצר ---\n' +
+          'כשהלקוח/ה מתעניין/ת במוצר, שואל/ת מה מתאים לו/ה, או מבקש/ת לראות מה יש — קרא/י ל-search_products עם מה שהוא/היא תיאר/ה במילים שלו/ה. ' +
+          'אחר כך כתב/י המלצה קצרה בפרוזה ובאותו תור קרא/י ל-show_products עם ה-refs של המוצרים שבאמת הזכרת (עד 3). ' +
+          'הלקוח/ה יקבל/ת כרטיס לכל מוצר — תמונה, שם, מחיר וכפתור שמוביל ישירות לעמוד המוצר. ' +
+          'לעולם אל תכתב/י כתובת אתר או לינק בטקסט — הכרטיס נושא את הלינק, וכתיבת לינק ידנית תיצור כפילות. ' +
+          'הזכר/י בפרוזה בדיוק את המוצרים ששלחת ככרטיסים, כדי שהטקסט והכרטיסים יסתדרו. ' +
+          'אל תציע/י מוצרים בתוך תלונה, דיווח על מוצר פגום, נזק במשלוח, בקשת החזר או כל רגע של תסכול — שם התפקיד שלך הוא לפתור, לא למכור.'
+        );
+      }
+    } catch { /* product-card guidance optional — the tools enforce the gate themselves */ }
   }
   return lines.join('\n');
 }

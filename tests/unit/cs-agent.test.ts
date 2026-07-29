@@ -227,4 +227,48 @@ describe('runCsTurn (brain-led loop)', () => {
     const sent2 = (callModel.mock.calls[0][0] as any).messages;
     expect(typeof sent2[sent2.length - 1].content).toBe('string');
   });
+
+  // --- product cards (WhatsApp parity with the widget) ---
+
+  const cards = [{ productId: 'p-1', name: 'מרכך קיק', price: 45.9, originalPrice: null, isOnSale: false, productUrl: 'https://x/product/a', imageUrl: 'https://cdn/a.webp' }];
+
+  it('show_products cards ride out on the turn result, alongside the prose', async () => {
+    handlers['show_products'] = vi.fn().mockResolvedValue({ ok: true, cards, data: { sent: [{ name: 'מרכך קיק' }] } });
+    callModel
+      .mockResolvedValueOnce({ toolCalls: [{ id: 'tc1', name: 'show_products', args: { refs: ['p1'] } }], text: null })
+      .mockResolvedValueOnce({ toolCalls: [], text: 'לשיער יבש אני ממליצה על המרכך הזה 👇' });
+    store['972501112222'] = bound();
+    const { runCsTurn } = await import('@/lib/cs/cs-agent');
+    const res = await runCsTurn(job('מה מתאים לשיער יבש?'), { callModel });
+    expect(res.reply.kind).toBe('text');
+    expect(res.cards).toEqual(cards);
+    // The shown products are recorded on the assistant message so a later pass can attribute them.
+    expect(inserted['chat_messages']).toContainEqual(expect.objectContaining({ role: 'assistant', metadata: { product_ids: ['p-1'] } }));
+  });
+
+  it('a turn with no cards carries none — and writes no product metadata', async () => {
+    callModel.mockResolvedValue({ toolCalls: [], text: 'ההזמנה שלך בדרך 📦' });
+    store['972501112222'] = bound();
+    const { runCsTurn } = await import('@/lib/cs/cs-agent');
+    const res = await runCsTurn(job('איפה ההזמנה שלי'), { callModel });
+    expect(res.cards).toBeUndefined();
+    const assistant = (inserted['chat_messages'] || []).find((m: any) => m.role === 'assistant');
+    expect(assistant.metadata).toBeUndefined();
+  });
+
+  // Following an escalation ack with product cards would read as selling to someone who just
+  // reported a problem, so a hand-off discards whatever the brain queued earlier in the turn.
+  it('hand-off wins over cards — an escalated turn sends no products', async () => {
+    handlers['show_products'] = vi.fn().mockResolvedValue({ ok: true, cards, data: {} });
+    handlers['escalate_to_human'] = vi.fn().mockResolvedValue({ ok: true, escalated: true, data: { handed_off: true } });
+    callModel
+      .mockResolvedValueOnce({ toolCalls: [{ id: 'tc1', name: 'show_products', args: { refs: ['p1'] } }], text: null })
+      .mockResolvedValueOnce({ toolCalls: [{ id: 'tc2', name: 'escalate_to_human', args: { reason: 'מוצר פגום' } }], text: null })
+      .mockResolvedValueOnce({ toolCalls: [], text: 'מצטערת מאוד, מעבירה לנציג/ה 🙏' });
+    store['972501112222'] = bound();
+    const { runCsTurn } = await import('@/lib/cs/cs-agent');
+    const res = await runCsTurn(job('הגיע שבור'), { callModel });
+    expect(res.reply.kind).toBe('text');
+    expect(res.cards).toBeUndefined();
+  });
 });

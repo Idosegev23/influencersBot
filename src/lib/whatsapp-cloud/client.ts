@@ -306,6 +306,51 @@ export async function sendInteractiveList(params: {
 }
 
 // -----------------------------------------------------------------------
+// Send: interactive call-to-action URL button — 24h service-window message.
+//
+// This is the closest WhatsApp gets to the widget's product card: an image header, a body, and a
+// real button that opens a URL. Unlike reply buttons it sends NO payload back, so it never turns
+// into a menu the shopper has to answer. Free inside the service window (non-template message).
+// The image link MUST be a public https JPEG or PNG under 5 MB — WhatsApp rejects webp here
+// (webp is sticker-only), which is why product images go through /api/wa/product-image.
+// -----------------------------------------------------------------------
+export async function sendInteractiveCtaUrl(params: {
+  to: string;
+  body: string;              // <=1024
+  displayText: string;       // button label, <=20
+  url: string;
+  imageUrl?: string;         // header image — public https jpeg/png
+  headerText?: string;       // used only when no imageUrl; <=60
+  footer?: string;           // <=60
+}): Promise<WhatsAppSendResult> {
+  const { phoneNumberId } = getConfig();
+  const to = toWaId(params.to);
+  const interactive: any = {
+    type: 'cta_url',
+    body: { text: params.body.slice(0, 1024) },
+    action: {
+      name: 'cta_url',
+      parameters: { display_text: params.displayText.slice(0, 20), url: params.url },
+    },
+  };
+  if (params.imageUrl) interactive.header = { type: 'image', image: { link: params.imageUrl } };
+  else if (params.headerText) interactive.header = { type: 'text', text: params.headerText.slice(0, 60) };
+  if (params.footer) interactive.footer = { text: params.footer.slice(0, 60) };
+
+  const { ok, data } = await graphFetch(`/${phoneNumberId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to,
+      type: 'interactive',
+      interactive,
+    }),
+  });
+  return parseSendResponse(ok, data);
+}
+
+// -----------------------------------------------------------------------
 // Mark inbound message as read (shows blue ticks on the user's side)
 // -----------------------------------------------------------------------
 export async function markAsRead(waMessageId: string): Promise<boolean> {

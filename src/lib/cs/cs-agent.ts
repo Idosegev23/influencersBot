@@ -13,7 +13,7 @@ import { randomUUID } from 'node:crypto';
 import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { loadCsSession, createCsSession, saveCsSession, type CsSessionRow, type CsPhase } from '@/lib/cs/cs-session';
 import { getCsTools, CS_TOOL_DEFS } from '@/lib/cs/tools';
-import type { CsToolCtx, CsToolResult, OpenAIFunctionDef } from '@/lib/cs/tools/types';
+import type { CsProductCard, CsToolCtx, CsToolResult, OpenAIFunctionDef } from '@/lib/cs/tools/types';
 import { buildCsSystemPrompt, buildContextDigest, stripSuggestions, type CsRecentTurn } from '@/lib/cs/cs-context';
 import { laneModel } from '@/lib/llm/config';
 import { toWaId } from '@/lib/whatsapp-cloud/client';
@@ -29,6 +29,9 @@ export interface CsTurnResult {
     | { kind: 'list'; body: string; buttonLabel: string; sections: any[]; header?: string; footer?: string }
     | { kind: 'none' };
   phase: CsPhase;
+  // Product cards the brain chose via show_products. WhatsApp has no multi-card message, so each
+  // one is its own send — the worker dispatches them AFTER the text so the prose leads.
+  cards?: CsProductCard[];
 }
 
 // content is `string` for text turns and an OpenAI multimodal content-part array (text + image_url)
@@ -127,12 +130,19 @@ async function recordPausedInbound(session: CsSessionRow, userMessage: string): 
 }
 
 // Persist the turn to chat_messages + bump message_count (mirror widget-chat-handler.ts).
-async function persistTurn(chatSessionId: string, userMessage: string, assistantText: string): Promise<void> {
+// Carded product ids ride on the assistant message's metadata so a later pass can attribute
+// purchases the way the widget already does, without re-deriving what was shown.
+async function persistTurn(chatSessionId: string, userMessage: string, assistantText: string, cards: CsProductCard[] = []): Promise<void> {
   const { data: sess } = await supabaseAdmin.from('chat_sessions').select('message_count').eq('id', chatSessionId).single();
   const msgCount = (((sess as any)?.message_count) || 0) + 2;
   await Promise.all([
     supabaseAdmin.from('chat_messages').insert({ session_id: chatSessionId, role: 'user', content: userMessage }),
-    supabaseAdmin.from('chat_messages').insert({ session_id: chatSessionId, role: 'assistant', content: assistantText }),
+    supabaseAdmin.from('chat_messages').insert({
+      session_id: chatSessionId,
+      role: 'assistant',
+      content: assistantText,
+      ...(cards.length ? { metadata: { product_ids: cards.map((c) => c.productId) } } : {}),
+    }),
     supabaseAdmin.from('chat_sessions').update({ message_count: msgCount }).eq('id', chatSessionId),
   ]);
 }
@@ -206,6 +216,7 @@ export async function runCsTurn(job: CsJob, depsOverride?: Partial<CsAgentDeps>)
   const messages: CsChatMessage[] = [...history, { role: 'user', content: userContent }];
   let finalText: string | null = null;
   let handedOff = false; // escalate_to_human fired this turn → pause FUTURE turns, but still ack THIS one
+  let cards: CsProductCard[] = [];
 
   for (let iter = 0; iter < MAX_ITERS; iter++) {
     const turn = await deps.callModel({ system, messages, tools: CS_TOOL_DEFS });
@@ -219,6 +230,7 @@ export async function runCsTurn(job: CsJob, depsOverride?: Partial<CsAgentDeps>)
       if (result.bind) session = await applyBind(session, ctx, result.bind);
       if (result.learnedName) session = await applyLearnedName(session, ctx, result.learnedName);
       if (result.escalated) handedOff = true;
+      if (result.cards?.length) cards = result.cards;   // last show_products call wins (never accumulates past the cap)
       messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result.data ?? { ok: result.ok }) });
     }
     // Do NOT short-circuit on a hand-off. escalate_to_human pauses the bot for FUTURE turns, but the
@@ -232,7 +244,11 @@ export async function runCsTurn(job: CsJob, depsOverride?: Partial<CsAgentDeps>)
   const HANDOFF_ACK = 'אני מעבירה את זה לנציג/ה אנושי/ת שיחזרו אליך בהקדם 🙏';
   const replyBody = stripSuggestions(finalText || (handedOff ? HANDOFF_ACK : 'סליחה, אפשר לנסח שוב? 🙏'));
   if (replyBody) recentTurns.push({ role: 'assistant', text: replyBody });
+  // A hand-off means something went wrong for this shopper. Whatever the brain queued earlier in
+  // the turn, following an escalation ack with product cards would read as selling to someone who
+  // just reported a problem — so the cards are dropped, not sent.
+  if (handedOff) cards = [];
   await saveCsSession(session, { context: { ...(session.context || {}), recentTurns: recentTurns.slice(-8) }, last_activity_at: new Date().toISOString() });
-  if (session.active_chat_session_id) await persistTurn(session.active_chat_session_id, userMessage, replyBody);
-  return { reply: { kind: 'text', body: replyBody }, phase: session.phase };
+  if (session.active_chat_session_id) await persistTurn(session.active_chat_session_id, userMessage, replyBody, cards);
+  return { reply: { kind: 'text', body: replyBody }, phase: session.phase, ...(cards.length ? { cards } : {}) };
 }

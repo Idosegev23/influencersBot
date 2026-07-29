@@ -49,6 +49,18 @@ export async function processOneCsInbound(job: CsJob): Promise<string | null> {
     await new Promise((r) => setTimeout(r, 400 * (i + 1)));
   }
 
+  // Product cards ride AFTER the text so the prose leads and the cards illustrate it. They are
+  // sent before the done-guard for the same reason the text is: a crash here should re-process
+  // rather than leave the shopper with a recommendation and no products. Card delivery is
+  // best-effort and never changes the turn's outcome — the answer itself already landed.
+  if (sent.success && turn.cards?.length) {
+    try {
+      const { sendProductCards } = await import('@/lib/cs/cs-product-cards');
+      const delivered = await sendProductCards(job.waId, turn.cards);
+      if (delivered < turn.cards.length) console.warn('[cs-worker] product cards partially delivered', delivered, '/', turn.cards.length);
+    } catch (e) { console.warn('[cs-worker] product cards failed', e); }
+  }
+
   if (sent.success) {
     try { if (job.msg?.id) await redisSetNx(doneKey, '1', 900); } catch { /* ignore */ }
     // Promise.resolve(...) wraps the call so a fire-and-forget reaction can never throw

@@ -21,7 +21,8 @@
     "backup:db": "./scripts/backup-database.sh",
     "backup:migrations": "./scripts/backup-migrations.sh",
     "backup:all": "./scripts/backup-all.sh",
-    "precommit": "./scripts/build-and-check.sh"
+    "precommit": "./scripts/build-and-check.sh",
+    "cs:products-e2e": "npx tsx --tsconfig tsconfig.json scripts/cs-products-e2e.ts"
   },
   "dependencies": {
     "@google/genai": "^1.38.0",
@@ -55,6 +56,7 @@
     "react-dom": "19.2.3",
     "react-markdown": "^10.1.0",
     "recharts": "^3.6.0",
+    "sharp": "^0.35.3",
     "tailwind-merge": "^3.4.0",
     "three": "^0.184.0",
     "xlsx": "^0.18.5"

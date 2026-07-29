@@ -47,6 +47,9 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // sharp loads platform-specific native binaries; bundling it breaks that resolution.
+  // Used by /api/wa/product-image to transcode product photos to JPEG for WhatsApp.
+  serverExternalPackages: ['sharp'],
   images: {
     // Skip Vercel image optimization: our /api/image-proxy already caches
     // Instagram URLs (max-age=86400), and Vercel's optimizer rejects
