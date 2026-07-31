@@ -20,6 +20,7 @@ async function getGeminiModel() {
 export interface ExtractedProduct {
   name: string;
   nameHe?: string;
+  brand?: string;
   description?: string;
   price?: number;
   originalPrice?: number;
@@ -91,13 +92,15 @@ ${categoryGlossary}
 4. subcategory: ערך אחד שמתאר את סוג הפריט. אוצר המילים המקובל בתחום:
    ${v.subcategories.join(', ')}
    אם שום ערך לא מתאים — other
-5. productLine: הסדרה / הקולקציה / קו המוצר, אם קיים.
-6. ${ingredientsRule}
-7. keyIngredients / benefits / targetAudience: רשימות קצרות בעברית. אם לא ידוע — [].
-8. אם הדף הוא עמוד רשימת מוצרים (קטלוג) ולא מוצר בודד — החזר isProductPage: false
-9. isAvailable: false אם כתוב "אזל", "SOLD OUT", "לא במלאי"
-10. isOnSale: true אם יש מחיר מקורי וגם מחיר מבצע
-11. אל תמציא ערכים. שדה שאין לו בסיס בדף — null (או [] לרשימה).
+5. brand: המותג / היצרן של הפריט (למשל "MANGO", "NIKE"). באתר רב-מותגי זה שדה קריטי.
+   אם האתר מוכר רק את המותג של עצמו — שם האתר. אם לא ידוע — null.
+6. productLine: הסדרה / הקולקציה / קו המוצר, אם קיים.
+7. ${ingredientsRule}
+8. keyIngredients / benefits / targetAudience: רשימות קצרות בעברית. אם לא ידוע — [].
+9. אם הדף הוא עמוד רשימת מוצרים (קטלוג) ולא מוצר בודד — החזר isProductPage: false
+10. isAvailable: false אם כתוב "אזל", "SOLD OUT", "לא במלאי"
+11. isOnSale: true אם יש מחיר מקורי וגם מחיר מבצע
+12. אל תמציא ערכים. שדה שאין לו בסיס בדף — null (או [] לרשימה).
 
 כללים ייחודיים לתחום ${v.label.he}:
 ${v.extractionRules}
@@ -106,6 +109,7 @@ ${v.extractionRules}
 {
   "isProductPage": true/false,
   "name": "שם המוצר",
+  "brand": null,
   "description": "תיאור קצר",
   "price": 45.90,
   "originalPrice": null,
@@ -156,6 +160,19 @@ const cleanSchemaValue = (v: unknown): string => {
 };
 
 const schemaType = (n: any): string => (Array.isArray(n?.['@type']) ? n['@type'][0] : n?.['@type']) || '';
+
+/**
+ * The Product node's brand. Read straight from JSON-LD rather than trusted to the model,
+ * because on multi-brand retailers ("do you carry MANGO?") brand is the highest-value
+ * attribute and the page text rarely states it unambiguously.
+ */
+export function brandFromStructuredData(structuredData: unknown): string | null {
+  const product = schemaNodes(structuredData).find(n => schemaType(n) === 'Product');
+  if (!product) return null;
+  const raw = product.brand;
+  const name = cleanSchemaValue(raw && typeof raw === 'object' ? (raw as any).name : raw);
+  return name || null;
+}
 
 /**
  * The Product node's primary image. Preferred over `image_urls[0]`, which is whichever
@@ -272,6 +289,9 @@ ${(page.page_content || '').substring(0, 3000)}
     return {
       name: data.name,
       nameHe: data.name, // Already Hebrew for Israeli sites
+      // JSON-LD wins over the model: the schema states the brand outright, the page text
+      // usually only implies it.
+      brand: brandFromStructuredData(page.structured_data) || data.brand || null,
       description: data.description || null,
       price: data.price ? parseFloat(data.price) : null,
       originalPrice: data.originalPrice ? parseFloat(data.originalPrice) : null,
@@ -445,6 +465,7 @@ export async function extractAllProducts(
         source_page_id: sourcePage?.id || null,
         name: product.name,
         name_he: product.nameHe,
+        brand: product.brand,
         description: product.description,
         price: product.price,
         original_price: product.originalPrice,
