@@ -8,7 +8,8 @@ describe('igScanStep', () => {
   it('runs the scan and advances', async () => {
     const { igScanStep } = await import('@/lib/pipeline/steps/ig-scan');
     const res = await igScanStep({ jobId: 'j1', accountId: 'a1', username: 'u', step: 'ig-scan', batch: 0, state: { currentStep: 'ig-scan', counts: {}, cursors: {}, options: { transcribe: true, maxPages: null, postsLimit: 50, isDemo: true } } as any });
-    expect(runScanJob).toHaveBeenCalledWith('j1');
+    // manageJobStatus:false is load-bearing — see tests/unit/pipeline/ig-scan-job-status.test.ts
+    expect(runScanJob).toHaveBeenCalledWith('j1', { manageJobStatus: false });
     expect(res.status).toBe('advance');
   });
 });

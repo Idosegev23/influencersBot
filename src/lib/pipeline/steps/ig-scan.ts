@@ -7,7 +7,11 @@ import { hasInstagram, enrichSkips, type StepResult } from './index';
 export async function igScanStep(ctx: StepContext): Promise<StepResult> {
   if (enrichSkips(ctx, 'instagram')) return { status: 'advance' }; // enriching a different source
   if (!hasInstagram(ctx)) return { status: 'advance' }; // website-only account: nothing to scrape
-  await runScanJob(ctx.jobId); // scrapes profile+posts+highlights+comments into DB
+  // scrapes profile+posts+highlights+comments into DB.
+  // manageJobStatus:false — this is step 2 of 11 against a job row the pipeline owns;
+  // letting runScanJob mark it succeeded here ended the job in the eyes of every status
+  // reader while six steps were still queued.
+  await runScanJob(ctx.jobId, { manageJobStatus: false });
 
   const supabase = await createClient();
   if (!ctx.state.websiteUrl) {
