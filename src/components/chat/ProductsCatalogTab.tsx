@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { track } from '@/lib/analytics/track';
+import { categoryKeys, categoryLabel as registryCategoryLabel } from '@/lib/catalog/verticals';
 import {
   Loader2, Search, ExternalLink, ShoppingBag,
   X, Sparkles, AlignCenter, Check, Plus,
@@ -77,16 +78,24 @@ interface ProductsCatalogTabProps {
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
 
-const CATEGORY_LABELS: Record<string, string> = {
-  hair_care: 'טיפוח שיער', face_care: 'טיפוח פנים', body_care: 'טיפוח גוף',
-  makeup: 'איפור', fragrance: 'בשמים', skincare: 'טיפוח עור',
-  food: 'אוכל', spices: 'תבלינים', paint: 'צבעים',
-  tools: 'כלים', service: 'שירותים', general: 'כללי',
-  other: 'אחר',
-};
+// Category display names come from the vertical registry — the same source that drives the
+// extraction prompt, so a market added there labels correctly here with no edit.
+// `categoryLabel` is called without a vertical: the registry searches every vertical, which
+// is what we want since this component isn't told which market the account is in, and rows
+// extracted under a previous vertical must still read correctly after a re-scan.
+// Legacy keys ('paint', 'service', 'general') predate the registry and fall through to the
+// de-snaked key, which reads acceptably.
+function categoryLabel(cat?: string): string {
+  return registryCategoryLabel(undefined, cat || '');
+}
 
-const FOOD_CATEGORIES = new Set(['food', 'spices']);
-const BEAUTY_CATEGORIES = new Set(['hair_care', 'face_care', 'body_care', 'makeup', 'fragrance', 'skincare']);
+// Which categories mark an account as food / beauty, for the vertical-specific filter
+// affordances below. Derived from the registry, minus 'other' — a catch-all bucket exists in
+// every vertical and would otherwise match any account. 'food' and 'skincare' are legacy keys
+// written by the pre-registry extractor.
+const withoutOther = (id: string) => categoryKeys(id).filter(k => k !== 'other');
+const FOOD_CATEGORIES = new Set([...withoutOther('food'), 'food']);
+const BEAUTY_CATEGORIES = new Set(withoutOther('beauty'));
 
 function isFoodBrand(products: Product[]): boolean {
   return products.some(p => FOOD_CATEGORIES.has(p.category || ''));
@@ -94,11 +103,6 @@ function isFoodBrand(products: Product[]): boolean {
 
 function isBeautyBrand(products: Product[]): boolean {
   return products.some(p => BEAUTY_CATEGORIES.has(p.category || ''));
-}
-
-function categoryLabel(cat?: string): string {
-  if (!cat) return '';
-  return CATEGORY_LABELS[cat] || cat.replace(/_/g, ' ');
 }
 
 /** Build rich hidden context from a product for the AI */

@@ -117,6 +117,17 @@ export async function crawlPageBatch(
       const html = await res.text();
       const $ = cheerio.load(html);
 
+      // Structured data — MUST be collected before the <script> strip below, otherwise
+      // cheerio has already detached the ld+json nodes and every page saves an empty array.
+      const structuredData: unknown[] = [];
+      $('script[type="application/ld+json"]').each((_, el) => {
+        try {
+          structuredData.push(JSON.parse($(el).html() || ''));
+        } catch {
+          /* skip malformed */
+        }
+      });
+
       // Remove noise before extraction.
       $('script, style, noscript, iframe, svg').remove();
       $('.cookie-banner, .popup, #cookie-consent, .cookie-notice').remove();
@@ -185,16 +196,6 @@ export async function crawlPageBatch(
         const src = $(el).attr('src');
         if (src && src.startsWith('http') && !src.includes('data:') && !src.includes('.svg')) {
           imageUrls.push(src);
-        }
-      });
-
-      // Structured data
-      const structuredData: unknown[] = [];
-      $('script[type="application/ld+json"]').each((_, el) => {
-        try {
-          structuredData.push(JSON.parse($(el).html() || ''));
-        } catch {
-          /* skip malformed */
         }
       });
 

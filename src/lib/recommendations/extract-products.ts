@@ -4,6 +4,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
+import { getVertical, type VerticalId } from '@/lib/catalog/verticals';
 
 // Use dynamic import for Gemini to avoid build issues
 async function getGeminiModel() {
@@ -50,21 +51,56 @@ export interface ExtractionResult {
 // Product Extraction from Single Page
 // ============================================
 
-const EXTRACTION_PROMPT = `אתה מומחה לחילוץ נתוני מוצרים מאתרי איקומרס ישראליים.
+/**
+ * Assemble the extraction prompt for a market.
+ *
+ * Everything true of every e-commerce page (price splitting, catalog-page guard, stock
+ * wording, JSON envelope) lives here once; everything market-specific — the category enum,
+ * the subcategory vocabulary, which attributes matter — comes from the vertical registry.
+ * Supporting a new market is therefore a registry entry, never a prompt edit.
+ *
+ * @see src/lib/catalog/verticals.ts
+ */
+export function buildExtractionPrompt(verticalId?: VerticalId | string | null): string {
+  const v = getVertical(verticalId);
+  const categories = Object.keys(v.categories).join(', ');
+  const categoryGlossary = Object.entries(v.categories)
+    .map(([key, label]) => `   ${key} = ${label.he}`)
+    .join('\n');
+
+  const volumeRule = v.attributes.volume
+    ? 'חלץ נפח / משקל (מ"ל, ליטר, גרם, ק"ג) ל-volume, והמר ל-volumeMl (מספר) כשמדובר בנוזל.'
+    : 'volume ו-volumeMl אינם רלוונטיים בתחום הזה — החזר null בשניהם.';
+  const ingredientsRule = v.attributes.ingredients
+    ? 'ingredients: רשימת הרכיבים המלאה מהתווית, אם מופיעה בדף.'
+    : 'ingredients: החזר [] — בתחום הזה אין רשימת רכיבים.';
+
+  return `אתה מומחה לחילוץ נתוני מוצרים מאתרי איקומרס ישראליים.
+תחום האתר: ${v.label.he}.
 נתח את תוכן הדף הבא וחלץ מידע על המוצר.
+
+אם מופיע בדף בלוק "נתונים מובנים (schema.org)" — הוא מגיע ישירות מהאתר והוא מקור האמת.
+העדף אותו על פני ניחוש מהטקסט החופשי, במיוחד לשם, מחיר, מותג ושיוך הקטגוריה.
+"נתיב קטגוריות באתר" הוא ההיררכיה שהאתר עצמו מגדיר — גזור ממנו את category ו-subcategory.
 
 חוקים:
 1. חלץ את המחיר מהטקסט (חפש ₪ ואז מספר). אם יש מחיר מבצע ומחיר מקורי — הפרד ביניהם.
-2. חלץ נפח ממ"ל, גר', מ"ל — המר ל-volumeMl (מספר).
-3. category: אחד מ: hair_care, body_care, face_care, men, lip_care, nails, accessories, sets, other
-4. subcategory: shampoo, conditioner, mask, serum, oil, cream, gel, wax, clay, spray, brush, towel, kit, lip_oil, other
-5. productLine: הסדרה (למשל "קיק", "חומצה היאלורונית", "ארגן", "סילבר אסאי", "אובליפיכה")
-6. keyIngredients: רכיבים עיקריים בעברית (["שמן קיק", "קרטין"])
-7. benefits: יתרונות (["שיער יבש", "לחות", "חיזוק"])
-8. targetAudience: קהל יעד (["שיער פגום", "שיער צבוע", "גברים"])
-9. אם הדף הוא עמוד רשימת מוצרים (קטלוג) ולא מוצר בודד — החזר isProductPage: false
-10. isAvailable: false אם כתוב "אזל", "SOLD OUT", "לא במלאי"
-11. isOnSale: true אם יש מחיר מקורי וגם מחיר מבצע
+2. ${volumeRule}
+3. category: בחר בדיוק ערך אחד מתוך: ${categories}
+${categoryGlossary}
+4. subcategory: ערך אחד שמתאר את סוג הפריט. אוצר המילים המקובל בתחום:
+   ${v.subcategories.join(', ')}
+   אם שום ערך לא מתאים — other
+5. productLine: הסדרה / הקולקציה / קו המוצר, אם קיים.
+6. ${ingredientsRule}
+7. keyIngredients / benefits / targetAudience: רשימות קצרות בעברית. אם לא ידוע — [].
+8. אם הדף הוא עמוד רשימת מוצרים (קטלוג) ולא מוצר בודד — החזר isProductPage: false
+9. isAvailable: false אם כתוב "אזל", "SOLD OUT", "לא במלאי"
+10. isOnSale: true אם יש מחיר מקורי וגם מחיר מבצע
+11. אל תמציא ערכים. שדה שאין לו בסיס בדף — null (או [] לרשימה).
+
+כללים ייחודיים לתחום ${v.label.he}:
+${v.extractionRules}
 
 החזר JSON בלבד (ללא markdown):
 {
@@ -73,32 +109,125 @@ const EXTRACTION_PROMPT = `אתה מומחה לחילוץ נתוני מוצרי�
   "description": "תיאור קצר",
   "price": 45.90,
   "originalPrice": null,
-  "category": "hair_care",
-  "subcategory": "shampoo",
-  "productLine": "קיק",
-  "volume": "450 מ\"ל",
-  "volumeMl": 450,
-  "ingredients": ["Aqua", "Sodium Laureth Sulfate", ...],
-  "keyIngredients": ["שמן קיק", "קרטין"],
-  "benefits": ["שיער יבש", "חיזוק"],
-  "targetAudience": ["שיער פגום"],
+  "category": "${Object.keys(v.categories)[0]}",
+  "subcategory": "${v.subcategories[0]}",
+  "productLine": null,
+  "volume": null,
+  "volumeMl": null,
+  "ingredients": [],
+  "keyIngredients": [],
+  "benefits": [],
+  "targetAudience": [],
   "isAvailable": true,
   "isOnSale": false
 }`;
+}
+
+/**
+ * Flatten schema.org JSON-LD into a compact Hebrew-labelled block for the extractor prompt.
+ *
+ * Most e-commerce platforms (Magento, Shopify, WooCommerce) emit a complete `Product` node
+ * plus a `BreadcrumbList` spelling out the site's own category hierarchy. That is strictly
+ * better ground truth than the page's free text — especially for SPA storefronts whose
+ * server-rendered text is mostly navigation chrome.
+ *
+ * Returns '' when the page has no Product/BreadcrumbList, so the caller can omit the block.
+ */
+function schemaNodes(structuredData: unknown): any[] {
+  const nodes: any[] = [];
+  const visit = (node: unknown, depth = 0) => {
+    if (!node || typeof node !== 'object' || depth > 4) return;
+    if (Array.isArray(node)) {
+      node.forEach(n => visit(n, depth + 1));
+      return;
+    }
+    const obj = node as Record<string, unknown>;
+    if (Array.isArray(obj['@graph'])) (obj['@graph'] as unknown[]).forEach(n => visit(n, depth + 1));
+    if (obj['@type']) nodes.push(obj);
+  };
+  visit(structuredData);
+  return nodes;
+}
+
+// Magento writes the literal string "null" for unset attributes.
+const cleanSchemaValue = (v: unknown): string => {
+  const s = typeof v === 'string' ? v.trim() : v == null ? '' : String(v);
+  return s === 'null' || s === 'undefined' ? '' : s;
+};
+
+const schemaType = (n: any): string => (Array.isArray(n?.['@type']) ? n['@type'][0] : n?.['@type']) || '';
+
+/**
+ * The Product node's primary image. Preferred over `image_urls[0]`, which is whichever
+ * <img> the crawler saw first — on SPA storefronts with no og:image that is typically a
+ * navigation logo, not the product.
+ */
+export function structuredProductImage(structuredData: unknown): string | null {
+  const product = schemaNodes(structuredData).find(n => schemaType(n) === 'Product');
+  if (!product) return null;
+  const raw = Array.isArray(product.image) ? product.image[0] : product.image;
+  const url = cleanSchemaValue(typeof raw === 'object' && raw ? (raw as any).url : raw);
+  return url.startsWith('http') ? url : null;
+}
+
+export function summarizeStructuredData(structuredData: unknown): string {
+  const nodes = schemaNodes(structuredData);
+  const clean = cleanSchemaValue;
+  const typeOf = schemaType;
+
+  const lines: string[] = [];
+
+  const product = nodes.find(n => typeOf(n) === 'Product');
+  if (product) {
+    const push = (label: string, value: unknown) => {
+      const v = clean(value);
+      if (v) lines.push(`${label}: ${v}`);
+    };
+    push('שם המוצר', product.name);
+    push('תיאור', product.description);
+    push('מותג', product.brand?.name ?? product.brand);
+    push('מק"ט', product.sku);
+    push('צבע', product.color);
+    push('חומר', product.material);
+
+    const offer = Array.isArray(product.offers) ? product.offers[0] : product.offers;
+    if (offer && typeof offer === 'object') {
+      push('מחיר', (offer as any).price);
+      push('מטבע', (offer as any).priceCurrency);
+      push('זמינות', (offer as any).availability);
+    }
+    const image = Array.isArray(product.image) ? product.image[0] : product.image;
+    push('תמונה', image);
+  }
+
+  const crumbs = nodes.find(n => typeOf(n) === 'BreadcrumbList');
+  if (crumbs && Array.isArray(crumbs.itemListElement)) {
+    const trail = crumbs.itemListElement
+      .map((el: any) => clean(el?.item?.name ?? el?.name))
+      // The home crumb carries no category signal and misleads the model.
+      .filter((name: string) => name && !/^(דף הבית|home|בית)$/i.test(name));
+    if (trail.length) lines.push(`נתיב קטגוריות באתר: ${trail.join(' > ')}`);
+  }
+
+  return lines.length ? lines.join('\n') : '';
+}
 
 export async function extractProductFromPage(page: {
   url: string;
   page_title: string;
   page_content: string;
   extracted_data?: any;
+  structured_data?: unknown;
   image_urls?: string[];
-}): Promise<ExtractedProduct | null> {
+}, verticalId?: VerticalId | string | null): Promise<ExtractedProduct | null> {
   try {
     const { client, model } = await getGeminiModel();
 
+    const schema = summarizeStructuredData(page.structured_data);
     const pageContext = `
 כותרת: ${page.page_title || ''}
 URL: ${page.url}
+${schema ? `\nנתונים מובנים (schema.org) — מקור אמת מהאתר:\n${schema}\n` : ''}
 תוכן:
 ${(page.page_content || '').substring(0, 3000)}
 `;
@@ -107,7 +236,7 @@ ${(page.page_content || '').substring(0, 3000)}
       model,
       contents: pageContext,
       config: {
-        systemInstruction: EXTRACTION_PROMPT,
+        systemInstruction: buildExtractionPrompt(verticalId),
         temperature: 0.1,
         maxOutputTokens: 8192,
         thinkingConfig: { thinkingBudget: 0 },
@@ -132,8 +261,10 @@ ${(page.page_content || '').substring(0, 3000)}
     // Skip if no name extracted
     if (!data.name || data.name === 'כל המוצרים') return null;
 
-    // Pick best image — image_urls is a Postgres text[] array
+    // Pick best image — the schema.org Product image first (image_urls[0] is whichever
+    // <img> came first in the DOM, which on og:image-less SPA pages is often a nav logo).
     const imageUrl =
+      structuredProductImage(page.structured_data) ||
       (Array.isArray(page.image_urls) && page.image_urls.length > 0 ? page.image_urls[0] : null) ||
       page.extracted_data?.images?.[0] ||
       null;
@@ -168,17 +299,33 @@ ${(page.page_content || '').substring(0, 3000)}
 // Batch Extract All Products for an Account
 // ============================================
 
-export async function extractAllProducts(accountId: string, options?: { maxPages?: number }): Promise<ExtractionResult> {
+export async function extractAllProducts(
+  accountId: string,
+  options?: { maxPages?: number; vertical?: VerticalId | string | null }
+): Promise<ExtractionResult> {
   const start = Date.now();
   const errors: string[] = [];
   const supabase = await createClient();
 
-  console.log(`[ExtractProducts] Starting extraction for account ${accountId}`);
+  // Which market's taxonomy to extract against. Explicit option wins (the scan that is
+  // running now knows best); otherwise fall back to what the account was last scanned as.
+  let vertical = options?.vertical;
+  if (!vertical) {
+    const { data: account } = await supabase
+      .from('accounts')
+      .select('config')
+      .eq('id', accountId)
+      .single();
+    vertical = (account?.config as any)?.product_vertical || null;
+  }
+  const resolved = getVertical(vertical);
+
+  console.log(`[ExtractProducts] Starting extraction for account ${accountId} (vertical: ${resolved.id})`);
 
   // 1. Fetch all scraped product pages
   const { data: pages, error } = await supabase
     .from('instagram_bio_websites')
-    .select('id, url, page_title, page_content, extracted_data, image_urls')
+    .select('id, url, page_title, page_content, extracted_data, structured_data, image_urls')
     .eq('account_id', accountId)
     .eq('processing_status', 'completed');
 
@@ -186,18 +333,24 @@ export async function extractAllProducts(accountId: string, options?: { maxPages
     return { accountId, totalPages: 0, productsExtracted: 0, seriesDetected: 0, errors: [error?.message || 'No pages found'], durationMs: Date.now() - start };
   }
 
-  // Product pages: the crawl extracted a price into extracted_data.price (the
-  // general, site-agnostic signal — Carolina Lemke uses root-level SKU slugs like
-  // /cl3606-01 with no "/product" in the URL), OR the URL looks like a product page
-  // (backward-compat for QuickShop /product/ sites).
+  // Product pages, in order of signal strength:
+  //  1. schema.org/Product in the page's JSON-LD — the platform declaring it itself. The
+  //     strongest signal, and the only one that survives SPA storefronts whose prices are
+  //     rendered client-side and therefore never reach extracted_data.
+  //  2. the crawl extracted a price into extracted_data.price (site-agnostic — Carolina
+  //     Lemke uses root-level SKU slugs like /cl3606-01 with no "/product" in the URL).
+  //  3. the URL looks like a product page (backward-compat for QuickShop /product/ sites).
   let productPages = pages.filter((p: any) => {
+    const hasProductSchema = /"@type"\s*:\s*(\[\s*)?"Product"/.test(
+      JSON.stringify(p.structured_data ?? '')
+    );
     const price = p.extracted_data?.price;
     const hasPrice = price != null && String(price).trim() !== '';
     const urlMatch =
       p.url?.includes('/product') &&
       !p.url?.endsWith('/products') &&
       !p.url?.includes('/category');
-    return hasPrice || urlMatch;
+    return hasProductSchema || hasPrice || urlMatch;
   });
 
   // Optional cap (serverless time budget): large catalogs (Carolina ~1,444) would
@@ -222,7 +375,7 @@ export async function extractAllProducts(accountId: string, options?: { maxPages
   for (let i = 0; i < productPages.length; i += BATCH_SIZE) {
     const batch = productPages.slice(i, i + BATCH_SIZE);
     const results = await Promise.allSettled(
-      batch.map((page: any) => extractProductFromPage(page))
+      batch.map((page: any) => extractProductFromPage(page, resolved.id))
     );
 
     for (let j = 0; j < results.length; j++) {

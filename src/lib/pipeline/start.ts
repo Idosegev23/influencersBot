@@ -15,8 +15,10 @@ export interface StartPipelineInput {
   maxPages?: number | null;
   postsLimit?: number;
   archetype?: string;
+  productVertical?: string;
   scanMode?: 'full' | 'quote';
   categories?: { pathPattern: string; cap: number }[];
+  seedUrls?: string[];
   youtube?: string;
   tiktok?: string;
   enrichSources?: ('instagram' | 'website' | 'youtube' | 'tiktok')[];
@@ -42,8 +44,10 @@ export async function startPipeline(input: StartPipelineInput): Promise<StartPip
     maxPages = null,
     postsLimit = DEFAULT_SCAN_CONFIG.postsLimit,
     archetype = 'brand',
+    productVertical,
     scanMode = 'full',
     categories,
+    seedUrls,
     youtube,
     tiktok,
     enrichSources,
@@ -84,7 +88,7 @@ export async function startPipeline(input: StartPipelineInput): Promise<StartPip
     counts: {},
     cursors: {},
     websiteUrl: websiteUrl || undefined,
-    options: { transcribe, maxPages, postsLimit, isDemo, language, archetype, scanMode, categories, youtube, tiktok, hasIg, enrichSources },
+    options: { transcribe, maxPages, postsLimit, isDemo, language, archetype, productVertical, scanMode, categories, seedUrls, youtube, tiktok, hasIg, enrichSources },
   };
   await saveState(job.id, state);
   await publishStep({ jobId: job.id, step: 'create-account', batch: 0 });

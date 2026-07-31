@@ -33,6 +33,13 @@ export async function siteDiscoverStep(ctx: StepContext): Promise<StepResult> {
     urls = urls.slice(0, ctx.state.options.maxPages);
   }
 
+  // Explicit seeds bypass the sitemap entirely. SPA storefronts (headless Magento/Shopify)
+  // routinely list only category pages in their sitemap, leaving product detail pages
+  // reachable solely as links inside the listing HTML — seeds are how those get crawled.
+  // They are appended AFTER the caps so neither `categories` nor `maxPages` truncates them.
+  const seedUrls = ctx.state.options.seedUrls;
+  if (seedUrls && seedUrls.length) urls = [...new Set([...urls, ...seedUrls])];
+
   await pushFrontier(ctx.jobId, urls);
   await setCount(ctx.jobId, 'crawl', { done: 0, total: urls.length });
   return { status: 'advance' };

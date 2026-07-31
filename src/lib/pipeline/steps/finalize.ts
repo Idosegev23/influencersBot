@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { extractImageData } from '@/lib/scraping/image-analyzer';
+import { verticalForArchetype } from '@/lib/catalog/verticals';
 import type { StepContext } from '../types';
 import type { StepResult } from './index';
 
@@ -37,6 +38,14 @@ export async function finalizeStep(ctx: StepContext): Promise<StepResult> {
   if (!cfg.archetype) {
     cfg.archetype = ctx.state.options?.archetype || (ctx.state.websiteUrl ? 'brand' : 'influencer');
   }
+
+  // Catalog vertical — the market whose taxonomy the product catalog uses. Persisted so
+  // the catalog UI can label categories and a standalone product re-extract knows the
+  // market without being told again. An explicit form value always wins over the
+  // archetype-derived default, including on re-scan (the admin may be correcting it).
+  const pickedVertical = ctx.state.options?.productVertical;
+  if (pickedVertical) cfg.product_vertical = pickedVertical;
+  else if (!cfg.product_vertical) cfg.product_vertical = verticalForArchetype(cfg.archetype);
 
   // scan-mode marking — quote = bounded pre-sales demo; undefined ⇒ full.
   cfg.scan_mode = ctx.state.options?.scanMode || 'full';

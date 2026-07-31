@@ -19,7 +19,13 @@ export async function productExtractStep(ctx: StepContext): Promise<StepResult> 
   // Cap for serverless time budget — large catalogs (Carolina ~1,444 products)
   // would exceed maxDuration if every page went through Gemini extraction.
   // Full-catalog ingestion is a follow-up (batch this step like site-crawl).
-  await extractAllProducts(ctx.accountId, { maxPages: 200 });
+  // Catalog vertical picks the taxonomy + extraction rules (fashion vs food vs SaaS…).
+  // Passed explicitly because this step runs BEFORE finalize persists it to the account
+  // config; extractAllProducts falls back to that config on a standalone re-run.
+  await extractAllProducts(ctx.accountId, {
+    maxPages: 200,
+    vertical: ctx.state.options?.productVertical,
+  });
   await enrichAllProducts(ctx.accountId);
 
   return { status: 'advance' };

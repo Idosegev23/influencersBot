@@ -19,8 +19,16 @@ export interface PipelineOptions {
   isDemo: boolean;
   language?: 'he' | 'en'; // account output language: dashboard + chat + widget + persona. Default 'he'. Written to accounts.language in create-account.
   archetype?: string; // brand | influencer | service_provider | ... (applied in finalize)
+  // Catalog market: fashion | beauty | food | home | saas | services | ... Selects the
+  // product taxonomy AND the extraction prompt (see src/lib/catalog/verticals.ts).
+  // Undefined ⇒ derived from the archetype, defaulting to 'general'.
+  productVertical?: string;
   scanMode?: 'quote' | 'full'; // quote = bounded pre-sales demo scan; undefined/full = current behaviour
   categories?: { pathPattern: string; cap: number }[]; // selected path slices for quote mode; undefined = full scope
+  // Explicit urls appended to the crawl frontier, bypassing the sitemap and immune to
+  // `categories` / `maxPages` caps. Needed for SPA storefronts whose sitemap lists only
+  // category pages, leaving product detail pages reachable solely via listing-page links.
+  seedUrls?: string[];
   youtube?: string; // YouTube channel URL or @handle (optional extra source)
   tiktok?: string;  // TikTok @handle or URL (optional extra source)
   hasIg?: boolean;  // true = `username` is a real IG handle to scrape (even if it equals the domain, e.g. @buyme.co.il); false = domain/social anchor only

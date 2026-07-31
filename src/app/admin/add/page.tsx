@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { Category } from '@/lib/pipeline/discover';
 import { normalizeIgUsername } from '@/lib/pipeline/username';
+import { VERTICALS, categoryKeys, categoryLabel, verticalForArchetype } from '@/lib/catalog/verticals';
 
 type ScanMode = 'quote' | 'full';
 
@@ -46,6 +47,10 @@ export default function AddAccountPage() {
   const [youtube, setYoutube] = useState('');
   const [tiktok, setTiktok] = useState('');
   const [archetype, setArchetype] = useState('brand');
+  // Catalog market — drives the product taxonomy AND the extraction prompt.
+  // Follows the archetype until the admin overrides it, then stays put.
+  const [productVertical, setProductVertical] = useState<string>(() => verticalForArchetype('brand'));
+  const [verticalTouched, setVerticalTouched] = useState(false);
   const [language, setLanguage] = useState<'he' | 'en'>('he');
   const [isDemo, setIsDemo] = useState(true);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -216,6 +221,7 @@ export default function AddAccountPage() {
           language,
           transcribe,
           archetype,
+          productVertical,
           maxPages: maxPages ? Number(maxPages) : null,
           postsLimit: postsLimit ? Number(postsLimit) : undefined,
           scanMode,
@@ -595,7 +601,11 @@ export default function AddAccountPage() {
             </label>
             <select
               value={archetype}
-              onChange={(e) => setArchetype(e.target.value)}
+              onChange={(e) => {
+                setArchetype(e.target.value);
+                // Suggest a matching catalog vertical until the admin picks one by hand.
+                if (!verticalTouched) setProductVertical(verticalForArchetype(e.target.value));
+              }}
               className="neon-input w-full"
             >
               <option value="brand">מותג (brand)</option>
@@ -606,6 +616,41 @@ export default function AddAccountPage() {
               <option value="media_news">מדיה/חדשות (media_news)</option>
               <option value="tech_creator">יוצר טק (tech_creator)</option>
             </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-sm font-semibold mr-2" style={{ color: '#1f2937' }}>
+              תחום הקטלוג <span className="font-normal" style={{ color: '#817a6c' }}>(product vertical)</span>
+            </label>
+            <select
+              value={productVertical}
+              onChange={(e) => {
+                setProductVertical(e.target.value);
+                setVerticalTouched(true);
+              }}
+              className="neon-input w-full"
+            >
+              {VERTICALS.map(v => (
+                <option key={v.id} value={v.id}>
+                  {v.label.he} ({v.id})
+                </option>
+              ))}
+            </select>
+            <p className="text-xs" style={{ color: '#817a6c' }}>
+              קובע את טקסונומיית הקטגוריות של המוצרים ואת הפרומפט שמחלץ אותם מהאתר.
+              בחירה שגויה כאן = כל המוצרים ייפלו ל"אחר". ברירת המחדל נגזרת מסוג החשבון.
+            </p>
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {categoryKeys(productVertical).map(key => (
+                <span
+                  key={key}
+                  className="text-[11px] px-2 py-0.5 rounded-full"
+                  style={{ background: '#f3f0ea', color: '#6b6355' }}
+                >
+                  {categoryLabel(productVertical, key)}
+                </span>
+              ))}
+            </div>
           </div>
 
           <div className="space-y-2">

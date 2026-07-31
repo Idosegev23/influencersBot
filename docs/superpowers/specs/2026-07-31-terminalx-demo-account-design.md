@@ -62,27 +62,59 @@ selection before `pushFrontier`, and counted in the crawl total.
 
 This is the generic escape hatch for SPA sites whose product pages aren't in the sitemap.
 
-### C. Fashion taxonomy + ld+json grounding in the product extractor
+### C. Catalog vertical registry — one taxonomy + prompt per market
 
-`src/lib/recommendations/extract-products.ts` hardcodes a **cosmetics** category enum
-(`hair_care, body_care, face_care, men, lip_care, nails, accessories, sets, other`) and
-subcategories (`shampoo, conditioner, mask, …`). Every TerminalX product would land in
-`other`.
+`src/lib/recommendations/extract-products.ts` hardcoded a **cosmetics** category enum
+(`hair_care, body_care, face_care, men, lip_care, nails, …`). Every non-cosmetics account —
+fashion, food, SaaS, home goods — collapsed into `other`.
 
-Two changes:
-1. Extend the prompt's enum with fashion categories: `women, men, kids, beauty, home,
-   sports, jewelry, shoes, bags, sale` alongside the existing cosmetics values, and a
-   fashion subcategory vocabulary (`shirts, tshirts, dresses, pants, jeans, skirts,
-   jackets, coats, knitwear, activewear, swimwear, underwear, sneakers, boots, sandals,
-   bags, belts, hats, …`).
-2. Feed `page.structured_data` (now populated by change A) into `pageContext` so the model
-   classifies from real Product + BreadcrumbList data rather than guessing from free text.
-   This keeps the AI in charge of the taxonomy (as chosen) while grounding it on facts.
+Patching "fashion" into that one prompt would only move the problem to the next market. So
+instead: **`src/lib/catalog/verticals.ts`**, a pure-data registry with one entry per market:
 
-### D. Hebrew labels for fashion categories in the catalog UI
+| id | id | id |
+|---|---|---|
+| `fashion` | `beauty` | `food` |
+| `home` | `sports` | `jewelry` |
+| `electronics` | `health` | `baby_kids` |
+| `pets` | `saas` | `services` |
+| `general` (fallback) | | |
 
-`src/components/chat/ProductsCatalogTab.tsx` `CATEGORY_LABELS` only knows cosmetics keys;
-unknown keys render as raw slugs in the filter chips. Add the fashion keys.
+Each entry declares:
+- `label` — bilingual display name
+- `categories` — the main category enum, each with a bilingual label
+- `subcategories` — the vocabulary the model may draw on
+- `extractionRules` — market-specific prompt guidance
+- `attributes` — which of volume / ingredients / material / sizes are meaningful here
+
+One registry entry now drives **three** consumers, so adding a market never means editing a
+prompt, a component, or a form:
+1. `buildExtractionPrompt(verticalId)` — assembles the Gemini system instruction. Shared
+   rules (price splitting, catalog-page guard, stock wording, JSON envelope) live once;
+   the enum, vocabulary and rules come from the registry.
+2. `ProductsCatalogTab` filter chips — category labels resolve through
+   `categoryLabel()`, which searches the account's vertical first and then every other, so
+   rows extracted under a previous vertical still read correctly after a re-scan.
+3. The `/admin/add` form — see F.
+
+The extractor also now feeds `page.structured_data` (populated by change A) into
+`pageContext`, so the model classifies from real `Product` + `BreadcrumbList` data rather
+than guessing from free text, and prefers the schema.org product image over `image_urls[0]`
+(on og:image-less SPA pages that first image is often a nav logo).
+
+Product-page detection gains a third signal ahead of the existing two: the presence of a
+`schema.org/Product` node. This is the only signal that survives SPA storefronts whose
+prices render client-side and therefore never reach `extracted_data.price`.
+
+### D. `productVertical` threaded through the pipeline
+
+`PipelineOptions.productVertical` → `StartPipelineInput` → `product-extract` (passed
+explicitly, because that step runs before finalize) → `finalize` persists it to
+`accounts.config.product_vertical`. An explicit choice always wins, including on re-scan;
+otherwise a stored value is preserved, and a blank first scan derives one from the
+archetype via `verticalForArchetype()`.
+
+`extractAllProducts(accountId, { vertical })` falls back to `config.product_vertical` when
+run standalone, so a manual re-extract needs no argument.
 
 ### E. Public widget demo via the real proxy
 
