@@ -4,6 +4,8 @@
  */
 
 import { routeToArchetype } from './archetypes/intentRouter';
+import { recordTurnCost } from '@/lib/costs/recorder';
+import type { TokenUsage } from './archetypes/types';
 import { processWithArchetype } from './archetypes';
 import { getInsightsForPersona } from './conversation-learner';
 import {
@@ -65,6 +67,8 @@ function getArchetypeFallbackSuggestions(archetype: string, language?: string): 
 export interface SandwichBotInput {
   userMessage: string;
   accountId: string;
+  /** Conversation id, used only to attribute turn cost per session (src/lib/costs/). */
+  sessionId?: string | null;
   username: string;
   influencerName: string;
   conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
@@ -111,6 +115,7 @@ export interface SandwichBotInput {
 export interface SandwichBotOutput {
   response: string;
   responseId?: string | null; // OpenAI Responses API response ID for context chaining
+  usage?: TokenUsage | null;  // token counts for this turn (already recorded; exposed for callers that surface them)
   metadata: {
     archetype: string;
     confidence: number;
@@ -464,9 +469,17 @@ export class SandwichBot {
     console.log(`✅ [SandwichBot] Processing complete`);
     console.log(`${'='.repeat(60)}\n`);
 
+    // Cost accounting — fire-and-forget, never throws, never blocks the reply.
+    void recordTurnCost({
+      accountId: input.accountId,
+      sessionId: input.sessionId,
+      usage: archetypeResult.usage,
+    });
+
     return {
       response: finalResponse,
       responseId: archetypeResult.responseId,
+      usage: archetypeResult.usage ?? null,
       metadata: {
         archetype: classification.primaryArchetype,
         confidence: classification.confidence,

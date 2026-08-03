@@ -122,9 +122,22 @@ export interface ArchetypeInput {
   conversationTopics?: string[]; // From rolling_summary — recurring topics for deepening
 }
 
+/**
+ * Token counts for one model call, as reported by OpenAI.
+ * `inputTokens` is inclusive of `cachedInputTokens`.
+ * Threaded up so cost can be recorded per turn — see src/lib/costs/.
+ */
+export interface TokenUsage {
+  model: string;
+  inputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
+}
+
 export interface ArchetypeOutput {
   response: string;
   responseId?: string | null; // OpenAI Responses API response ID
+  usage?: TokenUsage | null;  // token counts for cost tracking; null when the call was served without a model
   triggeredGuardrails: {
     ruleId: string;
     severity: string;

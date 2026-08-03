@@ -66,6 +66,7 @@ import {
 // import { applyExperiments, trackExperimentExposure, type ExperimentContext } from '@/engines/experiments';
 import type { EngineContext, AccountContext, SessionContext, UserContext, KnowledgeRefs, LimitsContext, RequestContext } from '@/engines/context';
 import { processSandwichMessageWithMetadata } from '@/lib/chatbot/sandwichBot';
+import { resolvePreviousResponseId } from '@/lib/chatbot/chain-ttl';
 import { buildConversationContext, trimToTokenBudget, updateRollingSummary, shouldUpdateSummary } from '@/lib/chatbot/conversation-memory';
 import { createPipelineMetrics, withMetrics, logPipelineMetrics, recordMetrics } from '@/lib/metrics/pipeline-metrics';
 import { getCachedSuggestionRAG, cacheSuggestionRAG, prewarmSuggestionRAG, type CachedRAGResult } from '@/lib/suggestion-cache';
@@ -1082,6 +1083,8 @@ export async function POST(req: NextRequest) {
 
         let fullText = '';
         let responseId: string | null = null;
+        // Populated from the model's real usage below. It used to be hardcoded to zeros
+        // and never assigned, so every `done` / `response_sent` event reported 0 tokens.
         let tokenInfo = { input: 0, output: 0 };
 
         // NOTE: RAG cache (Warm RAG, Fresh Voice) is checked before parallel block.
@@ -1207,6 +1210,7 @@ export async function POST(req: NextRequest) {
           const sandwichResult = await processSandwichMessageWithMetadata({
             userMessage: scopedUserMessage,
             accountId,
+            sessionId: currentSessionId,
             username: username,
             influencerName,
             conversationHistory,
@@ -1214,7 +1218,11 @@ export async function POST(req: NextRequest) {
             rollingSummary: session?.rolling_summary || undefined,
             modelTier: decision?.modelStrategy?.model,
             personalityConfig: personalityConfig || undefined,
-            previousResponseId: session?.last_response_id || previousResponseId || null,
+            // Idle sessions drop the chain — see src/lib/chatbot/chain-ttl.ts. The
+            // client-supplied id is only a fallback for turns with no session row yet.
+            previousResponseId: session
+              ? resolvePreviousResponseId(session)
+              : previousResponseId || null,
             fromSuggestion: !!fromSuggestion,
             chunkId: chunkId || undefined,
             // Inject cached RAG results (Warm RAG, Fresh Voice) — LLM runs fresh
@@ -1260,6 +1268,12 @@ export async function POST(req: NextRequest) {
 
           // Capture Responses API response ID for context chaining
           responseId = sandwichResult.responseId || null;
+          if (sandwichResult.usage) {
+            tokenInfo = {
+              input: sandwichResult.usage.inputTokens || 0,
+              output: sandwichResult.usage.outputTokens || 0,
+            };
+          }
 
           // Cache RAG results for future suggestion clicks (fire-and-forget)
           // Only cache if we didn't already have cached RAG (avoid redundant writes)
@@ -1346,12 +1360,16 @@ export async function POST(req: NextRequest) {
             await Promise.all([
               saveChatMessage(currentSessionId, 'user', displayMessage),
               saveChatMessage(currentSessionId, 'assistant', fullText, { latency_ms: latencyMs }),
-              responseId
-                ? supabase
-                    .from('chat_sessions')
-                    .update({ last_response_id: responseId })
-                    .eq('id', currentSessionId)
-                : Promise.resolve(),
+              // last_turn_at is written alongside the chain id — it is what the idle TTL
+              // reads. Stamped unconditionally, so a turn that produced no responseId
+              // still counts as activity.
+              supabase
+                .from('chat_sessions')
+                .update({
+                  ...(responseId ? { last_response_id: responseId } : {}),
+                  last_turn_at: new Date().toISOString(),
+                })
+                .eq('id', currentSessionId),
               emitEvent({
                 type: 'response_sent',
                 accountId,

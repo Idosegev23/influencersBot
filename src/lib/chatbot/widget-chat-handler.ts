@@ -10,6 +10,7 @@
 import { randomUUID } from 'crypto';
 import { createClient } from '@/lib/supabase/server';
 import { processSandwichMessageWithMetadata } from './sandwichBot';
+import { resolvePreviousResponseId } from './chain-ttl';
 import { runEscalationCheck } from '@/engines/escalation/dispatch';
 import { buildPersonalityFromDB } from './personality-wrapper';
 import { turnTimings } from '@/lib/analytics/value-proof/timings';
@@ -355,12 +356,14 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
     const sandwichResult = await processSandwichMessageWithMetadata({
       userMessage: message,
       accountId,
+      sessionId,
       username,
       influencerName,
       conversationHistory,
       rollingSummary: session?.rolling_summary || undefined,
       personalityConfig: personalityConfig || undefined,
-      previousResponseId: session?.last_response_id || null,
+      // Idle sessions drop the chain — see src/lib/chatbot/chain-ttl.ts
+      previousResponseId: resolvePreviousResponseId(session),
       mode: 'widget',
       widgetConfig: widgetConfigWithRecs,
       // Parity with the /chat page. The widget already gets product links via
@@ -473,6 +476,8 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
       .update({
         ...(responseId ? { last_response_id: responseId } : {}),
         message_count: msgCount,
+        // Read by the previous_response_id idle TTL — see chain-ttl.ts
+        last_turn_at: new Date().toISOString(),
       })
       .eq('id', sessionId),
   ]);

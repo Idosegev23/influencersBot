@@ -12,6 +12,7 @@
 import { randomUUID } from 'crypto';
 import { createClient } from '@/lib/supabase/server';
 import { processSandwichMessageWithMetadata } from '@/lib/chatbot/sandwichBot';
+import { resolvePreviousResponseId } from '@/lib/chatbot/chain-ttl';
 import { buildPersonalityFromDB } from '@/lib/chatbot/personality-wrapper';
 import { updateRollingSummary } from '@/lib/chatbot/conversation-memory';
 import {
@@ -180,12 +181,15 @@ export async function processInstagramGraphDM(
     const sandwichResult = await processSandwichMessageWithMetadata({
       userMessage: messageText,
       accountId,
+      sessionId: sessionUUID,
       username,
       influencerName,
       conversationHistory,
       rollingSummary: session?.rolling_summary || undefined,
       personalityConfig: personalityConfig || undefined,
-      previousResponseId: session?.last_response_id || null,
+      // Idle sessions drop the chain — see src/lib/chatbot/chain-ttl.ts. This matters most
+      // on DM, where a thread stays open for days and would otherwise chain indefinitely.
+      previousResponseId: resolvePreviousResponseId(session),
       mode: 'dm', // Same DM mode as Respond.io handler
       onToken: (token: string) => {
         fullText += token;
@@ -274,6 +278,8 @@ export async function processInstagramGraphDM(
         .update({
           ...(responseId ? { last_response_id: responseId } : {}),
           message_count: msgCount,
+          // Read by the previous_response_id idle TTL — see chain-ttl.ts
+          last_turn_at: new Date().toISOString(),
         })
         .eq('id', sessionUUID),
     ]);

@@ -3,6 +3,7 @@
  * מחלקת בסיס לכל הארכיטיפים
  */
 
+import type { TokenUsage } from './types';
 import {
   ArchetypeDefinition,
   ArchetypeInput,
@@ -116,6 +117,7 @@ export abstract class BaseArchetype {
     return {
       response: this.replaceName(finalResponse, influencerName),
       responseId: response.responseId,
+      usage: response.usage ?? null,
       triggeredGuardrails,
       knowledgeUsed: [knowledgeQuery],
       confidence: this.calculateConfidence(input, response.text),
@@ -177,7 +179,7 @@ export abstract class BaseArchetype {
   protected async generateResponse(
     input: ArchetypeInput,
     knowledgeQuery: string
-  ): Promise<{ text: string; responseId?: string | null }> {
+  ): Promise<{ text: string; responseId?: string | null; usage?: TokenUsage | null }> {
     return this.generateAIResponse(input, knowledgeQuery);
   }
 
@@ -594,7 +596,7 @@ export abstract class BaseArchetype {
   protected async generateAIResponse(
     input: ArchetypeInput,
     knowledgeQuery: string
-  ): Promise<{ text: string; responseId?: string | null }> {
+  ): Promise<{ text: string; responseId?: string | null; usage?: TokenUsage | null }> {
     const influencerName = input.accountContext.influencerName || 'היוצר/ת';
 
     try {
@@ -922,6 +924,7 @@ ${answerLanguageLine}
             return {
               text: this.replaceName(result.text, influencerName),
               responseId: result.responseId,
+              usage: result.usage,
             };
           }
           throw new Error('Empty streaming response from primary model');
@@ -942,6 +945,7 @@ ${answerLanguageLine}
             return {
               text: this.replaceName(result.text, influencerName),
               responseId: result.responseId,
+              usage: result.usage,
             };
           }
           throw new Error('Empty streaming response from fallback model');
@@ -1019,7 +1023,7 @@ ${answerLanguageLine}
     input: Array<{ role: 'user' | 'assistant'; content: string }>;
     previousResponseId: string | null;
     onToken: (token: string) => void;
-  }): Promise<{ text: string; responseId: string | null }> {
+  }): Promise<{ text: string; responseId: string | null; usage: TokenUsage | null }> {
     const streamStart = Date.now();
     let ttftMs: number | null = null;
 
@@ -1037,6 +1041,7 @@ ${answerLanguageLine}
     let responseId: string | null = null;
     let tokensIn = 0;
     let tokensOut = 0;
+    let tokensCached = 0;
 
     for await (const event of stream as AsyncIterable<ResponseStreamEvent>) {
       if (event.type === 'response.output_text.delta') {
@@ -1053,6 +1058,7 @@ ${answerLanguageLine}
         if (usage) {
           tokensIn = usage.input_tokens || 0;
           tokensOut = usage.output_tokens || 0;
+          tokensCached = usage.input_tokens_details?.cached_tokens || 0;
         }
       }
     }
@@ -1060,7 +1066,12 @@ ${answerLanguageLine}
     const totalMs = Date.now() - streamStart;
     console.log(`[Model] ✅ ${params.model} | TTFT: ${ttftMs}ms | Total: ${totalMs}ms | Tokens: ${tokensIn}→${tokensOut} | Chars: ${fullContent.length}`);
 
-    return { text: fullContent, responseId };
+    return {
+      text: fullContent,
+      responseId,
+      // Surfaced (not just logged) so the turn can be costed — see src/lib/costs/
+      usage: { model: params.model, inputTokens: tokensIn, cachedInputTokens: tokensCached, outputTokens: tokensOut },
+    };
   }
 
   /**

@@ -6,6 +6,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { processSandwichMessageWithMetadata } from '@/lib/chatbot/sandwichBot';
+import { resolvePreviousResponseId } from '@/lib/chatbot/chain-ttl';
 import { buildPersonalityFromDB } from '@/lib/chatbot/personality-wrapper';
 import { updateRollingSummary, shouldUpdateSummary } from '@/lib/chatbot/conversation-memory';
 import { sendLongTextMessage } from './client';
@@ -121,12 +122,15 @@ export async function processInstagramDM(payload: WebhookPayload): Promise<DMPro
     const sandwichResult = await processSandwichMessageWithMetadata({
       userMessage: messageText,
       accountId,
+      sessionId: sessionKey,
       username,
       influencerName,
       conversationHistory,
       rollingSummary: session?.rolling_summary || undefined,
       personalityConfig: personalityConfig || undefined,
-      previousResponseId: session?.last_response_id || null,
+      // Idle sessions drop the chain — see src/lib/chatbot/chain-ttl.ts. This matters most
+      // on DM, where a thread stays open for days and would otherwise chain indefinitely.
+      previousResponseId: resolvePreviousResponseId(session),
       mode: 'dm', // New mode for DM context
       onToken: (token: string) => {
         fullText += token;
@@ -172,6 +176,8 @@ export async function processInstagramDM(payload: WebhookPayload): Promise<DMPro
         .update({
           ...(responseId ? { last_response_id: responseId } : {}),
           message_count: msgCount,
+          // Read by the previous_response_id idle TTL — see chain-ttl.ts
+          last_turn_at: new Date().toISOString(),
         })
         .eq('id', sessionKey),
     ]);
