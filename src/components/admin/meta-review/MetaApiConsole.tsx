@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import ApiCallCard from './ApiCallCard';
+import { fetchIgConnectLink } from '@/lib/instagram-graph/connect-link-client';
 
 interface Props { accountId: string; }
 
@@ -35,9 +36,18 @@ export default function MetaApiConsole({ accountId }: Props) {
   // Return to whichever page hosts the console (standalone /admin/meta-review or the
   // embedded influencer page) after the OAuth round-trip.
   const pathname = usePathname() || `/admin/influencers/${accountId}`;
-  const reconnectUrl =
-    `/api/auth/instagram/connect?accountId=${accountId}` +
-    `&returnTo=${encodeURIComponent(`${pathname}#meta-api-console`)}`;
+  // Signed server-side — see lib/instagram-graph/connect-token.
+  const [reconnecting, setReconnecting] = useState(false);
+  async function startReconnect() {
+    if (reconnecting) return;
+    setReconnecting(true);
+    const url = await fetchIgConnectLink({
+      accountId,
+      returnTo: `${pathname}#meta-api-console`,
+    });
+    if (url) window.location.href = url;
+    else setReconnecting(false);
+  }
 
   const selectedThreadObj = threads.find((t) => t.id === selectedThread);
   const effectiveRecipientId = (selectedThreadObj?.recipientId || manualRecipientId).trim();
@@ -69,12 +79,13 @@ export default function MetaApiConsole({ accountId }: Props) {
             </span>
           )}
         </div>
-        <a
-          href={reconnectUrl}
-          className="inline-block mt-4 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700"
+        <button
+          onClick={startReconnect}
+          disabled={reconnecting}
+          className="inline-block mt-4 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-60"
         >
           Reconnect &amp; review permissions
-        </a>
+        </button>
       </section>
 
       {/* Block 1 — Basic */}

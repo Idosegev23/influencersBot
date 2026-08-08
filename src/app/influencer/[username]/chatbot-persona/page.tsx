@@ -4,6 +4,7 @@ import { useState, useEffect, use, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDashboardLang } from '@/hooks/useDashboardLang';
 import { getDashboardStrings } from '@/lib/i18n/dashboard';
+import { fetchIgConnectLink } from '@/lib/instagram-graph/connect-link-client';
 import {
   Bot,
   Instagram,
@@ -221,9 +222,11 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
     }
   };
 
-  const handleConnectIG = () => {
+  const handleConnectIG = async () => {
     if (!accountId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(accountId)) return;
-    window.location.href = `/api/auth/instagram/connect?accountId=${encodeURIComponent(accountId)}`;
+    // The connect URL must be signed server-side — see lib/instagram-graph/connect-token.
+    const url = await fetchIgConnectLink({ accountId, username });
+    if (url) window.location.href = url;
   };
 
   if (loading) {

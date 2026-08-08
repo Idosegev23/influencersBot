@@ -1,6 +1,6 @@
 /**
  * Instagram OAuth — Start Connection Flow
- * GET /api/auth/instagram/connect?accountId=xxx
+ * GET /api/auth/instagram/connect?token=<signed>
  *
  * מפנה את האינפלואנסר לעמוד ההרשאות של אינסטגרם.
  * אחרי שהוא מאשר — הוא חוזר ל-/api/auth/instagram/callback
@@ -8,23 +8,33 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { IG_OAUTH_SCOPE_PARAM } from '@/lib/instagram-graph/scopes';
+import { verifyConnectToken } from '@/lib/instagram-graph/connect-token';
 
 const INSTAGRAM_APP_ID = process.env.INSTAGRAM_APP_ID || process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID || '';
 
-// NOTE: this route is intentionally open — the admin dashboard generates a
-// shareable "connect link" (`?accountId=…`) that an influencer opens WITHOUT a
-// session to connect their own Instagram, and the owner-facing button hits the
-// same route. The actual account linking still requires the person to
-// authenticate with Instagram (OAuth) in the callback. (A signed/expiring link
-// would close the connect-IDOR without breaking the share flow — future option.)
+// This route stays session-less on purpose — an influencer opens the shared
+// link without a dashboard login. What it will NOT accept any more is a raw
+// `?accountId=`: with Advanced Access on manage_messages, anyone can complete
+// OAuth, so a guessed accountId would attach an attacker's Instagram to another
+// tenant's account. The accountId now arrives inside an HMAC-signed, expiring
+// token minted by /api/auth/instagram/connect-link, which is where the
+// admin/owner authorization check happens.
 
 // Scopes live in @/lib/instagram-graph/scopes — Advanced-Access permissions
 // only. Requesting a Standard-Access permission here can fail the consent
 // screen for anyone without a role in the Meta app (i.e. every real customer).
 
 export async function GET(req: NextRequest) {
-  const accountId = req.nextUrl.searchParams.get('accountId') || '';
   const returnTo = req.nextUrl.searchParams.get('returnTo') || '';
+
+  const verified = verifyConnectToken(req.nextUrl.searchParams.get('token'));
+  if (!verified) {
+    console.warn('[IG OAuth] Rejected connect attempt with a missing/invalid/expired token');
+    return NextResponse.redirect(
+      new URL('/instagram/connected?error=invalid_or_expired_link', req.url),
+    );
+  }
+  const accountId = verified.accountId;
 
   if (!INSTAGRAM_APP_ID) {
     return NextResponse.json(

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveDraftByToken } from '@/lib/onboarding/resolve';
+import { signConnectToken } from '@/lib/instagram-graph/connect-token';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,8 +16,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
   const draft = await resolveDraftByToken(token);
   if (!draft) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
+  // The onboarding token already proved which account this is, so we can mint
+  // the signed connect token directly instead of round-tripping through
+  // /api/auth/instagram/connect-link (which authorizes admins/influencers).
   const url = new URL('/api/auth/instagram/connect', req.nextUrl.origin);
-  url.searchParams.set('accountId', draft.id);
+  url.searchParams.set('token', signConnectToken(draft.id));
   url.searchParams.set('returnTo', `/onboard/${token}`);
   return NextResponse.redirect(url);
 }

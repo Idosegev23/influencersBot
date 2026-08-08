@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { Instagram, Flag, Send, MessageCircle } from 'lucide-react';
 import { useDashboardLang } from '@/hooks/useDashboardLang';
 import { getDashboardStrings, dashboardDir } from '@/lib/i18n/dashboard';
+import { fetchIgConnectLink } from '@/lib/instagram-graph/connect-link-client';
 
 interface Msg { role: string; content: string; createdAt: string; by?: string }
 interface Thread {
@@ -41,9 +42,21 @@ export default function InstagramPage() {
   const [sendErr, setSendErr] = useState('');
   const [disconnecting, setDisconnecting] = useState(false);
 
-  const connectUrl =
-    `/api/auth/instagram/connect?accountId=${accountId}` +
-    `&returnTo=${encodeURIComponent(`/influencer/${username}/instagram`)}`;
+  // The connect URL carries an HMAC-signed accountId that only the server can
+  // mint (see lib/instagram-graph/connect-token), so it is fetched on click
+  // rather than built here.
+  const [connecting, setConnecting] = useState(false);
+  async function startConnect() {
+    if (connecting || !accountId) return;
+    setConnecting(true);
+    const url = await fetchIgConnectLink({
+      accountId,
+      username,
+      returnTo: `/influencer/${username}/instagram`,
+    });
+    if (url) window.location.href = url;
+    else setConnecting(false);
+  }
 
   async function disconnect() {
     if (disconnecting) return;
@@ -199,13 +212,14 @@ export default function InstagramPage() {
                 <Instagram className="w-8 h-8 mx-auto mb-3" style={{ color: 'var(--color-primary)' }} />
                 <p className="text-sm font-medium mb-1" style={{ color: 'var(--dash-text)' }}>{t.notConnected}</p>
                 <p className="text-xs mb-4 max-w-sm mx-auto" style={{ color: 'var(--dash-text-3)' }}>{t.connectHint}</p>
-                <a
-                  href={connectUrl}
-                  className="inline-block px-5 py-2.5 rounded-xl text-sm font-semibold text-white"
+                <button
+                  onClick={startConnect}
+                  disabled={connecting}
+                  className="inline-block px-5 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-60"
                   style={{ background: 'var(--color-primary)' }}
                 >
                   {t.connect}
-                </a>
+                </button>
               </div>
             )}
           </div>

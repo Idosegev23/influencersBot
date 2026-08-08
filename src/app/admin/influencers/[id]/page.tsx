@@ -6,6 +6,7 @@ import EscalationContactsForm from './EscalationContactsForm';
 import StoreConnectionForm from './StoreConnectionForm';
 import SourcesPanel from './SourcesPanel';
 import MetaApiConsole from '@/components/admin/meta-review/MetaApiConsole';
+import { fetchIgConnectLink } from '@/lib/instagram-graph/connect-link-client';
 
 interface AdminDocument {
   id: string;
@@ -138,7 +139,20 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
     else { setCopiedLink(true); setTimeout(() => setCopiedLink(false), 2000); }
   }
 
-  const igConnectLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/api/auth/instagram/connect?accountId=${id}`;
+  // Minted server-side (HMAC-signed, 7-day expiry) — see
+  // lib/instagram-graph/connect-token. A raw accountId is no longer accepted.
+  async function copyIgConnectLink() {
+    const link = await fetchIgConnectLink({ accountId: id });
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+    } catch {
+      // Safari can revoke clipboard access once the user gesture is gone.
+      window.prompt('קישור התחברות לאינסטגרם', link);
+    }
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
@@ -607,7 +621,7 @@ export default function InfluencerDetailPage({ params }: { params: Promise<{ id:
               </button>
 
               <button
-                onClick={() => copyToClipboard(igConnectLink, 'link')}
+                onClick={copyIgConnectLink}
                 className="w-full flex items-center justify-between gap-2 p-3 rounded-xl text-sm transition-colors"
                 style={{ backgroundColor: 'rgba(220, 38, 39, 0.04)' }}
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.backgroundColor = '#FFE2E3'; }}

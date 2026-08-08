@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { fetchIgConnectLink } from '@/lib/instagram-graph/connect-link-client';
 
 interface Influencer {
   id: string;
@@ -31,9 +32,19 @@ export default function InfluencersListPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
 
-  function copyIgLink(accountId: string) {
-    const link = `${window.location.origin}/api/auth/instagram/connect?accountId=${accountId}`;
-    navigator.clipboard.writeText(link);
+  // The link is minted server-side (HMAC-signed, 7-day expiry) — see
+  // lib/instagram-graph/connect-token. Regenerate it if an influencer reports
+  // "invalid or expired link".
+  async function copyIgLink(accountId: string) {
+    const link = await fetchIgConnectLink({ accountId });
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+    } catch {
+      // Safari can revoke clipboard access once the user gesture is gone
+      // (we awaited a fetch) — fall back to showing the link.
+      window.prompt('Instagram connect link', link);
+    }
     setCopiedLinkId(accountId);
     setTimeout(() => setCopiedLinkId(null), 2000);
   }
