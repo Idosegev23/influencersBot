@@ -22,20 +22,30 @@ own card directly — we never touch payment.
 | D9 | Template provisioning: minimal set of 3 CS templates injected into the customer's WABA at connect time |
 | D10 | Tech Provider designation goes on the **existing** `LeadersInfluencers` app (1297141655644794) — verified that a failed Access Verification is resubmittable and does not kill own-business traffic |
 
-## 1. Meta prerequisites (manual, Ido)
+## 1. Meta prerequisites (manual, Ido) — re-verified against current docs 2026-08-08
 
-Do 1–2 now (possible before the Tech Provider toggle); the toggle itself only when the flow
-is built and recordable — App Review needs a screencast of a working flow.
+Meta's official order: Business Verification (✅ done) → **App Review** → Tech Provider
+onboarding (App Dashboard → **Use cases → Customize**). Access Verification is triggered
+during program onboarding (60-day window) — prepare documents, submit when prompted.
 
-1. **Facebook Login for Business** configuration → yields `config_id`
-2. **Embedded Signup Builder** (App Dashboard → WhatsApp) — generate the v4 snippet. v2 dies 2026-10-15; we build on v4 only
-3. Mark app as **Tech Provider** (irreversible; do last)
-4. **App Review**: Advanced Access for `whatsapp_business_management` + `whatsapp_business_messaging` (screencast = pilot customer run, §10)
-5. **Access Verification** (business documents) — Business Verification is already done (`verified` on Leaders Digital Assets)
-6. System-user token with `business_management` added (current token lacks it — Graph calls on the business object 403)
-7. Data Use Checkup: privacy-policy URL + deletion URL (`/api/influencer/request-deletion` exists)
+1. **App Review — submit NOW, needs nothing built.** Advanced Access for
+   `whatsapp_business_management` + `whatsapp_business_messaging`. Evidence = **two
+   videos**: (a) a message sent from our system landing in a WhatsApp client — the live
+   CS bot does this daily; a cURL send recording is also accepted; (b) template creation
+   — our template scripts / WhatsApp Manager. Review latency runs in parallel with dev.
+2. **2FA on the Business Manager** — program requirement, verify it's on
+3. **Facebook Login for Business** configuration — create from the "WhatsApp Embedded
+   Signup Configuration" template → yields `config_id`
+4. **Embedded Signup Builder** (App Dashboard → WhatsApp) — v4 snippet. v2 dies
+   2026-10-15; we build on v4 only
+5. **Tech Provider onboarding** (Use cases → Customize; irreversible) — after review
+6. **Access Verification** (business documents) — when prompted during onboarding
+7. System-user token with `business_management` added (current token lacks it — Graph
+   calls on the business object 403)
+8. Data Use Checkup: privacy-policy URL + deletion URL (`/api/influencer/request-deletion` exists)
 
-Onboarding cap until 4+5 complete: 10 customers / rolling 7 days. After: 200.
+Onboarding cap until review+verification complete: 10 customers / rolling 7 days. After: 200.
+The §9 pilot recording is no longer needed for App Review — keep it as internal QA evidence.
 
 ## 2. Data model
 
@@ -98,7 +108,8 @@ template being approved (§5); until then the wizard shows a pending state, not 
 Body: `{ code, waba_id, phone_number_id }` — **no accountId, ever** (token → account
 server-side, same anti-IDOR pattern as the IG connect route).
 
-1. Exchange `code` → business-integration system-user token
+1. Exchange `code` → business-integration system-user token. **The code lives 30
+   seconds** — exchange happens synchronously in this route, never deferred to a queue
 2. **Ownership check**: `debug_token` → `granular_scopes.target_ids` must contain the
    claimed `waba_id`, else 403 and nothing is written. The token from Meta is the source
    of truth, not the browser
@@ -201,7 +212,10 @@ Block on the existing account page: number, verified name, channel status,
 
 ## Verify during build (flagged, not assumed)
 
-1. Exact ES v4 popup event payload shape (`FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING`)
+1. Exact ES v4 popup event payload shape — generic flow confirmed (`event: 'FINISH'` /
+   `FINISH_ONLY_WABA`, `phone_number_id` + `waba_id` + `business_id`; `CANCEL` carries
+   `current_step` / `error_code`); the Coexistence-specific `extras`/`featureType`
+   values in `FB.login` still need confirmation
 2. Whether template creation on the customer's WABA needs any extra permission beyond
    the exchanged token's `whatsapp_business_management`
 3. The 2026-10-01 "service messages become chargeable" date (third-party blogs, not a
