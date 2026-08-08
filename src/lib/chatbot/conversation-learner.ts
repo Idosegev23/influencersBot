@@ -216,7 +216,7 @@ ${conversationText.substring(0, 10000)}
 
     try {
       const response = await openai.chat.completions.create({
-        model: 'gpt-5-nano-2025-08-07',
+        model: 'gpt-5.6-luna',
         messages: [
           { role: 'system', content: 'אתה מנתח שיחות. החזר JSON בלבד.' },
           { role: 'user', content: prompt },

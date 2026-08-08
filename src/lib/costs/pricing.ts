@@ -36,6 +36,21 @@ export interface ModelPricing {
 }
 
 const PRICES: Record<string, ModelPricing> = {
+  // GPT-5.6 family (launch pricing 2026-07-09, cut 2026-07-30; cached assumed 10% of input,
+  // long-context assumed 2x like 5.4/5.5 — NOT yet confirmed from our own billing, re-derive
+  // once real 5.6 line items appear in /v1/organization/costs).
+  'gpt-5.6-sol': {
+    inputPerM: 5, cachedInputPerM: 0.5, outputPerM: 30,
+    longContextInputPerM: 10, longContextOutputPerM: 60,
+  },
+  'gpt-5.6-terra': {
+    inputPerM: 2, cachedInputPerM: 0.2, outputPerM: 12,
+    longContextInputPerM: 4, longContextOutputPerM: 24,
+  },
+  'gpt-5.6-luna': {
+    inputPerM: 0.2, cachedInputPerM: 0.02, outputPerM: 1.2,
+    longContextInputPerM: 0.4, longContextOutputPerM: 2.4,
+  },
   'gpt-5.4': {
     inputPerM: 2.5, cachedInputPerM: 0.25, outputPerM: 15,
     longContextInputPerM: 5, longContextOutputPerM: 30,

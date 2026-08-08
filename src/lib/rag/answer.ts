@@ -69,7 +69,7 @@ export async function answerQuestion(input: AnswerInput): Promise<AnswerResult> 
 
     const client = getClient();
     const response = await client.responses.create({
-      model: 'gpt-5-nano-2025-08-07',
+      model: 'gpt-5.6-luna',
       instructions: NO_INFO_PROMPT,
       input: query,
       reasoning: { effort: 'minimal' as any },
@@ -96,7 +96,7 @@ export async function answerQuestion(input: AnswerInput): Promise<AnswerResult> 
   const sourcesContext = formatSourcesForLLM(sources);
 
   const response = await client.responses.create({
-    model: 'gpt-5-nano-2025-08-07',
+    model: 'gpt-5.6-luna',
     instructions: SYSTEM_PROMPT,
     input: `${sourcesContext}\n\nQuestion: ${query}\n\nAnswer using ONLY the sources above. Cite with [source_id].`,
     reasoning: { effort: 'low' as any },

@@ -31,7 +31,7 @@ import OpenAI from 'openai';
 
 // Same model as the widget chat (baseArchetype.CHAT_MODEL). Cache absorbs the
 // extra latency: typical hit rate ≥80% per (account, page-pattern, returning).
-const CHIPS_MODEL = 'gpt-5.4';
+const CHIPS_MODEL = 'gpt-5.6-terra'; // pinned to match the widget chat model (baseArchetype CHAT_MODEL)
 const CHIPS_TIMEOUT_MS = 12000;
 const CHIPS_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 const MAX_CHIPS = 4;

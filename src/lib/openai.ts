@@ -9,9 +9,9 @@ function getClient() {
 }
 
 // Models configuration - using Responses API
-export const CHAT_MODEL = 'gpt-5-nano';      // Fastest, cheapest - for chat
-const ANALYSIS_MODEL = 'gpt-5-nano';  // For analysis  
-const COMPLEX_MODEL = 'gpt-5';        // For persona generation
+export const CHAT_MODEL = 'gpt-5.6-luna';    // Fastest, cheapest - for chat
+const ANALYSIS_MODEL = 'gpt-5.6-luna';  // For analysis
+const COMPLEX_MODEL = 'gpt-5.6-terra';  // For persona generation
 
 // ============================================
 // Influencer Type Detection

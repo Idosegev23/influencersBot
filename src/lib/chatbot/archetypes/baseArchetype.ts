@@ -21,9 +21,9 @@ const openai = new OpenAI({
 });
 
 // Model Configuration
-const CHAT_MODEL = 'gpt-5.4'; // Full 5.4 — best quality for Hebrew chat
-const FALLBACK_MODEL = 'gpt-5.4-mini-2026-03-17'; // 5.4-mini as fallback (faster, slightly lower quality)
-const NANO_MODEL = 'gpt-5.4-nano-2026-03-17'; // ⚡ 2.3x faster, great TTFT for simple queries
+const CHAT_MODEL = 'gpt-5.6-terra'; // benched 2026-08-08: same 10/10 quality as gpt-5.4, ~37% cheaper per reply, faster TTFT
+const FALLBACK_MODEL = 'gpt-5.4-mini-2026-03-17'; // kept on 5.4 family — 5.6 access still propagating, this catches denials
+const NANO_MODEL = 'gpt-5.6-luna'; // ⚡ ~130 tok/s, judged 10/10; weak at long-context recall — short queries only
 const MAX_TOKENS = 2048; // Enough for full Hebrew recipes, routines, and detailed content
 
 // Map decision engine model tiers to actual OpenAI model names

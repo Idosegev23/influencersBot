@@ -18,7 +18,7 @@ describe('priceFor', () => {
   });
 
   it('knows the models this codebase actually calls', () => {
-    for (const m of ['gpt-5.4', 'gpt-5.5', 'gpt-5-nano', 'gpt-5.4-nano', 'text-embedding-3-large', 'text-embedding-3-small']) {
+    for (const m of ['gpt-5.4', 'gpt-5.5', 'gpt-5-nano', 'gpt-5.4-nano', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'text-embedding-3-large', 'text-embedding-3-small']) {
       const p = priceFor(m);
       expect(p, m).toBeTruthy();
       expect(p!.inputPerM, m).toBeGreaterThan(0);

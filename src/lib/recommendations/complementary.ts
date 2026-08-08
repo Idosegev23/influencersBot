@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 import { redisGet, redisSet } from '@/lib/redis';
 
 function getClient() { return new OpenAI({ apiKey: process.env.OPENAI_API_KEY }); }
-const MODEL = 'gpt-5-nano'; // small/fast — pick 2-3 complements, cached per product
+const MODEL = 'gpt-5.6-luna'; // small/fast — pick 2-3 complements, cached per product
 
 export interface CatalogItem { id: string; name: string; nameHe?: string | null; category?: string | null; description?: string | null; }
 

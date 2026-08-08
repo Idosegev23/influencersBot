@@ -14,10 +14,10 @@ export type Lane = 'money' | 'router' | 'qa' | 'stt';
 /** The OpenAI model id for a lane (the agent brain runs on OpenAI; Gemini is P2.2 fallback). */
 export function laneModel(lane: Lane): string {
   switch (lane) {
-    case 'money': return env('AGENT_MODEL_MONEY', 'gpt-5.5'); // intent + pricing extraction
-    case 'router': return env('AGENT_MODEL_ROUTER', 'gpt-5.4-nano'); // cheap classify
-    case 'qa': return env('AGENT_MODEL_QA', 'gpt-5.5');
+    case 'money': return env('AGENT_MODEL_MONEY', 'gpt-5.6-sol'); // intent + pricing extraction (same price as gpt-5.5, stronger agentic)
+    case 'router': return env('AGENT_MODEL_ROUTER', 'gpt-5.6-luna'); // cheap classify
+    case 'qa': return env('AGENT_MODEL_QA', 'gpt-5.6-sol');
     case 'stt': return env('AGENT_MODEL_STT', 'gpt-4o-transcribe');
-    default: return env('AGENT_MODEL_MONEY', 'gpt-5.5');
+    default: return env('AGENT_MODEL_MONEY', 'gpt-5.6-sol');
   }
 }

@@ -25,8 +25,8 @@ const openai = new OpenAI({
 });
 
 // Model configuration
-const UNDERSTANDING_MODEL = 'gpt-5.4-nano-2026-03-17'; // Fast and cheap for understanding
-const FALLBACK_MODEL = 'gpt-5';           // Fallback if nano fails
+const UNDERSTANDING_MODEL = 'gpt-5.6-luna'; // Fast and cheap for understanding (benched 2026-08-08)
+const FALLBACK_MODEL = 'gpt-5.4';         // Fallback if luna fails (5.4 family — stable while 5.6 access propagates)
 
 /**
  * Main entry point for Understanding Engine

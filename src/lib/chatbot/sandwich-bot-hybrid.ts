@@ -123,7 +123,7 @@ ${metadataPrompt}
     ];
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-5-nano-2025-08-07',
+      model: 'gpt-5.6-luna',
       messages,
       tools,
       // GPT-5 Nano only supports temperature: 1 (default)
@@ -174,7 +174,7 @@ ${metadataPrompt}
     ];
 
     const finalResponse = await openai.chat.completions.create({
-      model: 'gpt-5-nano-2025-08-07',
+      model: 'gpt-5.6-luna',
       messages: finalMessages,
       // GPT-5 Nano only supports temperature: 1 (default)
     });
@@ -243,7 +243,7 @@ export async function processWithHybridAndPersona(
     ];
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-5-nano-2025-08-07',
+      model: 'gpt-5.6-luna',
       messages,
       tools,
       // GPT-5 Nano only supports temperature: 1 (default)
@@ -279,7 +279,7 @@ export async function processWithHybridAndPersona(
     ];
 
     const finalResponse = await openai.chat.completions.create({
-      model: 'gpt-5-nano-2025-08-07',
+      model: 'gpt-5.6-luna',
       messages: finalMessages,
       // GPT-5 Nano only supports temperature: 1 (default)
     });
