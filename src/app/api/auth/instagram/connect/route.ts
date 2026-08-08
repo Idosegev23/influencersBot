@@ -7,6 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { IG_OAUTH_SCOPE_PARAM } from '@/lib/instagram-graph/scopes';
 
 const INSTAGRAM_APP_ID = process.env.INSTAGRAM_APP_ID || process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID || '';
 
@@ -17,13 +18,9 @@ const INSTAGRAM_APP_ID = process.env.INSTAGRAM_APP_ID || process.env.NEXT_PUBLIC
 // authenticate with Instagram (OAuth) in the callback. (A signed/expiring link
 // would close the connect-IDOR without breaking the share flow — future option.)
 
-// Scopes to request — these are the permissions we need
-const SCOPES = [
-  'instagram_business_basic',
-  'instagram_business_manage_messages',
-  'instagram_business_manage_comments',
-  'instagram_business_manage_insights',
-].join(',');
+// Scopes live in @/lib/instagram-graph/scopes — Advanced-Access permissions
+// only. Requesting a Standard-Access permission here can fail the consent
+// screen for anyone without a role in the Meta app (i.e. every real customer).
 
 export async function GET(req: NextRequest) {
   const accountId = req.nextUrl.searchParams.get('accountId') || '';
@@ -52,7 +49,7 @@ export async function GET(req: NextRequest) {
   authUrl.searchParams.set('client_id', INSTAGRAM_APP_ID);
   authUrl.searchParams.set('redirect_uri', redirectUri);
   authUrl.searchParams.set('response_type', 'code');
-  authUrl.searchParams.set('scope', SCOPES);
+  authUrl.searchParams.set('scope', IG_OAUTH_SCOPE_PARAM);
   authUrl.searchParams.set('state', state);
 
   console.log(`[IG OAuth] Redirecting to Instagram login for account ${accountId}`);

@@ -16,6 +16,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isSafeReturnTo } from '@/lib/meta-review/util';
+import { subscribeMessagesWebhook } from '@/lib/instagram-graph/subscribe';
 
 const INSTAGRAM_APP_ID = process.env.INSTAGRAM_APP_ID || process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID || '';
 const INSTAGRAM_APP_SECRET = process.env.INSTAGRAM_APP_SECRET || '';
@@ -134,16 +135,34 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    console.log(`[IG OAuth] Successfully connected @${igAccount.username} (${igbaId})`);
+    // 6. Subscribe the account to the `messages` webhook.
+    //    Saving the connection row does NOT make Instagram deliver DMs — the
+    //    account has to subscribe this app explicitly. Skipping it here used to
+    //    leave a connection that looks healthy in every UI but receives nothing
+    //    until the ig-connection-health cron repaired it the next morning.
+    //    Non-fatal: that cron is still the safety net if this call fails.
+    const subscribed = await subscribeMessagesWebhook(longLivedToken.access_token);
+    if (!subscribed) {
+      console.error(
+        `[IG OAuth] messages webhook subscription FAILED for @${igAccount.username} (${igbaId}) — ` +
+        `DMs will not arrive until the ig-connection-health cron re-subscribes`,
+      );
+    }
+
+    console.log(
+      `[IG OAuth] Successfully connected @${igAccount.username} (${igbaId})` +
+      `${subscribed ? '' : ' [webhook subscription pending]'}`,
+    );
 
     // Redirect back to the admin console if a safe returnTo was supplied,
     // otherwise the influencer "thank you" page.
     if (isSafeReturnTo(returnTo)) {
       return NextResponse.redirect(new URL(returnTo, req.url));
     }
-    return NextResponse.redirect(
-      new URL(`/instagram/connected?username=${encodeURIComponent(igAccount.username)}`, req.url),
-    );
+    const done = new URL('/instagram/connected', req.url);
+    done.searchParams.set('username', igAccount.username);
+    if (!subscribed) done.searchParams.set('webhook', 'pending');
+    return NextResponse.redirect(done);
 
   } catch (error: any) {
     console.error('[IG OAuth] Error:', error.message);

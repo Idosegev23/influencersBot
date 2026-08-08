@@ -19,6 +19,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { refreshExpiringTokens } from './token-refresh';
+import { subscribeMessagesWebhook, getSubscribedFields } from './subscribe';
 
 const GRAPH_BASE = 'https://graph.instagram.com/v22.0';
 
@@ -42,32 +43,9 @@ async function meCheck(token: string): Promise<{ ok: boolean; status: number; er
   }
 }
 
-async function getSubscribedFields(token: string): Promise<Set<string> | null> {
-  try {
-    const res = await fetch(`${GRAPH_BASE}/me/subscribed_apps?access_token=${encodeURIComponent(token)}`);
-    if (!res.ok) return null;
-    const json = await res.json().catch(() => ({}));
-    const fields = new Set<string>();
-    for (const app of json.data || []) for (const f of app.subscribed_fields || []) fields.add(f);
-    return fields;
-  } catch {
-    return null;
-  }
-}
-
-async function subscribeMessages(token: string): Promise<boolean> {
-  try {
-    const res = await fetch(
-      `${GRAPH_BASE}/me/subscribed_apps?subscribed_fields=messages&access_token=${encodeURIComponent(token)}`,
-      { method: 'POST' },
-    );
-    if (!res.ok) return false;
-    const json = await res.json().catch(() => ({}));
-    return json.success !== false;
-  } catch {
-    return false;
-  }
-}
+// getSubscribedFields / subscribeMessagesWebhook live in ./subscribe — shared
+// with the OAuth callback, which now subscribes at connect time so this cron is
+// a repair net rather than the only path that ever subscribes an account.
 
 export async function runIgConnectionHealth(): Promise<IgHealthReport> {
   // 1. Keep tokens alive — the core recurring failure.
@@ -117,7 +95,7 @@ export async function runIgConnectionHealth(): Promise<IgHealthReport> {
       continue;
     }
     if (!fields.has('messages')) {
-      const ok = await subscribeMessages(conn.access_token);
+      const ok = await subscribeMessagesWebhook(conn.access_token);
       if (ok) report.resubscribed.push(label);
       else report.problems.push(`${label}: messages webhook MISSING and auto re-subscribe failed`);
     }
