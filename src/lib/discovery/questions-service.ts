@@ -257,7 +257,7 @@ export async function generateWeeklyAnswers(
         .join('\n');
 
       const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5.6-luna',
         messages: [
           {
             role: 'system',
@@ -268,8 +268,9 @@ export async function generateWeeklyAnswers(
             content: `שאלה: ${q.question_text}\n\nתוכן רלוונטי:\n${contentContext}`,
           },
         ],
-        temperature: 0.8,
-        max_tokens: 500,
+        // gpt-5.6 rejects custom temperature; reasoning tokens share the
+        // completion budget — 500 would starve the visible answer
+        max_completion_tokens: 2000,
       });
 
       const answer = response.choices[0]?.message?.content;

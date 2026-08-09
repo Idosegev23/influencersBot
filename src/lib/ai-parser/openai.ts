@@ -70,10 +70,10 @@ export async function parseWithOpenAI(
 
     const result = await retryWithBackoff(async () => {
       return await openai.chat.completions.create({
-        model: 'gpt-5.2-2025-12-11',
+        model: 'gpt-5.6-terra',
         messages,
-        temperature: 0.1,
-        max_tokens: 8192,
+        // gpt-5.6 rejects custom temperature; reasoning tokens share the completion budget
+        max_completion_tokens: 8192,
         response_format: { type: 'json_object' },
       });
     }, 3, 2000);

@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
 
         controller.enqueue(sse('meta', {
           engine,
-          model: 'gpt-5.4',
+          model: 'gpt-5.6-terra',
           note: engine === 'gemini'
             ? 'Full SandwichBot pipeline with Gemini Embedding 2 (3072d) retrieval'
             : 'Full SandwichBot pipeline with OpenAI text-embedding-3-large (2000d) retrieval',

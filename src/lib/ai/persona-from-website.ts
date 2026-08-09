@@ -113,7 +113,7 @@ ${digest.slice(0, 14000)}
       method: 'POST',
       headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'gpt-5.4',
+        model: 'gpt-5.6-terra',
         input: prompt,
         reasoning: { effort: 'medium' },
         text: { format: { type: 'text' } },
@@ -177,7 +177,7 @@ ${digest.slice(0, 14000)}
     preprocessing_data: { source: 'website', pages_analyzed: pages.length, raw: persona },
     metadata: {
       source: 'persona-from-website',
-      model: 'gpt-5.4',
+      model: 'gpt-5.6-terra',
       pages_analyzed: pages.length,
       built_at: new Date().toISOString(),
     },

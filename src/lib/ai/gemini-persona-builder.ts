@@ -313,7 +313,7 @@ async function tryGPT54(fullPrompt: string, inputSize: number): Promise<string |
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-5.4',
+          model: 'gpt-5.6-terra',
           input: fullPrompt,
           reasoning: { effort: 'medium' },
           text: { format: { type: 'text' } },
@@ -800,7 +800,7 @@ export async function savePersonaToDatabase(
 
       // Store preprocessing data and raw output
       preprocessing_data: preprocessedData,
-      gemini_raw_output: { raw: geminiRawOutput, parsed: persona, model: 'gpt-5.4', version: 'v2' },
+      gemini_raw_output: { raw: geminiRawOutput, parsed: persona, model: 'gpt-5.6-terra', version: 'v2' },
 
       // Timestamps
       last_full_scrape_at: new Date().toISOString(),

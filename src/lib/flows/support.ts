@@ -77,7 +77,7 @@ async function saveSupportRequest(
 export async function detectSupportIntent(message: string): Promise<{ intent: 'support' | 'general'; confidence: number }> {
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-5.6-luna',
       messages: [
         {
           role: 'system',
@@ -97,7 +97,7 @@ export async function detectSupportIntent(message: string): Promise<{ intent: 's
         }
       ],
       response_format: { type: 'json_object' },
-      temperature: 0.3,
+      // gpt-5.6 rejects custom temperature (default 1 only)
     });
 
     const result = JSON.parse(response.choices[0].message.content || '{}');

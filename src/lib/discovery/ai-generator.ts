@@ -170,13 +170,14 @@ export async function generateAIList(
 
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-5.6-luna',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content },
       ],
-      temperature: 0.7,
-      max_tokens: 2000,
+      // gpt-5.6 rejects custom temperature; reasoning tokens count toward the
+      // completion budget, so give headroom or answers come back empty
+      max_completion_tokens: 4000,
       response_format: { type: 'json_object' },
     });
 
@@ -236,7 +237,7 @@ export async function generateAllAILists(accountId: string, influencerName: stri
           title_he: title,
           items,
           item_count: items.length,
-          generation_model: 'gpt-4o-mini',
+          generation_model: 'gpt-5.6-luna',
           influencer_name: influencerName,
           generated_at: new Date().toISOString(),
           expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
