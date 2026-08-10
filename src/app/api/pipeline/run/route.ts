@@ -7,6 +7,7 @@ import { getScanJobsRepo } from '@/lib/db/repositories/scanJobsRepo';
 import { nextStep } from '@/lib/pipeline/types';
 import type { PipelineStep } from '@/lib/pipeline/types';
 import { notifyScanComplete } from '@/lib/pipeline/notify';
+import { markOnboardingFailed } from '@/lib/onboarding/failure';
 
 export const maxDuration = 600;
 
@@ -35,6 +36,10 @@ export async function POST(req: Request) {
   if (result.status === 'failed') {
     await repo.addStepLog(jobId, step, 'failed', 0, result.error);
     await repo.markFailed(jobId, 'PIPELINE_STEP_FAILED', `${step}: ${result.error}`);
+    // Tell the onboarding wizard. Without this the account stays on 'scanning'
+    // forever and the client watches a spinner that will never resolve. No-ops for
+    // any account that is not mid-onboarding (e.g. a failed nightly re-scan).
+    await markOnboardingFailed(job.account_id, `${step}: ${result.error}`);
     return NextResponse.json({ status: 'failed', step });
   }
   if (result.status === 're-enqueue') {

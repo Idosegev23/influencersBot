@@ -3,6 +3,7 @@ import { saveState } from '@/lib/pipeline/state';
 import { publishStep } from '@/lib/pipeline/qstash';
 import { DEFAULT_SCAN_CONFIG } from '@/lib/scraping/newScanOrchestrator';
 import { normalizeIgUsername } from '@/lib/pipeline/username';
+import { normalizeWebsiteUrl } from '@/lib/pipeline/website-url';
 import type { PipelineState } from '@/lib/pipeline/types';
 
 export interface StartPipelineInput {
@@ -37,7 +38,7 @@ export async function startPipeline(input: StartPipelineInput): Promise<StartPip
   const {
     accountId,
     username,
-    websiteUrl,
+    websiteUrl: rawWebsiteUrl,
     isDemo = true,
     language, // undefined = don't touch accounts.language (preserves existing lang on re-scan; DB default 'he' on first insert)
     transcribe = true,
@@ -53,6 +54,12 @@ export async function startPipeline(input: StartPipelineInput): Promise<StartPip
     enrichSources,
     requestedBy = 'admin:pipeline',
   } = input;
+
+  // Defense in depth: every caller should normalize at its own boundary, but this is
+  // the one chokepoint they all pass through. A bare domain reaching the state object
+  // does not fail here — it fails 6 steps later inside sitemap discovery's new URL(),
+  // after Instagram has already been scanned, taking the whole job down with it.
+  const websiteUrl = normalizeWebsiteUrl(rawWebsiteUrl) || null;
 
   // Normalize the IG handle — admins often paste a full profile URL / @ / ?hl=he,
   // which used verbatim as the scrape handle yields an empty account.

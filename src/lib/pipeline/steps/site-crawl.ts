@@ -23,7 +23,27 @@ export async function siteCrawlStep(ctx: StepContext): Promise<StepResult> {
   const total = ctx.state.counts?.crawl?.total ?? batchUrls.length;
   let newTotal = total;
 
-  const { discoveredLinks } = await crawlPageBatch(batchUrls, ctx.accountId);
+  // A batch that throws (network, parse, a hostile page) used to fail the whole job,
+  // discarding Instagram, transcriptions and every step after the crawl. Lose the
+  // batch, keep the scan: the popped URLs still count as done so progress advances
+  // and the remaining frontier is worked normally.
+  let discoveredLinks: string[] = [];
+  try {
+    ({ discoveredLinks } = await crawlPageBatch(batchUrls, ctx.accountId));
+  } catch (e: any) {
+    const message = e?.message || String(e);
+    console.error(`[site-crawl] batch of ${batchUrls.length} failed for job ${ctx.jobId}: ${message}`);
+    try {
+      const { getScanJobsRepo } = await import('@/lib/db/repositories/scanJobsRepo');
+      await getScanJobsRepo().addStepLog(
+        ctx.jobId, 'site-crawl', 'failed', 0,
+        `דילוג על ${batchUrls.length} עמודים: ${message}`,
+      );
+    } catch { /* logging the skip must never itself fail the job */ }
+    await setCount(ctx.jobId, 'crawl', { done: prevDone + batchUrls.length, total });
+    const left = await frontierSize(ctx.jobId);
+    return left > 0 ? { status: 're-enqueue' } : { status: 'advance' };
+  }
 
   // BFS fallback: only exercise Redis when there are links to consider, so this
   // step stays hermetic (no live Redis) when a sitemap already filled the frontier.

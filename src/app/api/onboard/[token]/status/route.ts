@@ -28,6 +28,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ tok
     accountName: ob.accountName || draft.config?.display_name || '',
     clientName: ob.clientName || '',
     status: ob.status || 'draft',
+    // Populated only when status === 'failed' (see lib/onboarding/failure.ts) so the
+    // wizard can show what broke instead of spinning on a scan that already died.
+    error: ob.error || null,
     sources: draft.config?.sources || {},
     connected: !!conn,
     igUsername: conn?.ig_username || null,

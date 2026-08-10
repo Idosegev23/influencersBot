@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { resolveDraftByToken } from '@/lib/onboarding/resolve';
 import { startPipeline } from '@/lib/pipeline/start';
 import { normalizeIgUsername } from '@/lib/pipeline/username';
+import { normalizeWebsiteUrl } from '@/lib/pipeline/website-url';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +26,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   }
 
   const body = await req.json().catch(() => ({}));
-  const website = (body.website || '').trim();
+  // Clients type bare domains ("triroars.co.il"). Normalize HERE so both the stored
+  // config.sources.website (reused by every later re-scan) and the pipeline get an
+  // absolute URL — an unnormalized value throws "Invalid URL" at site-discover.
+  const website = normalizeWebsiteUrl(body.website);
   const tiktok = (body.tiktok || '').trim();
   const youtube = (body.youtube || '').trim();
 

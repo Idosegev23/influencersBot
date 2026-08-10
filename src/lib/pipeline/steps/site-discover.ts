@@ -7,8 +7,33 @@ import { enrichSkips, type StepResult } from './index';
 export async function siteDiscoverStep(ctx: StepContext): Promise<StepResult> {
   if (enrichSkips(ctx, 'website')) return { status: 'advance' }; // enriching a different source
   if (!ctx.state.websiteUrl) return { status: 'advance' };
-  let urls = await discoverSitemapUrls(ctx.state.websiteUrl);
-  if (urls.length === 0) urls = [ctx.state.websiteUrl]; // BFS fallback seed
+
+  try {
+    return await discoverAndQueue(ctx);
+  } catch (e: any) {
+    // The website is ONE source among several, and it is scanned at step 6 of 11 —
+    // after Instagram, transcription, YouTube and TikTok have already succeeded.
+    // Letting it fail the job threw all of that away, plus every step after it
+    // (rag-ingest, product-extract, persona-build, finalize), because someone typed
+    // a domain without https://. Record it and carry on with the sources that work.
+    const message = e?.message || String(e);
+    console.error(`[site-discover] skipping website scan for job ${ctx.jobId}: ${message}`);
+    try {
+      const { getScanJobsRepo } = await import('@/lib/db/repositories/scanJobsRepo');
+      await getScanJobsRepo().addStepLog(
+        ctx.jobId, 'site-discover', 'failed', 0,
+        `דילוג על סריקת האתר (${ctx.state.websiteUrl}): ${message}`,
+      );
+    } catch { /* logging the skip must never itself fail the job */ }
+    // Empty frontier → site-crawl finds nothing to do and advances immediately.
+    await setCount(ctx.jobId, 'crawl', { done: 0, total: 0 });
+    return { status: 'advance' };
+  }
+}
+
+async function discoverAndQueue(ctx: StepContext): Promise<StepResult> {
+  let urls = await discoverSitemapUrls(ctx.state.websiteUrl!);
+  if (urls.length === 0) urls = [ctx.state.websiteUrl!]; // BFS fallback seed
 
   const categories = ctx.state.options.categories;
   if (categories && categories.length) {
