@@ -383,6 +383,14 @@ export async function extractAllProducts(
 
   console.log(`[ExtractProducts] Found ${productPages.length} product pages out of ${pages.length} total`);
 
+  // Brochure sites (e.g. Hamania) have no product pages at all — no Product schema, no
+  // prices, no /product URLs. Wiping the tables here would delete a manually-seeded
+  // catalog and re-insert nothing, so bail out before the destructive clear.
+  if (productPages.length === 0) {
+    console.log('[ExtractProducts] No product pages detected — keeping existing catalog untouched');
+    return { accountId, totalPages: pages.length, productsExtracted: 0, seriesDetected: 0, errors, durationMs: Date.now() - start };
+  }
+
   // 2. Clear existing products for this account (fresh extraction)
   await supabase.from('widget_products').delete().eq('account_id', accountId);
   await supabase.from('widget_product_series').delete().eq('account_id', accountId);
