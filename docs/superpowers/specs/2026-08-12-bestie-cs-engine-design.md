@@ -127,15 +127,17 @@ order tools in its definition list — enforced at registry build, not in the pr
 
 - **Widget + main chat page:** a real opening screen with two choices — "שירות לקוחות" /
   "לדבר על ___" (wording derives from archetype and account language). Existing smart
-  chips stay beneath it, with one change: **the first starter is always a support
-  starter** (e.g. "יש לי בעיה עם הזמנה" — wording per archetype), ahead of the content
-  starters. Tapping it opens the CS conversation directly, same as choosing the CS
-  option. On the chat page this replaces the default support tab's role; `NavTabs` keeps
-  working for accounts that configure content tabs.
+  chips stay beneath it. On the chat page this replaces the default support tab's role;
+  `NavTabs` keeps working for accounts that configure content tabs.
 - **WhatsApp:** first-contact text menu. **Instagram:** quick replies — the CS brain
   already emits `<<SUGGESTIONS>>…<</SUGGESTIONS>>`; `stripSuggestions` (`cs-context.ts:8`)
   strips it for WhatsApp, `dm-handler.ts:468` already parses that exact marker into IG
   quick replies. The adapter parses where WhatsApp strips.
+- **The first starter is always a support starter — on every channel.** Wherever starters
+  are offered (widget chips, chat-page chips, the WhatsApp opening menu, Instagram quick
+  replies), a support/problem starter (e.g. "יש לי בעיה עם הזמנה" — wording per archetype)
+  appears **first**, ahead of all content starters. Selecting it opens the CS conversation
+  directly, same as choosing the CS option on the opening screen.
 - **Never blocking:** free text bypasses the screen; the brain infers mode.
 
 ### 6. Structured CS screens inside the conversation
