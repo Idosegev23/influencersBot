@@ -11,13 +11,13 @@
 import OpenAI from 'openai';
 import { randomUUID } from 'node:crypto';
 import { supabase as supabaseAdmin } from '@/lib/supabase';
-import { loadCsSession, createCsSession, saveCsSession, type CsSessionRow, type CsPhase } from '@/lib/cs/cs-session';
+import { loadCsSessionByChannel, createCsSession, saveCsSession, type CsSessionRow, type CsPhase } from '@/lib/cs/cs-session';
 import { buildCsToolset } from '@/lib/cs/tools/registry';
 import type { CsProductCard, CsToolCtx, CsToolResult, OpenAIFunctionDef } from '@/lib/cs/tools/types';
 import { buildCsSystemPrompt, buildContextDigest, stripSuggestions, type CsRecentTurn } from '@/lib/cs/cs-context';
 import { laneModel } from '@/lib/llm/config';
 import { toWaId } from '@/lib/whatsapp-cloud/client';
-import { whatsappIdentity } from '@/lib/cs/identity';
+import { whatsappIdentity, identityKey, type CsIdentity } from '@/lib/cs/identity';
 import type { CsJob } from '@/lib/cs/wa-cs-queue';
 
 export interface CsTurnResult {
@@ -149,14 +149,37 @@ async function persistTurn(chatSessionId: string, userMessage: string, assistant
   ]);
 }
 
+// Channel-agnostic turn input (spec §1, §3). Milestone-2/3 adapters (widget, web chat, IG DM)
+// call runCsTurnCore directly with their own identity; the WhatsApp worker keeps calling
+// runCsTurn(job) below, which is now a thin wrapper.
+export interface CsTurnInput {
+  identity: CsIdentity;
+  text: string;
+  image?: CsJob['image'] | null;
+  contactId?: string | null;
+  // Conversation mode as CONTEXT, not a route (spec §3): the opening-screen choice. Phrasing
+  // and emphasis only — the brain may still cross over mid-conversation. WhatsApp always 'cs' in M1.
+  mode?: 'cs' | 'content';
+}
+
 export async function runCsTurn(job: CsJob, depsOverride?: Partial<CsAgentDeps>): Promise<CsTurnResult> {
+  return runCsTurnCore(
+    { identity: whatsappIdentity(job.waId), text: job.textBody || '', image: job.image ?? null, contactId: job.contactId ?? null },
+    depsOverride,
+  );
+}
+
+export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<CsAgentDeps>): Promise<CsTurnResult> {
   const deps: CsAgentDeps = { callModel: depsOverride?.callModel ?? defaultCallModel };
-  const waId = job.waId;
+  const { channel, channelUserId } = identityKey(input.identity);
+  // waId is the legacy name for the channel user id — on WhatsApp they are the same value, and
+  // in M1 only WhatsApp reaches this path (adapters land in M2/M3).
+  const waId = channelUserId;
   // Image inbound: userMessage is a short text stand-in (caption or a marker) used for persistence,
   // detectHandoff and the escalation transcript; the ACTUAL photo is threaded to the model below.
-  const img = job.image;
-  const userMessage = (img ? (img.caption ? `[תמונה] ${img.caption}` : '[הלקוח/ה שלח/ה תמונה]') : (job.textBody || '')).trim();
-  let session = (await loadCsSession(waId)) || (await createCsSession(waId, job.contactId ?? null));
+  const img = input.image ?? null;
+  const userMessage = (img ? (img.caption ? `[תמונה] ${img.caption}` : '[הלקוח/ה שלח/ה תמונה]') : (input.text || '')).trim();
+  let session = (await loadCsSessionByChannel(channel, channelUserId)) || (await createCsSession(channelUserId, input.contactId ?? null));
 
   // Lightweight pre-bind memory (Task C6 follow-up, closes an opus-review finding): chat_messages
   // history only exists AFTER bind_brand, so pre-bind onboarding turns (greeting → "which brand?" →
@@ -205,11 +228,11 @@ export async function runCsTurn(job: CsJob, depsOverride?: Partial<CsAgentDeps>)
 
   // 4) Build the brand-grounded system prompt (persona + RAG + re-entry digest — NO scripted menu).
   const openThreads = await loadOpenThreads(waId);
-  const digest = await buildContextDigest(session, openThreads);
+  const digest = await buildContextDigest(session, openThreads, input.mode ?? 'cs');
   const system = await buildCsSystemPrompt({ accountId: session.active_account_id, userMessage, digest });
 
   // 5) Tool-calling loop.
-  const ctx: CsToolCtx = { waId, accountId: session.active_account_id, chatSessionId: session.active_chat_session_id, ticketId: session.active_ticket_id, customerName: session.customer_name, identity: whatsappIdentity(waId), lastImageUrl: img?.url ?? null };
+  const ctx: CsToolCtx = { waId, accountId: session.active_account_id, chatSessionId: session.active_chat_session_id, ticketId: session.active_ticket_id, customerName: session.customer_name, identity: input.identity, lastImageUrl: img?.url ?? null };
   // Archetype-aware toolset (spec §4): pre-bind (account null) = the full set, today's behavior;
   // post-bind the account's archetype + config decide what the model is even OFFERED.
   const toolset = buildCsToolset({

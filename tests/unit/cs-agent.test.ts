@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 let store: Record<string, any> = {};
+const sessionLoadCalls: Array<[string, string]> = [];
 vi.mock('@/lib/cs/cs-session', () => ({
   WARM_WINDOW_MS: 45 * 60 * 1000,
   isWarm: () => false,
   loadCsSession: async (waId: string) => store[waId] || null,
+  loadCsSessionByChannel: async (channel: string, channelUserId: string) => { sessionLoadCalls.push([channel, channelUserId]); return store[channelUserId] || null; },
   createCsSession: async (waId: string, contactId: string | null) => { const r = { wa_id: waId, contact_id: contactId, phase: 'onboarding', active_account_id: null, active_ticket_id: null, active_chat_session_id: null, customer_name: null, context: {}, last_activity_at: new Date().toISOString(), version: 0 }; store[waId] = r; return r; },
   saveCsSession: async (prev: any, patch: any) => { store[prev.wa_id] = { ...prev, ...patch, version: prev.version + 1 }; return true; },
 }));
@@ -270,5 +272,28 @@ describe('runCsTurn (brain-led loop)', () => {
     const res = await runCsTurn(job('הגיע שבור'), { callModel });
     expect(res.reply.kind).toBe('text');
     expect(res.cards).toBeUndefined();
+  });
+
+  // --- CS-engine M1 (spec §1, §8): the channel-agnostic entry ---
+
+  it('runCsTurnCore accepts a channel identity and loads the session by (channel, channel_user_id)', async () => {
+    sessionLoadCalls.length = 0;
+    callModel.mockResolvedValueOnce({ toolCalls: [], text: 'שלום!' });
+    const { runCsTurnCore } = await import('@/lib/cs/cs-agent');
+    const res = await runCsTurnCore(
+      { identity: { channel: 'whatsapp', waId: '972501112222', trust: 'channel_verified' }, text: 'היי' },
+      { callModel },
+    );
+    expect(res.reply).toEqual({ kind: 'text', body: 'שלום!' });
+    expect(sessionLoadCalls).toContainEqual(['whatsapp', '972501112222']);
+  });
+
+  it('runCsTurn(job) delegates to the core with a whatsapp identity (worker contract unchanged)', async () => {
+    sessionLoadCalls.length = 0;
+    callModel.mockResolvedValueOnce({ toolCalls: [], text: 'שלום!' });
+    const { runCsTurn } = await import('@/lib/cs/cs-agent');
+    const res = await runCsTurn(job('היי'), { callModel });
+    expect(res.reply.kind).toBe('text');
+    expect(sessionLoadCalls).toContainEqual(['whatsapp', '972501112222']);
   });
 });

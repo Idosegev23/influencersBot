@@ -15,6 +15,9 @@ export interface CsContextDigest {
   knownName: string | null;
   boundBrand: string | null; // brand display name, or null when unbound
   warm: boolean;             // last activity < 45 min
+  // Conversation mode as CONTEXT, not a route (CS-engine spec §3): the opening-screen choice.
+  // 'cs' is the default; 'content' is only ever passed by the M2+ channel adapters.
+  mode: 'cs' | 'content';
   openThreads: Array<{ ticketId: string; brand: string; topic: string }>;
   // Lightweight pre-bind memory (Task C6 follow-up): the last few exchanges, persisted on
   // whatsapp_cs_sessions.context.recentTurns by cs-agent.ts. chat_messages history only exists
@@ -30,6 +33,7 @@ export interface CsContextDigest {
 export async function buildContextDigest(
   session: CsSessionRow,
   openThreads: Array<{ ticketId: string; brand: string; topic: string }>,
+  mode: 'cs' | 'content' = 'cs',
 ): Promise<CsContextDigest> {
   let boundBrand: string | null = null;
   let policy: string | null = null;
@@ -41,7 +45,7 @@ export async function buildContextDigest(
     policy = typeof p === 'string' && p.trim() ? p : null;
   }
   const recentTurns = Array.isArray((session.context as any)?.recentTurns) ? (session.context as any).recentTurns : [];
-  return { knownName: session.customer_name, boundBrand, warm: isWarm(session), openThreads, recentTurns, policy };
+  return { knownName: session.customer_name, boundBrand, warm: isWarm(session), mode, openThreads, recentTurns, policy };
 }
 
 /**
@@ -63,6 +67,8 @@ export async function buildCsSystemPrompt(input: {
   lines.push('על ברכה פשוטה ("היי") — פתח/י בחום ושאל/י איך אפשר לעזור (או המשך/י בפרוזה נושא פתוח קודם). אל תוביל/י ברכה בהצעה "להעביר לנציג" — הצע/י אדם רק כשבאמת נתקעת או כשהלקוח/ה מבקש/ת.');
   lines.push('תמונות: כשהלקוח/ה שולח/ת תמונה — את/ה רואה אותה ממש. התבונן/י בה, תאר/י בקצרה מה את/ה רואה (מוצר, נזק, תווית, טקסט), אשר/י מול המדיניות (למשל אם המוצר אכן נראה פגום/פתוח), ופעל/י בהתאם. אם התמונה לא ברורה או לא רלוונטית — בקש/י בעדינות תמונה טובה יותר.');
   lines.push('שיחה חופשית בלבד: אין כפתורים ואין רשימות בחירה (WhatsApp interactive) — כל תגובה היא טקסט רגיל. כל בחירה (מותג, המשך פנייה) נעשית בשיחה טבעית: את/ה שואל/ת, הלקוח/ה עונ/ה בטקסט חופשי, ואת/ה מבין/ה, מאשר/ת בפרוזה וממשיכ/ה.');
+
+  if (digest.mode === 'content') lines.push('שים/י לב: הלקוח/ה בחר/ה לשוחח על התוכן — זו שיחת תוכן, לא פניית שירות. אם באמצע השיחה עולה בעיה או בקשת שירות, אפשר לטפל בה בטבעיות.');
 
   if (digest.knownName) lines.push(`שם הלקוח/ה: ${digest.knownName}. פנה/י אליו/ה בשם, ואל תשאל/י שוב לשם.`);
   else lines.push('שם הלקוח/ה עדיין לא ידוע — פתח/י בברכה קצרה וחמה ושאל/י בטבעיות איך קוראים ללקוח/ה (אפשר באותה נשימה עם שאלת המותג, למשל: "היי! אני בסטי 🙂 איך קוראים לך? ולאיזה מותג / עסק את/ה צריך/ה עזרה?"). ברגע שקיבלת שם — קרא/י ל-remember_name פעם אחת כדי לזכור אותו, ומאותו רגע פנה/י אליו/ה בשם.');
