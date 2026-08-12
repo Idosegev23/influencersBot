@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>בסטי × מאמי</title>
+<style>
+  /* ===== stage tokens (single committed dark look) ===== */
+  :root{
+    --stage:#161226;          /* dark plum-slate */
+    --stage-soft:#1F1935;
+    --ink:#F3EFFA;            /* light text on stage */
+    --ink-dim:#A79FC2;
+    --mami:#E0446E;           /* Mami pink */
+    --bestie:#8B6CFF;         /* Bestie purple */
+    --ok:#30A46C;
+    --warn:#F0A32E;
+    --danger:#E5484D;
+    --wa-wallpaper:#EFE7DC;
+    --wa-green:#D9FDD3;
+    --wa-header:#075E54;
+    --radius:14px;
+    font-size:16px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--stage);
+    color:var(--ink);
+    font-family:-apple-system,"Segoe UI","Helvetica Neue","Assistant","Heebo",Arial,sans-serif;
+    display:flex;flex-direction:column;gap:14px;
+    padding:16px 22px 14px;
+    min-height:100vh;
+  }
+
+  /* ===== top bar ===== */
+  header{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+  .brand{display:flex;align-items:baseline;gap:10px}
+  .brand h1{font-size:1.35rem;font-weight:800;letter-spacing:.2px}
+  .brand h1 .x{color:var(--ink-dim);font-weight:400;margin:0 6px}
+  .brand h1 .mami{color:var(--mami)}
+  .brand h1 .bestie{color:var(--bestie)}
+  .brand small{color:var(--ink-dim);font-size:.85rem}
+  .tabs{display:flex;gap:8px;margin-inline-start:auto}
+  .tab{
+    border:1px solid #3A3157;background:var(--stage-soft);color:var(--ink-dim);
+    padding:9px 16px;border-radius:999px;font-size:.95rem;font-weight:600;cursor:pointer;
+    transition:all .15s;
+  }
+  .tab:hover{color:var(--ink)}
+  .tab.on{background:var(--bestie);border-color:var(--bestie);color:#fff}
+  .tab:focus-visible,.btn:focus-visible{outline:2px solid var(--bestie);outline-offset:2px}
+  .chips{display:flex;gap:10px;align-items:center}
+  .chip{
+    display:flex;align-items:center;gap:7px;
+    background:var(--stage-soft);border:1px solid #3A3157;border-radius:999px;
+    padding:8px 14px;font-size:.92rem;font-variant-numeric:tabular-nums;
+  }
+  .chip b{font-weight:700}
+  #statusChip{border-width:1px;font-weight:700}
+  #statusChip.s-open{color:#9DB8FF;border-color:#3D5AA6}
+  #statusChip.s-waiting{color:var(--warn);border-color:#8A6420}
+  #statusChip.s-reminder{color:#FF9E66;border-color:#9C5A2E}
+  #statusChip.s-esc{color:#FF8B8F;border-color:#9C3A3E}
+  #statusChip.s-closed{color:#7FE0AE;border-color:#2E7D54}
+  #jumpFlash{color:var(--warn);font-weight:800;font-size:.92rem;min-width:90px;transition:opacity .4s;opacity:0}
+  #jumpFlash.show{opacity:1}
+
+  /* ===== main area ===== */
+  main{display:flex;gap:16px;flex:1;min-height:0;align-items:stretch}
+
+  /* rules card */
+  aside{
+    width:230px;flex:0 0 230px;background:var(--stage-soft);
+    border:1px solid #3A3157;border-radius:var(--radius);padding:16px 14px;
+    display:flex;flex-direction:column;gap:10px;align-self:flex-start;
+  }
+  aside h2{font-size:.85rem;letter-spacing:.14em;color:var(--mami);font-weight:800}
+  .rule{
+    border-radius:10px;padding:9px 10px;font-size:.88rem;line-height:1.45;
+    color:var(--ink-dim);border:1px solid transparent;transition:all .25s;
+  }
+  .rule b{color:var(--ink);font-weight:700;display:block;font-size:.9rem}
+  .rule.hot{background:#2A2244;border-color:var(--bestie);color:var(--ink)}
+  .rule.hot b{color:var(--bestie)}
+  aside footer{font-size:.78rem;color:var(--ink-dim);border-top:1px solid #3A3157;padding-top:10px;line-height:1.5}
+
+  /* phones */
+  .phones{display:flex;gap:16px;flex:1;min-height:0}
+  .phone{
+    flex:1;display:flex;flex-direction:column;min-width:0;
+    background:#0e0b18;border:1px solid #3A3157;border-radius:22px;overflow:hidden;
+    opacity:.42;filter:saturate(.75);transition:opacity .3s,box-shadow .3s,filter .3s;
+  }
+  .phone.active{opacity:1;filter:none;box-shadow:0 0 0 2px var(--bestie),0 10px 40px rgba(139,108,255,.25)}
+  .wa-head{
+    background:var(--wa-header);color:#fff;padding:10px 14px;
+    display:flex;align-items:center;gap:10px;flex:0 0 auto;
+  }
+  .ava{width:36px;height:36px;border-radius:50%;background:#ffffff2b;display:grid;place-items:center;font-size:1.15rem}
+  .wa-head .who{line-height:1.2}
+  .wa-head .who b{font-size:.98rem;display:block}
+  .wa-head .who span{font-size:.75rem;opacity:.8}
+  .wa-tag{margin-inline-start:auto;font-size:.7rem;background:#ffffff22;border-radius:6px;padding:3px 7px;letter-spacing:.05em}
+  .chat{
+    flex:1;overflow-y:auto;background:var(--wa-wallpaper);
+    background-image:radial-gradient(#00000008 1px,transparent 1px);background-size:18px 18px;
+    padding:12px 10px 16px;display:flex;flex-direction:column;gap:7px;scroll-behavior:smooth;
+  }
+  .daychip,.syschip{
+    align-self:center;background:#ffffffd9;color:#54656f;font-size:.74rem;
+    border-radius:8px;padding:4px 10px;box-shadow:0 1px 1px #0000001a;
+  }
+  .syschip{background:#fdf3d0;color:#6b5b1e}
+  .logline{align-self:center;color:#54656f;font-size:.78rem;font-style:italic;text-align:center;
+    background:#ffffffb5;border-radius:8px;padding:6px 10px;max-width:92%;box-shadow:0 1px 1px #0000001a}
+  .msg{
+    max-width:86%;border-radius:10px;padding:7px 9px 5px;font-size:.9rem;line-height:1.5;color:#111b21;
+    box-shadow:0 1px 1px #0000001f;position:relative;white-space:pre-line;
+    animation:pop .22s ease-out;
+  }
+  @keyframes pop{from{transform:translateY(6px);opacity:0}to{transform:none;opacity:1}}
+  @media (prefers-reduced-motion:reduce){.msg{animation:none}}
+  .msg.party{align-self:flex-end;background:var(--wa-green);border-start-end-radius:10px;border-start-start-radius:2px}
+  .msg.bestie{align-self:flex-start;background:#fff;border-start-start-radius:10px;border-start-end-radius:2px}
+  .msg .name{font-size:.72rem;font-weight:800;color:var(--bestie);margin-bottom:2px}
+  .msg.party .name{color:#0b7a5c}
+  .msg .meta{display:flex;justify-content:flex-end;gap:4px;font-size:.66rem;color:#667781;margin-top:3px;font-variant-numeric:tabular-nums}
+  .ticks{color:#53bdeb;letter-spacing:-2px}
+  .msg.urgent{box-shadow:0 0 0 2px var(--danger),0 1px 1px #0000001f}
+  .attach{display:flex;align-items:center;gap:7px;background:#f0f2f5;border-radius:8px;padding:7px 9px;margin-top:5px;font-size:.8rem;color:#3b4a54}
+
+  /* escalation card */
+  .esc-card{
+    align-self:stretch;background:#fff;border-radius:12px;overflow:hidden;
+    box-shadow:0 2px 10px #00000030;border-inline-start:5px solid var(--danger);
+    animation:pop .25s ease-out;
+  }
+  .esc-card .eh{background:#FDECEC;color:#B3261E;font-weight:800;font-size:.88rem;padding:8px 12px;display:flex;gap:8px;align-items:center}
+  .esc-card .eb{padding:10px 12px;display:flex;flex-direction:column;gap:7px;font-size:.8rem;color:#1f2a33;line-height:1.5}
+  .esc-card .row b{color:#000;font-weight:700}
+  .esc-card .tl{background:#F6F7F9;border-radius:8px;padding:7px 9px;font-size:.75rem;color:#42525e;font-variant-numeric:tabular-nums;line-height:1.7}
+  .esc-card .fail{background:#FDECEC;color:#B3261E;border-radius:8px;padding:7px 9px;font-weight:700;font-size:.78rem}
+  .esc-card .need{background:#EAF3FF;color:#174A8C;border-radius:8px;padding:7px 9px;font-weight:700;font-size:.78rem}
+  .esc-card .flag{display:inline-block;background:var(--danger);color:#fff;border-radius:6px;padding:1px 8px;font-size:.7rem;font-weight:800}
+
+  /* typing indicator */
+  .typing{display:flex;gap:4px;padding:10px 12px;background:#fff;border-radius:10px;align-self:flex-start;box-shadow:0 1px 1px #0000001f}
+  .typing.party{align-self:flex-end;background:var(--wa-green)}
+  .typing i{width:7px;height:7px;border-radius:50%;background:#8696a0;animation:blink 1s infinite}
+  .typing i:nth-child(2){animation-delay:.2s}.typing i:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
+
+  /* ===== bottom: narration + controls ===== */
+  .dock{display:flex;gap:16px;align-items:center;flex:0 0 auto}
+  .narration{
+    flex:1;background:var(--stage-soft);border:1px solid #3A3157;border-radius:var(--radius);
+    padding:13px 18px;display:flex;align-items:center;gap:12px;min-height:60px;
+  }
+  .narration .icon{font-size:1.3rem}
+  .narration p{font-size:1.05rem;line-height:1.45}
+  .narration p b{color:var(--bestie)}
+  .controls{display:flex;gap:8px;align-items:center}
+  .btn{
+    border:1px solid #3A3157;background:var(--stage-soft);color:var(--ink);
+    padding:12px 18px;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;transition:all .15s;
+  }
+  .btn:hover{border-color:var(--bestie)}
+  .btn.primary{background:var(--bestie);border-color:var(--bestie);color:#fff;font-size:1.08rem;padding:12px 26px}
+  .btn.primary:hover{background:#9d82ff}
+  .btn:disabled{opacity:.35;cursor:default}
+  .btn.autoOn{background:var(--mami);border-color:var(--mami);color:#fff}
+  .progress{color:var(--ink-dim);font-size:.9rem;font-variant-numeric:tabular-nums;min-width:52px;text-align:center}
+  .kbd-hint{color:var(--ink-dim);font-size:.72rem;text-align:center;margin-top:2px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1><span class="bestie">בסטי</span><span class="x">×</span><span class="mami">מאמי</span></h1>
+    <small>דמו · בסטי דואגת שכולם עושים את העבודה</small>
+  </div>
+  <div class="chips">
+    <div class="chip">🕐 <b id="clock">—</b></div>
+    <div class="chip" id="statusChip">●&nbsp;<span id="statusTxt">—</span></div>
+    <span id="jumpFlash"></span>
+  </div>
+  <nav class="tabs">
+    <button class="tab on" id="tab0">תסריט 1 · בסטי המתווכת</button>
+    <button class="tab" id="tab1">תסריט 2 · בסטי יוצאת למלחמה</button>
+  </nav>
+</header>
+
+<main>
+  <aside>
+    <h2>כללי מאמי</h2>
+    <div class="rule" id="rule-sla"><b>⏱ מענה ספק — עד 4 שעות</b>ספק שלא עונה בזמן מקבל תזכורת אוטומטית</div>
+    <div class="rule" id="rule-full"><b>🎯 רף תשובה — פתרון מלא</b>פשרות חלקיות לא נחשבות תשובה</div>
+    <div class="rule" id="rule-rem2"><b>🚨 אסקלציה — אחרי 2 תזכורות</b>עוברת לנציג מאמי עם סיכום מלא</div>
+    <div class="rule" id="rule-churn"><b>💔 כוונת נטישה — עדיפות מיידית</b>לקוח שמאיים לעזוב לא מחכה לטיימר</div>
+    <footer>הכללים מוגדרים על-ידי מאמי וניתנים לשינוי — בסטי אוכפת אותם על ספקים ועל נציגים כאחד.</footer>
+  </aside>
+
+  <div class="phones">
+    <section class="phone" id="ph-customer">
+      <div class="wa-head"><div class="ava">👩🏻</div><div class="who"><b>מאמי · בסטי</b><span>מקוונת</span></div><span class="wa-tag">הטלפון של שירה</span></div>
+      <div class="chat" id="chat-customer"></div>
+    </section>
+    <section class="phone" id="ph-supplier">
+      <div class="wa-head"><div class="ava" id="supAva">🏬</div><div class="who"><b>בסטי · מועדון מאמי</b><span>מקוונת</span></div><span class="wa-tag" id="supTag">הטלפון של הספק</span></div>
+      <div class="chat" id="chat-supplier"></div>
+    </section>
+    <section class="phone" id="ph-cs">
+      <div class="wa-head"><div class="ava">🎧</div><div class="who"><b>בסטי · ערוץ נציגים</b><span>מקוונת</span></div><span class="wa-tag">שירות לקוחות מאמי</span></div>
+      <div class="chat" id="chat-cs"></div>
+    </section>
+  </div>
+</main>
+
+<div class="dock">
+  <div class="narration"><span class="icon" id="narIcon">▶️</span><p id="narText">לחצו <b>הבא</b> כדי להתחיל את הסיפור</p></div>
+  <div class="controls">
+    <div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" id="btnRestart" title="אתחול">↺</button>
+        <button class="btn" id="btnPrev">→ הקודם</button>
+        <button class="btn primary" id="btnNext">הבא ←</button>
+        <button class="btn" id="btnAuto">▶ אוטו</button>
+      </div>
+      <div class="kbd-hint">רווח / חץ שמאלה = הבא · חץ ימינה = הקודם</div>
+    </div>
+    <div class="progress" id="progress">0/0</div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   beat schema:
+   { phone:'customer'|'supplier'|'cs', from:'party'|'bestie',
+     type:'bubble'|'system'|'log'|'card', text, name?,
+     day?, time, clockOnly?, status?, rule?, urgent?, jump?,
+     narration, icon?, attach? }
+   ========================================================= */
+
+const STATUS = {
+  open:    ['פנייה פתוחה','s-open'],
+  waiting: ['ממתינה לספק','s-waiting'],
+  handling:['בטיפול','s-open'],
+  reminder:['תזכורות לספק','s-reminder'],
+  esc:     ['אסקלציה לנציג','s-esc'],
+  closed:  ['נסגרה ✓','s-closed'],
+};
+
+const SCENARIOS = [
+{
+  name:'תסריט 1',
+  supplier:{ava:'🧖🏻‍♀️',tag:'הטלפון של ספא נופר'},
+  beats:[
+  { phone:'customer', from:'party', type:'bubble', day:'יום ראשון', time:'10:02',
+    text:'היי בסטי 🙋🏻‍♀️ קניתי דרך מאמי שובר עיסוי זוגי לספא נופר. התקשרתי לקבוע תור ואמרו לי שהשובר בכלל לא מופיע אצלהם במערכת 😡',
+    status:'open', icon:'📩',
+    narration:'הלקוחה פונה לבסטי בערוץ של מאמי — במקום להתווכח לבד מול הספק.' },
+
+  { phone:'customer', from:'bestie', type:'bubble', time:'10:03',
+    text:'היי שירה! 💜 בודקת ברגע זה.\nמצאתי: שובר עיסוי זוגי — ספא נופר · ₪249 · נרכש 2.8 · בתוקף עד 2.11 · מס׳ MB-58412.\nהשובר תקף לחלוטין. אני פונה לספא עכשיו ומעדכנת אותך — את לא צריכה לעשות כלום.',
+    icon:'🔎',
+    narration:'בסטי מאתרת את השובר במערכת מאמי ומאמתת את העובדות — הלקוחה לא מתעסקת עם אף אחד.' },
+
+  { phone:'supplier', from:'bestie', type:'bubble', time:'10:05',
+    text:'שלום ספא נופר 👋 כאן בסטי, נציגת מועדון מאמי.\nלקוחת מועדון, שירה, מחזיקה שובר תקף שלא אותר אצלכם:\n· שובר MB-58412 · עיסוי זוגי · נרכש 2.8 · בתוקף עד 2.11\nאבקש בדיקה, הפעלה מחדש ותור עבורה. תודה! 🙏',
+    status:'waiting', rule:'rule-sla', icon:'📤',
+    narration:'בסטי פותחת פנייה מסודרת מול הספק — כל הפרטים במקום אחד, בלי פינג-פונג. השעון של מאמי מתחיל לרוץ: 4 שעות למענה.' },
+
+  { phone:'supplier', from:'party', type:'bubble', time:'10:14',
+    text:'היי בסטי, קיבלנו. בודקים מול המערכת ונחזור אלייך בהקדם 🙏',
+    icon:'⏳',
+    narration:'הספק מאשר קבלה. בסטי עוקבת — הפנייה לא "נעלמת" אצל אף אחד.' },
+
+  { phone:'supplier', from:'party', type:'bubble', time:'11:02',
+    text:'בדקנו — הייתה תקלת סנכרון אצלנו והשובר לא נטען. הופעל מחדש ✅\nאפשר להציע לשירה תור ליום חמישי 18:00 או שישי 11:00.',
+    status:'handling', rule:'rule-sla', icon:'✅',
+    narration:'הספק משתף פעולה — מענה מלא תוך שעה, הרבה בתוך ה-SLA של מאמי. ככה זה אמור לעבוד.' },
+
+  { phone:'supplier', from:'bestie', type:'bubble', time:'11:04',
+    text:'מעולה, תודה על טיפול מהיר! מעבירה לשירה לבחירת מועד 🙌',
+    icon:'🔁',
+    narration:'בסטי סוגרת את הפינה מול הספק וממשיכה ללקוחה.' },
+
+  { phone:'customer', from:'bestie', type:'bubble', time:'11:05',
+    text:'שירה, מסודר! ✨\nהייתה תקלת סנכרון אצל הספא — השובר שלך פעיל שוב.\nמציעים לך תור: יום חמישי 18:00 או שישי 11:00. מה מתאים לך?',
+    icon:'💬',
+    narration:'הלקוחה מקבלת פתרון מוכן — לא "תתקשרי אליהם שוב".' },
+
+  { phone:'customer', from:'party', type:'bubble', time:'11:09',
+    text:'וואו זה היה מהיר! 😍 חמישי 18:00 מושלם',
+    icon:'🎉',
+    narration:'שעה ושבע דקות מהתלונה — ויש תור.' },
+
+  { phone:'customer', from:'bestie', type:'bubble', time:'11:10',
+    text:'נקבע! 📅 יום חמישי · 18:00 · ספא נופר.\nשובר MB-58412 מוכן לשימוש. תעדכני אותי איך היה — ואם משהו מסתבך, אני כאן 💜',
+    icon:'📅',
+    narration:'בסטי סוגרת את הלופ מול הלקוחה ומוודאת שהיא מרוצה.' },
+
+  { phone:'supplier', from:'bestie', type:'bubble', time:'11:11',
+    text:'סגור — שירה מגיעה יום חמישי 18:00. תודה על המענה המהיר 💪',
+    icon:'🤝',
+    narration:'וגם הספק מקבל אישור סופי. כולם מסונכרנים — בלי שאף בן-אדם במאמי נגע בזה.' },
+
+  { phone:'cs', from:'party', type:'log', time:'11:12',
+    text:'📋 פנייה #1041 נסגרה אוטומטית · שובר הופעל מחדש + נקבע תור · זמן טיפול: 1:10 שעות · ללא מעורבות נציג',
+    status:'closed', icon:'🧾',
+    narration:'זה כל מה ששירות הלקוחות של מאמי רואה: שורה ביומן. אפס עבודה אנושית כשהספק משתף פעולה.' },
+
+  { phone:'customer', from:'party', type:'bubble', day:'יום חמישי', time:'20:31', jump:'⏩ 4 ימים קדימה',
+    text:'בסטיייי היינו היום בספא — היה מושלם!! 🧖🏻‍♀️✨ תודה על הטיפול המהיר 💜',
+    icon:'💜',
+    narration:'הלקוחה חוזרת מרוצה. תלונה הפכה לחוויית מועדון.' },
+
+  { phone:'customer', from:'bestie', type:'bubble', time:'20:33',
+    text:'איזה כיף לשמוע! 🥰 בשביל זה אנחנו כאן.\nמאמי תמיד איתך — ואני תמיד זמינה 💜',
+    icon:'🏁',
+    narration:'סוף תסריט 1 — הספק עשה את העבודה, בסטי תיווכה, מאמי לא הרימה אצבע. עכשיו נראה מה קורה כשזה לא עובד ככה…' },
+]},
+
+{
+  name:'תסריט 2',
+  supplier:{ava:'🍝',tag:'הטלפון של מסעדת לוקה'},
+  beats:[
+  { phone:'customer', from:'party', type:'bubble', day:'יום שני', time:'12:10',
+    text:'בסטי אני במסעדת לוקה עכשיו עם השובר של מאמי והם מסרבים לקבל אותו!! אומרים שפג תוקף. אני בטוחה שהוא בתוקף 😤',
+    status:'open', icon:'🚨',
+    narration:'פנייה בזמן אמת — הלקוחה עומדת במסעדה ברגע זה.' },
+
+  { phone:'customer', from:'bestie', type:'bubble', time:'12:11',
+    text:'שירה, אני על זה ברגע זה.\nבדקתי: שובר MB-61277 · ארוחה זוגית · ₪189 · בתוקף עד 15.9 — עוד חודש שלם.\nאת צודקת. פונה למסעדה עכשיו.',
+    icon:'🔎',
+    narration:'בסטי מאמתת את העובדות מול מערכת מאמי לפני שהיא יוצאת לדרך — היא לא "מבררת", היא יודעת.' },
+
+  { phone:'supplier', from:'bestie', type:'bubble', time:'12:13',
+    text:'שלום מסעדת לוקה, כאן בסטי ממועדון מאמי.\nלקוחת מועדון נמצאת אצלכם כעת עם שובר MB-61277, בתוקף עד 15.9 לפי מערכת מאמי.\nאבקש לכבד את השובר במקום, או לחזור אליי מיידית.',
+    status:'waiting', rule:'rule-sla', icon:'📤',
+    narration:'פנייה רשמית לספק. השעון של מאמי רץ: 4 שעות למענה.' },
+
+  { phone:'supplier', from:'party', type:'bubble', time:'12:26',
+    text:'אצלנו במערכת השובר מופיע כלא בתוקף. שהלקוחה תפנה למאמי לבירור.',
+    icon:'🙄',
+    narration:'הספק מגלגל את האחריות ללקוחה. בדיוק בשביל הרגע הזה בסטי קיימת.' },
+
+  { phone:'supplier', from:'bestie', type:'bubble', time:'12:28',
+    text:'הלקוחה כבר פנתה — אליי 🙂\nלפי סעיף 4 להסכם מול מאמי, תוקף שוברים נקבע לפי מערכת מאמי. השובר בתוקף עד 15.9.\nמצרפת אישור רכישה. אבקש אישור לכיבוד מלא של השובר.',
+    attach:'📎 אישור-רכישה-MB-61277.pdf', icon:'⚖️',
+    narration:'בסטי לא מתווכחת — היא מצטטת את ההסכם ומצרפת אסמכתאות.' },
+
+  { phone:'customer', from:'party', type:'bubble', time:'13:05', jump:'⏩ חצי שעה',
+    text:'בסוף שילמנו מלא 😞 ₪312. שמרתי קבלה.',
+    icon:'🧾',
+    narration:'בינתיים במציאות: הלקוחה שילמה מכיסה. הנזק כבר קרה — עכשיו השאלה מי מתקן אותו.' },
+
+  { phone:'customer', from:'bestie', type:'bubble', time:'13:06',
+    text:'שמרי את הקבלה — אני מטפלת בזה עד הסוף.\nאו שהשובר יכובד רטרואקטיבית, או שתקבלי החזר מלא. לא פחות מזה. 💜',
+    icon:'🛡️',
+    narration:'בסטי מתחייבת לרף של מאמי: פתרון מלא. ומעכשיו — היא לא עוזבת את זה.' },
+
+  { phone:'supplier', from:'bestie', type:'bubble', time:'16:28', jump:'⏩ +4 שעות',
+    text:'תזכורת ⏰ הפנייה בעניין שובר MB-61277 ממתינה כבר 4 שעות — מעבר לזמן המענה שסוכם מול מאמי.\nהלקוחה שילמה בינתיים ₪312 מכיסה. אבקש התייחסות עוד היום.',
+    status:'reminder', rule:'rule-sla', icon:'⏰',
+    narration:'חריגת SLA — תזכורת ראשונה נשלחת אוטומטית. אף פנייה לא נרדמת.' },
+
+  { phone:'supplier', from:'bestie', type:'bubble', time:'20:28', jump:'⏩ +4 שעות',
+    text:'תזכורת שנייה ואחרונה לפני העברה לטיפול מאמי:\nאי-כיבוד שובר תקף מהווה הפרה של סעיף 4 להסכם.\nללא מענה עד 10:00 מחר — הפנייה תועבר להנהלת מאמי עם מלוא התיעוד.',
+    rule:'rule-rem2', icon:'📛',
+    narration:'תזכורת שנייה — הטון עולה, עם דד-ליין והשלכות מוגדרות. בסטי נלחמת לפי הכללים של מאמי.' },
+
+  { phone:'customer', from:'party', type:'bubble', time:'20:45',
+    text:'זה פשוט מביך. אם ככה נראה המועדון — אני שוקלת לבטל את החברות שלי במאמי 😔',
+    urgent:true, rule:'rule-churn', icon:'💔',
+    narration:'הלקוחה מאותתת נטישה. בסטי מזהה את זה בזמן אמת.' },
+
+  { phone:'customer', from:'bestie', type:'bubble', time:'20:46',
+    text:'שירה, אני מבינה אותך לגמרי — ובדיוק בגלל זה אני כאן.\nהעליתי את הפנייה שלך לעדיפות מקסימלית ברגע זה. את תקבלי פתרון מלא — אני אישית על זה. 💜',
+    icon:'🚀',
+    narration:'כוונת נטישה = עדיפות מיידית, בלי לחכות לטיימרים. הלקוחה שומעת שמישהו נלחם בשבילה.' },
+
+  { phone:'supplier', from:'party', type:'bubble', time:'21:05',
+    text:'טוב… נוכל לכבד 50% מהשובר, לפנים משורת הדין.',
+    icon:'🤏',
+    narration:'הספק סוף-סוף עונה — עם פשרה חלקית.' },
+
+  { phone:'supplier', from:'bestie', type:'bubble', time:'21:07',
+    text:'לא מספיק.\nהשובר תקף במלואו — "לפנים משורת הדין" זה כיבוד מלא והתנצלות ללקוחה.\nההצעה לא עומדת בתנאי מאמי. אני מעבירה את הפנייה להנהלת מאמי עם מלוא התיעוד.',
+    rule:'rule-full', icon:'❌',
+    narration:'בסטי שופטת את ההצעה מול הרף של מאמי — פתרון מלא ללקוח. 50% לא עובר. עכשיו מגיעה האסקלציה.' },
+
+  { phone:'cs', from:'bestie', type:'card', time:'21:08',
+    status:'esc', icon:'🚨',
+    card:{
+      title:'אסקלציה · פנייה #1042',
+      flag:'עדיפות קריטית — כוונת נטישה',
+      rows:[
+        ['לקוחה','שירה לוי · חברת מועדון 3 שנים'],
+        ['שובר','MB-61277 · ארוחה זוגית · מסעדת לוקה · ₪189 · בתוקף עד 15.9'],
+        ['נזק בפועל','הלקוחה שילמה ₪312 מכיסה (קבלה מצורפת)'],
+      ],
+      timeline:'12:10 סירוב במסעדה · 12:13 פנייה לספק · 12:28 ציטוט הסכם + אסמכתא · 16:28 תזכורת 1 · 20:28 תזכורת 2 · 20:45 איתות נטישה · 21:05 הצעת ספק: 50%',
+      fail:'❌ הצעת הספק (50%) לא עומדת בכלל מאמי: "רף תשובה — פתרון מלא"',
+      need:'👉 נדרש מהנציג: אישור החזר מלא ₪312 או אכיפת כיבוד מלא מול הספק',
+    },
+    narration:'האסקלציה מגיעה לנציג כסיכום מלא של כל הסיפור — מי אמר מה, מה הוצע, איזה כלל נשבר ומה נדרש. הנציג לא קורא שרשורים. הוא מחליט.' },
+
+  { phone:'cs', from:'bestie', type:'bubble', day:'יום שלישי', time:'09:02', jump:'⏩ למחרת בבוקר',
+    text:'בוקר טוב דנה ☀️ תזכורת: אסקלציה #1042 פתוחה כבר 12 שעות.\nהלקוחה בסיכון נטישה. אבקש החלטה הבוקר 🙏',
+    icon:'⏰',
+    narration:'הצד השלישי של הסיפור: בסטי מנדנדת גם לנציגים של מאמי. אותם כללים — על כולם.' },
+
+  { phone:'cs', from:'bestie', type:'bubble', time:'12:30', jump:'⏩ +3.5 שעות',
+    text:'דנה, פנייה #1042 היא הוותיקה ביותר בתור שלך (15+ שעות).\nצריך רק החלטה אחת: החזר מלא או אכיפה מול הספק. מה מאשרים?',
+    icon:'📣',
+    narration:'נדנוד שני, ממוקד: בסטי לא שולחת "תזכורת" — היא מגישה החלטה מוכנה לאישור.' },
+
+  { phone:'cs', from:'party', type:'bubble', time:'13:45', name:'דנה · שירות לקוחות',
+    text:'טופל! ✅ אישרתי החזר מלא ₪312 + שובר פיצוי ₪100.\nדיברתי עם לוקה — קיבלו התראה רשמית והתחייבו לתקן את הסנכרון מול מאמי.',
+    icon:'✅',
+    narration:'הנציג סוגר — עם פתרון שעומד ברף. בסטי דאגה שגם הוא יעשה את העבודה שלו.' },
+
+  { phone:'cs', from:'bestie', type:'bubble', time:'13:47',
+    text:'מעולה 🙌 מעדכנת את שירה וסוגרת את הפנייה.\nרושמת ללוקה הערת עבר — בהפרה הבאה האסקלציה תהיה מיידית.',
+    icon:'🗂️',
+    narration:'הידע נשמר: לספק יש עכשיו היסטוריה. המערכת נהיית חכמה יותר עם כל מקרה.' },
+
+  { phone:'customer', from:'bestie', type:'bubble', time:'13:48',
+    text:'שירה, יש פתרון מלא 🎉\n✅ החזר מלא של ₪312 לחשבונך\n✅ שובר פיצוי ₪100 ממאמי\n✅ המסעדה קיבלה התראה והתחייבה שזה לא יחזור\nסליחה על חוויית הערב — ותודה שנתת לנו לתקן 💜',
+    status:'closed', icon:'🏆',
+    narration:'הלקוחה מקבלת יותר ממה שביקשה — כי הרף של מאמי הוא "הכי טוב ללקוח", לא "מספיק כדי לסגור".' },
+
+  { phone:'customer', from:'party', type:'bubble', time:'13:55',
+    text:'וואו. לא ציפיתי שתילחמו בשבילי ככה 😍 נשארת במועדון, ברור. תודה בסטי 💜',
+    icon:'💜',
+    narration:'מנטישה — לנאמנות. בסטי דאגה שכולם יעשו את העבודה שלהם: הספק, הנציג, והמערכת.' },
+]},
+];
+
+/* ===== player ===== */
+const $ = id => document.getElementById(id);
+const chats = {customer:$('chat-customer'), supplier:$('chat-supplier'), cs:$('chat-cs')};
+const phones = {customer:$('ph-customer'), supplier:$('ph-supplier'), cs:$('ph-cs')};
+let scen = 0, idx = -1, auto = null, busy = false;
+
+function bubbleEl(b){
+  if(b.type==='log'){ const d=document.createElement('div'); d.className='logline'; d.textContent=b.text; return d; }
+  if(b.type==='system'){ const d=document.createElement('div'); d.className='syschip'; d.textContent=b.text; return d; }
+  if(b.type==='card'){
+    const c=b.card, d=document.createElement('div'); d.className='esc-card';
+    d.innerHTML =
+      '<div class="eh">🚨 '+c.title+' <span class="flag">'+c.flag+'</span></div>'+
+      '<div class="eb">'+
+        c.rows.map(r=>'<div class="row"><b>'+r[0]+':</b> '+r[1]+'</div>').join('')+
+        '<div class="tl">'+c.timeline+'</div>'+
+        '<div class="fail">'+c.fail+'</div>'+
+        '<div class="need">'+c.need+'</div>'+
+      '</div>';
+    return d;
+  }
+  const d=document.createElement('div');
+  d.className='msg '+(b.from==='party'?'party':'bestie')+(b.urgent?' urgent':'');
+  const name = b.from==='bestie' ? 'בסטי 💜' : (b.name||null);
+  d.innerHTML = (name?'<div class="name">'+name+'</div>':'')
+    + b.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>')
+    + (b.attach?'<div class="attach">'+b.attach+'</div>':'')
+    + '<div class="meta">'+b.time+(b.from==='party'?' <span class="ticks">✓✓</span>':'')+'</div>';
+  return d;
+}
+
+function dayChip(txt){ const d=document.createElement('div'); d.className='daychip'; d.textContent=txt; return d; }
+
+function applyChrome(b, accumulated){
+  // clock = last day + time seen
+  $('clock').textContent = accumulated.day + ' · ' + (b? b.time : accumulated.time);
+  const st = STATUS[accumulated.status] || ['—',''];
+  $('statusTxt').textContent = st[0];
+  $('statusChip').className = 'chip ' + st[1];
+  document.querySelectorAll('.rule').forEach(r=>r.classList.remove('hot'));
+  if(b && b.rule) $('rule-'+b.rule.replace('rule-','')).classList.add('hot');
+  Object.values(phones).forEach(p=>p.classList.remove('active'));
+  if(b) phones[b.phone].classList.add('active');
+  $('narIcon').textContent = b ? (b.icon||'💬') : '▶️';
+  $('narText').innerHTML = b ? b.narration : 'לחצו <b>הבא</b> כדי להתחיל את הסיפור';
+  $('progress').textContent = (idx+1)+'/'+SCENARIOS[scen].beats.length;
+  $('btnPrev').disabled = idx < 0;
+  $('btnNext').disabled = idx >= SCENARIOS[scen].beats.length-1;
+  if(b && b.jump){ const f=$('jumpFlash'); f.textContent=b.jump; f.classList.add('show'); setTimeout(()=>f.classList.remove('show'),2600); }
+  else $('jumpFlash').classList.remove('show');
+}
+
+function renderUpTo(n, animateLast){
+  const beats = SCENARIOS[scen].beats;
+  Object.values(chats).forEach(c=>c.innerHTML='');
+  const acc = {day:beats[0].day||'', time:beats[0].time, status:'open', lastDay:{}};
+  const finish = (b) => {
+    if(b.day) acc.day = b.day;
+    acc.time = b.time;
+    if(b.status) acc.status = b.status;
+  };
+  const appendBeat = (b) => {
+    if(b.day && acc.lastDay[b.phone] !== b.day){ chats[b.phone].appendChild(dayChip(b.day)); acc.lastDay[b.phone]=b.day; }
+    else if(!acc.lastDay[b.phone]){ chats[b.phone].appendChild(dayChip(b.day||acc.day||'היום')); acc.lastDay[b.phone]=b.day||acc.day||'היום'; }
+    chats[b.phone].appendChild(bubbleEl(b));
+    chats[b.phone].scrollTop = chats[b.phone].scrollHeight;
+  };
+  for(let i=0;i<=n-(animateLast?1:0);i++){ if(i<0||!beats[i]) continue; if(b_ok(beats[i])){ if(beats[i].day) acc.day=beats[i].day; appendBeat(beats[i]); finish(beats[i]); } }
+  function b_ok(b){return !!b}
+  if(animateLast && n>=0){
+    const b = beats[n]; busy = true;
+    if(b.day) acc.day=b.day;
+    if(b.day && acc.lastDay[b.phone] !== b.day){ chats[b.phone].appendChild(dayChip(b.day)); acc.lastDay[b.phone]=b.day; }
+    else if(!acc.lastDay[b.phone]){ chats[b.phone].appendChild(dayChip(acc.day||'היום')); acc.lastDay[b.phone]=acc.day||'היום'; }
+    applyChrome(b, {...acc, status: b.status||acc.status});
+    if(b.type==='bubble'){
+      const t=document.createElement('div'); t.className='typing'+(b.from==='party'?' party':''); t.innerHTML='<i></i><i></i><i></i>';
+      chats[b.phone].appendChild(t); chats[b.phone].scrollTop = chats[b.phone].scrollHeight;
+      setTimeout(()=>{ t.remove(); chats[b.phone].appendChild(bubbleEl(b)); chats[b.phone].scrollTop = chats[b.phone].scrollHeight; finish(b); busy=false; }, 620);
+    } else {
+      chats[b.phone].appendChild(bubbleEl(b)); chats[b.phone].scrollTop = chats[b.phone].scrollHeight; finish(b); busy=false;
+    }
+  } else {
+    const b = n>=0 ? beats[n] : null;
+    applyChrome(b, acc);
+    busy=false;
+  }
+}
+
+function next(){ const max=SCENARIOS[scen].beats.length-1; if(busy||idx>=max){ if(idx>=max) stopAuto(); return; } idx++; renderUpTo(idx,true); if(idx>=max) stopAuto(); }
+function prev(){ if(idx<0) return; idx--; renderUpTo(idx,false); }
+function restart(){ stopAuto(); idx=-1; renderUpTo(idx,false); }
+function setScenario(i){ stopAuto(); scen=i; idx=-1;
+  $('tab0').classList.toggle('on',i===0); $('tab1').classList.toggle('on',i===1);
+  const s=SCENARIOS[i]; $('supAva').textContent=s.supplier.ava; $('supTag').textContent=s.supplier.tag;
+  renderUpTo(idx,false);
+}
+function stopAuto(){ if(auto){clearInterval(auto);auto=null;$('btnAuto').classList.remove('autoOn');$('btnAuto').textContent='▶ אוטו';} }
+function toggleAuto(){ if(auto){stopAuto();return;} $('btnAuto').classList.add('autoOn'); $('btnAuto').textContent='⏸ אוטו'; next(); auto=setInterval(next,3800); }
+
+$('btnNext').onclick=next; $('btnPrev').onclick=prev; $('btnRestart').onclick=restart; $('btnAuto').onclick=toggleAuto;
+$('tab0').onclick=()=>setScenario(0); $('tab1').onclick=()=>setScenario(1);
+document.addEventListener('keydown',e=>{
+  if(e.key===' '||e.key==='ArrowLeft'){e.preventDefault();next();}
+  else if(e.key==='ArrowRight'){e.preventDefault();prev();}
+});
+setScenario(0);
+</script>
+</body>
+</html>
