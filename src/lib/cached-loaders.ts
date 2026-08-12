@@ -168,7 +168,9 @@ export async function loadInfluencerProfileCached(
 
       // Transform to Influencer format (same logic as getInfluencerByUsername)
       const config = account.config || {};
-      const persona = (account.chatbot_persona as any)?.[0];
+      // PostgREST returns one-to-one embeds as an object (unique account_id constraint)
+      const personaRel = account.chatbot_persona as any;
+      const persona = Array.isArray(personaRel) ? personaRel[0] : personaRel;
       const profileHistory = account.instagram_profile_history || [];
       const latestProfile = profileHistory.length > 0 
         ? profileHistory.sort((a: any, b: any) => 

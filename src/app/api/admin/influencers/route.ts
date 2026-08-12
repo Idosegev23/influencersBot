@@ -32,7 +32,8 @@ export async function GET() {
     // Enrich with stats
     const influencers = await Promise.all((accounts || []).map(async (account) => {
       const config = account.config || {};
-      const persona = (account.chatbot_persona as any)?.[0];
+      const personaRel = account.chatbot_persona as any;
+      const persona = Array.isArray(personaRel) ? personaRel[0] : personaRel;
 
       // Get stats + IG connection
       const [

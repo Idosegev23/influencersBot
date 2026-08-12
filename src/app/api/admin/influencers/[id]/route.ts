@@ -31,7 +31,8 @@ export async function GET(
     }
 
     const config = account.config || {};
-    const persona = (account.chatbot_persona as any)?.[0];
+    const personaRel = account.chatbot_persona as any;
+    const persona = Array.isArray(personaRel) ? personaRel[0] : personaRel;
     const geminiOutput = persona?.gemini_raw_output || {};
 
     // Get stats

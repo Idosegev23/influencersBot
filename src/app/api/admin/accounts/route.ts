@@ -62,7 +62,7 @@ export async function GET() {
       .filter((account: any) => (account.config as any)?.crmOnly !== true)
       .map((account: any) => {
       const config = account.config || {};
-      const persona = account.chatbot_persona?.[0];
+      const persona = Array.isArray(account.chatbot_persona) ? account.chatbot_persona[0] : account.chatbot_persona;
       
       // Get latest profile data (sorted by snapshot_date DESC in query)
       const profileHistory = account.instagram_profile_history || [];

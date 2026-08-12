@@ -174,7 +174,10 @@ export async function getInfluencerByUsername(username: string): Promise<Influen
 
   // Transform to Influencer format
   const config = account.config || {};
-  const persona = (account.chatbot_persona as any)?.[0];
+  // PostgREST returns the persona as an object (not a 1-element array) now that
+  // chatbot_persona.account_id has a unique constraint (one-to-one detection).
+  const personaRel = account.chatbot_persona as any;
+  const persona = Array.isArray(personaRel) ? personaRel[0] : personaRel;
   const profileHistory = account.instagram_profile_history || [];
   const latestProfile = profileHistory.length > 0 
     ? profileHistory.sort((a: any, b: any) => 
