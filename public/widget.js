@@ -1073,7 +1073,17 @@
   var container = document.createElement('div');
   container.id = 'ibot-widget-container';
   updateContainerPosition();
-  document.body.appendChild(container);
+  // Head-safe mount: some site builders (e.g. Webflow custom code) only allow
+  // scripts in <head>, where document.body doesn't exist yet at execution
+  // time. The container is detached until the DOM is ready — render() only
+  // writes container.innerHTML, so early renders still show once mounted.
+  if (document.body) {
+    document.body.appendChild(container);
+  } else {
+    document.addEventListener('DOMContentLoaded', function () {
+      document.body.appendChild(container);
+    });
+  }
 
   // Keyboard handling: when the on-screen keyboard opens, visualViewport shrinks.
   // Resize the open mobile sheet to the visible height so the input bar stays
