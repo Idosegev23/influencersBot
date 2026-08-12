@@ -1,4 +1,5 @@
 import { supabase as supabaseAdmin } from '@/lib/supabase';
+import type { CsChannel } from '@/lib/cs/identity';
 
 // `phase` is a COARSE ANALYTICS HINT ONLY (onboarding|serving) — it does NOT gate the brain.
 // The brain-led loop decides everything from the injected context digest.
@@ -11,7 +12,9 @@ export interface CsSessionContext {
 }
 
 export interface CsSessionRow {
-  wa_id: string;
+  wa_id: string;                 // legacy key (still PK — migration 074 step 1 keeps populating it)
+  channel: CsChannel;
+  channel_user_id: string;       // waId / IGSID / widget visitor id / web-chat session id (spec §8)
   contact_id: string | null;
   phase: CsPhase;
   active_account_id: string | null;
@@ -33,20 +36,29 @@ export function isWarm(row: CsSessionRow, now: number = Date.now()): boolean {
   return now - Date.parse(row.last_activity_at) < WARM_WINDOW_MS;
 }
 
-export async function loadCsSession(waId: string): Promise<CsSessionRow | null> {
+export async function loadCsSessionByChannel(channel: CsChannel, channelUserId: string): Promise<CsSessionRow | null> {
   const { data } = await supabaseAdmin
     .from('whatsapp_cs_sessions')
     .select('*')
-    .eq('wa_id', waId)
+    .eq('channel', channel)
+    .eq('channel_user_id', channelUserId)
     .maybeSingle();
   return (data as CsSessionRow) ?? null;
+}
+
+export async function loadCsSession(waId: string): Promise<CsSessionRow | null> {
+  return loadCsSessionByChannel('whatsapp', waId);
 }
 
 export async function createCsSession(waId: string, contactId: string | null): Promise<CsSessionRow> {
   const { data } = await supabaseAdmin
     .from('whatsapp_cs_sessions')
     .insert({
+      // Migration 074 step 1: wa_id is still the PK and keeps being populated; the channel
+      // pair is what code reads. Only WhatsApp reaches creation in M1, so wa_id = channel_user_id.
       wa_id: waId,
+      channel: 'whatsapp',
+      channel_user_id: waId,
       contact_id: contactId,
       phase: 'onboarding',
       context: {},

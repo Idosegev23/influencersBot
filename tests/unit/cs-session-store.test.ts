@@ -6,7 +6,7 @@ vi.mock('@/lib/supabase', () => {
   const from = () => {
     const ctx: any = {};
     ctx.select = () => ctx;
-    ctx.eq = () => ctx;
+    ctx.eq = (col: string, val: any) => { (state.filters ||= []).push([col, val]); return ctx; };
     ctx.maybeSingle = async () => ({ data: state.rows[0] ?? null, error: null });
     ctx.single = async () => ({ data: state.insertRow, error: null });
     ctx.insert = (row: any) => { state.insertRow = { ...row }; return ctx; };
@@ -19,7 +19,7 @@ vi.mock('@/lib/supabase', () => {
 });
 
 describe('cs-session store', () => {
-  beforeEach(() => { state.rows = []; state.insertRow = null; state.updateResult = [{ wa_id: 'x' }]; });
+  beforeEach(() => { state.rows = []; state.insertRow = null; state.updateResult = [{ wa_id: 'x' }]; state.filters = []; });
 
   it('isWarm true when last activity < 45 min', async () => {
     const { isWarm, WARM_WINDOW_MS } = await import('@/lib/cs/cs-session');
@@ -31,11 +31,20 @@ describe('cs-session store', () => {
     expect(isWarm(cold, now)).toBe(false);
   });
 
-  it('createCsSession inserts an onboarding-phase row', async () => {
+  it('createCsSession inserts an onboarding-phase row with channel columns (migration 074 step 1: wa_id keeps being populated)', async () => {
     const { createCsSession } = await import('@/lib/cs/cs-session');
     const row = await createCsSession('972500000000', 'contact-1');
-    expect(state.insertRow).toMatchObject({ wa_id: '972500000000', contact_id: 'contact-1', phase: 'onboarding', version: 0 });
+    expect(state.insertRow).toMatchObject({ wa_id: '972500000000', contact_id: 'contact-1', phase: 'onboarding', version: 0, channel: 'whatsapp', channel_user_id: '972500000000' });
     expect(row.wa_id).toBe('972500000000');
+  });
+
+  it('loadCsSessionByChannel queries by (channel, channel_user_id); loadCsSession(waId) delegates to it', async () => {
+    const { loadCsSessionByChannel, loadCsSession } = await import('@/lib/cs/cs-session');
+    await loadCsSessionByChannel('whatsapp', '972501112222');
+    expect(state.filters).toEqual(expect.arrayContaining([['channel', 'whatsapp'], ['channel_user_id', '972501112222']]));
+    state.filters = [];
+    await loadCsSession('972501112222');
+    expect(state.filters).toEqual(expect.arrayContaining([['channel', 'whatsapp'], ['channel_user_id', '972501112222']]));
   });
 
   it('saveCsSession returns true when a row was updated (version matched)', async () => {
