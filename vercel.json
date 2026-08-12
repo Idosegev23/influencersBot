@@ -22,6 +22,10 @@
       "schedule": "0 */6 * * *"
     },
     {
+      "path": "/api/cron/trial-reminders",
+      "schedule": "23 6 * * *"
+    },
+    {
       "path": "/api/cron/poll-stories",
       "schedule": "*/30 * * * *"
     },
