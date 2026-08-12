@@ -12,7 +12,7 @@ import OpenAI from 'openai';
 import { randomUUID } from 'node:crypto';
 import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { loadCsSession, createCsSession, saveCsSession, type CsSessionRow, type CsPhase } from '@/lib/cs/cs-session';
-import { getCsTools, CS_TOOL_DEFS } from '@/lib/cs/tools';
+import { buildCsToolset } from '@/lib/cs/tools/registry';
 import type { CsProductCard, CsToolCtx, CsToolResult, OpenAIFunctionDef } from '@/lib/cs/tools/types';
 import { buildCsSystemPrompt, buildContextDigest, stripSuggestions, type CsRecentTurn } from '@/lib/cs/cs-context';
 import { laneModel } from '@/lib/llm/config';
@@ -76,10 +76,11 @@ async function priorUserTexts(chatSessionId: string | null): Promise<string[]> {
   const { data } = await supabaseAdmin.from('chat_messages').select('role, content').eq('session_id', chatSessionId).order('created_at', { ascending: false }).limit(8);
   return ((data as any[]) || []).reverse().filter((m) => m.role === 'user').map((m) => m.content);
 }
-async function escalationConfig(accountId: string | null): Promise<any> {
+// One config fetch per turn: escalation settings AND the archetype-aware toolset both read from it.
+async function loadAccountMeta(accountId: string | null): Promise<{ config: any } | null> {
   if (!accountId) return null;
   const { data } = await supabaseAdmin.from('accounts').select('config').eq('id', accountId).single();
-  return (data as any)?.config?.escalation || null;
+  return data ? { config: (data as any).config || {} } : null;
 }
 async function loadOpenThreads(waId: string): Promise<Array<{ ticketId: string; brand: string; topic: string }>> {
   const { data } = await supabaseAdmin
@@ -182,10 +183,11 @@ export async function runCsTurn(job: CsJob, depsOverride?: Partial<CsAgentDeps>)
   // genuinely don't know it's an escalation, so we proceed to the model. But once detectHandoff
   // HAS decided this is a known escalation, that decision is final — a known escalation must
   // never reach the model just because the pause/notify dispatch (runCsHandoffCheck) failed.
+  const accountMeta = await loadAccountMeta(session.active_account_id);
   let handoff: { triggered: boolean; [k: string]: any } | null = null;
   try {
     const { detectHandoff } = await import('@/engines/escalation/detect'); // Phase D (D2)
-    const cfg = await escalationConfig(session.active_account_id);
+    const cfg = accountMeta?.config?.escalation || null;
     handoff = detectHandoff(userMessage, await priorUserTexts(session.active_chat_session_id), { enabledTriggers: cfg?.triggers, lowConfidenceThreshold: cfg?.lowConfidenceThreshold });
   } catch (e) {
     console.warn('[cs-agent] detectHandoff failed — treating as unknown, proceeding to the model', e);
@@ -208,7 +210,13 @@ export async function runCsTurn(job: CsJob, depsOverride?: Partial<CsAgentDeps>)
 
   // 5) Tool-calling loop.
   const ctx: CsToolCtx = { waId, accountId: session.active_account_id, chatSessionId: session.active_chat_session_id, ticketId: session.active_ticket_id, customerName: session.customer_name, identity: whatsappIdentity(waId), lastImageUrl: img?.url ?? null };
-  const toolMap = new Map(getCsTools().map((t) => [t.def.function.name, t]));
+  // Archetype-aware toolset (spec §4): pre-bind (account null) = the full set, today's behavior;
+  // post-bind the account's archetype + config decide what the model is even OFFERED.
+  const toolset = buildCsToolset({
+    channel: ctx.identity.channel,
+    account: accountMeta ? { archetype: accountMeta.config?.archetype, config: accountMeta.config } : null,
+  });
+  const toolMap = new Map(toolset.tools.map((t) => [t.def.function.name, t]));
   const history = session.active_chat_session_id ? await loadHistory(session.active_chat_session_id) : [];
   // Image turn → multimodal content (text + image_url) so the brain sees the photo; text turn → string.
   const userContent: any = img?.dataUrl
@@ -220,7 +228,7 @@ export async function runCsTurn(job: CsJob, depsOverride?: Partial<CsAgentDeps>)
   let cards: CsProductCard[] = [];
 
   for (let iter = 0; iter < MAX_ITERS; iter++) {
-    const turn = await deps.callModel({ system, messages, tools: CS_TOOL_DEFS });
+    const turn = await deps.callModel({ system, messages, tools: toolset.defs });
     if (!turn.toolCalls?.length) { finalText = turn.text; break; }
     messages.push({ role: 'assistant', content: turn.text, tool_calls: turn.toolCalls.map((tc) => ({ id: tc.id, type: 'function', function: { name: tc.name, arguments: JSON.stringify(tc.args) } })) });
 
