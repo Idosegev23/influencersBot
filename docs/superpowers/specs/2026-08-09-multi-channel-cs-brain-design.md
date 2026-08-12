@@ -1,7 +1,7 @@
 # Multi-Channel CS Brain — Design
 
 **Date:** 2026-08-09
-**Status:** Approved, not built
+**Status:** Superseded by `2026-08-12-bestie-cs-engine-design.md` (identity/trust core absorbed there unchanged)
 **Goal:** One brain serves a brand across WhatsApp and Instagram DM. A shopper who asks
 "where is my order" gets the same answer, in the same voice, from the same ticket queue,
 whichever channel they use.
