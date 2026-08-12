@@ -7,8 +7,8 @@ import { parseRecipients, resolveBrandName } from '@/lib/pipeline/notify-helpers
 
 const APP = (process.env.NEXT_PUBLIC_APP_URL || 'https://bestie.ldrsgroup.com').replace(/\/$/, '');
 
-/** Pick the team template wrapper by demo/real. */
-export function pickTeamSend(isDemo: boolean): (p: { to: string; brandName: string; accountUsername: string }) => Promise<WhatsAppSendResult> {
+/** Pick the team template wrapper by demo/real. Demo sends also carry accountId → widget-demo button. */
+export function pickTeamSend(isDemo: boolean): (p: { to: string; brandName: string; accountUsername: string; accountId?: string }) => Promise<WhatsAppSendResult> {
   return isDemo ? sendDemoReady : sendAccountReady;
 }
 
@@ -45,7 +45,7 @@ export async function notifyScanComplete(args: {
     const send = pickTeamSend(isDemo);
     await Promise.allSettled(
       parseRecipients(process.env.SCAN_NOTIFY_RECIPIENTS).map((to) =>
-        send({ to, brandName: brand, accountUsername: slug }),
+        send({ to, brandName: brand, accountUsername: slug, accountId: job.account_id! }),
       ),
     );
 
