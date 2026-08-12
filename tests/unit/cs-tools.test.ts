@@ -27,7 +27,7 @@ vi.mock('@/lib/supabase', () => ({
   },
 }));
 
-const ctx = (over: any = {}) => ({ waId: '972501112222', accountId: null, chatSessionId: null, ticketId: null, customerName: 'דנה', senderPhone: '972501112222', ...over } as any);
+const ctx = (over: any = {}) => ({ waId: '972501112222', accountId: null, chatSessionId: null, ticketId: null, customerName: 'דנה', identity: { channel: 'whatsapp', waId: '972501112222', trust: 'channel_verified' }, ...over } as any);
 const tool = async (name: string) => {
   const { getCsTools } = await import('@/lib/cs/tools');
   const t = getCsTools().find((x) => x.def.function.name === name);

@@ -16,14 +16,16 @@ export interface CsProductCard {
   imageUrl: string;        // original (usually .webp); the send path routes it through the JPEG proxy
 }
 
+import type { CsIdentity } from '@/lib/cs/identity';
+
 // Per-turn tool execution context. Handlers READ + SCOPE on it; the loop APPLIES the returned signals.
 export interface CsToolCtx {
-  waId: string;
+  waId: string;                  // channel_user_id (WhatsApp send address / ticket key; still WA-shaped in M1)
   accountId: string | null;      // bound brand (null until bind_brand); scopes EVERY read
   chatSessionId: string | null;
   ticketId: string | null;
   customerName: string | null;
-  senderPhone: string;           // = waId (E.164)
+  identity: CsIdentity;          // WHO is asking + how much we trust it (spec §1). Replaces senderPhone.
   lastImageUrl?: string | null;  // durable URL of an image the shopper sent THIS turn → attached to escalation
   // search_products writes the candidates it returned to the model; show_products reads them back to
   // resolve the refs it was given. Lives on the per-TURN ctx, so a ref can never address a product

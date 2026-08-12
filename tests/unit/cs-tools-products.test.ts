@@ -32,7 +32,7 @@ const disabled = () => ({ config: { whatsapp_cs: { enabled: true } } });
 
 const ctx = (over: any = {}) => ({
   waId: '972501112222', accountId: 'acc-1', chatSessionId: 'cs-1', ticketId: 't1',
-  customerName: 'דנה', senderPhone: '972501112222', ...over,
+  customerName: 'דנה', identity: { channel: 'whatsapp', waId: '972501112222', trust: 'channel_verified' }, ...over,
 } as any);
 
 const product = (over: any = {}) => ({

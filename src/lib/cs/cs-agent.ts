@@ -17,6 +17,7 @@ import type { CsProductCard, CsToolCtx, CsToolResult, OpenAIFunctionDef } from '
 import { buildCsSystemPrompt, buildContextDigest, stripSuggestions, type CsRecentTurn } from '@/lib/cs/cs-context';
 import { laneModel } from '@/lib/llm/config';
 import { toWaId } from '@/lib/whatsapp-cloud/client';
+import { whatsappIdentity } from '@/lib/cs/identity';
 import type { CsJob } from '@/lib/cs/wa-cs-queue';
 
 export interface CsTurnResult {
@@ -206,7 +207,7 @@ export async function runCsTurn(job: CsJob, depsOverride?: Partial<CsAgentDeps>)
   const system = await buildCsSystemPrompt({ accountId: session.active_account_id, userMessage, digest });
 
   // 5) Tool-calling loop.
-  const ctx: CsToolCtx = { waId, accountId: session.active_account_id, chatSessionId: session.active_chat_session_id, ticketId: session.active_ticket_id, customerName: session.customer_name, senderPhone: waId, lastImageUrl: img?.url ?? null };
+  const ctx: CsToolCtx = { waId, accountId: session.active_account_id, chatSessionId: session.active_chat_session_id, ticketId: session.active_ticket_id, customerName: session.customer_name, identity: whatsappIdentity(waId), lastImageUrl: img?.url ?? null };
   const toolMap = new Map(getCsTools().map((t) => [t.def.function.name, t]));
   const history = session.active_chat_session_id ? await loadHistory(session.active_chat_session_id) : [];
   // Image turn → multimodal content (text + image_url) so the brain sees the photo; text turn → string.

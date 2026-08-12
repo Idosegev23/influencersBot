@@ -1,5 +1,6 @@
 import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { toWaId } from '@/lib/whatsapp-cloud/client';
+import { identityPhone } from '@/lib/cs/identity';
 import type { CsProductCard, CsTool, CsToolCtx, CsToolResult, OpenAIFunctionDef } from './types';
 
 const TERMINAL_TICKET = new Set(['resolved', 'closed', 'cancelled']);
@@ -37,7 +38,7 @@ const resolveBrandTool: CsTool = {
   } },
   async handler(args, ctx) {
     const { resolveBrand } = await import('@/lib/cs/brand-resolver');
-    const preferAccountIds = await previouslyEngagedAccountIds(ctx.senderPhone);
+    const preferAccountIds = await previouslyEngagedAccountIds(identityPhone(ctx.identity) ?? ctx.waId);
     const res = await resolveBrand(String(args?.query || ''), { preferAccountIds });
     return { ok: true, data: { kind: res.kind, candidates: res.candidates.map((c) => ({ accountId: c.accountId, name: c.displayName, domain: c.domain, score: c.score })) } };
   },
@@ -68,7 +69,7 @@ const lookupOrderTool: CsTool = {
   async handler(args, ctx) {
     if (!ctx.accountId) return { ok: false, data: { reason: 'no_brand_bound' } };
     const { lookupOrder } = await import('@/lib/orders/lookup');
-    const outcome = await lookupOrder(ctx.accountId, String(args?.orderNumber || ''), ctx.senderPhone);
+    const outcome = await lookupOrder(ctx.accountId, String(args?.orderNumber || ''), identityPhone(ctx.identity) ?? '');
     return { ok: true, data: outcome };
   },
 };
@@ -82,7 +83,7 @@ const lookupOrdersByPhoneTool: CsTool = {
   async handler(_args, ctx) {
     if (!ctx.accountId) return { ok: false, data: { reason: 'no_brand_bound' } };
     const { lookupOrdersByPhone } = await import('@/lib/orders/lookup');
-    const orders = await lookupOrdersByPhone(ctx.accountId, ctx.senderPhone);
+    const orders = await lookupOrdersByPhone(ctx.accountId, identityPhone(ctx.identity) ?? '');
     return { ok: true, data: { orders: orders.map((o) => ({ orderNumber: o.orderNumber, status: o.status, total: o.total, itemSummary: o.itemSummary, trackingUrl: o.trackingUrls?.[0] })) } };
   },
 };
@@ -94,7 +95,7 @@ const listOpenThreadsTool: CsTool = {
     parameters: { type: 'object', properties: {} },
   } },
   async handler(_args, ctx) {
-    return { ok: true, data: { threads: await openCsThreads(ctx.senderPhone) } };
+    return { ok: true, data: { threads: await openCsThreads(identityPhone(ctx.identity) ?? ctx.waId) } };
   },
 };
 
@@ -113,7 +114,7 @@ const bindBrandTool: CsTool = {
     if (cfg?.whatsapp_cs?.enabled !== true) return { ok: false, data: { reason: 'brand_not_cs_enabled' } };
     const { openOrAttachCsTicket } = await import('@/lib/cs/cs-ticket'); // Phase D (D1)
     let ticketId: string | null = ctx.ticketId;
-    try { ticketId = (await openOrAttachCsTicket({ accountId, waId: ctx.waId, customerPhone: ctx.senderPhone, customerName: ctx.customerName })).ticketId; }
+    try { ticketId = (await openOrAttachCsTicket({ accountId, waId: ctx.waId, customerPhone: identityPhone(ctx.identity) ?? ctx.waId, customerName: ctx.customerName })).ticketId; }
     catch (e) { console.warn('[cs-tools] openOrAttachCsTicket failed', e); }
     return { ok: true, bind: { accountId, ticketId }, data: { brand: cfg.display_name || cfg.username || accountId, ticketId } };
   },
@@ -128,7 +129,7 @@ const openOrAttachTicketTool: CsTool = {
   async handler(args, ctx): Promise<CsToolResult> {
     if (!ctx.accountId) return { ok: false, data: { reason: 'no_brand_bound' } };
     const { openOrAttachCsTicket } = await import('@/lib/cs/cs-ticket'); // Phase D (D1)
-    const t = await openOrAttachCsTicket({ accountId: ctx.accountId, waId: ctx.waId, customerPhone: ctx.senderPhone, customerName: ctx.customerName, topic: args?.topic });
+    const t = await openOrAttachCsTicket({ accountId: ctx.accountId, waId: ctx.waId, customerPhone: identityPhone(ctx.identity) ?? ctx.waId, customerName: ctx.customerName, topic: args?.topic });
     return { ok: true, bind: { accountId: ctx.accountId, ticketId: t.ticketId }, data: { ticketId: t.ticketId } };
   },
 };
