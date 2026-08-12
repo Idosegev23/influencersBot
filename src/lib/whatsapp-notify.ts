@@ -121,7 +121,8 @@ async function runTemplate(args: {
   to: string;
   headerParams?: string[];
   bodyParams?: string[];
-  urlButtonParam?: string;   // for single URL button with `{{1}}` in URL
+  urlButtonParam?: string;    // single URL button with `{{1}}` in URL
+  urlButtonParams?: string[]; // multiple URL buttons — element i → button index i
 }): Promise<WhatsAppSendResult> {
   if (!flag(args.flagName)) {
     return {
@@ -143,14 +144,16 @@ async function runTemplate(args: {
       parameters: args.bodyParams.map<TParam>((t) => ({ type: 'text', text: sanitizeParam(t) })),
     });
   }
-  if (args.urlButtonParam != null) {
+  const urlParams =
+    args.urlButtonParams ?? (args.urlButtonParam != null ? [args.urlButtonParam] : []);
+  urlParams.forEach((text, index) => {
     components.push({
       type: 'button',
       sub_type: 'url',
-      index: 0,
-      parameters: [{ type: 'text', text: args.urlButtonParam }],
+      index,
+      parameters: [{ type: 'text', text }],
     });
-  }
+  });
 
   try {
     const result = await sendTemplate({
@@ -467,15 +470,30 @@ export async function sendInfluencerWelcome(p: {
 }
 
 // =====================================================================
-// 7) demo_ready_v1 — demo scan finished (team notification)
-//    Category: UTILITY  |  Vars: body {{1}} = brand name, url {{1}} = username slug
+// 7) demo_ready_v2 / demo_ready_v1 — demo scan finished (team notification)
+//    v2: body {{1}} = brand, url button 0 {{1}} = username slug (/chat/),
+//        url button 1 {{1}} = accountId (/demo/ widget demo page)
+//    v1 (fallback while v2 is PENDING, or when accountId is unknown):
+//        single chat button only.
 //    Trigger: pipeline completion (notifyScanComplete)
 // =====================================================================
 export async function sendDemoReady(p: {
   to: string;
   brandName: string;
   accountUsername: string;
+  accountId?: string;
 }): Promise<WhatsAppSendResult> {
+  if (p.accountId) {
+    const v2 = await runTemplate({
+      templateName: 'demo_ready_v2',
+      flagName: 'DEMO_READY',
+      to: p.to,
+      bodyParams: [p.brandName],
+      urlButtonParams: [p.accountUsername, p.accountId],
+    });
+    if (v2.success) return v2;
+    // v2 PENDING/rejected/missing — fall back to the approved v1 (chat link only).
+  }
   return runTemplate({
     templateName: 'demo_ready_v1',
     flagName: 'DEMO_READY',
