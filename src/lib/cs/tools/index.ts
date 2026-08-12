@@ -63,13 +63,13 @@ const rememberNameTool: CsTool = {
 const lookupOrderTool: CsTool = {
   def: { type: 'function', function: {
     name: 'lookup_order',
-    description: 'Look up ONE order by its number for the bound brand. Phone verification is enforced INSIDE. Returns structured data (kind: found|not_found|unverified|ambiguous) — YOU phrase the reply from it.',
+    description: "Look up ONE order by its number for the bound brand. Phone verification is enforced INSIDE. Returns structured data (kind: found|not_found|unverified|ambiguous|identity_required|escalate) — YOU phrase the reply from it. kind:'identity_required' → ask for the phone number AND order number before retrying; kind:'escalate' → this order can only be handled by a human — call escalate_to_human.",
     parameters: { type: 'object', properties: { orderNumber: { type: 'string' } }, required: ['orderNumber'] },
   } },
   async handler(args, ctx) {
     if (!ctx.accountId) return { ok: false, data: { reason: 'no_brand_bound' } };
     const { lookupOrder } = await import('@/lib/orders/lookup');
-    const outcome = await lookupOrder(ctx.accountId, String(args?.orderNumber || ''), identityPhone(ctx.identity) ?? '');
+    const outcome = await lookupOrder(ctx.accountId, String(args?.orderNumber || ''), ctx.identity);
     return { ok: true, data: outcome };
   },
 };
@@ -77,14 +77,15 @@ const lookupOrderTool: CsTool = {
 const lookupOrdersByPhoneTool: CsTool = {
   def: { type: 'function', function: {
     name: 'lookup_orders_by_phone',
-    description: "Proactively find the shopper's recent orders for the bound brand by their WhatsApp phone (no order number needed). Each order carries its number, status (incl. cancelled/refunded), total, and — for the recent ones — an itemSummary of WHAT'S IN IT; present the contents too, and if an order is cancelled/refunded say so plainly (don't imply it's on the way).",
+    description: "Proactively find the shopper's recent orders for the bound brand by their verified/claimed phone (no order number needed). Each order carries its number, status (incl. cancelled/refunded), total, and — for the recent ones — an itemSummary of WHAT'S IN IT; present the contents too, and if an order is cancelled/refunded say so plainly (don't imply it's on the way). kind:'identity_required' → ask for the shopper's phone number first.",
     parameters: { type: 'object', properties: {} },
   } },
   async handler(_args, ctx) {
     if (!ctx.accountId) return { ok: false, data: { reason: 'no_brand_bound' } };
     const { lookupOrdersByPhone } = await import('@/lib/orders/lookup');
-    const orders = await lookupOrdersByPhone(ctx.accountId, identityPhone(ctx.identity) ?? '');
-    return { ok: true, data: { orders: orders.map((o) => ({ orderNumber: o.orderNumber, status: o.status, total: o.total, itemSummary: o.itemSummary, trackingUrl: o.trackingUrls?.[0] })) } };
+    const res = await lookupOrdersByPhone(ctx.accountId, ctx.identity);
+    if (res.kind === 'identity_required') return { ok: true, data: { kind: 'identity_required' } };
+    return { ok: true, data: { orders: res.orders.map((o) => ({ orderNumber: o.orderNumber, status: o.status, total: o.total, itemSummary: o.itemSummary, trackingUrl: o.trackingUrls?.[0] })) } };
   },
 };
 

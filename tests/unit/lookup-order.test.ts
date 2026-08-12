@@ -19,7 +19,13 @@ vi.mock('@/lib/supabase', () => ({
 
 import { lookupOrder, lookupOrdersByPhone } from '@/lib/orders/lookup';
 import { getFocusShipmentStatus } from '@/lib/shipment/focus-client';
-import { findBrandOrdersByPhone } from '@/lib/orders/brand-orders';
+import { findBrandOrdersByPhone, findBrandOrderByNumber } from '@/lib/orders/brand-orders';
+import { whatsappIdentity, type CsIdentity } from '@/lib/cs/identity';
+
+const widgetClaim = (phone?: string): CsIdentity =>
+  phone
+    ? { channel: 'widget', visitorId: 'v-1', phone, trust: 'phone_claimed' }
+    : { channel: 'widget', visitorId: 'v-1', trust: 'unverified' };
 
 const row = (over: any = {}) => ({
   id: 'r1', account_id: 'acc-1', external_id: 'ord_123', order_number: '1042',
@@ -42,12 +48,12 @@ describe('lookupOrder', () => {
 
   it('returns not_found when no brand_orders row', async () => {
     H.row = null;
-    expect(await lookupOrder('acc-1', '9999', '972501234567')).toEqual({ kind: 'not_found' });
+    expect(await lookupOrder('acc-1', '9999', whatsappIdentity('972501234567'))).toEqual({ kind: 'not_found' });
   });
 
   it('returns found with line items and the REAL order status when phone matches', async () => {
     H.row = row(); H.pull = pull();
-    const out = await lookupOrder('acc-1', '1042', '972501234567');
+    const out = await lookupOrder('acc-1', '1042', whatsappIdentity('972501234567'));
     expect(out.kind).toBe('found');
     expect((out as any).found).toBe(true);
     expect((out as any).lineItems).toHaveLength(1);
@@ -58,33 +64,33 @@ describe('lookupOrder', () => {
 
   it('single lookup surfaces a cancelled order status over the (masking) fulfillment status', async () => {
     H.row = row(); H.pull = pull({ status: 'cancelled', fulfillmentStatus: 'unfulfilled' });
-    const out = await lookupOrder('acc-1', '1042', '972501234567');
+    const out = await lookupOrder('acc-1', '1042', whatsappIdentity('972501234567'));
     expect(out.kind).toBe('found');
     expect((out as any).status).toBe('cancelled');
   });
 
   it('returns unverified when the order phone does not match the sender', async () => {
     H.row = row(); H.pull = pull({ customerPhone: '0509999999' });
-    expect(await lookupOrder('acc-1', '1042', '972501234567')).toEqual({ kind: 'unverified' });
+    expect(await lookupOrder('acc-1', '1042', whatsappIdentity('972501234567'))).toEqual({ kind: 'unverified' });
   });
 
   it('a config whatsapp_cs.test_numbers master bypasses phone-verify (reveals despite mismatch)', async () => {
     H.row = row(); H.pull = pull({ customerPhone: '0509999999' });
     H.config = { whatsapp_cs: { test_numbers: ['0559749242'] } };
-    const out = await lookupOrder('acc-1', '1042', '972559749242');
+    const out = await lookupOrder('acc-1', '1042', whatsappIdentity('972559749242'));
     expect(out.kind).toBe('found');
   });
 
   it('reveals when the order has no phone (guest checkout)', async () => {
     H.row = row({ customer_phone: null }); H.pull = pull({ customerPhone: null });
-    const out = await lookupOrder('acc-1', '1042', '972501234567');
+    const out = await lookupOrder('acc-1', '1042', whatsappIdentity('972501234567'));
     expect(out.kind).toBe('found');
   });
 
   it('adds Focus shipment enrichment when configured', async () => {
     H.row = row(); H.pull = pull();
     H.config = { shipment_provider: { type: 'focus', host: 'focus.example', enabled: true, expected_master_customer_id: 10004 } };
-    const out = await lookupOrder('acc-1', '1042', '972501234567');
+    const out = await lookupOrder('acc-1', '1042', whatsappIdentity('972501234567'));
     expect((out as any).shipment).toEqual({ found: true, statusText: 'delivered' });
   });
 
@@ -95,7 +101,7 @@ describe('lookupOrder', () => {
   it('calls getFocusShipmentStatus with the order_number as reference — NOT tracking_number', async () => {
     H.row = row(); H.pull = pull(); // order_number '1042', trackingNumber 'TN1' — must not be confused
     H.config = { shipment_provider: { type: 'focus', host: 'focus.example', enabled: true, expected_master_customer_id: 10004 } };
-    await lookupOrder('acc-1', '1042', '972501234567');
+    await lookupOrder('acc-1', '1042', whatsappIdentity('972501234567'));
     expect(getFocusShipmentStatus).toHaveBeenCalledWith(
       expect.objectContaining({ reference: '1042', customerCode: 10004, expectedMasterCustomerId: 10004 }),
     );
@@ -104,7 +110,7 @@ describe('lookupOrder', () => {
   it('does not call Focus when shipment_provider is not configured', async () => {
     H.row = row(); H.pull = pull();
     H.config = {};
-    await lookupOrder('acc-1', '1042', '972501234567');
+    await lookupOrder('acc-1', '1042', whatsappIdentity('972501234567'));
     expect(getFocusShipmentStatus).not.toHaveBeenCalled();
   });
 });
@@ -115,20 +121,22 @@ describe('lookupOrdersByPhone', () => {
   it('enriches recent by-phone orders with line items via a lazy pull (so the bot can show contents)', async () => {
     vi.mocked(findBrandOrdersByPhone).mockResolvedValueOnce([row({ order_number: '1042', line_items: null })] as any);
     H.pull = pull(); // the /orders/{id} detail pull returns line items (1× Argan Oil)
-    const out = await lookupOrdersByPhone('acc-1', '972501234567');
-    expect(out[0].itemSummary).toContain('Argan Oil');
+    const res = await lookupOrdersByPhone('acc-1', whatsappIdentity('972501234567'));
+    if (res.kind !== 'found') throw new Error('expected found');
+    expect(res.orders[0].itemSummary).toContain('Argan Oil');
   });
 
-  it('returns [] when no orders match the phone', async () => {
+  it('returns no orders when none match the phone', async () => {
     vi.mocked(findBrandOrdersByPhone).mockResolvedValueOnce([]);
-    expect(await lookupOrdersByPhone('acc-1', '972501234567')).toEqual([]);
+    expect(await lookupOrdersByPhone('acc-1', whatsappIdentity('972501234567'))).toEqual({ kind: 'found', orders: [] });
   });
 
   it('returns a single mapped order', async () => {
     vi.mocked(findBrandOrdersByPhone).mockResolvedValueOnce([row()] as any);
-    const out = await lookupOrdersByPhone('acc-1', '972501234567');
-    expect(out).toHaveLength(1);
-    expect(out[0]).toMatchObject({ found: true, orderNumber: '1042', status: 'fulfilled' });
+    const res = await lookupOrdersByPhone('acc-1', whatsappIdentity('972501234567'));
+    if (res.kind !== 'found') throw new Error('expected found');
+    expect(res.orders).toHaveLength(1);
+    expect(res.orders[0]).toMatchObject({ found: true, orderNumber: '1042', status: 'fulfilled' });
   });
 
   it('returns N mapped orders, each account-scoped by the store lookup', async () => {
@@ -136,10 +144,11 @@ describe('lookupOrdersByPhone', () => {
       row({ order_number: '1042' }),
       row({ order_number: '1043', fulfillment_status: null, status: 'open' }),
     ] as any);
-    const out = await lookupOrdersByPhone('acc-1', '972501234567');
-    expect(out).toHaveLength(2);
-    expect(out.map((o) => o.orderNumber)).toEqual(['1042', '1043']);
-    expect(out[1].status).toBe('open'); // falls back to row.status when fulfillment_status is null
+    const res = await lookupOrdersByPhone('acc-1', whatsappIdentity('972501234567'));
+    if (res.kind !== 'found') throw new Error('expected found');
+    expect(res.orders).toHaveLength(2);
+    expect(res.orders.map((o) => o.orderNumber)).toEqual(['1042', '1043']);
+    expect(res.orders[1].status).toBe('open'); // falls back to row.status when fulfillment_status is null
     expect(findBrandOrdersByPhone).toHaveBeenCalledWith('acc-1', '972501234567');
   });
 
@@ -149,7 +158,58 @@ describe('lookupOrdersByPhone', () => {
     vi.mocked(findBrandOrdersByPhone).mockResolvedValueOnce([
       row({ order_number: '16689', status: 'cancelled', fulfillment_status: 'unfulfilled' }),
     ] as any);
-    const out = await lookupOrdersByPhone('acc-1', '972501234567');
-    expect(out[0].status).toBe('cancelled');
+    const res = await lookupOrdersByPhone('acc-1', whatsappIdentity('972501234567'));
+    if (res.kind !== 'found') throw new Error('expected found');
+    expect(res.orders[0].status).toBe('cancelled');
+  });
+});
+
+describe('lookupOrder trust gating (spec §2 — CS engine)', () => {
+  beforeEach(() => {
+    H.row = null; H.pull = null; H.config = {};
+    vi.mocked(findBrandOrderByNumber).mockClear();
+    vi.mocked(findBrandOrdersByPhone).mockClear();
+  });
+
+  it('unverified identity → identity_required BEFORE any data is touched', async () => {
+    H.row = row();
+    const out = await lookupOrder('acc-1', '1042', widgetClaim(undefined));
+    expect(out.kind).toBe('identity_required');
+    expect(findBrandOrderByNumber).not.toHaveBeenCalled();
+  });
+
+  it('GUEST-CHECKOUT-ON-WIDGET: no-phone order + claimed phone → escalate, never found', async () => {
+    // The leak this whole design exists to prevent: a widget visitor who guesses an order
+    // number must NOT see a guest-checkout order (reveal-when-absent is WhatsApp-only).
+    H.row = row({ customer_phone: null }); H.pull = pull({ customerPhone: null });
+    const out = await lookupOrder('acc-1', '1042', widgetClaim('0501234567'));
+    expect(out.kind).toBe('escalate');
+  });
+
+  it('claimed phone matching the order phone → found', async () => {
+    H.row = row(); H.pull = pull(); // order phone 0501234567
+    const out = await lookupOrder('acc-1', '1042', widgetClaim('+972501234567'));
+    expect(out.kind).toBe('found');
+  });
+
+  it('claimed phone that does NOT match → unverified', async () => {
+    H.row = row(); H.pull = pull({ customerPhone: '0509999999' });
+    const out = await lookupOrder('acc-1', '1042', widgetClaim('0501234567'));
+    expect(out.kind).toBe('unverified');
+  });
+
+  it('test_numbers QA bypass does NOT apply to claimed identities (WhatsApp-only affordance)', async () => {
+    H.row = row(); H.pull = pull({ customerPhone: '0509999999' });
+    H.config = { whatsapp_cs: { test_numbers: ['0501234567'] } };
+    const out = await lookupOrder('acc-1', '1042', widgetClaim('0501234567'));
+    expect(out.kind).toBe('unverified');
+  });
+
+  it('lookupOrdersByPhone: unverified → identity_required; claimed → searches by the CLAIMED phone', async () => {
+    expect((await lookupOrdersByPhone('acc-1', widgetClaim(undefined))).kind).toBe('identity_required');
+    vi.mocked(findBrandOrdersByPhone).mockResolvedValueOnce([row()] as any);
+    const res = await lookupOrdersByPhone('acc-1', widgetClaim('0501234567'));
+    expect(res.kind).toBe('found');
+    expect(findBrandOrdersByPhone).toHaveBeenCalledWith('acc-1', '0501234567');
   });
 });

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { whatsappIdentity } from '@/lib/cs/identity';
 
 const findBrandOrderByNumber = vi.fn();
 const pull = vi.fn();
@@ -25,28 +26,28 @@ describe('lookupOrder phone-verify', () => {
   it('returns not_found when brand_orders has no row', async () => {
     findBrandOrderByNumber.mockResolvedValueOnce(null);
     const { lookupOrder } = await import('@/lib/orders/lookup');
-    const r = await lookupOrder('a1', '1042', '972501234567');
+    const r = await lookupOrder('a1', '1042', whatsappIdentity('972501234567'));
     expect(r.kind).toBe('not_found');
   });
 
   it('found when order phone matches the sender', async () => {
     pull.mockResolvedValue({ orderNumber: '1042', customerPhone: '0501234567', lineItems: [], status: 'open' });
     const { lookupOrder } = await import('@/lib/orders/lookup');
-    const r = await lookupOrder('a1', '1042', '972501234567');
+    const r = await lookupOrder('a1', '1042', whatsappIdentity('972501234567'));
     expect(r.kind).toBe('found');
   });
 
   it('unverified when order phone does NOT match the sender', async () => {
     pull.mockResolvedValue({ orderNumber: '1042', customerPhone: '0509999999', lineItems: [], status: 'open' });
     const { lookupOrder } = await import('@/lib/orders/lookup');
-    const r = await lookupOrder('a1', '1042', '972501234567');
+    const r = await lookupOrder('a1', '1042', whatsappIdentity('972501234567'));
     expect(r.kind).toBe('unverified');
   });
 
   it('found (revealed) when the order carries no phone', async () => {
     pull.mockResolvedValue({ orderNumber: '1042', customerPhone: null, lineItems: [], status: 'open' });
     const { lookupOrder } = await import('@/lib/orders/lookup');
-    const r = await lookupOrder('a1', '1042', '972501234567');
+    const r = await lookupOrder('a1', '1042', whatsappIdentity('972501234567'));
     expect(r.kind).toBe('found');
   });
 });

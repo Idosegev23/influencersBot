@@ -5,7 +5,8 @@ import './connectors/shopify';
 import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { getConnector } from './connectors/registry';
 import { findBrandOrderByNumber, findBrandOrdersByPhone, upsertBrandOrder, type BrandOrderRow } from './brand-orders';
-import { phoneMatches } from './phone-verify';
+import { verifyOrderAccess } from './phone-verify';
+import { identityPhone, type CsIdentity } from '@/lib/cs/identity';
 import { toWaId } from '@/lib/whatsapp-cloud/client';
 import type { NormalizedLineItem, NormalizedOrder, OrderConnectorCreds, StorePlatform } from './connectors/types';
 import type { OrderLookupResult } from '@/lib/shopify/order-lookup';
@@ -16,7 +17,9 @@ export type OrderLookupOutcome =
   | (OrderLookupResult & { kind: 'found'; lineItems?: NormalizedLineItem[]; shipment?: FocusCustomerStatusView | null })
   | { kind: 'not_found' }
   | { kind: 'ambiguous' }
-  | { kind: 'unverified' };
+  | { kind: 'unverified' }         // phone mismatch — ask the shopper to double-check the number
+  | { kind: 'identity_required' }  // unverified identity — collect phone + order number first (spec §2)
+  | { kind: 'escalate' };          // no-phone order under a CLAIMED identity — human, never reveal
 
 async function loadConfig(accountId: string): Promise<any> {
   const { data, error } = await supabaseAdmin.from('accounts').select('config').eq('id', accountId).single();
@@ -93,7 +96,10 @@ function isTestNumber(config: any, senderPhone: string): boolean {
   return list.some((n: any) => toWaId(String(n)) === s);
 }
 
-export async function lookupOrder(accountId: string, orderNumber: string, senderPhone: string): Promise<OrderLookupOutcome> {
+export async function lookupOrder(accountId: string, orderNumber: string, identity: CsIdentity): Promise<OrderLookupOutcome> {
+  // Trust gate BEFORE any data is touched: an unverified identity has nothing to match against,
+  // so neither the cache row nor the live connector may be consulted (spec §2).
+  if (identity.trust !== 'channel_verified' && !identityPhone(identity)) return { kind: 'identity_required' };
   const row = await findBrandOrderByNumber(accountId, orderNumber);
   if (!row || !row.source_platform) return { kind: 'not_found' };
 
@@ -114,7 +120,14 @@ export async function lookupOrder(accountId: string, orderNumber: string, sender
   }
 
   const orderPhone = fresh?.customerPhone ?? row.customer_phone;
-  if (!isTestNumber(config, senderPhone) && !phoneMatches(orderPhone, senderPhone)) return { kind: 'unverified' };
+  // Test-number QA bypass stays a WhatsApp-only affordance: the allowlist holds WA numbers.
+  const bypass = identity.channel === 'whatsapp' && isTestNumber(config, identity.waId);
+  if (!bypass) {
+    const verdict = verifyOrderAccess(orderPhone, identity);
+    if (verdict === 'identity_required') return { kind: 'identity_required' };
+    if (verdict === 'escalate') return { kind: 'escalate' };
+    if (verdict === 'mismatch') return { kind: 'unverified' };
+  }
 
   const normalized: NormalizedOrder = fresh ?? {
     orderNumber: row.order_number || orderNumber,
@@ -139,9 +152,13 @@ export async function lookupOrder(accountId: string, orderNumber: string, sender
 // bounded for cost) so the bot can show each order's contents; the pull result is cached for next time.
 const BY_PHONE_ENRICH = 5;
 
-export async function lookupOrdersByPhone(accountId: string, senderPhone: string): Promise<OrderLookupResult[]> {
-  const rows = await findBrandOrdersByPhone(accountId, senderPhone);
-  if (!rows.length) return [];
+export async function lookupOrdersByPhone(accountId: string, identity: CsIdentity): Promise<{ kind: 'identity_required' } | { kind: 'found'; orders: OrderLookupResult[] }> {
+  // Same trust gate as lookupOrder: a claimed identity searches by its CLAIMED phone (any order
+  // found this way carries that phone by construction); no phone at all → refuse (spec §2).
+  const phone = identityPhone(identity);
+  if (!phone) return { kind: 'identity_required' };
+  const rows = await findBrandOrdersByPhone(accountId, phone);
+  if (!rows.length) return { kind: 'found', orders: [] };
   const sorted = [...rows].sort((a, b) => (Date.parse(b.placed_at || '') || 0) - (Date.parse(a.placed_at || '') || 0));
   const config = await loadConfig(accountId);
 
@@ -156,7 +173,7 @@ export async function lookupOrdersByPhone(accountId: string, senderPhone: string
     return null;
   }));
 
-  return sorted.map((r: BrandOrderRow, i) => ({
+  return { kind: 'found', orders: sorted.map((r: BrandOrderRow, i) => ({
     found: true,
     orderNumber: r.order_number || undefined,
     status: displayStatus(r.status, r.fulfillment_status),
@@ -165,5 +182,5 @@ export async function lookupOrdersByPhone(accountId: string, senderPhone: string
     itemSummary: items[i]?.length ? itemSummary(items[i]!) : undefined,
     trackingNumbers: r.tracking_number ? [r.tracking_number] : undefined,
     trackingUrls: r.tracking_url ? [r.tracking_url] : undefined,
-  }));
+  })) };
 }

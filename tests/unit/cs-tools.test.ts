@@ -89,8 +89,19 @@ describe('CS tools', () => {
     expect(unbound.ok).toBe(false);
     lookupOrder.mockResolvedValue({ kind: 'found', found: true, orderNumber: '1042', status: 'נשלח' });
     const bound = await (await tool('lookup_order')).handler({ orderNumber: '1042' }, ctx({ accountId: 'acc-1' }));
-    expect(lookupOrder).toHaveBeenCalledWith('acc-1', '1042', '972501112222');
+    expect(lookupOrder).toHaveBeenCalledWith('acc-1', '1042',
+      expect.objectContaining({ channel: 'whatsapp', waId: '972501112222', trust: 'channel_verified' }));
     expect((bound.data as any).kind).toBe('found');
+  });
+
+  it('lookup_orders_by_phone passes the identity and surfaces identity_required as data', async () => {
+    lookupOrdersByPhone.mockResolvedValue({ kind: 'found', orders: [{ orderNumber: '1042', status: 'fulfilled', total: '199.00', itemSummary: '2× Argan Oil', trackingUrls: ['https://t/1'] }] });
+    const r = await (await tool('lookup_orders_by_phone')).handler({}, ctx({ accountId: 'acc-1' }));
+    expect(lookupOrdersByPhone).toHaveBeenCalledWith('acc-1', expect.objectContaining({ channel: 'whatsapp' }));
+    expect((r.data as any).orders[0]).toMatchObject({ orderNumber: '1042', trackingUrl: 'https://t/1' });
+    lookupOrdersByPhone.mockResolvedValue({ kind: 'identity_required' });
+    const gated = await (await tool('lookup_orders_by_phone')).handler({}, ctx({ accountId: 'acc-1' }));
+    expect((gated.data as any).kind).toBe('identity_required');
   });
 
   it('escalate_to_human GATE: pauses the bot + notifies + returns escalated', async () => {
