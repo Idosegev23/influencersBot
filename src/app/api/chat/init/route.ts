@@ -51,6 +51,10 @@ export async function GET(request: Request) {
     let greeting: string;
     let quickReplies: string[];
     const topicSuggestions: string[] = [];
+    // Coupon/price fillers make no sense for service orgs and public bodies
+    const hasCommercialSuggestions =
+      !['service_provider', 'government_ministry'].includes(config.archetype) &&
+      config.coupons_disabled !== true;
 
     if (isMediaNews) {
       // Media/News accounts: greeting with hot topics
@@ -104,7 +108,7 @@ export async function GET(request: Request) {
           const topTopics = persona.knowledge_map.coreTopics.slice(0, 3);
           quickReplies.push(...topTopics.map((t: any) => `ספר/י לי על ${t.name}`));
         }
-        quickReplies.push('יש קופונים?');
+        quickReplies.push(hasCommercialSuggestions ? 'יש קופונים?' : 'ספרו לי עוד');
       }
 
       // Build topic-based suggestion pool for fast follow-ups
@@ -120,7 +124,10 @@ export async function GET(request: Request) {
           }
         }
       }
-      topicSuggestions.push('יש קופון הנחה?', 'מה הכי שווה עכשיו?', 'ספרו לי עוד');
+      if (hasCommercialSuggestions) {
+        topicSuggestions.push('יש קופון הנחה?', 'מה הכי שווה עכשיו?');
+      }
+      topicSuggestions.push('ספרו לי עוד');
     }
 
     // Load partnerships count for marketing disclaimer
