@@ -26,6 +26,7 @@ import {
 import { applyActiveCouponFilter } from '@/lib/coupons/active-filter';
 import { claimDmMessage, resolveSenderIdentity, formatContactLabel } from './dm-guards';
 import { runEscalationCheck } from '@/engines/escalation/dispatch';
+import { runLeadCaptureCheck, leadDiggingInstruction } from '@/engines/escalation/lead-capture';
 
 // ============================================
 // Types
@@ -160,9 +161,11 @@ export async function processInstagramGraphDM(
 
     // Resolve WHO we're talking to and hand it to the model — without this the bot
     // speaks generically and can't tell a brand/collab DM from a fan. Best-effort:
-    // a failure or unknown identity must never block the reply.
+    // a failure or unknown identity must never block the reply. Kept in scope for
+    // the lead-capture check below (the brief email links the IG profile).
+    let contact: { name?: string; username?: string } | null = null;
     try {
-      const contact = await resolveSenderIdentity(senderId, accessToken || undefined);
+      contact = await resolveSenderIdentity(senderId, accessToken || undefined);
       const contactLabel = formatContactLabel(contact);
       if (contactLabel) {
         conversationHistory.unshift({
@@ -172,6 +175,15 @@ export async function processInstagramGraphDM(
       }
     } catch {
       // identity is best-effort
+    }
+
+    // Lead-capture accounts get the "digging" behavior (Yoav: בוט חופר ולא חכם):
+    // answer briefly, qualify with ONE question per turn until a brief can be sent.
+    if (config.lead_capture?.enabled === true) {
+      conversationHistory.unshift({
+        role: 'assistant' as const,
+        content: leadDiggingInstruction(config.display_name || config.username || 'העסק'),
+      });
     }
 
     // 5. Process through SandwichBot — SAME engine as widget, social, and Respond.io DM
@@ -258,6 +270,16 @@ export async function processInstagramGraphDM(
       userMessage: messageText,
       source: 'dm',
     }).catch((e: any) => console.error('[escalation] dm hook failed:', e?.message || e));
+
+    // 6e. Lead-capture check — same fire-and-forget contract as escalation. No-op
+    // unless config.lead_capture.enabled; emails a structured brief once the
+    // qualifying questions gathered enough (see engines/escalation/lead-capture.ts).
+    runLeadCaptureCheck({
+      accountId,
+      sessionId: sessionUUID,
+      userMessage: messageText,
+      contact,
+    }).catch((e: any) => console.error('[lead-capture] dm hook failed:', e?.message || e));
 
     // 7. Save messages + update session
     const msgCount = (session?.message_count || 0) + 2;

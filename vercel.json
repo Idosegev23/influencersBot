@@ -6,6 +6,10 @@
       "schedule": "0 * * * *"
     },
     {
+      "path": "/api/cron/ig-lead-flush",
+      "schedule": "50 * * * *"
+    },
+    {
       "path": "/api/cron/quickshop-cart-sync",
       "schedule": "17 * * * *"
     },

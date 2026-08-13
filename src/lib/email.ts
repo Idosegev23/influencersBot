@@ -58,18 +58,22 @@ function getAuthClient() {
 
 // ── Email Builder ──
 
-function buildRawEmail(options: {
+// Exported for unit tests (header assertions without hitting the Gmail API).
+export function buildRawEmail(options: {
   to: string | string[];
+  cc?: string | string[];
   subject: string;
   html: string;
   from?: string;
 }): string {
   const to = Array.isArray(options.to) ? options.to.join(', ') : options.to;
+  const cc = Array.isArray(options.cc) ? options.cc.join(', ') : options.cc;
   const from = options.from || `BestieAI <${SEND_FROM}>`;
 
   const messageParts = [
     `From: ${from}`,
     `To: ${to}`,
+    ...(cc ? [`Cc: ${cc}`] : []),
     `Subject: =?UTF-8?B?${Buffer.from(options.subject).toString('base64')}?=`,
     'MIME-Version: 1.0',
     'Content-Type: text/html; charset=UTF-8',
@@ -87,18 +91,21 @@ function buildRawEmail(options: {
 
 function buildRawEmailWithAttachments(options: {
   to: string | string[];
+  cc?: string | string[];
   subject: string;
   html: string;
   from?: string;
   attachments: { filename: string; content: Buffer; mimeType: string }[];
 }): string {
   const to = Array.isArray(options.to) ? options.to.join(', ') : options.to;
+  const cc = Array.isArray(options.cc) ? options.cc.join(', ') : options.cc;
   const from = options.from || `BestieAI <${SEND_FROM}>`;
   const boundary = `=_Part_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
   const parts: string[] = [
     `From: ${from}`,
     `To: ${to}`,
+    ...(cc ? [`Cc: ${cc}`] : []),
     `Subject: =?UTF-8?B?${Buffer.from(options.subject).toString('base64')}?=`,
     'MIME-Version: 1.0',
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
@@ -137,6 +144,7 @@ function buildRawEmailWithAttachments(options: {
 
 export interface SendEmailOptions {
   to: string | string[];
+  cc?: string | string[];
   subject: string;
   html: string;
 }
