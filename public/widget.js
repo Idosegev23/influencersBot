@@ -230,6 +230,13 @@
         actionPrompt: 'רוצה לתאם דמו?',
         actionOpen: 'תיאום דמו',
       },
+      teaser: {
+        generic: 'יש לך שאלה? אני כאן 🙂',
+        cs: 'צריך/ה עזרה עם הזמנה או כל דבר אחר? 🙂',
+        product: 'שאלה על ״{product}״? אשמח לעזור',
+        close: 'סגירת הצעת הצ׳אט',
+        open: 'פתיחת צ׳אט',
+      },
       cs: {
         choiceCs: 'שירות לקוחות 🛟',
         choiceContent: 'לשוחח עם {brand} 💬',
@@ -360,6 +367,13 @@
         successBody: "We'll reach out within one business day to schedule.",
         actionPrompt: 'Want to book a demo?',
         actionOpen: 'Book demo',
+      },
+      teaser: {
+        generic: 'Got a question? I\'m here 🙂',
+        cs: 'Need help with an order or anything else? 🙂',
+        product: 'A question about "{product}"? Happy to help',
+        close: 'Dismiss chat suggestion',
+        open: 'Open chat',
       },
       cs: {
         choiceCs: 'Customer service 🛟',
@@ -1492,8 +1506,11 @@
   // ---- Closed state: blob only ----
   function renderClosed() {
     panelPainted = false;   // next open should slide the panel up again
+    // The launcher is a real button for keyboard + screen-reader users (a11y review
+    // 2026-08-13): accessible name, Tab-focusable, Enter/Space activation, aria-expanded.
     container.innerHTML =
-      '<div id="ibot-trigger" style="' +
+      '<div id="ibot-trigger" role="button" tabindex="0" aria-expanded="false" ' +
+      'aria-label="' + escapeHtml((locale.teaser && locale.teaser.open) || 'Open chat') + '" style="' +
       'width:60px;height:60px;cursor:pointer;' +
       'transition:transform 0.3s ease, opacity 0.25s ease;animation:ibot-slide-up 0.35s ease-out;' +
       'border-radius:50%;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.1);">' +
@@ -1501,12 +1518,17 @@
       '</div>';
 
     var trigger = document.getElementById('ibot-trigger');
-    trigger.onclick = function () {
+    var openFromTrigger = function () {
       isOpen = true;
       inputTouched = false;   // fresh open → no keyboard until the user taps the input
       try { markTooltipSeen(); } catch (e) {}
+      try { removeTeaser(); } catch (e) {}
       widgetTrack('widget_opened', {});
       render();
+    };
+    trigger.onclick = openFromTrigger;
+    trigger.onkeydown = function (e) {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); openFromTrigger(); }
     };
     trigger.onmouseover = function () { this.style.transform = 'scale(1.03)'; };
     trigger.onmouseout = function () { this.style.transform = 'scale(1)'; };
@@ -3534,14 +3556,73 @@
     if (Date.now() - proactiveLastFired < PROACTIVE_COOLDOWN_MS) return false;
     return true;
   }
+
+  // ---- Accessible proactive TEASER (a11y review 2026-08-13) ----
+  // Proactive engagement never opens the full window anymore — an auto-opening panel
+  // steals context (WCAG 3.2.x spirit), covers content on mobile, and is the classic
+  // accessibility-lawsuit screenshot. Instead we show a small teaser bubble by the
+  // launcher (the Zendesk/Intercom pattern): announced politely to screen readers,
+  // zero focus theft, ESC/X dismissible, no auto-vanish timer, dismissal remembered
+  // permanently, reduced-motion respected. Clicking it opens the chat — a user action.
+  var TEASER_OFF_KEY = 'ibot_teaser_off_' + ACCOUNT_ID;
+  function teaserDismissedForever() { try { return localStorage.getItem(TEASER_OFF_KEY) === '1'; } catch (e) { return true; } }
+  function removeTeaser() {
+    var el = document.getElementById('ibot-teaser');
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+    document.removeEventListener('keydown', teaserEscHandler);
+  }
+  function teaserEscHandler(e) { if (e.key === 'Escape' || e.key === 'Esc') window.__ibotTeaserDismiss(); }
+  window.__ibotTeaserDismiss = function () {
+    try { localStorage.setItem(TEASER_OFF_KEY, '1'); } catch (e) { /* */ }
+    removeTeaser();
+    widgetTrack('widget_teaser_dismissed', {});
+  };
+  window.__ibotTeaserOpen = function () {
+    removeTeaser();
+    widgetTrack('widget_teaser_clicked', {});
+    isOpen = true;
+    inputTouched = false;
+    render();
+  };
+  function showProactiveTeaser(reason) {
+    try {
+      if (isOpen || teaserDismissedForever()) return;
+      if (document.getElementById('ibot-teaser')) return;
+      var ctx = pageContext || {};
+      var text = (ctx.product && ctx.product.name)
+        ? locale.teaser.product.replace('{product}', String(ctx.product.name).slice(0, 40))
+        : (modules.customerService.enabled ? locale.teaser.cs : locale.teaser.generic);
+      var side = (config.position === 'bottom-left') ? 'left:20px;' : 'right:20px;';
+      var reduced = false;
+      try { reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { /* */ }
+      var el = document.createElement('div');
+      el.id = 'ibot-teaser';
+      // role=status + aria-live=polite: screen readers announce WITHOUT moving focus.
+      el.setAttribute('role', 'status');
+      el.setAttribute('aria-live', 'polite');
+      el.style.cssText = 'position:fixed;z-index:2147483646;bottom:calc(92px + env(safe-area-inset-bottom));' + side +
+        'max-width:min(78vw,300px);background:var(--ibot-panel-bg,#fff);color:var(--ibot-text-primary,#111);' +
+        'border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,0.18);padding:6px 8px;font-size:13.5px;line-height:1.35;' +
+        'direction:' + locale.dir + ';display:flex;gap:4px;align-items:center;' +
+        (reduced ? '' : 'animation:ibot-slide-up 0.3s ease-out;');
+      el.innerHTML =
+        '<button onclick="window.__ibotTeaserOpen()" aria-label="' + escapeHtml(locale.teaser.open) + '" ' +
+          'style="background:transparent;border:none;cursor:pointer;font-family:inherit;font-size:inherit;line-height:inherit;color:inherit;text-align:' + (locale.dir === 'rtl' ? 'right' : 'left') + ';padding:6px;flex:1;min-width:0;">' +
+          escapeHtml(text) + '</button>' +
+        '<button onclick="window.__ibotTeaserDismiss()" aria-label="' + escapeHtml(locale.teaser.close) + '" ' +
+          'style="background:transparent;border:none;color:var(--ibot-text-muted,#888);cursor:pointer;font-size:18px;line-height:1;flex-shrink:0;padding:6px;min-width:32px;min-height:32px;">&times;</button>';
+      document.body.appendChild(el);
+      document.addEventListener('keydown', teaserEscHandler);
+      widgetTrack('widget_teaser_shown', { reason: reason });
+      // NO auto-vanish timer (WCAG 2.2.1): the teaser stays until dismissed or clicked.
+    } catch (e) { /* never break host page */ }
+  }
+
   function fireProactive(reason) {
-    if (!canFireProactive()) return;
+    if (!canFireProactive() || teaserDismissedForever()) return;
     proactiveLastFired = Date.now();
     try { localStorage.setItem('ibot_proactive_' + ACCOUNT_ID, String(proactiveLastFired)); } catch (e) { /* */ }
-    widgetTrack('widget_proactive_opened', { reason: reason });
-    isOpen = true;
-    inputTouched = false;   // proactive open → no keyboard until the user taps the input
-    render();
+    showProactiveTeaser(reason);
   }
 
   function armProactiveTriggers() {
