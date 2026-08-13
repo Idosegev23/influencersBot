@@ -355,7 +355,6 @@ export default function PrivacyPage() {
                 {[
                   { name: 'OpenAI', use: 'צ\'אטבוט ראשי', link: 'https://openai.com/policies/privacy-policy' },
                   { name: 'Google Gemini', use: 'ניתוח תמונות וסרטונים', link: 'https://ai.google.dev/gemini-api/terms' },
-                  { name: 'Anthropic Claude', use: 'ניתוח מסמכים (גיבוי)', link: 'https://www.anthropic.com/privacy' },
                 ].map(({ name, use, link }) => (
                   <a key={name} href={link} target="_blank" rel="noopener noreferrer"
                     className="p-3 bg-white/[0.03] border border-white/5 rounded-xl hover:border-indigo-500/30 transition-colors block">
@@ -385,8 +384,9 @@ export default function PrivacyPage() {
                   <ul className="text-sm list-disc list-inside space-y-1">
                     <li><strong className="text-white">Supabase</strong> — בסיס נתונים ואימות</li>
                     <li><strong className="text-white">Vercel</strong> — אחסון והרצת האתר</li>
+                    <li><strong className="text-white">Cloudflare</strong> — DNS ותשתית רשת</li>
                     <li><strong className="text-white">Upstash</strong> — מטמון והגבלת קצב</li>
-                    <li><strong className="text-white">OpenAI, Google, Anthropic</strong> — עיבוד AI (צ׳אט, ניתוח מסמכים, תמלול)</li>
+                    <li><strong className="text-white">OpenAI, Google</strong> — עיבוד AI (צ׳אט, ניתוח מסמכים, תמלול)</li>
                     <li><strong className="text-white">Meta</strong> — Instagram Graph API ו-WhatsApp Cloud API להפעלת ערוצי ההודעות</li>
                     <li><strong className="text-white">Apify</strong> — איסוף תוכן ציבורי מאינסטגרם</li>
                     <li><strong className="text-white">Google Workspace</strong> — שמירת פניות שנשלחו דרך טפסי האתר ושליחתן בדוא״ל</li>
