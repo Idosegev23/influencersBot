@@ -46,7 +46,10 @@ const ARCHETYPE_TRIGGERS: Record<ArchetypeType, string[]> = {
   ],
 
   parenting: [
-    'ילד', 'תינוק', 'בייבי', 'שינה', 'גמילה', 'מוצץ',
+    // NOTE: bare 'שינה' deliberately absent — adult sleep is a product question
+    // (supplements, mattresses) on many brand accounts; baby-sleep messages
+    // virtually always carry תינוק/ילד/בייבי anyway.
+    'ילד', 'תינוק', 'בייבי', 'גמילה', 'מוצץ',
     'עגלת תינוק', 'מיטת תינוק', 'חיתול', 'הנקה', 'בקבוק', 'פורמולה',
     'גן', 'משחקים', 'התפתחות', 'הליכה', 'דיבור',
   ],

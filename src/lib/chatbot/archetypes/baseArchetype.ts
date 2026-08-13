@@ -66,8 +66,12 @@ export abstract class BaseArchetype {
     // 1. Check guardrails first
     const triggeredGuardrails = this.checkGuardrails(input.userMessage);
     
-    // If critical guardrail triggered, block and return safety message
-    const criticalGuardrail = triggeredGuardrails.find(g => g.severity === 'critical');
+    // If critical guardrail triggered, block and return safety message.
+    // Only rules authored as action:'block' may block — a critical severity on a
+    // 'warn' rule (e.g. parenting SIDS) means "always append the warning", not
+    // "refuse the question". Blocking on severity alone turned every message
+    // containing a warn-keyword into a hard refusal.
+    const criticalGuardrail = triggeredGuardrails.find(g => g.severity === 'critical' && g.action === 'block');
     if (criticalGuardrail) {
       const rule = this.definition.guardrails.find(r => r.id === criticalGuardrail.ruleId);
       const blockedFallback = (input.accountContext.language || 'he').toLowerCase() === 'en'

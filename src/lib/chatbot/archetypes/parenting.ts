@@ -11,7 +11,9 @@ const PARENTING_GUARDRAILS: GuardrailRule[] = [
     id: 'sids-prevention',
     description: 'בטיחות שינה - מניעת SIDS',
     triggers: {
-      keywords: ['מיטת תינוק', 'שינה', 'בובות במיטה', 'שמיכה'],
+      // Baby-sleep-specific phrases only — bare 'שינה' also matches adult sleep
+      // questions (supplements, mattresses…) and must not drag the SIDS warning in.
+      keywords: ['מיטת תינוק', 'שינת תינוק', 'שינה של התינוק', 'בובות במיטה', 'שמיכה לתינוק'],
     },
     action: 'warn',
     warningMessage: '⚠️ בטיחות שינה זה קודש! [שם המשפיענית] תמיד מקפידה על מיטה ריקה לפי הנחיות משרד הבריאות - ללא בובות, שמיכות או כריות עד גיל שנה.',
