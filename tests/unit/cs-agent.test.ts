@@ -307,4 +307,40 @@ describe('runCsTurn (brain-led loop)', () => {
     expect(res.reply.kind).toBe('text');
     expect(sessionLoadCalls).toContainEqual(['whatsapp', '972501112222']);
   });
+
+  // --- CS-engine M2 (spec §5, §7): web-channel readiness ---
+
+  const widgetInput = (over: any = {}) => ({
+    identity: { channel: 'widget', visitorId: 'v-77', trust: 'unverified' },
+    text: 'איפה ההזמנה שלי?',
+    boundAccountId: 'acc-1',
+    ...over,
+  } as any);
+
+  it('boundAccountId auto-binds a fresh web session — first turn is already brand-scoped (spec §5)', async () => {
+    callModel.mockResolvedValueOnce({ toolCalls: [], text: 'היי!' });
+    const { runCsTurnCore } = await import('@/lib/cs/cs-agent');
+    await runCsTurnCore(widgetInput(), { callModel });
+    expect(store['v-77'].active_account_id).toBe('acc-1');
+    expect(store['v-77'].active_chat_session_id).toBeTruthy();
+  });
+
+  it('claimedPhone upgrades the identity to phone_claimed, persists on the session, and survives the NEXT turn (spec §7)', async () => {
+    const seenIdentities: any[] = [];
+    handlers['lookup_orders_by_phone'] = vi.fn().mockImplementation(async (_a: any, ctx: any) => { seenIdentities.push(ctx.identity); return { ok: true, data: { orders: [] } }; });
+    callModel
+      .mockResolvedValueOnce({ toolCalls: [{ id: 't1', name: 'lookup_orders_by_phone', args: {} }], text: null })
+      .mockResolvedValueOnce({ toolCalls: [], text: 'בדקתי!' });
+    const { runCsTurnCore } = await import('@/lib/cs/cs-agent');
+    await runCsTurnCore(widgetInput({ claimedPhone: '0501234567' }), { callModel });
+    expect(seenIdentities[0]).toMatchObject({ channel: 'widget', phone: '0501234567', trust: 'phone_claimed' });
+    expect(store['v-77'].context.claimedPhone).toBe('0501234567');
+
+    // Second turn WITHOUT claimedPhone — the stored phone still upgrades the identity.
+    callModel
+      .mockResolvedValueOnce({ toolCalls: [{ id: 't2', name: 'lookup_orders_by_phone', args: {} }], text: null })
+      .mockResolvedValueOnce({ toolCalls: [], text: 'שוב!' });
+    await runCsTurnCore(widgetInput(), { callModel });
+    expect(seenIdentities[1]).toMatchObject({ channel: 'widget', phone: '0501234567', trust: 'phone_claimed' });
+  });
 });

@@ -13,14 +13,16 @@ export async function openOrAttachCsTicket(input: {
   customerPhone: string;
   customerName: string | null;
   topic?: string;
+  source?: string; // channel ticket source (spec §8): whatsapp_cs (default) | widget_cs | web_cs | instagram_cs
 }): Promise<{ ticketId: string }> {
+  const source = input.source || 'whatsapp_cs';
   const wa = toWaId(input.customerPhone || input.waId);
 
   const { data: rows } = await supabase
     .from('support_requests')
     .select('id, status, customer_phone')
     .eq('account_id', input.accountId)
-    .eq('source', 'whatsapp_cs')
+    .eq('source', source)
     .order('updated_at', { ascending: false })
     .limit(20);
 
@@ -37,8 +39,8 @@ export async function openOrAttachCsTicket(input: {
       customer_phone: input.customerPhone,
       message: input.topic || 'פנייה בוואטסאפ',            // NOT NULL
       status: 'new',
-      source: 'whatsapp_cs',
-      metadata: { channel: 'whatsapp_cs', topic: input.topic || null },
+      source,
+      metadata: { channel: source, topic: input.topic || null },
     })
     .select('id')
     .single();

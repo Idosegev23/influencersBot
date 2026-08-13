@@ -18,7 +18,7 @@ import type { CsProductCard, CsToolCtx, CsToolResult, OpenAIFunctionDef } from '
 import { buildCsSystemPrompt, buildContextDigest, stripSuggestions, type CsRecentTurn } from '@/lib/cs/cs-context';
 import { laneModel } from '@/lib/llm/config';
 import { toWaId } from '@/lib/whatsapp-cloud/client';
-import { whatsappIdentity, identityKey, type CsIdentity } from '@/lib/cs/identity';
+import { whatsappIdentity, identityKey, withClaimedPhone, CS_TICKET_SOURCES, type CsIdentity } from '@/lib/cs/identity';
 import type { CsJob } from '@/lib/cs/wa-cs-queue';
 
 export interface CsTurnResult {
@@ -89,7 +89,7 @@ async function loadAccountMeta(accountId: string | null): Promise<{ config: any 
 async function loadOpenThreads(waId: string): Promise<Array<{ ticketId: string; brand: string; topic: string }>> {
   const { data } = await supabaseAdmin
     .from('support_requests').select('id, account_id, status, message, metadata, accounts(config)')
-    .eq('source', 'whatsapp_cs').in('customer_phone', phoneVariants(waId)).order('updated_at', { ascending: false }).limit(10);
+    .in('source', CS_TICKET_SOURCES).in('customer_phone', phoneVariants(waId)).order('updated_at', { ascending: false }).limit(10);
   return ((data as any[]) || []).filter((r) => !TERMINAL_TICKET.has(r.status)).map((r) => ({
     ticketId: r.id, brand: r.accounts?.config?.display_name || r.accounts?.config?.username || 'המותג', topic: r.metadata?.topic || r.message || 'פנייה',
   }));
@@ -164,6 +164,12 @@ export interface CsTurnInput {
   // Conversation mode as CONTEXT, not a route (spec §3): the opening-screen choice. Phrasing
   // and emphasis only — the brain may still cross over mid-conversation. WhatsApp always 'cs' in M1.
   mode?: 'cs' | 'content';
+  // Web channels (spec §5): the account IS the brand — bind it up-front, no bind_brand tool needed.
+  boundAccountId?: string;
+  // Lazy identity (spec §7): a phone the visitor just typed (details form). Persisted on the
+  // session so they are asked once, not once per conversation.
+  claimedPhone?: string;
+  language?: 'he' | 'en';
 }
 
 export async function runCsTurn(job: CsJob, depsOverride?: Partial<CsAgentDeps>): Promise<CsTurnResult> {
@@ -184,6 +190,21 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
   const img = input.image ?? null;
   const userMessage = (img ? (img.caption ? `[תמונה] ${img.caption}` : '[הלקוח/ה שלח/ה תמונה]') : (input.text || '')).trim();
   let session = (await loadCsSessionByChannel(channel, channelUserId)) || (await createCsSession(channelUserId, input.contactId ?? null));
+
+  // Effective identity (spec §7): a phone claimed THIS turn, or one stored on the session from an
+  // earlier turn, upgrades a claimed-channel identity to phone_claimed. WhatsApp is untouched.
+  const storedClaimedPhone = typeof (session.context as any)?.claimedPhone === 'string' ? (session.context as any).claimedPhone : undefined;
+  const identity = withClaimedPhone(input.identity, input.claimedPhone ?? storedClaimedPhone);
+
+  const ctx: CsToolCtx = { waId, accountId: session.active_account_id, chatSessionId: session.active_chat_session_id, ticketId: session.active_ticket_id, customerName: session.customer_name, identity, lastImageUrl: img?.url ?? null };
+
+  // Web channels (spec §5): the account IS the brand — bind up-front so the very first CS turn
+  // already speaks with the brand persona and every tool scopes correctly. The whatsapp_cs.enabled
+  // roster gate does not apply here: that gate curates the shared-number brand roster, while a web
+  // surface is embedded BY the account itself (cs_web.enabled is checked at the route).
+  if (input.boundAccountId && session.active_account_id !== input.boundAccountId) {
+    session = await applyBind(session, ctx, { accountId: input.boundAccountId });
+  }
 
   // Lightweight pre-bind memory (Task C6 follow-up, closes an opus-review finding): chat_messages
   // history only exists AFTER bind_brand, so pre-bind onboarding turns (greeting → "which brand?" →
@@ -232,11 +253,11 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
 
   // 4) Build the brand-grounded system prompt (persona + RAG + re-entry digest — NO scripted menu).
   const openThreads = await loadOpenThreads(waId);
-  const digest = await buildContextDigest(session, openThreads, input.mode ?? 'cs');
+  const digest = await buildContextDigest(session, openThreads, input.mode ?? 'cs', input.language ?? 'he');
   const system = await buildCsSystemPrompt({ accountId: session.active_account_id, userMessage, digest });
 
   // 5) Tool-calling loop.
-  const ctx: CsToolCtx = { waId, accountId: session.active_account_id, chatSessionId: session.active_chat_session_id, ticketId: session.active_ticket_id, customerName: session.customer_name, identity: input.identity, lastImageUrl: img?.url ?? null };
+  // ctx was built (and possibly bound) right after session load — see the auto-bind block above.
   // Archetype-aware toolset (spec §4): pre-bind (account null) = the full set, today's behavior;
   // post-bind the account's archetype + config decide what the model is even OFFERED.
   const toolset = buildCsToolset({
@@ -287,7 +308,9 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
   // the turn, following an escalation ack with product cards would read as selling to someone who
   // just reported a problem — so the cards are dropped, not sent.
   if (handedOff) cards = [];
-  await saveCsSession(session, { context: { ...(session.context || {}), recentTurns: recentTurns.slice(-8) }, last_activity_at: new Date().toISOString() });
+  const contextPatch: any = { ...(session.context || {}), recentTurns: recentTurns.slice(-8) };
+  if (input.claimedPhone?.trim()) contextPatch.claimedPhone = input.claimedPhone.trim(); // asked once, kept forever (spec §7)
+  await saveCsSession(session, { context: contextPatch, last_activity_at: new Date().toISOString() });
   if (session.active_chat_session_id) await persistTurn(session.active_chat_session_id, userMessage, replyBody, cards);
   return { reply: { kind: 'text', body: replyBody }, phase: session.phase, ...(cards.length ? { cards } : {}), ...(payloads.size ? { payloads: [...payloads.values()] } : {}) };
 }

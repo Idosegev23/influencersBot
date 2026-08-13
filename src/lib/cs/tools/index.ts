@@ -1,6 +1,6 @@
 import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { toWaId } from '@/lib/whatsapp-cloud/client';
-import { identityPhone } from '@/lib/cs/identity';
+import { identityPhone, ticketSourceFor, CS_TICKET_SOURCES } from '@/lib/cs/identity';
 import type { CsProductCard, CsTool, CsToolCtx, CsToolResult, OpenAIFunctionDef } from './types';
 
 const TERMINAL_TICKET = new Set(['resolved', 'closed', 'cancelled']);
@@ -13,7 +13,7 @@ function phoneVariants(waId: string): string[] {
 // Returning memory (§6 step #1): account_ids this shopper already engaged (open/closed whatsapp_cs tickets).
 async function previouslyEngagedAccountIds(waId: string): Promise<string[]> {
   const { data } = await supabaseAdmin
-    .from('support_requests').select('account_id').eq('source', 'whatsapp_cs').in('customer_phone', phoneVariants(waId));
+    .from('support_requests').select('account_id').in('source', CS_TICKET_SOURCES).in('customer_phone', phoneVariants(waId));
   return Array.from(new Set(((data as any[]) || []).map((r) => r.account_id).filter(Boolean)));
 }
 
@@ -21,7 +21,7 @@ async function previouslyEngagedAccountIds(waId: string): Promise<string[]> {
 async function openCsThreads(waId: string): Promise<Array<{ ticketId: string; brand: string; topic: string; status: string }>> {
   const { data } = await supabaseAdmin
     .from('support_requests').select('id, account_id, status, message, metadata, accounts(config)')
-    .eq('source', 'whatsapp_cs').in('customer_phone', phoneVariants(waId)).order('updated_at', { ascending: false }).limit(10);
+    .in('source', CS_TICKET_SOURCES).in('customer_phone', phoneVariants(waId)).order('updated_at', { ascending: false }).limit(10);
   return ((data as any[]) || []).filter((r) => !TERMINAL_TICKET.has(r.status)).map((r) => ({
     ticketId: r.id,
     brand: r.accounts?.config?.display_name || r.accounts?.config?.username || 'המותג',
@@ -115,7 +115,7 @@ const bindBrandTool: CsTool = {
     if (cfg?.whatsapp_cs?.enabled !== true) return { ok: false, data: { reason: 'brand_not_cs_enabled' } };
     const { openOrAttachCsTicket } = await import('@/lib/cs/cs-ticket'); // Phase D (D1)
     let ticketId: string | null = ctx.ticketId;
-    try { ticketId = (await openOrAttachCsTicket({ accountId, waId: ctx.waId, customerPhone: identityPhone(ctx.identity) ?? ctx.waId, customerName: ctx.customerName })).ticketId; }
+    try { ticketId = (await openOrAttachCsTicket({ accountId, waId: ctx.waId, customerPhone: identityPhone(ctx.identity) ?? ctx.waId, customerName: ctx.customerName, source: ticketSourceFor(ctx.identity) })).ticketId; }
     catch (e) { console.warn('[cs-tools] openOrAttachCsTicket failed', e); }
     return { ok: true, bind: { accountId, ticketId }, data: { brand: cfg.display_name || cfg.username || accountId, ticketId } };
   },
@@ -130,7 +130,7 @@ const openOrAttachTicketTool: CsTool = {
   async handler(args, ctx): Promise<CsToolResult> {
     if (!ctx.accountId) return { ok: false, data: { reason: 'no_brand_bound' } };
     const { openOrAttachCsTicket } = await import('@/lib/cs/cs-ticket'); // Phase D (D1)
-    const t = await openOrAttachCsTicket({ accountId: ctx.accountId, waId: ctx.waId, customerPhone: identityPhone(ctx.identity) ?? ctx.waId, customerName: ctx.customerName, topic: args?.topic });
+    const t = await openOrAttachCsTicket({ accountId: ctx.accountId, waId: ctx.waId, customerPhone: identityPhone(ctx.identity) ?? ctx.waId, customerName: ctx.customerName, topic: args?.topic, source: ticketSourceFor(ctx.identity) });
     return { ok: true, bind: { accountId: ctx.accountId, ticketId: t.ticketId }, data: { ticketId: t.ticketId } };
   },
 };

@@ -29,3 +29,27 @@ export function identityKey(id: CsIdentity): { channel: CsChannel; channelUserId
 export function whatsappIdentity(waId: string): CsIdentity {
   return { channel: 'whatsapp', waId, trust: 'channel_verified' };
 }
+
+/** support_requests.source per channel (spec §8). */
+export function ticketSourceFor(id: CsIdentity): string {
+  switch (id.channel) {
+    case 'whatsapp':  return 'whatsapp_cs';
+    case 'instagram': return 'instagram_cs';
+    case 'widget':    return 'widget_cs';
+    case 'web_chat':  return 'web_cs';
+  }
+}
+
+/** Every CS source across channels — thread listings match a person, not a channel (spec §8). */
+export const CS_TICKET_SOURCES = ['whatsapp_cs', 'instagram_cs', 'widget_cs', 'web_cs'];
+
+/**
+ * Lazy identity (spec §7): apply a claimed phone (just typed, or stored on the session) to a
+ * claimed-trust identity. WhatsApp identities pass through untouched — Meta already vouches.
+ */
+export function withClaimedPhone(id: CsIdentity, phone: string | null | undefined): CsIdentity {
+  if (id.channel === 'whatsapp') return id;
+  const clean = phone?.trim();
+  if (!clean) return id;
+  return { ...id, phone: clean, trust: 'phone_claimed' };
+}

@@ -64,6 +64,19 @@ describe('cs-ticket', () => {
     expect(row.message).toBeTruthy();       // NOT NULL fallback
   });
 
+  it('a widget_cs source rides both the source column and metadata.channel (spec §8)', async () => {
+    const sb = makeSupabase({ existing: [] });
+    vi.doMock('@/lib/supabase', () => ({ supabase: sb }));
+    const { openOrAttachCsTicket } = await import('@/lib/cs/cs-ticket');
+    await openOrAttachCsTicket({
+      accountId: 'acc-1', waId: 'v-77', customerPhone: '0501234567',
+      customerName: 'דנה', source: 'widget_cs',
+    });
+    const row = sb.inserts[0].row;
+    expect(row.source).toBe('widget_cs');
+    expect(row.metadata.channel).toBe('widget_cs');
+  });
+
   it('appendCsTicketHistory inserts one history row', async () => {
     const sb = makeSupabase({});
     vi.doMock('@/lib/supabase', () => ({ supabase: sb }));

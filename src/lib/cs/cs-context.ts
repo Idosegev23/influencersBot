@@ -18,6 +18,7 @@ export interface CsContextDigest {
   // Conversation mode as CONTEXT, not a route (CS-engine spec §3): the opening-screen choice.
   // 'cs' is the default; 'content' is only ever passed by the M2+ channel adapters.
   mode: 'cs' | 'content';
+  language: 'he' | 'en';
   openThreads: Array<{ ticketId: string; brand: string; topic: string }>;
   // Lightweight pre-bind memory (Task C6 follow-up): the last few exchanges, persisted on
   // whatsapp_cs_sessions.context.recentTurns by cs-agent.ts. chat_messages history only exists
@@ -34,6 +35,7 @@ export async function buildContextDigest(
   session: CsSessionRow,
   openThreads: Array<{ ticketId: string; brand: string; topic: string }>,
   mode: 'cs' | 'content' = 'cs',
+  language: 'he' | 'en' = 'he',
 ): Promise<CsContextDigest> {
   let boundBrand: string | null = null;
   let policy: string | null = null;
@@ -45,7 +47,7 @@ export async function buildContextDigest(
     policy = typeof p === 'string' && p.trim() ? p : null;
   }
   const recentTurns = Array.isArray((session.context as any)?.recentTurns) ? (session.context as any).recentTurns : [];
-  return { knownName: session.customer_name, boundBrand, warm: isWarm(session), mode, openThreads, recentTurns, policy };
+  return { knownName: session.customer_name, boundBrand, warm: isWarm(session), mode, language, openThreads, recentTurns, policy };
 }
 
 /**
@@ -69,6 +71,7 @@ export async function buildCsSystemPrompt(input: {
   lines.push('שיחה חופשית בלבד: אין כפתורים ואין רשימות בחירה (WhatsApp interactive) — כל תגובה היא טקסט רגיל. כל בחירה (מותג, המשך פנייה) נעשית בשיחה טבעית: את/ה שואל/ת, הלקוח/ה עונ/ה בטקסט חופשי, ואת/ה מבין/ה, מאשר/ת בפרוזה וממשיכ/ה.');
 
   if (digest.mode === 'content') lines.push('שים/י לב: הלקוח/ה בחר/ה לשוחח על התוכן — זו שיחת תוכן, לא פניית שירות. אם באמצע השיחה עולה בעיה או בקשת שירות, אפשר לטפל בה בטבעיות.');
+  if (digest.language === 'en') lines.push("Reply in English — this brand's audience is English-speaking. Keep the same warm, concise tone.");
 
   if (digest.knownName) lines.push(`שם הלקוח/ה: ${digest.knownName}. פנה/י אליו/ה בשם, ואל תשאל/י שוב לשם.`);
   else lines.push('שם הלקוח/ה עדיין לא ידוע — פתח/י בברכה קצרה וחמה ושאל/י בטבעיות איך קוראים ללקוח/ה (אפשר באותה נשימה עם שאלת המותג, למשל: "היי! אני בסטי 🙂 איך קוראים לך? ולאיזה מותג / עסק את/ה צריך/ה עזרה?"). ברגע שקיבלת שם — קרא/י ל-remember_name פעם אחת כדי לזכור אותו, ומאותו רגע פנה/י אליו/ה בשם.');
