@@ -44,3 +44,20 @@ export async function runWebCsTurn(p: WebCsTurnParams): Promise<WebCsTurnResult>
     payloads: turn.payloads ?? [],
   };
 }
+
+/**
+ * Run a CS turn and emit it through a channel's NDJSON stream. Both web routes use this so the
+ * event sequence is identical: delta (full reply) → payload × N → suggestions → done. Unknown
+ * event types are ignored by both clients today, so `payload`/`suggestions` are non-breaking.
+ */
+export async function emitWebCsEvents(
+  emit: (e: Record<string, any>) => void,
+  p: WebCsTurnParams,
+): Promise<WebCsTurnResult> {
+  const r = await runWebCsTurn(p);
+  if (r.text) emit({ type: 'delta', text: r.text });
+  for (const payload of r.payloads) emit({ type: 'payload', payload });
+  if (r.suggestions.length) emit({ type: 'suggestions', suggestions: r.suggestions });
+  emit({ type: 'done', sessionId: null, fullText: r.text, productCount: 0, intent: null, cs: true });
+  return r;
+}

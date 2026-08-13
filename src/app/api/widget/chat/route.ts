@@ -6,41 +6,9 @@
 import { NextRequest } from 'next/server';
 import { processWidgetMessage } from '@/lib/chatbot/widget-chat-handler';
 import { createClient } from '@/lib/supabase/server';
+import { emitWebCsEvents } from '@/lib/cs/web-adapter';
+import { getWidgetCorsHeaders as getCorsHeaders, isWidgetOriginAllowed as isOriginAllowed } from '@/lib/widget/cors';
 import type { ProductRecommendation } from '@/lib/recommendations/engine';
-
-// ============================================
-// CORS Headers
-// ============================================
-
-function getCorsHeaders(origin: string): Record<string, string> {
-  return {
-    'Access-Control-Allow-Origin': origin || '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Max-Age': '86400',
-  };
-}
-
-/**
- * Validate that the request origin matches the account's registered domain.
- * Allows: localhost (dev), vercel preview deploys, and the account's own domain.
- */
-function isOriginAllowed(origin: string, accountDomain?: string): boolean {
-  if (!origin || origin === 'null') return true; // server-side or file:// requests
-  try {
-    const url = new URL(origin);
-    // Always allow localhost / dev
-    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') return true;
-    // Allow our own domains (including the admin preview iframe which
-    // proxies the customer site under bestie.* subdomains).
-    if (url.hostname.endsWith('.vercel.app')
-      || url.hostname.endsWith('bestieai.co.il')
-      || url.hostname.endsWith('ldrsgroup.com')) return true;
-    // Allow the account's registered domain
-    if (accountDomain && url.hostname.endsWith(accountDomain.replace(/^www\./, ''))) return true;
-  } catch { /* invalid URL */ }
-  return false;
-}
 
 // ============================================
 // OPTIONS — CORS Preflight
@@ -153,6 +121,44 @@ export async function POST(req: NextRequest) {
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
         );
       }
+    }
+
+    // CS-engine mode (spec §5): when the visitor chose customer service AND the account has the
+    // flag, the turn runs through the CS brain (runCsTurnCore) instead of the sandwich bot.
+    // Flag off → mode is ignored and the request falls through to the sandwich path (parity).
+    const csTurn = body?.mode === 'cs' && cfg?.cs_web?.enabled === true;
+    if (csTurn && (typeof anonId !== 'string' || !anonId)) {
+      return new Response(
+        JSON.stringify({ error: 'anonId is required in cs mode' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+    if (csTurn) {
+      const csDetails = (body?.csDetails && typeof body.csDetails === 'object') ? body.csDetails : {};
+      const stream = new ReadableStream({
+        async start(controller) {
+          try {
+            controller.enqueue(encodeEvent({ type: 'meta', sessionId: sessionId || 'pending' }));
+            controller.enqueue(encodeEvent({ type: 'thinking', text: loc.thinking[Math.floor(Math.random() * loc.thinking.length)] }));
+            await emitWebCsEvents((e) => controller.enqueue(encodeEvent(e)), {
+              channel: 'widget',
+              accountId,
+              channelUserId: anonId,
+              text: String(message),
+              claimedPhone: typeof csDetails.phone === 'string' ? csDetails.phone : undefined,
+              language: accountLanguage === 'en' ? 'en' : 'he',
+            });
+          } catch (error: any) {
+            console.error('[Widget Chat] CS turn error:', error);
+            controller.enqueue(encodeEvent({ type: 'error', message: loc.errorProcessing }));
+          } finally {
+            controller.close();
+          }
+        },
+      });
+      return new Response(stream, {
+        headers: { ...corsHeaders, 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-cache', Connection: 'keep-alive' },
+      });
     }
 
     // Stream the response as NDJSON

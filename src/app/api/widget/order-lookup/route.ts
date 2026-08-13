@@ -12,15 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { lookupShopifyOrder, type ShopifyIntegrationConfig } from '@/lib/shopify/order-lookup';
-
-function cors(origin: string): Record<string, string> {
-  return {
-    'Access-Control-Allow-Origin': origin || '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Max-Age': '86400',
-  };
-}
+import { getWidgetCorsHeaders as cors, isWidgetOriginAllowed } from '@/lib/widget/cors';
 
 export async function OPTIONS(req: NextRequest) {
   return new Response(null, { status: 204, headers: cors(req.headers.get('origin') || '*') });
@@ -49,6 +41,19 @@ export async function POST(req: NextRequest) {
     }
 
     const cfg: any = account.config || {};
+
+    // Same origin allow-list as /api/widget/chat — this endpoint used to echo any origin.
+    const origin = req.headers.get('origin') || '';
+    if (origin && origin !== '*' && !isWidgetOriginAllowed(origin, cfg?.widget?.domain || cfg?.username)) {
+      return NextResponse.json({ error: 'Origin not allowed for this account' }, { status: 403, headers });
+    }
+
+    // CS-engine accounts (spec §2): order lookup goes through the brain's trust-gated
+    // lookup_order tool — this side door is closed for them.
+    if (cfg?.cs_web?.enabled === true) {
+      return NextResponse.json({ error: 'Order lookup runs through customer-service chat for this store', code: 'cs_mode' }, { status: 410, headers });
+    }
+
     const shopify: ShopifyIntegrationConfig | undefined = cfg?.integrations?.shopify;
     if (!shopify?.enabled || !shopify?.shop_domain || !shopify?.admin_api_token) {
       return NextResponse.json({

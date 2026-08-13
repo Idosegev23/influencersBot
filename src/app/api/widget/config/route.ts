@@ -84,6 +84,11 @@ export async function GET(req: NextRequest) {
       bookings: {
         enabled: bookingsMod.enabled === true,
       },
+      // CS-engine mode (spec §5): opening choice screen + CS conversation via the brand brain.
+      // Root-level flag (config.cs_web) — shared with the main chat page, not a widget-only toggle.
+      customerService: {
+        enabled: (config as any)?.cs_web?.enabled === true,
+      },
     };
 
     return NextResponse.json(

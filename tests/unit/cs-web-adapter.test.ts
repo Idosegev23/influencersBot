@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const runCsTurnCore = vi.fn();
 vi.mock('@/lib/cs/cs-agent', () => ({ runCsTurnCore: (...a: any[]) => runCsTurnCore(...a) }));
 
-import { runWebCsTurn } from '@/lib/cs/web-adapter';
+import { runWebCsTurn, emitWebCsEvents } from '@/lib/cs/web-adapter';
 
 describe('runWebCsTurn (web adapter, spec §5)', () => {
   beforeEach(() => { vi.clearAllMocks(); });
@@ -45,5 +45,27 @@ describe('runWebCsTurn (web adapter, spec §5)', () => {
     runCsTurnCore.mockResolvedValue({ reply: { kind: 'none' }, phase: 'serving' });
     const r = await runWebCsTurn({ channel: 'widget', accountId: 'acc-1', channelUserId: 'v-1', text: 'הודעה' });
     expect(r).toEqual({ text: '', suggestions: [], payloads: [] });
+  });
+
+  it('emitWebCsEvents emits delta → payload×N → suggestions → done, in that order', async () => {
+    runCsTurnCore.mockResolvedValue({
+      reply: { kind: 'text', body: 'הנה הסטטוס' }, phase: 'serving',
+      suggestions: ['תודה'],
+      payloads: [{ kind: 'order_status_card', order: { orderNumber: '1042' } }, { kind: 'ticket_confirmation', ticketId: 't-1' }],
+    });
+    const events: any[] = [];
+    await emitWebCsEvents((e) => events.push(e), { channel: 'widget', accountId: 'acc-1', channelUserId: 'v-1', text: 'איפה?' });
+    expect(events.map((e) => e.type)).toEqual(['delta', 'payload', 'payload', 'suggestions', 'done']);
+    expect(events[0].text).toBe('הנה הסטטוס');
+    expect(events[1].payload.kind).toBe('order_status_card');
+    expect(events[3].suggestions).toEqual(['תודה']);
+    expect(events[4]).toMatchObject({ type: 'done', fullText: 'הנה הסטטוס', cs: true });
+  });
+
+  it('emitWebCsEvents on a silent turn (paused) emits only done', async () => {
+    runCsTurnCore.mockResolvedValue({ reply: { kind: 'none' }, phase: 'serving' });
+    const events: any[] = [];
+    await emitWebCsEvents((e) => events.push(e), { channel: 'widget', accountId: 'acc-1', channelUserId: 'v-1', text: 'הודעה' });
+    expect(events.map((e) => e.type)).toEqual(['done']);
   });
 });
