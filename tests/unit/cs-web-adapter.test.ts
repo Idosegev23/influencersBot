@@ -62,6 +62,17 @@ describe('runWebCsTurn (web adapter, spec §5)', () => {
     expect(events[4]).toMatchObject({ type: 'done', fullText: 'הנה הסטטוס', cs: true });
   });
 
+  it('suggestionsInDone (chat page): suggestions re-embed into done.fullText, no suggestions event', async () => {
+    runCsTurnCore.mockResolvedValue({
+      reply: { kind: 'text', body: 'בטיפול!' }, phase: 'serving',
+      suggestions: ['תודה', 'עוד שאלה'],
+    });
+    const events: any[] = [];
+    await emitWebCsEvents((e) => events.push(e), { channel: 'web_chat', accountId: 'acc-1', channelUserId: 'a_1', text: 'הי' }, { suggestionsInDone: true });
+    expect(events.map((e) => e.type)).toEqual(['delta', 'done']);
+    expect(events[1].fullText).toBe('בטיפול!<<SUGGESTIONS>>תודה|עוד שאלה<</SUGGESTIONS>>');
+  });
+
   it('emitWebCsEvents on a silent turn (paused) emits only done', async () => {
     runCsTurnCore.mockResolvedValue({ reply: { kind: 'none' }, phase: 'serving' });
     const events: any[] = [];

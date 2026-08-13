@@ -53,7 +53,13 @@ interface StreamError {
   code?: string;
 }
 
-type StreamEvent = StreamMeta | StreamCards | StreamDelta | StreamDone | StreamError | StreamThinking;
+// CS-engine structured screen (spec §6) — emitted by the CS-mode branch only.
+interface StreamPayload {
+  type: 'payload';
+  payload: { kind: string; [k: string]: unknown };
+}
+
+type StreamEvent = StreamMeta | StreamCards | StreamDelta | StreamDone | StreamError | StreamThinking | StreamPayload;
 
 // ============================================
 // Hook State
@@ -76,6 +82,7 @@ interface UseStreamChatOptions {
   onDelta?: (delta: string, fullText: string) => void;
   onDone?: (done: StreamDone) => void;
   onError?: (error: StreamError) => void;
+  onPayload?: (payload: StreamPayload['payload']) => void;
 }
 
 // ============================================
@@ -105,6 +112,9 @@ export function useStreamChat(options: UseStreamChatOptions = {}) {
     chunkId?: string;
     hiddenContext?: string; // extra context sent to API but not shown in chat
     ref?: string;          // attribution slug from URL ?ref= or coupon copy
+    mode?: 'cs';           // CS-engine mode (spec §5) — route the turn to the CS brain
+    channelUserId?: string; // persistent anon id — the web_chat CS identity key
+    csDetails?: { phone?: string; orderNumber?: string }; // details-form claim (spec §7)
   }) => {
     // Cancel any existing stream
     if (abortControllerRef.current) {
@@ -188,6 +198,10 @@ export function useStreamChat(options: UseStreamChatOptions = {}) {
               case 'done':
                 setState(s => ({ ...s, isStreaming: false, done: event }));
                 options.onDone?.(event);
+                break;
+
+              case 'payload':
+                options.onPayload?.(event.payload);
                 break;
 
               case 'error':

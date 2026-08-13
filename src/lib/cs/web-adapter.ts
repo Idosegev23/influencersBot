@@ -53,11 +53,19 @@ export async function runWebCsTurn(p: WebCsTurnParams): Promise<WebCsTurnResult>
 export async function emitWebCsEvents(
   emit: (e: Record<string, any>) => void,
   p: WebCsTurnParams,
+  opts?: { suggestionsInDone?: boolean },
 ): Promise<WebCsTurnResult> {
   const r = await runWebCsTurn(p);
   if (r.text) emit({ type: 'delta', text: r.text });
   for (const payload of r.payloads) emit({ type: 'payload', payload });
-  if (r.suggestions.length) emit({ type: 'suggestions', suggestions: r.suggestions });
-  emit({ type: 'done', sessionId: null, fullText: r.text, productCount: 0, intent: null, cs: true });
+  if (opts?.suggestionsInDone) {
+    // Chat-page flavor: the page already parses <<SUGGESTIONS>> out of done.fullText
+    // (parseSuggestions in page.tsx) — re-embedding reuses that path with zero client change.
+    const marker = r.suggestions.length ? `<<SUGGESTIONS>>${r.suggestions.join('|')}<</SUGGESTIONS>>` : '';
+    emit({ type: 'done', sessionId: null, fullText: r.text + marker, productCount: 0, intent: null, cs: true });
+  } else {
+    if (r.suggestions.length) emit({ type: 'suggestions', suggestions: r.suggestions });
+    emit({ type: 'done', sessionId: null, fullText: r.text, productCount: 0, intent: null, cs: true });
+  }
   return r;
 }

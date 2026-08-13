@@ -229,6 +229,34 @@ export async function POST(req: NextRequest) {
         pm.data.accountId = accountId;
         if (fromSuggestion) pm.data.fromSuggestion = true;
 
+        // === CS-ENGINE MODE (spec §5) ===
+        // The visitor chose customer service (opening screen / support starter / complaint
+        // swap) and the account has cs_web enabled → the turn runs through the CS brain
+        // (runCsTurnCore) instead of the sandwich. Flag off → mode ignored, sandwich path
+        // continues unchanged (parity).
+        const csWebEnabled = ((influencer as any)._rawConfig?.cs_web?.enabled === true);
+        const csChannelUserId = typeof body.channelUserId === 'string' && body.channelUserId.trim() ? body.channelUserId.trim().slice(0, 64) : null;
+        if (body.mode === 'cs' && csWebEnabled && csChannelUserId && accountId) {
+          try {
+            const { emitWebCsEvents } = await import('@/lib/cs/web-adapter');
+            controller.enqueue(encodeEvent({ type: 'meta', sessionId: rawSessionId || null, uiDirectives: null } as any));
+            const csDetails = (body.csDetails && typeof body.csDetails === 'object') ? body.csDetails : {};
+            await emitWebCsEvents((e) => controller.enqueue(encodeEvent(e as any)), {
+              channel: 'web_chat',
+              accountId,
+              channelUserId: csChannelUserId,
+              text: displayMessage,
+              claimedPhone: typeof csDetails.phone === 'string' ? csDetails.phone : undefined,
+              language: (influencer as any).language === 'en' ? 'en' : 'he',
+            }, { suggestionsInDone: true });
+          } catch (err) {
+            console.error('[Stream] CS turn failed:', err);
+            controller.enqueue(encodeEvent({ type: 'error', message: (influencer as any).language === 'en' ? 'Something went wrong' : 'משהו השתבש, נסו שוב', code: 'CS_TURN_FAILED' }));
+          }
+          controller.close();
+          return;
+        }
+
         // === EARLY RAG CACHE CHECK (Warm RAG, Fresh Voice) ===
         // On suggestion click: check if RAG results are cached.
         // If yes → skip RAG retrieval (~3-5s saved), but LLM always runs fresh → unique response each time.
