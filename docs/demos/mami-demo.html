@@ -172,6 +172,43 @@
   .btn.autoOn{background:var(--mami);border-color:var(--mami);color:#fff}
   .progress{color:var(--ink-dim);font-size:.9rem;font-variant-numeric:tabular-nums;min-width:52px;text-align:center}
   .kbd-hint{color:var(--ink-dim);font-size:.72rem;text-align:center;margin-top:2px}
+
+  /* ===== admin view ===== */
+  #adminView{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:14px;min-height:0}
+  #adminView[hidden]{display:none}
+  .adm-head{display:flex;align-items:baseline;gap:14px}
+  .adm-head h2{font-size:1.15rem;font-weight:800}
+  .adm-head span{color:var(--ink-dim);font-size:.88rem}
+  .kpis{display:flex;gap:12px}
+  .kpi{flex:1;background:var(--stage-soft);border:1px solid #3A3157;border-radius:var(--radius);padding:12px 16px;text-align:center}
+  .kpi b{display:block;font-size:1.5rem;font-variant-numeric:tabular-nums}
+  .kpi span{color:var(--ink-dim);font-size:.78rem}
+  .kpi.good b{color:#7FE0AE}.kpi.warn b{color:var(--warn)}.kpi.bad b{color:#FF8B8F}
+  .adm-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .adm-card{background:var(--stage-soft);border:1px solid #3A3157;border-radius:var(--radius);padding:14px 16px;display:flex;flex-direction:column;gap:9px}
+  .adm-card h3{font-size:.85rem;letter-spacing:.1em;color:var(--mami);font-weight:800}
+  .adm-row{display:flex;justify-content:space-between;gap:10px;font-size:.85rem;line-height:1.45;border-bottom:1px solid #2A2244;padding-bottom:7px}
+  .adm-row:last-child{border-bottom:none;padding-bottom:0}
+  .adm-row .k{color:var(--ink-dim)}
+  .adm-row .v{font-weight:600;text-align:left}
+  .pill{display:inline-block;border-radius:999px;padding:2px 10px;font-size:.72rem;font-weight:700}
+  .pill.crit{background:#4A1D22;color:#FF8B8F}
+  .pill.ok{background:#173B2A;color:#7FE0AE}
+  .pill.wait{background:#453412;color:var(--warn)}
+  .slider{display:flex;flex-direction:column;gap:5px}
+  .slider .track{height:8px;border-radius:99px;background:#2A2244;position:relative}
+  .slider .fill{position:absolute;inset-inline-start:0;top:0;bottom:0;width:80%;border-radius:99px;background:linear-gradient(90deg,var(--bestie),var(--mami))}
+  .slider .dot{position:absolute;top:50%;inset-inline-start:80%;transform:translate(50%,-50%);width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 4px #0008}
+  .slider .lbls{display:flex;justify-content:space-between;font-size:.7rem;color:var(--ink-dim)}
+  .adm-table{width:100%;border-collapse:collapse;font-size:.8rem}
+  .adm-table th{color:var(--ink-dim);font-weight:600;text-align:right;padding:4px 6px;border-bottom:1px solid #3A3157;font-size:.72rem}
+  .adm-table td{padding:6px;border-bottom:1px solid #2A2244;vertical-align:top}
+  .adm-table tr:last-child td{border-bottom:none}
+  .check{font-size:.85rem;line-height:1.7}
+  .doc{display:flex;justify-content:space-between;font-size:.82rem;border-bottom:1px solid #2A2244;padding-bottom:6px}
+  .doc:last-child{border-bottom:none}
+  .doc small{color:var(--ink-dim)}
+  .adm-note{color:var(--ink-dim);font-size:.75rem;font-style:italic}
 </style>
 </head>
 <body>
@@ -189,15 +226,18 @@
   <nav class="tabs">
     <button class="tab on" id="tab0">תסריט 1 · בסטי המתווכת</button>
     <button class="tab" id="tab1">תסריט 2 · בסטי יוצאת למלחמה</button>
+    <button class="tab" id="tab2">⚙️ ממשק הניהול של מאמי</button>
   </nav>
 </header>
 
 <main>
   <aside>
     <h2>כללי מאמי</h2>
-    <div class="rule" id="rule-sla"><b>⏱ מענה ספק — עד 4 שעות</b>ספק שלא עונה בזמן מקבל תזכורת אוטומטית</div>
+    <div class="rule" id="rule-sla"><b>⏱ מענה ספק — עד 4 שעות</b>נספר בשעות הפעילות של הספק</div>
+    <div class="rule" id="rule-update"><b>📣 לקוח מעודכן תמיד</b>עדכון יזום בכל שלב — גם כשאין חדש</div>
+    <div class="rule" id="rule-tier"><b>🕕 מודעות לשעות פעילות</b>מוקד סגור? עוברים לאיש הקשר הישיר</div>
     <div class="rule" id="rule-full"><b>🎯 רף תשובה — פתרון מלא</b>פשרות חלקיות לא נחשבות תשובה</div>
-    <div class="rule" id="rule-rem2"><b>🚨 אסקלציה — אחרי 2 תזכורות</b>עוברת לנציג מאמי עם סיכום מלא</div>
+    <div class="rule" id="rule-esc"><b>🚨 ספק סורר — אסקלציה בו-ביום</b>עוברת לנציג מאמי עם סיכום מלא, לא למחרת</div>
     <div class="rule" id="rule-churn"><b>💔 כוונת נטישה — עדיפות מיידית</b>לקוח שמאיים לעזוב לא מחכה לטיימר</div>
     <footer>הכללים מוגדרים על-ידי מאמי וניתנים לשינוי — בסטי אוכפת אותם על ספקים ועל נציגים כאחד.</footer>
   </aside>
@@ -217,6 +257,79 @@
     </section>
   </div>
 </main>
+
+<section id="adminView" hidden>
+  <div class="adm-head">
+    <h2>⚙️ מרכז הבקרה של בסטי — מנהלת שירות הלקוחות, מאמי</h2>
+    <span>כל מה שראיתם בתסריטים מוגדר כאן — בלי קוד, בלי טכנאים</span>
+  </div>
+  <div class="kpis">
+    <div class="kpi"><b>34</b><span>פניות היום</span></div>
+    <div class="kpi good"><b>29</b><span>נסגרו אוטומטית (85%)</span></div>
+    <div class="kpi warn"><b>3</b><span>ממתינות לספק</span></div>
+    <div class="kpi bad"><b>2</b><span>אסקלציות פתוחות</span></div>
+    <div class="kpi"><b>1:38</b><span>זמן טיפול ממוצע</span></div>
+  </div>
+  <div class="adm-grid">
+    <div class="adm-card">
+      <h3>🎭 הפרסונה של בסטי</h3>
+      <div class="adm-row"><span class="k">שם</span><span class="v">בסטי 💜</span></div>
+      <div class="adm-row"><span class="k">טון מול לקוחות</span><span class="v">חם ואמפתי</span></div>
+      <div class="adm-row"><span class="k">טון מול ספקים</span><span class="v">מקצועי ואסרטיבי</span></div>
+      <div class="adm-row"><span class="k">שפות</span><span class="v">עברית · EN · RU</span></div>
+      <div class="slider">
+        <span class="k" style="font-size:.8rem;color:var(--ink-dim)">רמת התעקשות מול ספקים</span>
+        <div class="track"><div class="fill"></div><div class="dot"></div></div>
+        <div class="lbls"><span>גמישה</span><span>4/5 · לא מוותרת</span></div>
+      </div>
+    </div>
+    <div class="adm-card">
+      <h3>📏 כללי השירות (SLA)</h3>
+      <div class="adm-row"><span class="k">מענה ספק</span><span class="v">4 שעות · בשעות פעילות</span></div>
+      <div class="adm-row"><span class="k">עדכון יזום ללקוח</span><span class="v">כל 4 שעות, גם בלי חדש</span></div>
+      <div class="adm-row"><span class="k">מוקד ספק סגור</span><span class="v">מעבר לאיש קשר ישיר</span></div>
+      <div class="adm-row"><span class="k">ספק סורר</span><span class="v">אסקלציה בו-ביום</span></div>
+      <div class="adm-row"><span class="k">כוונת נטישה</span><span class="v">קריטי מיידי</span></div>
+      <div class="adm-row"><span class="k">רף סגירה</span><span class="v">פתרון מלא בלבד</span></div>
+    </div>
+    <div class="adm-card">
+      <h3>📇 ספקים ואנשי קשר</h3>
+      <table class="adm-table">
+        <tr><th>ספק</th><th>מוקד</th><th>איש קשר ישיר</th><th>מדד</th></tr>
+        <tr><td>אלקטרו הום</td><td>עד 18:00</td><td>רוני לוי</td><td>⭐ 3.2 · הערת עבר</td></tr>
+        <tr><td>ספא נופר</td><td>עד 20:00</td><td>מיכל אדר</td><td>⭐ 4.9</td></tr>
+        <tr><td>הום גארדן</td><td>עד 17:00</td><td>יוסי בר</td><td>⭐ 4.1</td></tr>
+        <tr><td>מלונות סול</td><td>24/7</td><td>ענת כהן</td><td>⭐ 4.6</td></tr>
+      </table>
+    </div>
+    <div class="adm-card">
+      <h3>📬 פניות חיות</h3>
+      <div class="adm-row"><span class="k">#1042 · שואב X30 · אלקטרו הום</span><span class="v"><span class="pill crit">קריטית · אצל דנה</span></span></div>
+      <div class="adm-row"><span class="k">#1041 · שובר ספא · ספא נופר</span><span class="v"><span class="pill ok">נסגרה אוטומטית · 1:10</span></span></div>
+      <div class="adm-row"><span class="k">#1039 · שובר מלון · מלונות סול</span><span class="v"><span class="pill wait">ממתינה לספק · 0:40</span></span></div>
+      <div class="adm-row"><span class="k">#1038 · מארז טיפוח · ביוטי פלוס</span><span class="v"><span class="pill ok">נסגרה אוטומטית · 0:22</span></span></div>
+    </div>
+    <div class="adm-card">
+      <h3>🚀 אונבורדינג ספק חדש</h3>
+      <div class="check">
+        ✅ הסכם + סעיפי שירות (SLA, החזרות)<br>
+        ✅ ערוץ מוקד — WhatsApp / מייל<br>
+        ✅ איש קשר ישיר + שעות פעילות<br>
+        ✅ מדיניות החלפות והחזרים<br>
+        ⬜ חיבור מערכת הזמנות (API)<br>
+        ⬜ שיחת היכרות עם בסטי
+      </div>
+    </div>
+    <div class="adm-card">
+      <h3>📚 מסמכי הנחיות</h3>
+      <div class="doc"><span>מדיניות מוצר פגום</span><small>v3 · עודכן 4.8</small></div>
+      <div class="doc"><span>נוסחי פנייה לספקים</span><small>v2 · עודכן 28.7</small></div>
+      <div class="doc"><span>מדרג פיצויים ללקוח</span><small>v1 · עודכן 15.7</small></div>
+      <div class="doc"><span>ספר הטון של מאמי</span><small>v1 · עודכן 2.7</small></div>
+      <div class="adm-note">בסטי לומדת כל מסמך ברגע ההעלאה — שינוי מדיניות נכנס לתוקף מיידית.</div>
+    </div>
+  </div>
+</section>
 
 <div class="dock">
   <div class="narration"><span class="icon" id="narIcon">▶️</span><p id="narText">לחצו <b>הבא</b> כדי להתחיל את הסיפור</p></div>
@@ -319,8 +432,13 @@ const SCENARIOS = [
 
   { phone:'customer', from:'bestie', type:'bubble', time:'20:33',
     text:'איזה כיף לשמוע! 🥰 בשביל זה אנחנו כאן.\nמאמי תמיד איתך — ואני תמיד זמינה 💜',
+    icon:'💜',
+    narration:'הלופ מול הלקוחה נסגר. אבל בסטי לא שוכחת עוד צד אחד…' },
+
+  { phone:'supplier', from:'bestie', type:'bubble', day:'יום שישי', time:'09:30', jump:'⏩ למחרת בבוקר',
+    text:'בוקר טוב ספא נופר ☀️\nעדכון נעים לסיום: שירה ביקרה אתמול ודירגה את החוויה 5/5 — ״היה מושלם״ 🌟\nהטיפול המהיר שלכם בתקלה נרשם לזכותכם במדד הספקים של מאמי (⭐ 4.9). תודה שאתם שותפים כאלה 🙏',
     icon:'🏁',
-    narration:'סוף תסריט 1 — הספק עשה את העבודה, בסטי תיווכה, מאמי לא הרימה אצבע. עכשיו נראה מה קורה כשזה לא עובד ככה…' },
+    narration:'סוף תסריט 1 — הביקורת הטובה חוזרת לספק. בסטי משמרת קשרי ספקים חזקים, לא רק פותרת תקלות. עכשיו נראה מה קורה כשהספק לא משתף פעולה…' },
 ]},
 
 {
@@ -340,103 +458,128 @@ const SCENARIOS = [
   { phone:'supplier', from:'bestie', type:'bubble', time:'12:13',
     text:'שלום אלקטרו הום, כאן בסטי ממועדון מאמי.\nלקוחת מועדון קיבלה היום שואב רובוטי X30 (הזמנה #78412) שאינו נדלק כלל.\nלפי ההסכם מול מאמי — מוצר פגום בעת המסירה מזכה בהחלפה מיידית או החזר מלא. אבקש עדכון עוד היום.',
     status:'waiting', rule:'rule-sla', icon:'📤',
-    narration:'פנייה רשמית לספק. השעון של מאמי רץ: 4 שעות למענה.' },
+    narration:'פנייה רשמית למוקד הספק. השעון של מאמי רץ: 4 שעות למענה, בשעות הפעילות.' },
 
   { phone:'supplier', from:'party', type:'bubble', time:'12:26',
     text:'שתפתח קריאת שירות במעבדה שלנו. זמן טיפול סטנדרטי — 21 ימי עסקים.',
     icon:'🙄',
-    narration:'הספק שולח את הלקוחה למסלול מעבדה של שלושה שבועות. בדיוק בשביל הרגע הזה בסטי קיימת.' },
+    narration:'המוקד שולח את הלקוחה למסלול מעבדה של שלושה שבועות. בדיוק בשביל הרגע הזה בסטי קיימת.' },
 
   { phone:'supplier', from:'bestie', type:'bubble', time:'12:28',
     text:'מסלול מעבדה לא רלוונטי כאן 🙂\nלפי סעיף 6 להסכם מול מאמי — מוצר שנמסר פגום מוחלף מיידית או מזוכה במלואו, ללא מעבדה.\nמצרפת אישור הזמנה וסרטון של התקלה. אבקש אישור החלפה.',
     attach:'📎 הזמנה-78412.pdf · 🎥 סרטון-תקלה.mp4', icon:'⚖️',
     narration:'בסטי לא מתווכחת — היא מצטטת את ההסכם ומצרפת אסמכתאות.' },
 
+  { phone:'customer', from:'bestie', type:'bubble', time:'12:30',
+    text:'שירה, עדכון ביניים 📣\nהספק הציע מסלול מעבדה של 3 שבועות — דחיתי. לפי מדיניות מאמי מגיעה לך החלפה מיידית או החזר מלא, ועל זה אני עומדת.\nאני מעדכנת אותך שוב עד 16:30 — גם אם אין חדש. את לא צריכה לרדוף אחרי אף אחד 💜',
+    rule:'rule-update', icon:'📣',
+    narration:'הכלל החשוב של שירות אמיתי: הלקוחה מעודכנת יזום, עם שעה מוגדרת לעדכון הבא. היא אף פעם לא זו ששואלת "מה קורה?".' },
+
   { phone:'customer', from:'party', type:'bubble', time:'13:05', jump:'⏩ חצי שעה',
-    text:'בינתיים אני עם קופסה של ₪1,290 שלא עובדת בסלון 😞',
+    text:'תודה שאת על זה… בינתיים אני עם קופסה של ₪1,290 שלא עובדת בסלון 😞',
     icon:'📦',
-    narration:'בינתיים במציאות: הלקוחה שילמה ונשארה בלי מוצר. הנזק כבר קרה — השאלה מי מתקן אותו ומתי.' },
+    narration:'הלקוחה מתוסכלת — אבל שימו לב: היא לא שואלת מה קורה, כי היא כבר יודעת. היא רק מתפרקת.' },
 
   { phone:'customer', from:'bestie', type:'bubble', time:'13:06',
-    text:'אני מטפלת בזה עד הסוף.\nמוצר שהגיע פגום = החלפה מיידית או החזר מלא. לא תיקון של שלושה שבועות. לא פחות מזה. 💜',
+    text:'אני לגמרי איתך.\nמוצר שהגיע פגום = החלפה מיידית או החזר מלא. לא תיקון של שלושה שבועות. לא פחות מזה.\nהעדכון הבא ממני עד 16:30 כמו שהבטחתי 💜',
     icon:'🛡️',
-    narration:'בסטי מתחייבת לרף של מאמי: פתרון מלא. ומעכשיו — היא לא עוזבת את זה.' },
+    narration:'אמפתיה + התחייבות + שעת עדכון הבאה. בסטי מחזיקה את הלקוחה ביד לאורך כל הדרך.' },
 
-  { phone:'supplier', from:'bestie', type:'bubble', time:'16:28', jump:'⏩ +4 שעות',
-    text:'תזכורת ⏰ הפנייה בעניין הזמנה #78412 ממתינה כבר 4 שעות — מעבר לזמן המענה שסוכם מול מאמי.\nהלקוחה נשארה עם מוצר פגום ששולם במלואו. אבקש התייחסות עוד היום.',
+  { phone:'supplier', from:'bestie', type:'bubble', time:'16:28', jump:'⏩ אחר הצהריים',
+    text:'תזכורת ⏰ הפנייה בעניין הזמנה #78412 ממתינה כבר 4 שעות — מעבר לזמן המענה שסוכם מול מאמי.\nהלקוחה נשארה עם מוצר פגום ששולם במלואו. אבקש התייחסות לפני סגירת המוקד היום.',
     status:'reminder', rule:'rule-sla', icon:'⏰',
-    narration:'חריגת SLA — תזכורת ראשונה נשלחת אוטומטית. אף פנייה לא נרדמת.' },
+    narration:'חריגת SLA — תזכורת אוטומטית למוקד, עם דד-ליין שמתחשב בשעות הפעילות שלו.' },
 
-  { phone:'supplier', from:'bestie', type:'bubble', time:'20:28', jump:'⏩ +4 שעות',
-    text:'תזכורת שנייה ואחרונה לפני העברה לטיפול מאמי:\nהתחמקות מהחלפת מוצר פגום מהווה הפרה של סעיף 6 להסכם.\nללא מענה עד 10:00 מחר — הפנייה תועבר להנהלת מאמי עם מלוא התיעוד.',
-    rule:'rule-rem2', icon:'📛',
-    narration:'תזכורת שנייה — הטון עולה, עם דד-ליין והשלכות מוגדרות. בסטי נלחמת לפי הכללים של מאמי.' },
+  { phone:'customer', from:'bestie', type:'bubble', time:'16:30',
+    text:'שירה, עדכון 16:30 כמו שהבטחתי 📣\nהמוקד עדיין לא אישר — שלחתי להם תזכורת רשמית.\nשימי לב: המוקד שלהם סוגר ב-18:00, אז אני עוברת במקביל גם לאיש הקשר הישיר של אלקטרו הום מול מאמי. ממשיכה לעדכן 💜',
+    rule:'rule-update', icon:'📣',
+    narration:'עדכון יזום בדיוק בשעה שהובטחה — כולל מה התוכנית קדימה. ככה נראית רמה של שירות.' },
 
-  { phone:'customer', from:'party', type:'bubble', time:'20:45',
-    text:'זה פשוט מביך. אם ככה נראה המועדון — אני שוקלת לבטל את החברות שלי במאמי 😔',
-    urgent:true, rule:'rule-churn', icon:'💔',
-    narration:'הלקוחה מאותתת נטישה. בסטי מזהה את זה בזמן אמת.' },
+  { phone:'supplier', from:'party', type:'system', time:'17:10',
+    text:'🕕 המוקד סוגר ב-18:00 · בסטי עוברת לערוץ איש הקשר הישיר — רוני, אלקטרו הום ↔ מאמי',
+    rule:'rule-tier', icon:'🕕',
+    narration:'בסטי מבינה שעות פעילות: אין טעם לצעוק על מוקד סגור. לכל ספק במאמי מוגדר איש קשר ישיר — וזה הרגע שלו.' },
 
-  { phone:'customer', from:'bestie', type:'bubble', time:'20:46',
-    text:'שירה, אני מבינה אותך לגמרי — ובדיוק בגלל זה אני כאן.\nהעליתי את הפנייה שלך לעדיפות מקסימלית ברגע זה. את תקבלי פתרון מלא — אני אישית על זה. 💜',
-    icon:'🚀',
-    narration:'כוונת נטישה = עדיפות מיידית, בלי לחכות לטיימרים. הלקוחה שומעת שמישהו נלחם בשבילה.' },
+  { phone:'supplier', from:'bestie', type:'bubble', time:'17:12',
+    text:'שלום רוני 👋 כאן בסטי ממועדון מאמי — פנייה דחופה שהמוקד לא סגר לפני סוף היום:\nהזמנה #78412, שואב X30 שנמסר פגום הבוקר. לפי סעיף 6 — החלפה מיידית או החזר מלא.\nאשמח לאישור שלך עוד הערב, או ראשון בבוקר שלך מחר.',
+    icon:'📲',
+    narration:'פנייה מנומסת אבל חד-משמעית לאיש הקשר הישיר, עם ציפייה ברורה: הערב או ראשון בבוקר.' },
 
-  { phone:'supplier', from:'party', type:'bubble', time:'21:05',
-    text:'טוב… נוכל לזרז את המעבדה ל-10 ימי עסקים, ולתת מכשיר חלופי להשאלה בינתיים.',
-    icon:'🤏',
-    narration:'הספק סוף-סוף עונה — עם פשרה חלקית. עדיין תיקון, לא החלפה.' },
+  { phone:'customer', from:'bestie', type:'bubble', time:'18:35', jump:'⏩ ערב',
+    text:'שירה, עדכון ערב 📣\nלא התקבל מענה מהספק עד סוף יום העסקים — אז אני לא נותנת לזה לחכות ללילה:\nהעברתי את המקרה שלך כבר עכשיו לצוות מאמי עם כל התיעוד. את תשמעי ממני מחר בבוקר עם תשובה. לילה טוב 💜',
+    rule:'rule-esc', icon:'🌙',
+    narration:'ספק סורר + לקוחה בלי פתרון = אסקלציה עוד באותו ערב. לא מחר, לא "נראה". והלקוחה יודעת בדיוק איפה הדברים עומדים.' },
 
-  { phone:'supplier', from:'bestie', type:'bubble', time:'21:07',
-    text:'לא מספיק.\nהמוצר נמסר פגום — ללקוחה מגיע מוצר חדש או כסף בחזרה, לא מעבדה מזורזת.\nההצעה לא עומדת בתנאי מאמי. אני מעבירה את הפנייה להנהלת מאמי עם מלוא התיעוד.',
-    rule:'rule-full', icon:'❌',
-    narration:'בסטי שופטת את ההצעה מול הרף של מאמי — פתרון מלא ללקוח. תיקון מזורז לא עובר. עכשיו מגיעה האסקלציה.' },
-
-  { phone:'cs', from:'bestie', type:'card', time:'21:08',
+  { phone:'cs', from:'bestie', type:'card', time:'18:37',
     status:'esc', icon:'🚨',
     card:{
       title:'אסקלציה · פנייה #1042',
-      flag:'עדיפות קריטית — כוונת נטישה',
+      flag:'עדיפות גבוהה — ספק סורר',
       rows:[
         ['לקוחה','שירה לוי · חברת מועדון 3 שנים'],
         ['הזמנה','#78412 · שואב רובוטי X30 · אלקטרו הום · ₪1,290 · נמסר פגום (לא נדלק)'],
         ['נזק בפועל','שולם ₪1,290 · הלקוחה ללא מוצר עובד מיום המסירה (סרטון תקלה מצורף)'],
       ],
-      timeline:'12:10 דיווח על מוצר פגום · 12:13 פנייה לספק · 12:28 ציטוט הסכם + אסמכתאות · 16:28 תזכורת 1 · 20:28 תזכורת 2 · 20:45 איתות נטישה · 21:05 הצעת ספק: מעבדה מזורזת',
-      fail:'❌ הצעת הספק (תיקון מזורז + השאלה) לא עומדת בכלל מאמי: "מוצר פגום = החלפה מיידית או החזר מלא"',
-      need:'👉 נדרש מהנציג: אכיפת החלפה מיידית מול הספק או אישור החזר ₪1,290',
+      timeline:'12:10 דיווח על מוצר פגום · 12:13 פנייה למוקד · 12:26 "מעבדה 21 יום" · 12:28 ציטוט הסכם + אסמכתאות · 16:28 תזכורת SLA · 17:12 הועבר לאיש קשר ישיר (רוני) · 18:00 מוקד נסגר ללא מענה',
+      fail:'❌ הצעת המוקד (מעבדה 21 יום) נדחתה — מפרה את כלל מאמי: "מוצר פגום = החלפה מיידית או החזר מלא". איש הקשר טרם הגיב.',
+      need:'👉 נדרש מהנציג: החלטה עד מחר 10:00 — אכיפת החלפה מול הספק או אישור החזר ₪1,290. הלקוחה הובטחה תשובה בבוקר.',
     },
-    narration:'האסקלציה מגיעה לנציג כסיכום מלא של כל הסיפור — מי אמר מה, מה הוצע, איזה כלל נשבר ומה נדרש. הנציג לא קורא שרשורים. הוא מחליט.' },
+    narration:'האסקלציה נפתחת עוד באותו ערב — עם כל הסיפור מסוכם: ציר זמן, מה נוסה, איזה כלל נשבר ומה ההחלטה הנדרשת. הנציג לא קורא שרשורים. הוא מחליט.' },
 
-  { phone:'cs', from:'bestie', type:'bubble', day:'יום שלישי', time:'09:02', jump:'⏩ למחרת בבוקר',
-    text:'בוקר טוב דנה ☀️ תזכורת: אסקלציה #1042 פתוחה כבר 12 שעות.\nהלקוחה בסיכון נטישה. אבקש החלטה הבוקר 🙏',
+  { phone:'customer', from:'party', type:'bubble', time:'20:45',
+    text:'דיברתי עם בעלי על זה עכשיו… זה פשוט מביך. אם ככה נראה המועדון — אני שוקלת לבטל את החברות שלי במאמי 😔',
+    urgent:true, rule:'rule-churn', icon:'💔',
+    narration:'הלקוחה מאותתת נטישה. בסטי מזהה את זה בזמן אמת.' },
+
+  { phone:'customer', from:'bestie', type:'bubble', time:'20:46',
+    text:'שירה, אני מבינה אותך לגמרי — ובדיוק בגלל זה אני כאן.\nהמקרה שלך כבר אצל צוות מאמי, וברגע זה סימנתי אותו קריטי. יש לך תשובה מחר בבוקר — ואני אישית דואגת שתהיה תשובה מלאה 💜',
+    icon:'🚀',
+    narration:'כוונת נטישה = קפיצת עדיפות מיידית על האסקלציה שכבר קיימת. שום דבר לא מחכה לטיימר.' },
+
+  { phone:'cs', from:'party', type:'system', time:'20:47',
+    text:'🔺 עדיפות פנייה #1042 עודכנה אוטומטית: גבוהה ← קריטית · זוהתה כוונת נטישה (חברת מועדון 3 שנים)',
+    icon:'🔺',
+    narration:'הנציגה רואה את שינוי העדיפות בזמן אמת — עם הסיבה. המערכת שקופה לכולם.' },
+
+  { phone:'cs', from:'bestie', type:'bubble', day:'יום שלישי', time:'08:35', jump:'⏩ למחרת בבוקר',
+    text:'בוקר טוב דנה ☀️ פנייה #1042 (קריטית) ממתינה מאתמול בערב.\nהבטחתי ללקוחה תשובה הבוקר. ההחלטה הנדרשת: אכיפת החלפה מול אלקטרו הום או החזר ₪1,290. מה מאשרים?',
     icon:'⏰',
-    narration:'הצד השלישי של הסיפור: בסטי מנדנדת גם לנציגים של מאמי. אותם כללים — על כולם.' },
+    narration:'תחילת יום העבודה = בסטי כבר שם. לא "תזכורת" — הגשת החלטה מוכנה לאישור.' },
 
-  { phone:'cs', from:'bestie', type:'bubble', time:'12:30', jump:'⏩ +3.5 שעות',
-    text:'דנה, פנייה #1042 היא הוותיקה ביותר בתור שלך (15+ שעות).\nצריך רק החלטה אחת: אכיפת החלפה מול הספק או החזר מלא. מה מאשרים?',
-    icon:'📣',
-    narration:'נדנוד שני, ממוקד: בסטי לא שולחת "תזכורת" — היא מגישה החלטה מוכנה לאישור.' },
+  { phone:'supplier', from:'party', type:'bubble', time:'09:12', name:'רוני · אלקטרו הום',
+    text:'בוקר טוב בסטי, ראיתי את הפנייה מאתמול.\nמה שאני יכול לאשר: זירוז מעבדה ל-10 ימי עסקים + מכשיר חלופי להשאלה בינתיים.',
+    icon:'🤏',
+    narration:'איש הקשר עונה בתחילת יום העבודה שלו — הגיוני ואמיתי. אבל ההצעה עדיין תיקון, לא החלפה.' },
 
-  { phone:'cs', from:'party', type:'bubble', time:'13:45', name:'דנה · שירות לקוחות',
-    text:'טופל! ✅ אלקטרו הום שולחים מחר שליח עם X30 חדש ואוספים את הפגום.\nבנוסף אישרתי שובר פיצוי ₪100. הספק קיבל התראה רשמית על ההתנהלות.',
+  { phone:'supplier', from:'bestie', type:'bubble', time:'09:14',
+    text:'תודה על המענה רוני — אבל זה לא עומד בהסכם.\nמוצר שנמסר פגום = מוצר חדש או כסף בחזרה, לא מעבדה מזורזת.\nהנושא כבר אצל הנהלת מאמי. אם תוכל לאשר החלפה עד 10:00 — נסגור את זה בינינו עכשיו.',
+    rule:'rule-full', icon:'❌',
+    narration:'בסטי שופטת את ההצעה מול הרף — ונותנת לספק הזדמנות אחרונה לתקן לפני שההנהלה מכריעה.' },
+
+  { phone:'customer', from:'bestie', type:'bubble', time:'09:15',
+    text:'שירה, עדכון בוקר כמו שהבטחתי 📣\nאיש הקשר של הספק הציע תיקון מזורז — דחיתי, זה לא עומד במדיניות שלנו.\nצוות מאמי מכריע ברגעים אלה. תשובה סופית עד הצהריים 💜',
+    rule:'rule-update', icon:'📣',
+    narration:'ההבטחה מאתמול בערב מקוימת: עדכון בוקר יזום, עם צפי ברור לתשובה הסופית.' },
+
+  { phone:'cs', from:'party', type:'bubble', time:'10:30', name:'דנה · שירות לקוחות',
+    text:'טופל! ✅ דיברתי עם סמנכ״ל הלקוחות של אלקטרו הום:\nשליח מחר עם X30 חדש + איסוף הפגום באותו ביקור.\nבנוסף אישרתי שובר פיצוי ₪100. הספק קיבל התראה רשמית על ההתנהלות.',
     icon:'✅',
-    narration:'הנציג סוגר — עם פתרון שעומד ברף. בסטי דאגה שגם הוא יעשה את העבודה שלו.' },
+    narration:'הנציגה סוגרת בתוך שעתיים מתחילת היום — עם פתרון שעומד ברף. בסטי דאגה שגם הצד של מאמי יעשה את העבודה.' },
 
-  { phone:'cs', from:'bestie', type:'bubble', time:'13:47',
-    text:'מעולה 🙌 מעדכנת את שירה וסוגרת את הפנייה.\nרושמת לאלקטרו הום הערת עבר — בהפרה הבאה האסקלציה תהיה מיידית.',
+  { phone:'cs', from:'bestie', type:'bubble', time:'10:32',
+    text:'מעולה 🙌 מעדכנת את שירה וסוגרת את הפנייה.\nרושמת לאלקטרו הום הערת עבר — בהפרה הבאה האסקלציה תהיה מיידית, ומדד הספק שלהם מתעדכן.',
     icon:'🗂️',
-    narration:'הידע נשמר: לספק יש עכשיו היסטוריה. המערכת נהיית חכמה יותר עם כל מקרה.' },
+    narration:'הידע נשמר: לספק יש עכשיו היסטוריה ומדד. המערכת נהיית חכמה יותר עם כל מקרה.' },
 
-  { phone:'customer', from:'bestie', type:'bubble', time:'13:48',
-    text:'שירה, יש פתרון מלא 🎉\n✅ מחר מגיע אלייך שואב X30 חדש עם שליח\n✅ הפגום נאסף באותו ביקור — בלי שתצטרכי לצאת מהבית\n✅ שובר פיצוי ₪100 ממאמי\nסליחה על הטרטור — ותודה שנתת לנו לתקן 💜',
+  { phone:'customer', from:'bestie', type:'bubble', time:'10:33',
+    text:'שירה, יש פתרון מלא — לפני הצהריים כמו שהבטחתי 🎉\n✅ מחר מגיע אלייך שואב X30 חדש עם שליח\n✅ הפגום נאסף באותו ביקור — בלי שתצטרכי לצאת מהבית\n✅ שובר פיצוי ₪100 ממאמי\nסליחה על הטרטור — ותודה שנתת לנו לתקן 💜',
     status:'closed', icon:'🏆',
-    narration:'הלקוחה מקבלת יותר ממה שביקשה — כי הרף של מאמי הוא "הכי טוב ללקוח", לא "מספיק כדי לסגור".' },
+    narration:'הבטחה, עמידה בזמנים, ופתרון מעבר למה שביקשה — כי הרף של מאמי הוא "הכי טוב ללקוח".' },
 
-  { phone:'customer', from:'party', type:'bubble', time:'13:55',
-    text:'וואו. לא ציפיתי שתילחמו בשבילי ככה 😍 נשארת במועדון, ברור. תודה בסטי 💜',
+  { phone:'customer', from:'party', type:'bubble', time:'10:41',
+    text:'וואו. עדכנת אותי בכל שלב ולא הרפית עד שנסגר 😍 נשארת במועדון, ברור. תודה בסטי 💜',
     icon:'💜',
-    narration:'מנטישה — לנאמנות. בסטי דאגה שכולם יעשו את העבודה שלהם: הספק, הנציג, והמערכת.' },
+    narration:'מנטישה — לנאמנות. בסטי דאגה שכולם יעשו את העבודה שלהם: המוקד, איש הקשר, הנציגה — והלקוחה הרגישה את זה בכל שלב.' },
 ]},
 ];
 
@@ -532,7 +675,17 @@ function renderUpTo(n, animateLast){
 function next(){ const max=SCENARIOS[scen].beats.length-1; if(busy||idx>=max){ if(idx>=max) stopAuto(); return; } idx++; renderUpTo(idx,true); if(idx>=max) stopAuto(); }
 function prev(){ if(idx<0) return; idx--; renderUpTo(idx,false); }
 function restart(){ stopAuto(); idx=-1; renderUpTo(idx,false); }
-function setScenario(i){ stopAuto(); scen=i; idx=-1;
+let adminOn=false;
+const mainEl=document.querySelector('main'), dockEl=document.querySelector('.dock');
+function showAdmin(){ stopAuto(); adminOn=true;
+  $('adminView').hidden=false; mainEl.style.display='none'; dockEl.style.display='none';
+  $('tab0').classList.remove('on'); $('tab1').classList.remove('on'); $('tab2').classList.add('on');
+}
+function hideAdmin(){ adminOn=false;
+  $('adminView').hidden=true; mainEl.style.display=''; dockEl.style.display='';
+  $('tab2').classList.remove('on');
+}
+function setScenario(i){ stopAuto(); hideAdmin(); scen=i; idx=-1;
   $('tab0').classList.toggle('on',i===0); $('tab1').classList.toggle('on',i===1);
   const s=SCENARIOS[i]; $('supAva').textContent=s.supplier.ava; $('supTag').textContent=s.supplier.tag;
   renderUpTo(idx,false);
@@ -541,8 +694,9 @@ function stopAuto(){ if(auto){clearInterval(auto);auto=null;$('btnAuto').classLi
 function toggleAuto(){ if(auto){stopAuto();return;} $('btnAuto').classList.add('autoOn'); $('btnAuto').textContent='⏸ אוטו'; next(); auto=setInterval(next,3800); }
 
 $('btnNext').onclick=next; $('btnPrev').onclick=prev; $('btnRestart').onclick=restart; $('btnAuto').onclick=toggleAuto;
-$('tab0').onclick=()=>setScenario(0); $('tab1').onclick=()=>setScenario(1);
+$('tab0').onclick=()=>setScenario(0); $('tab1').onclick=()=>setScenario(1); $('tab2').onclick=showAdmin;
 document.addEventListener('keydown',e=>{
+  if(adminOn) return;
   if(e.key===' '||e.key==='ArrowLeft'){e.preventDefault();next();}
   else if(e.key==='ArrowRight'){e.preventDefault();prev();}
 });
