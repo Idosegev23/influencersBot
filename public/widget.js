@@ -59,7 +59,15 @@
   // between chat, the inline support-ticket form, and the post-submit
   // confirmation. Other modes (leads, bookings) will follow the same pattern.
   var view = 'chat'; // 'chat' | 'support_form' | 'support_success' | 'lead_form' | 'lead_success' | 'book_demo_form' | 'book_demo_success'
-  var modules = { support: { enabled: false }, leads: { enabled: false }, bookings: { enabled: false } };
+  var modules = { support: { enabled: false }, leads: { enabled: false }, bookings: { enabled: false }, customerService: { enabled: false } };
+  // ---- CS-engine mode (spec §5) ----
+  // csMode: the visitor chose "customer service" on the opening screen (or tapped the support
+  // starter). Turns are routed to the CS brain server-side. csDetailsPending: a details-form
+  // submission (phone/order#) riding the NEXT turn. csSuggestions: quick-reply chips parsed
+  // from the brain's reply.
+  var csMode = false;
+  var csDetailsPending = null;
+  var csSuggestions = [];
   var supportForm = { name: '', email: '', phone: '', orderNumber: '', category: '', message: '', urgent: false, attachment: null, attachmentUploading: false, error: null, submitting: false };
   var leadForm = { name: '', email: '', phone: '', interest: '', error: null, submitting: false };
   var bookDemoForm = { name: '', email: '', company: '', teamSize: '', message: '', preferredTime: '', error: null, submitting: false };
@@ -218,6 +226,23 @@
         actionPrompt: 'רוצה לתאם דמו?',
         actionOpen: 'תיאום דמו',
       },
+      cs: {
+        choiceCs: 'שירות לקוחות 🛟',
+        choiceContent: 'לשוחח עם {brand} 💬',
+        supportStarter: 'יש לי בעיה עם הזמנה',
+        greeting: 'היי! כאן שירות הלקוחות של {brand} 🙂 איך אפשר לעזור?',
+        detailsTitle: 'כדי לאתר את ההזמנה צריך עוד פרט או שניים:',
+        phoneLabel: 'טלפון',
+        orderLabel: 'מספר הזמנה',
+        detailsSubmit: 'שליחה',
+        detailsSent: 'שלחתי את הפרטים',
+        orderTitle: 'סטטוס הזמנה',
+        trackBtn: 'למעקב משלוח',
+        ticketTitle: 'נפתחה פנייה ✓',
+        ticketBody: 'מספר פנייה לשמירה:',
+        escalatedTitle: 'הפנייה הועברה לנציג/ה',
+        escalatedBody: 'נחזור אליך בהקדם 🙏',
+      },
     },
     en: {
       dir: 'ltr',
@@ -331,6 +356,23 @@
         successBody: "We'll reach out within one business day to schedule.",
         actionPrompt: 'Want to book a demo?',
         actionOpen: 'Book demo',
+      },
+      cs: {
+        choiceCs: 'Customer service 🛟',
+        choiceContent: 'Chat with {brand} 💬',
+        supportStarter: 'I have an issue with my order',
+        greeting: "Hi! You've reached {brand} customer service 🙂 How can I help?",
+        detailsTitle: 'To find your order I need one or two details:',
+        phoneLabel: 'Phone',
+        orderLabel: 'Order number',
+        detailsSubmit: 'Send',
+        detailsSent: 'Sent my details',
+        orderTitle: 'Order status',
+        trackBtn: 'Track shipment',
+        ticketTitle: 'Ticket opened ✓',
+        ticketBody: 'Your reference:',
+        escalatedTitle: 'Passed to a human agent',
+        escalatedBody: "We'll get back to you shortly 🙏",
       },
     },
   };
@@ -1034,6 +1076,7 @@
           },
           leads: { enabled: !!(data.modules.leads && data.modules.leads.enabled) },
           bookings: { enabled: !!(data.modules.bookings && data.modules.bookings.enabled) },
+          customerService: { enabled: !!(data.modules.customerService && data.modules.customerService.enabled) },
         };
       }
       updateContainerPosition();
@@ -1295,6 +1338,9 @@
     chips = [];
     ratings = {};
     pendingAction = null;
+    csMode = false;
+    csDetailsPending = null;
+    csSuggestions = [];
     animatedUpTo = 0;       // fresh thread → let the new welcome slide in
     view = 'chat';
     fetchChips('initial');
@@ -1488,6 +1534,12 @@
         continue;
       }
 
+      // CS structured screens (spec §6): order status / details form / confirmations.
+      if (m.role === 'cs_payload' && m.payload) {
+        msgsHtml += renderCsPayload(m.payload, pc, mi, rowAnim);
+        continue;
+      }
+
       // Typing / thinking indicator
       if (isEmpty) {
         var indicatorContent = thinkingText
@@ -1583,8 +1635,18 @@
       msgsHtml +
       '</div>' +
 
+      // ---- CS opening choice (spec §5): two big buttons before the first user message ----
+      ((modules.customerService.enabled && !csMode && !messages.some(function (mm) { return mm.role === 'user'; }))
+        ? renderCsChoiceRow(pc)
+        : '') +
+
+      // ---- CS quick replies parsed from the brain's reply (spec §5) ----
+      ((csMode && csSuggestions.length > 0 && !isLoading)
+        ? renderChipsRow(csSuggestions, pc, { csChips: true })
+        : '') +
+
       // ---- Smart chips row (only when no user message yet AND chips loaded) ----
-      ((chips.length > 0 && !messages.some(function (mm) { return mm.role === 'user'; }))
+      ((!csMode && chips.length > 0 && !messages.some(function (mm) { return mm.role === 'user'; }))
         ? renderChipsRow(chips, pc)
         : '') +
 
@@ -1680,6 +1742,7 @@
     if (supportBtn) {
       supportBtn.onclick = function () {
         widgetTrack('widget_support_opened', { from: 'header' });
+        if (modules.customerService.enabled) { window.__ibotCsStart('header'); return; }
         openSupportForm(null);
       };
       supportBtn.onmouseover = function () { this.style.background = 'rgba(255,255,255,0.22)'; };
@@ -1742,6 +1805,11 @@
       extractPageContextAsync().then(function (enriched) { pageContext = enriched; });
     }
 
+    // CS turn extras: details ride exactly one turn; stale quick replies clear on send.
+    var csDetailsToSend = csDetailsPending;
+    csDetailsPending = null;
+    csSuggestions = [];
+
     fetch(BASE_URL + '/api/widget/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1753,6 +1821,8 @@
         language: config.language,
         pageContext: pageContext,
         modules: { support: !!modules.support.enabled, leads: !!modules.leads.enabled, bookings: !!modules.bookings.enabled },
+        mode: csMode ? 'cs' : undefined,
+        csDetails: csDetailsToSend || undefined,
       }),
     })
       .then(function (res) {
@@ -1855,6 +1925,13 @@
                     has_prefill: !!event.action.prefill,
                   });
                   scheduleRender();
+                } else if (event.type === 'payload' && event.payload) {
+                  // CS structured screen (spec §6) — its own row under the reply bubble.
+                  messages.push({ role: 'cs_payload', payload: event.payload });
+                  scheduleRender();
+                } else if (event.type === 'suggestions' && Array.isArray(event.suggestions)) {
+                  csSuggestions = event.suggestions;
+                  scheduleRender();
                 } else if (event.type === 'error') {
                   messages[messages.length - 1].content = event.message || locale.errorMessage;
                   isLoading = false;
@@ -1933,7 +2010,26 @@
   // broken in the 370px panel — a chip got cut off and visitors didn't
   // realize there was more behind a horizontal scroll. Wrap + cap keeps
   // everything visible in the small surface.
-  function renderChipsRow(items, pc) {
+  // ---- CS opening choice row (spec §5): "customer service" / "chat with the brand".
+  // The support starter is ALWAYS the first pill (twice-emphasized spec requirement).
+  function renderCsChoiceRow(pc) {
+    var mob = window.innerWidth < 640;
+    var brand = config.brandName || locale.brandName;
+    var btnBase = 'cursor:pointer;border-radius:14px;padding:' + (mob ? '13px 14px' : '11px 12px') + ';font-size:' + (mob ? '14.5px' : '13px') + ';font-weight:600;font-family:inherit;line-height:1.3;text-align:center;flex:1;min-width:0;transition:transform 0.15s;';
+    return (
+      '<div style="padding:' + (mob ? '8px 16px' : '6px 16px') + ';display:flex;flex-direction:column;gap:8px;direction:' + locale.dir + ';flex-shrink:0;">' +
+        '<div style="display:flex;gap:8px;">' +
+          '<button onclick="window.__ibotCsStart(\'choice\')" style="' + btnBase + 'background:' + pc + ';border:1px solid ' + pc + ';color:#fff;">' + escapeHtml(locale.cs.choiceCs) + '</button>' +
+          '<button onclick="window.__ibotCsContent()" style="' + btnBase + 'background:var(--ibot-surface);border:1px solid var(--ibot-border);color:var(--ibot-text-primary);">' + escapeHtml(locale.cs.choiceContent.replace('{brand}', brand)) + '</button>' +
+        '</div>' +
+        '<button onclick="window.__ibotCsStarter()" style="background:var(--ibot-surface);border:1px solid ' + pc + ';color:var(--ibot-text-primary);cursor:pointer;border-radius:999px;padding:' + (mob ? '9px 15px' : '7px 12px') + ';font-size:' + (mob ? '14px' : '12.5px') + ';font-family:inherit;line-height:1.3;">' +
+          escapeHtml(locale.cs.supportStarter) + '</button>' +
+      '</div>'
+    );
+  }
+
+  function renderChipsRow(items, pc, opts) {
+    var isCs = !!(opts && opts.csChips);
     var pills = '';
     var rendered = 0;
     var mob = window.innerWidth < 640;   // prominent tap targets on mobile full-screen
@@ -1944,7 +2040,7 @@
       // tell the visitor what they're about to ask. Long labels wrap to a
       // second line instead of truncating.
       pills +=
-        '<button onclick="window.__ibotChipClick(' + i + ')" ' +
+        '<button onclick="window.__ibot' + (isCs ? 'CsSuggestion' : 'ChipClick') + '(' + i + ')" ' +
         'style="background:var(--ibot-surface);border:1px solid var(--ibot-border);color:var(--ibot-text-primary);cursor:pointer;' +
         'border-radius:999px;padding:' + (mob ? '9px 15px' : '6px 11px') + ';font-size:' + (mob ? '14px' : '12.5px') + ';line-height:1.3;white-space:normal;text-align:center;' +
         (mob ? 'min-height:40px;' : '') +
@@ -1960,6 +2056,59 @@
       pills +
       '</div>'
     );
+  }
+
+  // ---- CS structured screens (spec §6) — rendered as their own rows inside the chat ----
+  function renderCsPayload(p, pc, mi, rowAnim) {
+    var panel = 'background:var(--ibot-surface);border:1px solid var(--ibot-border);border-radius:14px;padding:12px 14px;margin-bottom:12px;max-width:88%;direction:' + locale.dir + ';';
+    var wrap = '<div style="display:flex;justify-content:flex-end;' + (rowAnim || '') + '">';
+
+    if (p.kind === 'order_status_card' && p.order) {
+      var o = p.order;
+      var rows = '';
+      if (o.status) rows += '<div style="display:inline-block;background:' + pc + '1a;color:' + pc + ';border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;margin-bottom:6px;">' + escapeHtml(o.status) + '</div>';
+      if (o.itemSummary) rows += '<div style="font-size:12.5px;color:var(--ibot-text-primary);margin-bottom:4px;">' + escapeHtml(o.itemSummary) + '</div>';
+      if (o.total) rows += '<div style="font-size:12px;color:var(--ibot-text-muted);margin-bottom:4px;">' + escapeHtml(String(o.total)) + '</div>';
+      if (o.shipmentText) rows += '<div style="font-size:12.5px;color:var(--ibot-text-primary);margin-bottom:4px;">🚚 ' + escapeHtml(o.shipmentText) + '</div>';
+      if (o.trackingUrl) rows += '<a href="' + escapeHtml(o.trackingUrl) + '" target="_blank" rel="noopener" style="display:inline-block;background:' + pc + ';color:#fff;border-radius:10px;padding:7px 14px;font-size:12.5px;font-weight:600;text-decoration:none;margin-top:4px;">' + escapeHtml(locale.cs.trackBtn) + '</a>';
+      return wrap +
+        '<div style="' + panel + '">' +
+          '<div style="font-size:13px;font-weight:700;color:var(--ibot-text-primary);margin-bottom:6px;">' + escapeHtml(locale.cs.orderTitle) + (o.orderNumber ? ' #' + escapeHtml(String(o.orderNumber)) : '') + '</div>' +
+          rows +
+        '</div></div>';
+    }
+
+    if (p.kind === 'details_form') {
+      if (p.submitted) {
+        return wrap + '<div style="' + panel + 'opacity:0.65;font-size:12.5px;color:var(--ibot-text-muted);">✓ ' + escapeHtml(locale.cs.detailsSent) + '</div></div>';
+      }
+      var inputStyle = 'width:100%;box-sizing:border-box;background:var(--ibot-bg);border:1px solid var(--ibot-border);border-radius:10px;padding:8px 10px;font-size:13px;font-family:inherit;color:var(--ibot-text-primary);margin-bottom:8px;direction:' + locale.dir + ';';
+      return wrap +
+        '<div style="' + panel + 'width:88%;">' +
+          '<div style="font-size:12.5px;color:var(--ibot-text-primary);margin-bottom:8px;">' + escapeHtml(locale.cs.detailsTitle) + '</div>' +
+          '<input id="ibot-cs-phone-' + mi + '" type="tel" placeholder="' + escapeHtml(locale.cs.phoneLabel) + '" style="' + inputStyle + '">' +
+          (p.need === 'phone_and_order' ? '<input id="ibot-cs-order-' + mi + '" type="text" placeholder="' + escapeHtml(locale.cs.orderLabel) + '" style="' + inputStyle + '">' : '') +
+          '<button onclick="window.__ibotCsDetails(' + mi + ')" style="background:' + pc + ';border:none;color:#fff;cursor:pointer;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:600;font-family:inherit;">' + escapeHtml(locale.cs.detailsSubmit) + '</button>' +
+        '</div></div>';
+    }
+
+    if (p.kind === 'ticket_confirmation') {
+      return wrap +
+        '<div style="' + panel + '">' +
+          '<div style="font-size:13px;font-weight:700;color:var(--ibot-text-primary);margin-bottom:4px;">' + escapeHtml(locale.cs.ticketTitle) + '</div>' +
+          '<div style="font-size:12.5px;color:var(--ibot-text-muted);">' + escapeHtml(locale.cs.ticketBody) + ' <span style="font-family:monospace;color:var(--ibot-text-primary);">' + escapeHtml(String(p.ticketId).slice(0, 8)) + '</span></div>' +
+        '</div></div>';
+    }
+
+    if (p.kind === 'escalation_notice') {
+      return wrap +
+        '<div style="' + panel + '">' +
+          '<div style="font-size:13px;font-weight:700;color:var(--ibot-text-primary);margin-bottom:4px;">🛟 ' + escapeHtml(locale.cs.escalatedTitle) + '</div>' +
+          '<div style="font-size:12.5px;color:var(--ibot-text-muted);">' + escapeHtml(locale.cs.escalatedBody) + '</div>' +
+        '</div></div>';
+    }
+
+    return '';
   }
 
   // ---- Product cards row (inside messages) ----
@@ -2608,7 +2757,14 @@
     } else if (act.type === 'book_demo') {
       openBookDemoForm(act.prefill || {});
     } else if (act.type === 'track_order') {
-      openOrderForm(act.prefill || {});
+      if (modules.customerService.enabled) {
+        // CS engine on: order tracking is a CS conversation (trust-gated lookup_order),
+        // not the unverified email side door.
+        window.__ibotCsStart('track_order');
+        csSendText((act.prefill && act.prefill.orderNumber) ? locale.cs.supportStarter + ' (' + locale.cs.orderLabel + ': ' + act.prefill.orderNumber + ')' : locale.cs.supportStarter);
+      } else {
+        openOrderForm(act.prefill || {});
+      }
     } else if (act.type === 'navigate' && act.prefill && act.prefill.url) {
       // Navigation flow: widget.js runs in the customer's page (or our preview
       // proxy iframe — both same-origin to the iframe). Navigating top-level
@@ -2781,7 +2937,59 @@
     render();
   }
   window.__ibotRate = function (idx, r) { rateMessage(idx, r); };
-  window.__ibotHuman = function () { openHumanRequest(); };
+  window.__ibotHuman = function () {
+    // CS engine on → the human request IS a CS conversation (the brain escalates properly).
+    if (modules.customerService.enabled) { window.__ibotCsStart('human_link'); return; }
+    openHumanRequest();
+  };
+
+  // ---- CS-engine handlers (spec §5) ----
+  function csSendText(text) {
+    var inputEl = document.getElementById('ibot-input');
+    if (inputEl) inputEl.value = text;
+    chips = [];
+    sendMessage();
+  }
+  window.__ibotCsStart = function (from) {
+    if (csMode) return;
+    csMode = true;
+    widgetTrack('widget_cs_started', { from: from || 'choice' });
+    var brand = config.brandName || locale.brandName;
+    messages.push({ role: 'assistant', content: locale.cs.greeting.replace('{brand}', brand) });
+    render();
+    var inputEl = document.getElementById('ibot-input');
+    if (inputEl) inputEl.focus();
+  };
+  window.__ibotCsContent = function () {
+    widgetTrack('widget_cs_content_chosen', {});
+    var inputEl = document.getElementById('ibot-input');
+    if (inputEl) inputEl.focus();
+  };
+  window.__ibotCsStarter = function () {
+    csMode = true;
+    widgetTrack('widget_cs_started', { from: 'support_starter' });
+    csSendText(locale.cs.supportStarter);
+  };
+  window.__ibotCsSuggestion = function (i) {
+    var s = csSuggestions[i];
+    if (!s) return;
+    widgetTrack('widget_cs_suggestion_clicked', { chip: s, position: i });
+    csSendText(s);
+  };
+  window.__ibotCsDetails = function (mi) {
+    var phoneEl = document.getElementById('ibot-cs-phone-' + mi);
+    var orderEl = document.getElementById('ibot-cs-order-' + mi);
+    var phone = phoneEl ? phoneEl.value.trim() : '';
+    var orderNumber = orderEl ? orderEl.value.trim() : '';
+    if (!phone && !orderNumber) return;
+    var m = messages[mi];
+    if (m && m.role === 'cs_payload' && m.payload) m.payload.submitted = true;
+    csDetailsPending = { phone: phone || undefined, orderNumber: orderNumber || undefined };
+    widgetTrack('widget_cs_details_submitted', { has_phone: !!phone, has_order: !!orderNumber });
+    // The visible message carries what the brain needs in prose; the structured
+    // claim rides csDetails so lookupOrder gets a verifiable phone_claimed identity.
+    csSendText(locale.cs.detailsSent + (orderNumber ? ' (' + locale.cs.orderLabel + ': ' + orderNumber + ')' : '') + (phone ? ' (' + locale.cs.phoneLabel + ': ' + phone + ')' : ''));
+  };
   window.__ibotTranscript = function () { requestEmailTranscript(); };
 
   // ============================================
