@@ -35,6 +35,8 @@ export const EVENT_CATALOG: Record<string, EventDef> = {
   // Conversation starters / suggestion pills
   starter_pill_clicked: { category: 'engagement', surface: 'chat' },
   suggestion_pill_clicked: { category: 'engagement', surface: 'chat' },
+  cs_choice_clicked: { category: 'engagement', surface: 'chat' },
+  cs_support_starter_clicked: { category: 'engagement', surface: 'chat' },
   conversation_starter_clicked: { category: 'engagement', surface: 'chat' },
   meeting_pill_clicked: { category: 'engagement', surface: 'chat' },
 

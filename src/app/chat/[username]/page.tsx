@@ -64,6 +64,8 @@ import { startSessionTracker, setSessionTab, endSessionTracker } from '@/lib/ana
 // accounts.config.features.handoff_button_enabled (boolean).
 // Toggle live from /admin/handoff without deploying.
 import type { Influencer, ContentItem, InfluencerType } from '@/types';
+import CsPayloadBlocks from '@/components/chat/CsPayloadBlocks';
+import type { CsUiPayload } from '@/lib/cs/payloads';
 
 // Feature flag for streaming
 const USE_STREAMING = process.env.NEXT_PUBLIC_USE_STREAMING !== 'false';
@@ -104,6 +106,7 @@ interface Message {
   traceId?: string;
   decisionId?: string; // For linking UI actions to decisions
   suggestions?: string[]; // AI-generated follow-up suggestions
+  csPayloads?: CsUiPayload[]; // CS-engine structured screens (spec §6) — persist in scrollback
   metadata?: {
     source?: 'whatsapp_personal' | 'handoff_system_note' | 'handoff_fallback_note' | string;
     author_label?: string;
@@ -174,6 +177,11 @@ const CHAT_PAGE_STRINGS = {
     sendError: 'אופס, משהו השתבש. נסה לשלוח שוב או לנסח את השאלה אחרת',
     requiredFields: 'נא למלא את כל השדות החובה',
     submitError: 'שגיאה בשליחת הפנייה',
+    csChoice: 'שירות לקוחות 🛟',
+    csContentChoice: 'לשוחח עם {name} 💬',
+    csStarter: 'יש לי בעיה עם הזמנה',
+    csGreeting: 'היי! כאן שירות הלקוחות 🙂 איך אפשר לעזור?',
+    csDetailsSent: 'שלחתי את הפרטים',
   },
   en: {
     streamRetry: 'Something went wrong. Please try sending again.',
@@ -181,8 +189,27 @@ const CHAT_PAGE_STRINGS = {
     sendError: 'Something went wrong. Try sending again or rephrasing your question.',
     requiredFields: 'Please fill in all required fields.',
     submitError: 'Error submitting your request.',
+    csChoice: 'Customer service 🛟',
+    csContentChoice: 'Chat with {name} 💬',
+    csStarter: 'I have an issue with my order',
+    csGreeting: "Hi! You've reached customer service 🙂 How can I help?",
+    csDetailsSent: 'Sent my details',
   },
 } as const;
+
+// Complaint signals (module scope — shared by the CS-mode chokepoint AND the legacy
+// support-tab redirect for non-CS accounts).
+const COMPLAINT_PATTERNS = [
+  /שבור|נשבר|סדק|סדוק|פגום|מקולקל|מעוך|רוסק|נמעך|דלף|דלפה|ניזוק|נזק/,
+  /לא הגיע|לא קיבלתי|איפה ההזמנה|איפה החבילה|לא נמסר|איחור|איחר|נעלם/,
+  /לא מה שהזמנתי|מוצר שגוי|קיבלתי משהו אחר|מוצר אחר/,
+  /הקוד לא עובד|הקופון לא עובד|קופון לא תקף|בעיה בקופון|הקופון פג/,
+  /חיוב כפול|חויבתי פעמיים|לא קיבלתי החזר|החזר כספי|לבטל הזמנה|בעיה בתשלום/,
+  /תלונה|מתלוננת|לא עובד|לא פועל|תקלה|נשרף|נכוויתי|כוויה|צרב/,
+  /אני רוצה (החזר|החלפה|לבטל)/,
+  /\bבעיה\b/,
+];
+const isComplaintText = (text: string) => COMPLAINT_PATTERNS.some((re) => re.test((text || '').toLowerCase()));
 
 function chatStrings(influencer: Influencer | null) {
   return ((influencer as any)?.language === 'en') ? CHAT_PAGE_STRINGS.en : CHAT_PAGE_STRINGS.he;
@@ -539,6 +566,23 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
 
   // Refs to store streaming data for final message
   const streamMetaRef = useRef<StreamMeta | null>(null);
+  // --- CS-engine mode (spec §5) ---
+  const csWebEnabled = (influencer as any)?._rawConfig?.cs_web?.enabled === true;
+  const [csMode, setCsMode] = useState(false);
+  const csModeRef = useRef(false);                 // read at send time inside the wrapper chokepoint
+  const csDetailsRef = useRef<{ phone?: string; orderNumber?: string } | null>(null); // one-turn claim
+  const streamPayloadsRef = useRef<CsUiPayload[]>([]);
+  const enterCsMode = useCallback(() => { csModeRef.current = true; setCsMode(true); }, []);
+  const getPersistentAnonId = useCallback((): string => {
+    try {
+      let a = localStorage.getItem(`anon_id_${username}`);
+      if (!a) {
+        a = `a_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+        localStorage.setItem(`anon_id_${username}`, a);
+      }
+      return a;
+    } catch { return `a_mem_${username}`; }
+  }, [username]);
   const streamCardsRef = useRef<StreamCards | null>(null);
 
   // Streaming hook
@@ -567,6 +611,10 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     onDelta: () => {
       // First token arrived — hide typing dots, streaming text takes over
       setIsTyping(false);
+    },
+    onPayload: (payload) => {
+      // CS structured screen (spec §6) — collected during the stream, attached at onDone.
+      streamPayloadsRef.current.push(payload as unknown as CsUiPayload);
     },
     onDone: (done) => {
       if (done.responseId) setResponseId(done.responseId);
@@ -605,12 +653,14 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
               type: cards.cardsType,
               data: cards.items as BrandCardData[]
             } : undefined,
+            csPayloads: streamPayloadsRef.current.length ? [...streamPayloadsRef.current] : undefined,
           };
         }));
       }
       // Reset refs
       streamMetaRef.current = null;
       streamCardsRef.current = null;
+      streamPayloadsRef.current = [];
       setStreamingMessageId(null);
     },
     onError: (error) => {
@@ -630,13 +680,23 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   });
 
   // Wrap sendStreamMessage so attribution `ref` is always injected
-  // (callers don't need to remember to pass it).
+  // (callers don't need to remember to pass it). This wrapper is also the CS-mode
+  // chokepoint (spec §3): every send site funnels through here, so a complaint typed
+  // mid-content flips the conversation into CS mode instead of the old tab redirect,
+  // and CS turns always carry the persistent anon id + any pending details claim.
   const sendStreamMessage = useCallback((params: Parameters<typeof sendStreamMessageRaw>[0]) => {
+    if (csWebEnabled && !csModeRef.current && isComplaintText(params.message)) {
+      enterCsMode();
+    }
+    const cs = csWebEnabled && csModeRef.current;
+    const csDetails = cs ? (csDetailsRef.current || undefined) : undefined;
+    if (cs) csDetailsRef.current = null;
     return sendStreamMessageRaw({
       ...params,
       ref: params.ref || refSourceRef.current || undefined,
+      ...(cs ? { mode: 'cs' as const, channelUserId: getPersistentAnonId(), csDetails } : {}),
     });
-  }, [sendStreamMessageRaw]);
+  }, [sendStreamMessageRaw, csWebEnabled, enterCsMode, getPersistentAnonId]);
 
   // Track user interactions for analytics with full attribution
   const trackEvent = async (eventType: string, payload: Record<string, unknown> = {}) => {
@@ -916,21 +976,13 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   // (bot hasn't even responded yet) so the redirect feels instant.
   const lastUserComplaintRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!accountRedirectsToTab) return;
+    // CS-engine accounts (spec §3): the complaint chokepoint lives in the sendStreamMessage
+    // wrapper (flips the conversation into CS mode BEFORE the send) — this legacy tab
+    // redirect stays for non-CS accounts only.
+    if (!accountRedirectsToTab || csWebEnabled) return;
     const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
     if (!lastUserMsg || lastUserComplaintRef.current === lastUserMsg.id) return;
-    const text = (lastUserMsg.content || '').toLowerCase();
-    const COMPLAINT_RE = [
-      /שבור|נשבר|סדק|סדוק|פגום|מקולקל|מעוך|רוסק|נמעך|דלף|דלפה|ניזוק|נזק/,
-      /לא הגיע|לא קיבלתי|איפה ההזמנה|איפה החבילה|לא נמסר|איחור|איחר|נעלם/,
-      /לא מה שהזמנתי|מוצר שגוי|קיבלתי משהו אחר|מוצר אחר/,
-      /הקוד לא עובד|הקופון לא עובד|קופון לא תקף|בעיה בקופון|הקופון פג/,
-      /חיוב כפול|חויבתי פעמיים|לא קיבלתי החזר|החזר כספי|לבטל הזמנה|בעיה בתשלום/,
-      /תלונה|מתלוננת|לא עובד|לא פועל|תקלה|נשרף|נכוויתי|כוויה|צרב/,
-      /אני רוצה (החזר|החלפה|לבטל)/,
-      /\bבעיה\b/,
-    ];
-    const hit = COMPLAINT_RE.some((re) => re.test(text));
+    const hit = isComplaintText(lastUserMsg.content);
     if (hit) {
       lastUserComplaintRef.current = lastUserMsg.id;
       setSupportPrefill({ details: lastUserMsg.content });
@@ -938,13 +990,14 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       setIsTyping(false);
       setActiveTab('support' as TabId);
     }
-  }, [messages, accountRedirectsToTab, cancelStream]);
+  }, [messages, accountRedirectsToTab, csWebEnabled, cancelStream]);
 
   // Auto-open support modal when directed by engine — UNLESS this account
   // opted into tab redirect (then we route to the tab instead of the modal).
   useEffect(() => {
     const lastMessage = messages[messages.length - 1];
     if (lastMessage?.role === 'assistant' && lastMessage?.uiDirectives?.showSupportModal) {
+      if (csWebEnabled) { enterCsMode(); return; } // CS engine: next turn goes to the brain, no modal/tab
       if (accountRedirectsToTab) {
         // Soft-redirect: drop the modal directive and switch to tab.
         const userMsgs = [...messages].reverse().find((m) => m.role === 'user');
@@ -966,6 +1019,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   useEffect(() => {
     const lastMessage = messages[messages.length - 1];
     const directives = lastMessage?.uiDirectives as any;
+    if (csWebEnabled) { if (lastMessage?.role === 'assistant' && directives?.openSupportTab) enterCsMode(); return; }
     if (lastMessage?.role === 'assistant' && directives?.openSupportTab) {
       const prefill = directives.supportPrefill as { details?: string } | undefined;
       if (prefill?.details) setSupportPrefill(prefill);
@@ -1746,11 +1800,41 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           )}
                       </motion.div>
 
-                      {/* Starter pills — unified for ALL account types */}
-                      {quickReplies.length > 0 && (
+                      {/* CS opening choice (spec §5) — customer service vs content conversation */}
+                      {csWebEnabled && !csMode && (
+                        <div className="flex gap-2 mb-3" dir={(influencer as any).language === 'en' ? 'ltr' : 'rtl'}>
+                          <button
+                            onClick={() => {
+                              track('cs_choice_clicked', { choice: 'cs' });
+                              enterCsMode();
+                              setMessages((prev) => [...prev, { id: Date.now().toString(), role: 'assistant', content: chatStrings(influencer).csGreeting }]);
+                            }}
+                            className="flex-1 rounded-xl px-4 py-3 text-sm font-semibold text-white"
+                            style={{ background: 'var(--color-primary, #883fe2)' }}
+                          >
+                            {chatStrings(influencer).csChoice}
+                          </button>
+                          <button
+                            onClick={() => track('cs_choice_clicked', { choice: 'content' })}
+                            className="flex-1 rounded-xl px-4 py-3 text-sm font-semibold border"
+                            style={{ borderColor: 'var(--color-primary, #883fe2)', color: 'var(--color-text)' }}
+                          >
+                            {chatStrings(influencer).csContentChoice.replace('{name}', (influencer as any).displayName || (influencer as any).name || '')}
+                          </button>
+                        </div>
+                      )}
+                      {/* Starter pills — unified for ALL account types.
+                          Spec §5: the support starter is ALWAYS first when CS is enabled. */}
+                      {(csWebEnabled || quickReplies.length > 0) && (
                         <StarterPills
-                          items={quickReplies}
+                          items={csWebEnabled ? [chatStrings(influencer).csStarter, ...quickReplies] : quickReplies}
                           onSelect={(q) => {
+                            if (csWebEnabled && q === chatStrings(influencer).csStarter) {
+                              track('cs_support_starter_clicked', {});
+                              enterCsMode();
+                              sendQuickMessage(q);
+                              return;
+                            }
                             track('starter_pill_clicked', {
                               pill_label: q,
                               pill_index: quickReplies.indexOf(q),
@@ -1911,6 +1995,20 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             </div>
                           </div>
                           
+                          {/* CS-engine structured screens (spec §6) — persist in scrollback,
+                              so NOT gated to the last message like DirectiveRenderer. */}
+                          {msg.role === 'assistant' && !!msg.csPayloads?.length && !isStreamingThis && (
+                            <CsPayloadBlocks
+                              payloads={msg.csPayloads}
+                              language={(influencer as any).language}
+                              brandColor={undefined}
+                              onDetailsSubmit={(d) => {
+                                csDetailsRef.current = d;
+                                sendQuickMessage(chatStrings(influencer).csDetailsSent);
+                              }}
+                            />
+                          )}
+
                           {/* Engine v2: UI Directives Renderer (including streaming) */}
                           {msg.role === 'assistant' && displayDirectives && index === messages.length - 1 && (!isTyping || isStreamingThis) && (
                             <div className="mt-3">

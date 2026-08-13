@@ -35,6 +35,9 @@ export type AnalyticsEventName =
   | 'starter_pill_clicked'
   | 'suggestion_pill_clicked'
   | 'topic_pill_clicked'
+  // CS engine (spec §5)
+  | 'cs_choice_clicked'
+  | 'cs_support_starter_clicked'
   // Services
   | 'services_loaded'
   | 'service_card_opened'
