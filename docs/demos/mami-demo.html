@@ -209,6 +209,50 @@
   .doc:last-child{border-bottom:none}
   .doc small{color:var(--ink-dim)}
   .adm-note{color:var(--ink-dim);font-size:.75rem;font-style:italic}
+  .adm-nav{display:flex;gap:6px;margin-inline-start:auto}
+  .anav{border:1px solid #3A3157;background:transparent;color:var(--ink-dim);padding:7px 16px;border-radius:999px;font-size:.88rem;font-weight:700;cursor:pointer}
+  .anav.on{background:var(--mami);border-color:var(--mami);color:#fff}
+  .anav:hover{color:var(--ink)}
+  #admBody{display:flex;flex-direction:column;gap:14px}
+  [data-nav]{cursor:pointer;border-radius:8px;transition:background .12s}
+  [data-nav]:hover{background:#2A2244}
+  .adm-row[data-nav]{padding:7px 8px;margin:0 -8px;border-bottom:1px solid #2A2244}
+  tr[data-nav]:hover td{background:#2A2244}
+  .backbtn{align-self:flex-start;border:1px solid #3A3157;background:var(--stage-soft);color:var(--ink);padding:7px 16px;border-radius:999px;font-size:.85rem;font-weight:700;cursor:pointer}
+  .backbtn:hover{border-color:var(--bestie)}
+  .adm-title{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .adm-title h3{font-size:1.1rem;font-weight:800;color:var(--ink);letter-spacing:0}
+  .adm-title .sub{color:var(--ink-dim);font-size:.85rem}
+  .exec{background:#241A3E;border:1px solid var(--bestie);border-radius:var(--radius);padding:14px 16px}
+  .exec h4{color:var(--bestie);font-size:.82rem;letter-spacing:.12em;margin-bottom:8px}
+  .exec p{font-size:.95rem;line-height:1.65}
+  .exec ul{margin:8px 18px 0 0;font-size:.85rem;color:var(--ink-dim);line-height:1.8}
+  .tline{display:flex;flex-direction:column;gap:0;font-size:.84rem}
+  .tline .ti{display:flex;gap:10px;padding:5px 0;border-inline-start:2px solid #3A3157;padding-inline-start:12px;position:relative}
+  .tline .ti::before{content:'';position:absolute;inset-inline-start:-5px;top:11px;width:8px;height:8px;border-radius:50%;background:#3A3157}
+  .tline .ti.hot::before{background:var(--danger)}
+  .tline .ti.ok::before{background:var(--ok)}
+  .tline .tt{color:var(--ink-dim);font-variant-numeric:tabular-nums;min-width:88px;flex:0 0 auto}
+  .t-msg{border-inline-start:3px solid #3A3157;padding:5px 10px;font-size:.83rem;line-height:1.5;color:var(--ink);background:#241E3C;border-radius:6px;margin-bottom:6px}
+  .t-msg b{display:block;font-size:.72rem;margin-bottom:1px}
+  .t-msg.bestie{border-color:var(--bestie)} .t-msg.bestie b{color:var(--bestie)}
+  .t-msg.party{border-color:var(--ok)} .t-msg.party b{color:#7FE0AE}
+  .bar-row{display:flex;align-items:center;gap:10px;font-size:.82rem}
+  .bar-label{min-width:150px;color:var(--ink-dim)}
+  .bar-track{flex:1;height:14px;background:#2A2244;border-radius:99px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--bestie),var(--mami))}
+  .bar-fill.g{background:#2E7D54}.bar-fill.w{background:#8A6420}.bar-fill.b{background:#9C3A3E}
+  .bar-val{min-width:44px;font-variant-numeric:tabular-nums;font-weight:700;text-align:left}
+  .fchips{display:flex;gap:8px;flex-wrap:wrap}
+  .fchip{border:1px solid #3A3157;background:var(--stage-soft);color:var(--ink-dim);padding:6px 14px;border-radius:999px;font-size:.83rem;font-weight:700;cursor:pointer}
+  .fchip.on{background:var(--bestie);border-color:var(--bestie);color:#fff}
+  .insight{border-inline-start:3px solid var(--warn);background:#241E3C;border-radius:8px;padding:9px 12px;font-size:.85rem;line-height:1.55}
+  .insight b{color:var(--warn)}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+  .score-big{font-size:1.6rem;font-weight:800}
+  .meta-chips{display:flex;gap:8px;flex-wrap:wrap}
+  .mchip{background:var(--stage-soft);border:1px solid #3A3157;border-radius:999px;padding:5px 12px;font-size:.78rem;color:var(--ink-dim)}
+  .mchip b{color:var(--ink)}
 </style>
 </head>
 <body>
@@ -261,74 +305,15 @@
 <section id="adminView" hidden>
   <div class="adm-head">
     <h2>⚙️ מרכז הבקרה של בסטי — מנהלת שירות הלקוחות, מאמי</h2>
-    <span>כל מה שראיתם בתסריטים מוגדר כאן — בלי קוד, בלי טכנאים</span>
+    <span>הכל קליקאבילי — פניות, ספקים, תקצירים ואנליטיקס</span>
+    <nav class="adm-nav">
+      <button class="anav on" data-anav="overview">סקירה</button>
+      <button class="anav" data-anav="cases">פניות</button>
+      <button class="anav" data-anav="suppliers">ספקים</button>
+      <button class="anav" data-anav="analytics">אנליטיקס</button>
+    </nav>
   </div>
-  <div class="kpis">
-    <div class="kpi"><b>34</b><span>פניות היום</span></div>
-    <div class="kpi good"><b>29</b><span>נסגרו אוטומטית (85%)</span></div>
-    <div class="kpi warn"><b>3</b><span>ממתינות לספק</span></div>
-    <div class="kpi bad"><b>2</b><span>אסקלציות פתוחות</span></div>
-    <div class="kpi"><b>1:38</b><span>זמן טיפול ממוצע</span></div>
-  </div>
-  <div class="adm-grid">
-    <div class="adm-card">
-      <h3>🎭 הפרסונה של בסטי</h3>
-      <div class="adm-row"><span class="k">שם</span><span class="v">בסטי 💜</span></div>
-      <div class="adm-row"><span class="k">טון מול לקוחות</span><span class="v">חם ואמפתי</span></div>
-      <div class="adm-row"><span class="k">טון מול ספקים</span><span class="v">מקצועי ואסרטיבי</span></div>
-      <div class="adm-row"><span class="k">שפות</span><span class="v">עברית · EN · RU</span></div>
-      <div class="slider">
-        <span class="k" style="font-size:.8rem;color:var(--ink-dim)">רמת התעקשות מול ספקים</span>
-        <div class="track"><div class="fill"></div><div class="dot"></div></div>
-        <div class="lbls"><span>גמישה</span><span>4/5 · לא מוותרת</span></div>
-      </div>
-    </div>
-    <div class="adm-card">
-      <h3>📏 כללי השירות (SLA)</h3>
-      <div class="adm-row"><span class="k">מענה ספק</span><span class="v">4 שעות · בשעות פעילות</span></div>
-      <div class="adm-row"><span class="k">עדכון יזום ללקוח</span><span class="v">כל 4 שעות, גם בלי חדש</span></div>
-      <div class="adm-row"><span class="k">מוקד ספק סגור</span><span class="v">מעבר לאיש קשר ישיר</span></div>
-      <div class="adm-row"><span class="k">ספק סורר</span><span class="v">אסקלציה בו-ביום</span></div>
-      <div class="adm-row"><span class="k">כוונת נטישה</span><span class="v">קריטי מיידי</span></div>
-      <div class="adm-row"><span class="k">רף סגירה</span><span class="v">פתרון מלא בלבד</span></div>
-    </div>
-    <div class="adm-card">
-      <h3>📇 ספקים ואנשי קשר</h3>
-      <table class="adm-table">
-        <tr><th>ספק</th><th>מוקד</th><th>איש קשר ישיר</th><th>מדד</th></tr>
-        <tr><td>אלקטרו הום</td><td>עד 18:00</td><td>רוני לוי</td><td>⭐ 3.2 · הערת עבר</td></tr>
-        <tr><td>ספא נופר</td><td>עד 20:00</td><td>מיכל אדר</td><td>⭐ 4.9</td></tr>
-        <tr><td>הום גארדן</td><td>עד 17:00</td><td>יוסי בר</td><td>⭐ 4.1</td></tr>
-        <tr><td>מלונות סול</td><td>24/7</td><td>ענת כהן</td><td>⭐ 4.6</td></tr>
-      </table>
-    </div>
-    <div class="adm-card">
-      <h3>📬 פניות חיות</h3>
-      <div class="adm-row"><span class="k">#1042 · שואב X30 · אלקטרו הום</span><span class="v"><span class="pill crit">קריטית · אצל דנה</span></span></div>
-      <div class="adm-row"><span class="k">#1041 · שובר ספא · ספא נופר</span><span class="v"><span class="pill ok">נסגרה אוטומטית · 1:10</span></span></div>
-      <div class="adm-row"><span class="k">#1039 · שובר מלון · מלונות סול</span><span class="v"><span class="pill wait">ממתינה לספק · 0:40</span></span></div>
-      <div class="adm-row"><span class="k">#1038 · מארז טיפוח · ביוטי פלוס</span><span class="v"><span class="pill ok">נסגרה אוטומטית · 0:22</span></span></div>
-    </div>
-    <div class="adm-card">
-      <h3>🚀 אונבורדינג ספק חדש</h3>
-      <div class="check">
-        ✅ הסכם + סעיפי שירות (SLA, החזרות)<br>
-        ✅ ערוץ מוקד — WhatsApp / מייל<br>
-        ✅ איש קשר ישיר + שעות פעילות<br>
-        ✅ מדיניות החלפות והחזרים<br>
-        ⬜ חיבור מערכת הזמנות (API)<br>
-        ⬜ שיחת היכרות עם בסטי
-      </div>
-    </div>
-    <div class="adm-card">
-      <h3>📚 מסמכי הנחיות</h3>
-      <div class="doc"><span>מדיניות מוצר פגום</span><small>v3 · עודכן 4.8</small></div>
-      <div class="doc"><span>נוסחי פנייה לספקים</span><small>v2 · עודכן 28.7</small></div>
-      <div class="doc"><span>מדרג פיצויים ללקוח</span><small>v1 · עודכן 15.7</small></div>
-      <div class="doc"><span>ספר הטון של מאמי</span><small>v1 · עודכן 2.7</small></div>
-      <div class="adm-note">בסטי לומדת כל מסמך ברגע ההעלאה — שינוי מדיניות נכנס לתוקף מיידית.</div>
-    </div>
-  </div>
+  <div id="admBody"></div>
 </section>
 
 <div class="dock">
@@ -675,11 +660,296 @@ function renderUpTo(n, animateLast){
 function next(){ const max=SCENARIOS[scen].beats.length-1; if(busy||idx>=max){ if(idx>=max) stopAuto(); return; } idx++; renderUpTo(idx,true); if(idx>=max) stopAuto(); }
 function prev(){ if(idx<0) return; idx--; renderUpTo(idx,false); }
 function restart(){ stopAuto(); idx=-1; renderUpTo(idx,false); }
+/* ================= ADMIN: data ================= */
+const SUP = {
+  electro:{name:'אלקטרו הום', ava:'🔌', cat:'חשמל ומוצרי בית', score:3.2, sla:62, resp:'5:40', esc:18, cases90:41,
+    hotline:'א׳-ה׳ עד 18:00', contact:'רוני לוי', role:'מנהל לקוחות אסטרטגיים',
+    issues:[['מוצר פגום',14],['איחור באספקה',11],['אי-כיבוד מחיר מועדון',7],['החזר כספי',6],['אחר',3]],
+    history:['12.8 · הערת עבר — התחמקות מהחלפת מוצר פגום (#1042)','28.7 · תזכורת SLA שנייה באותו שבוע (#1035)','3.7 · איחור אספקה חוזר (#987)']},
+  spa:{name:'ספא נופר', ava:'🧖🏻‍♀️', cat:'ספא ופנאי', score:4.9, sla:97, resp:'0:52', esc:2, cases90:28,
+    hotline:'א׳-ו׳ עד 20:00', contact:'מיכל אדר', role:'מנהלת קשרי מועדונים',
+    issues:[['תיאום תורים',9],['שובר לא נטען',6],['שינוי מועד',8],['אחר',5]],
+    history:['8.8 · שיתוף פעולה מהיר בתקלת סנכרון (#1041) — ⭐5 מהלקוחה']},
+  garden:{name:'הום גארדן', ava:'🪴', cat:'גינה וריהוט חוץ', score:4.1, sla:84, resp:'2:10', esc:6, cases90:33,
+    hotline:'א׳-ה׳ עד 17:00', contact:'יוסי בר', role:'סמנכ״ל שירות',
+    issues:[['איחור באספקה',12],['פריט חסר במשלוח',8],['תיאום הרכבה',7],['אחר',6]],
+    history:['21.7 · שיפור עקבי בזמני מענה מאז חיבור איש קשר ישיר']},
+  sol:{name:'מלונות סול', ava:'🏨', cat:'נופש ומלונאות', score:4.6, sla:91, resp:'1:15', esc:4, cases90:19,
+    hotline:'מוקד 24/7', contact:'ענת כהן', role:'מנהלת הזמנות ארציות',
+    issues:[['שדרוג/שינוי הזמנה',6],['ביטול הזמנה',5],['חיוב כפול',4],['אחר',4]],
+    history:['15.7 · חיוב כפול טופל בו-ביום + פיצוי יזום']},
+  beauty:{name:'ביוטי פלוס', ava:'💄', cat:'קוסמטיקה וטיפוח', score:4.7, sla:93, resp:'1:03', esc:3, cases90:22,
+    hotline:'א׳-ה׳ עד 19:00', contact:'שני מזרחי', role:'מנהלת סחר',
+    issues:[['מוצר חסר במארז',7],['רגישות/החזרה',6],['איחור באספקה',4],['אחר',5]],
+    history:[]},
+};
+const CASES = [
+ {id:'1042', sup:'electro', cust:'שירה לוי · חברת מועדון 3 שנים', what:'שואב רובוטי X30 · ₪1,290', issue:'מוצר פגום',
+  status:'esc', pill:'נסגרה · אסקלציה', opened:'יום ב׳ 12:10', closed:'יום ג׳ 10:33', dur:'22:23', slaNote:'חריגת ספק · הלקוחה עודכנה 6 פעמים יזומות',
+  exec:'שואב X30 נמסר פגום (לא נדלק) ללקוחת מועדון ותיקה ששילמה ₪1,290. מוקד אלקטרו הום הציע מסלול מעבדה של 21 יום — בניגוד לסעיף 6 (החלפה מיידית/החזר). לאחר תזכורת SLA ומעבר לאיש הקשר הישיר ללא מענה עד סוף היום — הפנייה הועברה לאסקלציה בו-ביום. בערב זוהתה כוונת נטישה והעדיפות הוקפצה לקריטית. דנה הכריעה מול סמנכ״ל הלקוחות: החלפה מיידית + איסוף הפגום + ₪100 פיצוי.',
+  bullets:['הלקוחה קיבלה 6 עדכונים יזומים — אפס פניות "מה קורה?"','נרשמה הערת עבר לספק + עדכון מדד (3.4 → 3.2)','עלות פיצוי: ₪100 · הלקוחה נשארה במועדון'],
+  timeline:[['ב׳ 12:10','דיווח לקוחה: מוצר פגום',''],['ב׳ 12:13','פנייה למוקד הספק',''],['ב׳ 12:26','המוקד: "מעבדה 21 יום" — נדחה','hot'],['ב׳ 16:28','תזכורת SLA למוקד','hot'],['ב׳ 17:12','מעבר לאיש קשר ישיר (רוני)',''],['ב׳ 18:37','אסקלציה בו-ביום לנציגה','hot'],['ב׳ 20:47','עדיפות ← קריטית (כוונת נטישה)','hot'],['ג׳ 09:12','הצעת ספק: מעבדה מזורזת — נדחתה',''],['ג׳ 10:30','הכרעה: החלפה + איסוף + ₪100','ok'],['ג׳ 10:41','הלקוחה: "נשארת במועדון" 💜','ok']],
+  chats:{customer:[['party','שירה','השואב שהזמנתי דרך מאמי הגיע היום — והוא לא נדלק בכלל 😤'],['bestie','בסטי','לפי מדיניות מאמי: מוצר פגום ב-14 הימים הראשונים = החלפה מיידית או החזר מלא. פונה לספק עכשיו.'],['bestie','בסטי','עדכון ערב 📣 לא התקבל מענה מהספק — העברתי את המקרה כבר עכשיו לצוות מאמי. תשמעי ממני מחר בבוקר.'],['party','שירה','וואו. עדכנת אותי בכל שלב ולא הרפית עד שנסגר 😍 נשארת במועדון.']],
+   supplier:[['bestie','בסטי','לפי סעיף 6 להסכם — מוצר שנמסר פגום מוחלף מיידית או מזוכה במלואו, ללא מעבדה.'],['party','מוקד','שתפתח קריאת שירות במעבדה. זמן טיפול — 21 ימי עסקים.'],['bestie','בסטי','תזכורת ⏰ הפנייה ממתינה 4 שעות — מעבר לזמן שסוכם מול מאמי.'],['party','רוני (איש קשר)','מה שאני יכול לאשר: זירוז מעבדה + מכשיר חלופי.'],['bestie','בסטי','לא עומד בהסכם. הנושא אצל הנהלת מאמי.']],
+   cs:[['bestie','בסטי','אסקלציה #1042 — כל התיעוד בפנים. נדרשת החלטה: החלפה או החזר ₪1,290.'],['party','דנה','טופל! שליח מחר עם X30 חדש + איסוף + ₪100 פיצוי. הספק קיבל התראה רשמית.']]},
+ },
+ {id:'1041', sup:'spa', cust:'שירה לוי', what:'שובר עיסוי זוגי · ₪249', issue:'שובר לא נטען',
+  status:'ok', pill:'נסגרה אוטומטית', opened:'יום א׳ 10:02', closed:'יום א׳ 11:12', dur:'1:10', slaNote:'ללא מעורבות נציג · ⭐5 מהלקוחה',
+  exec:'שובר עיסוי זוגי לא אותר במערכת הספא עקב תקלת סנכרון. בסטי אימתה את השובר מול מערכת מאמי, פנתה לספא עם פנייה מסודרת — והספא הפעיל מחדש את השובר והציע תורים בתוך שעה. נקבע תור, הלקוחה דירגה ⭐5, והביקורת הועברה לספק.',
+  bullets:['אפס עבודת נציג — רק שורת יומן','זמן טיפול 1:10 · בתוך ה-SLA','הדירוג הוחזר לספק — שימור קשרי ספקים'],
+  timeline:[['א׳ 10:02','דיווח לקוחה: השובר לא מופיע',''],['א׳ 10:05','פנייה לספא עם פרטי השובר',''],['א׳ 11:02','הספא: תקלת סנכרון — הופעל מחדש','ok'],['א׳ 11:10','נקבע תור לחמישי 18:00','ok'],['ו׳ 09:30','ביקורת ⭐5 הועברה לספק','ok']],
+  chats:{customer:[['party','שירה','אמרו לי שהשובר לא מופיע אצלהם במערכת 😡'],['bestie','בסטי','מצאתי את השובר — תקף לחלוטין. אני פונה לספא עכשיו, את לא צריכה לעשות כלום.'],['party','שירה','היה מושלם!! תודה על הטיפול 💜']],
+   supplier:[['bestie','בסטי','שובר MB-58412 תקף ולא אותר אצלכם. אבקש בדיקה והפעלה מחדש.'],['party','ספא נופר','תקלת סנכרון — הופעל מחדש ✅ מציעים תור לחמישי או שישי.'],['bestie','בסטי','שירה דירגה 5/5 — ״היה מושלם״. נרשם לזכותכם במדד הספקים 🌟']],
+   cs:[['bestie','מערכת','פנייה #1041 נסגרה אוטומטית · 1:10 · ללא מעורבות נציג']]},
+ },
+ {id:'1039', sup:'sol', cust:'מור אביטל', what:'שובר סופ״ש זוגי · ₪890', issue:'חיוב כפול',
+  status:'wait', pill:'ממתינה לספק · 0:40', opened:'היום 09:20', closed:'—', dur:'0:40 (רץ)', slaNote:'בתוך SLA · עדכון יזום ללקוחה נשלח',
+  exec:'הלקוחה חויבה פעמיים על שובר סופ״ש. בסטי אימתה את החיוב הכפול מול מערכת הסליקה, פנתה למוקד מלונות סול (24/7) עם האסמכתאות, ועדכנה את הלקוחה יזום. ממתינה לאישור זיכוי — בתוך חלון ה-SLA.',
+  bullets:['אסמכתאות צורפו בפנייה הראשונה — בלי פינג-פונג','הלקוחה קיבלה עדכון יזום עם צפי'],
+  timeline:[['09:20','דיווח לקוחה: חיוב כפול',''],['09:24','אומת מול מערכת הסליקה',''],['09:26','פנייה למוקד + אסמכתאות',''],['09:30','עדכון יזום ללקוחה','ok']],
+  chats:{customer:[['party','מור','חויבתי פעמיים על השובר של סול 😕'],['bestie','בסטי','בדקתי — אכן חיוב כפול. פניתי למלון עם האסמכתאות. מעדכנת אותך עד 13:00 💜']],
+   supplier:[['bestie','בסטי','חיוב כפול על הזמנה #55231 — מצרפת אסמכתאות סליקה. אבקש זיכוי היום.']],
+   cs:[]},
+ },
+ {id:'1038', sup:'beauty', cust:'דנה קרן', what:'מארז טיפוח פרימיום · ₪189', issue:'מוצר חסר במארז',
+  status:'ok', pill:'נסגרה אוטומטית · 0:22', opened:'היום 08:40', closed:'היום 09:02', dur:'0:22', slaNote:'ללא מעורבות נציג',
+  exec:'במארז חסר סרום. בסטי פנתה לביוטי פלוס, הספק אישר משלוח משלים באותו יום ללא ויכוח. הלקוחה עודכנה ואישרה. נסגר ב-22 דקות.',
+  bullets:['הספק שיתף פעולה מיידית — מדד גבוה נשמר'],
+  timeline:[['08:40','דיווח: חסר סרום במארז',''],['08:47','פנייה לספק',''],['08:58','אושר משלוח משלים היום','ok'],['09:02','הלקוחה אישרה — נסגר','ok']],
+  chats:{customer:[['party','דנה','הגיע המארז אבל חסר הסרום 😞'],['bestie','בסטי','מצטערת! פניתי לספק — משלוח משלים יוצא אלייך היום 💜']],
+   supplier:[['bestie','בסטי','מארז #7231 חסר סרום — אבקש השלמה.'],['party','ביוטי פלוס','נשלח היום עם שליח ✅']],
+   cs:[]},
+ },
+ {id:'1036', sup:'garden', cust:'אורן שדה', what:'סט ריהוט גינה · ₪2,450', issue:'איחור באספקה',
+  status:'ok', pill:'נסגרה · 3:05', opened:'אתמול 11:15', closed:'אתמול 14:20', dur:'3:05', slaNote:'תזכורת SLA אחת · פיצוי הובלה חינם',
+  exec:'אספקה התעכבה שבוע מעבר להתחייבות. אחרי תזכורת SLA אחת, הום גארדן קבעו מועד מחייב + ויתרו על דמי ההובלה (₪150) כפיצוי. הלקוח אישר.',
+  bullets:['פיצוי יזום מהספק — בלי אסקלציה','דפוס איחורים מתועד באנליטיקס הספק'],
+  timeline:[['11:15','דיווח: איחור שבוע באספקה',''],['11:20','פנייה לספק',''],['13:40','תזכורת SLA','hot'],['14:20','מועד מחייב + הובלה חינם','ok']],
+  chats:{customer:[['party','אורן','הבטיחו אספקה לפני שבוע ואין כלום'],['bestie','בסטי','צודק — זה מעבר להתחייבות. מטפלת מולם עכשיו ומעדכנת עד 14:30.']],
+   supplier:[['bestie','בסטי','הזמנה #4410 באיחור שבוע. אבקש מועד מחייב היום.'],['party','הום גארדן','משלוח יום חמישי 9:00-12:00 + הובלה על חשבוננו ✅']],
+   cs:[]},
+ },
+ {id:'1035', sup:'electro', cust:'רותם גל', what:'מקרר צד-צד · ₪4,890', issue:'אי-כיבוד מחיר מועדון',
+  status:'esc', pill:'נסגרה · אסקלציה · 9:12', opened:'28.7 10:05', closed:'28.7 19:17', dur:'9:12', slaNote:'2 תזכורות SLA · הופעל איש קשר',
+  exec:'בקופה נדרש מחיר מדף במקום מחיר מועדון (פער ₪600). המוקד טען "המבצע הסתיים" למרות שהמחיר מופיע בקטלוג מאמי החתום. אחרי שתי תזכורות ומעבר לאיש הקשר — אושר המחיר + זיכוי רטרואקטיבי. נרשמה הערת דפוס: פעם שנייה החודש.',
+  bullets:['הפער הוחזר במלואו (₪600)','דפוס חוזר אצל הספק — מסומן באנליטיקס'],
+  timeline:[['10:05','דיווח: נדרש מחיר מדף',''],['10:12','פנייה למוקד + קטלוג חתום',''],['14:15','תזכורת SLA 1','hot'],['17:30','תזכורת 2 + איש קשר','hot'],['19:17','אושר מחיר מועדון + זיכוי','ok']],
+  chats:{customer:[['party','רותם','בקופה אומרים שהמבצע של מאמי הסתיים ורוצים ₪600 יותר'],['bestie','בסטי','המחיר בקטלוג החתום תקף עד סוף החודש. אל תשלמי את הפער — אני על זה.']],
+   supplier:[['bestie','בסטי','מצרפת את הקטלוג החתום — סעיף מחירי מועדון מחייב. אבקש אישור מחיר וזיכוי.'],['party','רוני (איש קשר)','בדקתי — הקטלוג תקף. מאשר זיכוי מלא.']],
+   cs:[['bestie','בסטי','דפוס: אי-כיבוד מחיר פעם שנייה החודש אצל אלקטרו הום — מומלץ לשיחת ספק רבעונית.']]},
+ },
+];
+const PILL={esc:'crit',ok:'ok',wait:'wait'};
+
+/* ================= ADMIN: renderers ================= */
+const esc_ = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+let admState={view:'overview'};
+
+function kpiRow(){
+  return `<div class="kpis">
+    <div class="kpi"><b>34</b><span>פניות היום</span></div>
+    <div class="kpi good"><b>29</b><span>נסגרו אוטומטית (85%)</span></div>
+    <div class="kpi warn"><b>3</b><span>ממתינות לספק</span></div>
+    <div class="kpi bad"><b>2</b><span>אסקלציות פתוחות</span></div>
+    <div class="kpi"><b>1:38</b><span>זמן טיפול ממוצע</span></div>
+  </div>`;
+}
+function caseRow(c){
+  const s=SUP[c.sup];
+  return `<div class="adm-row" data-nav="case:${c.id}"><span class="k">#${c.id} · ${esc_(c.what.split('·')[0])} · ${s.name}</span><span class="v"><span class="pill ${PILL[c.status]}">${c.pill}</span></span></div>`;
+}
+function rOverview(){
+  return kpiRow()+`<div class="adm-grid">
+    <div class="adm-card">
+      <h3>🎭 הפרסונה של בסטי</h3>
+      <div class="adm-row"><span class="k">שם</span><span class="v">בסטי 💜</span></div>
+      <div class="adm-row"><span class="k">טון מול לקוחות</span><span class="v">חם ואמפתי</span></div>
+      <div class="adm-row"><span class="k">טון מול ספקים</span><span class="v">מקצועי ואסרטיבי</span></div>
+      <div class="adm-row"><span class="k">שפות</span><span class="v">עברית · EN · RU</span></div>
+      <div class="slider">
+        <span style="font-size:.8rem;color:var(--ink-dim)">רמת התעקשות מול ספקים</span>
+        <div class="track"><div class="fill"></div><div class="dot"></div></div>
+        <div class="lbls"><span>גמישה</span><span>4/5 · לא מוותרת</span></div>
+      </div>
+    </div>
+    <div class="adm-card">
+      <h3>📏 כללי השירות (SLA)</h3>
+      <div class="adm-row"><span class="k">מענה ספק</span><span class="v">4 שעות · בשעות פעילות</span></div>
+      <div class="adm-row"><span class="k">עדכון יזום ללקוח</span><span class="v">כל 4 שעות, גם בלי חדש</span></div>
+      <div class="adm-row"><span class="k">מוקד ספק סגור</span><span class="v">מעבר לאיש קשר ישיר</span></div>
+      <div class="adm-row"><span class="k">ספק סורר</span><span class="v">אסקלציה בו-ביום</span></div>
+      <div class="adm-row"><span class="k">כוונת נטישה</span><span class="v">קריטי מיידי</span></div>
+      <div class="adm-row"><span class="k">רף סגירה</span><span class="v">פתרון מלא בלבד</span></div>
+    </div>
+    <div class="adm-card">
+      <h3>📇 ספקים <span style="color:var(--ink-dim);font-weight:400;font-size:.72rem">· לחיצה = פירוט</span></h3>
+      <table class="adm-table">
+        <tr><th>ספק</th><th>מוקד</th><th>איש קשר</th><th>מדד</th></tr>
+        ${Object.entries(SUP).map(([id,s])=>`<tr data-nav="supplier:${id}"><td>${s.ava} ${s.name}</td><td>${s.hotline.replace('א׳-ה׳ ','').replace('א׳-ו׳ ','')}</td><td>${s.contact}</td><td>⭐ ${s.score}</td></tr>`).join('')}
+      </table>
+    </div>
+    <div class="adm-card">
+      <h3>📬 פניות אחרונות <span style="color:var(--ink-dim);font-weight:400;font-size:.72rem">· לחיצה = תקציר מלא</span></h3>
+      ${CASES.slice(0,4).map(caseRow).join('')}
+    </div>
+    <div class="adm-card">
+      <h3>🚀 אונבורדינג ספק חדש</h3>
+      <div class="check">✅ הסכם + סעיפי שירות (SLA, החזרות)<br>✅ ערוץ מוקד — WhatsApp / מייל<br>✅ איש קשר ישיר + שעות פעילות<br>✅ מדיניות החלפות והחזרים<br>⬜ חיבור מערכת הזמנות (API)<br>⬜ שיחת היכרות עם בסטי</div>
+    </div>
+    <div class="adm-card">
+      <h3>📚 מסמכי הנחיות</h3>
+      <div class="doc"><span>מדיניות מוצר פגום</span><small>v3 · עודכן 4.8</small></div>
+      <div class="doc"><span>נוסחי פנייה לספקים</span><small>v2 · עודכן 28.7</small></div>
+      <div class="doc"><span>מדרג פיצויים ללקוח</span><small>v1 · עודכן 15.7</small></div>
+      <div class="doc"><span>ספר הטון של מאמי</span><small>v1 · עודכן 2.7</small></div>
+      <div class="adm-note">בסטי לומדת כל מסמך ברגע ההעלאה — שינוי מדיניות נכנס לתוקף מיידית.</div>
+    </div>
+  </div>`;
+}
+function rCases(){
+  return `<div class="adm-card"><h3>📬 כל הפניות <span style="color:var(--ink-dim);font-weight:400;font-size:.72rem">· לחיצה על שורה פותחת תקציר מנהלים ותמלול מלא</span></h3>
+  <table class="adm-table">
+    <tr><th>#</th><th>לקוח/ה</th><th>מה</th><th>סוג בעיה</th><th>ספק</th><th>משך</th><th>סטטוס</th></tr>
+    ${CASES.map(c=>`<tr data-nav="case:${c.id}"><td>#${c.id}</td><td>${esc_(c.cust.split('·')[0])}</td><td>${esc_(c.what)}</td><td>${c.issue}</td><td>${SUP[c.sup].name}</td><td>${c.dur}</td><td><span class="pill ${PILL[c.status]}">${c.pill}</span></td></tr>`).join('')}
+  </table></div>`;
+}
+function chatBlock(title, msgs){
+  if(!msgs || !msgs.length) return '';
+  return `<div class="adm-card"><h3>${title}</h3>${msgs.map(m=>`<div class="t-msg ${m[0]}"><b>${esc_(m[1])}</b>${esc_(m[2])}</div>`).join('')}</div>`;
+}
+function rCase(id){
+  const c=CASES.find(x=>x.id===id); if(!c) return rCases();
+  const s=SUP[c.sup];
+  return `<button class="backbtn" data-nav="cases:0">→ חזרה לפניות</button>
+  <div class="adm-title"><h3>פנייה #${c.id} · ${esc_(c.what)}</h3><span class="pill ${PILL[c.status]}">${c.pill}</span></div>
+  <div class="meta-chips">
+    <span class="mchip">לקוחה: <b>${esc_(c.cust)}</b></span>
+    <span class="mchip">ספק: <b data-nav="supplier:${c.sup}" style="cursor:pointer;text-decoration:underline">${s.name}</b></span>
+    <span class="mchip">סוג: <b>${c.issue}</b></span>
+    <span class="mchip">נפתחה: <b>${c.opened}</b></span>
+    <span class="mchip">נסגרה: <b>${c.closed}</b></span>
+    <span class="mchip">משך: <b>${c.dur}</b></span>
+  </div>
+  <div class="exec"><h4>📋 תקציר מנהלים</h4><p>${esc_(c.exec)}</p><ul>${c.bullets.map(b=>`<li>${esc_(b)}</li>`).join('')}</ul></div>
+  <div class="two-col">
+    <div class="adm-card"><h3>🕐 ציר זמן</h3><div class="tline">${c.timeline.map(t=>`<div class="ti ${t[2]}"><span class="tt">${t[0]}</span><span>${esc_(t[1])}</span></div>`).join('')}</div>
+      <div class="adm-note">${esc_(c.slaNote)}</div></div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      ${chatBlock('💬 מול הלקוחה', c.chats.customer)}
+      ${chatBlock('🏪 מול הספק', c.chats.supplier)}
+      ${chatBlock('🎧 ערוץ נציגים', c.chats.cs)}
+    </div>
+  </div>`;
+}
+function barRows(pairs, max){
+  const m = max || Math.max(...pairs.map(p=>p[1]));
+  return pairs.map(p=>`<div class="bar-row"><span class="bar-label">${esc_(p[0])}</span><div class="bar-track"><div class="bar-fill" style="width:${Math.round(p[1]/m*100)}%"></div></div><span class="bar-val">${p[1]}</span></div>`).join('');
+}
+function slaClass(v){return v>=90?'g':v>=75?'w':'b'}
+function rSuppliers(){
+  return `<div class="adm-grid">${Object.entries(SUP).map(([id,s])=>`
+    <div class="adm-card" data-nav="supplier:${id}">
+      <h3>${s.ava} ${s.name} <span style="color:var(--ink-dim);font-weight:400;font-size:.72rem">· ${s.cat}</span></h3>
+      <div class="adm-row"><span class="k">מדד ספק</span><span class="v score-big">⭐ ${s.score}</span></div>
+      <div class="bar-row"><span class="bar-label">עמידת SLA</span><div class="bar-track"><div class="bar-fill ${slaClass(s.sla)}" style="width:${s.sla}%"></div></div><span class="bar-val">${s.sla}%</span></div>
+      <div class="adm-row"><span class="k">זמן מענה ממוצע</span><span class="v">${s.resp}</span></div>
+      <div class="adm-row"><span class="k">פניות (90 יום)</span><span class="v">${s.cases90} · ${s.esc}% אסקלציות</span></div>
+    </div>`).join('')}</div>`;
+}
+function rSupplier(id){
+  const s=SUP[id]; if(!s) return rSuppliers();
+  const cs=CASES.filter(c=>c.sup===id);
+  return `<button class="backbtn" data-nav="suppliers:0">→ חזרה לספקים</button>
+  <div class="adm-title"><h3>${s.ava} ${s.name}</h3><span class="sub">${s.cat}</span><span class="score-big">⭐ ${s.score}</span></div>
+  <div class="meta-chips">
+    <span class="mchip">מוקד: <b>${s.hotline}</b></span>
+    <span class="mchip">איש קשר ישיר: <b>${s.contact}</b> · ${s.role}</span>
+    <span class="mchip">פניות 90 יום: <b>${s.cases90}</b></span>
+  </div>
+  <div class="two-col">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="adm-card"><h3>📈 ביצועים</h3>
+        <div class="bar-row"><span class="bar-label">עמידת SLA</span><div class="bar-track"><div class="bar-fill ${slaClass(s.sla)}" style="width:${s.sla}%"></div></div><span class="bar-val">${s.sla}%</span></div>
+        <div class="adm-row"><span class="k">זמן מענה ממוצע</span><span class="v">${s.resp}</span></div>
+        <div class="adm-row"><span class="k">שיעור אסקלציות</span><span class="v">${s.esc}%</span></div>
+      </div>
+      <div class="adm-card"><h3>🧩 פילוח בעיות (90 יום)</h3>${barRows(s.issues)}</div>
+      ${s.history.length?`<div class="adm-card"><h3>🗂️ היסטוריה והערות</h3>${s.history.map(h=>`<div class="adm-row"><span class="k">${esc_(h)}</span></div>`).join('')}</div>`:''}
+    </div>
+    <div class="adm-card"><h3>📬 פניות אחרונות מול הספק</h3>
+      ${cs.length?cs.map(caseRow).join(''):'<div class="adm-note">אין פניות אחרונות</div>'}
+      <div class="adm-note">לחיצה על פנייה פותחת תקציר מנהלים + תמלול מלא</div>
+    </div>
+  </div>`;
+}
+function rAnalytics(f){
+  f=f||'all';
+  const sups=Object.entries(SUP);
+  const chip=(id,label)=>`<button class="fchip ${f===id?'on':''}" data-nav="analytics:${id}">${label}</button>`;
+  const agg = f==='all'
+    ? sups.reduce((a,[,s])=>{s.issues.forEach(([k,v])=>a[k]=(a[k]||0)+v);return a},{})
+    : Object.fromEntries(SUP[f].issues);
+  const issuePairs=Object.entries(agg).sort((a,b)=>b[1]-a[1]);
+  const tot = f==='all'? sups.reduce((a,[,s])=>a+s.cases90,0) : SUP[f].cases90;
+  const sla = f==='all'? Math.round(sups.reduce((a,[,s])=>a+s.sla*s.cases90,0)/tot) : SUP[f].sla;
+  const escR= f==='all'? Math.round(sups.reduce((a,[,s])=>a+s.esc*s.cases90,0)/tot) : SUP[f].esc;
+  const resp= f==='all'? '2:26' : SUP[f].resp;
+  const insights = f==='all'
+    ? [`<b>אלקטרו הום</b> אחראי ל-34% מכלל הפניות ו-62% עמידת SLA בלבד — מומלץ לשיחת ספק רבעונית.`,
+       `<b>מוצר פגום</b> הוא סוג הבעיה הנפוץ ביותר החודש (21 מקרים) — 67% ממנו אצל ספק אחד.`,
+       `85% מהפניות נסגרות ללא נציג — הזמן האנושי מושקע רק ב-2 אסקלציות פתוחות.`]
+    : f==='electro'
+    ? [`<b>מוצר פגום</b> = 34% מפניות הספק · זמן הטיפול הממוצע בהן 6:20 — פי 4 מהממוצע במועדון.`,
+       `דפוס <b>אי-כיבוד מחיר מועדון</b> חזר פעמיים החודש (#1035 + מקרה קודם) — מתועד בהערות העבר.`,
+       `מאז חיבור איש הקשר הישיר (רוני) — זמן הסגירה באסקלציות ירד מ-3 ימים ל-22 שעות.`]
+    : [`הספק עומד ביעדי ה-SLA · אין דפוסי בעיה חריגים ב-90 הימים האחרונים.`];
+  return `<div class="fchips">${chip('all','כל הספקים')}${sups.map(([id,s])=>chip(id,s.ava+' '+s.name)).join('')}</div>
+  <div class="kpis">
+    <div class="kpi"><b>${tot}</b><span>פניות · 90 יום</span></div>
+    <div class="kpi ${sla>=90?'good':sla>=75?'warn':'bad'}"><b>${sla}%</b><span>עמידת SLA</span></div>
+    <div class="kpi"><b>${resp}</b><span>זמן מענה ממוצע</span></div>
+    <div class="kpi ${escR<=5?'good':escR<=10?'warn':'bad'}"><b>${escR}%</b><span>שיעור אסקלציות</span></div>
+  </div>
+  <div class="two-col">
+    <div class="adm-card"><h3>🧩 פניות לפי סוג בעיה ${f!=='all'?'· '+SUP[f].name:''}</h3>${barRows(issuePairs)}</div>
+    <div class="adm-card"><h3>🏪 עמידת SLA לפי ספק</h3>
+      ${sups.map(([id,s])=>`<div class="bar-row" data-nav="analytics:${id}"><span class="bar-label">${s.ava} ${s.name}</span><div class="bar-track"><div class="bar-fill ${slaClass(s.sla)}" style="width:${s.sla}%"></div></div><span class="bar-val">${s.sla}%</span></div>`).join('')}
+      <div class="adm-note">לחיצה על ספק מסננת את כל המסך</div>
+    </div>
+  </div>
+  <div class="adm-card"><h3>💡 תובנות של בסטי</h3>${insights.map(i=>`<div class="insight">${i}</div>`).join('')}</div>`;
+}
+function renderAdmin(){
+  const v=admState.view;
+  document.querySelectorAll('.anav').forEach(b=>b.classList.toggle('on',
+    b.dataset.anav===v || (v==='case'&&b.dataset.anav==='cases') || (v==='supplier'&&b.dataset.anav==='suppliers')));
+  $('admBody').innerHTML =
+    v==='overview'? rOverview() :
+    v==='cases'? rCases() :
+    v==='case'? rCase(admState.id) :
+    v==='suppliers'? rSuppliers() :
+    v==='supplier'? rSupplier(admState.id) :
+    rAnalytics(admState.id);
+  $('adminView').scrollTop=0;
+}
+$('admBody').addEventListener('click',e=>{
+  const n=e.target.closest('[data-nav]'); if(!n) return;
+  e.stopPropagation();
+  const [view,id]=n.dataset.nav.split(':');
+  admState = view==='analytics'? {view:'analytics',id} :
+             view==='case'? {view:'case',id} :
+             view==='supplier'? {view:'supplier',id} :
+             {view};
+  renderAdmin();
+});
+document.querySelectorAll('.anav').forEach(b=>b.onclick=()=>{admState={view:b.dataset.anav, id:b.dataset.anav==='analytics'?'all':undefined};renderAdmin();});
+
 let adminOn=false;
 const mainEl=document.querySelector('main'), dockEl=document.querySelector('.dock');
 function showAdmin(){ stopAuto(); adminOn=true;
   $('adminView').hidden=false; mainEl.style.display='none'; dockEl.style.display='none';
   $('tab0').classList.remove('on'); $('tab1').classList.remove('on'); $('tab2').classList.add('on');
+  renderAdmin();
 }
 function hideAdmin(){ adminOn=false;
   $('adminView').hidden=true; mainEl.style.display=''; dockEl.style.display='';
