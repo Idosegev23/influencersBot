@@ -138,6 +138,10 @@ order tools in its definition list — enforced at registry build, not in the pr
   replies), a support/problem starter (e.g. "יש לי בעיה עם הזמנה" — wording per archetype)
   appears **first**, ahead of all content starters. Selecting it opens the CS conversation
   directly, same as choosing the CS option on the opening screen.
+  **Web-surface refinement (Ido, 2026-08-13):** where the opening choice screen itself is
+  visible, the CS choice button IS the first support entry — no duplicate starter pill
+  beneath it, and the widget shows content chips only AFTER the visitor picks "chat"
+  (the cold-start panel must never stack choice buttons + a pile of chips).
 - **Never blocking:** free text bypasses the screen; the brain infers mode.
 
 ### 6. Structured CS screens inside the conversation
