@@ -109,7 +109,7 @@ export async function processInstagramGraphDM(
     //    we never write rows or generate replies when the bot is disabled.
     const accountData = await supabase
       .from('accounts')
-      .select('config')
+      .select('config, language')
       .eq('id', accountId)
       .single()
       .then(r => r.data);
@@ -123,6 +123,36 @@ export async function processInstagramGraphDM(
 
     // Access token — needed both for sender-identity resolution (below) and sending.
     const accessToken = await getAccessTokenForAccount(supabase, accountId);
+
+    // CS-engine mode (spec M3): accounts with cs_ig.enabled route DMs to the CS brain
+    // (runCsTurnCore — same brain as WhatsApp CS and the web surfaces) instead of the
+    // persona sandwich. Per-account flag, default OFF — LDRS and every current DM
+    // account stay on the sandwich untouched. The dedup claim + kill-switch above
+    // already ran; the ❤️ reaction and quick-reply mechanics are identical.
+    if (config.cs_ig?.enabled === true) {
+      const { runIgCsTurn } = await import('./dm-cs-adapter');
+      const cs = await runIgCsTurn({
+        accountId,
+        igsid: senderId,
+        text: messageText,
+        language: accountData?.language === 'en' ? 'en' : 'he',
+      });
+      if (cs.text) {
+        const csClean = stripMarkdownForDM(cs.text);
+        const csQuickReplies = cs.suggestions
+          .slice(0, 13)
+          .map(s => ({ title: truncateForIG(s, 20), payload: s }));
+        if (csQuickReplies.length > 0) {
+          await sendLongInstagramDMWithQuickReplies(senderId, csClean, csQuickReplies, igAccountId, accessToken || undefined);
+        } else {
+          await sendLongInstagramDM(senderId, csClean, igAccountId, accessToken || undefined);
+        }
+      }
+      if (messageId) {
+        sendReaction(senderId, messageId, '❤️', igAccountId, accessToken || undefined).catch(() => {});
+      }
+      return { success: true };
+    }
 
     // 3. Get or create DM session (keyed by sender + account via thread_id)
     const threadId = `dm_ig_graph_${senderId}_${accountId}`;
